@@ -363,7 +363,15 @@ function isConversionHref(hrefRaw) {
 
 function isMartijnWhatsappHref(hrefRaw) {
   const href = String(hrefRaw || '').trim();
-  return /^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href);
+  return /^https:\/\/wa\.me\/31643262792$/i.test(href);
+}
+
+function hasPrefilledWhatsappMessage(hrefRaw) {
+  const href = String(hrefRaw || '').trim();
+  return (
+    (/^https:\/\/wa\.me\/31643262792\?/i.test(href) && /[?&]text=/i.test(href)) ||
+    (/^https:\/\/api\.whatsapp\.com\/send\?/i.test(href) && /[?&]text=/i.test(href))
+  );
 }
 
 function stripHtmlTags(valueRaw) {
@@ -522,7 +530,17 @@ function auditConversionCtas({ pages = [] } = {}) {
     if (conversionLinks.length === 0 && trackedWhatsappButtons.length === 0) {
       issues.push({ type: 'missing-conversion-link', path: pathName, message: `${pathName} heeft geen meetbare CTA-route.` });
     }
-    const nonWhatsappLinks = conversionLinks.filter((anchor) => !isMartijnWhatsappHref(anchor.href));
+    const prefilledWhatsappLinks = conversionLinks.filter((anchor) => hasPrefilledWhatsappMessage(anchor.href));
+    if (prefilledWhatsappLinks.length > 0) {
+      issues.push({
+        type: 'whatsapp-link-prefilled-message',
+        path: pathName,
+        message: `${pathName} heeft een WhatsApp-link met vooringevuld bericht; WhatsApp hoort leeg te openen.`,
+      });
+    }
+    const nonWhatsappLinks = conversionLinks.filter(
+      (anchor) => !isMartijnWhatsappHref(anchor.href) && !hasPrefilledWhatsappMessage(anchor.href)
+    );
     if (nonWhatsappLinks.length > 0) {
       issues.push({
         type: 'non-whatsapp-conversion-link',
@@ -541,7 +559,9 @@ function auditConversionCtas({ pages = [] } = {}) {
       });
     }
     const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label));
-    const nonWhatsappLeadCtas = leadCtaLinks.filter((anchor) => !isMartijnWhatsappHref(anchor.href));
+    const nonWhatsappLeadCtas = leadCtaLinks.filter(
+      (anchor) => !isMartijnWhatsappHref(anchor.href) && !hasPrefilledWhatsappMessage(anchor.href)
+    );
     if (nonWhatsappLeadCtas.length > 0) {
       issues.push({
         type: 'lead-cta-not-whatsapp',

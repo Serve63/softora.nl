@@ -305,6 +305,20 @@ test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsA
     strictWhatsappIssues.map((issue) => issue.type).sort(),
     ['lead-cta-not-whatsapp', 'non-whatsapp-conversion-link', 'whatsapp-link-missing-new-tab-safety'].sort()
   );
+
+  const prefilledWhatsappIssues = auditConversionCtas({
+    pages: [
+      {
+        path: '/prefilled-whatsapp',
+        html:
+          '<a href="https://wa.me/31643262792?text=Hoi%20Martijn" target="_blank" rel="noopener noreferrer" data-softora-conversion="public-cta" data-softora-conversion-page="/prefilled-whatsapp" data-softora-conversion-target="whatsapp">Contact</a>',
+      },
+    ],
+  });
+
+  assert.deepEqual(prefilledWhatsappIssues.map((issue) => issue.type), [
+    'whatsapp-link-prefilled-message',
+  ]);
 });
 
 test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gemarkeerd zijn', () => {

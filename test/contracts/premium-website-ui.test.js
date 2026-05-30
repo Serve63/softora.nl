@@ -469,10 +469,10 @@ test('premium website contactformulier verstuurt via server-side contact api', (
   );
   assert.doesNotMatch(source, /mailto:info@softora\.nl/);
   assert.match(scriptSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
-  assert.match(scriptSource, /function buildWhatsappUrl\(name, email, message\)/);
-  assert.match(scriptSource, /__softoraPublicConversionLanding/);
-  assert.match(scriptSource, /Landingspagina: /);
-  assert.match(scriptSource, /CTA-pagina: /);
+  assert.match(scriptSource, /function buildWhatsappUrl\(\)/);
+  assert.match(scriptSource, /return MARTIJN_WHATSAPP_URL;/);
+  assert.doesNotMatch(scriptSource, /\?text=/);
+  assert.doesNotMatch(scriptSource, /Hoi Martijn|Landingspagina: |CTA-pagina: |encodeURIComponent\(lines/);
   assert.match(scriptSource, /window\.open\(url, '_blank', 'noopener,noreferrer'\)/);
   assert.match(scriptSource, /fetch\('\/api\/public-contact',\s*\{/);
   assert.match(scriptSource, /method:\s*'POST'/);
