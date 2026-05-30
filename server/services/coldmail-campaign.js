@@ -43,10 +43,12 @@ const DEFAULT_COLDMAIL_SMTP_GREETING_TIMEOUT_MS = 30_000;
 const DEFAULT_COLDMAIL_SMTP_SOCKET_TIMEOUT_MS = 90_000;
 const DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE = 'Europe/Amsterdam';
 const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 7;
-const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 17;
+const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 18;
 const DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES = 12;
-const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 60;
-const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 75;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 70;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 82;
+const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS = 45;
+const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS = 240;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -2645,6 +2647,12 @@ function createColdmailCampaignService(deps = {}) {
       Object.prototype.hasOwnProperty.call(raw, 'senderMinIntervalMinutes') ||
       Object.prototype.hasOwnProperty.call(raw, 'senderCooldownMinutes') ||
       Object.prototype.hasOwnProperty.call(raw, 'mailboxIntervalMinutes');
+    const hasSendJitterMin =
+      Object.prototype.hasOwnProperty.call(raw, 'sendJitterMinSeconds') ||
+      Object.prototype.hasOwnProperty.call(raw, 'preSendJitterMinSeconds');
+    const hasSendJitterMax =
+      Object.prototype.hasOwnProperty.call(raw, 'sendJitterMaxSeconds') ||
+      Object.prototype.hasOwnProperty.call(raw, 'preSendJitterMaxSeconds');
     const startHour = parsePositiveInt(
       raw.startHour ?? raw.safeStartHour,
       DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR,
@@ -2673,13 +2681,15 @@ function createColdmailCampaignService(deps = {}) {
     );
     const sendJitterMinSeconds = parsePositiveInt(
       raw.sendJitterMinSeconds ?? raw.preSendJitterMinSeconds,
-      0,
+      DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS,
       0,
       300
     );
     const sendJitterMaxSeconds = parsePositiveInt(
       raw.sendJitterMaxSeconds ?? raw.preSendJitterMaxSeconds,
-      sendJitterMinSeconds,
+      hasSendJitterMin && !hasSendJitterMax
+        ? sendJitterMinSeconds
+        : Math.max(sendJitterMinSeconds, DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS),
       sendJitterMinSeconds,
       300
     );
@@ -2702,6 +2712,63 @@ function createColdmailCampaignService(deps = {}) {
       sendJitterMinSeconds,
       sendJitterMaxSeconds,
     };
+  }
+
+  function hasColdmailAutopilotUsableSenderConfig(value) {
+    const config = normalizeColdmailAutopilotConfig(value);
+    if (!config.senderEmails.length) return false;
+    if (config.subject && config.body) return true;
+    return config.senderEmails.some((email) => {
+      const profile = config.senderProfiles && config.senderProfiles[email];
+      return Boolean(profile && profile.subject && profile.body);
+    });
+  }
+
+  function getColdmailAutopilotScheduleScore(value) {
+    const schedule = normalizeColdmailAutopilotSchedule(value);
+    let score = 0;
+    if (schedule.timezone === DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) score += 1;
+    if (schedule.weekdaysOnly) score += 1;
+    if (schedule.startHour <= DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR) score += 1;
+    if (schedule.endHour >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR) score += 1;
+    if (schedule.minIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES) score += 1;
+    if (schedule.senderMinIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES) score += 1;
+    if (schedule.senderMaxIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES) score += 1;
+    if (schedule.sendJitterMinSeconds >= DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS) score += 1;
+    if (schedule.sendJitterMaxSeconds >= DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS) score += 1;
+    return score;
+  }
+
+  function isLegacyColdmailAutopilotDashboardSchedule(value) {
+    const schedule = normalizeColdmailAutopilotSchedule(value);
+    return schedule.startHour === 8 &&
+      schedule.endHour === 17 &&
+      schedule.minIntervalMinutes === 5 &&
+      schedule.senderMinIntervalMinutes === 14 &&
+      schedule.senderMaxIntervalMinutes === 18 &&
+      schedule.sendJitterMinSeconds === 5 &&
+      schedule.sendJitterMaxSeconds === 45;
+  }
+
+  function pickColdmailAutopilotConfig(primary, fallback) {
+    if (hasColdmailAutopilotUsableSenderConfig(primary)) {
+      return normalizeColdmailAutopilotConfig(primary);
+    }
+    return normalizeColdmailAutopilotConfig(fallback);
+  }
+
+  function pickColdmailAutopilotSchedule(primary, fallback) {
+    if (!primary || typeof primary !== 'object' || isLegacyColdmailAutopilotDashboardSchedule(primary)) {
+      return normalizeColdmailAutopilotSchedule(fallback);
+    }
+    if (
+      fallback &&
+      typeof fallback === 'object' &&
+      getColdmailAutopilotScheduleScore(fallback) > getColdmailAutopilotScheduleScore(primary)
+    ) {
+      return normalizeColdmailAutopilotSchedule(fallback);
+    }
+    return normalizeColdmailAutopilotSchedule(primary);
   }
 
   function getEnvColdmailAutopilotConfig() {
@@ -2889,25 +2956,31 @@ function createColdmailCampaignService(deps = {}) {
   async function updateColdmailAutopilotSettings(input = {}, actor = 'Coldmail Autopilot') {
     const state = await loadColdmailAutopilotState();
     const rawConfig = input && input.config && typeof input.config === 'object' ? input.config : {};
+    const rawSchedule = input && input.schedule && typeof input.schedule === 'object' ? input.schedule : {};
+    const fallbackConfig = await loadColdmailAutopilotSenderSettingsConfig().catch(() => state.config);
     const nextSenderEmails = Object.prototype.hasOwnProperty.call(rawConfig, 'senderEmails')
       ? rawConfig.senderEmails
       : Object.prototype.hasOwnProperty.call(rawConfig, 'senderEmail')
         ? rawConfig.senderEmail
         : state.config.senderEmails;
+    const requestedEnabled = Object.prototype.hasOwnProperty.call(input, 'enabled')
+      ? normalizeBooleanFlag(input.enabled, state.enabled)
+      : state.enabled;
+    const candidateConfig = normalizeColdmailAutopilotConfig({
+      ...state.config,
+      ...rawConfig,
+      senderEmails: nextSenderEmails,
+    });
+    const baseConfig = pickColdmailAutopilotConfig(state.config, fallbackConfig);
+    const candidateSchedule = normalizeColdmailAutopilotSchedule({
+      ...state.schedule,
+      ...rawSchedule,
+    });
     const nextState = {
       ...state,
-      enabled: Object.prototype.hasOwnProperty.call(input, 'enabled')
-        ? normalizeBooleanFlag(input.enabled, state.enabled)
-        : state.enabled,
-      config: normalizeColdmailAutopilotConfig({
-        ...state.config,
-        ...rawConfig,
-        senderEmails: nextSenderEmails,
-      }),
-      schedule: normalizeColdmailAutopilotSchedule({
-        ...state.schedule,
-        ...(input && input.schedule && typeof input.schedule === 'object' ? input.schedule : {}),
-      }),
+      enabled: requestedEnabled,
+      config: pickColdmailAutopilotConfig(candidateConfig, baseConfig),
+      schedule: pickColdmailAutopilotSchedule(candidateSchedule, state.schedule),
       updatedAt: now().toISOString(),
       updatedBy: truncateText(normalizeString(actor), 120),
     };
@@ -2966,6 +3039,23 @@ function createColdmailCampaignService(deps = {}) {
       toneStyle: normalizeString(raw.toneStyle) || 'Vriendelijk & professioneel',
       senders,
     };
+  }
+
+  async function loadColdmailAutopilotSenderSettingsConfig() {
+    const settings = await loadColdmailingSenderSettings();
+    const senderEmails = normalizeColdmailAutopilotSenderEmails([
+      ...Object.keys(settings.senders || {}),
+      settings.senderEmail,
+    ]).filter(isColdmailAutopilotAllowedSenderEmail);
+    return normalizeColdmailAutopilotConfig({
+      senderEmail: senderEmails[0] || settings.senderEmail,
+      senderEmails,
+      senderProfiles: settings.senders,
+      subject: settings.subject,
+      body: settings.body,
+      aiInstructions: settings.aiInstructions,
+      toneStyle: settings.toneStyle,
+    });
   }
 
   function resolveColdmailAutopilotSenderProfile(settings, config, senderEmail) {
@@ -3229,23 +3319,30 @@ function createColdmailCampaignService(deps = {}) {
   async function finishColdmailAutopilotRun(state, result, actor, options = {}) {
     const compactResult = compactColdmailAutopilotResult(result);
     const latestState = await loadColdmailAutopilotState().catch(() => null);
+    const fallbackConfig = await loadColdmailAutopilotSenderSettingsConfig().catch(() => state && state.config);
+    const trustedStateConfig = pickColdmailAutopilotConfig(state && state.config, fallbackConfig);
+    const trustedStateSchedule = normalizeColdmailAutopilotSchedule(state && state.schedule);
     const preserveDisabledState =
       latestState &&
       latestState.enabled === false &&
       state &&
       state.enabled !== false;
     const baseState = preserveDisabledState
-      ? {
-          ...state,
-          enabled: false,
-          config: latestState.config || state.config,
-          schedule: latestState.schedule || state.schedule,
-          updatedAt: latestState.updatedAt || state.updatedAt,
-          updatedBy: latestState.updatedBy || state.updatedBy,
-          emergencyStoppedAt: latestState.emergencyStoppedAt || state.emergencyStoppedAt,
-          emergencyStopReason: latestState.emergencyStopReason || state.emergencyStopReason,
-        }
-      : state;
+        ? {
+            ...state,
+            enabled: false,
+            config: pickColdmailAutopilotConfig(latestState.config, trustedStateConfig),
+            schedule: pickColdmailAutopilotSchedule(latestState.schedule, trustedStateSchedule),
+            updatedAt: latestState.updatedAt || state.updatedAt,
+            updatedBy: latestState.updatedBy || state.updatedBy,
+            emergencyStoppedAt: latestState.emergencyStoppedAt || state.emergencyStoppedAt,
+            emergencyStopReason: latestState.emergencyStopReason || state.emergencyStopReason,
+          }
+        : {
+            ...state,
+            config: trustedStateConfig,
+            schedule: trustedStateSchedule,
+          };
     const logSource = preserveDisabledState && Array.isArray(latestState.log)
       ? latestState.log
       : baseState.log;
