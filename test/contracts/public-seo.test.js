@@ -148,9 +148,9 @@ test('public seo pages load first-party conversion tracking once', () => {
 
   assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(trackerSource, /softora:public-conversion/);
-  assert.match(trackerSource, /Landingspagina: /);
-  assert.match(trackerSource, /CTA-pagina: /);
-  assert.match(trackerSource, /Referrer: /);
+  assert.match(trackerSource, /recordConversion\(link\)/);
+  assert.match(trackerSource, /link\.setAttribute\('href', MARTIJN_WHATSAPP_URL\)/);
+  assert.doesNotMatch(trackerSource, /Landingspagina: |CTA-pagina: |Referrer: |\?text=|searchParams\.set\('text'|buildWhatsappText|withWhatsappText/);
   assert.doesNotMatch(trackerSource, /localStorage|sessionStorage/);
 
   for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {

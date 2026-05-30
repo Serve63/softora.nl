@@ -6,18 +6,8 @@
     return String((element && element.value) || '').trim();
   }
 
-  function buildWhatsappUrl(name, email, message) {
-    var landing = String(window.__softoraPublicConversionLanding || window.location.pathname || '/');
-
-    var lines = [
-      'Hoi Martijn, ik heb een vraag via Softora.nl.',
-      name ? 'Naam: ' + name : '',
-      email ? 'E-mail: ' + email : '',
-      message ? 'Vraag: ' + message : '',
-      'Landingspagina: ' + landing,
-      'CTA-pagina: ' + (window.location.pathname || '/'),
-    ].filter(Boolean);
-    return MARTIJN_WHATSAPP_URL + '?text=' + encodeURIComponent(lines.join('\n'));
+  function buildWhatsappUrl() {
+    return MARTIJN_WHATSAPP_URL;
   }
 
   function openWhatsapp(url) {
@@ -77,7 +67,7 @@
         return;
       }
 
-      openWhatsapp(buildWhatsappUrl(name, email, message));
+      openWhatsapp(buildWhatsappUrl());
       setStatus(statusElement, 'WhatsApp wordt geopend. We bewaren je vraag ook veilig.', false);
       setSubmitState(submitButton, true);
 

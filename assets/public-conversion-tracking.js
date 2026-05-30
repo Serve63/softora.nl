@@ -30,31 +30,6 @@
     return /^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(String(url || '').trim());
   }
 
-  function buildWhatsappText(element) {
-    var page = getAttr(element, 'data-softora-conversion-page') || getPagePath();
-    var label = String((element && element.textContent) || '').replace(/\s+/g, ' ').trim();
-    var lines = [
-      'Hoi Martijn, ik wil graag contact via Softora.nl.',
-      label ? 'CTA: ' + label : '',
-      'Landingspagina: ' + getLandingPath(),
-      'CTA-pagina: ' + page,
-      getReferrerPath() ? 'Referrer: ' + getReferrerPath() : '',
-    ];
-    return lines.filter(Boolean).join('\n');
-  }
-
-  function withWhatsappText(urlRaw, text) {
-    try {
-      var url = new URL(urlRaw, window.location.href);
-      if (!url.searchParams.get('text')) {
-        url.searchParams.set('text', text);
-      }
-      return url.toString();
-    } catch {
-      return urlRaw;
-    }
-  }
-
   function recordConversion(element) {
     var eventData = {
       name: getAttr(element, 'data-softora-conversion'),
@@ -89,7 +64,7 @@
     if (!isMartijnWhatsappUrl(href)) return;
 
     recordConversion(link);
-    link.setAttribute('href', withWhatsappText(href, buildWhatsappText(link)));
+    link.setAttribute('href', MARTIJN_WHATSAPP_URL);
   }
 
   getLandingPath();
