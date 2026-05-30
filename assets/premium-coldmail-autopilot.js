@@ -307,27 +307,28 @@
     render();
     const enabled = !(state && state.enabled);
     try {
+      const payload = { enabled };
+      if (enabled) {
+        payload.config = buildAutopilotConfig();
+        payload.schedule = {
+          timezone: "Europe/Amsterdam",
+          weekdaysOnly: true,
+          startHour: 7,
+          endHour: 18,
+          minIntervalMinutes: 12,
+          senderMinIntervalMinutes: 70,
+          senderMaxIntervalMinutes: 82,
+          sendJitterMinSeconds: 45,
+          sendJitterMaxSeconds: 240,
+        };
+      }
       applyStatusPayload(await json(SETTINGS_URL, {
         method: "POST",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          enabled,
-          config: buildAutopilotConfig(),
-          schedule: {
-            timezone: "Europe/Amsterdam",
-            weekdaysOnly: true,
-            startHour: 8,
-            endHour: 17,
-            minIntervalMinutes: 5,
-            senderMinIntervalMinutes: 14,
-            senderMaxIntervalMinutes: 18,
-            sendJitterMinSeconds: 5,
-            sendJitterMaxSeconds: 45,
-          },
-        }),
+        body: JSON.stringify(payload),
       }));
       if (typeof global.showToast === "function") {
         global.showToast(enabled ? "Team-autopilot staat aan voor iedereen van Softora. Instellingen zijn bevroren." : "Team-autopilot staat uit. Instellingen zijn vrijgegeven.");

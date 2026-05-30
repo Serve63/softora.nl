@@ -710,6 +710,72 @@ test('coldmail autopilot stays idle until it is explicitly enabled', async () =>
   assert.equal(getAutopilotState().lastResult.reason, 'disabled');
 });
 
+test('coldmail autopilot disable toggle keeps sender configuration and live schedule intact', async () => {
+  const { service, getAutopilotState } = createService({
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl', 'martijn@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Kleine vraag over jullie website',
+            body: 'Goedemorgen, zou u openstaan voor een betere website?',
+          },
+          'martijn@softora.nl': {
+            subject: 'Kleine vraag over jullie website',
+            body: 'Goedemorgen, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 18,
+        minIntervalMinutes: 12,
+        senderMinIntervalMinutes: 70,
+        senderMaxIntervalMinutes: 82,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+    },
+  });
+
+  await service.updateColdmailAutopilotSettings({
+    enabled: false,
+    config: {
+      senderEmails: [],
+      senderProfiles: {},
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 8,
+      endHour: 17,
+      minIntervalMinutes: 5,
+      senderMinIntervalMinutes: 14,
+      senderMaxIntervalMinutes: 18,
+      sendJitterMinSeconds: 5,
+      sendJitterMaxSeconds: 45,
+    },
+  }, 'Dashboard toggle');
+
+  const state = getAutopilotState();
+  assert.equal(state.enabled, false);
+  assert.deepEqual(state.config.senderEmails, ['serve@softora.nl', 'martijn@softora.nl']);
+  assert.deepEqual(Object.keys(state.config.senderProfiles), ['serve@softora.nl', 'martijn@softora.nl']);
+  assert.equal(state.schedule.startHour, 7);
+  assert.equal(state.schedule.endHour, 18);
+  assert.equal(state.schedule.minIntervalMinutes, 12);
+  assert.equal(state.schedule.senderMinIntervalMinutes, 70);
+  assert.equal(state.schedule.senderMaxIntervalMinutes, 82);
+  assert.equal(state.schedule.sendJitterMinSeconds, 45);
+  assert.equal(state.schedule.sendJitterMaxSeconds, 240);
+});
+
 test('coldmail autopilot sends a small safe batch through the existing campaign service', async () => {
   const { service, sentMessages, getAutopilotState, getSendGuardState } = createService({
     rows: [
@@ -2125,6 +2191,96 @@ test('coldmail autopilot keeps an emergency disabled state when a running batch 
   assert.equal(getAutopilotState().lock, null);
   assert.equal(getAutopilotState().lastResult.reason, 'sent');
   assert.equal(getAutopilotState().emergencyStopReason, 'Noodstop tijdens actieve run.');
+});
+
+test('coldmail autopilot does not let an empty disabled state wipe sender config after a run', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 18,
+        minIntervalMinutes: 12,
+        senderMinIntervalMinutes: 70,
+        senderMaxIntervalMinutes: 82,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+    },
+    onSendMail: ({ getAutopilotState, setAutopilotState }) => {
+      setAutopilotState({
+        ...getAutopilotState(),
+        enabled: false,
+        config: {
+          count: 1,
+          senderEmails: [],
+          senderProfiles: {},
+        },
+        schedule: {
+          timezone: 'Europe/Amsterdam',
+          weekdaysOnly: true,
+          startHour: 7,
+          endHour: 17,
+          minIntervalMinutes: 12,
+          senderMinIntervalMinutes: 60,
+          senderMaxIntervalMinutes: 60,
+          sendJitterMinSeconds: 0,
+          sendJitterMaxSeconds: 0,
+        },
+      });
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  const state = getAutopilotState();
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(state.enabled, false);
+  assert.deepEqual(state.config.senderEmails, ['serve@softora.nl']);
+  assert.equal(state.config.senderProfiles['serve@softora.nl'].subject, 'Korte vraag voor {{bedrijf}}');
+  assert.equal(state.schedule.endHour, 18);
+  assert.equal(state.schedule.senderMinIntervalMinutes, 70);
+  assert.equal(state.schedule.senderMaxIntervalMinutes, 82);
+  assert.equal(state.schedule.sendJitterMinSeconds, 45);
+  assert.equal(state.schedule.sendJitterMaxSeconds, 240);
 });
 
 test('coldmail autopilot does not treat a full agenda as a mail safety stop', async () => {
