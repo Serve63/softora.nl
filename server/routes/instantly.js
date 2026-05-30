@@ -24,6 +24,8 @@ function registerInstantlyRoutes(app, deps = {}) {
         refreshExistingVariables: body.refreshExistingVariables,
         refreshExistingLimit: body.refreshExistingLimit,
         refreshExistingOnly: body.refreshExistingOnly,
+        reconcileOnly: body.reconcileOnly,
+        cleanupOnly: body.cleanupOnly,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           normalizeString(body.actor) ||
