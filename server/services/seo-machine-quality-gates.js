@@ -386,6 +386,15 @@ function isLeadCtaLabel(labelRaw) {
   return /\b(neem contact op|contact opnemen|contact|stuur (?:een )?bericht|verstuur(?: bericht)?|whatsapp|start gesprek|plan gesprek|plan scan|vraag advies|offerte(?: aanvragen)?|bel direct|start project|pakket aanvragen|meer informatie|bespreken)\b/i.test(label);
 }
 
+function hasVisibleWhatsappCtaLabel(labelRaw) {
+  const label = stripHtmlTags(labelRaw).toLowerCase();
+  if (!/\bwhatsapp\b/i.test(label)) return false;
+  return (
+    label.trim() === 'whatsapp' ||
+    /\b(?:stuur|vraag|plan|start|bespreek|contact|gesprek|direct|advies|ons|bericht)\b/i.test(label)
+  );
+}
+
 function extractAnchorEntries(htmlRaw) {
   return Array.from(String(htmlRaw || '').matchAll(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/a>/gi)).map(
     (match) => ({
@@ -479,6 +488,15 @@ function extractButtonLikeControlEntries(htmlRaw) {
   return entries;
 }
 
+function extractCtaHelperTextEntries(htmlRaw) {
+  return Array.from(
+    String(htmlRaw || '').matchAll(/<(div|p|span)\b([^>]*\bclass=["'][^"']*\bcta-tel\b[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi)
+  ).map((match) => ({
+    attrs: match[2] || '',
+    label: stripHtmlTags(match[3] || ''),
+  }));
+}
+
 function hasSafeBlankTarget(attrsRaw) {
   const attrs = String(attrsRaw || '');
   const target = getAttrValue(attrs, 'target');
@@ -526,9 +544,21 @@ function auditConversionCtas({ pages = [] } = {}) {
     const annotatedLinks = conversionLinks.filter((anchor) => hasCompleteConversionTracking(anchor.attrs));
     const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
     const trackedWhatsappButtons = leadCtaButtons.filter(isTrackedWhatsappButton);
+    const whatsappChannelLabels = [
+      ...conversionLinks.filter((anchor) => hasVisibleWhatsappCtaLabel(anchor.label)),
+      ...leadCtaButtons.filter((button) => hasVisibleWhatsappCtaLabel(button.label)),
+      ...extractCtaHelperTextEntries(html).filter((entry) => hasVisibleWhatsappCtaLabel(entry.label)),
+    ];
 
     if (conversionLinks.length === 0 && trackedWhatsappButtons.length === 0) {
       issues.push({ type: 'missing-conversion-link', path: pathName, message: `${pathName} heeft geen meetbare CTA-route.` });
+    }
+    if (whatsappChannelLabels.length > 0) {
+      issues.push({
+        type: 'public-cta-visible-whatsapp-label',
+        path: pathName,
+        message: `${pathName} noemt WhatsApp zichtbaar in een klant-CTA; gebruik neutrale tekst zoals Contact, Start gesprek of Vraag advies.`,
+      });
     }
     const prefilledWhatsappLinks = conversionLinks.filter((anchor) => hasPrefilledWhatsappMessage(anchor.href));
     if (prefilledWhatsappLinks.length > 0) {
