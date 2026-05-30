@@ -5726,6 +5726,103 @@ test('coldmail campaign blocks the same recipient across different sender mailbo
   assert.equal(second.sentMessages.length, 0);
 });
 
+test('coldmail campaign keeps old Instantly recipient guards permanently', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'old-instantly-row',
+        bedrijf: 'Old Instantly Company',
+        naam: 'Old Instantly Company',
+        email: 'old-instantly@example.test',
+        website: 'old-instantly.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: {
+      entries: [],
+      recipientEntries: [
+        {
+          at: '2026-01-10T09:00:00.000Z',
+          senderEmail: 'martijnven@websoftora.com',
+          recipientKey: 'email:old-instantly@example.test',
+          recipientEmail: 'old-instantly@example.test',
+          recipientDomain: 'old-instantly-example-test',
+          recipientCompanyKey: 'old-instantly-company',
+          recipientId: 'old-instantly-row',
+          recipientCompany: 'Old Instantly Company',
+          source: 'instantly-backfill',
+          provider: 'instantly',
+          campaignId: 'campaign-1',
+          leadId: 'lead-1',
+        },
+      ],
+    },
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({ count: 1 });
+  assert.equal(preview.selected, 0);
+  assert.equal(preview.failedItems[0].code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+  assert.match(preview.failedItems[0].error, /al eerder gemaild/);
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /al eerder gemaild/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+});
+
+test('coldmail campaign expires old non-permanent recipient guards', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'old-normal-row',
+        bedrijf: 'Old Normal Company',
+        naam: 'Old Normal Company',
+        email: 'old-normal@example.test',
+        website: 'old-normal.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: {
+      entries: [],
+      recipientEntries: [
+        {
+          at: '2026-01-10T09:00:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          recipientKey: 'email:old-normal@example.test',
+          recipientEmail: 'old-normal@example.test',
+          recipientDomain: 'old-normal-example-test',
+          recipientCompanyKey: 'old-normal-company',
+          recipientId: 'old-normal-row',
+          recipientCompany: 'Old Normal Company',
+        },
+      ],
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages[0].to, 'old-normal@example.test');
+});
+
 test('coldmail campaign deduplicates copied recipient guard entries when saving', async () => {
   const oldRecipient = {
     at: '2026-04-24T11:00:00.000Z',
