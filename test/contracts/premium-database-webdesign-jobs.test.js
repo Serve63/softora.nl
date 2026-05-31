@@ -10,6 +10,7 @@ const {
   diagnoseWebdesignMockupRecord,
   getDeviceMockupRendererSpec,
   isSuspectWebdesignMockupRenderer,
+  trimUniformWebdesignSideGuttersDataUrl,
 } = require('../../server/services/premium-database-webdesign-jobs');
 
 const TINY_PNG_DATA_URL =
@@ -32,6 +33,30 @@ function createResponseRecorder() {
 
 function wait(ms = 0) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function createSideGutterWebdesignDataUrl(options = {}) {
+  const sharp = require('sharp');
+  const width = Number(options.width) || 1024;
+  const height = Number(options.height) || 1536;
+  const left = Number(options.left) || 184;
+  const right = Number(options.right) || 185;
+  const contentWidth = width - left - right;
+  const svg = `
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${width}" height="${height}" fill="#ffffff"/>
+      <rect x="${left}" y="0" width="${contentWidth}" height="${height}" fill="#123456"/>
+      <rect x="${left + 48}" y="72" width="${contentWidth - 96}" height="180" rx="18" fill="#f97316"/>
+      <rect x="${left + 48}" y="320" width="${contentWidth - 96}" height="72" rx="14" fill="#ffffff" opacity="0.96"/>
+    </svg>`;
+  const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
+  return `data:image/png;base64,${buffer.toString('base64')}`;
+}
+
+async function getDataUrlMetadata(dataUrl) {
+  const sharp = require('sharp');
+  const base64 = String(dataUrl || '').split(',')[1] || '';
+  return sharp(Buffer.from(base64, 'base64')).metadata();
 }
 
 test('premium database webdesign jobs do not break app bootstrap when sharp is unavailable', () => {
@@ -99,6 +124,19 @@ test('premium database server mockup renderer matches the browser layout without
   assert.match(svg, /x="173" y="218" width="894" height="514"/);
   assert.doesNotMatch(svg, /x="290" y="335" width="964" height="520"/);
   assert.doesNotMatch(svg, /x="332" y="375" width="880" height="430"/);
+});
+
+test('premium database trims AI side gutters without stretching the webdesign image', async () => {
+  const dataUrl = await createSideGutterWebdesignDataUrl();
+  const trimmed = await trimUniformWebdesignSideGuttersDataUrl(dataUrl);
+  const metadata = await getDataUrlMetadata(trimmed.dataUrl);
+
+  assert.equal(trimmed.cropped, true);
+  assert.equal(trimmed.reason, 'trimmed_uniform_side_gutters');
+  assert.equal(trimmed.original.width, 1024);
+  assert.equal(trimmed.original.height, 1536);
+  assert.equal(metadata.height, 1536);
+  assert.equal(metadata.width, 691);
 });
 
 test('premium database mockup diagnostics flag text-label renderers for repair', () => {
@@ -349,6 +387,66 @@ test('premium database webdesign jobs persist status and generated photos throug
 
   assert.equal(getRes.statusCode, 200);
   assert.equal(getRes.body.job.status, 'done');
+});
+
+test('premium database webdesign jobs store trimmed webdesign photos before mockup creation', async () => {
+  const dataUrl = await createSideGutterWebdesignDataUrl();
+  const uploadedPhotos = [];
+  let latestJob = null;
+  const dataOpsStore = {
+    upsertWebdesignJob: async (job) => {
+      latestJob = {
+        ...job,
+        customer: { ...job.customer },
+      };
+      return { ok: true };
+    },
+    getWebdesignJob: async (jobId) => (latestJob && latestJob.id === jobId ? latestJob : null),
+    uploadDesignPhoto: async (entry) => {
+      uploadedPhotos.push(entry);
+      return { ok: true };
+    },
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => ({
+        image: { dataUrl, fileName: 'preview.png' },
+      }),
+    },
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_trim12345678',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-trim', bedrijf: 'Softora' },
+      },
+    },
+    createResponseRecorder()
+  );
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_trim12345678' },
+    },
+    createResponseRecorder()
+  );
+
+  assert.equal(uploadedPhotos.length, 1);
+  const storedMetadata = await getDataUrlMetadata(uploadedPhotos[0].dataUrl);
+  const mockupMetadata = await getDataUrlMetadata(uploadedPhotos[0].websiteMockup);
+  assert.equal(storedMetadata.width, 691);
+  assert.equal(storedMetadata.height, 1536);
+  assert.equal(mockupMetadata.width, 1600);
+  assert.equal(mockupMetadata.height, 1000);
+  assert.equal(uploadedPhotos[0].legacyMeta.webdesignCanvasRepair.type, 'trimmed_uniform_side_gutters');
 });
 
 test('premium database webdesign jobs list running jobs for the current user', async () => {

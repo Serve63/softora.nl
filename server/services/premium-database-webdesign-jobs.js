@@ -8,6 +8,14 @@ const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
   'softora-server-device-v7',
 ]);
 const APPROVED_MOCKUP_QUALITY_STATUSES = new Set(['checked', 'verified', 'ok']);
+const WEBDESIGN_GUTTER_MIN_SIZE = 320;
+const WEBDESIGN_GUTTER_THRESHOLD = 12;
+const WEBDESIGN_GUTTER_CORNER_TOLERANCE = 32;
+const WEBDESIGN_SIDE_GUTTER_MIN_RATIO = 0.08;
+const WEBDESIGN_VERTICAL_GUTTER_MAX_RATIO = 0.025;
+const WEBDESIGN_GUTTER_CROP_PAD_RATIO = 0.018;
+const WEBDESIGN_GUTTER_CROP_MIN_PAD = 12;
+const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
 let cachedSharp = null;
 
 function loadSharpModule() {
@@ -40,6 +48,174 @@ function normalizeFiniteNumber(value, fallback) {
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function getPixelColor(data, info, x, y) {
+  const channels = Number(info && info.channels) || 0;
+  const width = Number(info && info.width) || 0;
+  if (!Buffer.isBuffer(data) || channels < 3 || width <= 0) return null;
+  const offset = (y * width + x) * channels;
+  if (offset < 0 || offset + 2 >= data.length) return null;
+  return {
+    r: data[offset],
+    g: data[offset + 1],
+    b: data[offset + 2],
+  };
+}
+
+function colorDistance(left, right) {
+  if (!left || !right) return Infinity;
+  const red = Number(left.r) - Number(right.r);
+  const green = Number(left.g) - Number(right.g);
+  const blue = Number(left.b) - Number(right.b);
+  return Math.sqrt(red * red + green * green + blue * blue);
+}
+
+function averageColors(colors) {
+  const valid = (Array.isArray(colors) ? colors : []).filter(Boolean);
+  if (!valid.length) return null;
+  const totals = valid.reduce(
+    (next, color) => ({
+      r: next.r + Number(color.r || 0),
+      g: next.g + Number(color.g || 0),
+      b: next.b + Number(color.b || 0),
+    }),
+    { r: 0, g: 0, b: 0 }
+  );
+  return {
+    r: totals.r / valid.length,
+    g: totals.g / valid.length,
+    b: totals.b / valid.length,
+  };
+}
+
+function averageCornerColor(data, info, startX, startY, sampleSize) {
+  const width = Number(info && info.width) || 0;
+  const height = Number(info && info.height) || 0;
+  const colors = [];
+  for (let y = startY; y < Math.min(height, startY + sampleSize); y += 1) {
+    for (let x = startX; x < Math.min(width, startX + sampleSize); x += 1) {
+      colors.push(getPixelColor(data, info, x, y));
+    }
+  }
+  return averageColors(colors);
+}
+
+function getUniformWebdesignBackground(data, info) {
+  const width = Number(info && info.width) || 0;
+  const height = Number(info && info.height) || 0;
+  const sampleSize = Math.max(4, Math.min(16, Math.floor(Math.min(width, height) * 0.03)));
+  const corners = [
+    averageCornerColor(data, info, 0, 0, sampleSize),
+    averageCornerColor(data, info, Math.max(0, width - sampleSize), 0, sampleSize),
+    averageCornerColor(data, info, 0, Math.max(0, height - sampleSize), sampleSize),
+    averageCornerColor(data, info, Math.max(0, width - sampleSize), Math.max(0, height - sampleSize), sampleSize),
+  ].filter(Boolean);
+  if (corners.length < 4) return null;
+  const background = averageColors(corners);
+  const cornersMatch = corners.every((corner) => colorDistance(corner, background) <= WEBDESIGN_GUTTER_CORNER_TOLERANCE);
+  return cornersMatch ? background : null;
+}
+
+function findNonBackgroundWebdesignBounds(data, info, background) {
+  const width = Number(info && info.width) || 0;
+  const height = Number(info && info.height) || 0;
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const color = getPixelColor(data, info, x, y);
+      if (colorDistance(color, background) <= WEBDESIGN_GUTTER_THRESHOLD) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  if (right < left || bottom < top) return null;
+  return { left, top, right, bottom };
+}
+
+function getSafeWebdesignSideGutterCrop(bounds, width, height) {
+  if (!bounds || width < WEBDESIGN_GUTTER_MIN_SIZE || height < WEBDESIGN_GUTTER_MIN_SIZE) return null;
+  const leftMargin = Math.max(0, Number(bounds.left) || 0);
+  const rightMargin = Math.max(0, width - 1 - (Number(bounds.right) || 0));
+  const topMargin = Math.max(0, Number(bounds.top) || 0);
+  const bottomMargin = Math.max(0, height - 1 - (Number(bounds.bottom) || 0));
+  const minSideMargin = Math.floor(width * WEBDESIGN_SIDE_GUTTER_MIN_RATIO);
+  const maxVerticalMargin = Math.floor(height * WEBDESIGN_VERTICAL_GUTTER_MAX_RATIO);
+  if (leftMargin < minSideMargin || rightMargin < minSideMargin) return null;
+  if (topMargin > maxVerticalMargin || bottomMargin > maxVerticalMargin) return null;
+
+  const contentWidth = (Number(bounds.right) || 0) - (Number(bounds.left) || 0) + 1;
+  if (contentWidth < width * 0.45 || contentWidth > width * 0.9) return null;
+
+  const pad = clampNumber(
+    Math.round(width * WEBDESIGN_GUTTER_CROP_PAD_RATIO),
+    WEBDESIGN_GUTTER_CROP_MIN_PAD,
+    WEBDESIGN_GUTTER_CROP_MAX_PAD
+  );
+  const left = Math.max(0, leftMargin - pad);
+  const right = Math.min(width - 1, (Number(bounds.right) || 0) + pad);
+  const cropWidth = right - left + 1;
+  if (cropWidth >= width * 0.94) return null;
+  return {
+    left,
+    top: 0,
+    width: cropWidth,
+    height,
+    detected: {
+      leftMargin,
+      rightMargin,
+      topMargin,
+      bottomMargin,
+      contentWidth,
+    },
+  };
+}
+
+async function trimUniformWebdesignSideGuttersDataUrl(dataUrl, options = {}) {
+  const parsed = parseImageDataUrl(dataUrl);
+  if (!parsed) return { dataUrl, cropped: false, reason: 'invalid_image_data_url' };
+  const sharp = typeof options.loadSharpImpl === 'function' ? options.loadSharpImpl() : loadSharpModule();
+  const raster = await sharp(parsed.buffer, { limitInputPixels: 45_000_000 })
+    .rotate()
+    .flatten({ background: '#ffffff' })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const width = Number(raster && raster.info && raster.info.width) || 0;
+  const height = Number(raster && raster.info && raster.info.height) || 0;
+  const original = { width, height };
+  if (width < WEBDESIGN_GUTTER_MIN_SIZE || height < WEBDESIGN_GUTTER_MIN_SIZE) {
+    return { dataUrl, cropped: false, reason: 'too_small', original };
+  }
+  const background = getUniformWebdesignBackground(raster.data, raster.info);
+  const bounds = background ? findNonBackgroundWebdesignBounds(raster.data, raster.info, background) : null;
+  const crop = getSafeWebdesignSideGutterCrop(bounds, width, height);
+  if (!crop) return { dataUrl, cropped: false, reason: 'no_safe_side_gutter_crop', original, bounds };
+
+  const cropped = await sharp(parsed.buffer, { limitInputPixels: 45_000_000 })
+    .rotate()
+    .flatten({ background: '#ffffff' })
+    .extract({
+      left: crop.left,
+      top: crop.top,
+      width: crop.width,
+      height: crop.height,
+    })
+    .png()
+    .toBuffer();
+  return {
+    dataUrl: `data:image/png;base64,${cropped.toString('base64')}`,
+    cropped: true,
+    reason: 'trimmed_uniform_side_gutters',
+    original,
+    output: { width: crop.width, height: crop.height },
+    crop,
+    bounds,
+  };
 }
 
 function buildDeviceSpec(definition) {
@@ -683,18 +859,29 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
 
     const customer = job.customer;
-    const mockupDataUrl = await createDeviceMockupDataUrl(dataUrl, customer, { loadSharpImpl });
+    const normalizedImage = await trimUniformWebdesignSideGuttersDataUrl(dataUrl, { loadSharpImpl });
+    const storageDataUrl = normalizedImage.dataUrl || dataUrl;
+    const mockupDataUrl = await createDeviceMockupDataUrl(storageDataUrl, customer, { loadSharpImpl });
     const checkedAt = new Date().toISOString();
     const websitePhotoName =
       truncateText(normalizeString(image.fileName || `${customer.dom || customer.bedrijf || 'webdesign'}-webdesign.png`), 180) ||
       'Websitefoto';
     const websiteMockupName = truncateText(replaceImageFileSuffix(websitePhotoName, `-device-mockup-${DEVICE_MOCKUP_FILE_VERSION}`), 180);
     const identityKey = buildCustomerIdentityKey(customer);
+    const canvasRepair = normalizedImage.cropped
+      ? {
+          type: normalizedImage.reason,
+          original: normalizedImage.original,
+          output: normalizedImage.output,
+          crop: normalizedImage.crop,
+          repairedAt: checkedAt,
+        }
+      : null;
     if (dataOpsStore && typeof dataOpsStore.uploadDesignPhoto === 'function') {
       const structured = await dataOpsStore.uploadDesignPhoto(
         {
           customerId: customer.id,
-          dataUrl,
+          dataUrl: storageDataUrl,
           websiteMockup: mockupDataUrl,
           websiteMockupName,
           mockupRenderer: DEVICE_MOCKUP_RENDERER,
@@ -713,6 +900,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
             mockupQualityStatus: 'checked',
             mockupQualityCheckedAt: checkedAt,
             updatedAt: new Date().toISOString().slice(0, 10),
+            ...(canvasRepair ? { webdesignCanvasRepair: canvasRepair } : {}),
           },
         },
         { source: 'premium-database-webdesign-jobs' }
@@ -731,7 +919,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       .filter((id) => id !== customer.id);
     const photoDataKey = buildDataKey(customer.id);
     const mockupPhotoDataKey = buildDataKey(`${customer.id}_mockup`);
-    const chunks = dataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
+    const chunks = storageDataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
     const mockupChunks = mockupDataUrl.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, 'g')) || [];
     if (chunks.length > MAX_STORAGE_CHUNKS || mockupChunks.length > MAX_STORAGE_CHUNKS) {
       throw new Error('De AI-foto was te groot om betrouwbaar op te slaan. Probeer het opnieuw.');
@@ -771,6 +959,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         mockupQualityStatus: 'checked',
         mockupQualityCheckedAt: checkedAt,
         updatedAt: new Date().toISOString().slice(0, 10),
+        ...(canvasRepair ? { webdesignCanvasRepair: canvasRepair } : {}),
       },
     };
 
@@ -1104,4 +1293,5 @@ module.exports = {
   diagnoseWebdesignMockupRecord,
   getDeviceMockupRendererSpec,
   isSuspectWebdesignMockupRenderer,
+  trimUniformWebdesignSideGuttersDataUrl,
 };
