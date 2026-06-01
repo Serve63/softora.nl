@@ -2915,12 +2915,23 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  async function loadColdmailAutopilotState() {
+  async function loadColdmailAutopilotStateRecord() {
     const state = await getUiStateValues(coldmailAutopilotScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
-    return normalizeColdmailAutopilotState(
-      safeJsonParse(values[coldmailAutopilotKey] || '{}', {})
-    );
+    const rawValue = values[coldmailAutopilotKey];
+    const hasValue = Object.prototype.hasOwnProperty.call(values, coldmailAutopilotKey) &&
+      Boolean(normalizeString(rawValue));
+    return {
+      state: normalizeColdmailAutopilotState(safeJsonParse(rawValue || '{}', {})),
+      hasValue,
+      source: normalizeString(state && state.source),
+      updatedAt: normalizeString(state && state.updatedAt),
+    };
+  }
+
+  async function loadColdmailAutopilotState() {
+    const record = await loadColdmailAutopilotStateRecord();
+    return record.state;
   }
 
   async function saveColdmailAutopilotState(state, actor = 'coldmail-autopilot') {
@@ -3347,7 +3358,10 @@ function createColdmailCampaignService(deps = {}) {
 
   async function finishColdmailAutopilotRun(state, result, actor, options = {}) {
     const compactResult = compactColdmailAutopilotResult(result);
-    const latestState = await loadColdmailAutopilotState().catch(() => null);
+    const latestStateRecord = await loadColdmailAutopilotStateRecord().catch(() => null);
+    const latestState = latestStateRecord && latestStateRecord.hasValue
+      ? latestStateRecord.state
+      : null;
     const fallbackConfig = await loadColdmailAutopilotSenderSettingsConfig().catch(() => state && state.config);
     const trustedStateConfig = pickColdmailAutopilotConfig(state && state.config, fallbackConfig);
     const trustedStateSchedule = normalizeColdmailAutopilotSchedule(state && state.schedule);
@@ -3405,7 +3419,15 @@ function createColdmailCampaignService(deps = {}) {
 
   async function runColdmailAutopilot(input = {}) {
     const actor = truncateText(normalizeString(input.actor), 120) || 'Coldmail Autopilot';
-    let state = await loadColdmailAutopilotState();
+    const stateRecord = await loadColdmailAutopilotStateRecord();
+    let state = stateRecord.state;
+
+    if (!stateRecord.hasValue) {
+      return compactColdmailAutopilotResult(buildColdmailAutopilotSkipResult(
+        'state_unavailable',
+        'Autopilot-state kon niet veilig uit Supabase worden geladen. Er is niets verzonden en niets overschreven.'
+      ));
+    }
 
     if (!state.enabled) {
       return finishColdmailAutopilotRun(

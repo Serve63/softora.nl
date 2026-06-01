@@ -193,6 +193,11 @@ function createService(overrides = {}) {
     ? overrides.sendGuardReadStates.map((state) => JSON.parse(JSON.stringify(state)))
     : null;
   let autopilotState = overrides.autopilotState || {};
+  const autopilotReadStates = Array.isArray(overrides.autopilotReadStates)
+    ? overrides.autopilotReadStates.map((state) =>
+      state === null ? null : JSON.parse(JSON.stringify(state))
+    )
+    : null;
   let coldmailingSettings = overrides.coldmailingSettings || {};
   let rows = (overrides.rows || [
     {
@@ -284,6 +289,15 @@ function createService(overrides = {}) {
         };
       }
       if (scope === 'premium_coldmail_autopilot') {
+        if (autopilotReadStates && autopilotReadStates.length) {
+          const nextState = autopilotReadStates.shift();
+          if (nextState === null) return null;
+          return {
+            values: {
+              softora_coldmail_autopilot_v1: JSON.stringify(nextState),
+            },
+          };
+        }
         return {
           values: {
             softora_coldmail_autopilot_v1: JSON.stringify(autopilotState),
@@ -728,6 +742,49 @@ test('coldmail autopilot stays idle until it is explicitly enabled', async () =>
   assert.equal(getAutopilotState().lastResult.reason, 'disabled');
 });
 
+test('coldmail autopilot does not overwrite live settings when state cannot be loaded', async () => {
+  const liveState = {
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 7,
+      endHour: 18,
+      minIntervalMinutes: 12,
+      senderMinIntervalMinutes: 70,
+      senderMaxIntervalMinutes: 82,
+      sendJitterMinSeconds: 45,
+      sendJitterMaxSeconds: 240,
+    },
+  };
+  const { service, sentMessages, getAutopilotState, getSavedStates } = createService({
+    autopilotState: liveState,
+    autopilotReadStates: [null],
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'state_unavailable');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getAutopilotState().enabled, true);
+  assert.equal(getSavedStates().some((entry) => entry.scope === 'premium_coldmail_autopilot'), false);
+});
+
 test('coldmail autopilot disable toggle keeps sender configuration and live schedule intact', async () => {
   const { service, getAutopilotState } = createService({
     autopilotState: {
@@ -882,6 +939,82 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(getAutopilotState().lastResult.reason, 'sent');
   assert.equal(getAutopilotState().lock, null);
   assert.equal(getSendGuardState().entries.length, 2);
+});
+
+test('coldmail autopilot keeps enabled state when latest state read is unavailable after send', async () => {
+  const liveState = {
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+      branch: 'Horeca & Restaurants',
+      service: "Website's",
+      specialAction: '',
+      radiusKm: 250,
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 9,
+      endHour: 17,
+      minIntervalMinutes: 12,
+      senderMinIntervalMinutes: 70,
+      senderMaxIntervalMinutes: 82,
+      sendJitterMinSeconds: 45,
+      sendJitterMaxSeconds: 240,
+    },
+  };
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    autopilotState: liveState,
+    autopilotReadStates: [liveState, null],
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().enabled, true);
+  assert.equal(getAutopilotState().lastResult.reason, 'sent');
+  assert.equal(getAutopilotState().schedule.senderMaxIntervalMinutes, 82);
 });
 
 test('coldmail autopilot blocks invalid domains without extending the send cooldown', async () => {
