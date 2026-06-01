@@ -92,6 +92,10 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /<meta name="robots" content="index, follow">/);
   assert.match(first, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/">/);
   assert.match(first, /type="application\/ld\+json" data-softora-public-seo="structured-data"/);
+  assert.match(first, /"telephone":"\+31643262792"/);
+  assert.match(first, /"addressLocality":"Oisterwijk"/);
+  assert.match(first, /"addressRegion":"Noord-Brabant"/);
+  assert.match(first, /"contactType":"sales"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
   assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260529a" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);

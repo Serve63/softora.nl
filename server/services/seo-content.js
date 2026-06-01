@@ -1,6 +1,10 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/softora-office-digital-growth.jpg';
 const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
+const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
+const SOFTORA_PUBLIC_PHONE = '+31643262792';
+const SOFTORA_LOCALITY = 'Oisterwijk';
+const SOFTORA_REGION = 'Noord-Brabant';
 
 const SEO_CONTENT_COLLECTIONS = Object.freeze({
   blog: Object.freeze({
@@ -1090,6 +1094,13 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         ]),
       }),
       Object.freeze({
+        heading: 'Wat dit betekent voor Oisterwijkse ondernemers',
+        paragraphs: Object.freeze([
+          'In Oisterwijk, Moergestel, Heukelom en de route richting Tilburg zoeken veel bedrijven niet naar een groot bureau op afstand, maar naar iemand die snel begrijpt hoe de aanvraag binnenkomt en wat er daarna moet gebeuren. Dat maakt lokale SEO vooral praktisch: de pagina moet vertrouwen geven en direct naar de juiste dienst sturen.',
+          'Voor een dienstverlener kan dat een conversiegerichte website zijn. Voor een groeiend team kan het juist gaan om CRM, offerte-opvolging of AI die intakes voorbereidt. De lokale basis wordt sterker wanneer die keuzes zichtbaar naast elkaar staan in plaats van verstopt raken in algemene marketingtekst.',
+        ]),
+      }),
+      Object.freeze({
         heading: 'Van aanvraag naar opvolging',
         paragraphs: Object.freeze([
           'Lokale ondernemers hebben vaak geen behoefte aan ingewikkelde systemen, maar wel aan duidelijkheid. Wie heeft contact opgenomen, wat is de vraag en welke vervolgstap hoort erbij?',
@@ -1108,7 +1119,9 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Diensten', href: '/diensten' }),
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
+      Object.freeze({ label: 'Softora in Tilburg', href: '/regio/tilburg' }),
       Object.freeze({ label: 'Branches', href: '/branches' }),
       Object.freeze({ label: 'Installateurs', href: '/branches/installateurs' }),
     ]),
@@ -1138,6 +1151,13 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         ]),
       }),
       Object.freeze({
+        heading: 'Lokale intent rond Tilburg goed afbakenen',
+        paragraphs: Object.freeze([
+          'Tilburg is groot genoeg voor eigen zoekintentie, maar ligt ook dichtbij Oisterwijk, Berkel-Enschot, Udenhout, Goirle en Hilvarenbeek. Daarom werkt de pagina het best wanneer hij Tilburg niet als losse city-swap behandelt, maar als onderdeel van een regionaal netwerk van ondernemers die websites, CRM en automatisering willen verbeteren.',
+          'Die afbakening helpt bezoekers kiezen: wie vooral een vindbare website nodig heeft, gaat naar de websitepagina; wie aanvragen beter wil opvolgen, gaat richting CRM of AI automatisering. Zo blijft de regiopagina behulpzaam en voorkom je dat lokale content dun of herhaald voelt.',
+        ]),
+      }),
+      Object.freeze({
         heading: 'Automatisering maakt groei beheersbaar',
         paragraphs: Object.freeze([
           'Als er meer aanvragen binnenkomen, groeit ook de opvolging. AI automatisering kan helpen met intake, samenvattingen, leadkwalificatie en taken voor het team.',
@@ -1154,7 +1174,9 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Softora in Oisterwijk', href: '/regio/oisterwijk' }),
       Object.freeze({ label: 'Branches', href: '/branches' }),
       Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
       Object.freeze({ label: 'Makelaars', href: '/branches/makelaars' }),
@@ -1876,7 +1898,28 @@ function buildOrganizationGraph(siteOrigin) {
       name: 'Softora',
       url: `${siteOrigin}/`,
       logo: buildAbsoluteUrl(siteOrigin, DEFAULT_LOGO_PATH),
-      email: 'info@softora.nl',
+      email: SOFTORA_PUBLIC_EMAIL,
+      telephone: SOFTORA_PUBLIC_PHONE,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: SOFTORA_LOCALITY,
+        addressRegion: SOFTORA_REGION,
+        addressCountry: 'NL',
+      },
+      areaServed: [
+        { '@type': 'AdministrativeArea', name: SOFTORA_LOCALITY },
+        { '@type': 'AdministrativeArea', name: 'Tilburg' },
+        { '@type': 'AdministrativeArea', name: 'Midden-Brabant' },
+        { '@type': 'Country', name: 'Nederland' },
+      ],
+      contactPoint: {
+        '@type': 'ContactPoint',
+        telephone: SOFTORA_PUBLIC_PHONE,
+        email: SOFTORA_PUBLIC_EMAIL,
+        contactType: 'sales',
+        areaServed: 'NL',
+        availableLanguage: ['nl'],
+      },
     },
     {
       '@type': 'WebSite',

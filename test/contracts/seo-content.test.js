@@ -299,10 +299,23 @@ test('seo content renders branche en regio landingspagina’s met service schema
 
   assert.match(regioHtml, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/regio\/tilburg">/);
   assert.match(regioHtml, /"@type":"Service"/);
+  assert.match(regioHtml, /"telephone":"\+31643262792"/);
+  assert.match(regioHtml, /"addressLocality":"Oisterwijk"/);
+  assert.match(regioHtml, /"addressRegion":"Noord-Brabant"/);
   assert.match(regioHtml, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
   assert.match(regioHtml, /Terug naar regio/);
+  assert.match(regioHtml, /Berkel-Enschot/);
+  assert.match(regioHtml, /href="\/ai-automatisering"/);
+  assert.match(regioHtml, /href="\/regio\/oisterwijk"/);
   assert.match(regioHtml, /href="\/crm-systeem-op-maat"/);
   assert.match(regioHtml, /href="\/branches\/zakelijke-dienstverleners"/);
+
+  const oisterwijkHtml = buildSeoContentArticleHtml(getSeoContentItem('regio', 'oisterwijk'), {
+    siteOrigin: 'https://www.softora.nl',
+  });
+  assert.match(oisterwijkHtml, /Moergestel/);
+  assert.match(oisterwijkHtml, /href="\/crm-systeem-op-maat"/);
+  assert.match(oisterwijkHtml, /href="\/regio\/tilburg"/);
 });
 
 test('current live seo content keeps weak pages supported by contextual incoming links', () => {

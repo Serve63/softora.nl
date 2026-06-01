@@ -1,6 +1,10 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/softora-office-digital-growth.jpg';
 const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
+const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
+const SOFTORA_PUBLIC_PHONE = '+31643262792';
+const SOFTORA_LOCALITY = 'Oisterwijk';
+const SOFTORA_REGION = 'Noord-Brabant';
 const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
 
 const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
@@ -497,6 +501,12 @@ function buildStructuredDataGraph(entry, siteOriginRaw) {
   const siteOrigin = normalizeSiteOrigin(siteOriginRaw);
   const pageUrl = buildAbsoluteUrl(siteOrigin, entry.path);
   const logoUrl = buildAbsoluteUrl(siteOrigin, DEFAULT_LOGO_PATH);
+  const defaultAreaServed = [
+    { '@type': 'AdministrativeArea', name: SOFTORA_LOCALITY },
+    { '@type': 'AdministrativeArea', name: 'Tilburg' },
+    { '@type': 'AdministrativeArea', name: 'Midden-Brabant' },
+    { '@type': 'Country', name: 'Nederland' },
+  ];
   const graph = [
     {
       '@type': 'Organization',
@@ -504,7 +514,23 @@ function buildStructuredDataGraph(entry, siteOriginRaw) {
       name: 'Softora',
       url: `${siteOrigin}/`,
       logo: logoUrl,
-      email: 'info@softora.nl',
+      email: SOFTORA_PUBLIC_EMAIL,
+      telephone: SOFTORA_PUBLIC_PHONE,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: SOFTORA_LOCALITY,
+        addressRegion: SOFTORA_REGION,
+        addressCountry: 'NL',
+      },
+      areaServed: defaultAreaServed,
+      contactPoint: {
+        '@type': 'ContactPoint',
+        telephone: SOFTORA_PUBLIC_PHONE,
+        email: SOFTORA_PUBLIC_EMAIL,
+        contactType: 'sales',
+        areaServed: 'NL',
+        availableLanguage: ['nl'],
+      },
     },
     {
       '@type': 'WebSite',
@@ -533,10 +559,10 @@ function buildStructuredDataGraph(entry, siteOriginRaw) {
       name: entry.serviceName || entry.title,
       description: entry.description,
       provider: { '@id': `${siteOrigin}/#organization` },
-      areaServed: {
-        '@type': 'Country',
-        name: 'Nederland',
-      },
+      areaServed:
+        entry.path === '/website-laten-maken-oisterwijk'
+          ? { '@type': 'AdministrativeArea', name: SOFTORA_LOCALITY }
+          : defaultAreaServed,
       url: pageUrl,
     });
   }
