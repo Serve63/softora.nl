@@ -162,6 +162,28 @@ test('legacy public hero line breaks keep readable text spacing', () => {
   }
 });
 
+test('legacy public service heroes use route-relevant realistic assets', () => {
+  const bedrijfssoftware = readFile('premium-bedrijfssoftware.html');
+  const voicesoftware = readFile('premium-voicesoftware.html');
+  const legacyHeroBackground = /\.hero::before\s*\{[\s\S]*?background:\s*url\('([^']+)'\)[^;]*;/;
+
+  assert.match(
+    bedrijfssoftware,
+    /\.hero::before\s*\{[\s\S]*background:\s*url\('\/assets\/softora-crm-workflow\.jpg'\) center center \/ cover no-repeat;/s,
+    'Bedrijfssoftware hero moet een concrete CRM/workflow-foto gebruiken in plaats van een generiek dashboard'
+  );
+  assert.match(
+    voicesoftware,
+    /\.hero::before\s*\{[\s\S]*background:\s*url\('\/assets\/softora-telefonie-studio\.jpg'\) center center \/ cover no-repeat;/s,
+    'Voicesoftware hero moet een voice/telefonie-foto gebruiken in plaats van een generiek dashboard'
+  );
+  assert.notStrictEqual(
+    bedrijfssoftware.match(legacyHeroBackground)?.[1],
+    voicesoftware.match(legacyHeroBackground)?.[1],
+    'Oudere servicepagina’s mogen niet opnieuw dezelfde generieke hero-foto delen'
+  );
+});
+
 test('seo-growth mobile navigation keeps the contact CTA in the visible flow', () => {
   const css = readFile('assets/seo-growth-pages.css');
 
