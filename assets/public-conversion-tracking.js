@@ -67,6 +67,44 @@
     link.setAttribute('href', MARTIJN_WHATSAPP_URL);
   }
 
+  function getSubmitControl(event) {
+    var submitter = event && event.submitter;
+    if (
+      submitter &&
+      submitter.matches &&
+      submitter.matches('[data-softora-conversion][data-softora-whatsapp-action="submit"]')
+    ) {
+      return submitter;
+    }
+
+    var form = event && event.target;
+    if (form && form.querySelector) {
+      return form.querySelector('[data-softora-conversion][data-softora-whatsapp-action="submit"]');
+    }
+
+    return null;
+  }
+
+  function handleConversionSubmit(event) {
+    var control = getSubmitControl(event);
+    if (!control) return;
+
+    var target = getAttr(control, 'data-softora-conversion-target');
+    var whatsappUrl = getAttr(control, 'data-softora-whatsapp-url');
+    if (target !== 'whatsapp' || !isMartijnWhatsappUrl(whatsappUrl)) return;
+
+    var form = event && event.target;
+    if (form && form.checkValidity && !form.checkValidity()) return;
+
+    recordConversion(control);
+
+    if (event && !event.defaultPrevented) {
+      event.preventDefault();
+      window.open(MARTIJN_WHATSAPP_URL, '_blank', 'noopener,noreferrer');
+    }
+  }
+
   getLandingPath();
   document.addEventListener('click', handleConversionClick, true);
+  document.addEventListener('submit', handleConversionSubmit);
 })();

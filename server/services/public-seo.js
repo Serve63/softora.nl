@@ -749,7 +749,7 @@ function addPublicConversionTrackingScriptIfMissing(htmlRaw) {
 
   return injectBeforeBodyClose(
     html,
-    '    <script src="/assets/public-conversion-tracking.js?v=20260529a" defer></script>'
+    '    <script src="/assets/public-conversion-tracking.js?v=20260601a" defer></script>'
   );
 }
 
