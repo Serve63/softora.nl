@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const { createUiStateStore } = require('../../server/services/ui-state');
 
+const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
+
 function createFixture(overrides = {}) {
   const inMemoryUiStateByScope = new Map();
   const loggerCalls = [];
@@ -56,6 +58,32 @@ test('ui-state store normalizes scopes and sanitizes values', () => {
     ok: 'yes',
     empty: '',
   });
+});
+
+test('ui-state store keeps large coldmail send guard values intact while sanitizing', () => {
+  const { store } = createFixture({ isSupabaseConfigured: false });
+  const largeGuard = JSON.stringify({
+    entries: [],
+    recipientEntries: Array.from({ length: 1200 }, (_, index) => ({
+      at: '2026-05-31T13:10:00.000Z',
+      recipientEmail: `lead-${index}@example.test`,
+      recipientKey: `email:lead-${index}@example.test`,
+      recipientCompany: `Company ${index}`,
+      permanent: true,
+      provider: 'instantly',
+      source: 'instantly-import',
+      reason: 'Permanent Instantly guard that must not be truncated.',
+    })),
+  });
+
+  assert.ok(largeGuard.length > 200000);
+  const sanitized = store.sanitizeUiStateValues({
+    [COLDMAIL_SEND_GUARD_KEY]: largeGuard,
+    default_limit: 'x'.repeat(250000),
+  });
+
+  assert.equal(sanitized[COLDMAIL_SEND_GUARD_KEY].length, largeGuard.length);
+  assert.equal(sanitized.default_limit.length, 200000);
 });
 
 test('ui-state store reads values through REST fallback when client is unavailable', async () => {
@@ -126,6 +154,91 @@ test('ui-state store writes values through REST fallback when client upsert fail
     panel: 'overview',
     nullable: '',
   });
+});
+
+test('ui-state store merges live coldmail send guards before saving stale state', async () => {
+  const existingInstantlyGuard = {
+    at: '2026-05-31T13:10:00.000Z',
+    recipientKey: 'email:old-instantly@example.test',
+    recipientEmail: 'old-instantly@example.test',
+    recipientCompany: 'Old Instantly Company',
+    permanent: true,
+    provider: 'instantly',
+    source: 'instantly-import',
+  };
+  const newSendGuard = {
+    at: '2026-06-01T11:08:36.049Z',
+    senderEmail: 'servec321@gmail.com',
+    recipientKey: 'email:new-softora@example.test',
+    recipientEmail: 'new-softora@example.test',
+    recipientCompany: 'New Softora Company',
+  };
+  const upserts = [];
+  const client = {
+    from(table) {
+      assert.equal(table, 'app_state');
+      return {
+        select(columns) {
+          assert.equal(columns, 'payload');
+          return {
+            eq(column, value) {
+              assert.equal(column, 'state_key');
+              assert.equal(value, 'ui_state:premium_coldmail_send_guard');
+              return {
+                async maybeSingle() {
+                  return {
+                    data: {
+                      payload: {
+                        values: {
+                          [COLDMAIL_SEND_GUARD_KEY]: JSON.stringify({
+                            entries: [],
+                            recipientEntries: [existingInstantlyGuard],
+                          }),
+                        },
+                      },
+                    },
+                    error: null,
+                  };
+                },
+              };
+            },
+          };
+        },
+        async upsert(row) {
+          upserts.push(row);
+          return { error: null };
+        },
+      };
+    },
+  };
+  const { store } = createFixture({ client });
+
+  await store.setUiStateValues(
+    'premium_coldmail_send_guard',
+    {
+      [COLDMAIL_SEND_GUARD_KEY]: JSON.stringify({
+        entries: [newSendGuard],
+        recipientEntries: [newSendGuard],
+      }),
+    },
+    { source: 'coldmail-send-guard' }
+  );
+
+  assert.equal(upserts.length, 1);
+  const saved = JSON.parse(upserts[0].payload.values[COLDMAIL_SEND_GUARD_KEY]);
+  assert.equal(
+    saved.recipientEntries.some(
+      (entry) =>
+        entry.recipientEmail === 'old-instantly@example.test' &&
+        entry.permanent === true &&
+        entry.provider === 'instantly'
+    ),
+    true
+  );
+  assert.equal(
+    saved.recipientEntries.some((entry) => entry.recipientEmail === 'new-softora@example.test'),
+    true
+  );
 });
 
 test('ui-state store reads values through REST fallback when client read crashes', async () => {

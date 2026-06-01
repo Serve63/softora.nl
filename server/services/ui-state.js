@@ -1,3 +1,63 @@
+const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
+const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
+const DEFAULT_UI_STATE_VALUE_MAX_LENGTH = 200000;
+const COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH = 1000000;
+const COLDMAIL_SEND_GUARD_MAX_ENTRIES = 1000;
+const COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES = 3000;
+
+function safeJsonObjectParse(value) {
+  try {
+    const parsed = JSON.parse(String(value || '{}'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function stableGuardEntryKey(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  return JSON.stringify(
+    Object.keys(entry)
+      .sort()
+      .reduce((out, key) => {
+        const value = entry[key];
+        if (value !== undefined) out[key] = value;
+        return out;
+      }, {})
+  );
+}
+
+function dedupeGuardEntries(entries) {
+  const seen = new Set();
+  return (Array.isArray(entries) ? entries : []).filter((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const key = stableGuardEntryKey(entry);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function mergeColdmailSendGuardStates(currentRaw, incomingRaw) {
+  const current = safeJsonObjectParse(currentRaw);
+  const incoming = safeJsonObjectParse(incomingRaw);
+  const entries = dedupeGuardEntries([
+    ...(Array.isArray(current.entries) ? current.entries : []),
+    ...(Array.isArray(incoming.entries) ? incoming.entries : []),
+  ]).slice(-COLDMAIL_SEND_GUARD_MAX_ENTRIES);
+  const recipientEntries = dedupeGuardEntries([
+    ...(Array.isArray(current.recipientEntries) ? current.recipientEntries : []),
+    ...(Array.isArray(current.entries) ? current.entries : []),
+    ...(Array.isArray(incoming.recipientEntries) ? incoming.recipientEntries : []),
+    ...(Array.isArray(incoming.entries) ? incoming.entries : []),
+  ]).slice(-COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES);
+  return JSON.stringify({
+    ...incoming,
+    entries,
+    recipientEntries,
+  });
+}
+
 function createUiStateStore(deps = {}) {
   const {
     uiStateScopePrefix = 'ui_state:',
@@ -36,6 +96,11 @@ function createUiStateStore(deps = {}) {
     return normalizedScope ? `${uiStateScopePrefix}${normalizedScope}` : '';
   }
 
+  function getUiStateValueMaxLength(key) {
+    if (key === COLDMAIL_SEND_GUARD_KEY) return COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH;
+    return DEFAULT_UI_STATE_VALUE_MAX_LENGTH;
+  }
+
   function sanitizeUiStateValues(values) {
     if (!values || typeof values !== 'object' || Array.isArray(values)) return {};
     const out = {};
@@ -47,7 +112,7 @@ function createUiStateStore(deps = {}) {
         out[key] = '';
         continue;
       }
-      out[key] = truncateText(String(rawValue), 200000);
+      out[key] = truncateText(String(rawValue), getUiStateValueMaxLength(key));
     }
     return out;
   }
@@ -199,6 +264,37 @@ function createUiStateStore(deps = {}) {
     try {
       const client = getSupabaseClient();
       const rowKey = getUiStateRowKey(normalizedScope);
+      if (
+        normalizedScope === COLDMAIL_SEND_GUARD_SCOPE &&
+        Object.prototype.hasOwnProperty.call(sanitizedValues, COLDMAIL_SEND_GUARD_KEY)
+      ) {
+        try {
+          let currentRow = null;
+          if (client) {
+            const { data, error } = await client
+              .from(supabaseStateTable)
+              .select('payload')
+              .eq('state_key', rowKey)
+              .maybeSingle();
+            if (!error) currentRow = data || null;
+          }
+          if (!currentRow) {
+            const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload');
+            if (fallback.ok) {
+              currentRow = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
+            }
+          }
+          const currentRaw = currentRow?.payload?.values?.[COLDMAIL_SEND_GUARD_KEY] || '';
+          if (currentRaw) {
+            sanitizedValues[COLDMAIL_SEND_GUARD_KEY] = mergeColdmailSendGuardStates(
+              currentRaw,
+              sanitizedValues[COLDMAIL_SEND_GUARD_KEY]
+            );
+          }
+        } catch (error) {
+          logger.error('[UI State][ColdmailSendGuardMergeError]', error?.message || error);
+        }
+      }
       const row = {
         state_key: rowKey,
         payload: {
