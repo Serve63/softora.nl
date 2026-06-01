@@ -243,6 +243,9 @@ test('ai telefonist money page answers comparison and follow-up intent', () => {
   assert.match(source, /<meta name="description" content="Laat een AI telefonist maken door Softora/);
   assert.match(source, /Laat geen telefoontje meer zonder opvolging/);
   assert.match(source, /AI telefonist, voicemail of callcenter\?/);
+  assert.match(source, /Wat moet een AI telefonist weten voordat hij opneemt\?/);
+  assert.match(source, /Overdrachtsregels voor boze, gevoelige of onduidelijke gesprekken/);
+  assert.match(source, /Bestemming van de samenvatting: CRM, mailbox, taak of dashboard/);
   assert.match(source, /Veelgestelde vragen over een AI telefonist/);
   assert.match(source, /Wat doet een AI telefonist na een gesprek\?/);
   assert.match(source, /Wanneer moet een mens het overnemen\?/);
