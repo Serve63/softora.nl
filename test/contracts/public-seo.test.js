@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const {
   INDEXABLE_PUBLIC_SEO_PAGES,
@@ -22,6 +23,77 @@ const KNOWN_FILES = new Set([
   'premium-seo.html',
   'premium-websitegenerator.html',
 ]);
+
+function runPublicConversionTracker({ formIsValid = true } = {}) {
+  const listeners = {};
+  const opened = [];
+  const dispatched = [];
+  const submitControl = {
+    matches(selector) {
+      return selector === '[data-softora-conversion][data-softora-whatsapp-action="submit"]';
+    },
+    getAttribute(name) {
+      return {
+        'data-softora-conversion': 'public-form-submit',
+        'data-softora-conversion-page': '/contact',
+        'data-softora-conversion-target': 'whatsapp',
+        'data-softora-whatsapp-action': 'submit',
+        'data-softora-whatsapp-url': 'https://wa.me/31643262792',
+      }[name] || '';
+    },
+  };
+  const fakeForm = {
+    checkValidity: () => formIsValid,
+    querySelector: () => submitControl,
+  };
+  const context = {
+    URL,
+    CustomEvent: function CustomEvent(name, options) {
+      this.type = name;
+      this.detail = options && options.detail;
+    },
+    document: {
+      referrer: 'https://www.softora.nl/diensten?utm=test',
+      addEventListener(type, handler) {
+        listeners[type] = handler;
+      },
+    },
+    window: {
+      location: { origin: 'https://www.softora.nl', pathname: '/contact', search: '?bron=seo' },
+      open(url, target, features) {
+        opened.push({ url, target, features });
+        return {};
+      },
+      dispatchEvent(event) {
+        dispatched.push(event);
+      },
+    },
+  };
+  context.window.window = context.window;
+  context.window.document = context.document;
+
+  const trackerSource = fs.readFileSync(path.join(root, 'assets/public-conversion-tracking.js'), 'utf8');
+  vm.runInNewContext(trackerSource, context);
+
+  let prevented = false;
+  listeners.submit({
+    target: fakeForm,
+    submitter: submitControl,
+    defaultPrevented: false,
+    preventDefault() {
+      prevented = true;
+      this.defaultPrevented = true;
+    },
+  });
+
+  return {
+    opened,
+    dispatched,
+    prevented,
+    events: context.window.__softoraPublicConversionEvents || [],
+    lastConversion: context.window.__softoraPublicLastConversion,
+  };
+}
 
 test('public seo sitemap exposes the indexable acquisition pages only', () => {
   const sitemap = buildPublicSeoSitemapXml({
@@ -97,7 +169,7 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /"addressRegion":"Noord-Brabant"/);
   assert.match(first, /"contactType":"sales"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
-  assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260529a" defer><\/script>/);
+  assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260601a" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal((second.match(/data-softora-public-seo="internal-links"/g) || []).length, 1);
@@ -153,6 +225,9 @@ test('public seo pages load first-party conversion tracking once', () => {
   assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(trackerSource, /softora:public-conversion/);
   assert.match(trackerSource, /recordConversion\(link\)/);
+  assert.match(trackerSource, /document\.addEventListener\('submit', handleConversionSubmit\)/);
+  assert.match(trackerSource, /recordConversion\(control\)/);
+  assert.match(trackerSource, /window\.open\(MARTIJN_WHATSAPP_URL, '_blank', 'noopener,noreferrer'\)/);
   assert.match(trackerSource, /link\.setAttribute\('href', MARTIJN_WHATSAPP_URL\)/);
   assert.doesNotMatch(trackerSource, /Landingspagina: |CTA-pagina: |Referrer: |\?text=|searchParams\.set\('text'|buildWhatsappText|withWhatsappText/);
   assert.doesNotMatch(trackerSource, /localStorage|sessionStorage/);
@@ -169,6 +244,44 @@ test('public seo pages load first-party conversion tracking once', () => {
       `${entry.path} mist de publieke conversietracker.`
     );
   }
+});
+
+test('public conversion tracker records valid WhatsApp form submits without browser storage', () => {
+  const trackerSource = fs.readFileSync(path.join(root, 'assets/public-conversion-tracking.js'), 'utf8');
+
+  assert.match(trackerSource, /function handleConversionSubmit\(event\)/);
+  assert.match(trackerSource, /data-softora-whatsapp-action="submit"/);
+  assert.match(trackerSource, /data-softora-whatsapp-url/);
+  assert.match(trackerSource, /if \(form && form\.checkValidity && !form\.checkValidity\(\)\) return;/);
+  assert.doesNotMatch(trackerSource, /localStorage|sessionStorage/);
+});
+
+test('public conversion tracker measures and routes valid WhatsApp form submits', () => {
+  const result = runPublicConversionTracker();
+
+  assert.equal(result.prevented, true);
+  assert.deepEqual(result.opened, [
+    {
+      url: 'https://wa.me/31643262792',
+      target: '_blank',
+      features: 'noopener,noreferrer',
+    },
+  ]);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.lastConversion.name, 'public-form-submit');
+  assert.equal(result.lastConversion.page, '/contact');
+  assert.equal(result.lastConversion.target, 'whatsapp');
+  assert.equal(result.lastConversion.landing, '/contact?bron=seo');
+  assert.equal(result.lastConversion.referrer, '/diensten?utm=test');
+  assert.equal(result.dispatched[0].type, 'softora:public-conversion');
+});
+
+test('public conversion tracker does not count invalid WhatsApp form submits', () => {
+  const result = runPublicConversionTracker({ formIsValid: false });
+
+  assert.equal(result.prevented, false);
+  assert.deepEqual(result.opened, []);
+  assert.deepEqual(result.events, []);
 });
 
 const CORE_INTERNAL_LINK_EXPECTATIONS = [
