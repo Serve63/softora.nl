@@ -1456,6 +1456,251 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-processen-automatiseren-zonder-controle-verliezen',
+    title: 'AI processen automatiseren zonder controle te verliezen',
+    description:
+      'Hoe MKB-bedrijven AI processen kunnen automatiseren met duidelijke grenzen, menselijke controle en bruikbare opvolging.',
+    category: 'AI automatisering',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-09',
+    updatedAt: '2026-06-09',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-automatisering-workflow-softora.jpg',
+      alt: 'Team bespreekt een AI automatiseringsworkflow met duidelijke processtappen, overdracht en menselijke controle.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'AI processen automatiseren werkt alleen verantwoord wanneer input, beslismomenten, systeemkoppelingen en menselijke controle vooraf helder zijn.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Begin bij het proces dat elke week terugkomt',
+        paragraphs: Object.freeze([
+          'Een proces automatiseren met AI begint niet bij een model of prompt, maar bij terugkerend werk dat nu tijd kost. Denk aan aanvragen samenvatten, klantvragen sorteren, offertes voorbereiden, taken klaarzetten of gesprekken vertalen naar CRM-notities.',
+          'Voor MKB-bedrijven is vooral herhaalbaarheid belangrijk. Als dezelfde informatie steeds opnieuw binnenkomt en dezelfde vervolgstap nodig is, kan AI helpen om de eerste voorbereiding sneller en consistenter te maken.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Leg vast wat AI wel en niet mag doen',
+        paragraphs: Object.freeze([
+          'De sterkste AI processen hebben duidelijke grenzen. AI mag bijvoorbeeld informatie samenvatten, ontbrekende velden signaleren of een vervolgtaak voorstellen. Belangrijke keuzes, uitzonderingen en gevoelige beslissingen blijven zichtbaar voor een medewerker.',
+          'Die verdeling voorkomt dat automatisering oncontroleerbaar wordt. Het team ziet welke informatie is gebruikt, welke suggestie AI doet en waar menselijke beoordeling nodig blijft voordat er actie wordt genomen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppel de uitkomst aan je bestaande werkroute',
+        paragraphs: Object.freeze([
+          'Een AI proces wordt pas nuttig wanneer het resultaat ergens landt. Een samenvatting in een los venster is kwetsbaar. Een CRM-taak, agenda-actie, mailboxconcept of dashboardmelding maakt de informatie bruikbaar voor opvolging.',
+          'Softora bouwt AI automatisering daarom rond de route die al belangrijk is: website, formulier, chatbot, telefonie, CRM, mailbox of planning. Zo ondersteunt AI het proces zonder dat het team grip kwijtraakt.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'AI automatisering voor leadopvolging', href: '/blog/ai-automatisering-leadopvolging' }),
+      Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-ai-workflow',
+    title: 'Wat is een AI workflow?',
+    description:
+      'Een heldere uitleg van AI workflows: hoe invoer, AI-stappen, menselijke controle en systeemkoppelingen samen een proces vormen.',
+    category: 'AI automatisering',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-10',
+    updatedAt: '2026-06-10',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-leadopvolging-workflow-mkb-softora.jpg',
+      alt: 'Werktafel met procesnotities voor een AI workflow die leads samenvat, kwalificeert en overdraagt aan een medewerker.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een AI workflow is een vaste route waarin AI informatie verwerkt, een taak voorbereidt en de uitkomst doorzet naar een mens of systeem.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Een AI workflow is een proces waarin kunstmatige intelligentie een duidelijke stap uitvoert binnen een vaste route. De workflow bepaalt welke informatie binnenkomt, wat AI ermee mag doen en waar de uitkomst daarna terechtkomt.',
+          'Voorbeelden zijn een formulier dat automatisch wordt samengevat, een telefoongesprek dat een CRM-notitie wordt of een chatbotgesprek dat eindigt in een taak voor opvolging.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke onderdelen erbij horen',
+        paragraphs: Object.freeze([
+          'Een goede AI workflow bestaat uit input, instructies, controle, output en overdracht. Input kan tekst, een gesprek, een formulier of klantdata zijn. De instructies bepalen hoe AI die informatie moet beoordelen of samenvatten.',
+          'Daarna volgt de controle: mag AI alleen voorbereiden of ook iets klaarzetten? De output moet vervolgens bruikbaar zijn, bijvoorbeeld als taak, status, mailconcept, agenda-actie of CRM-notitie.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waarom menselijke controle nodig blijft',
+        paragraphs: Object.freeze([
+          'AI kan helpen om herhaling sneller te verwerken, maar context en verantwoordelijkheid verdwijnen niet. Bij commerciële keuzes, uitzonderingen of gevoelige klantvragen moet een medewerker kunnen meekijken.',
+          'Daarom werkt een AI workflow het beste als hij transparant is. Je wilt kunnen zien wat AI heeft gedaan, welke informatie is gebruikt en welke stap daarna logisch is.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'AI processen automatiseren', href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen' }),
+      Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'website-crm-koppeling-leadopvolging-mkb',
+    title: 'Website en CRM koppelen voor betere MKB leadopvolging',
+    description:
+      'Waarom een website sterker wordt wanneer aanvragen direct landen in CRM, taken, statusoverzicht en meetbare opvolging.',
+    category: 'CRM',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-11',
+    updatedAt: '2026-06-11',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-datakwaliteit-klantopvolging-softora.jpg',
+      alt: 'Medewerkers bespreken CRM klantopvolging met websiteaanvragen, leadstatussen en duidelijke vervolgtaken.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een website-CRM-koppeling voorkomt dat aanvragen blijven hangen in losse inboxen en maakt opvolging beter zichtbaar voor het team.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een aanvraag is pas waardevol als opvolging klopt',
+        paragraphs: Object.freeze([
+          'Een MKB-website kan bezoekers aantrekken, uitleg geven en contactmomenten verzamelen. Maar als aanvragen daarna in losse mailboxen, WhatsApp-gesprekken of spreadsheets blijven hangen, wordt leadopvolging alsnog kwetsbaar.',
+          'Door de website aan CRM te koppelen, krijgt elke aanvraag sneller een plek. Het team ziet wie contact heeft opgenomen, welke dienst relevant is, welke status erbij hoort en welke vervolgstap nodig is.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke informatie je direct wilt vastleggen',
+        paragraphs: Object.freeze([
+          'De basis hoeft niet ingewikkeld te zijn. Naam, bedrijf, contactgegevens, dienst, vraag, bronpagina, urgentie en gewenste opvolging geven vaak al genoeg context om sneller te reageren.',
+          'Daarna kun je uitbreiden met automatische samenvattingen, leadkwalificatie, taken, agenda-acties en rapportages. De koppeling moet vooral voorkomen dat informatie opnieuw handmatig wordt overgetypt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak leadkwaliteit meetbaar',
+        paragraphs: Object.freeze([
+          'Een CRM-koppeling maakt ook duidelijk welke pagina’s passende aanvragen opleveren. Niet alleen het aantal leads telt, maar ook de kwaliteit van de vraag, de snelheid van opvolging en de stap die daarna wordt gezet.',
+          'Softora kijkt daarom naar de hele route: zoekvraag, websitepagina, CTA, aanvraag, CRM-status en actie. Zo wordt websitegroei beter verbonden met het echte verkoopproces.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Website leadgeneratie meten', href: '/blog/website-leadgeneratie-mkb-meten' }),
+      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-sales-pipeline-crm',
+    title: 'Wat is een sales pipeline in CRM?',
+    description:
+      'Een praktische uitleg van sales pipelines in CRM: fases, taken, eigenaarschap en opvolging van nieuwe lead tot klant.',
+    category: 'CRM',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-12',
+    updatedAt: '2026-06-12',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+      alt: 'CRM-dashboard met sales pipeline, leadfases en opvolgtaken voor overzichtelijke commerciële opvolging.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een sales pipeline is de vaste route waarmee een team ziet in welke fase een lead zit en welke actie nodig is.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Een sales pipeline is een overzicht van commerciële fases. Een lead komt bijvoorbeeld binnen als nieuwe aanvraag, gaat daarna naar kwalificatie, afspraak, voorstel, opvolging en uiteindelijk gewonnen of verloren.',
+          'In een CRM helpt zo’n pipeline om overzicht te houden. Je ziet welke kansen openstaan, wie eigenaar is en welke taak als volgende moet gebeuren.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waarom fases duidelijk moeten zijn',
+        paragraphs: Object.freeze([
+          'Een pipeline werkt alleen wanneer iedereen dezelfde betekenis geeft aan een fase. Als “opvolgen” voor de ene medewerker iets anders betekent dan voor de andere, wordt rapportage onbetrouwbaar.',
+          'Daarom begint een goed CRM niet met zoveel mogelijk velden, maar met heldere statusovergangen. Welke informatie is nodig om naar de volgende fase te gaan en wie beslist dat?',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Hoe automatisering kan ondersteunen',
+        paragraphs: Object.freeze([
+          'Automatisering kan helpen door taken klaar te zetten, ontbrekende informatie te signaleren of een samenvatting te maken na een formulier, chatbotgesprek of telefoontje.',
+          'AI kan daarbij ondersteunen, maar de pipeline blijft een proceskeuze. Het team moet kunnen controleren of de fase klopt en welke commerciële stap verstandig is.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
+      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'vergelijkingen',
+    slug: 'crm-op-maat-vs-standaard-crm',
+    title: 'CRM op maat vs standaard CRM: wanneer kies je wat?',
+    description:
+      'Een nuchtere vergelijking tussen standaard CRM en CRM op maat voor MKB-bedrijven die leads, klanten en opvolging beter willen organiseren.',
+    category: 'CRM',
+    intent: 'Vergelijking',
+    publishedAt: '2026-06-15',
+    updatedAt: '2026-06-15',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+      alt: 'CRM-dashboard en procesoverzicht waarmee standaard CRM en CRM op maat praktisch worden vergeleken.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Standaard CRM is vaak sterk om snel te starten, terwijl CRM op maat logischer wordt wanneer je eigen proces leidend moet zijn.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Standaard CRM is vaak logisch bij een duidelijke basis',
+        paragraphs: Object.freeze([
+          'Een standaard CRM kan een goede keuze zijn wanneer je vooral contactgegevens, notities, taken en eenvoudige opvolging wilt vastleggen. Je kunt relatief snel starten en hoeft minder keuzes zelf te maken.',
+          'De beperking ontstaat wanneer je werkwijze niet goed past in de vaste schermen, fases of rapportages. Dan gaan teams alsnog werken met extra spreadsheets, losse notities of handmatige omwegen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'CRM op maat wordt interessant bij eigen processen',
+        paragraphs: Object.freeze([
+          'CRM op maat is vooral logisch wanneer je eigen leadfases, rollen, berekeningen, klanttypes, automatiseringen of koppelingen nodig hebt. Het systeem volgt dan de manier waarop je team werkt in plaats van andersom.',
+          'Dat betekent niet dat maatwerk altijd groter moet zijn. De beste eerste versie is vaak compact: duidelijke pipeline, klantkaart, taken, statusoverzicht en koppeling met website, mailbox of agenda.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Vergelijk vooral op procesfit',
+        paragraphs: Object.freeze([
+          'De juiste keuze hangt niet alleen af van prijs of functies. Belangrijker is of het CRM ervoor zorgt dat leads sneller duidelijkheid krijgen, klantinformatie betrouwbaar blijft en medewerkers minder dubbel werk doen.',
+          'Softora kijkt daarom eerst naar de route van aanvraag naar opvolging. Als standaard CRM die route goed draagt, is dat prima. Als het proces onderscheidend is of veel omwegen vraagt, wordt CRM op maat sterker.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
+      Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Maatwerk software vs standaard software', href: '/vergelijkingen/maatwerk-software-vs-standaard-software' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
