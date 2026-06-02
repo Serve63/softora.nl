@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const { createPublicContactService } = require('../../server/services/public-contact');
 const { registerPublicContactRoutes } = require('../../server/routes/public-contact');
+const { createPublicConversionService } = require('../../server/services/public-conversion');
+const { registerPublicConversionRoutes } = require('../../server/routes/public-conversion');
 
 function createResponseRecorder() {
   return {
@@ -101,5 +103,48 @@ test('public contact route exposes the contact endpoint', () => {
   registerPublicContactRoutes(app, { coordinator });
 
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/public-contact'));
+  assert.equal(typeof routes[0][2], 'function');
+});
+
+test('public conversion service logs sanitized WhatsApp CTA events', () => {
+  const logs = [];
+  const service = createPublicConversionService({
+    logger: { info: (...args) => logs.push(args) },
+    now: () => new Date('2026-06-02T10:15:00.000Z'),
+  });
+
+  const event = service.recordConversion(
+    {
+      name: 'public-cta',
+      page: '/diensten',
+      target: 'WHATSAPP',
+      landing: '/diensten?utm=seo',
+      referrer: '/blog/website-leadgeneratie',
+      path: '/diensten',
+      at: '2026-06-02T10:14:59.000Z',
+    },
+    { ip: '127.0.0.1', userAgent: 'contract-test' }
+  );
+
+  assert.equal(event.target, 'whatsapp');
+  assert.equal(event.receivedAt, '2026-06-02T10:15:00.000Z');
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0][0], '[PublicConversion][CTA]');
+  assert.equal(logs[0][1].page, '/diensten');
+  assert.equal(logs[0][1].userAgent, 'contract-test');
+});
+
+test('public conversion route exposes anonymous first-party measurement endpoint', () => {
+  const routes = [];
+  const coordinator = { recordResponse: () => null };
+  const app = {
+    post(pathname, handler) {
+      routes.push(['POST', pathname, handler]);
+    },
+  };
+
+  registerPublicConversionRoutes(app, { coordinator });
+
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/public-conversion'));
   assert.equal(typeof routes[0][2], 'function');
 });

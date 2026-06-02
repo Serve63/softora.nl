@@ -8,6 +8,7 @@ const {
 } = require('./premium-database-webdesign-jobs');
 const { createMailboxService } = require('./mailbox');
 const { createPublicContactService } = require('./public-contact');
+const { createPublicConversionService } = require('./public-conversion');
 const {
   buildAgendaAppRuntimeOptions,
   buildAiDashboardRuntimeOptions,
@@ -54,6 +55,11 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
   const publicContactCoordinator = createPublicContactService(
     featureRouteOptions.publicContact || {}
   );
+  const publicConversionCoordinator = createPublicConversionService(
+    featureRouteOptions.publicConversion || {
+      logger: aiDashboardOptions.logger || console,
+    }
+  );
 
   registerFeatureRoutesImpl(
     app,
@@ -66,6 +72,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
       premiumDatabaseWebdesignJobsCoordinator,
       mailboxCoordinator,
       publicContactCoordinator,
+      publicConversionCoordinator,
     })
   );
 

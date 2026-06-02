@@ -28,6 +28,7 @@ function runPublicConversionTracker({ formIsValid = true } = {}) {
   const listeners = {};
   const opened = [];
   const dispatched = [];
+  const beacons = [];
   const submitControl = {
     matches(selector) {
       return selector === '[data-softora-conversion][data-softora-whatsapp-action="submit"]';
@@ -67,6 +68,16 @@ function runPublicConversionTracker({ formIsValid = true } = {}) {
       dispatchEvent(event) {
         dispatched.push(event);
       },
+      navigator: {
+        sendBeacon(url, body) {
+          beacons.push({ url, body });
+          return true;
+        },
+      },
+      Blob: function Blob(parts, options) {
+        this.parts = parts;
+        this.type = options && options.type;
+      },
     },
   };
   context.window.window = context.window;
@@ -88,6 +99,7 @@ function runPublicConversionTracker({ formIsValid = true } = {}) {
 
   return {
     opened,
+    beacons,
     dispatched,
     prevented,
     events: context.window.__softoraPublicConversionEvents || [],
@@ -224,6 +236,9 @@ test('public seo pages load first-party conversion tracking once', () => {
 
   assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(trackerSource, /softora:public-conversion/);
+  assert.match(trackerSource, /\/api\/public-conversion/);
+  assert.match(trackerSource, /sendBeacon\(\s*'\/api\/public-conversion'/);
+  assert.match(trackerSource, /keepalive: true/);
   assert.match(trackerSource, /recordConversion\(link\)/);
   assert.match(trackerSource, /document\.addEventListener\('submit', handleConversionSubmit\)/);
   assert.match(trackerSource, /recordConversion\(control\)/);
@@ -268,6 +283,10 @@ test('public conversion tracker measures and routes valid WhatsApp form submits'
     },
   ]);
   assert.equal(result.events.length, 1);
+  assert.equal(result.beacons.length, 1);
+  assert.equal(result.beacons[0].url, '/api/public-conversion');
+  assert.equal(result.beacons[0].body.type, 'application/json');
+  assert.match(result.beacons[0].body.parts[0], /"landing":"\/contact\?bron=seo"/);
   assert.equal(result.lastConversion.name, 'public-form-submit');
   assert.equal(result.lastConversion.page, '/contact');
   assert.equal(result.lastConversion.target, 'whatsapp');

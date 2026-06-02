@@ -159,6 +159,21 @@ test('public contact route validates anonymous contact requests server-side', as
   assert.equal(typeof body.error, 'string');
 });
 
+test('public conversion route accepts anonymous WhatsApp CTA measurement', async () => {
+  const { response, body } = await postJson('/api/public-conversion', {
+    name: 'public-cta',
+    page: '/diensten',
+    target: 'whatsapp',
+    landing: '/diensten?utm=seo',
+    referrer: '/blog/website-leadgeneratie',
+    path: '/diensten',
+    at: '2026-06-02T10:20:00.000Z',
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+});
+
 test('seo read routes keep their auth boundaries', async () => {
   const pagesResult = await getProtectedApiExpectation('/api/seo/pages');
   if (pagesResult.response.status === 200) {
