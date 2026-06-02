@@ -334,22 +334,6 @@ h2 {
   max-height: 330px;
 }
 
-.harvest-panel-no-website h2 span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 20px;
-  margin-left: 8px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(139, 34, 82, .10);
-  color: var(--harvest-brand);
-  font-size: 12px;
-  line-height: 1;
-  vertical-align: middle;
-}
-
 .harvest-table {
   width: 100%;
   border-collapse: collapse;

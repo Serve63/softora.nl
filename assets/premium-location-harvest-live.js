@@ -241,8 +241,7 @@
 
   function renderNoWebsiteCompanies(payload) {
     const body = byId("harvestNoWebsiteTableBody");
-    const countNode = byId("harvestNoWebsiteCount");
-    if (!body || !countNode) return;
+    if (!body) return;
 
     const query = normalizeSearch(state.query);
     const companies = getCompanies(payload)
@@ -260,8 +259,6 @@
         ].join(" "));
         return !query || companyText.includes(query);
       });
-
-    countNode.textContent = String(companies.length);
 
     if (!companies.length) {
       body.innerHTML = '<tr><td colspan="4">Geen actieve complete bedrijven zonder website gevonden.</td></tr>';
