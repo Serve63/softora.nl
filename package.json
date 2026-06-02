@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "harvest:database": "node scripts/run-premium-database-harvest.js",
     "test:contracts": "node --test test/contracts/*.test.js",
     "test:smoke": "node --test test/smoke/*.test.js",
     "check:secrets": "node scripts/check-tracked-secrets.js",
