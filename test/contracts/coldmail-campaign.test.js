@@ -5147,6 +5147,43 @@ test('coldmail campaign recipient preview respects Oisterwijk radius', async () 
   assert.equal(result.recipients[0].distanceKm, 0);
 });
 
+test('coldmail campaign recipient preview does not filter by radius when radius is disabled', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'near-1',
+        bedrijf: 'Oisterwijk Winkel',
+        email: 'near@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Dorpsstraat 1, Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'far-north-1',
+        bedrijf: 'Groningen Studio',
+        email: 'groningen@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        lat: 53.2194,
+        lng: 6.5665,
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+    radiusKm: '',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.radiusKm, null);
+  assert.equal(result.selected, 2);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Oisterwijk Winkel', 'Groningen Studio']);
+});
+
 test('coldmail campaign radius includes real customer database places near Oisterwijk', async () => {
   const { service } = createService({
     rows: [
