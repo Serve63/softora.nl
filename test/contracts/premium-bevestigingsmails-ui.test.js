@@ -455,7 +455,7 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /<option value="info@softora\.nl"/);
   assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
   assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
-  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com', 'martijnven123@gmail\.com', 'serve290@gmail\.com', 'servecreusen7@gmail\.com'\]\);/);
+  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com', 'martijnven123@gmail\.com', 'serve290@gmail\.com', 'servecreusen7@gmail\.com', 'contact\.venvisuals@gmail\.com'\]\);/);
   assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
   assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
   assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
@@ -497,9 +497,10 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
-  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260602a/);
+  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260602b/);
   assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
   assert.match(senderSettingsSource, /"martijnven123@gmail\.com": "Goedemorgen \{\{naam\}\}/);
+  assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": "Goedemorgen \{\{naam\}\}/);
   assert.match(senderSettingsSource, /Servé Creusen/);
   assert.match(senderSettingsSource, /📍 \{\{stad\}\}/);
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
