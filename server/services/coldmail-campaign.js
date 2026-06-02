@@ -134,6 +134,7 @@ const TEST_RECIPIENT_EMAILS = new Set(COLDMAIL_TEST_RECIPIENT_EMAILS);
 const TEST_RECIPIENT_LOOKUP_EMAILS = new Set([COLDMAIL_TEST_RECIPIENT_EMAIL, 'servec321@gail.com']);
 const TEST_RECIPIENT_COMPANIES = new Set(['mcv e-commerce', 'softora testmodus']);
 const MARTIJN_LINKEDIN_CTA_PATTERN = /(?:💼\s*)?mijn\s+linkedin\s*👈?|linkedin\.com\/in\/martijn-van-de-ven/i;
+const COLDMAIL_AUTOPILOT_MAX_SENDER_EMAILS = 12;
 const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
@@ -2614,7 +2615,7 @@ function createColdmailCampaignService(deps = {}) {
         seen.add(email);
         return true;
       })
-      .slice(0, 5);
+      .slice(0, COLDMAIL_AUTOPILOT_MAX_SENDER_EMAILS);
   }
 
   function isColdmailAutopilotAllowedSenderEmail(value) {
