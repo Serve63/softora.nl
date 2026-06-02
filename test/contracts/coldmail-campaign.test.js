@@ -1664,7 +1664,7 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
   assert.equal(sentMessages[0].subject, 'Korte vraag voor Bakkerij Zon');
 });
 
-test('coldmail autopilot keeps all six configured Softora sender emails', async () => {
+test('coldmail autopilot keeps all seven configured Softora sender emails', async () => {
   const senderEmails = [
     'serve@softora.nl',
     'martijn@softora.nl',
@@ -1672,6 +1672,7 @@ test('coldmail autopilot keeps all six configured Softora sender emails', async 
     'martijnven123@gmail.com',
     'serve290@gmail.com',
     'servecreusen7@gmail.com',
+    'contact.venvisuals@gmail.com',
   ];
   const { service, getAutopilotState } = createService({
     rows: [],
@@ -2799,6 +2800,7 @@ test('coldmail campaign blocks private copies for personal senders', async () =>
     'martijnven123@gmail.com',
     'serve290@gmail.com',
     'servecreusen7@gmail.com',
+    'contact.venvisuals@gmail.com',
   ]) {
     const { service, sentMessages } = createService({
       coldmailAuditBcc: 'servec321@gmail.com',
@@ -5849,6 +5851,7 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
     'martijnven123@gmail.com',
     'serve290@gmail.com',
     'servecreusen7@gmail.com',
+    'contact.venvisuals@gmail.com',
   ]);
 });
 

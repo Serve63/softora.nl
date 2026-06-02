@@ -27,6 +27,7 @@ const DEFAULT_MAILBOX_EMAILS = [
   'martijnven123@gmail.com',
   'serve290@gmail.com',
   'servecreusen7@gmail.com',
+  'contact.venvisuals@gmail.com',
 ];
 const MAILBOX_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
@@ -35,6 +36,7 @@ const MAILBOX_DISPLAY_NAMES = {
   'martijnven123@gmail.com': 'Martijn van de Ven',
   'serve290@gmail.com': 'Servé Creusen',
   'servecreusen7@gmail.com': 'Servé Creusen',
+  'contact.venvisuals@gmail.com': 'Servé Creusen',
 };
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';

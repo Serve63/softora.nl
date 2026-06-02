@@ -142,6 +142,7 @@ const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'martijnven123@gmail.com',
   'serve290@gmail.com',
   'servecreusen7@gmail.com',
+  'contact.venvisuals@gmail.com',
 ]);
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
@@ -151,6 +152,7 @@ const SENDER_DISPLAY_NAMES = {
   'martijnven123@gmail.com': 'Martijn van de Ven',
   'serve290@gmail.com': 'Servé Creusen',
   'servecreusen7@gmail.com': 'Servé Creusen',
+  'contact.venvisuals@gmail.com': 'Servé Creusen',
 };
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
@@ -159,6 +161,7 @@ const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'martijnven123@gmail.com',
   'serve290@gmail.com',
   'servecreusen7@gmail.com',
+  'contact.venvisuals@gmail.com',
 ]);
 let cachedColdmailPreviewSharp = null;
 
@@ -204,6 +207,12 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
+  'contact.venvisuals@gmail.com': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
 };
 const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'serve@softora.nl',
@@ -212,6 +221,7 @@ const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'martijnven123@gmail.com',
   'serve290@gmail.com',
   'servecreusen7@gmail.com',
+  'contact.venvisuals@gmail.com',
 ]);
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
@@ -2177,6 +2187,7 @@ function createColdmailCampaignService(deps = {}) {
           'martijnven123@gmail.com',
           'serve290@gmail.com',
           'servecreusen7@gmail.com',
+          'contact.venvisuals@gmail.com',
         ]
           .map(normalizeEmailAddress)
           .filter(isLikelyValidEmail)
@@ -3137,7 +3148,8 @@ function createColdmailCampaignService(deps = {}) {
       email === 'servec321@gmail.com' ||
       email === 'martijnven123@gmail.com' ||
       email === 'serve290@gmail.com' ||
-      email === 'servecreusen7@gmail.com'
+      email === 'servecreusen7@gmail.com' ||
+      email === 'contact.venvisuals@gmail.com'
     ) {
       return normalizeColdmailingSenderProfile(fallback);
     }

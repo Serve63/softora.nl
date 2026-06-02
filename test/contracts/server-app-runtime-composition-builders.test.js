@@ -418,6 +418,7 @@ test('server app runtime composition builders preserve feature wiring groups and
     'martijnven123@gmail.com',
     'serve290@gmail.com',
     'servecreusen7@gmail.com',
+    'contact.venvisuals@gmail.com',
   ]);
   const testRecipients =
     await context.featureRouteOptions.coldmailing.coldmailCampaignService.getColdmailCampaignRecipients({
