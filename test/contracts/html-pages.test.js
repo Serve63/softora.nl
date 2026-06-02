@@ -36,7 +36,16 @@ function createResponseRecorder() {
 
 function createFixture() {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-'));
-  const knownFiles = new Set(['premium-website.html', 'premium-personeel-login.html', 'premium-personeel-agenda.html']);
+  const knownFiles = new Set([
+    'premium-website.html',
+    'premium-websites.html',
+    'website-laten-maken-oisterwijk.html',
+    'premium-bedrijfssoftware.html',
+    'premium-chatbot.html',
+    'premium-voicesoftware.html',
+    'premium-personeel-login.html',
+    'premium-personeel-agenda.html',
+  ]);
   const loggerCalls = [];
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
@@ -176,6 +185,46 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.match(res.body, /href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a"/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com/);
   assert.doesNotMatch(res.body, /fonts\.gstatic\.com/);
+});
+
+test('html page coordinator preloads public legacy service hero background images', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  const pages = [
+    {
+      fileName: 'premium-websites.html',
+      preload: '<link rel="preload" as="image" href="/assets/seo-content/website-leads-analytics-softora.jpg">',
+    },
+    {
+      fileName: 'website-laten-maken-oisterwijk.html',
+      preload: '<link rel="preload" as="image" href="/assets/seo-content/website-leads-analytics-softora.jpg">',
+    },
+    {
+      fileName: 'premium-bedrijfssoftware.html',
+      preload: '<link rel="preload" as="image" href="/assets/softora-crm-workflow.jpg">',
+    },
+    {
+      fileName: 'premium-chatbot.html',
+      preload:
+        '<link rel="preload" as="image" href="/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg">',
+    },
+    {
+      fileName: 'premium-voicesoftware.html',
+      preload: '<link rel="preload" as="image" href="/assets/softora-telefonie-studio.jpg">',
+    },
+  ];
+
+  for (const page of pages) {
+    fs.writeFileSync(
+      path.join(pagesDir, page.fileName),
+      '<!DOCTYPE html><html><head><title>Service</title></head><body>Service</body></html>'
+    );
+
+    const res = createResponseRecorder();
+    await coordinator.sendSeoManagedHtmlPageResponse({ originalUrl: '/' }, res, () => {}, page.fileName);
+
+    assert.match(res.body, new RegExp(page.preload.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.equal((res.body.match(/rel="preload" as="image"/g) || []).length, 1);
+  }
 });
 
 test('html page coordinator injects critical premium sidebar shell before theme stylesheet', async () => {
