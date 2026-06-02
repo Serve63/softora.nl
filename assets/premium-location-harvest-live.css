@@ -326,6 +326,22 @@ h2 {
   max-height: calc(100vh - 255px);
 }
 
+@media (min-width: 1001px) {
+  .harvest-panel-locations,
+  .harvest-results-column > .harvest-panel:first-child {
+    display: flex;
+    flex-direction: column;
+    height: max(430px, calc(100vh - 255px));
+  }
+
+  .harvest-panel-locations .harvest-location-list,
+  .harvest-results-column > .harvest-panel:first-child .harvest-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+  }
+}
+
 .harvest-panel-no-website {
   grid-column: 1 / -1;
 }
