@@ -326,6 +326,10 @@ h2 {
   max-height: calc(100vh - 255px);
 }
 
+.harvest-panel-no-website {
+  grid-column: 1 / -1;
+}
+
 .harvest-panel-no-website .harvest-table-wrap {
   max-height: 330px;
 }
