@@ -45,7 +45,7 @@
 
   function statusLabel(status) {
     const normalized = normalizeText(status).toLowerCase();
-    if (normalized === "done") return "Gedaan";
+    if (normalized === "done") return "";
     if (normalized === "previously_done") return "";
     if (normalized === "active") return "Bezig";
     if (normalized === "skipped") return "Overgeslagen";
@@ -54,7 +54,7 @@
 
   function statusClass(status) {
     const normalized = normalizeText(status).toLowerCase();
-    if (normalized === "previously_done") return "previous";
+    if (normalized === "done" || normalized === "previously_done") return "previous";
     if (["done", "active", "skipped"].includes(normalized)) return normalized;
     return "todo";
   }
