@@ -39,6 +39,13 @@ const DEFAULT_BLACKLIST = Object.freeze([
   'basisschool',
   'college',
   'festival',
+  'hulp en advies voor ondernemers',
+  'bedrijven in ',
+  'hilvarenbeek.nl',
+  'gemeentelink.nl',
+  'ondernemenindekempen.nl',
+  'timmerman-nu.nl',
+  'daadkracht-marketing.nl',
 ]);
 
 const DIRECTORY_DOMAINS = Object.freeze([
@@ -53,6 +60,8 @@ const DIRECTORY_DOMAINS = Object.freeze([
   'openingstijden.com',
   'indebuurt.nl',
   'trustoo.nl',
+  'ondernemenindekempen.nl',
+  'timmerman-nu.nl',
 ]);
 
 const SKIPPED_DOMAINS = Object.freeze([
@@ -314,8 +323,16 @@ function extractPhones(html) {
 function cleanupPhone(value) {
   const raw = normalizeString(value).replace(/\s+/g, ' ');
   const digits = raw.replace(/\D+/g, '');
-  if (digits.length < 7 || digits.length > 14) return '';
+  if (digits.length < 10 || digits.length > 14) return '';
   return raw;
+}
+
+function looksLikeFullStreetAddress(value) {
+  const line = normalizeString(value);
+  if (!line) return false;
+  const hasPostcode = /\b[1-9][0-9]{3}\s?[A-Z]{2}\b/i.test(line);
+  const hasStreetNumber = /\b[\p{L}'’.-]+(?:\s+[\p{L}'’.-]+){0,5}\s+\d+[a-z]?\b/iu.test(line);
+  return hasPostcode && hasStreetNumber;
 }
 
 function lineContainsExactPlace(line, place) {
@@ -350,6 +367,7 @@ function isBlacklistedCandidate(candidate, blacklist = DEFAULT_BLACKLIST) {
     candidate.website,
     candidate.email,
     candidate.address,
+    Array.isArray(candidate.sources) ? candidate.sources.join(' ') : '',
   ].join(' '));
   return (blacklist || DEFAULT_BLACKLIST).some((item) => haystack.includes(normalizeText(item)));
 }
@@ -381,9 +399,10 @@ function validateCandidate(candidate, target, options = {}) {
   if (!candidate.website || !normalizeDomain(candidate.website)) reasons.push('website ontbreekt');
   if (!candidate.websiteReachable) reasons.push('website niet bereikbaar of niet werkend');
   if (!candidate.email) reasons.push('e-mail ontbreekt');
-  if (!candidate.phone) reasons.push('telefoon ontbreekt');
+  if (!candidate.phone || !cleanupPhone(candidate.phone)) reasons.push('telefoon ontbreekt of ongeldig');
   if (!candidate.address) reasons.push('adres ontbreekt');
   if (candidate.address && !lineContainsExactPlace(candidate.address, target.place)) reasons.push('adres staat niet in exacte plaats');
+  if (candidate.address && !looksLikeFullStreetAddress(candidate.address)) reasons.push('adres is geen volledig straatadres');
   if (isBlacklistedCandidate(candidate, options.blacklist)) reasons.push('blacklist of niet-commerciele organisatie');
   return reasons;
 }

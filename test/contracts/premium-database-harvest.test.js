@@ -116,7 +116,10 @@ test('premium database harvest rejects incomplete, wrong-place, parked and black
   assert.match(validateCandidate({ ...baseCandidate, phone: '' }, target).join(', '), /telefoon ontbreekt/);
   assert.match(validateCandidate({ ...baseCandidate, websiteReachable: false }, target).join(', '), /website niet bereikbaar/);
   assert.match(validateCandidate({ ...baseCandidate, address: 'Markt 1, 5211 JV Den Bosch' }, target).join(', '), /exacte plaats/);
+  assert.match(validateCandidate({ ...baseCandidate, phone: '025-10-07' }, target).join(', '), /telefoon ontbreekt/);
+  assert.match(validateCandidate({ ...baseCandidate, address: '5081 CA Helvoirt' }, target).join(', '), /volledig straatadres/);
   assert.match(validateCandidate({ ...baseCandidate, website: 'https://www.bouwinfosys.nl' }, target).join(', '), /blacklist/);
+  assert.match(validateCandidate({ ...baseCandidate, companyName: 'Hulp en advies voor ondernemers', website: 'https://www.hilvarenbeek.nl/hulp-en-advies-voor-ondernemers' }, target).join(', '), /blacklist/);
 });
 
 test('premium database harvest dedupes by domain, email, phone and company address', async () => {
