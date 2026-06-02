@@ -17,6 +17,7 @@ const IMPORT_HEADERS = Object.freeze([
 
 const SAFE_IMPORT_RECORDS_PER_FILE = 1999;
 const DEFAULT_OUTPUT_BASENAME = 'softora-bedrijven';
+const DEFAULT_SITE_PROGRESS_RELATIVE_PATH = 'assets/premium-database-harvest-progress.json';
 const DEFAULT_FETCH_TIMEOUT_MS = 12000;
 const DEFAULT_MAX_LOCATIONS = 1;
 const DEFAULT_MAX_SEARCH_RESULTS_PER_SOURCE = 12;
@@ -632,6 +633,7 @@ async function harvestLocation(targetLabel, options = {}) {
   progress.completionReason = progress.completed
     ? 'Meerdere bronsoorten doorzocht en twee lege uitbreidingsrondes gehaald.'
     : 'Nog niet genoeg lege uitbreidingsrondes of bronfamilies om hard af te ronden.';
+  progress.updatedAt = new Date().toISOString();
   return { target, accepted, raw, progress };
 }
 
@@ -676,6 +678,33 @@ function splitRecordsForImport(records, maxRecords = SAFE_IMPORT_RECORDS_PER_FIL
 
 function buildRawJsonl(rawEntries) {
   return (rawEntries || []).map((entry) => JSON.stringify(entry)).join('\n') + ((rawEntries || []).length ? '\n' : '');
+}
+
+function buildProgressPayload(state, options = {}) {
+  const progress = (state.progress || []).map((item) => ({
+    target: item.target,
+    label: item.target,
+    status: item.status,
+    completed: Boolean(item.completed),
+    acceptedCount: Math.max(0, Number(item.acceptedCount) || 0),
+    rejectedCount: Math.max(0, Number(item.rejectedCount) || 0),
+    candidatesSeen: Math.max(0, Number(item.candidatesSeen) || 0),
+    completionReason: item.completionReason || '',
+    updatedAt: item.updatedAt || state.updatedAt || new Date().toISOString(),
+  }));
+  return {
+    version: 1,
+    source: 'softora-local-harvest',
+    updatedAt: state.updatedAt || new Date().toISOString(),
+    completedTargetLabels: progress
+      .filter((item) => item.completed || item.status === 'afgerond' || item.status === 'done')
+      .map((item) => item.label)
+      .filter(Boolean),
+    targetProgress: progress,
+    importReadyCount: Math.max(0, Number((state.records || []).length) || 0),
+    rawCandidateCount: Math.max(0, Number((state.raw || []).length) || 0),
+    outputBaseName: options.basename || DEFAULT_OUTPUT_BASENAME,
+  };
 }
 
 function buildLiveHtml(state) {
@@ -741,9 +770,18 @@ async function writeOutputs(outputDir, state, options = {}) {
   }
   const rawJsonlPath = path.join(outputDir, `${basename}-raw.jsonl`);
   const liveHtmlPath = path.join(outputDir, `${basename}-verzamellijst-live.html`);
+  const progressJsonPath = path.join(outputDir, `${basename}-progress.json`);
+  const progressPayload = buildProgressPayload(state, options);
   await fs.writeFile(rawJsonlPath, buildRawJsonl(state.raw || []), 'utf8');
   await fs.writeFile(liveHtmlPath, buildLiveHtml(state), 'utf8');
-  return { csvPath: baseCsvPath, extraCsvPaths, rawJsonlPath, liveHtmlPath };
+  await fs.writeFile(progressJsonPath, JSON.stringify(progressPayload, null, 2) + '\n', 'utf8');
+  let siteProgressPath = '';
+  if (options.syncSiteProgress || options.siteProgressPath) {
+    siteProgressPath = options.siteProgressPath || path.join(options.repoRoot || path.resolve(__dirname, '../..'), DEFAULT_SITE_PROGRESS_RELATIVE_PATH);
+    await ensureDirectory(path.dirname(siteProgressPath));
+    await fs.writeFile(siteProgressPath, JSON.stringify(progressPayload, null, 2) + '\n', 'utf8');
+  }
+  return { csvPath: baseCsvPath, extraCsvPaths, rawJsonlPath, liveHtmlPath, progressJsonPath, siteProgressPath };
 }
 
 async function runHarvest(options = {}) {
@@ -778,10 +816,12 @@ async function runHarvest(options = {}) {
 module.exports = {
   DEFAULT_BLACKLIST,
   DEFAULT_OUTPUT_BASENAME,
+  DEFAULT_SITE_PROGRESS_RELATIVE_PATH,
   IMPORT_HEADERS,
   SAFE_IMPORT_RECORDS_PER_FILE,
   buildImportCsv,
   buildLiveHtml,
+  buildProgressPayload,
   buildRawJsonl,
   buildSourceSearches,
   createDedupeIndex,

@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const { runHarvest } = require('./lib/premium-database-harvest-core');
+const { DEFAULT_SITE_PROGRESS_RELATIVE_PATH, runHarvest } = require('./lib/premium-database-harvest-core');
 
 function parseArgs(argv) {
   const args = {
     maxLocations: 1,
     outputDir: path.join(process.cwd(), 'reports/premium-database-harvest'),
     paidDataBudgetEur: 0,
+    syncSiteProgress: true,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -36,6 +37,11 @@ function parseArgs(argv) {
     } else if (arg === '--paid-data-budget-eur') {
       args.paidDataBudgetEur = Number(next) || 0;
       index += 1;
+    } else if (arg === '--site-progress-path') {
+      args.siteProgressPath = path.resolve(next);
+      index += 1;
+    } else if (arg === '--no-site-progress') {
+      args.syncSiteProgress = false;
     } else if (arg === '--help') {
       args.help = true;
     }
@@ -51,7 +57,8 @@ function printHelp() {
 Belangrijk:
   - Standaard gebruikt deze tool alleen openbare bronnen en betaalde databronnen staan uit.
   - Gebruik --search-provider none om alleen handmatige seed-URL's in tests of uitbreidingen te gebruiken.
-  - Output: softora-bedrijven-verzamellijst-live.html, softora-bedrijven-importklaar.csv en softora-bedrijven-raw.jsonl.
+  - Output: softora-bedrijven-verzamellijst-live.html, softora-bedrijven-importklaar.csv, softora-bedrijven-raw.jsonl en softora-bedrijven-progress.json.
+  - De site-modal leest standaard mee via ${DEFAULT_SITE_PROGRESS_RELATIVE_PATH}; gebruik --no-site-progress om dat uit te zetten.
 `);
 }
 
@@ -70,6 +77,8 @@ async function main() {
   console.log(`Live document: ${result.output.liveHtmlPath}`);
   console.log(`CSV: ${result.output.csvPath}`);
   console.log(`Raw JSONL: ${result.output.rawJsonlPath}`);
+  console.log(`Voortgang JSON: ${result.output.progressJsonPath}`);
+  if (result.output.siteProgressPath) console.log(`Site-modal voortgang: ${result.output.siteProgressPath}`);
 }
 
 main().catch((error) => {

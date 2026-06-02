@@ -27,6 +27,7 @@ function loadDatabaseDeepSearchClient(options = {}) {
     setTimeout,
     fetch: async () => ({ ok: true, json: async () => ({ ok: true, rows: [] }) }),
   };
+  sandbox.window.__SOFTORA_DISABLE_HARVEST_PROGRESS_POLL = true;
   if (options.document) sandbox.window.document = options.document;
   sandbox.window.confirm = () => true;
   vm.runInNewContext(targetCoordsSource, sandbox);
@@ -320,6 +321,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
+  const helperScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search-helpers.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const contactStatusScriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
   const instantlySyncScriptPath = path.join(__dirname, '../../assets/premium-database-instantly-sync.js');
@@ -332,6 +334,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
   const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
+  const helperScriptSource = fs.readFileSync(helperScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
   const contactStatusScriptSource = fs.readFileSync(contactStatusScriptPath, 'utf8');
   const instantlySyncScriptSource = fs.readFileSync(instantlySyncScriptPath, 'utf8');
@@ -672,7 +675,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
+  assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260602b/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526b/);
   assert.match(instantlySyncScriptSource, /window\.location\.reload\(\)/);
@@ -792,7 +795,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260602b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260602b"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -851,6 +854,12 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(deepSearchScriptSource, /DEFAULT_TARGET_TEXT_BASE64/);
   assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
   assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v4"/);
+  assert.match(helperScriptSource, /manualCompletedTargetLabels = Object\.freeze/);
+  assert.match(helperScriptSource, /Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
+  assert.match(helperScriptSource, /Nederland \| Noord-Brabant \| Hilvarenbeek \| Haghorst/);
+  assert.match(helperScriptSource, /HARVEST_PROGRESS_URL = "assets\/premium-database-harvest-progress\.json"/);
+  assert.match(helperScriptSource, /function createHarvestProgressBridge\(options\)/);
+  assert.match(deepSearchScriptSource, /helpers\.createHarvestProgressBridge/);
   assert.match(deepSearchScriptSource, /PREVIOUS_TARGET_ORDER_VERSION = "distance-oisterwijk-v3"/);
   assert.match(deepSearchScriptSource, /LEGACY_TARGET_ORDER_VERSION_V2 = "distance-oisterwijk-v2"/);
   assert.match(deepSearchScriptSource, /function getRawDefaultTargetLabels\(\)/);
@@ -1794,6 +1803,7 @@ test('premium database deep search keeps old index-only progress on the original
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     getUiState: async () => ({
       values: {
         deep_search_state: JSON.stringify({
@@ -1810,6 +1820,73 @@ test('premium database deep search keeps old index-only progress on the original
 
   assert.match(listNode.innerHTML, /^<button class="deep-search-target is-active is-active"[\s\S]*1\. Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
   assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Altena \| Almkerk/);
+});
+
+test('premium database deep search marks manually completed locations as done by default', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const listNode = { innerHTML: '' };
+  const currentNode = { textContent: '' };
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: currentNode,
+      deepSearchDesiredCount: { value: '25' },
+      deepSearchList: listNode,
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: {},
+      deepSearchStartButton: createClassListNode(),
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    getUiState: async () => ({ values: {} }),
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
+  assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Boxtel \| Boxtel/);
+  assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*Nederland \| Noord-Brabant \| Hilvarenbeek \| Haghorst/);
+  assert.match(listNode.innerHTML, /class="deep-search-target is-active is-active"[\s\S]*Nederland \| Noord-Brabant \| Loon op Zand \| Loon op Zand/);
+  assert.equal(currentNode.textContent, 'Nu: Nederland | Noord-Brabant | Loon op Zand | Loon op Zand');
+});
+
+test('premium database deep search mirrors local harvest progress in the site modal', async () => {
+  const deepSearchClient = loadDatabaseDeepSearchClient();
+  const listNode = { innerHTML: '' };
+  const currentNode = { textContent: '' };
+  const controller = deepSearchClient.createController({
+    nodes: {
+      deepSearchCost: {},
+      deepSearchCurrent: currentNode,
+      deepSearchDesiredCount: { value: '25' },
+      deepSearchList: listNode,
+      deepSearchModal: createClassListNode(),
+      deepSearchSources: {},
+      deepSearchStartButton: createClassListNode(),
+    },
+    scope: 'premium_database',
+    stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
+    getUiState: async () => ({ values: {} }),
+    readHarvestProgress: async () => ({
+      version: 1,
+      completedTargetLabels: ['Nederland | Noord-Brabant | Vught | Helvoirt'],
+      targetProgress: [{
+        label: 'Nederland | Noord-Brabant | Vught | Helvoirt',
+        status: 'afgerond',
+        completed: true,
+      }],
+    }),
+  });
+
+  controller.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.match(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*1\. Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
+  assert.match(listNode.innerHTML, /class="deep-search-target is-active is-active"[\s\S]*2\. Nederland \| Noord-Brabant \| Boxtel \| Boxtel/);
+  assert.equal(currentNode.textContent, 'Nu: Nederland | Noord-Brabant | Boxtel | Boxtel');
 });
 
 test('premium database deep search modal shows backend cost estimate when available', async () => {
@@ -2099,6 +2176,7 @@ test('premium database deep search continues to the next location until the requ
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2182,6 +2260,7 @@ test('premium database deep search sends compact duplicate exclusions for the fu
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2263,6 +2342,7 @@ test('premium database deep search turns the start button into a disabled comple
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2320,6 +2400,7 @@ test('premium database deep search sends compact duplicate exclusions for the fu
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2377,6 +2458,7 @@ test('premium database deep search lists websites from newly added customers aft
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2428,6 +2510,7 @@ test('premium database deep search stops duplicate-only batches to protect API c
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async () => false,
@@ -2477,6 +2560,7 @@ test('premium database deep search stops when new companies could not be saved',
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2539,6 +2623,7 @@ test('premium database deep search only shows websites after companies are added
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 50,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2616,6 +2701,7 @@ test('premium database deep search persists compact website progress without pre
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     getUiState: async () => ({ values: { deep_search_state: JSON.stringify({ roundMode: '1' }) } }),
     getCustomers: () => customers,
     importRows: async (receivedRows) => {
@@ -2667,6 +2753,7 @@ test('premium database deep search persists compact website progress without pre
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     getUiState: async () => ({ values: { deep_search_state: finalStatePatch } }),
     getCustomers: () => customers,
     setUiState: async () => ({ ok: true }),
@@ -2720,6 +2807,7 @@ test('premium database deep search does not backfill found websites from older c
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     getUiState: async () => ({
       values: {
         deep_search_state: JSON.stringify({
@@ -2764,6 +2852,7 @@ test('premium database deep search clears old found websites when a new batch se
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     getUiState: async () => ({
       values: {
         deep_search_state: JSON.stringify({
@@ -2835,6 +2924,7 @@ test('premium database deep search locks the modal while a batch is running', as
     },
     scope: 'premium_database',
     stateKey: 'deep_search_state',
+    manualCompletedTargetLabels: [],
     autoContinueDelayMs: 0,
     getCustomers: () => customers,
     importRows: async (receivedRows) => {

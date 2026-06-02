@@ -427,7 +427,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['check:live-production-version:wait'], 'node scripts/wait-live-production-version.js');
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
-  assert.equal(packageJson.scripts['harvest:database'], 'node scripts/run-premium-database-harvest.js');
+  assert.equal(packageJson.scripts['harvest:database'], 'node tools/run-premium-database-harvest.js');
   assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
   assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');

@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const {
   buildImportCsv,
+  buildProgressPayload,
   harvestLocation,
   inspectOfficialWebsite,
   loadPlanningTargets,
@@ -15,7 +16,7 @@ const {
   splitRecordsForImport,
   validateCandidate,
   writeOutputs,
-} = require('../../scripts/lib/premium-database-harvest-core');
+} = require('../../tools/lib/premium-database-harvest-core');
 const { parseSpreadsheetUpload } = require('../../server/services/premium-database-import');
 
 function response(body, url, status = 200) {
@@ -194,6 +195,7 @@ test('premium database harvest splits import batches below backend limit', () =>
 
 test('premium database harvest writes live html, raw jsonl and csv outputs', async () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-harvest-'));
+  const siteProgressPath = path.join(outputDir, 'site-progress.json');
   const result = await writeOutputs(outputDir, {
     records: [
       {
@@ -216,13 +218,51 @@ test('premium database harvest writes live html, raw jsonl and csv outputs', asy
       completionReason: 'Meerdere bronsoorten doorzocht en twee lege uitbreidingsrondes gehaald.',
     }],
     updatedAt: '2026-06-02T12:00:00.000Z',
+  }, {
+    siteProgressPath,
   });
 
   assert.equal(fs.existsSync(result.csvPath), true);
   assert.equal(fs.existsSync(result.rawJsonlPath), true);
   assert.equal(fs.existsSync(result.liveHtmlPath), true);
+  assert.equal(fs.existsSync(result.progressJsonPath), true);
+  assert.equal(fs.existsSync(result.siteProgressPath), true);
   assert.match(fs.readFileSync(result.liveHtmlPath, 'utf8'), /meta http-equiv="refresh"/);
   assert.match(fs.readFileSync(result.liveHtmlPath, 'utf8'), /Laatste afkeuringen/);
+  const progress = JSON.parse(fs.readFileSync(result.progressJsonPath, 'utf8'));
+  const siteProgress = JSON.parse(fs.readFileSync(result.siteProgressPath, 'utf8'));
+  assert.deepEqual(progress.completedTargetLabels, ['Nederland | Noord-Brabant | Vught | Helvoirt']);
+  assert.deepEqual(siteProgress.completedTargetLabels, progress.completedTargetLabels);
+});
+
+test('premium database harvest progress payload exposes completed targets for the site modal', () => {
+  const progress = buildProgressPayload({
+    records: [{ companyName: 'Acme Helvoirt BV' }],
+    raw: [{ accepted: true }, { accepted: false }],
+    progress: [
+      {
+        target: 'Nederland | Noord-Brabant | Vught | Helvoirt',
+        status: 'afgerond',
+        completed: true,
+        acceptedCount: 62,
+        rejectedCount: 12,
+        candidatesSeen: 74,
+      },
+      {
+        target: 'Nederland | Noord-Brabant | Boxtel | Boxtel',
+        status: 'bezig',
+        completed: false,
+        acceptedCount: 5,
+      },
+    ],
+    updatedAt: '2026-06-02T12:00:00.000Z',
+  });
+
+  assert.equal(progress.importReadyCount, 1);
+  assert.equal(progress.rawCandidateCount, 2);
+  assert.deepEqual(progress.completedTargetLabels, ['Nederland | Noord-Brabant | Vught | Helvoirt']);
+  assert.equal(progress.targetProgress[0].completed, true);
+  assert.equal(progress.targetProgress[1].completed, false);
 });
 
 test('premium database harvest can run without paid data sources or Google Places', async () => {
@@ -240,8 +280,8 @@ test('premium database harvest can run without paid data sources or Google Place
       'https://acme-helvoirt.nl/': validBusinessHtml(),
     }),
   });
-  const scriptSource = fs.readFileSync(path.join(process.cwd(), 'scripts/run-premium-database-harvest.js'), 'utf8')
-    + fs.readFileSync(path.join(process.cwd(), 'scripts/lib/premium-database-harvest-core.js'), 'utf8');
+  const scriptSource = fs.readFileSync(path.join(process.cwd(), 'tools/run-premium-database-harvest.js'), 'utf8')
+    + fs.readFileSync(path.join(process.cwd(), 'tools/lib/premium-database-harvest-core.js'), 'utf8');
 
   assert.equal(result.records.length, 1);
   assert.equal(scriptSource.includes('places.googleapis.com'), false);
