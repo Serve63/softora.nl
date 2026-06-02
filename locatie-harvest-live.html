@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Softora | Bedrijven Scraper</title>
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/premium-location-harvest-live.css?v=20260602k">
+</head>
+<body>
+  <main class="harvest-shell">
+    <header class="harvest-topbar">
+      <div>
+        <p class="harvest-kicker">Softora database</p>
+        <h1>Bedrijven Scraper</h1>
+      </div>
+      <div class="harvest-live-pill" aria-live="polite">
+        <span class="harvest-live-dot" aria-hidden="true"></span>
+        <span id="harvestUpdatedAt">Laden</span>
+      </div>
+    </header>
+
+    <section class="harvest-stats" aria-label="Voortgang">
+      <article class="harvest-stat"><span class="harvest-stat-label">Bedrijven Gevonden</span><strong id="harvestCompanyCount">0</strong></article>
+      <article class="harvest-stat"><span class="harvest-stat-label">Voltooide Locaties</span><strong id="harvestDoneCount">0</strong></article>
+      <article class="harvest-stat"><span class="harvest-stat-label">Locaties nog te doen</span><strong id="harvestTodoCount">0</strong></article>
+      <article class="harvest-stat"><span class="harvest-stat-label">Bezig met:</span><strong class="harvest-stat-place" id="harvestActiveCount">Geen actieve locatie</strong></article>
+    </section>
+
+    <section class="harvest-grid">
+      <article class="harvest-panel harvest-panel-locations">
+        <div class="harvest-panel-head">
+          <div>
+            <p class="harvest-kicker">Locaties</p>
+            <h2>Planning</h2>
+          </div>
+          <div class="harvest-progress">
+            <div class="harvest-progress-bar"><span id="harvestProgressBar"></span></div>
+            <span id="harvestProgressText">0%</span>
+          </div>
+        </div>
+        <div class="harvest-location-list" id="harvestLocationList" aria-live="polite"></div>
+      </article>
+
+      <article class="harvest-panel">
+        <div class="harvest-panel-head harvest-panel-head-table">
+          <div>
+            <p class="harvest-kicker">Bedrijven</p>
+            <h2 id="harvestCurrentLocation">Nog geen locatie actief</h2>
+          </div>
+          <label class="harvest-search">
+            <span>Zoeken</span>
+            <input id="harvestSearchInput" type="search" autocomplete="off" placeholder="Bedrijfsnaam of locatie">
+          </label>
+        </div>
+        <div class="harvest-table-wrap">
+          <table class="harvest-table">
+            <thead>
+              <tr>
+                <th>Bedrijfsnaam</th>
+                <th>Telefoonnummer</th>
+                <th>Mailadres</th>
+                <th>Locatie</th>
+              </tr>
+            </thead>
+            <tbody id="harvestCompanyTableBody">
+              <tr><td colspan="4">Laden...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script src="/assets/premium-location-harvest-live.js?v=20260602k" defer></script>
+</body>
+</html>
