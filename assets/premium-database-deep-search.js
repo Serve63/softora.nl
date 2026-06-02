@@ -426,13 +426,14 @@
         return defaults;
     }
 
-    function normalizeState(raw) {
+    function normalizeState(raw, manuallyCompletedTargetLabels) {
         const parsed = typeof raw === "string" ? safeParseJson(raw) : (raw || {});
         const loadedTargets = Array.isArray(parsed.targets)
             ? parsed.targets.map(normalizeTarget).filter(Boolean)
             : [];
         const progressDefaultLabels = getProgressDefaultLabels(parsed);
-        const targets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress, progressDefaultLabels);
+        const progressedTargets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress, progressDefaultLabels);
+        const targets = typeof helpers.applyManualCompletedTargets === "function" ? helpers.applyManualCompletedTargets(progressedTargets, manuallyCompletedTargetLabels) : progressedTargets;
         let activeIndex = Math.max(0, Math.min(targets.length - 1, Number(parsed.activeIndex) || 0));
         if (normalizeString(parsed.targetOrderVersion) !== TARGET_ORDER_VERSION && Number.isFinite(Number(parsed.activeIndex))) {
             const legacyActiveLabel = normalizeString(progressDefaultLabels[Math.max(0, Number(parsed.activeIndex) || 0)]);
@@ -503,12 +504,13 @@
             ? 0
             : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
         const getCustomers = options.getCustomers || function () { return []; };
+        const manuallyCompletedTargetLabels = Array.isArray(options.manualCompletedTargetLabels) ? options.manualCompletedTargetLabels : (Array.isArray(helpers.manualCompletedTargetLabels) ? helpers.manualCompletedTargetLabels : []);
         const recordApiCost = typeof options.recordApiCost === "function"
             ? options.recordApiCost
             : function () { return Promise.resolve({ ok: true }); };
         const setStatusMessage = options.setStatusMessage || function () {};
         const toast = options.toast || function () {};
-        let state = normalizeState({});
+        let state = normalizeState({}, manuallyCompletedTargetLabels);
         let busy = false;
         let bound = false;
         let estimateState = {
@@ -580,7 +582,7 @@
                 const values = remoteState && remoteState.values && typeof remoteState.values === "object"
                     ? remoteState.values
                     : {};
-                state = normalizeState(values[stateKey]);
+                state = normalizeState(values[stateKey], manuallyCompletedTargetLabels);
                 render();
                 return state;
             }).catch(function () {

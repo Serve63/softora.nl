@@ -52,9 +52,21 @@
         return result;
     }
 
+    const manualCompletedTargetLabels = Object.freeze(["Nederland | Noord-Brabant | Vught | Helvoirt", "Nederland | Noord-Brabant | Boxtel | Boxtel", "Nederland | Noord-Brabant | Boxtel | Esch", "Nederland | Noord-Brabant | Boxtel | Liempde", "Nederland | Noord-Brabant | Hilvarenbeek | Biest-Houtakker", "Nederland | Noord-Brabant | Hilvarenbeek | Diessen", "Nederland | Noord-Brabant | Hilvarenbeek | Esbeek", "Nederland | Noord-Brabant | Hilvarenbeek | Haghorst"]);
+
+    function applyManualCompletedTargets(targets, labels) {
+        const completedKeys = new Set((Array.isArray(labels) ? labels : manualCompletedTargetLabels).map(normalizeKey));
+        if (!completedKeys.size) return targets || [];
+        return (targets || []).map(function (target) {
+            return target && completedKeys.has(normalizeKey(target.label)) ? { ...target, status: "done", placeComplete: true, completionReason: normalizeString(target.completionReason) || "Handmatig afgerond in de verzamellijst." } : target;
+        });
+    }
+
     global.SoftoraDatabaseDeepSearchHelpers = {
+        applyManualCompletedTargets: applyManualCompletedTargets,
         collectCustomerMatchKeys: collectCustomerMatchKeys,
         collectNewCustomersAfterImport: collectNewCustomersAfterImport,
+        manualCompletedTargetLabels: manualCompletedTargetLabels,
         normalizeExistingWebsiteDomain: normalizeExistingWebsiteDomain
     };
 })(window);
