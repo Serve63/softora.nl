@@ -144,6 +144,7 @@ test('indexable public SEO pages avoid low-trust generated-looking image filenam
 test('legacy public hero line breaks keep readable text spacing', () => {
   const pages = [
     'premium-websites.html',
+    'website-laten-maken-oisterwijk.html',
     'premium-bedrijfssoftware.html',
     'premium-chatbot.html',
     'premium-voicesoftware.html',
@@ -153,12 +154,15 @@ test('legacy public hero line breaks keep readable text spacing', () => {
     const source = readFile(fileName);
     const h1 = source.match(/<h1 class="hero-title">([\s\S]*?)<\/h1>/)?.[1] || '';
     const text = h1
-      .replace(/<br\s*\/?>/gi, ' ')
       .replace(/<[^>]+>/g, '')
       .replace(/\s+/g, ' ')
       .trim();
 
-    assert.doesNotMatch(text, /websitevoor|maatvoor|chatbotdie|voicesoftwaredie/i, `${fileName} hero-kop plakt woorden tegen elkaar`);
+    assert.doesNotMatch(
+      text,
+      /website(?:voor|in)|maatvoor|chatbotdie|voicesoftwaredie/i,
+      `${fileName} hero-kop plakt woorden tegen elkaar`
+    );
   }
 });
 
