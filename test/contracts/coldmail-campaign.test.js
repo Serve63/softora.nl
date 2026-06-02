@@ -2736,7 +2736,14 @@ test('coldmail campaign adds audit bcc when configured', async () => {
 });
 
 test('coldmail campaign blocks private copies for personal senders', async () => {
-  for (const senderEmail of ['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com', 'martijnven123@gmail.com']) {
+  for (const senderEmail of [
+    'serve@softora.nl',
+    'martijn@softora.nl',
+    'servec321@gmail.com',
+    'martijnven123@gmail.com',
+    'serve290@gmail.com',
+    'servecreusen7@gmail.com',
+  ]) {
     const { service, sentMessages } = createService({
       coldmailAuditBcc: 'servec321@gmail.com',
       mailReplyTo: 'servec321@gmail.com',
@@ -5784,6 +5791,8 @@ test('coldmail campaign exposes the same sender accounts as mailbox', () => {
     'martijn@softora.nl',
     'servec321@gmail.com',
     'martijnven123@gmail.com',
+    'serve290@gmail.com',
+    'servecreusen7@gmail.com',
   ]);
 });
 
