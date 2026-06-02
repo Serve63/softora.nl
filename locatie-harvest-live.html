@@ -43,35 +43,61 @@
         <div class="harvest-location-list" id="harvestLocationList" aria-live="polite"></div>
       </article>
 
-      <article class="harvest-panel">
-        <div class="harvest-panel-head harvest-panel-head-table">
-          <div>
-            <p class="harvest-kicker">Bedrijven</p>
-            <h2 id="harvestCurrentLocation">Nog geen locatie actief</h2>
+      <div class="harvest-results-column">
+        <article class="harvest-panel">
+          <div class="harvest-panel-head harvest-panel-head-table">
+            <div>
+              <p class="harvest-kicker">Bedrijven</p>
+              <h2 id="harvestCurrentLocation">Nog geen locatie actief</h2>
+            </div>
+            <label class="harvest-search">
+              <span>Zoeken</span>
+              <input id="harvestSearchInput" type="search" autocomplete="off" placeholder="Bedrijfsnaam of locatie">
+            </label>
           </div>
-          <label class="harvest-search">
-            <span>Zoeken</span>
-            <input id="harvestSearchInput" type="search" autocomplete="off" placeholder="Bedrijfsnaam of locatie">
-          </label>
-        </div>
-        <div class="harvest-table-wrap">
-          <table class="harvest-table">
-            <thead>
-              <tr>
-                <th>Bedrijfsnaam</th>
-                <th>Telefoonnummer</th>
-                <th>Mailadres</th>
-                <th>Locatie</th>
-              </tr>
-            </thead>
-            <tbody id="harvestCompanyTableBody">
-              <tr><td colspan="4">Laden...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
+          <div class="harvest-table-wrap">
+            <table class="harvest-table">
+              <thead>
+                <tr>
+                  <th>Bedrijfsnaam</th>
+                  <th>Telefoonnummer</th>
+                  <th>Mailadres</th>
+                  <th>Locatie</th>
+                </tr>
+              </thead>
+              <tbody id="harvestCompanyTableBody">
+                <tr><td colspan="4">Laden...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="harvest-panel harvest-panel-no-website">
+          <div class="harvest-panel-head harvest-panel-head-table">
+            <div>
+              <p class="harvest-kicker">Zonder website</p>
+              <h2>Actief zonder website <span id="harvestNoWebsiteCount">0</span></h2>
+            </div>
+          </div>
+          <div class="harvest-table-wrap">
+            <table class="harvest-table harvest-table-no-website">
+              <thead>
+                <tr>
+                  <th>Bedrijfsnaam</th>
+                  <th>Telefoonnummer</th>
+                  <th>Mailadres</th>
+                  <th>Locatie</th>
+                </tr>
+              </thead>
+              <tbody id="harvestNoWebsiteTableBody">
+                <tr><td colspan="4">Laden...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
     </section>
   </main>
-  <script src="/assets/premium-location-harvest-live.js?v=20260602l" defer></script>
+  <script src="/assets/premium-location-harvest-live.js?v=20260602m" defer></script>
 </body>
 </html>

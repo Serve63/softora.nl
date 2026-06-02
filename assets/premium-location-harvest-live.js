@@ -81,6 +81,33 @@
     );
   }
 
+  function hasWebsite(company) {
+    return Boolean(normalizeText(company && company.website));
+  }
+
+  function looksInactive(company) {
+    const text = normalizeSearch([
+      company && company.companyName,
+      company && company.location,
+      company && company.sourcePlace,
+      company && company.contactStatus,
+      company && company.contactError,
+      company && company.sourceUrl
+    ].join(" "));
+    return /in liquidatie|failliet|faillissement|uitgeschreven|opgeheven|beeindigd|beindigd|ontbonden|gestaakt|surseance/.test(text);
+  }
+
+  function getLastDoneTargetPlaces(payload, amount) {
+    return getTargets(payload)
+      .filter(function (target) { return normalizeText(target.status).toLowerCase() === "done"; })
+      .slice()
+      .sort(function (a, b) {
+        return new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime();
+      })
+      .slice(-amount)
+      .map(function (target) { return splitLocation(target.label); });
+  }
+
   function countCompleteCompanies(payload) {
     return getCompanies(payload).filter(isCompleteCompany).length;
   }
@@ -181,10 +208,54 @@
     }).join("");
   }
 
+  function renderNoWebsiteCompanies(payload) {
+    const body = byId("harvestNoWebsiteTableBody");
+    const countNode = byId("harvestNoWebsiteCount");
+    if (!body || !countNode) return;
+
+    const lastDonePlaces = new Set(getLastDoneTargetPlaces(payload, 6).map(normalizeText));
+    const query = normalizeSearch(state.query);
+    const companies = getCompanies(payload)
+      .filter(function (company) {
+        return lastDonePlaces.has(normalizeText(company && company.place))
+          && isCompleteCompany(company)
+          && !hasWebsite(company)
+          && !looksInactive(company);
+      })
+      .filter(function (company) {
+        const companyText = normalizeSearch([
+          company.companyName,
+          company.phone,
+          company.email,
+          company.location
+        ].join(" "));
+        return !query || companyText.includes(query);
+      });
+
+    countNode.textContent = String(companies.length);
+
+    if (!companies.length) {
+      body.innerHTML = '<tr><td colspan="4">Geen actieve complete bedrijven zonder website gevonden binnen de laatste 6 afgeronde locaties.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = companies.map(function (company) {
+      return [
+        "<tr>",
+        "<td>" + escapeHtml(company.companyName) + "</td>",
+        "<td>" + escapeHtml(company.phone) + "</td>",
+        "<td>" + escapeHtml(company.email) + "</td>",
+        "<td>" + escapeHtml(company.location) + "</td>",
+        "</tr>"
+      ].join("");
+    }).join("");
+  }
+
   function render(payload) {
     renderStats(payload);
     renderLocations(payload);
     renderCompanies(payload);
+    renderNoWebsiteCompanies(payload);
   }
 
   function loadData() {
@@ -209,7 +280,10 @@
     if (input) {
       input.addEventListener("input", function () {
         state.query = input.value || "";
-        if (state.payload) renderCompanies(state.payload);
+        if (state.payload) {
+          renderCompanies(state.payload);
+          renderNoWebsiteCompanies(state.payload);
+        }
       });
     }
     loadData();
