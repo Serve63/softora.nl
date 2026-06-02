@@ -1904,7 +1904,7 @@ async function initColdmailingMailboxOptions() {
   const select = document.getElementById('campaignSenderEmail');
   if (!select || select.dataset.mailboxOptionsLoaded === '1') return;
   select.dataset.mailboxOptionsLoaded = '1';
-  const allowedSenderEmails = new Set(['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com', 'martijnven123@gmail.com']);
+  const allowedSenderEmails = new Set(['serve@softora.nl', 'martijn@softora.nl', 'servec321@gmail.com', 'martijnven123@gmail.com', 'serve290@gmail.com', 'servecreusen7@gmail.com']);
   try {
     const response = await fetch('/api/coldmailing/mailbox-options', {
       credentials: 'same-origin',
