@@ -591,7 +591,21 @@ async function harvestLocation(targetLabel, options = {}) {
     completed: false,
     completionReason: '',
   };
+  async function emitProgress() {
+    progress.updatedAt = new Date().toISOString();
+    if (typeof options.onProgress !== 'function') return;
+    await options.onProgress({
+      target,
+      accepted: accepted.slice(),
+      raw: raw.slice(),
+      progress: {
+        ...progress,
+        sourceFamilies: new Set(progress.sourceFamilies),
+      },
+    });
+  }
 
+  await emitProgress();
   for (const source of buildSourceSearches(target)) {
     progress.sourceFamilies.add(source.family);
     const urls = await collectUrlsForSource(target, source, options);
@@ -612,6 +626,7 @@ async function harvestLocation(targetLabel, options = {}) {
       raw.push(inspected.raw);
       if (!inspected.candidate) {
         progress.rejectedCount += 1;
+        await emitProgress();
         continue;
       }
       const keys = buildDedupeKeys(inspected.candidate);
@@ -619,13 +634,16 @@ async function harvestLocation(targetLabel, options = {}) {
         inspected.raw.accepted = false;
         inspected.raw.reasons = ['duplicaat'];
         progress.rejectedCount += 1;
+        await emitProgress();
         continue;
       }
       keys.forEach((key) => dedupeIndex.add(key));
       accepted.push(inspected.candidate);
       progress.acceptedCount += 1;
+      await emitProgress();
     }
     progress.emptyRounds = accepted.length === acceptedBeforeRound ? progress.emptyRounds + 1 : 0;
+    await emitProgress();
   }
 
   progress.completed = shouldCompleteLocation(progress, options);
@@ -634,6 +652,7 @@ async function harvestLocation(targetLabel, options = {}) {
     ? 'Meerdere bronsoorten doorzocht en twee lege uitbreidingsrondes gehaald.'
     : 'Nog niet genoeg lege uitbreidingsrondes of bronfamilies om hard af te ronden.';
   progress.updatedAt = new Date().toISOString();
+  await emitProgress();
   return { target, accepted, raw, progress };
 }
 
@@ -787,6 +806,7 @@ async function writeOutputs(outputDir, state, options = {}) {
 async function runHarvest(options = {}) {
   const outputDir = options.outputDir || path.join(process.cwd(), 'reports/premium-database-harvest');
   const labels = options.targets || await loadPlanningTargets(options);
+  const externalOnProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   const startAt = normalizeString(options.startAt);
   const startIndex = startAt
     ? Math.max(0, labels.findIndex((label) => normalizeText(label) === normalizeText(startAt)))
@@ -800,13 +820,36 @@ async function runHarvest(options = {}) {
   };
   await writeOutputs(outputDir, state, options);
   for (const label of selectedLabels) {
+    const baseRecords = state.records.slice();
+    const baseRaw = state.raw.slice();
+    const progressIndex = state.progress.length;
+    state.progress.push({
+      target: parseTargetLabel(label).label,
+      status: 'bezig',
+      completed: false,
+      acceptedCount: 0,
+      rejectedCount: 0,
+      candidatesSeen: 0,
+      completionReason: 'Deze locatie wordt nu doorzocht.',
+      updatedAt: new Date().toISOString(),
+    });
+    state.updatedAt = new Date().toISOString();
+    await writeOutputs(outputDir, state, options);
     const result = await harvestLocation(label, {
       ...options,
       existingRecords: state.records,
+      onProgress: async (partial) => {
+        state.records = baseRecords.concat(partial.accepted || []);
+        state.raw = baseRaw.concat(partial.raw || []);
+        state.progress[progressIndex] = partial.progress;
+        state.updatedAt = new Date().toISOString();
+        await writeOutputs(outputDir, state, options);
+        if (externalOnProgress) await externalOnProgress({ ...state, currentTarget: partial.target });
+      },
     });
-    state.records.push(...result.accepted);
-    state.raw.push(...result.raw);
-    state.progress.push(result.progress);
+    state.records = baseRecords.concat(result.accepted);
+    state.raw = baseRaw.concat(result.raw);
+    state.progress[progressIndex] = result.progress;
     state.updatedAt = new Date().toISOString();
     await writeOutputs(outputDir, state, options);
   }

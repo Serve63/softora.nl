@@ -145,6 +145,42 @@ test('premium database harvest dedupes by domain, email, phone and company addre
   assert.equal(result.raw.some((entry) => (entry.reasons || []).includes('duplicaat')), true);
 });
 
+test('premium database harvest emits live progress while a location is still running', async () => {
+  const targetLabel = 'Nederland | Noord-Brabant | Vught | Helvoirt';
+  const snapshots = [];
+  const result = await harvestLocation(targetLabel, {
+    searchProvider: 'none',
+    seedUrlsByTarget: {
+      [targetLabel]: ['https://live-helvoirt.nl'],
+    },
+    fetchImpl: createFetchByUrl({
+      'https://live-helvoirt.nl/': validBusinessHtml({
+        name: 'Live Helvoirt BV',
+        email: 'info@live-helvoirt.nl',
+        phone: '073 222 33 44',
+        address: 'Torenstraat 8, 5268 AT Helvoirt',
+      }),
+    }),
+    onProgress(partial) {
+      snapshots.push({
+        acceptedCount: partial.progress.acceptedCount,
+        rejectedCount: partial.progress.rejectedCount,
+        candidatesSeen: partial.progress.candidatesSeen,
+        status: partial.progress.status,
+        completed: partial.progress.completed,
+        records: partial.accepted.length,
+        raw: partial.raw.length,
+      });
+    },
+  });
+
+  assert.equal(result.accepted.length, 1);
+  assert.equal(snapshots.length > 2, true);
+  assert.equal(snapshots.some((snapshot) => snapshot.status === 'bezig'), true);
+  assert.equal(snapshots.some((snapshot) => snapshot.acceptedCount === 1 && snapshot.records === 1), true);
+  assert.equal(snapshots.at(-1).completed, true);
+});
+
 test('premium database harvest completion waits for source mix and two empty expansion rounds', () => {
   assert.equal(shouldCompleteLocation({ sourceFamilies: new Set(['general-search', 'directory']), emptyRounds: 2 }), false);
   assert.equal(shouldCompleteLocation({ sourceFamilies: new Set(['general-search', 'directory', 'association']), emptyRounds: 1 }), false);
