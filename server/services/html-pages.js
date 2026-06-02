@@ -81,6 +81,16 @@ html,body{min-height:100vh;}
 ].join('\n');
 const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg?v=20260511a';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
+const PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE = Object.freeze({
+  'premium-website.html': HOMEPAGE_HERO_IMAGE_PRELOAD,
+  'premium-websites.html': '<link rel="preload" as="image" href="/assets/seo-content/website-leads-analytics-softora.jpg">',
+  'website-laten-maken-oisterwijk.html':
+    '<link rel="preload" as="image" href="/assets/seo-content/website-leads-analytics-softora.jpg">',
+  'premium-bedrijfssoftware.html': '<link rel="preload" as="image" href="/assets/softora-crm-workflow.jpg">',
+  'premium-chatbot.html':
+    '<link rel="preload" as="image" href="/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg">',
+  'premium-voicesoftware.html': '<link rel="preload" as="image" href="/assets/softora-telefonie-studio.jpg">',
+});
 const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260516a" defer></script>';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
   "default-src 'self'",
@@ -390,8 +400,9 @@ function createHtmlPageCoordinator(options = {}) {
     }
     renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });
 
-    if (fileName === 'premium-website.html') {
-      renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, HOMEPAGE_HERO_IMAGE_PRELOAD);
+    const publicHeroImagePreload = PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE[fileName];
+    if (publicHeroImagePreload) {
+      renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, publicHeroImagePreload);
     }
 
     renderedHtml = injectPremiumSidebarProfileHtml(renderedHtml, authState);
