@@ -7,12 +7,14 @@ const { setTimeout: delay } = require("timers/promises");
 
 const DATA_PATH = path.join(process.cwd(), "assets", "premium-location-harvest-live.json");
 const DEFAULT_LABEL = "Nederland | Noord-Brabant | Oirschot | Oirschot";
+const DRIMBLE_BASE_URL = "https://drimble.nl";
 const activeLabel = process.argv.slice(2).join(" ").trim() || DEFAULT_LABEL;
 const concurrency = Math.max(1, Number(process.env.HARVEST_CONCURRENCY || 4));
 const limit = Math.max(0, Number(process.env.HARVEST_LIMIT || 0));
 const deepScan = process.env.HARVEST_DEEP !== "0";
 const markDone = process.env.HARVEST_MARK_DONE === "1";
 const force = process.env.HARVEST_FORCE === "1";
+const refreshCandidates = process.env.HARVEST_REFRESH_CANDIDATES === "1";
 
 function normalizeText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -27,6 +29,32 @@ function decodeHtml(value) {
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
     .replace(/&nbsp;/g, " ");
+}
+
+function stripTags(value) {
+  return decodeHtml(String(value || "").replace(/<[^>]+>/g, " "));
+}
+
+function slugifyPlace(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " en ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function drimbleSlugForPlace(place) {
+  const normalized = normalizeText(place).toLowerCase();
+  if (normalized === "oost west en middelbeers") return "oostelbeers";
+  return slugifyPlace(place);
+}
+
+function drimbleSourcePlacesForPlace(place) {
+  const normalized = normalizeText(place).toLowerCase();
+  if (normalized === "oost west en middelbeers") return ["Oostelbeers"];
+  return [place];
 }
 
 function decodeCloudflareEmail(hex) {
@@ -242,6 +270,165 @@ function isComplete(company) {
   );
 }
 
+function extractOlderUrl(html, baseUrl) {
+  const match = String(html || "").match(/<a[^>]+href=["']([^"']+)["'][^>]*>\s*Ouder\s*<\/a>/i);
+  if (!match) return "";
+  try {
+    return new URL(match[1], baseUrl || DRIMBLE_BASE_URL).toString();
+  } catch {
+    return "";
+  }
+}
+
+function extractCandidatesFromHtml(html, options) {
+  const place = normalizeText(options && options.place);
+  const fallbackSourcePlace = normalizeText(options && options.sourcePlace) || place;
+  const sourcePage = Number(options && options.sourcePage) || 1;
+  const candidates = [];
+
+  for (const match of String(html || "").matchAll(/<tr\s+class=["']row[23]["'][\s\S]*?<\/tr>/gi)) {
+    const row = match[0];
+    const urlMatch = row.match(/<a[^>]+href=["']([^"']*\/bedrijf\/[^"']+)["']/i)
+      || row.match(/window\.location=['"]([^'"]*\/bedrijf\/[^'"]+)['"]/i);
+    const nameMatch = row.match(/<b>([\s\S]*?)<\/b>/i);
+    const locationMatch = row.match(/<span>([\s\S]*?)<\/span>/i);
+    const cells = Array.from(row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((cell) => stripTags(cell[1]));
+    const sourceUrl = urlMatch ? new URL(urlMatch[1], DRIMBLE_BASE_URL).toString() : "";
+    const companyName = nameMatch ? stripTags(nameMatch[1]) : "";
+    const location = locationMatch ? stripTags(locationMatch[1]) : "";
+    const addedAt = cells[0] || "";
+    const sourcePlace = cells[2] || fallbackSourcePlace;
+    const kvk = cells[cells.length - 1] || "";
+
+    if (!sourceUrl || !companyName || !location) continue;
+    candidates.push({
+      companyName,
+      phone: "",
+      email: "",
+      location,
+      place,
+      sourcePlace,
+      addedAt,
+      kvk,
+      sourceUrl,
+      sourcePage
+    });
+  }
+
+  return candidates;
+}
+
+async function collectCandidatesFromPages(initialUrl, options) {
+  const place = normalizeText(options && options.place);
+  const sourceSlug = normalizeText(options && options.slug);
+  const allowedSourcePlaces = new Set(
+    (options && options.allowedSourcePlaces || [])
+      .map((item) => normalizeText(item).toLowerCase())
+      .filter(Boolean)
+  );
+  const seenUrls = new Set();
+  const candidates = [];
+  let url = initialUrl;
+  let page = 1;
+
+  while (url && !seenUrls.has(url) && page <= 250) {
+    seenUrls.add(url);
+    const response = await fetchText(url, 15000);
+    if (!response.ok) break;
+    const sourcePlaceMatch = response.text.match(/<h1[^>]*>\s*Bedrijven in\s+([^<]+)<\/h1>/i);
+    const sourcePlace = sourcePlaceMatch ? stripTags(sourcePlaceMatch[1]) : place;
+    const allPageCandidates = extractCandidatesFromHtml(response.text, {
+      place,
+      sourcePlace,
+      sourcePage: page
+    });
+    const pageCandidates = allPageCandidates.filter((candidate) => {
+      if (!allowedSourcePlaces.size) return true;
+      return allowedSourcePlaces.has(normalizeText(candidate.sourcePlace).toLowerCase());
+    });
+    candidates.push(...pageCandidates);
+    const olderUrl = extractOlderUrl(response.text, response.url || url);
+    if (!olderUrl || allPageCandidates.length === 0) break;
+    url = olderUrl;
+    page += 1;
+    await delay(120);
+  }
+
+  return { candidates, pages: seenUrls.size, slug: sourceSlug };
+}
+
+async function fetchCandidatesForPlace(place, municipality) {
+  const slug = drimbleSlugForPlace(place);
+  if (!slug) return { candidates: [], pages: 0, slug: "" };
+
+  const direct = await collectCandidatesFromPages(`${DRIMBLE_BASE_URL}/bedrijven/${slug}/`, {
+    place,
+    slug
+  });
+  if (direct.candidates.length || !municipality) return direct;
+
+  const municipalitySlug = slugifyPlace(municipality);
+  if (!municipalitySlug) return direct;
+  const fallback = await collectCandidatesFromPages(`${DRIMBLE_BASE_URL}/bedrijven/gemeente/${municipalitySlug}/`, {
+    place,
+    slug: `${municipalitySlug}:${slug}`,
+    allowedSourcePlaces: drimbleSourcePlacesForPlace(place)
+  });
+
+  return fallback.candidates.length ? fallback : direct;
+}
+
+async function ensureCandidates(data, target, place, municipality) {
+  const scopedCompanies = (data.companies || []).filter((company) => normalizeText(company.place) === place);
+  if (scopedCompanies.length > 0 && !refreshCandidates) return scopedCompanies;
+
+  const fetched = await fetchCandidatesForPlace(place, municipality);
+  if (!fetched.candidates.length) {
+    throw new Error(`Geen kandidaatbedrijven gevonden voor ${place}`);
+  }
+
+  const existingKeys = new Set((data.companies || []).map((company) => {
+    return normalizeText(company.sourceUrl) || [
+      normalizeText(company.kvk),
+      normalizeText(company.companyName).toLowerCase(),
+      normalizeText(company.location).toLowerCase()
+    ].join("|");
+  }));
+  const added = [];
+
+  fetched.candidates.forEach((candidate) => {
+    const key = normalizeText(candidate.sourceUrl) || [
+      normalizeText(candidate.kvk),
+      normalizeText(candidate.companyName).toLowerCase(),
+      normalizeText(candidate.location).toLowerCase()
+    ].join("|");
+    if (!key || existingKeys.has(key)) return;
+    existingKeys.add(key);
+    added.push(candidate);
+  });
+
+  data.companies = Array.isArray(data.companies) ? data.companies : [];
+  data.companies.push(...added);
+  target.candidateCount = fetched.candidates.length;
+  target.rawCompanyCount = fetched.candidates.length;
+  target.companySourceSlug = fetched.slug;
+  target.companySourcePages = fetched.pages;
+  target.updatedAt = new Date().toISOString();
+  data.updatedAt = target.updatedAt;
+
+  console.log(JSON.stringify({
+    event: "candidates",
+    location: activeLabel,
+    place,
+    slug: fetched.slug,
+    pages: fetched.pages,
+    found: fetched.candidates.length,
+    added: added.length
+  }));
+
+  return (data.companies || []).filter((company) => normalizeText(company.place) === place);
+}
+
 async function loadData() {
   return JSON.parse(await fs.readFile(DATA_PATH, "utf8"));
 }
@@ -266,6 +453,7 @@ async function saveData(data, target, scopedCompanies, progress) {
   };
   if (markDone && target.checkedCompanyCount >= scopedCompanies.length && scopedCompanies.length > 0) {
     target.status = "done";
+    if (data.activeLocation === activeLabel) data.activeLocation = "";
   }
   const tmpPath = DATA_PATH + ".tmp";
   await fs.writeFile(tmpPath, JSON.stringify(data, null, 2) + "\n");
@@ -307,7 +495,9 @@ async function main() {
   data.activeLocation = activeLabel;
 
   const place = activeLabel.split("|").map((part) => part.trim()).filter(Boolean).pop();
-  const scopedCompanies = (data.companies || []).filter((company) => normalizeText(company.place) === place);
+  const locationParts = activeLabel.split("|").map((part) => part.trim()).filter(Boolean);
+  const municipality = locationParts.length >= 2 ? locationParts[locationParts.length - 2] : "";
+  let scopedCompanies = await ensureCandidates(data, target, place, municipality);
   const queue = scopedCompanies
     .filter((company) => force || !company.contactCheckedAt)
     .slice(0, limit || undefined);
