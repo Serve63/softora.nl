@@ -133,15 +133,73 @@
         return "Dekking is nog te laag: " + known + " gevonden tegenover circa " + estimate + " verwachte bedrijven.";
     }
 
+    function safeParseJson(raw) {
+        try {
+            const parsed = JSON.parse(String(raw || "{}"));
+            return parsed && typeof parsed === "object" ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function uniqueStrings(values, maxItems) {
+        const seen = new Set();
+        const result = [];
+        (values || []).forEach(function (value) {
+            const normalized = normalizeString(value);
+            const key = normalizeKey(normalized);
+            if (!normalized || !key || seen.has(key)) return;
+            seen.add(key);
+            result.push(normalized.slice(0, 180));
+        });
+        return result.slice(0, maxItems || 180);
+    }
+
+    function normalizeWebsiteHref(value) {
+        const raw = normalizeString(value);
+        if (!raw) return "";
+        return /^https?:\/\//i.test(raw) ? raw : "https://" + raw.replace(/^\/+/, "");
+    }
+
+    function normalizeWebsiteDisplayValue(value) {
+        const raw = normalizeString(value);
+        if (!raw) return "";
+        return raw.replace(/^https?:\/\/www\./i, "https://").replace(/\/$/, "");
+    }
+
+    function uniqueWebsiteValues(values, maxItems) {
+        const seen = new Set();
+        const result = [];
+        (values || []).forEach(function (value) {
+            const normalized = normalizeWebsiteDisplayValue(value && value.url || value);
+            const key = normalizeKey(normalized.replace(/^https?:\/\//i, ""));
+            if (!normalized || !key || seen.has(key)) return;
+            seen.add(key);
+            result.push(normalized.slice(0, 180));
+        });
+        return result.slice(0, maxItems || 200);
+    }
+
+    function collectWebsitesFromCustomers(customers) {
+        return (Array.isArray(customers) ? customers : []).map(function (customer) {
+            return customer && (customer.website || customer.dom || customer.url || customer.site);
+        });
+    }
+
     global.SoftoraDatabaseDeepSearchHelpers = {
         buildBatchCoverageResult: buildBatchCoverageResult,
         collectCustomerMatchKeys: collectCustomerMatchKeys,
         collectNewCustomersAfterImport: collectNewCustomersAfterImport,
+        collectWebsitesFromCustomers: collectWebsitesFromCustomers,
         describeCompletionCoverageGap: describeCompletionCoverageGap,
         hasEnoughCompletionCoverage: hasEnoughCompletionCoverage,
         isTargetCompletionConfirmed: isTargetCompletionConfirmed,
         mergeTargetEstimate: mergeTargetEstimate,
         normalizeEstimatedLocalBusinessCount: normalizeEstimatedLocalBusinessCount,
-        normalizeExistingWebsiteDomain: normalizeExistingWebsiteDomain
+        normalizeExistingWebsiteDomain: normalizeExistingWebsiteDomain,
+        normalizeWebsiteHref: normalizeWebsiteHref,
+        safeParseJson: safeParseJson,
+        uniqueStrings: uniqueStrings,
+        uniqueWebsiteValues: uniqueWebsiteValues
     };
 })(window);

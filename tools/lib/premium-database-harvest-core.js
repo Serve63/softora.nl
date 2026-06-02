@@ -677,7 +677,7 @@ async function harvestLocation(targetLabel, options = {}) {
   progress.status = progress.completed ? 'afgerond' : 'open';
   progress.completionReason = progress.completed
     ? 'Meerdere bronsoorten doorzocht en twee lege uitbreidingsrondes gehaald.'
-    : 'Nog niet genoeg lege uitbreidingsrondes of bronfamilies om hard af te ronden.';
+    : 'Nog niet genoeg lege uitbreidingsrondes of zoekbronnen om hard af te ronden.';
   progress.updatedAt = new Date().toISOString();
   await emitProgress();
   return { target, accepted, raw, progress };
@@ -816,12 +816,25 @@ function buildLiveHtml(state) {
 </head>
 <body>
   <h1>Softora Bedrijven-Verzamellijst</h1>
-  <div class="meta">Laatst bijgewerkt: ${escapeHtml(updatedTime)}</div>
+  <div class="meta">Laatst bijgewerkt: <span id="liveUpdatedTime">${escapeHtml(updatedTime)}</span></div>
   <section class="metrics">${metricCards}</section>
   <h2>Voortgang</h2>
   <table><thead><tr><th>#</th><th>Locatie</th><th>Status</th><th>Complete bedrijven</th></tr></thead><tbody>${progressRows || '<tr><td colspan="4">Nog geen locaties verwerkt.</td></tr>'}</tbody></table>
   <h2>Importklare bedrijven</h2>
   <table><thead><tr><th>#</th><th>Bedrijf</th><th>Website</th><th>E-mail</th><th>Telefoon</th><th>Adres</th></tr></thead><tbody>${businessRows || '<tr><td colspan="6">Nog geen complete records.</td></tr>'}</tbody></table>
+  <script>
+    (function () {
+      var node = document.getElementById('liveUpdatedTime');
+      if (!node) return;
+      function pad(value) { return String(value).padStart(2, '0'); }
+      function updateLiveTime() {
+        var now = new Date();
+        node.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
+      }
+      updateLiveTime();
+      window.setInterval(updateLiveTime, 1000);
+    }());
+  </script>
 </body>
 </html>`;
 }

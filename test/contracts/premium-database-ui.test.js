@@ -15,10 +15,12 @@ function loadDatabaseImportClient() {
 function loadDatabaseDeepSearchClient(options = {}) {
   const helperScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search-helpers.js');
   const targetCoordsScriptPath = path.join(__dirname, '../../assets/premium-database-target-coords.js');
+  const harvestProgressScriptPath = path.join(__dirname, '../../assets/premium-database-harvest-progress.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const distanceScriptPath = path.join(__dirname, '../../assets/premium-database-distance.js');
   const helperSource = fs.readFileSync(helperScriptPath, 'utf8');
   const targetCoordsSource = fs.readFileSync(targetCoordsScriptPath, 'utf8');
+  const harvestProgressSource = fs.readFileSync(harvestProgressScriptPath, 'utf8');
   const source = fs.readFileSync(scriptPath, 'utf8');
   const distanceSource = fs.readFileSync(distanceScriptPath, 'utf8');
   const sandbox = {
@@ -33,6 +35,7 @@ function loadDatabaseDeepSearchClient(options = {}) {
   vm.runInNewContext(targetCoordsSource, sandbox);
   vm.runInNewContext(distanceSource, sandbox);
   vm.runInNewContext(helperSource, sandbox);
+  vm.runInNewContext(harvestProgressSource, sandbox);
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseDeepSearch;
 }
@@ -795,7 +798,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260602c"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260602c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260602c"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-harvest-progress\.js\?v=20260602a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260602c"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -855,9 +858,13 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(deepSearchScriptSource, /function decodeBase64Utf8\(value\)/);
   assert.match(deepSearchScriptSource, /TARGET_ORDER_VERSION = "distance-oisterwijk-v4"/);
   assert.doesNotMatch(helperScriptSource, /manualCompletedTargetLabels/);
-  assert.doesNotMatch(helperScriptSource, /HARVEST_PROGRESS_URL/);
-  assert.doesNotMatch(helperScriptSource, /createHarvestProgressBridge/);
-  assert.doesNotMatch(deepSearchScriptSource, /createHarvestProgressBridge|refreshSharedHarvestProgress|readHarvestProgress/);
+  const harvestProgressScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-harvest-progress.js'), 'utf8');
+  assert.match(harvestProgressScriptSource, /HARVEST_PROGRESS_URL = "assets\/premium-database-harvest-progress\.json"/);
+  assert.match(harvestProgressScriptSource, /function readHarvestProgress\(\)/);
+  assert.match(harvestProgressScriptSource, /function createBridge\(options\)/);
+  assert.doesNotMatch(deepSearchScriptSource, /HARVEST_PROGRESS_URL/);
+  assert.match(deepSearchScriptSource, /SoftoraDatabaseHarvestProgress\.createBridge/);
+  assert.match(deepSearchScriptSource, /function refreshHarvestProgress\(\)/);
   assert.match(deepSearchScriptSource, /PREVIOUS_TARGET_ORDER_VERSION = "distance-oisterwijk-v3"/);
   assert.match(deepSearchScriptSource, /LEGACY_TARGET_ORDER_VERSION_V2 = "distance-oisterwijk-v2"/);
   assert.match(deepSearchScriptSource, /function getRawDefaultTargetLabels\(\)/);
@@ -955,8 +962,8 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.add\(target\.id\);/);
   assert.match(deepSearchScriptSource, /visibleSourceTargetIds\.clear\(\);/);
   assert.match(deepSearchScriptSource, /sessionFoundWebsitesByTargetId\.clear\(\);/);
-  assert.match(deepSearchScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
-  assert.match(deepSearchScriptSource, /function collectWebsitesFromCustomers\(customers\)/);
+  assert.match(helperScriptSource, /function uniqueWebsiteValues\(values, maxItems\)/);
+  assert.match(helperScriptSource, /function collectWebsitesFromCustomers\(customers\)/);
   assert.doesNotMatch(deepSearchScriptSource, /function collectWebsitesFromRows\(rows\)/);
   assert.doesNotMatch(deepSearchScriptSource, /\.concat\(sources\)/);
   assert.match(deepSearchScriptSource, /function serializeTargetProgressList\(targets\)/);
@@ -965,7 +972,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.doesNotMatch(deepSearchScriptSource, /function collectCustomerWebsitesForTarget\(target\)/);
   assert.doesNotMatch(deepSearchScriptSource, /function hasTargetSearchProgress\(target\)/);
   assert.match(deepSearchScriptSource, /function resetFoundWebsitesForSession\(target\)/);
-  assert.match(deepSearchScriptSource, /target\.foundWebsites = uniqueWebsiteValues/);
+  assert.match(deepSearchScriptSource, /target\.foundWebsites = helpers\.uniqueWebsiteValues/);
   assert.match(deepSearchScriptSource, /resetFoundWebsitesForSession\(target\);/);
   assert.match(deepSearchScriptSource, /Nog geen websites voor deze plek\./);
   assert.match(deepSearchScriptSource, /persisted: Boolean\(persistResult && persistResult\.ok !== false\)/);
@@ -1854,10 +1861,11 @@ test('premium database deep search keeps planned locations open by default', asy
   assert.equal(currentNode.textContent, 'Nu: Nederland | Noord-Brabant | Vught | Helvoirt');
 });
 
-test('premium database deep search ignores local harvest progress in the site modal', async () => {
+test('premium database deep search applies local harvest progress in the site modal', async () => {
   const deepSearchClient = loadDatabaseDeepSearchClient();
   const listNode = { innerHTML: '' };
   const currentNode = { textContent: '' };
+  const persisted = [];
   const controller = deepSearchClient.createController({
     nodes: {
       deepSearchCost: {},
@@ -1872,6 +1880,10 @@ test('premium database deep search ignores local harvest progress in the site mo
     stateKey: 'deep_search_state',
     manualCompletedTargetLabels: [],
     getUiState: async () => ({ values: {} }),
+    setUiState: async (_scope, payload) => {
+      persisted.push(payload);
+      return { ok: true };
+    },
     readHarvestProgress: async () => ({
       version: 1,
       completedTargetLabels: ['Nederland | Noord-Brabant | Vught | Helvoirt'],
@@ -1887,9 +1899,10 @@ test('premium database deep search ignores local harvest progress in the site mo
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(listNode.innerHTML, /^<button class="deep-search-target is-active is-active"[\s\S]*1\. Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
-  assert.doesNotMatch(listNode.innerHTML, /class="deep-search-target is-done"[\s\S]*1\. Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
-  assert.equal(currentNode.textContent, 'Nu: Nederland | Noord-Brabant | Vught | Helvoirt');
+  assert.match(listNode.innerHTML, /^<button class="deep-search-target is-done"[\s\S]*1\. Nederland \| Noord-Brabant \| Vught \| Helvoirt/);
+  assert.match(listNode.innerHTML, /class="deep-search-target is-active is-active"[\s\S]*2\. Nederland \| Noord-Brabant \| Boxtel \| Boxtel/);
+  assert.equal(currentNode.textContent, 'Nu: Nederland | Noord-Brabant | Boxtel | Boxtel');
+  assert.ok(persisted.some((payload) => /"status":"done"/.test(payload.patch.deep_search_state)));
 });
 
 test('premium database deep search modal shows backend cost estimate when available', async () => {

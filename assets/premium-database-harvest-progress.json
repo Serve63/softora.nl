@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source": "softora-local-harvest",
-  "updatedAt": "2026-06-02T15:42:53.535Z",
+  "updatedAt": "2026-06-02T16:45:45.495Z",
   "completedTargetLabels": [
     "Nederland | Noord-Brabant | Vught | Helvoirt",
     "Nederland | Noord-Brabant | Boxtel | Boxtel",
@@ -116,16 +116,16 @@
     {
       "target": "Nederland | Noord-Brabant | Oirschot | Oirschot",
       "label": "Nederland | Noord-Brabant | Oirschot | Oirschot",
-      "status": "open",
+      "status": "bezig",
       "completed": false,
-      "acceptedCount": 4,
-      "rejectedCount": 0,
-      "candidatesSeen": 4,
-      "completionReason": "Doorzoeken hervat vanuit bestaande verzamellijst.",
-      "updatedAt": "2026-06-02T15:42:53.466Z"
+      "acceptedCount": 20,
+      "rejectedCount": 2,
+      "candidatesSeen": 20,
+      "completionReason": "Echte AI-batch 1 verwerkt: 17 werkende Oirschot-sites toegevoegd; verkeerde plaats, kapotte site en parked redirect geweigerd. Geschatte omvang is ongeveer 320, dus deze locatie blijft open.",
+      "updatedAt": "2026-06-02T16:43:22.826Z"
     }
   ],
-  "importReadyCount": 818,
-  "rawCandidateCount": 0,
+  "importReadyCount": 834,
+  "rawCandidateCount": 3,
   "outputBaseName": "softora-bedrijven"
 }

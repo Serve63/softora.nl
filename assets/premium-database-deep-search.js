@@ -229,64 +229,11 @@
         doc.head.appendChild(style);
     }
 
-    function safeParseJson(raw) {
-        try {
-            const parsed = JSON.parse(String(raw || "{}"));
-            return parsed && typeof parsed === "object" ? parsed : {};
-        } catch (error) {
-            return {};
-        }
-    }
-
-    function uniqueStrings(values, maxItems) {
-        const seen = new Set();
-        const result = [];
-        (values || []).forEach(function (value) {
-            const normalized = normalizeString(value);
-            const key = normalizeKey(normalized);
-            if (!normalized || !key || seen.has(key)) return;
-            seen.add(key);
-            result.push(normalized.slice(0, 180));
-        });
-        return result.slice(0, maxItems || 180);
-    }
-
-    function normalizeWebsiteHref(value) {
-        const raw = normalizeString(value);
-        if (!raw) return "";
-        return /^https?:\/\//i.test(raw) ? raw : "https://" + raw.replace(/^\/+/, "");
-    }
-
-    function normalizeWebsiteDisplayValue(value) {
-        const raw = normalizeString(value);
-        if (!raw) return "";
-        return raw.replace(/^https?:\/\/www\./i, "https://").replace(/\/$/, "");
-    }
-
-    function uniqueWebsiteValues(values, maxItems) {
-        const seen = new Set();
-        const result = [];
-        (values || []).forEach(function (value) {
-            const normalized = normalizeWebsiteDisplayValue(value && value.url || value);
-            const key = normalizeKey(normalized.replace(/^https?:\/\//i, ""));
-            if (!normalized || !key || seen.has(key)) return;
-            seen.add(key);
-            result.push(normalized.slice(0, 180));
-        });
-        return result.slice(0, maxItems || 200);
-    }
-
     function normalizeDesiredCompanyCount(value) {
         const cleaned = String(value || "").replace(/[^\d]/g, "");
         const parsed = Number(cleaned);
         if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_DESIRED_COMPANY_COUNT;
         return Math.max(1, Math.min(MAX_DESIRED_COMPANY_COUNT, Math.round(parsed)));
-    }
-
-    function collectWebsitesFromCustomers(customers) {
-        return (Array.isArray(customers) ? customers : []).map(function (customer) {
-            return customer && (customer.website || customer.dom || customer.url || customer.site);
-        });
     }
 
     function createTarget(label, index) {
@@ -326,13 +273,13 @@
             added: Math.max(0, Number(raw && raw.added) || 0),
             costUsd: Math.max(0, Number(raw && raw.costUsd) || 0),
             estimatedLocalBusinessCount: helpers.normalizeEstimatedLocalBusinessCount(raw && raw.estimatedLocalBusinessCount),
-            estimateSources: uniqueStrings(raw && raw.estimateSources, 20),
+            estimateSources: helpers.uniqueStrings(raw && raw.estimateSources, 20),
             coverageStrategy: normalizeString(raw && raw.coverageStrategy),
             placeComplete: Boolean(raw && raw.placeComplete),
             completionReason: normalizeString(raw && raw.completionReason),
             completionChecks: Math.max(0, Number(raw && raw.completionChecks) || 0),
-            seen: uniqueStrings(raw && raw.seen, MAX_DEEP_SEARCH_EXCLUDE_ITEMS),
-            foundWebsites: uniqueWebsiteValues((raw && (raw.foundWebsites || raw.websites)) || raw && raw.lastSources, 200),
+            seen: helpers.uniqueStrings(raw && raw.seen, MAX_DEEP_SEARCH_EXCLUDE_ITEMS),
+            foundWebsites: helpers.uniqueWebsiteValues((raw && (raw.foundWebsites || raw.websites)) || raw && raw.lastSources, 200),
             lastSources: Array.isArray(raw && raw.lastSources) ? raw.lastSources.slice(0, 40) : [],
             updatedAt: normalizeString(raw && raw.updatedAt)
         };
@@ -371,12 +318,12 @@
             progress[key] = value;
             changed = true;
         });
-        const seen = uniqueStrings(target && target.seen, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+        const seen = helpers.uniqueStrings(target && target.seen, MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
         if (seen.length) {
             progress.seen = seen;
             changed = true;
         }
-        const foundWebsites = uniqueWebsiteValues(target && target.foundWebsites, 200);
+        const foundWebsites = helpers.uniqueWebsiteValues(target && target.foundWebsites, 200);
         if (foundWebsites.length) {
             progress.foundWebsites = foundWebsites;
             changed = true;
@@ -436,7 +383,7 @@
     }
 
     function normalizeState(raw) {
-        const parsed = typeof raw === "string" ? safeParseJson(raw) : (raw || {});
+        const parsed = typeof raw === "string" ? helpers.safeParseJson(raw) : (raw || {});
         const loadedTargets = Array.isArray(parsed.targets)
             ? parsed.targets.map(normalizeTarget).filter(Boolean)
             : [];
@@ -498,6 +445,12 @@
         });
     }
 
+    function readHarvestProgress() {
+        const progressApi = global.SoftoraDatabaseHarvestProgress;
+        if (!progressApi || typeof progressApi.readHarvestProgress !== "function") return Promise.resolve(null);
+        return progressApi.readHarvestProgress();
+    }
+
     function createController(options) {
         ensureBusyStyles();
         const nodes = options.nodes || {};
@@ -508,6 +461,17 @@
         const importRows = options.importRows;
         const fetchDeepSearchRows = options.readDeepSearchRows || readDeepSearchRows;
         const fetchDeepSearchEstimate = options.readDeepSearchEstimate || readDeepSearchEstimate;
+        const harvestProgressBridge = global.SoftoraDatabaseHarvestProgress && typeof global.SoftoraDatabaseHarvestProgress.createBridge === "function"
+            ? global.SoftoraDatabaseHarvestProgress.createBridge({
+                applyTargetProgress: applyTargetProgress,
+                normalizeState: normalizeState,
+                readHarvestProgress: options.readHarvestProgress,
+                targetOrderVersion: TARGET_ORDER_VERSION
+            })
+            : null;
+        const fetchHarvestProgress = harvestProgressBridge && typeof harvestProgressBridge.readProgress === "function"
+            ? harvestProgressBridge.readProgress
+            : (options.readHarvestProgress || readHarvestProgress);
         const autoContinueDelayMs = options.autoContinueDelayMs === 0
             ? 0
             : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
@@ -583,7 +547,7 @@
         function loadState() {
             if (!getUiState || !scope || !stateKey) {
                 render();
-                return Promise.resolve(state);
+                return refreshHarvestProgress();
             }
             return getUiState(scope).then(function (remoteState) {
                 const values = remoteState && remoteState.values && typeof remoteState.values === "object"
@@ -591,9 +555,33 @@
                     : {};
                 state = normalizeState(values[stateKey]);
                 render();
-                return state;
+                return refreshHarvestProgress();
             }).catch(function () {
                 render();
+                return refreshHarvestProgress();
+            });
+        }
+
+        function applyHarvestProgress(payload) {
+            if (!harvestProgressBridge || typeof harvestProgressBridge.applyToState !== "function") return false;
+            const nextState = harvestProgressBridge.applyToState(state, payload);
+            if (!nextState) return false;
+            state.targets = nextState.targets;
+            state.activeIndex = nextState.activeIndex;
+            state.desiredCompanyCount = nextState.desiredCompanyCount;
+            state.updatedAt = nextState.updatedAt;
+            return true;
+        }
+
+        function refreshHarvestProgress() {
+            if (typeof fetchHarvestProgress !== "function") return Promise.resolve(state);
+            return Promise.resolve(fetchHarvestProgress()).then(function (payload) {
+                if (applyHarvestProgress(payload)) {
+                    render();
+                    void persistState();
+                }
+                return state;
+            }).catch(function () {
                 return state;
             });
         }
@@ -633,13 +621,13 @@
         }
 
         function getSessionFoundWebsites(targetId) {
-            return uniqueWebsiteValues(sessionFoundWebsitesByTargetId.get(normalizeString(targetId)) || [], 200);
+            return helpers.uniqueWebsiteValues(sessionFoundWebsitesByTargetId.get(normalizeString(targetId)) || [], 200);
         }
 
         function setSessionFoundWebsites(targetId, websites) {
             const normalizedTargetId = normalizeString(targetId);
             if (!normalizedTargetId) return;
-            sessionFoundWebsitesByTargetId.set(normalizedTargetId, uniqueWebsiteValues(websites, 200));
+            sessionFoundWebsitesByTargetId.set(normalizedTargetId, helpers.uniqueWebsiteValues(websites, 200));
         }
 
         function renderSources(target) {
@@ -653,7 +641,7 @@
                 return;
             }
             nodes.deepSearchSources.innerHTML = websites.map(function (website) {
-                const href = normalizeWebsiteHref(website);
+                const href = helpers.normalizeWebsiteHref(website);
                 return "<a href=\"" + escapeHtml(href) + "\" target=\"_blank\" rel=\"noopener\">" + escapeHtml(website) + "</a>";
             }).join("");
         }
@@ -843,7 +831,7 @@
             state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
             target.updatedAt = new Date().toISOString();
             target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
-            target.foundWebsites = uniqueWebsiteValues((target.foundWebsites || []).concat(addedWebsites || []), 200);
+            target.foundWebsites = helpers.uniqueWebsiteValues((target.foundWebsites || []).concat(addedWebsites || []), 200);
             setSessionFoundWebsites(target.id, getSessionFoundWebsites(target.id).concat(addedWebsites || []));
             const businessKeys = [];
             businesses.forEach(function (business) {
@@ -851,7 +839,7 @@
                     businessKeys.push(key);
                 });
             });
-            target.seen = uniqueStrings(target.seen.concat(businessKeys), MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
+            target.seen = helpers.uniqueStrings(target.seen.concat(businessKeys), MAX_DEEP_SEARCH_EXCLUDE_ITEMS);
         }
 
         function advanceCompletedTarget(target) {
@@ -881,7 +869,7 @@
                 target: target.label,
                 count: requestCount,
                 batchNumber: target.batches + 1,
-                exclude: uniqueStrings(target.seen.concat(collectExistingKeys()), MAX_DEEP_SEARCH_EXCLUDE_ITEMS)
+                exclude: helpers.uniqueStrings(target.seen.concat(collectExistingKeys()), MAX_DEEP_SEARCH_EXCLUDE_ITEMS)
             }).then(function (body) {
                 const rows = Array.isArray(body.rows) ? body.rows : [];
                 target.lastSources = Array.isArray(body.sources) ? body.sources.slice(0, 40) : [];
@@ -899,7 +887,7 @@
                         : helpers.collectNewCustomersAfterImport(beforeCustomers, afterCustomers, addedCount);
                     const addedWebsites = importResult === false
                         ? []
-                        : collectWebsitesFromCustomers(addedCustomers);
+                        : helpers.collectWebsitesFromCustomers(addedCustomers);
                     updateTargetAfterSearch(target, body, addedCount, addedWebsites);
                     const completed = Boolean(body && body.placeComplete);
                     const customerPersisted = !(rows.length > 1 && addedCount > 0 && importResult === false);
@@ -1182,6 +1170,7 @@
             getRawDefaultTargetLabels: getRawDefaultTargetLabels,
             parseTargetLines: parseTargetLines,
             readDeepSearchEstimate: readDeepSearchEstimate,
+            readHarvestProgress: readHarvestProgress,
             readDeepSearchRows: readDeepSearchRows,
             runCurrentSearch: runCurrentSearch
         };
@@ -1193,6 +1182,7 @@
         getRawDefaultTargetLabels: getRawDefaultTargetLabels,
         parseTargetLines: parseTargetLines,
         readDeepSearchEstimate: readDeepSearchEstimate,
+        readHarvestProgress: readHarvestProgress,
         readDeepSearchRows: readDeepSearchRows
     };
 })(window);
