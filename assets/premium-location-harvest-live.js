@@ -126,6 +126,12 @@
     }).length;
   }
 
+  function countActiveCompaniesWithoutWebsite(payload) {
+    return getCompanies(payload).filter(function (company) {
+      return isCompleteCompany(company) && !hasWebsite(company) && !looksInactive(company);
+    }).length;
+  }
+
   function getActiveTarget(payload) {
     const targets = getTargets(payload);
     return targets.find(function (target) { return normalizeText(target.status).toLowerCase() === "active"; })
@@ -147,7 +153,7 @@
       maximumFractionDigits: 1
     }).format(percent);
 
-    byId("harvestDoneCount").textContent = String(done);
+    byId("harvestNoWebsiteStatCount").textContent = String(countActiveCompaniesWithoutWebsite(payload));
     byId("harvestActiveCount").textContent = active && activeTarget ? activeTarget.label : "Geen actieve locatie";
     byId("harvestTodoCount").textContent = String(todo);
     byId("harvestCompanyCount").textContent = String(countCompaniesWithWebsite(payload));
