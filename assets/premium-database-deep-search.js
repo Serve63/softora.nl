@@ -298,6 +298,9 @@
             found: 0,
             added: 0,
             costUsd: 0,
+            estimatedLocalBusinessCount: 0,
+            estimateSources: [],
+            coverageStrategy: "",
             placeComplete: false,
             completionReason: "",
             completionChecks: 0,
@@ -322,6 +325,9 @@
             found: Math.max(0, Number(raw && raw.found) || 0),
             added: Math.max(0, Number(raw && raw.added) || 0),
             costUsd: Math.max(0, Number(raw && raw.costUsd) || 0),
+            estimatedLocalBusinessCount: helpers.normalizeEstimatedLocalBusinessCount(raw && raw.estimatedLocalBusinessCount),
+            estimateSources: uniqueStrings(raw && raw.estimateSources, 20),
+            coverageStrategy: normalizeString(raw && raw.coverageStrategy),
             placeComplete: Boolean(raw && raw.placeComplete),
             completionReason: normalizeString(raw && raw.completionReason),
             completionChecks: Math.max(0, Number(raw && raw.completionChecks) || 0),
@@ -351,6 +357,9 @@
             "found",
             "added",
             "costUsd",
+            "estimatedLocalBusinessCount",
+            "estimateSources",
+            "coverageStrategy",
             "placeComplete",
             "completionReason",
             "completionChecks",
@@ -426,14 +435,13 @@
         return defaults;
     }
 
-    function normalizeState(raw, manuallyCompletedTargetLabels) {
+    function normalizeState(raw) {
         const parsed = typeof raw === "string" ? safeParseJson(raw) : (raw || {});
         const loadedTargets = Array.isArray(parsed.targets)
             ? parsed.targets.map(normalizeTarget).filter(Boolean)
             : [];
         const progressDefaultLabels = getProgressDefaultLabels(parsed);
-        const progressedTargets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress, progressDefaultLabels);
-        const targets = typeof helpers.applyManualCompletedTargets === "function" ? helpers.applyManualCompletedTargets(progressedTargets, manuallyCompletedTargetLabels) : progressedTargets;
+        const targets = applyTargetProgress(applyDefaultTargets(loadedTargets), parsed.targetProgress || parsed.progress, progressDefaultLabels);
         let activeIndex = Math.max(0, Math.min(targets.length - 1, Number(parsed.activeIndex) || 0));
         if (normalizeString(parsed.targetOrderVersion) !== TARGET_ORDER_VERSION && Number.isFinite(Number(parsed.activeIndex))) {
             const legacyActiveLabel = normalizeString(progressDefaultLabels[Math.max(0, Number(parsed.activeIndex) || 0)]);
@@ -504,13 +512,12 @@
             ? 0
             : Math.max(0, Number(options.autoContinueDelayMs) || AUTO_CONTINUE_DELAY_MS);
         const getCustomers = options.getCustomers || function () { return []; };
-        const manuallyCompletedTargetLabels = Array.isArray(options.manualCompletedTargetLabels) ? options.manualCompletedTargetLabels : (Array.isArray(helpers.manualCompletedTargetLabels) ? helpers.manualCompletedTargetLabels : []);
         const recordApiCost = typeof options.recordApiCost === "function"
             ? options.recordApiCost
             : function () { return Promise.resolve({ ok: true }); };
         const setStatusMessage = options.setStatusMessage || function () {};
         const toast = options.toast || function () {};
-        let state = normalizeState({}, manuallyCompletedTargetLabels);
+        let state = normalizeState({});
         let busy = false;
         let bound = false;
         let estimateState = {
@@ -520,7 +527,6 @@
             failed: false,
             requestId: 0
         };
-        const harvestProgressBridge = typeof helpers.createHarvestProgressBridge === "function" ? helpers.createHarvestProgressBridge({ globalObject: global, getState: function () { return state; }, render: render, persistState: persistState, isOpen: isOpen, manualCompletedTargetLabels: manuallyCompletedTargetLabels, pollMs: options.harvestProgressPollMs, readHarvestProgress: options.readHarvestProgress }) : null;
         const visibleSourceTargetIds = new Set();
         const sessionFoundWebsitesByTargetId = new Map();
 
@@ -583,7 +589,7 @@
                 const values = remoteState && remoteState.values && typeof remoteState.values === "object"
                     ? remoteState.values
                     : {};
-                state = normalizeState(values[stateKey], manuallyCompletedTargetLabels);
+                state = normalizeState(values[stateKey]);
                 render();
                 return state;
             }).catch(function () {
@@ -831,6 +837,7 @@
             target.found += Math.max(0, Number(body.found) || 0);
             target.added += Math.max(0, Number(addedCount) || 0);
             target.costUsd = Math.max(0, Number(target.costUsd) || 0) + costUsd;
+            helpers.mergeTargetEstimate(target, body);
             target.placeComplete = Boolean(body && body.placeComplete);
             target.completionReason = normalizeString(body && body.completionReason);
             state.totalCostUsd = Math.max(0, Number(state.totalCostUsd) || 0) + costUsd;
@@ -864,14 +871,6 @@
                 if (item.status !== "done") item.status = index === state.activeIndex ? "active" : "pending";
             });
             return true;
-        }
-
-        function isTargetCompletionConfirmed(target, result) {
-            const hasNewInformation = result.found > 0 || result.addedCount > 0;
-            const emptyCompletion = result.completed && !hasNewInformation;
-            target.completionChecks = emptyCompletion ? Math.max(0, Number(target.completionChecks) || 0) + 1 : 0;
-            target.placeComplete = emptyCompletion && target.completionChecks >= REQUIRED_EMPTY_COMPLETION_ROUNDS;
-            return target.placeComplete;
         }
 
         function runTargetBatch(target, requestedCount) {
@@ -911,7 +910,8 @@
                         customerPersisted: customerPersisted,
                         duplicateOnlyBatch: duplicateOnlyBatch,
                         costUsd: Math.max(0, Number(body && body.cost && body.cost.estimatedUsd) || 0),
-                        found: Math.max(0, Number(body.found) || 0)
+                        found: Math.max(0, Number(body.found) || 0),
+                        ...helpers.buildBatchCoverageResult(body)
                     };
                     const costLogPromise = recordApiCost({
                         source: "premium-database-deep-search",
@@ -927,6 +927,8 @@
                             promptVersion: body && body.promptVersion,
                             found: result.found,
                             added: result.addedCount,
+                            estimatedLocalBusinessCount: result.estimatedLocalBusinessCount,
+                            estimateSources: result.estimateSources,
                             inputTokens: body && body.cost && body.cost.inputTokens,
                             outputTokens: body && body.cost && body.cost.outputTokens,
                             reasoningTokens: body && body.cost && body.cost.reasoningTokens,
@@ -987,7 +989,7 @@
                             return { desiredReached: true };
                         });
                     }
-                    if (isTargetCompletionConfirmed(target, result)) {
+                    if (helpers.isTargetCompletionConfirmed(target, result, REQUIRED_EMPTY_COMPLETION_ROUNDS)) {
                         advanceCompletedTarget(target);
                         render();
                         return persistState().then(function () {
@@ -998,6 +1000,14 @@
                             setStatusMessage(baseMessage + " Deze plaats is automatisch afgerond." + nextMessage, "success", true);
                             toast("Plek afgerond");
                             return { completedTarget: true };
+                        });
+                    }
+                    if (result.completed && result.found === 0 && result.addedCount === 0 && !helpers.hasEnoughCompletionCoverage(target, result)) {
+                        target.placeComplete = false;
+                        target.status = "active";
+                        return persistState().then(function () {
+                            setStatusMessage(baseMessage + " AI dacht dat de plaats klaar was, maar dat klopt niet hard genoeg. " + helpers.describeCompletionCoverageGap(target, result) + " Deze locatie blijft open voor grondiger zoeken.", "info", true);
+                            return { stopped: true, needsDeeperSearch: true };
                         });
                     }
                     return persistState().then(function () {
@@ -1102,11 +1112,7 @@
             sessionFoundWebsitesByTargetId.clear();
             nodes.deepSearchModal.classList.add("on");
             nodes.deepSearchModal.setAttribute("aria-hidden", "false");
-            void loadState().then(function () {
-                return harvestProgressBridge ? harvestProgressBridge.refresh() : false;
-            }).finally(function () {
-                if (harvestProgressBridge) harvestProgressBridge.schedule();
-            });
+            void loadState();
         }
 
         function close() {
@@ -1114,7 +1120,6 @@
             if (busy) {
                 return false;
             }
-            if (harvestProgressBridge) harvestProgressBridge.clear();
             nodes.deepSearchModal.classList.remove("on");
             nodes.deepSearchModal.setAttribute("aria-hidden", "true");
             return true;
@@ -1178,7 +1183,6 @@
             parseTargetLines: parseTargetLines,
             readDeepSearchEstimate: readDeepSearchEstimate,
             readDeepSearchRows: readDeepSearchRows,
-            refreshSharedHarvestProgress: harvestProgressBridge ? harvestProgressBridge.refresh : function () { return Promise.resolve(false); },
             runCurrentSearch: runCurrentSearch
         };
     }

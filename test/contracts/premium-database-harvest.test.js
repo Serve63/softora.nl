@@ -270,8 +270,12 @@ test('premium database harvest writes live html, raw jsonl and csv outputs', asy
   assert.equal(fs.existsSync(result.siteProgressPath), true);
   const liveHtml = fs.readFileSync(result.liveHtmlPath, 'utf8');
   assert.match(liveHtml, /meta http-equiv="refresh"/);
+  assert.match(liveHtml, /Laatst bijgewerkt: 12:00/);
+  assert.doesNotMatch(liveHtml, /Laatst bijgewerkt: 2026-06-02T12:00:00\.000Z/);
+  assert.doesNotMatch(liveHtml, /Importklaar:/);
   assert.match(liveHtml, /Importklare bedrijven/);
   assert.match(liveHtml, /Complete bedrijven/);
+  assert.doesNotMatch(liveHtml, /Bronfamilie/);
   assert.doesNotMatch(liveHtml, /Nieuw laatste batch/);
   assert.doesNotMatch(liveHtml, /Afgekeurd/);
   assert.doesNotMatch(liveHtml, /Kandidaten/);

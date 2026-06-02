@@ -1547,12 +1547,46 @@ function buildDeepSearchJsonSchema() {
           required: ['bedrijfsnaam', 'adres', 'email', 'telefoonnummer', 'website', 'bronnen'],
         },
       },
+      estimatedLocalBusinessCount: { type: 'integer' },
+      estimateSources: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+      coverageStrategy: { type: 'string' },
       placeComplete: { type: 'boolean' },
       completionReason: { type: 'string' },
       notes: { type: 'string' },
     },
-    required: ['target', 'businesses', 'placeComplete', 'completionReason', 'notes'],
+    required: [
+      'target',
+      'businesses',
+      'estimatedLocalBusinessCount',
+      'estimateSources',
+      'coverageStrategy',
+      'placeComplete',
+      'completionReason',
+      'notes',
+    ],
   };
+}
+
+function normalizeDeepSearchEstimatedLocalBusinessCount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.min(100000, Math.round(parsed));
+}
+
+function normalizeDeepSearchEstimateSources(value) {
+  const seen = new Set();
+  const result = [];
+  (Array.isArray(value) ? value : []).forEach((source) => {
+    const normalized = truncateText(source, 220);
+    const key = normalizeImportKey(normalized);
+    if (!normalized || !key || seen.has(key)) return;
+    seen.add(key);
+    result.push(normalized);
+  });
+  return result.slice(0, 12);
 }
 
 function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber, promptVersion }) {
@@ -1574,8 +1608,11 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber, promp
     'Neem geen verenigingen, scholen, overheidsinstanties of stichtingen mee, tenzij ze commercieel interessant zijn.',
     'Vermijd dubbele bedrijven en verzin nooit ontbrekende gegevens.',
     'Werk in vervolgbatches: dit is niet één chatsessie maar een doorlopende zoekrun met eerder gevonden resultaten als uitsluitlijst.',
+    'Bepaal vóór het zoeken eerst een indicatie van hoeveel actieve bedrijven in de exacte plaats gevestigd zijn. Gebruik daarvoor live bronnen zoals KVK-achtige registers, lokale bedrijvengidsen, ondernemersverenigingen, bedrijventerreinen, gemeente-/plaatsinformatie en algemene zoekresultaten. Gebruik geen Google Places.',
+    'Vul estimatedLocalBusinessCount altijd met een integer. Gebruik alleen 0 wanneer een betrouwbare bron expliciet laat zien dat er geen lokale bedrijven zijn; anders geef je een voorzichtige positieve schatting.',
+    'Vul estimateSources met URL’s of bronnamen waarop de bedrijfsomvang-inschatting is gebaseerd en leg je zoekdekking kort uit in coverageStrategy.',
     'Zet placeComplete altijd op false wanneer je in deze response één of meer bedrijven aanlevert. Softora vraagt daarna automatisch om de volgende lading.',
-    'Zet placeComplete alleen op true wanneer je in deze response nul nieuwe complete bedrijven aanlevert én na live web search geen extra nieuwe complete en verifieerbare bedrijven voor deze plaats meer kunt vinden.',
+    'Zet placeComplete alleen op true wanneer je in deze response nul nieuwe complete bedrijven aanlevert én je zoekdekking logisch dicht bij estimatedLocalBusinessCount zit. Bij twijfel: false.',
     'Gebruik geen placeholders zoals onbekend, niet gevonden, n.v.t. of lege waarden.',
     'Geef uitsluitend JSON terug volgens het schema.',
   ].join('\n');
@@ -1583,6 +1620,8 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber, promp
   const userPrompt = [
     `Vind maximaal ${count} nieuwe actieve bedrijven in: ${target}.`,
     `Dit is batch ${Math.max(1, Number(batchNumber) || 1)} voor deze plek. Zoek verder dan de meest voor de hand liggende resultaten.`,
+    'Stap 1: zoek eerst uit hoeveel actieve bedrijven er ongeveer in deze exacte plaats gevestigd zijn. Dit getal is de richtlijn voor hoeveel we uiteindelijk moeten proberen te vinden.',
+    'Stap 2: zoek daarna zo breed mogelijk naar complete bedrijven, niet alleen de grote namen die bovenaan Google staan.',
     '',
     'Lever exact deze velden per bedrijf:',
     'Bedrijfsnaam | Adres | E-mail | Telefoonnummer | Website',
@@ -1594,11 +1633,15 @@ function buildDeepSearchPrompt({ target, count, excludeItems, batchNumber, promp
     '- Gebruik bij voorkeur de officiele bedrijfswebsite als bron voor e-mail en telefoon.',
     '- Website mag een domein of volledige URL zijn, maar moet echt bij het bedrijf horen.',
     '- Minimaal één bron per bedrijf moet op hetzelfde domein staan als de opgegeven website.',
+    '- Gebruik geen Google Places.',
+    '- Gebruik voor de bedrijfsomvang-inschatting meerdere bronsoorten waar mogelijk: lokale bedrijvengidsen, ondernemersvereniging, bedrijventerreinpagina’s, KVK-achtige/openbare registers, branchepagina’s, dorps-/gemeentepagina’s en brede webresultaten.',
+    '- Zoek ook gericht op kleinere/onvindbare bedrijven: contactpagina’s, postcode/straat + plaats, bedrijfsnaam + plaats, bedrijventerrein + plaats, en branche + plaats.',
     '- Vermijd dubbele bedrijven, handelsnamen met dezelfde website en eerder gevonden resultaten.',
     '- Gebruik bronnen als URL-lijst per bedrijf, zodat de controle zichtbaar blijft.',
     '- Als je bedrijven teruggeeft, zet placeComplete op false, ook als je denkt dat dit misschien de laatste lading is.',
-    '- Alleen als je nul nieuwe complete bedrijven kunt vinden na breder doorzoeken, zet je placeComplete op true en leg je kort uit waarom in completionReason.',
+    '- Alleen als je nul nieuwe complete bedrijven kunt vinden na breder doorzoeken én de gevonden/uitgesloten dekking redelijk aansluit op estimatedLocalBusinessCount, zet je placeComplete op true en leg je kort uit waarom in completionReason.',
     '- Als je nog niet zeker bent dat de plaats leeg is, of als je slechts de eerste zichtbare lading hebt, zet placeComplete op false.',
+    '- completionReason en coverageStrategy moeten concreet noemen welke bronsoorten je hebt doorzocht; geen vage tekst zoals “niets gevonden”.',
     '',
     'Eerder gevonden of al bestaande resultaten die je moet vermijden:',
     exclusionText,
@@ -1969,6 +2012,11 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     }
   ).catch(() => null);
   const placeComplete = businesses.length > 0 ? false : Boolean(parsed && parsed.placeComplete);
+  const estimatedLocalBusinessCount = normalizeDeepSearchEstimatedLocalBusinessCount(
+    parsed && parsed.estimatedLocalBusinessCount
+  );
+  const estimateSources = normalizeDeepSearchEstimateSources(parsed && parsed.estimateSources);
+  const coverageStrategy = truncateText(parsed && parsed.coverageStrategy, 400);
   const completionReason = truncateText(
     (parsed && (parsed.completionReason || parsed.notes)) ||
       (placeComplete ? 'Geen extra complete en verifieerbare bedrijven gevonden.' : ''),
@@ -1987,6 +2035,9 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
     requested: count,
     found: businesses.length,
     rejected: Math.max(0, rawBusinesses.length - businesses.length),
+    estimatedLocalBusinessCount,
+    estimateSources,
+    coverageStrategy,
     placeComplete,
     completionReason,
     cost,

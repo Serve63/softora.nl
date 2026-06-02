@@ -687,6 +687,15 @@ function formatDate(value = new Date()) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+function formatLiveUpdatedTime(value = new Date()) {
+  const raw = normalizeString(value || new Date().toISOString());
+  const isoTimeMatch = raw.match(/T(\d{2}:\d{2})/);
+  if (isoTimeMatch) return isoTimeMatch[1];
+  const plainTimeMatch = raw.match(/\b(\d{2}:\d{2})\b/);
+  if (plainTimeMatch) return plainTimeMatch[1];
+  return new Date(raw || Date.now()).toISOString().match(/T(\d{2}:\d{2})/)?.[1] || '';
+}
+
 function csvEscape(value) {
   const raw = normalizeString(value);
   return /[",\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
@@ -766,6 +775,7 @@ function buildLiveHtml(state) {
   const currentItem = progressItems.find((item) => !item.completed) || progressItems[progressItems.length - 1] || null;
   const currentTarget = currentItem ? parseTargetLabel(currentItem.target) : null;
   const currentLocationTotal = currentItem ? countRecordsForTarget(records, currentItem.target) : 0;
+  const updatedTime = formatLiveUpdatedTime(state.updatedAt || new Date().toISOString());
   const metricCards = [
     { value: records.length, label: 'Importklare bedrijven' },
     { value: completedItems.length, label: 'Locaties afgerond' },
@@ -778,7 +788,7 @@ function buildLiveHtml(state) {
     return `<tr${doneClass}><td>${index + 1}</td><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.status)}</td><td>${locationTotal}</td></tr>`;
   }).join('');
   const businessRows = records.map((item, index) => (
-    `<tr><td>${index + 1}</td><td>${escapeHtml(item.companyName)}</td><td><a href="${escapeHtml(item.website)}">${escapeHtml(normalizeDomain(item.website))}</a></td><td>${escapeHtml(item.email)}</td><td>${escapeHtml(item.phone)}</td><td>${escapeHtml(item.address)}</td><td>${escapeHtml(item.sourceFamily)}</td></tr>`
+    `<tr><td>${index + 1}</td><td>${escapeHtml(item.companyName)}</td><td><a href="${escapeHtml(item.website)}">${escapeHtml(normalizeDomain(item.website))}</a></td><td>${escapeHtml(item.email)}</td><td>${escapeHtml(item.phone)}</td><td>${escapeHtml(item.address)}</td></tr>`
   )).join('');
   return `<!doctype html>
 <html lang="nl">
@@ -806,12 +816,12 @@ function buildLiveHtml(state) {
 </head>
 <body>
   <h1>Softora Bedrijven-Verzamellijst</h1>
-  <div class="meta">Laatst bijgewerkt: ${escapeHtml(state.updatedAt || new Date().toISOString())} · Importklaar: ${records.length}</div>
+  <div class="meta">Laatst bijgewerkt: ${escapeHtml(updatedTime)}</div>
   <section class="metrics">${metricCards}</section>
   <h2>Voortgang</h2>
   <table><thead><tr><th>#</th><th>Locatie</th><th>Status</th><th>Complete bedrijven</th></tr></thead><tbody>${progressRows || '<tr><td colspan="4">Nog geen locaties verwerkt.</td></tr>'}</tbody></table>
   <h2>Importklare bedrijven</h2>
-  <table><thead><tr><th>#</th><th>Bedrijf</th><th>Website</th><th>E-mail</th><th>Telefoon</th><th>Adres</th><th>Bronfamilie</th></tr></thead><tbody>${businessRows || '<tr><td colspan="7">Nog geen complete records.</td></tr>'}</tbody></table>
+  <table><thead><tr><th>#</th><th>Bedrijf</th><th>Website</th><th>E-mail</th><th>Telefoon</th><th>Adres</th></tr></thead><tbody>${businessRows || '<tr><td colspan="6">Nog geen complete records.</td></tr>'}</tbody></table>
 </body>
 </html>`;
 }

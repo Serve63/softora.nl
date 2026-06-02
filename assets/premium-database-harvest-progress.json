@@ -1,10 +1,131 @@
 {
   "version": 1,
   "source": "softora-local-harvest",
-  "updatedAt": "",
-  "completedTargetLabels": [],
-  "targetProgress": [],
-  "importReadyCount": 0,
+  "updatedAt": "2026-06-02T15:42:53.535Z",
+  "completedTargetLabels": [
+    "Nederland | Noord-Brabant | Vught | Helvoirt",
+    "Nederland | Noord-Brabant | Boxtel | Boxtel",
+    "Nederland | Noord-Brabant | Boxtel | Esch",
+    "Nederland | Noord-Brabant | Boxtel | Liempde",
+    "Nederland | Noord-Brabant | Hilvarenbeek | Biest-Houtakker",
+    "Nederland | Noord-Brabant | Hilvarenbeek | Diessen",
+    "Nederland | Noord-Brabant | Hilvarenbeek | Esbeek",
+    "Nederland | Noord-Brabant | Hilvarenbeek | Haghorst",
+    "Nederland | Noord-Brabant | Hilvarenbeek | Hilvarenbeek"
+  ],
+  "targetProgress": [
+    {
+      "target": "Nederland | Noord-Brabant | Vught | Helvoirt",
+      "label": "Nederland | Noord-Brabant | Vught | Helvoirt",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 59,
+      "rejectedCount": 0,
+      "candidatesSeen": 59,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Boxtel | Boxtel",
+      "label": "Nederland | Noord-Brabant | Boxtel | Boxtel",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 124,
+      "rejectedCount": 0,
+      "candidatesSeen": 124,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Boxtel | Esch",
+      "label": "Nederland | Noord-Brabant | Boxtel | Esch",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 35,
+      "rejectedCount": 0,
+      "candidatesSeen": 35,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Boxtel | Liempde",
+      "label": "Nederland | Noord-Brabant | Boxtel | Liempde",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 152,
+      "rejectedCount": 0,
+      "candidatesSeen": 152,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Hilvarenbeek | Biest-Houtakker",
+      "label": "Nederland | Noord-Brabant | Hilvarenbeek | Biest-Houtakker",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 32,
+      "rejectedCount": 0,
+      "candidatesSeen": 32,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Hilvarenbeek | Diessen",
+      "label": "Nederland | Noord-Brabant | Hilvarenbeek | Diessen",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 54,
+      "rejectedCount": 0,
+      "candidatesSeen": 54,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Hilvarenbeek | Esbeek",
+      "label": "Nederland | Noord-Brabant | Hilvarenbeek | Esbeek",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 69,
+      "rejectedCount": 0,
+      "candidatesSeen": 69,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Hilvarenbeek | Haghorst",
+      "label": "Nederland | Noord-Brabant | Hilvarenbeek | Haghorst",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 28,
+      "rejectedCount": 0,
+      "candidatesSeen": 28,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Hilvarenbeek | Hilvarenbeek",
+      "label": "Nederland | Noord-Brabant | Hilvarenbeek | Hilvarenbeek",
+      "status": "afgerond",
+      "completed": true,
+      "acceptedCount": 261,
+      "rejectedCount": 0,
+      "candidatesSeen": 261,
+      "completionReason": "Overgenomen uit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    },
+    {
+      "target": "Nederland | Noord-Brabant | Oirschot | Oirschot",
+      "label": "Nederland | Noord-Brabant | Oirschot | Oirschot",
+      "status": "open",
+      "completed": false,
+      "acceptedCount": 4,
+      "rejectedCount": 0,
+      "candidatesSeen": 4,
+      "completionReason": "Doorzoeken hervat vanuit bestaande verzamellijst.",
+      "updatedAt": "2026-06-02T15:42:53.466Z"
+    }
+  ],
+  "importReadyCount": 818,
   "rawCandidateCount": 0,
   "outputBaseName": "softora-bedrijven"
 }

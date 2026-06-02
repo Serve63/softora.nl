@@ -496,12 +496,17 @@ test('premium database deep search uses OpenAI web search and returns complete r
         assert.deepEqual(payload.text.format.schema.required, [
           'target',
           'businesses',
+          'estimatedLocalBusinessCount',
+          'estimateSources',
+          'coverageStrategy',
           'placeComplete',
           'completionReason',
           'notes',
         ]);
         assert.match(payload.input[1].content, /Almkerk/);
         assert.match(payload.input[1].content, /Bakkerij Oud/);
+        assert.match(payload.input[1].content, /hoeveel actieve bedrijven er ongeveer/);
+        assert.match(payload.input[1].content, /Gebruik geen Google Places/);
         assert.match(payload.input[1].content, /placeComplete/);
         assert.doesNotMatch(payload.input[1].content, /Zoekstrategie v2/);
         assert.match(payload.input[0].content, /Harde regioregel/);
@@ -539,6 +544,9 @@ test('premium database deep search uses OpenAI web search and returns complete r
                     bronnen: ['https://onvolledig.nl'],
                   },
                 ],
+                estimatedLocalBusinessCount: 45,
+                estimateSources: ['Openbare bedrijvengids Almkerk', 'lokale ondernemersvereniging'],
+                coverageStrategy: 'Bedrijvengids, lokale ondernemersvereniging en brede contactpagina-zoekrondes gecontroleerd.',
                 placeComplete: false,
                 completionReason: '',
                 notes: '',
@@ -571,6 +579,9 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.reasoningEffort, 'medium');
   assert.equal(result.serviceTier, 'flex');
   assert.equal(result.promptVersion, 'v1');
+  assert.equal(result.estimatedLocalBusinessCount, 45);
+  assert.deepEqual(result.estimateSources, ['Openbare bedrijvengids Almkerk', 'lokale ondernemersvereniging']);
+  assert.match(result.coverageStrategy, /Bedrijvengids/);
   assert.equal(result.placeComplete, false);
   assert.equal(result.cost.currency, 'USD');
   assert.equal(result.cost.inputTokens, 1000);
