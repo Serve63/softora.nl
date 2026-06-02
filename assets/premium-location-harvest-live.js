@@ -116,19 +116,14 @@
     return /in liquidatie|failliet|faillissement|uitgeschreven|opgeheven|beeindigd|beindigd|ontbonden|gestaakt|surseance/.test(text);
   }
 
-  function getLastDoneTargetPlaces(payload, amount) {
-    return getTargets(payload)
-      .filter(function (target) { return normalizeText(target.status).toLowerCase() === "done"; })
-      .slice()
-      .sort(function (a, b) {
-        return new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime();
-      })
-      .slice(-amount)
-      .map(function (target) { return splitLocation(target.label); });
-  }
-
   function countCompleteCompanies(payload) {
     return getCompanies(payload).filter(isCompleteCompany).length;
+  }
+
+  function countCompaniesWithWebsite(payload) {
+    return getCompanies(payload).filter(function (company) {
+      return isCompleteCompany(company) && hasWebsite(company);
+    }).length;
   }
 
   function getActiveTarget(payload) {
@@ -155,7 +150,7 @@
     byId("harvestDoneCount").textContent = String(done);
     byId("harvestActiveCount").textContent = active && activeTarget ? activeTarget.label : "Geen actieve locatie";
     byId("harvestTodoCount").textContent = String(todo);
-    byId("harvestCompanyCount").textContent = String(countCompleteCompanies(payload));
+    byId("harvestCompanyCount").textContent = String(countCompaniesWithWebsite(payload));
     byId("harvestUpdatedAt").textContent = formatDateTime(payload && payload.updatedAt);
     byId("harvestProgressText").textContent = formattedPercent + "%";
     byId("harvestProgressBar").style.width = percent + "%";
@@ -198,7 +193,9 @@
     byId("harvestCurrentLocation").textContent = "Alle gevonden complete bedrijven";
 
     const query = normalizeSearch(state.query);
-    const companies = getCompanies(payload).filter(isCompleteCompany).filter(function (company) {
+    const companies = getCompanies(payload).filter(function (company) {
+      return isCompleteCompany(company) && hasWebsite(company);
+    }).filter(function (company) {
       const companyText = normalizeSearch([
         company.companyName,
         company.phone,
@@ -210,7 +207,7 @@
     });
 
     if (!companies.length) {
-      body.innerHTML = '<tr><td colspan="5">Nog geen complete bedrijven gevonden. Een bedrijf telt pas mee wanneer bedrijfsnaam, telefoonnummer, mailadres en locatie gevuld zijn.</td></tr>';
+      body.innerHTML = '<tr><td colspan="5">Nog geen complete bedrijven met website gevonden. Een bedrijf telt hier pas mee wanneer bedrijfsnaam, telefoonnummer, mailadres, website en locatie gevuld zijn.</td></tr>';
       return;
     }
 
@@ -241,12 +238,10 @@
     const countNode = byId("harvestNoWebsiteCount");
     if (!body || !countNode) return;
 
-    const lastDonePlaces = new Set(getLastDoneTargetPlaces(payload, 6).map(normalizeText));
     const query = normalizeSearch(state.query);
     const companies = getCompanies(payload)
       .filter(function (company) {
-        return lastDonePlaces.has(normalizeText(company && company.place))
-          && isCompleteCompany(company)
+        return isCompleteCompany(company)
           && !hasWebsite(company)
           && !looksInactive(company);
       })
@@ -263,7 +258,7 @@
     countNode.textContent = String(companies.length);
 
     if (!companies.length) {
-      body.innerHTML = '<tr><td colspan="4">Geen actieve complete bedrijven zonder website gevonden binnen de laatste 6 afgeronde locaties.</td></tr>';
+      body.innerHTML = '<tr><td colspan="4">Geen actieve complete bedrijven zonder website gevonden.</td></tr>';
       return;
     }
 
