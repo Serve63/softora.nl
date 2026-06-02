@@ -25,6 +25,7 @@ const {
   INDEXABLE_PUBLIC_SEO_PAGES,
   applyPublicSeoHeadDefaults,
 } = require('../../server/services/public-seo');
+const { extractInternalLinksFromHtml } = require('../../server/services/seo-machine-quality-gates');
 
 const repoRoot = path.resolve(__dirname, '../..');
 
@@ -122,6 +123,36 @@ test('seo content houdt future-dated publicaties uit routes en sitemap tot publi
     assert.ok(livePaths.includes(pathName), `${pathName} moet na publicatiedatum publiek zijn.`);
     assert.ok(liveSitemap.some((entry) => entry.path === pathName), `${pathName} moet na publicatiedatum in sitemap staan.`);
   }
+});
+
+test('seo content linkt op publicatiedatum niet naar future-dated content', () => {
+  const now = new Date('2026-06-02T12:00:00.000Z');
+  const publicPaths = new Set([
+    ...INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => entry.path),
+    ...getSeoContentPublicPaths({ now }),
+  ]);
+  const pages = [
+    ...getSeoContentCollectionPaths().map((pathName) => ({
+      path: pathName,
+      html: buildSeoContentIndexHtml(pathName.replace(/^\//, ''), {
+        siteOrigin: 'https://www.softora.nl',
+        now,
+      }),
+    })),
+    ...getSeoContentItems({ now }).map((item) => ({
+      path: getSeoContentPathForItem(item),
+      html: buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' }),
+    })),
+  ];
+
+  const brokenLinks = pages.flatMap((page) =>
+    extractInternalLinksFromHtml(page.html)
+      .filter((href) => !href.startsWith('/assets/'))
+      .filter((href) => !publicPaths.has(href))
+      .map((href) => `${page.path} -> ${href}`)
+  );
+
+  assert.deepEqual(brokenLinks, []);
 });
 
 test('seo content renders the existing blog visual language with real links', () => {

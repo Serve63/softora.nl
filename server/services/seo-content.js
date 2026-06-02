@@ -376,7 +376,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
   Object.freeze({
     collection: 'blog',
     slug: 'website-laten-maken-mkb-paginas',
-    title: 'Website laten maken voor het MKB: welke pagina’s heb je echt nodig?',
+    title: 'Welke pagina’s heeft een MKB-website nodig?',
     description:
       'Een praktische indeling voor MKB-websites die gevonden moeten worden, vertrouwen moeten wekken en aanvragen moeten opleveren.',
     category: 'Websites',
@@ -808,7 +808,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
   Object.freeze({
     collection: 'blog',
     slug: 'ai-automatisering-leadopvolging',
-    title: 'AI automatisering voor leadopvolging: hoe ziet een goede flow eruit?',
+    title: 'AI leadopvolging automatiseren: zo bouw je de flow',
     description:
       'Een praktische uitleg van een AI leadopvolging-flow, van intake en kwalificatie tot CRM-taak, samenvatting en menselijke controle.',
     category: 'AI automatisering',
@@ -1275,7 +1275,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
       Object.freeze({ label: 'AI leadopvolging flow', href: '/blog/ai-automatisering-leadopvolging' }),
-      Object.freeze({ label: 'Wat is leadkwalificatie?', href: '/kennisbank/wat-is-leadkwalificatie' }),
+      Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
     ]),
   }),
   Object.freeze({
