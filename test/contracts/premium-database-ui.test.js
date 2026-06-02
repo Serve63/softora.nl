@@ -64,6 +64,14 @@ function loadDatabaseWebdesignAssetStateClient() {
   return sandbox.window.SoftoraDatabaseWebdesignAssetState;
 }
 
+function loadDatabaseColdmailGuardClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-coldmail-guard.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: { URL }, URL };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseColdmailGuard;
+}
+
 function loadDatabaseWebdesignActionClient(options = {}) {
   const previewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
@@ -312,6 +320,57 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   }, helpers);
   assert.equal(missingPhoto.canGeneratePhoto, true);
   assert.equal(missingPhoto.isMailReady, false);
+});
+
+test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const guardClient = loadDatabaseColdmailGuardClient();
+
+  assert.match(pageSource, /assets\/premium-database-coldmail-guard\.js\?v=20260602a/);
+  assert.match(pageSource, /const COLDMAIL_SEND_GUARD_SCOPE = "premium_coldmail_send_guard";/);
+  assert.match(pageSource, /const COLDMAIL_SEND_GUARD_KEY = "softora_coldmail_send_guard_v1";/);
+  assert.match(pageSource, /function hasColdmailSendGuardSignal\(customer\)/);
+  assert.match(pageSource, /if \(hasColdmailSendGuardSignal\(customer\)\) return false;/);
+  assert.match(pageSource, /await refreshColdmailGuardState\(\);[\s\S]*const remoteState = await fetchUiStateGetWithFallback\(CUSTOMER_DB_SCOPE\);/);
+
+  const controller = guardClient.createController({
+    scope: 'premium_coldmail_send_guard',
+    key: 'softora_coldmail_send_guard_v1',
+    getUiState: async () => ({
+      values: {
+        softora_coldmail_send_guard_v1: JSON.stringify({
+          recipientEntries: [
+            {
+              recipientKey: 'email:info@example.nl',
+              recipientEmail: 'info@example.nl',
+              recipientDomain: 'example-nl',
+              recipientId: 'customer-guarded',
+            },
+          ],
+        }),
+      },
+    }),
+  });
+
+  await controller.load();
+
+  assert.equal(
+    controller.hasGuard({
+      id: 'customer-guarded',
+      email: 'info@example.nl',
+      website: 'https://example.nl',
+    }),
+    true
+  );
+  assert.equal(
+    controller.hasGuard({
+      id: 'customer-fresh',
+      email: 'info@fresh-example.nl',
+      website: 'https://fresh-example.nl',
+    }),
+    false
+  );
 });
 
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
