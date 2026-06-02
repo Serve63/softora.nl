@@ -323,7 +323,15 @@ function extractPhones(html) {
 function cleanupPhone(value) {
   const raw = normalizeString(value).replace(/\s+/g, ' ');
   const digits = raw.replace(/\D+/g, '');
-  if (digits.length < 10 || digits.length > 14) return '';
+  let nationalDigits = digits;
+  if (digits.startsWith('0031')) {
+    nationalDigits = `0${digits.slice(4)}`;
+  } else if (digits.startsWith('31')) {
+    nationalDigits = digits.slice(2).startsWith('0') ? digits.slice(2) : `0${digits.slice(2)}`;
+  }
+  const isServiceNumber = /^(?:0800|0900)\d{6,7}$/.test(nationalDigits);
+  const isRegularDutchNumber = /^0[1-9]\d{8}$/.test(nationalDigits);
+  if (!isServiceNumber && !isRegularDutchNumber) return '';
   return raw;
 }
 
@@ -745,15 +753,37 @@ function buildProgressPayload(state, options = {}) {
   };
 }
 
+function countRecordsForTarget(records, targetLabel) {
+  const target = parseTargetLabel(targetLabel);
+  if (!target.place) return 0;
+  return (records || []).filter((record) => lineContainsExactPlace(record.address || '', target.place)).length;
+}
+
 function buildLiveHtml(state) {
+  const records = state.records || [];
+  const rawEntries = state.raw || [];
+  const progressItems = state.progress || [];
+  const completedItems = progressItems.filter((item) => item.completed);
+  const currentItem = progressItems.find((item) => !item.completed) || progressItems[progressItems.length - 1] || null;
+  const currentTarget = currentItem ? parseTargetLabel(currentItem.target) : null;
+  const currentLocationTotal = currentItem ? countRecordsForTarget(records, currentItem.target) : 0;
+  const metricCards = [
+    { value: records.length, label: 'Importklare bedrijven' },
+    { value: completedItems.length, label: 'Locaties afgerond' },
+    { value: currentTarget ? currentTarget.place : 'Geen', label: 'Huidige plaats' },
+    { value: currentLocationTotal || (currentItem ? currentItem.acceptedCount : 0), label: currentTarget ? `${currentTarget.place} totaal` : 'Totaal huidige plaats' },
+    { value: currentItem ? currentItem.acceptedCount : 0, label: 'Nieuw laatste batch' },
+    { value: currentItem ? currentItem.rejectedCount : 0, label: 'Afgekeurd laatste batch' },
+  ].map((card) => `<div class="metric"><strong>${escapeHtml(card.value)}</strong><span>${escapeHtml(card.label)}</span></div>`).join('');
   const progressRows = (state.progress || []).map((item, index) => {
     const doneClass = item.completed ? ' class="done"' : '';
-    return `<tr${doneClass}><td>${index + 1}</td><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.status)}</td><td>${item.acceptedCount}</td><td>${item.rejectedCount}</td><td>${item.candidatesSeen}</td><td>${escapeHtml(item.completionReason)}</td></tr>`;
+    const locationTotal = countRecordsForTarget(records, item.target) || item.acceptedCount;
+    return `<tr${doneClass}><td>${index + 1}</td><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.status)}</td><td>${locationTotal}</td><td>${item.acceptedCount}</td><td>${item.rejectedCount}</td><td>${item.candidatesSeen}</td><td>${escapeHtml(item.completionReason)}</td></tr>`;
   }).join('');
-  const businessRows = (state.records || []).map((item, index) => (
+  const businessRows = records.map((item, index) => (
     `<tr><td>${index + 1}</td><td>${escapeHtml(item.companyName)}</td><td><a href="${escapeHtml(item.website)}">${escapeHtml(normalizeDomain(item.website))}</a></td><td>${escapeHtml(item.email)}</td><td>${escapeHtml(item.phone)}</td><td>${escapeHtml(item.address)}</td><td>${escapeHtml(item.sourceFamily)}</td></tr>`
   )).join('');
-  const rejectedRows = (state.raw || []).filter((item) => !item.accepted).slice(-80).map((item) => (
+  const rejectedRows = rawEntries.filter((item) => !item.accepted).slice(-80).map((item) => (
     `<tr><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.companyName || normalizeDomain(item.url) || item.url)}</td><td>${escapeHtml((item.reasons || []).join(', '))}</td><td>${escapeHtml(item.url)}</td></tr>`
   )).join('');
   return `<!doctype html>
@@ -765,20 +795,27 @@ function buildLiveHtml(state) {
   <title>Softora bedrijven harvest</title>
   <style>
     body{font-family:Inter,Arial,sans-serif;margin:24px;color:#171727;background:#fbfaf9}
-    h1{font-family:Impact,Arial Black,sans-serif;letter-spacing:.5px;margin:0 0 8px}
+    h1{font-family:Impact,Arial Black,sans-serif;letter-spacing:.5px;margin:0 0 8px;text-transform:uppercase}
     .meta{color:#7b7d8d;margin-bottom:22px}
+    .metrics{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:12px;margin:16px 0 24px}
+    .metric{background:white;border:1px solid #e8e3e6;border-radius:8px;padding:16px 18px;min-height:76px}
+    .metric strong{display:block;color:#981f58;font-size:28px;line-height:1.05;margin-bottom:6px}
+    .metric span{display:block;color:#282838;font-weight:700}
     table{width:100%;border-collapse:collapse;background:white;border:1px solid #e8e3e6;border-radius:8px;overflow:hidden;margin:12px 0 28px}
     th,td{border-bottom:1px solid #ebe7ea;padding:10px 12px;text-align:left;vertical-align:top}
     th{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:#858899;background:#f4f1f3}
     tr.done td:nth-child(2){text-decoration:line-through;color:#19743a}
     a{color:#981f58;font-weight:700}
+    @media(max-width:1100px){.metrics{grid-template-columns:repeat(3,minmax(150px,1fr))}}
+    @media(max-width:720px){.metrics{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
   <h1>Softora Bedrijven Harvest</h1>
-  <div class="meta">Laatst bijgewerkt: ${escapeHtml(state.updatedAt || new Date().toISOString())} · Importklaar: ${(state.records || []).length} · Ruwe kandidaten: ${(state.raw || []).length}</div>
+  <div class="meta">Laatst bijgewerkt: ${escapeHtml(state.updatedAt || new Date().toISOString())} · Importklaar: ${records.length} · Ruwe kandidaten: ${rawEntries.length}</div>
+  <section class="metrics">${metricCards}</section>
   <h2>Voortgang</h2>
-  <table><thead><tr><th>#</th><th>Locatie</th><th>Status</th><th>Importklaar</th><th>Afgekeurd</th><th>Kandidaten</th><th>Opmerking</th></tr></thead><tbody>${progressRows || '<tr><td colspan="7">Nog geen locaties verwerkt.</td></tr>'}</tbody></table>
+  <table><thead><tr><th>#</th><th>Locatie</th><th>Status</th><th>Totaal op locatie</th><th>Nieuw laatste batch</th><th>Afgekeurd</th><th>Kandidaten</th><th>Opmerking</th></tr></thead><tbody>${progressRows || '<tr><td colspan="8">Nog geen locaties verwerkt.</td></tr>'}</tbody></table>
   <h2>Importklare bedrijven</h2>
   <table><thead><tr><th>#</th><th>Bedrijf</th><th>Website</th><th>E-mail</th><th>Telefoon</th><th>Adres</th><th>Bronfamilie</th></tr></thead><tbody>${businessRows || '<tr><td colspan="7">Nog geen complete records.</td></tr>'}</tbody></table>
   <h2>Laatste afkeuringen</h2>
