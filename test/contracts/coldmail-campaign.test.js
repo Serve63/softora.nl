@@ -1664,6 +1664,62 @@ test('coldmail autopilot only uses explicitly configured sender emails', async (
   assert.equal(sentMessages[0].subject, 'Korte vraag voor Bakkerij Zon');
 });
 
+test('coldmail autopilot keeps all six configured Softora sender emails', async () => {
+  const senderEmails = [
+    'serve@softora.nl',
+    'martijn@softora.nl',
+    'servec321@gmail.com',
+    'martijnven123@gmail.com',
+    'serve290@gmail.com',
+    'servecreusen7@gmail.com',
+  ];
+  const { service, getAutopilotState } = createService({
+    rows: [],
+    coldmailingSettings: {
+      senders: Object.fromEntries(senderEmails.map((email) => [
+        email,
+        {
+          subject: 'Kleine vraag over jullie website',
+          body: 'Mocht je er niks mee willen doen, helemaal goed.',
+        },
+      ])),
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails,
+        senderProfiles: Object.fromEntries(senderEmails.map((email) => [
+          email,
+          {
+            subject: 'Kleine vraag over jullie website',
+            body: 'Mocht je er niks mee willen doen, helemaal goed.',
+          },
+        ])),
+        branch: 'Webdesign',
+        service: "Website's",
+        specialAction: 'webdesign',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 18,
+        minIntervalMinutes: 12,
+      },
+      lastRunAt: '2026-06-02T10:00:00.000Z',
+    },
+  });
+
+  await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.deepEqual(getAutopilotState().config.senderEmails, senderEmails);
+});
+
 test('coldmail autopilot refuses non-team sender emails even when SMTP exists', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
