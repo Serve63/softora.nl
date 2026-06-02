@@ -761,7 +761,6 @@ function countRecordsForTarget(records, targetLabel) {
 
 function buildLiveHtml(state) {
   const records = state.records || [];
-  const rawEntries = state.raw || [];
   const progressItems = state.progress || [];
   const completedItems = progressItems.filter((item) => item.completed);
   const currentItem = progressItems.find((item) => !item.completed) || progressItems[progressItems.length - 1] || null;
@@ -772,19 +771,14 @@ function buildLiveHtml(state) {
     { value: completedItems.length, label: 'Locaties afgerond' },
     { value: currentTarget ? currentTarget.place : 'Geen', label: 'Huidige plaats' },
     { value: currentLocationTotal || (currentItem ? currentItem.acceptedCount : 0), label: currentTarget ? `${currentTarget.place} totaal` : 'Totaal huidige plaats' },
-    { value: currentItem ? currentItem.acceptedCount : 0, label: 'Nieuw laatste batch' },
-    { value: currentItem ? currentItem.rejectedCount : 0, label: 'Afgekeurd laatste batch' },
   ].map((card) => `<div class="metric"><strong>${escapeHtml(card.value)}</strong><span>${escapeHtml(card.label)}</span></div>`).join('');
   const progressRows = (state.progress || []).map((item, index) => {
     const doneClass = item.completed ? ' class="done"' : '';
     const locationTotal = countRecordsForTarget(records, item.target) || item.acceptedCount;
-    return `<tr${doneClass}><td>${index + 1}</td><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.status)}</td><td>${locationTotal}</td><td>${item.acceptedCount}</td><td>${item.rejectedCount}</td><td>${item.candidatesSeen}</td><td>${escapeHtml(item.completionReason)}</td></tr>`;
+    return `<tr${doneClass}><td>${index + 1}</td><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.status)}</td><td>${locationTotal}</td></tr>`;
   }).join('');
   const businessRows = records.map((item, index) => (
     `<tr><td>${index + 1}</td><td>${escapeHtml(item.companyName)}</td><td><a href="${escapeHtml(item.website)}">${escapeHtml(normalizeDomain(item.website))}</a></td><td>${escapeHtml(item.email)}</td><td>${escapeHtml(item.phone)}</td><td>${escapeHtml(item.address)}</td><td>${escapeHtml(item.sourceFamily)}</td></tr>`
-  )).join('');
-  const rejectedRows = rawEntries.filter((item) => !item.accepted).slice(-80).map((item) => (
-    `<tr><td>${escapeHtml(item.target)}</td><td>${escapeHtml(item.companyName || normalizeDomain(item.url) || item.url)}</td><td>${escapeHtml((item.reasons || []).join(', '))}</td><td>${escapeHtml(item.url)}</td></tr>`
   )).join('');
   return `<!doctype html>
 <html lang="nl">
@@ -797,7 +791,7 @@ function buildLiveHtml(state) {
     body{font-family:Inter,Arial,sans-serif;margin:24px;color:#171727;background:#fbfaf9}
     h1{font-family:Impact,Arial Black,sans-serif;letter-spacing:.5px;margin:0 0 8px;text-transform:uppercase}
     .meta{color:#7b7d8d;margin-bottom:22px}
-    .metrics{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:12px;margin:16px 0 24px}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(170px,1fr));gap:12px;margin:16px 0 24px}
     .metric{background:white;border:1px solid #e8e3e6;border-radius:8px;padding:16px 18px;min-height:76px}
     .metric strong{display:block;color:#981f58;font-size:28px;line-height:1.05;margin-bottom:6px}
     .metric span{display:block;color:#282838;font-weight:700}
@@ -811,15 +805,13 @@ function buildLiveHtml(state) {
   </style>
 </head>
 <body>
-  <h1>Softora Bedrijven Harvest</h1>
-  <div class="meta">Laatst bijgewerkt: ${escapeHtml(state.updatedAt || new Date().toISOString())} · Importklaar: ${records.length} · Ruwe kandidaten: ${rawEntries.length}</div>
+  <h1>Softora Bedrijven-Verzamellijst</h1>
+  <div class="meta">Laatst bijgewerkt: ${escapeHtml(state.updatedAt || new Date().toISOString())} · Importklaar: ${records.length}</div>
   <section class="metrics">${metricCards}</section>
   <h2>Voortgang</h2>
-  <table><thead><tr><th>#</th><th>Locatie</th><th>Status</th><th>Totaal op locatie</th><th>Nieuw laatste batch</th><th>Afgekeurd</th><th>Kandidaten</th><th>Opmerking</th></tr></thead><tbody>${progressRows || '<tr><td colspan="8">Nog geen locaties verwerkt.</td></tr>'}</tbody></table>
+  <table><thead><tr><th>#</th><th>Locatie</th><th>Status</th><th>Complete bedrijven</th></tr></thead><tbody>${progressRows || '<tr><td colspan="4">Nog geen locaties verwerkt.</td></tr>'}</tbody></table>
   <h2>Importklare bedrijven</h2>
   <table><thead><tr><th>#</th><th>Bedrijf</th><th>Website</th><th>E-mail</th><th>Telefoon</th><th>Adres</th><th>Bronfamilie</th></tr></thead><tbody>${businessRows || '<tr><td colspan="7">Nog geen complete records.</td></tr>'}</tbody></table>
-  <h2>Laatste afkeuringen</h2>
-  <table><thead><tr><th>Locatie</th><th>Kandidaat</th><th>Reden</th><th>URL</th></tr></thead><tbody>${rejectedRows || '<tr><td colspan="4">Nog geen afkeuringen.</td></tr>'}</tbody></table>
 </body>
 </html>`;
 }

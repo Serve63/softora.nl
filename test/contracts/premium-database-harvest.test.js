@@ -271,9 +271,11 @@ test('premium database harvest writes live html, raw jsonl and csv outputs', asy
   const liveHtml = fs.readFileSync(result.liveHtmlPath, 'utf8');
   assert.match(liveHtml, /meta http-equiv="refresh"/);
   assert.match(liveHtml, /Importklare bedrijven/);
-  assert.match(liveHtml, /Totaal op locatie/);
-  assert.match(liveHtml, /Nieuw laatste batch/);
-  assert.match(liveHtml, /Laatste afkeuringen/);
+  assert.match(liveHtml, /Complete bedrijven/);
+  assert.doesNotMatch(liveHtml, /Nieuw laatste batch/);
+  assert.doesNotMatch(liveHtml, /Afgekeurd/);
+  assert.doesNotMatch(liveHtml, /Kandidaten/);
+  assert.doesNotMatch(liveHtml, /Laatste afkeuringen/);
   const progress = JSON.parse(fs.readFileSync(result.progressJsonPath, 'utf8'));
   const siteProgress = JSON.parse(fs.readFileSync(result.siteProgressPath, 'utf8'));
   assert.deepEqual(progress.completedTargetLabels, ['Nederland | Noord-Brabant | Vught | Helvoirt']);
