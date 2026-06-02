@@ -376,6 +376,31 @@ h2 {
   width: 24%;
 }
 
+.harvest-table-with-website th:nth-child(1),
+.harvest-table-with-website td:nth-child(1) {
+  width: 30%;
+}
+
+.harvest-table-with-website th:nth-child(2),
+.harvest-table-with-website td:nth-child(2) {
+  width: 12%;
+}
+
+.harvest-table-with-website th:nth-child(3),
+.harvest-table-with-website td:nth-child(3) {
+  width: 23%;
+}
+
+.harvest-table-with-website th:nth-child(4),
+.harvest-table-with-website td:nth-child(4) {
+  width: 18%;
+}
+
+.harvest-table-with-website th:nth-child(5),
+.harvest-table-with-website td:nth-child(5) {
+  width: 17%;
+}
+
 .harvest-table th,
 .harvest-table td {
   padding: 9px 12px;
@@ -404,6 +429,16 @@ h2 {
 
 .harvest-table td:first-child {
   font-weight: 800;
+}
+
+.harvest-website-link {
+  color: var(--harvest-brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.harvest-website-link:hover {
+  text-decoration: underline;
 }
 
 .harvest-missing {

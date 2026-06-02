@@ -32,6 +32,25 @@
       .replace(/'/g, "&#39;");
   }
 
+  function normalizeWebsiteHref(value) {
+    const raw = normalizeText(value);
+    if (!raw) return "";
+    const candidate = /^https?:\/\//i.test(raw) ? raw : "https://" + raw.replace(/^\/+/, "");
+    try {
+      const url = new URL(candidate);
+      if (!/^https?:$/.test(url.protocol) || !url.hostname.includes(".")) return "";
+      return url.href;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function formatWebsiteLabel(value) {
+    const raw = normalizeText(value);
+    if (!raw) return "";
+    return raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "");
+  }
+
   function formatDateTime(value) {
     const raw = normalizeText(value);
     if (!raw) return "Nog niet bijgewerkt";
@@ -184,24 +203,33 @@
         company.companyName,
         company.phone,
         company.email,
+        company.website,
         company.location
       ].join(" "));
       return !query || companyText.includes(query);
     });
 
     if (!companies.length) {
-      body.innerHTML = '<tr><td colspan="4">Nog geen complete bedrijven gevonden. Een bedrijf telt pas mee wanneer bedrijfsnaam, telefoonnummer, mailadres en locatie gevuld zijn.</td></tr>';
+      body.innerHTML = '<tr><td colspan="5">Nog geen complete bedrijven gevonden. Een bedrijf telt pas mee wanneer bedrijfsnaam, telefoonnummer, mailadres en locatie gevuld zijn.</td></tr>';
       return;
     }
 
     body.innerHTML = companies.map(function (company) {
       const phone = normalizeText(company.phone);
       const email = normalizeText(company.email);
+      const website = normalizeText(company.website);
+      const websiteHref = normalizeWebsiteHref(website);
+      const websiteLabel = formatWebsiteLabel(website);
       return [
         "<tr>",
         "<td>" + escapeHtml(company.companyName) + "</td>",
         '<td class="' + (phone ? "" : "harvest-missing") + '">' + escapeHtml(phone || "Nog niet gevonden") + "</td>",
         '<td class="' + (email ? "" : "harvest-missing") + '">' + escapeHtml(email || "Nog niet gevonden") + "</td>",
+        '<td class="' + (website ? "" : "harvest-missing") + '">'
+          + (websiteHref
+            ? '<a class="harvest-website-link" href="' + escapeHtml(websiteHref) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(websiteLabel || websiteHref) + "</a>"
+            : escapeHtml(website || "Nog niet gevonden"))
+          + "</td>",
         "<td>" + escapeHtml(company.location) + "</td>",
         "</tr>"
       ].join("");
