@@ -3233,6 +3233,50 @@ test('coldmail campaign accepts a webdesign mockup without quality approval meta
   assert.match(sentMessages[0].html, /cid:webdesign-mockup-prospect-1@softora/);
 });
 
+test('coldmail campaign trusts direct customer photo ids when legacy identity text is stale', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'manual-import-elingscraftbeerdrinks-nl-contact-0459',
+        bedrijf: 'Elings Craftbeer & Drinks',
+        naam: 'Elings Craftbeer & Drinks',
+        email: 'info@elingscraftbeerdrinks.nl',
+        tel: '013 504 15 93',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'manual-import-elingscraftbeerdrinks-nl-contact-0459': {
+        id: 'manual-import-elingscraftbeerdrinks-nl-contact-0459',
+        identityKey: 'elings craftbeer drinks||013 504 15 93',
+        photoKey: 'softora_database_photo_data_v1_manual-import-elingscraftbeerdrinks-nl-contact-0459',
+        chunkCount: 0,
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Elings Craftbeer & Drinks webdesign',
+        mockupPhotoKey: '',
+        mockupChunkCount: 0,
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Elings Craftbeer & Drinks device mockup',
+        mockupOrientation: 'upright',
+        mockupQualityStatus: 'checked',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuw webdesign gemaakt voor {{bedrijf}}',
+    body: 'Goedemorgen {{naam}},\n\nIk heb een webdesign voor jullie gemaakt.',
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages[0].to, 'info@elingscraftbeerdrinks.nl');
+  assert.match(sentMessages[0].html, /Elings Craftbeer &amp; Drinks device mockup/);
+});
+
 test('coldmail campaign accepts a legacy webdesign mockup renderer when a mockup image exists', async () => {
   const { service, sentMessages } = createService({
     rows: [
@@ -5145,6 +5189,43 @@ test('coldmail campaign recipient preview respects Oisterwijk radius', async () 
   assert.equal(result.selected, 1);
   assert.equal(result.recipients[0].bedrijf, 'Oisterwijk Winkel');
   assert.equal(result.recipients[0].distanceKm, 0);
+});
+
+test('coldmail campaign recipient preview does not filter by radius when radius is disabled', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'near-1',
+        bedrijf: 'Oisterwijk Winkel',
+        email: 'near@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        adres: 'Dorpsstraat 1, Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'far-north-1',
+        bedrijf: 'Groningen Studio',
+        email: 'groningen@example.test',
+        status: 'prospect',
+        branche: 'Retail & Winkels',
+        lat: 53.2194,
+        lng: 6.5665,
+        mail: true,
+      },
+    ],
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 10,
+    branch: 'Retail & Winkels',
+    radiusKm: '',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.radiusKm, null);
+  assert.equal(result.selected, 2);
+  assert.deepEqual(result.recipients.map((recipient) => recipient.bedrijf), ['Oisterwijk Winkel', 'Groningen Studio']);
 });
 
 test('coldmail campaign radius includes real customer database places near Oisterwijk', async () => {

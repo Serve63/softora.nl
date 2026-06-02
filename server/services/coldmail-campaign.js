@@ -1572,7 +1572,11 @@ function createColdmailCampaignService(deps = {}) {
     );
     for (const id of directIds) {
       const directPhoto = photos[id];
-      if (directPhoto && (photoRecordMatchesRowIdentity(directPhoto, row) || isDedicatedTestModeRow(row))) {
+      const directPhotoId = normalizeString(directPhoto && (directPhoto.id || directPhoto.customerId || id));
+      if (
+        directPhoto &&
+        (directPhotoId === id || photoRecordMatchesRowIdentity(directPhoto, row) || isDedicatedTestModeRow(row))
+      ) {
         return directPhoto;
       }
     }
@@ -2665,7 +2669,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function normalizeColdmailAutopilotRadiusKm(value) {
-    if (normalizeString(value) === '') return 50;
+    if (normalizeString(value) === '') return '';
     return parseRadiusKm(value);
   }
 
@@ -3773,9 +3777,10 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function matchesRadius(row, radiusKm) {
+    if (!hasExplicitRadiusKm(radiusKm)) return true;
     const radius = parseRadiusKm(radiusKm);
     const distanceKm = getRowDistanceKm(row);
-    if (!Number.isFinite(distanceKm)) return !hasExplicitRadiusKm(radiusKm);
+    if (!Number.isFinite(distanceKm)) return false;
     return distanceKm <= radius;
   }
 
@@ -3971,7 +3976,7 @@ function createColdmailCampaignService(deps = {}) {
     return {
       count,
       mode,
-      radiusKm: parseRadiusKm(input.radiusKm),
+      radiusKm: hasExplicitRadiusKm(input.radiusKm) ? parseRadiusKm(input.radiusKm) : null,
       values,
       customerValues,
       customerRows,
