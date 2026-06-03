@@ -109,13 +109,7 @@ textarea:focus { border-color: var(--oranje); box-shadow: 0 0 0 3px rgba(232,101
   background: var(--grijs-licht); border: 1px solid var(--grijs);
   border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; overflow: visible;
 }
-.persoon-sectie-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.persoon-nummer {
-  width: 26px; height: 26px; border-radius: 50%;
-  background: var(--oranje); color: var(--wit);
-  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
+.persoon-sectie-header { margin-bottom: 12px; }
 .persoon-label { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; color: var(--tekst); }
 
 .submit-btn {
@@ -435,7 +429,6 @@ function updatePersoonSectie() {
       const ddId = `dd-niveau-${i}`;
       div.innerHTML = `
         <div class="persoon-sectie-header">
-          <div class="persoon-nummer">${i}</div>
           <div class="persoon-label">Persoon ${i}</div>
         </div>
         <div class="form-group">
