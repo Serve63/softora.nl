@@ -223,40 +223,15 @@ textarea:focus { border-color: var(--oranje); box-shadow: 0 0 0 3px rgba(232,101
 }
 .contact-btn:hover { background: #1ebe5d; }
 
-.loader { text-align: center; color: var(--tekst-sub); font-size: 14px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.loading-panel {
-  min-height: calc(100vh - 80px); min-height: calc(100dvh - 80px);
-  display: flex; align-items: center; justify-content: center; padding: 30px 0;
+.loader {
+  text-align: center;
+  color: var(--tekst-sub);
+  font-size: 14px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
-.loading-card {
-  width: 100%; border: 1px solid var(--border); border-radius: 16px;
-  padding: 22px 18px; background: var(--wit);
-  box-shadow: 0 10px 28px rgba(28,26,23,0.06);
-}
-.loading-title {
-  font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700;
-  line-height: 1; color: var(--tekst); margin-bottom: 7px;
-}
-.loading-copy { color: var(--tekst-sub); font-size: 13px; line-height: 1.45; margin-bottom: 18px; }
-.loading-progress {
-  height: 9px; background: var(--grijs); border-radius: 999px; overflow: hidden;
-  margin-bottom: 15px;
-}
-.loading-progress-fill {
-  width: 12%; height: 100%; border-radius: 999px; background: var(--oranje);
-  transition: width 0.35s ease;
-}
-.loading-steps { display: grid; gap: 8px; }
-.loading-step {
-  display: flex; align-items: center; gap: 8px; color: var(--tekst-sub);
-  font-size: 12px; font-weight: 600;
-}
-.loading-step-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--grijs-mid);
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-.loading-step.active { color: var(--oranje-dark); }
-.loading-step.active .loading-step-dot { background: var(--oranje); transform: scale(1.2); }
 .spinner {
   width: 36px; height: 36px; border: 3px solid var(--grijs);
   border-top-color: var(--oranje); border-radius: 50%;
@@ -550,49 +525,18 @@ function profilePhotoUrl(profile) {
 
 function showLoadingPanel() {
   document.getElementById('results-content').innerHTML = `
-    <div class="loading-panel">
-      <div class="loading-card">
-        <div class="loading-title">Matches zoeken</div>
-        <div class="loading-copy" id="loader-tekst">We zoeken de beste beschikbare specialisten voor deze aanvraag.</div>
-        <div class="loading-progress" aria-hidden="true">
-          <div class="loading-progress-fill" id="loading-progress-fill"></div>
-        </div>
-        <div class="loading-steps">
-          <div class="loading-step active" data-step="0"><span class="loading-step-dot"></span>Profielen ophalen</div>
-          <div class="loading-step" data-step="1"><span class="loading-step-dot"></span>Ervaring vergelijken</div>
-          <div class="loading-step" data-step="2"><span class="loading-step-dot"></span>Beschikbaarheid checken</div>
-          <div class="loading-step" data-step="3"><span class="loading-step-dot"></span>Beste matches klaarzetten</div>
-        </div>
-      </div>
+    <div class="loader">
+      <div class="spinner"></div>
+      <div id="loader-tekst">Personeel zoeken...</div>
     </div>`;
 
-  const msgs = [
-    'Profielen ophalen uit de kandidatenpool...',
-    'Ervaring en werkzaamheden vergelijken...',
-    'Beschikbaarheid en regio checken...',
-    'Beste matches klaarzetten...'
-  ];
-  let step = 0;
-  let pct = 14;
+  const msgs = ['Personeel zoeken...','Database doorzoeken...','Beste match bepalen...','Profielen samenstellen...'];
+  let mi = 0;
   window._loaderInterval = setInterval(() => {
-    step = Math.min(step + 1, msgs.length - 1);
-    pct = Math.min(pct + 23, 88);
-    const label = document.getElementById('loader-tekst');
-    const fill = document.getElementById('loading-progress-fill');
-    if (label) label.textContent = msgs[step];
-    if (fill) fill.style.width = pct + '%';
-    document.querySelectorAll('.loading-step').forEach(item => {
-      item.classList.toggle('active', Number(item.dataset.step) <= step);
-    });
-  }, 430);
-}
-
-function completeLoadingPanel() {
-  const fill = document.getElementById('loading-progress-fill');
-  const label = document.getElementById('loader-tekst');
-  if (fill) fill.style.width = '100%';
-  if (label) label.textContent = 'Matches gevonden. Resultaten openen...';
-  document.querySelectorAll('.loading-step').forEach(item => item.classList.add('active'));
+    mi = (mi + 1) % msgs.length;
+    const el = document.getElementById('loader-tekst');
+    if (el) el.textContent = msgs[mi];
+  }, 1200);
 }
 
 function locationMarkup(regio) {
@@ -715,8 +659,7 @@ Sorteer op matchScore aflopend.`;
     const clean = text.replace(/```json|```/g, '').trim();
     await minimumLoading;
     clearInterval(window._loaderInterval);
-    completeLoadingPanel();
-    setTimeout(() => renderResults(JSON.parse(clean)), 180);
+    renderResults(JSON.parse(clean));
   } catch(err) {
     await minimumLoading;
     clearInterval(window._loaderInterval); document.getElementById('results-content').innerHTML = `<div class="error-msg">Er is iets misgegaan. Probeer het opnieuw.</div>`;
