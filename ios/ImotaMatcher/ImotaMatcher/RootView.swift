@@ -10,6 +10,10 @@ struct RootView: View {
 }
 
 struct ImotaMatcherWebView: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.addUserScript(
@@ -25,19 +29,57 @@ struct ImotaMatcherWebView: UIViewRepresentable {
         webView.backgroundColor = UIColor(red: 0.969, green: 0.965, blue: 0.957, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        loadLocalHTML(in: webView)
+        webView.scrollView.alwaysBounceVertical = true
+
+        let refreshControl = UIRefreshControl()
+        refreshControl.tintColor = UIColor(red: 0.91, green: 0.40, blue: 0.04, alpha: 1)
+        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.refresh(_:)), for: .valueChanged)
+        webView.scrollView.refreshControl = refreshControl
+
+        webView.navigationDelegate = context.coordinator
+        context.coordinator.attach(webView: webView)
+        Self.loadLocalHTML(in: webView)
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {}
 
-    private func loadLocalHTML(in webView: WKWebView) {
+    private static func loadLocalHTML(in webView: WKWebView) {
         guard let url = Bundle.main.url(forResource: "imota-matcher", withExtension: "html") else {
             webView.loadHTMLString("<h1>IMOTA preview kon de HTML niet vinden.</h1>", baseURL: nil)
             return
         }
 
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        private weak var webView: WKWebView?
+
+        func attach(webView: WKWebView) {
+            self.webView = webView
+        }
+
+        @objc func refresh(_ sender: UIRefreshControl) {
+            guard let webView else {
+                sender.endRefreshing()
+                return
+            }
+
+            ImotaMatcherWebView.loadLocalHTML(in: webView)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            webView.scrollView.refreshControl?.endRefreshing()
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            webView.scrollView.refreshControl?.endRefreshing()
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            webView.scrollView.refreshControl?.endRefreshing()
+        }
     }
 
     private static let previewBridgeScript = #"""
