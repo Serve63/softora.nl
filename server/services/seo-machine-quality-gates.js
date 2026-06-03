@@ -400,7 +400,9 @@ function extractAnchorEntries(htmlRaw) {
     (match) => ({
       attrs: match[1] || '',
       href: match[2] || '',
-      label: stripHtmlTags(match[3] || ''),
+      label:
+        stripHtmlTags(match[3] || '') ||
+        stripHtmlTags(getAttrValue(match[1] || '', 'aria-label') || getAttrValue(match[1] || '', 'title')),
     })
   );
 }

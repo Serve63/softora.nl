@@ -428,6 +428,26 @@ test('button-like lead controls zonder WhatsApp-route worden geblokkeerd', () =>
   assert.deepEqual(issues.map((issue) => issue.type).sort(), ['lead-button-not-whatsapp', 'public-cta-visible-whatsapp-label'].sort());
 });
 
+test('invisible of icon-only leadlinks zonder WhatsApp-route worden geblokkeerd', () => {
+  const issues = auditConversionCtas({
+    pages: [
+      {
+        path: '/icon-only-contact',
+        html: [
+          '<a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="public-cta" data-softora-conversion-page="/icon-only-contact" data-softora-conversion-target="whatsapp">Contact</a>',
+          '<a href="#" class="hero-contact-icon" aria-label="WhatsApp"></a>',
+          '<a href="/#contact" class="nav-contact-icon" title="Neem contact op"></a>',
+        ].join('\n'),
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    issues.map((issue) => issue.type).sort(),
+    ['lead-cta-not-whatsapp', 'non-whatsapp-conversion-link', 'untracked-conversion-link'].sort()
+  );
+});
+
 test('SEO-content CTAs zijn meetbaar en linken terug naar commerciële pagina’s', () => {
   const item = getSeoContentItems({ now: seoMachineNow }).find(
     (contentItem) => contentItem.slug === 'ai-automatisering-mkb-waar-beginnen'
