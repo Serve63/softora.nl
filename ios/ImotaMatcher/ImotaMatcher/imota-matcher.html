@@ -140,22 +140,6 @@ textarea:focus { border-color: var(--oranje); box-shadow: 0 0 0 3px rgba(232,101
 
 #results-panel { display: none; }
 
-.results-header {
-  background: var(--wit); border-bottom: 1px solid var(--grijs);
-  padding: 0 0 14px; margin-bottom: 14px;
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
-}
-.results-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; line-height: 1; color: var(--tekst); }
-.results-kicker {
-  color: var(--oranje-dark); font-size: 11px; font-weight: 700;
-  letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 5px;
-}
-.results-count {
-  background: var(--oranje-light); color: var(--oranje-dark);
-  border: 1px solid var(--oranje-mid); border-radius: 20px;
-  padding: 5px 12px; font-size: 12px; font-weight: 700; white-space: nowrap;
-}
-
 .personeel-card {
   background: var(--wit); border: 1px solid var(--border);
   border-radius: 14px; padding: 16px; margin-bottom: 12px;
@@ -670,17 +654,7 @@ Sorteer op matchScore aflopend.`;
 }
 
 function renderResults(personeel) {
-  const count = personeel.length;
-  const header = `
-    <div class="results-header">
-      <div>
-        <div class="results-kicker">IMOTA selectie</div>
-        <div class="results-title">Beste matches</div>
-      </div>
-      <div class="results-count">${count} ${count === 1 ? 'profiel' : 'profielen'}</div>
-    </div>`;
-
-  document.getElementById('results-content').innerHTML = header + personeel.map(renderProfileCard).join('');
+  document.getElementById('results-content').innerHTML = personeel.map(renderProfileCard).join('');
 }
 
 async function vervangPersoon(btn) {
