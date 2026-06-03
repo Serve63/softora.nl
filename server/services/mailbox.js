@@ -23,6 +23,8 @@ const DEFAULT_MAILBOX_EMAILS = [
   'ruben@softora.nl',
   'serve@softora.nl',
   'martijn@softora.nl',
+  'servecreusen@softora.nl',
+  'martijnvandeven@softora.nl',
   'servec321@gmail.com',
   'martijnven123@gmail.com',
   'serve290@gmail.com',
@@ -32,6 +34,8 @@ const DEFAULT_MAILBOX_EMAILS = [
 const MAILBOX_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
+  'servecreusen@softora.nl': 'Servé Creusen',
+  'martijnvandeven@softora.nl': 'Martijn van de Ven',
   'servec321@gmail.com': 'Servé Creusen',
   'martijnven123@gmail.com': 'Martijn van de Ven',
   'serve290@gmail.com': 'Servé Creusen',

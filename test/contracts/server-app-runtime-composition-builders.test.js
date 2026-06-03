@@ -415,6 +415,8 @@ test('server app runtime composition builders preserve feature wiring groups and
     'ruben@softora.nl',
     'serve@softora.nl',
     'martijn@softora.nl',
+    'servecreusen@softora.nl',
+    'martijnvandeven@softora.nl',
     'martijnven123@gmail.com',
     'serve290@gmail.com',
     'servecreusen7@gmail.com',
