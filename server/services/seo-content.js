@@ -414,6 +414,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
       Object.freeze({ label: 'Website kosten in 2026', href: '/blog/website-laten-maken-kosten-2026' }),
       Object.freeze({ label: 'Conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
+      Object.freeze({
+        label: 'Interne linkstructuur',
+        href: '/kennisbank/wat-is-interne-linkstructuur',
+        availableFrom: '2026-06-01',
+      }),
       Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
@@ -544,6 +549,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
       Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
       Object.freeze({ label: 'Wanneer is een chatbot zinvol?', href: '/blog/chatbot-laten-maken-wanneer-zinvol' }),
+      Object.freeze({
+        label: 'AI telefonist voor afspraakintake',
+        href: '/blog/ai-telefonist-voor-afspraakintake',
+        availableFrom: '2026-05-29',
+      }),
       Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
     ]),
   }),
@@ -633,6 +643,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
       Object.freeze({ label: 'AI automatisering startgids', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
+      Object.freeze({
+        label: 'AI telefonist voor afspraakintake',
+        href: '/blog/ai-telefonist-voor-afspraakintake',
+        availableFrom: '2026-05-29',
+      }),
     ]),
   }),
   Object.freeze({
@@ -718,6 +733,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken kosten 2026', href: '/blog/website-laten-maken-kosten-2026' }),
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
       Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
+      Object.freeze({
+        label: 'Interne linkstructuur',
+        href: '/kennisbank/wat-is-interne-linkstructuur',
+        availableFrom: '2026-06-01',
+      }),
       Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
     ]),
   }),
@@ -845,6 +865,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({
+        label: 'Wat is leadkwalificatie?',
+        href: '/kennisbank/wat-is-leadkwalificatie',
+        availableFrom: '2026-06-03',
+      }),
     ]),
   }),
   Object.freeze({
@@ -887,6 +912,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
       Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Wat is een AI telefonist?', href: '/kennisbank/wat-is-een-ai-telefonist' }),
+      Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
     ]),
   }),
   Object.freeze({
@@ -929,6 +956,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
       Object.freeze({ label: 'Blog', href: '/blog' }),
       Object.freeze({ label: 'Diensten', href: '/diensten' }),
+      Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
+      Object.freeze({ label: 'Conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
     ]),
   }),
   Object.freeze({
@@ -1275,6 +1304,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
       Object.freeze({ label: 'AI leadopvolging flow', href: '/blog/ai-automatisering-leadopvolging' }),
+      Object.freeze({
+        label: 'Wat is leadkwalificatie?',
+        href: '/kennisbank/wat-is-leadkwalificatie',
+        availableFrom: '2026-06-03',
+      }),
       Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
     ]),
   }),
@@ -1782,7 +1816,25 @@ function buildSeoContentFaq(item) {
   ]);
 }
 
-function enrichSeoContentItem(item) {
+function getSeoContentPublicationDayMs(valueRaw) {
+  const value = String(valueRaw || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+  return new Date(`${value}T00:00:00.000Z`).getTime();
+}
+
+function isSeoContentRelatedLinkAvailable(link, nowMs) {
+  const availableFrom = String(link && link.availableFrom ? link.availableFrom : '').trim();
+  if (!availableFrom) return true;
+  const availableMs = getSeoContentPublicationDayMs(availableFrom);
+  return Number.isFinite(availableMs) && availableMs <= nowMs;
+}
+
+function filterSeoContentRelatedLinks(linksRaw, nowMs) {
+  const links = Array.isArray(linksRaw) ? linksRaw : [];
+  return Object.freeze(links.filter((link) => isSeoContentRelatedLinkAvailable(link, nowMs)));
+}
+
+function enrichSeoContentItem(item, { nowMs = Date.now() } = {}) {
   if (!item) return item;
   const sections = Object.freeze([
     ...(item.sections || []),
@@ -1794,6 +1846,7 @@ function enrichSeoContentItem(item) {
     ...item,
     author: item.author || SEO_CONTENT_AUTHOR,
     reviewedBy: item.reviewedBy || SEO_CONTENT_REVIEWER,
+    relatedLinks: filterSeoContentRelatedLinks(item.relatedLinks, nowMs),
     sections,
     faq,
   });
@@ -1810,9 +1863,9 @@ function getSeoContentItems({ collection, now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.filter((item) => {
     if (collection && item.collection !== collection) return false;
-    const publishedMs = new Date(`${item.publishedAt}T00:00:00.000Z`).getTime();
+    const publishedMs = getSeoContentPublicationDayMs(item.publishedAt);
     return Number.isFinite(publishedMs) && publishedMs <= nowMs;
-  }).map(enrichSeoContentItem);
+  }).map((item) => enrichSeoContentItem(item, { nowMs }));
 }
 
 function getSeoContentItem(collectionRaw, slugRaw, options = {}) {
@@ -1848,7 +1901,7 @@ function getSeoContentSitemapEntries(options = {}) {
 function getSeoContentPublicationPlan({ now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   return SEO_CONTENT_ITEMS.map((item) => {
-    const publishedMs = new Date(`${item.publishedAt}T00:00:00.000Z`).getTime();
+    const publishedMs = getSeoContentPublicationDayMs(item.publishedAt);
     return {
       collection: item.collection,
       slug: item.slug,
