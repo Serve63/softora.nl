@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>IMOTA — Personeel Matcher</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -22,17 +22,33 @@
   --border: #E0DDD8;
   --succes: #2A7D4F;
 }
-body { font-family: 'Barlow', sans-serif; background: var(--grijs-licht); color: var(--tekst); min-height: 100vh; }
+html { min-height: 100%; background: var(--wit); }
+body {
+  font-family: 'Barlow', sans-serif; background: var(--wit); color: var(--tekst);
+  min-height: 100vh; min-height: 100dvh; overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
 
-.main { max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+.main { width: 100%; max-width: none; min-height: 100vh; min-height: 100dvh; margin: 0; padding: 0; }
 .page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 36px; color: var(--tekst); margin-bottom: 6px; }
 .page-sub { color: var(--tekst-sub); font-size: 15px; margin-bottom: 2rem; }
 
-.card { background: var(--wit); border: 1px solid var(--border); border-radius: 12px; overflow: visible; }
-.card-header { background: var(--oranje); padding: 14px 20px; display: flex; align-items: center; gap: 10px; border-radius: 12px 12px 0 0; }
-.card-header h2 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; color: var(--wit); letter-spacing: 0.5px; }
+.card { background: var(--wit); border: 0; border-radius: 0; min-height: 100vh; min-height: 100dvh; overflow: visible; }
+.card-header {
+  background: var(--oranje);
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 24px 18px;
+  min-height: calc(env(safe-area-inset-top, 0px) + 68px);
+  display: flex; align-items: center; gap: 12px; border-radius: 0;
+}
+.card-header h2 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; color: var(--wit); letter-spacing: 0.5px; }
 .card-header svg { color: rgba(255,255,255,0.85); flex-shrink: 0; }
-.card-body { padding: 20px; }
+.card-body { padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+
+#view-filter { width: 100%; max-width: none !important; min-height: 100vh; min-height: 100dvh; margin: 0 !important; }
+#view-results {
+  width: 100%; min-height: 100vh; min-height: 100dvh; background: var(--wit);
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
 
 .form-group { margin-bottom: 16px; }
 .form-group:last-child { margin-bottom: 0; }
