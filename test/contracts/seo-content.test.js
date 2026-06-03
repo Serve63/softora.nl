@@ -155,6 +155,24 @@ test('seo content linkt op publicatiedatum niet naar future-dated content', () =
   assert.deepEqual(brokenLinks, []);
 });
 
+test('seo content toont datumgebonden related links pas wanneer de steunpagina live is', () => {
+  const beforeLeadQualification = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-leadkwalificatie-mkb', {
+      now: new Date('2026-06-02T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const afterLeadQualification = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-leadkwalificatie-mkb', {
+      now: new Date('2026-06-03T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.doesNotMatch(beforeLeadQualification, /href="\/kennisbank\/wat-is-leadkwalificatie"/);
+  assert.match(afterLeadQualification, /href="\/kennisbank\/wat-is-leadkwalificatie"/);
+});
+
 test('seo content renders the existing blog visual language with real links', () => {
   const html = buildSeoContentIndexHtml('blog', {
     siteOrigin: 'https://www.softora.nl',
@@ -391,6 +409,45 @@ test('current live seo content keeps weak pages supported by contextual incoming
   for (const page of pages) {
     if (!contentArticlePaths.has(page.path)) continue;
     assert.ok(incoming.get(page.path).size >= 2, `${page.path} heeft te weinig contextuele interne ingangen.`);
+  }
+});
+
+test('seo linkmachine run date keeps fresh support articles above orphan risk', () => {
+  const now = new Date('2026-06-03T12:00:00.000Z');
+  const pages = [
+    ...INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => ({
+      path: entry.path,
+      html: applyPublicSeoHeadDefaults(fs.readFileSync(path.join(repoRoot, entry.fileName), 'utf8'), entry.fileName, {
+        siteOrigin: 'https://www.softora.nl',
+      }),
+    })),
+    ...getSeoContentCollectionPaths().map((pathName) => ({
+      path: pathName,
+      html: buildSeoContentIndexHtml(pathName.replace(/^\//, ''), {
+        siteOrigin: 'https://www.softora.nl',
+        now,
+      }),
+    })),
+    ...getSeoContentItems({ now }).map((item) => ({
+      path: getSeoContentPathForItem(item),
+      html: buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' }),
+    })),
+  ];
+  const publicPaths = new Set(pages.map((page) => page.path));
+  const incoming = new Map(pages.map((page) => [page.path, new Set()]));
+
+  for (const page of pages) {
+    for (const href of extractInternalLinksFromHtml(page.html)) {
+      if (href !== page.path && publicPaths.has(href)) incoming.get(href).add(page.path);
+    }
+  }
+
+  for (const pathName of [
+    '/blog/ai-telefonist-voor-afspraakintake',
+    '/kennisbank/wat-is-interne-linkstructuur',
+    '/kennisbank/wat-is-leadkwalificatie',
+  ]) {
+    assert.ok(incoming.get(pathName).size >= 3, `${pathName} heeft te weinig live contextuele ingangen.`);
   }
 });
 
