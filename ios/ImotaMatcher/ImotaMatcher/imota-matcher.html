@@ -212,6 +212,12 @@ textarea:focus { border-color: var(--oranje); box-shadow: 0 0 0 3px rgba(232,101
   left: 50%;
   transform: translate(-50%, -50%);
 }
+.loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: var(--wit);
+}
 .spinner {
   width: 36px; height: 36px; border: 3px solid var(--grijs);
   border-top-color: var(--oranje); border-radius: 50%;
@@ -585,20 +591,51 @@ function replaceProfileCard(kaart, profile, niveau) {
   }, 200);
 }
 
-function showLoadingPanel() {
-  document.getElementById('results-content').innerHTML = `
+function loaderMarkup(textId = 'loader-tekst') {
+  return `
     <div class="loader">
       <div class="spinner"></div>
-      <div id="loader-tekst">Personeel zoeken...</div>
+      <div id="${textId}">Personeel zoeken...</div>
     </div>`;
+}
 
+function startLoaderTextCycle(textId = 'loader-tekst') {
+  clearInterval(window._loaderInterval);
   const msgs = ['Personeel zoeken...','Database doorzoeken...','Beste match bepalen...','Profielen samenstellen...'];
   let mi = 0;
   window._loaderInterval = setInterval(() => {
     mi = (mi + 1) % msgs.length;
-    const el = document.getElementById('loader-tekst');
+    const el = document.getElementById(textId);
     if (el) el.textContent = msgs[mi];
   }, 1200);
+}
+
+function stopLoaderTextCycle() {
+  clearInterval(window._loaderInterval);
+  window._loaderInterval = null;
+}
+
+function showLoadingPanel() {
+  document.getElementById('results-content').innerHTML = loaderMarkup();
+  startLoaderTextCycle();
+}
+
+function showLoadingOverlay() {
+  const existing = document.getElementById('loader-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'loader-overlay';
+  overlay.className = 'loader-overlay';
+  overlay.innerHTML = loaderMarkup('loader-tekst-overlay');
+  document.body.appendChild(overlay);
+  startLoaderTextCycle('loader-tekst-overlay');
+}
+
+function hideLoadingOverlay() {
+  stopLoaderTextCycle();
+  const overlay = document.getElementById('loader-overlay');
+  if (overlay) overlay.remove();
 }
 
 function locationMarkup(profile) {
@@ -724,11 +761,11 @@ Sorteer op matchScore aflopend.`;
     const text = data.content.map(i => i.text || '').join('');
     const clean = text.replace(/```json|```/g, '').trim();
     await minimumLoading;
-    clearInterval(window._loaderInterval);
+    stopLoaderTextCycle();
     renderResults(JSON.parse(clean));
   } catch(err) {
     await minimumLoading;
-    clearInterval(window._loaderInterval); document.getElementById('results-content').innerHTML = `<div class="error-msg">Er is iets misgegaan. Probeer het opnieuw.</div>`;
+    stopLoaderTextCycle(); document.getElementById('results-content').innerHTML = `<div class="error-msg">Er is iets misgegaan. Probeer het opnieuw.</div>`;
   }
 
   btn.disabled = false;
@@ -744,7 +781,8 @@ async function vervangPersoon(btn) {
   const oudNaam = btn.dataset.naam;
   const niveau = btn.dataset.niveau;
   btn.disabled = true;
-  btn.innerHTML = `<div class="spinner" style="width:12px;height:12px;border-width:2px;margin:0;flex-shrink:0;"></div> Zoeken...`;
+  showLoadingOverlay();
+  const minimumLoading = wait(1200);
 
   const { werkzaamheden, branche, urgentie, startdatum } = _lastContext;
   const prompt = `Je bent een personeelsmatcher voor IMOTA. Genereer PRECIES 1 nieuw fictief maar realistisch personeelsprofiel als alternatief voor ${oudNaam}.
@@ -769,8 +807,12 @@ Object heeft: naam, initialen, rol, matchScore (70-99), vaardigheden (4-6 string
     const data = await response.json();
     const text = data.content.map(i => i.text || '').join('');
     const p = resolveAlternativeProfile(JSON.parse(text.replace(/```json|```/g, '').trim())[0], oudNaam, niveau);
+    await minimumLoading;
+    hideLoadingOverlay();
     replaceProfileCard(kaart, p, niveau);
   } catch(e) {
+    await minimumLoading;
+    hideLoadingOverlay();
     replaceProfileCard(kaart, fallbackAlternativeProfile(oudNaam, niveau), niveau);
   }
 }
