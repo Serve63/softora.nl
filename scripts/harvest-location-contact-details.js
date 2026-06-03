@@ -15,6 +15,11 @@ const deepScan = process.env.HARVEST_DEEP !== "0";
 const markDone = process.env.HARVEST_MARK_DONE === "1";
 const force = process.env.HARVEST_FORCE === "1";
 const refreshCandidates = process.env.HARVEST_REFRESH_CANDIDATES === "1";
+const allowEmpty = process.env.HARVEST_ALLOW_EMPTY === "1";
+const verboseCandidates = process.env.HARVEST_VERBOSE_CANDIDATES === "1";
+const emptyCandidateReviewPopulation = Math.max(0, Number(process.env.HARVEST_EMPTY_REVIEW_POPULATION || 3000));
+const companyTimeoutMs = Math.max(5000, Number(process.env.HARVEST_COMPANY_TIMEOUT_MS || 45000));
+const INACTIVE_COMPANY_PATTERN = /in liquidatie|failliet|faillissement|uitgeschreven|opgeheven|beeindigd|beindigd|ontbonden|gestaakt|surseance/i;
 
 function normalizeText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -48,12 +53,20 @@ function slugifyPlace(value) {
 function drimbleSlugForPlace(place) {
   const normalized = normalizeText(place).toLowerCase();
   if (normalized === "oost west en middelbeers") return "oostelbeers";
+  if (normalized === "'s-hertogenbosch") return "den-bosch";
   return slugifyPlace(place);
+}
+
+function drimbleSlugForMunicipality(municipality) {
+  const normalized = normalizeText(municipality).toLowerCase();
+  if (normalized === "'s-hertogenbosch") return "den-bosch";
+  return slugifyPlace(municipality);
 }
 
 function drimbleSourcePlacesForPlace(place) {
   const normalized = normalizeText(place).toLowerCase();
   if (normalized === "oost west en middelbeers") return ["Oostelbeers"];
+  if (normalized === "'s-hertogenbosch") return ["'s-Hertogenbosch", "Den Bosch"];
   return [place];
 }
 
@@ -219,8 +232,8 @@ function mergeContact(company, contact, sourceUrl) {
 
 async function fetchText(url, timeoutMs = 15000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
+  let timeout;
+  const request = (async () => {
     const response = await fetch(url, {
       redirect: "follow",
       signal: controller.signal,
@@ -234,11 +247,18 @@ async function fetchText(url, timeoutMs = 15000) {
       return { ok: false, status: response.status, text: "" };
     }
     return { ok: true, status: response.status, text: await response.text(), url: response.url };
-  } catch (error) {
+  })().catch((error) => {
     return { ok: false, status: 0, text: "", error: error.message };
-  } finally {
-    clearTimeout(timeout);
-  }
+  });
+  const timer = new Promise((resolve) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      resolve({ ok: false, status: 0, text: "", error: "timeout" });
+    }, timeoutMs);
+  });
+  const result = await Promise.race([request, timer]);
+  clearTimeout(timeout);
+  return result;
 }
 
 function contactUrlsForWebsite(website) {
@@ -268,6 +288,21 @@ function isComplete(company) {
     && normalizeEmail(company.email)
     && normalizeText(company.location)
   );
+}
+
+function looksInactive(company) {
+  return INACTIVE_COMPANY_PATTERN.test([
+    normalizeText(company && company.companyName),
+    normalizeText(company && company.location),
+    normalizeText(company && company.sourcePlace),
+    normalizeText(company && company.contactStatus),
+    normalizeText(company && company.contactError),
+    normalizeText(company && company.sourceUrl)
+  ].join(" "));
+}
+
+function isActiveComplete(company) {
+  return isComplete(company) && !looksInactive(company);
 }
 
 function extractOlderUrl(html, baseUrl) {
@@ -330,6 +365,7 @@ async function collectCandidatesFromPages(initialUrl, options) {
   const candidates = [];
   let url = initialUrl;
   let page = 1;
+  const stopOnEmptyFilteredPage = options && options.stopOnEmptyFilteredPage === true;
 
   while (url && !seenUrls.has(url) && page <= 250) {
     seenUrls.add(url);
@@ -348,13 +384,87 @@ async function collectCandidatesFromPages(initialUrl, options) {
     });
     candidates.push(...pageCandidates);
     const olderUrl = extractOlderUrl(response.text, response.url || url);
-    if (!olderUrl || allPageCandidates.length === 0) break;
+    if (!olderUrl || allPageCandidates.length === 0 || (stopOnEmptyFilteredPage && allowedSourcePlaces.size && pageCandidates.length === 0)) break;
     url = olderUrl;
     page += 1;
     await delay(120);
   }
 
   return { candidates, pages: seenUrls.size, slug: sourceSlug };
+}
+
+function extractMunicipalityAreaUrls(html) {
+  const urls = [];
+  const seen = new Set();
+
+  for (const match of String(html || "").matchAll(/href=["']([^"']*\/wijken\/\d+\/[^"']+\.html)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const label = stripTags(match[2]);
+    if (!label || /^(wijk|info|112|bedrijf|crime|failliet|vacature|vergunning|foto|monumenten)$/i.test(label)) continue;
+    const pathMatch = match[1].match(/\/wijken\/(\d+)\/([^/.]+)\.html/i);
+    if (!pathMatch) continue;
+    const key = `${pathMatch[1]}/${pathMatch[2]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    urls.push({
+      label,
+      url: `${DRIMBLE_BASE_URL}/kvk/wijken/${pathMatch[1]}/${pathMatch[2]}/`
+    });
+  }
+
+  return urls;
+}
+
+async function collectCandidatesFromMunicipalityAreas(place, municipalitySlug) {
+  if (!municipalitySlug) return { candidates: [], pages: 0, slug: "" };
+
+  const indexUrl = `${DRIMBLE_BASE_URL}/wijken/gemeente/${municipalitySlug}/`;
+  const index = await fetchText(indexUrl, 15000);
+  if (!index.ok) return { candidates: [], pages: 0, slug: `${municipalitySlug}:wijken` };
+
+  const areaUrls = extractMunicipalityAreaUrls(index.text);
+  const candidates = [];
+  let pages = 1;
+
+  for (const area of areaUrls) {
+    if (verboseCandidates) {
+      console.log(JSON.stringify({
+        event: "candidate-area-start",
+        location: activeLabel,
+        area: area.label
+      }));
+    }
+    const result = await collectCandidatesFromPages(area.url, {
+      place,
+      slug: `${municipalitySlug}:wijken:${slugifyPlace(area.label)}`,
+      allowedSourcePlaces: drimbleSourcePlacesForPlace(place),
+      stopOnEmptyFilteredPage: true
+    });
+    pages += result.pages;
+    candidates.push(...result.candidates);
+    if (verboseCandidates) {
+      console.log(JSON.stringify({
+        event: "candidate-area-done",
+        location: activeLabel,
+        area: area.label,
+        pages: result.pages,
+        candidates: result.candidates.length
+      }));
+    }
+  }
+
+  const seen = new Set();
+  const uniqueCandidates = candidates.filter((candidate) => {
+    const key = normalizeText(candidate.sourceUrl) || [
+      normalizeText(candidate.kvk),
+      normalizeText(candidate.companyName).toLowerCase(),
+      normalizeText(candidate.location).toLowerCase()
+    ].join("|");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { candidates: uniqueCandidates, pages, slug: `${municipalitySlug}:wijken` };
 }
 
 async function fetchCandidatesForPlace(place, municipality) {
@@ -367,15 +477,17 @@ async function fetchCandidatesForPlace(place, municipality) {
   });
   if (direct.candidates.length || !municipality) return direct;
 
-  const municipalitySlug = slugifyPlace(municipality);
+  const municipalitySlug = drimbleSlugForMunicipality(municipality);
   if (!municipalitySlug) return direct;
   const fallback = await collectCandidatesFromPages(`${DRIMBLE_BASE_URL}/bedrijven/gemeente/${municipalitySlug}/`, {
     place,
     slug: `${municipalitySlug}:${slug}`,
     allowedSourcePlaces: drimbleSourcePlacesForPlace(place)
   });
+  if (fallback.candidates.length) return fallback;
 
-  return fallback.candidates.length ? fallback : direct;
+  const areaFallback = await collectCandidatesFromMunicipalityAreas(place, municipalitySlug);
+  return areaFallback.candidates.length ? areaFallback : direct;
 }
 
 async function ensureCandidates(data, target, place, municipality) {
@@ -384,6 +496,57 @@ async function ensureCandidates(data, target, place, municipality) {
 
   const fetched = await fetchCandidatesForPlace(place, municipality);
   if (!fetched.candidates.length) {
+    const population = Number(target.population) || 0;
+    if (allowEmpty && emptyCandidateReviewPopulation > 0 && population >= emptyCandidateReviewPopulation) {
+      const now = new Date().toISOString();
+      target.status = "todo";
+      target.candidateCount = 0;
+      target.rawCompanyCount = 0;
+      target.checkedCompanyCount = 0;
+      target.completeCompanyCount = 0;
+      target.companySourceSlug = fetched.slug;
+      target.companySourcePages = fetched.pages;
+      target.noCandidateReason = `Controle nodig: geen kandidaatbedrijven gevonden voor ${place}, maar de plaats heeft ${population} inwoners`;
+      target.updatedAt = now;
+      data.updatedAt = now;
+      if (data.activeLocation === activeLabel) data.activeLocation = "";
+      const tmpPath = DATA_PATH + ".tmp";
+      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2) + "\n");
+      await fs.rename(tmpPath, DATA_PATH);
+      console.log(JSON.stringify({
+        event: "no-candidates-review",
+        location: activeLabel,
+        place,
+        population,
+        slug: fetched.slug,
+        pages: fetched.pages
+      }));
+      throw new Error(`Controle nodig: geen kandidaatbedrijven gevonden voor ${place} (${population} inwoners)`);
+    }
+    if (allowEmpty) {
+      const now = new Date().toISOString();
+      target.candidateCount = 0;
+      target.rawCompanyCount = 0;
+      target.checkedCompanyCount = 0;
+      target.completeCompanyCount = 0;
+      target.companySourceSlug = fetched.slug;
+      target.companySourcePages = fetched.pages;
+      target.noCandidateReason = `Geen kandidaatbedrijven gevonden voor ${place}`;
+      target.updatedAt = now;
+      data.updatedAt = now;
+      if (markDone) {
+        target.status = "done";
+        if (data.activeLocation === activeLabel) data.activeLocation = "";
+      }
+      console.log(JSON.stringify({
+        event: "no-candidates",
+        location: activeLabel,
+        place,
+        slug: fetched.slug,
+        pages: fetched.pages
+      }));
+      return [];
+    }
     throw new Error(`Geen kandidaatbedrijven gevonden voor ${place}`);
   }
 
@@ -413,6 +576,7 @@ async function ensureCandidates(data, target, place, municipality) {
   target.rawCompanyCount = fetched.candidates.length;
   target.companySourceSlug = fetched.slug;
   target.companySourcePages = fetched.pages;
+  delete target.noCandidateReason;
   target.updatedAt = new Date().toISOString();
   data.updatedAt = target.updatedAt;
 
@@ -434,7 +598,7 @@ async function loadData() {
 }
 
 async function saveData(data, target, scopedCompanies, progress) {
-  const completeCount = scopedCompanies.filter(isComplete).length;
+  const completeCount = scopedCompanies.filter(isActiveComplete).length;
   target.completeCompanyCount = completeCount;
   target.checkedCompanyCount = scopedCompanies.filter((company) => company.contactCheckedAt).length;
   target.candidateCount = scopedCompanies.length;
@@ -446,7 +610,7 @@ async function saveData(data, target, scopedCompanies, progress) {
     checked: target.checkedCompanyCount,
     total: scopedCompanies.length,
     complete: completeCount,
-    withWebsite: scopedCompanies.filter((company) => company.website).length,
+    withWebsite: scopedCompanies.filter((company) => isActiveComplete(company) && company.website).length,
     errors: progress.errors,
     running: progress.running,
     updatedAt: target.updatedAt
@@ -463,9 +627,11 @@ async function saveData(data, target, scopedCompanies, progress) {
 async function enrichCompany(company) {
   company.contactStatus = "checking";
   company.contactStartedAt = new Date().toISOString();
+  const deadline = Date.now() + companyTimeoutMs;
+  const remainingTimeout = (fallbackMs) => Math.max(1000, Math.min(fallbackMs, deadline - Date.now()));
 
-  if (company.sourceUrl) {
-    const detail = await fetchText(company.sourceUrl, 15000);
+  if (company.sourceUrl && Date.now() < deadline) {
+    const detail = await fetchText(company.sourceUrl, remainingTimeout(15000));
     if (detail.ok) {
       mergeContact(company, extractContactFromHtml(detail.text, { allowLooseHtml: false }), company.sourceUrl);
     } else {
@@ -476,7 +642,11 @@ async function enrichCompany(company) {
   if (deepScan && (!company.phone || !company.email) && company.website) {
     for (const url of contactUrlsForWebsite(company.website)) {
       if (company.phone && company.email) break;
-      const websitePage = await fetchText(url, 12000);
+      if (Date.now() >= deadline) {
+        company.contactError = [company.contactError, "company-timeout"].filter(Boolean).join(";");
+        break;
+      }
+      const websitePage = await fetchText(url, remainingTimeout(12000));
       if (!websitePage.ok) continue;
       mergeContact(company, extractContactFromHtml(websitePage.text, { allowLooseHtml: true }), websitePage.url || url);
       await delay(100);
@@ -484,7 +654,7 @@ async function enrichCompany(company) {
   }
 
   company.contactCheckedAt = new Date().toISOString();
-  company.contactStatus = isComplete(company) ? "complete" : "incomplete";
+  company.contactStatus = isActiveComplete(company) ? "complete" : "incomplete";
 }
 
 async function main() {
@@ -537,8 +707,8 @@ async function main() {
         company.contactCheckedAt = new Date().toISOString();
       }
       progress.checked += 1;
-      if (progress.checked % 10 === 0 || isComplete(company)) {
-        const complete = scopedCompanies.filter(isComplete).length;
+      if (progress.checked % 10 === 0 || isActiveComplete(company)) {
+        const complete = scopedCompanies.filter(isActiveComplete).length;
         console.log(JSON.stringify({
           event: "progress",
           workerId,
@@ -563,7 +733,7 @@ async function main() {
     location: activeLabel,
     checked: scopedCompanies.filter((company) => company.contactCheckedAt).length,
     total: scopedCompanies.length,
-    complete: scopedCompanies.filter(isComplete).length,
+    complete: scopedCompanies.filter(isActiveComplete).length,
     errors: progress.errors
   }));
 }

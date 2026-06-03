@@ -62,13 +62,21 @@
     }).format(date);
   }
 
+  function formatPopulation(target) {
+    const number = Number(target && target.population);
+    if (!Number.isFinite(number) || number <= 0) return "";
+    return (target && target.populationEstimated ? "ca. " : "")
+      + new Intl.NumberFormat("nl-NL").format(Math.round(number))
+      + " inwoners";
+  }
+
   function statusLabel(status) {
     const normalized = normalizeText(status).toLowerCase();
     if (normalized === "done") return "";
     if (normalized === "previously_done") return "";
     if (normalized === "active") return "Bezig";
     if (normalized === "skipped") return "Overgeslagen";
-    return "Open";
+    return "";
   }
 
   function statusClass(status) {
@@ -122,7 +130,7 @@
 
   function countCompaniesWithWebsite(payload) {
     return getCompanies(payload).filter(function (company) {
-      return isCompleteCompany(company) && hasWebsite(company);
+      return isCompleteCompany(company) && hasWebsite(company) && !looksInactive(company);
     }).length;
   }
 
@@ -144,8 +152,9 @@
     const done = targets.filter(function (target) { return target.status === "done" || target.status === "previously_done"; }).length;
     const skipped = targets.filter(function (target) { return target.status === "skipped"; }).length;
     const active = targets.filter(function (target) { return target.status === "active"; }).length;
-    const todo = targets.filter(function (target) { return target.status === "todo"; }).length;
     const activeTarget = getActiveTarget(payload);
+    const withWebsite = countCompaniesWithWebsite(payload);
+    const withoutWebsite = countActiveCompaniesWithoutWebsite(payload);
     const workTotal = Math.max(1, targets.length - skipped);
     const percent = (done / workTotal) * 100;
     const formattedPercent = new Intl.NumberFormat("nl-NL", {
@@ -153,10 +162,10 @@
       maximumFractionDigits: 1
     }).format(percent);
 
-    byId("harvestNoWebsiteStatCount").textContent = String(countActiveCompaniesWithoutWebsite(payload));
+    byId("harvestTotalFoundCount").textContent = String(withWebsite + withoutWebsite);
+    byId("harvestNoWebsiteStatCount").textContent = String(withoutWebsite);
     byId("harvestActiveCount").textContent = active && activeTarget ? activeTarget.label : "Geen actieve locatie";
-    byId("harvestTodoCount").textContent = String(todo);
-    byId("harvestCompanyCount").textContent = String(countCompaniesWithWebsite(payload));
+    byId("harvestCompanyCount").textContent = String(withWebsite);
     byId("harvestUpdatedAt").textContent = formatDateTime(payload && payload.updatedAt);
     byId("harvestProgressText").textContent = formattedPercent + "%";
     byId("harvestProgressBar").style.width = percent + "%";
@@ -177,6 +186,7 @@
       const candidateCount = Number(target.candidateCount || target.rawCompanyCount || 0);
       const checkedCount = Number(target.checkedCompanyCount || 0);
       const label = statusLabel(target.status);
+      const population = formatPopulation(target);
       const metaParts = [completeCount + " compleet"];
       if (candidateCount > completeCount) metaParts.push(candidateCount + " kandidaten");
       if (checkedCount > 0) metaParts.push(checkedCount + " gecontroleerd");
@@ -189,6 +199,7 @@
         '<div class="harvest-location-meta">' + escapeHtml(meta) + '</div>',
         '</div>',
         label ? '<span class="harvest-status ' + status + '">' + escapeHtml(label) + '</span>' : '<span class="harvest-status-spacer" aria-hidden="true"></span>',
+        population ? '<span class="harvest-population">' + escapeHtml(population) + '</span>' : '<span class="harvest-population-spacer" aria-hidden="true"></span>',
         '</div>'
       ].join("");
     }).join("");
@@ -196,11 +207,11 @@
 
   function renderCompanies(payload) {
     const body = byId("harvestCompanyTableBody");
-    byId("harvestCurrentLocation").textContent = "Alle gevonden complete bedrijven";
+    byId("harvestCurrentLocation").textContent = "Actief mét website";
 
     const query = normalizeSearch(state.query);
     const companies = getCompanies(payload).filter(function (company) {
-      return isCompleteCompany(company) && hasWebsite(company);
+      return isCompleteCompany(company) && hasWebsite(company) && !looksInactive(company);
     }).filter(function (company) {
       const companyText = normalizeSearch([
         company.companyName,
