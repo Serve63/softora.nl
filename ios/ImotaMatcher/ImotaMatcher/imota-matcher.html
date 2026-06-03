@@ -164,7 +164,10 @@ textarea:focus { border-color: var(--oranje); box-shadow: 0 0 0 3px rgba(232,101
 }
 .pc-info { min-width: 0; }
 .pc-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 21px; line-height: 1; color: var(--tekst); margin-bottom: 5px; }
-.pc-rol { font-size: 13px; line-height: 1.3; color: var(--tekst-sub); font-weight: 500; }
+.pc-rol { font-size: 13px; line-height: 1.24; color: var(--tekst-sub); font-weight: 500; }
+.pc-rol-main,
+.pc-ervaring { display: block; }
+.pc-ervaring { white-space: nowrap; }
 .pc-location {
   display: flex; align-items: center; gap: 4px; margin-top: 5px;
   font-size: 12px; line-height: 1.2; color: var(--tekst-sub);
@@ -546,7 +549,10 @@ function renderProfileCard(profile) {
         <img class="avatar" src="${photoUrl}" alt="${safeName}" loading="lazy" onerror="this.outerHTML='<div class=\\'avatar\\'>${initialen}</div>'">
         <div class="pc-info">
           <div class="pc-name">${safeName}</div>
-          <div class="pc-rol">${escapeHtml(profile.rol)} · ${escapeHtml(profile.ervaring)}</div>
+          <div class="pc-rol">
+            <span class="pc-rol-main">${escapeHtml(profile.rol)} ·</span>
+            <span class="pc-ervaring">${escapeHtml(profile.ervaring)}</span>
+          </div>
           ${locationMarkup(profile.regio)}
         </div>
         <div class="match-score">
