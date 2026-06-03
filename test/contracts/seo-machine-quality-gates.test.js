@@ -66,6 +66,20 @@ function renderSeoContentPages() {
   ];
 }
 
+function renderLooseCustomerFacingHtmlPages() {
+  return fs
+    .readdirSync(repoRoot)
+    .filter((fileName) => fileName.endsWith('.html'))
+    .filter((fileName) => !fileName.startsWith('premium-'))
+    .filter((fileName) => !fileName.startsWith('personeel-'))
+    .sort()
+    .map((fileName) => ({
+      path: `/${fileName.replace(/\.html$/, '')}`,
+      kind: 'loose-public-html',
+      html: fs.readFileSync(path.join(repoRoot, fileName), 'utf8'),
+    }));
+}
+
 test('publieke contactknoppen gebruiken klantvriendelijke labels', () => {
   const pages = [...renderStaticPublicPages(), ...renderSeoContentPages()];
   const pagesWithInternalContactLabel = pages
@@ -182,7 +196,7 @@ test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
 });
 
 test('seo machine scant ook publieke SEO-pagina’s op onbewezen claims', () => {
-  const pages = [...renderStaticPublicPages(), ...renderSeoContentPages()];
+  const pages = [...renderStaticPublicPages(), ...renderSeoContentPages(), ...renderLooseCustomerFacingHtmlPages()];
 
   assert.deepEqual(auditClaimSafety({ pages }), []);
 });
@@ -203,6 +217,7 @@ test('publieke losse HTML-bronnen sturen niet richting gevaarlijke claimvoorbeel
   assert.doesNotMatch(rawPublicSource, /\b(?:gegarandeerd|garantie)\b.{0,80}\b(?:leads?|omzet|conversie|ranking|google)\b/i);
   assert.doesNotMatch(rawPublicSource, /\bAI\b.{0,80}\b(?:altijd correct|maakt geen fouten|vervangt alle medewerkers|neemt alle beslissingen)\b/i);
   assert.doesNotMatch(rawPublicSource, /\b\d{2,}\+?\s+(?:klanttrajecten|trajecten|klanten|projecten|reviews)\b/i);
+  assert.doesNotMatch(rawPublicSource, /\b(?:medisch|juridisch|fiscaal|belasting|beleggings|financieel)\s+advies\b/i);
 });
 
 test('seo machine blokkeert harde uptimegaranties in publieke paginacopy', () => {
