@@ -105,7 +105,7 @@ struct ImotaMatcherWebView: UIViewRepresentable {
         "https://randomuser.me/api/portraits/men/51.jpg",
         "https://randomuser.me/api/portraits/men/18.jpg"
       ];
-      const regions = ["Noord-Brabant", "Tilburg", "Den Bosch", "Eindhoven", "Breda", "Waalwijk"];
+      const woonplaatsen = ["Tilburg", "Den Bosch", "Eindhoven", "Breda", "Waalwijk", "Boxtel", "Oss", "Helmond"];
       const skillMap = {
         "Onderhoud & Revisie": ["Preventief onderhoud", "Revisie", "Storingsanalyse", "Machineveiligheid", "Lagermontage"],
         "Modificatie": ["Machineombouw", "Constructiewerk", "Inbedrijfstelling", "Tekening lezen", "Procesoptimalisatie"],
@@ -130,6 +130,11 @@ struct ImotaMatcherWebView: UIViewRepresentable {
         return Math.max(1, Math.min(50, count || 1));
       }
 
+      function excludedName(prompt) {
+        const match = prompt.match(/alternatief voor\s+([^.\n]+)/i) || prompt.match(/ANDERE persoon is dan\s+([^.\n]+)/i);
+        return match ? match[1].trim() : "";
+      }
+
       function initials(name) {
         return name
           .split(" ")
@@ -146,19 +151,22 @@ struct ImotaMatcherWebView: UIViewRepresentable {
         const urgentie = extractField(prompt, "Urgentie") || "Normaal";
         const startdatum = extractField(prompt, "Startdatum") || "Zo snel mogelijk";
         const skills = skillMap[werkzaamheden] || skillMap["Onderhoud & Revisie"];
-        const name = names[index % names.length];
+        const excluded = excludedName(prompt).toLowerCase();
+        const excludedIndex = names.findIndex(name => name.toLowerCase() === excluded);
+        const profileIndex = (index + (excludedIndex >= 0 ? excludedIndex + 1 : 0)) % names.length;
+        const name = names[profileIndex];
         const score = Math.max(70, 97 - index * 4);
 
         return {
           naam: name,
           initialen: initials(name),
-          photoUrl: photos[index % photos.length],
+          photoUrl: photos[profileIndex % photos.length],
           rol: werkzaamheden + " specialist",
           matchScore: score,
           vaardigheden: skills.slice(0, 5),
           beschikbaar: startdatum,
-          ervaring: index % 3 === 0 ? "Senior (7-15 jaar)" : "Medior (3-7 jaar)",
-          regio: regions[index % regions.length],
+          ervaring: profileIndex % 3 === 0 ? "Senior (7-15 jaar)" : "Medior (3-7 jaar)",
+          woonplaats: woonplaatsen[profileIndex % woonplaatsen.length],
           motivatie: "Sterke demo-match voor " + werkzaamheden + " binnen " + branche + ". Past goed bij urgentie " + urgentie.toLowerCase() + " en kan snel meedraaien.",
           highlightSkills: skills.slice(0, 2)
         };

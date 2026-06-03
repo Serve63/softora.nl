@@ -475,7 +475,29 @@ const PROFILE_PHOTOS = [
   'https://randomuser.me/api/portraits/men/51.jpg',
   'https://randomuser.me/api/portraits/men/18.jpg'
 ];
+const FALLBACK_PROFILE_NAMES = [
+  'Jeroen van Loon',
+  'Martijn de Wit',
+  'Bas Verhoeven',
+  'Rick van Dijk',
+  'Sander Maas',
+  'Thomas Janssen',
+  'Niels van den Berg',
+  'Koen Peeters'
+];
 const FALLBACK_WOONPLAATSEN = ['Tilburg', 'Eindhoven', 'Den Bosch', 'Breda', 'Helmond', 'Oss', 'Waalwijk', 'Boxtel'];
+const FALLBACK_SKILLS = {
+  'Onderhoud & Revisie': ['Preventief onderhoud', 'Revisie', 'Storingsanalyse', 'Machineveiligheid', 'Lagermontage'],
+  'Modificatie': ['Machineombouw', 'Constructiewerk', 'Inbedrijfstelling', 'Tekening lezen', 'Procesoptimalisatie'],
+  'Machinehandling': ['Hijsen', 'Verplaatsen', 'Uitlijnen', 'Montageplanning', 'Veilig werken'],
+  'Engineering': ['3D CAD', 'Werkvoorbereiding', 'Machineontwerp', 'Tekeningen', 'Materiaalkeuze'],
+  'Lassen': ['TIG', 'MIG/MAG', 'RVS', 'Constructielassen', 'Pijplassen'],
+  'Hydraulica': ["Hydrauliekschema's", 'Slangenservice', 'Pompen', 'Cilinders', 'Drukmetingen'],
+  'PLC / Elektrotechniek': ['PLC storing zoeken', 'Sensoriek', 'Schakelkasten', "Elektroschema's", 'Aandrijftechniek'],
+  'Pneumatiek': ["Pneumatische schema's", 'Ventielen', 'Cilinders', 'Luchtbehandeling', 'Storingsdiagnose'],
+  'Montage': ['Mechanische montage', 'Uitlijnen', 'Assemblage', 'Tekening lezen', 'Kwaliteitscontrole'],
+  'Storingsonderhoud': ['Storing zoeken', 'Root cause analyse', 'Mechanica', 'Elektro basis', 'Snel schakelen']
+};
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -509,6 +531,58 @@ function profileWoonplaats(profile) {
   if (locatie && !teBreed.includes(locatie.toLowerCase())) return locatie;
   const index = Math.abs(hashString(profile.naam)) % FALLBACK_WOONPLAATSEN.length;
   return FALLBACK_WOONPLAATSEN[index];
+}
+
+function initialsFromName(name) {
+  return String(name || '')
+    .split(' ')
+    .filter(part => part.length > 2)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+function samePerson(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+function fallbackAlternativeProfile(oudNaam, niveau) {
+  const currentIndex = FALLBACK_PROFILE_NAMES.findIndex(name => samePerson(name, oudNaam));
+  const index = currentIndex >= 0 ? (currentIndex + 1) % FALLBACK_PROFILE_NAMES.length : Math.abs(hashString(oudNaam)) % FALLBACK_PROFILE_NAMES.length;
+  const naam = FALLBACK_PROFILE_NAMES[index];
+  const werkzaamheden = _lastContext.werkzaamheden || 'Onderhoud & Revisie';
+  const branche = _lastContext.branche || 'industrie';
+  const urgentie = _lastContext.urgentie || 'Normaal';
+  const skills = FALLBACK_SKILLS[werkzaamheden] || FALLBACK_SKILLS['Onderhoud & Revisie'];
+
+  return {
+    naam,
+    initialen: initialsFromName(naam),
+    photoUrl: PROFILE_PHOTOS[index % PROFILE_PHOTOS.length],
+    rol: `${werkzaamheden} specialist`,
+    matchScore: Math.max(82, 96 - index),
+    vaardigheden: skills.slice(0, 5),
+    beschikbaar: _lastContext.startdatum || 'Zo snel mogelijk',
+    ervaring: niveau && niveau !== 'Geen voorkeur' ? niveau : (index % 3 === 0 ? 'Senior (7-15 jaar)' : 'Medior (3-7 jaar)'),
+    woonplaats: FALLBACK_WOONPLAATSEN[index % FALLBACK_WOONPLAATSEN.length],
+    motivatie: `Sterke demo-match voor ${werkzaamheden} binnen ${branche}. Past goed bij urgentie ${urgentie.toLowerCase()} en kan snel meedraaien.`,
+    highlightSkills: skills.slice(0, 2)
+  };
+}
+
+function resolveAlternativeProfile(profile, oudNaam, niveau) {
+  if (!profile || samePerson(profile.naam, oudNaam)) return fallbackAlternativeProfile(oudNaam, niveau);
+  return profile;
+}
+
+function replaceProfileCard(kaart, profile, niveau) {
+  kaart.style.opacity = '0';
+  kaart.style.transition = 'opacity 0.2s';
+  setTimeout(() => {
+    profile.niveau = profile.niveau || niveau;
+    kaart.outerHTML = renderProfileCard(profile);
+  }, 200);
 }
 
 function showLoadingPanel() {
@@ -694,17 +768,10 @@ Object heeft: naam, initialen, rol, matchScore (70-99), vaardigheden (4-6 string
     });
     const data = await response.json();
     const text = data.content.map(i => i.text || '').join('');
-    const p = JSON.parse(text.replace(/```json|```/g, '').trim())[0];
-
-    kaart.style.opacity = '0';
-    kaart.style.transition = 'opacity 0.2s';
-    setTimeout(() => {
-      p.niveau = p.niveau || niveau;
-      kaart.outerHTML = renderProfileCard(p);
-    }, 200);
+    const p = resolveAlternativeProfile(JSON.parse(text.replace(/```json|```/g, '').trim())[0], oudNaam, niveau);
+    replaceProfileCard(kaart, p, niveau);
   } catch(e) {
-    btn.disabled = false;
-    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg> Iemand anders`;
+    replaceProfileCard(kaart, fallbackAlternativeProfile(oudNaam, niveau), niveau);
   }
 }
 
