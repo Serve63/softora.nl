@@ -247,6 +247,27 @@ input[type=number] { -moz-appearance: textfield; }
       <div class="card-body">
 
         <div class="form-group">
+          <label class="field-label">Branche / Sector</label>
+          <div class="cdd" id="dd-branche" data-value="">
+            <div class="cdd-trigger" onclick="toggleDD('dd-branche')">
+              <span class="cdd-val placeholder">Selecteer branche</span>
+              <svg class="cdd-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="cdd-menu">
+              <div class="cdd-item" data-value="Voedsel- &amp; Drankenindustrie" onclick="pickDD('dd-branche',this)">Voedsel- &amp; Drankenindustrie</div>
+              <div class="cdd-item" data-value="Chemie &amp; Petrochemie" onclick="pickDD('dd-branche',this)">Chemie &amp; Petrochemie</div>
+              <div class="cdd-item" data-value="Automotive" onclick="pickDD('dd-branche',this)">Automotive</div>
+              <div class="cdd-item" data-value="Bouw &amp; Infra" onclick="pickDD('dd-branche',this)">Bouw &amp; Infra</div>
+              <div class="cdd-item" data-value="Agrarisch / Agrofood" onclick="pickDD('dd-branche',this)">Agrarisch / Agrofood</div>
+              <div class="cdd-item" data-value="Papier &amp; Karton" onclick="pickDD('dd-branche',this)">Papier &amp; Karton</div>
+              <div class="cdd-item" data-value="Logistiek &amp; Warehousing" onclick="pickDD('dd-branche',this)">Logistiek &amp; Warehousing</div>
+              <div class="cdd-item" data-value="Metaalindustrie" onclick="pickDD('dd-branche',this)">Metaalindustrie</div>
+              <div class="cdd-item" data-value="Anders" onclick="pickDD('dd-branche',this)">Anders</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
           <label class="field-label">Werkzaamheden</label>
           <div class="cdd" id="dd-werkzaamheden" data-value="">
             <div class="cdd-trigger" onclick="toggleDD('dd-werkzaamheden')">
@@ -264,27 +285,6 @@ input[type=number] { -moz-appearance: textfield; }
               <div class="cdd-item" data-value="Pneumatiek" onclick="pickDD('dd-werkzaamheden',this)">Pneumatiek</div>
               <div class="cdd-item" data-value="Montage" onclick="pickDD('dd-werkzaamheden',this)">Montage</div>
               <div class="cdd-item" data-value="Storingsonderhoud" onclick="pickDD('dd-werkzaamheden',this)">Storingsonderhoud</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="field-label">Branche / Sector</label>
-          <div class="cdd" id="dd-branche" data-value="">
-            <div class="cdd-trigger" onclick="toggleDD('dd-branche')">
-              <span class="cdd-val placeholder">Selecteer branche</span>
-              <svg class="cdd-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-            </div>
-            <div class="cdd-menu">
-              <div class="cdd-item" data-value="Voedsel- &amp; Drankenindustrie" onclick="pickDD('dd-branche',this)">Voedsel- &amp; Drankenindustrie</div>
-              <div class="cdd-item" data-value="Chemie &amp; Petrochemie" onclick="pickDD('dd-branche',this)">Chemie &amp; Petrochemie</div>
-              <div class="cdd-item" data-value="Automotive" onclick="pickDD('dd-branche',this)">Automotive</div>
-              <div class="cdd-item" data-value="Bouw &amp; Infra" onclick="pickDD('dd-branche',this)">Bouw &amp; Infra</div>
-              <div class="cdd-item" data-value="Agrarisch / Agrofood" onclick="pickDD('dd-branche',this)">Agrarisch / Agrofood</div>
-              <div class="cdd-item" data-value="Papier &amp; Karton" onclick="pickDD('dd-branche',this)">Papier &amp; Karton</div>
-              <div class="cdd-item" data-value="Logistiek &amp; Warehousing" onclick="pickDD('dd-branche',this)">Logistiek &amp; Warehousing</div>
-              <div class="cdd-item" data-value="Metaalindustrie" onclick="pickDD('dd-branche',this)">Metaalindustrie</div>
-              <div class="cdd-item" data-value="Anders" onclick="pickDD('dd-branche',this)">Anders</div>
             </div>
           </div>
         </div>
