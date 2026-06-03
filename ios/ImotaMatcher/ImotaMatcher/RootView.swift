@@ -53,6 +53,16 @@ struct ImotaMatcherWebView: UIViewRepresentable {
         "Niels van den Berg",
         "Koen Peeters"
       ];
+      const photos = [
+        "https://randomuser.me/api/portraits/men/32.jpg",
+        "https://randomuser.me/api/portraits/men/75.jpg",
+        "https://randomuser.me/api/portraits/men/45.jpg",
+        "https://randomuser.me/api/portraits/men/62.jpg",
+        "https://randomuser.me/api/portraits/men/22.jpg",
+        "https://randomuser.me/api/portraits/men/36.jpg",
+        "https://randomuser.me/api/portraits/men/51.jpg",
+        "https://randomuser.me/api/portraits/men/18.jpg"
+      ];
       const regions = ["Noord-Brabant", "Tilburg", "Den Bosch", "Eindhoven", "Breda", "Waalwijk"];
       const skillMap = {
         "Onderhoud & Revisie": ["Preventief onderhoud", "Revisie", "Storingsanalyse", "Machineveiligheid", "Lagermontage"],
@@ -100,6 +110,7 @@ struct ImotaMatcherWebView: UIViewRepresentable {
         return {
           naam: name,
           initialen: initials(name),
+          photoUrl: photos[index % photos.length],
           rol: werkzaamheden + " specialist",
           matchScore: score,
           vaardigheden: skills.slice(0, 5),
