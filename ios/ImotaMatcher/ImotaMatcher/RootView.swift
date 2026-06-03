@@ -5,7 +5,7 @@ struct RootView: View {
     var body: some View {
         ImotaMatcherWebView()
             .ignoresSafeArea()
-            .background(Color(red: 0.969, green: 0.965, blue: 0.957))
+            .background(Color.white)
     }
 }
 
@@ -26,9 +26,10 @@ struct ImotaMatcherWebView: UIViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.isOpaque = false
-        webView.backgroundColor = UIColor(red: 0.969, green: 0.965, blue: 0.957, alpha: 1)
+        webView.backgroundColor = .white
         webView.scrollView.backgroundColor = webView.backgroundColor
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.bounces = true
         webView.scrollView.alwaysBounceVertical = true
 
         let refreshControl = UIRefreshControl()
