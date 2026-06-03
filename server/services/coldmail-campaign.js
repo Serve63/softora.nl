@@ -138,6 +138,8 @@ const COLDMAIL_AUTOPILOT_MAX_SENDER_EMAILS = 12;
 const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
+  'servecreusen@softora.nl',
+  'martijnvandeven@softora.nl',
   'servec321@gmail.com',
   'martijnven123@gmail.com',
   'serve290@gmail.com',
@@ -147,6 +149,8 @@ const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
 const SENDER_DISPLAY_NAMES = {
   'serve@softora.nl': 'Servé Creusen',
   'martijn@softora.nl': 'Martijn van de Ven',
+  'servecreusen@softora.nl': 'Servé Creusen',
+  'martijnvandeven@softora.nl': 'Martijn van de Ven',
   'ruben@softora.nl': 'Ruben',
   'servec321@gmail.com': 'Servé Creusen',
   'martijnven123@gmail.com': 'Martijn van de Ven',
@@ -157,6 +161,8 @@ const SENDER_DISPLAY_NAMES = {
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
   'martijn@softora.nl',
+  'servecreusen@softora.nl',
+  'martijnvandeven@softora.nl',
   'servec321@gmail.com',
   'martijnven123@gmail.com',
   'serve290@gmail.com',
@@ -181,6 +187,18 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
     subject: 'Korte vraag over uw website - Softora.nl',
     body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
     aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
+  'servecreusen@softora.nl': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    toneStyle: 'Vriendelijk & professioneel',
+  },
+  'martijnvandeven@softora.nl': {
+    subject: 'Korte vraag over uw website - Softora.nl',
+    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servec321@gmail.com': {
@@ -217,6 +235,8 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
 const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'serve@softora.nl',
   'martijn@softora.nl',
+  'servecreusen@softora.nl',
+  'martijnvandeven@softora.nl',
   'servec321@gmail.com',
   'martijnven123@gmail.com',
   'serve290@gmail.com',
@@ -2183,6 +2203,8 @@ function createColdmailCampaignService(deps = {}) {
           'ruben@softora.nl',
           'serve@softora.nl',
           'martijn@softora.nl',
+          'servecreusen@softora.nl',
+          'martijnvandeven@softora.nl',
           'servec321@gmail.com',
           'martijnven123@gmail.com',
           'serve290@gmail.com',

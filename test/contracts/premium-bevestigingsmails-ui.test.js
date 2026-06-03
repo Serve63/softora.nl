@@ -455,7 +455,7 @@ test('premium bevestigingsmails places sender dropdown in the campaign card and 
   assert.doesNotMatch(pageSource, /<option value="info@softora\.nl"/);
   assert.doesNotMatch(pageSource, /<option value="zakelijk@softora\.nl"/);
   assert.doesNotMatch(pageSource, /zakelijk@theimpactbox\.co/);
-  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servec321@gmail\.com', 'martijnven123@gmail\.com', 'serve290@gmail\.com', 'servecreusen7@gmail\.com', 'contact\.venvisuals@gmail\.com'\]\);/);
+  assert.match(pageSource, /const allowedSenderEmails = new Set\(\['serve@softora\.nl', 'martijn@softora\.nl', 'servecreusen@softora\.nl', 'martijnvandeven@softora\.nl', 'servec321@gmail\.com', 'martijnven123@gmail\.com', 'serve290@gmail\.com', 'servecreusen7@gmail\.com', 'contact\.venvisuals@gmail\.com'\]\);/);
   assert.match(pageSource, /allowedSenderEmails\.has\(String\(email \|\| ''\)\.toLowerCase\(\)\)/);
   assert.doesNotMatch(pageSource, /<div class="mf-label">Campagne afgerond na<\/div>/);
   assert.doesNotMatch(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
