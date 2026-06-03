@@ -483,6 +483,7 @@ const PROFILE_PHOTOS = [
   'https://randomuser.me/api/portraits/men/51.jpg',
   'https://randomuser.me/api/portraits/men/18.jpg'
 ];
+const FALLBACK_WOONPLAATSEN = ['Tilburg', 'Eindhoven', 'Den Bosch', 'Breda', 'Helmond', 'Oss', 'Waalwijk', 'Boxtel'];
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -510,6 +511,14 @@ function profilePhotoUrl(profile) {
   return PROFILE_PHOTOS[index];
 }
 
+function profileWoonplaats(profile) {
+  const locatie = String(profile.woonplaats || profile.plaats || profile.stad || profile.regio || '').trim();
+  const teBreed = ['noord-brabant', 'brabant', 'nederland', 'zuid-nederland'];
+  if (locatie && !teBreed.includes(locatie.toLowerCase())) return locatie;
+  const index = Math.abs(hashString(profile.naam)) % FALLBACK_WOONPLAATSEN.length;
+  return FALLBACK_WOONPLAATSEN[index];
+}
+
 function showLoadingPanel() {
   document.getElementById('results-content').innerHTML = `
     <div class="loader">
@@ -526,12 +535,13 @@ function showLoadingPanel() {
   }, 1200);
 }
 
-function locationMarkup(regio) {
-  if (!regio) return '';
+function locationMarkup(profile) {
+  const woonplaats = profileWoonplaats(profile);
+  if (!woonplaats) return '';
   return `
     <div class="pc-location">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 10c0 4.5-8 11-8 11S4 14.5 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-      ${escapeHtml(regio)}
+      ${escapeHtml(woonplaats)}
     </div>`;
 }
 
@@ -553,7 +563,7 @@ function renderProfileCard(profile) {
             <span class="pc-rol-main">${escapeHtml(profile.rol)} ·</span>
             <span class="pc-ervaring">${escapeHtml(profile.ervaring)}</span>
           </div>
-          ${locationMarkup(profile.regio)}
+          ${locationMarkup(profile)}
         </div>
         <div class="match-score">
           <div class="match-pct">${bar}%</div>
@@ -628,7 +638,7 @@ Elk object heeft:
 - vaardigheden: array van 4-6 strings
 - beschikbaar: string
 - ervaring: string
-- regio: string
+- woonplaats: string (concrete Nederlandse woonplaats, geen provincie of streek; gebruik nooit "Noord-Brabant")
 - motivatie: string (1-2 zinnen)
 - highlightSkills: array van 1-2 strings
 
@@ -682,7 +692,7 @@ Projectgegevens:
 
 Zorg dat het een ANDERE persoon is dan ${oudNaam}. Geef output ALLEEN als JSON-array met 1 object. Geen uitleg, geen markdown.
 
-Object heeft: naam, initialen, rol, matchScore (70-99), vaardigheden (4-6 strings), beschikbaar, ervaring, regio, motivatie, highlightSkills (1-2 strings).`;
+Object heeft: naam, initialen, rol, matchScore (70-99), vaardigheden (4-6 strings), beschikbaar, ervaring, woonplaats (concrete Nederlandse woonplaats, geen provincie of streek), motivatie, highlightSkills (1-2 strings).`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
