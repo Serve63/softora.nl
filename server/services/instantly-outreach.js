@@ -42,6 +42,7 @@ const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nO
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
+const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
@@ -1511,6 +1512,12 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
+function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeString) {
+  const html = typeof content === 'string' ? content.trim() : normalizeString(content);
+  if (!html) return '';
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td align="left" style="padding:0;margin:0;"><div style="max-width:${INSTANTLY_EMAIL_CONTENT_MAX_WIDTH}px;margin:0;">${html}</div></td></tr></table>`;
+}
+
 function buildInstantlyEmailHtml(
   {
     baseText,
@@ -1539,7 +1546,7 @@ function buildInstantlyEmailHtml(
         normalizeString
       )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
     : '';
-  return `${renderMailTextAsHtml(baseText, normalizeString, {
+  const content = `${renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
   })}${renderImageHtml(
     webdesignImageUrl,
@@ -1548,6 +1555,7 @@ function buildInstantlyEmailHtml(
     normalizeString,
     webdesignImageDimensions
   )}${mockupHtml}${optOut}`;
+  return wrapInstantlyEmailHtml(content, normalizeString);
 }
 
 async function warmInstantlyPreviewImageCache(
