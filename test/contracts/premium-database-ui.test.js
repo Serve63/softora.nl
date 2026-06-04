@@ -378,6 +378,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-resilience\.js\?v=20260604a/);
   assert.match(resilienceSource, /const DEFAULT_TIMEOUT_MS = 6500;/);
   assert.match(resilienceSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
+  assert.match(resilienceSource, /function withTimeout\(task, timeoutMs, message\) \{/);
   assert.match(resilienceSource, /function fetchJsonWithTimeout\(url, options, timeoutMs\) \{/);
   assert.match(resilienceSource, /controller\.abort\(\);/);
   assert.match(resilienceSource, /throw new Error\("Supabase-data reageert niet op tijd\."\);/);
@@ -387,6 +388,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /loadFailed = true;[\s\S]*console\.error\("Klanten laden via Supabase mislukt:", error\);/);
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
+  assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 2200, "Coldmail send-guard reageert niet op tijd\."\)/);
 });
 
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {

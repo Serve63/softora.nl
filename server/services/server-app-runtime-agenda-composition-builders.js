@@ -5,6 +5,28 @@ const {
   buildAgendaSupportRuntimeOptions,
 } = require('./server-app-runtime-feature-options');
 
+const DATA_OPS_UI_STATE_BOOTSTRAP_TIMEOUT_MS = 2500;
+
+async function awaitDataOpsUiStateWithBootstrapTimeout(promise, scope) {
+  let timeoutId = null;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(
+            new Error(
+              `DataOps UI-state bootstrap timeout na ${Math.round(DATA_OPS_UI_STATE_BOOTSTRAP_TIMEOUT_MS / 1000)}s voor ${scope}`
+            )
+          );
+        }, DATA_OPS_UI_STATE_BOOTSTRAP_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function buildAgendaSupportRuntimeCompositionOptions({
   envConfig,
   runtimeMemory,
@@ -256,10 +278,17 @@ function buildServerAppAgendaWiringRuntimeContext({
           dataOpsBridge.canHandleScope(scope) &&
           typeof dataOpsBridge.getUiStateValues === 'function'
         ) {
-          const bridged = await dataOpsBridge.getUiStateValues(scope, {
-            legacyGetUiStateValues,
-          });
-          if (bridged) return bridged;
+          try {
+            const bridged = await awaitDataOpsUiStateWithBootstrapTimeout(
+              dataOpsBridge.getUiStateValues(scope, {
+                legacyGetUiStateValues,
+              }),
+              scope
+            );
+            if (bridged) return bridged;
+          } catch (error) {
+            console.warn('[DataOps][bootstrap-ui-state-fallback]', error?.message || error);
+          }
         }
         return legacyGetUiStateValues(scope, ...args);
       },

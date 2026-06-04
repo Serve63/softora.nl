@@ -4,6 +4,28 @@ const {
 const { createColdmailCampaignService } = require('./coldmail-campaign');
 const { createInstantlyOutreachService } = require('./instantly-outreach');
 
+const DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
+
+async function awaitDataOpsUiStateWithTimeout(promise, scope) {
+  let timeoutId = null;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(
+            new Error(
+              `DataOps UI-state read timeout na ${Math.round(DATA_OPS_UI_STATE_READ_TIMEOUT_MS / 1000)}s voor ${scope}`
+            )
+          );
+        }, DATA_OPS_UI_STATE_READ_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
   const legacyGetUiStateValues =
     typeof uiSeoRuntime.getUiStateValues === 'function'
@@ -18,10 +40,17 @@ function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
       dataOpsBridge.canHandleScope(scope) &&
       typeof dataOpsBridge.getUiStateValues === 'function'
     ) {
-      const bridged = await dataOpsBridge.getUiStateValues(scope, {
-        legacyGetUiStateValues,
-      });
-      if (bridged) return bridged;
+      try {
+        const bridged = await awaitDataOpsUiStateWithTimeout(
+          dataOpsBridge.getUiStateValues(scope, {
+            legacyGetUiStateValues,
+          }),
+          scope
+        );
+        if (bridged) return bridged;
+      } catch (error) {
+        console.warn('[DataOps][feature-ui-state-fallback]', error?.message || error);
+      }
     }
     return legacyGetUiStateValues(scope, ...args);
   };
