@@ -21,9 +21,13 @@ const DEFAULT_COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const DEFAULT_COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const DEFAULT_COLDMAIL_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
 const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
+const DEFAULT_COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
+const DEFAULT_COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const DEFAULT_SYNC_INTERVAL_MINUTES = 15;
 const DEFAULT_SYNC_BATCH_SIZE = 10;
+const DEFAULT_MANUAL_UPLOAD_LIMIT = 100;
+const MAX_MANUAL_UPLOAD_LIMIT = 250;
 const DEFAULT_DAILY_CAP = 25;
 const DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT = 1000;
 const DEFAULT_DAILY_CAP_TIME_ZONE = 'Europe/Amsterdam';
@@ -41,6 +45,8 @@ const COLDMAIL_MOCKUP_CAPTION =
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
+const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
+const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
 const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN = /je\s+kunt\s+je\s+webdesign\s+hier\s+bekijken\s*👈?/i;
@@ -170,6 +176,41 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_mockup_caption',
   'softora_webdesign_ready',
 ]);
+const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
+  'email',
+  'first_name',
+  'last_name',
+  'company_name',
+  'company',
+  'phone',
+  'website',
+  'personalization',
+  'softora_customer_id',
+  'softora_source',
+  'softora_company',
+  'softora_status',
+  'softora_contact_name',
+  'softora_city',
+  'softora_city_with_pin',
+  'softora_subject',
+  'softora_mail_body',
+  'softora_mail_body_with_optout',
+  'softora_instantly_email_text',
+  'softora_instantly_email_body',
+  'softora_instantly_email_html',
+  'softora_image_visibility_ps',
+  'softora_reference',
+  'softora_unsubscribe_url',
+  'softora_webdesign_public_path',
+  'softora_webdesign_public_url',
+  'softora_webdesign_image_url',
+  'softora_webdesign_mockup_url',
+  'softora_webdesign_image_prewarmed',
+  'softora_webdesign_mockup_prewarmed',
+  'softora_mockup_caption',
+  'softora_website_domain',
+  'softora_webdesign_ready',
+]);
 let cachedInstantlyPreviewSharp = null;
 
 function loadInstantlyPreviewSharp() {
@@ -259,6 +300,33 @@ function getEmailDomain(email) {
   const normalized = normalizeEmailAddress(email);
   const index = normalized.lastIndexOf('@');
   return index >= 0 ? normalized.slice(index + 1).replace(/\.+$/g, '') : '';
+}
+
+function normalizeColdmailGuardKeyPart(value, normalizeString = defaultNormalizeString) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/.*$/g, '')
+    .replace(/[^a-z0-9@._:-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 180);
+}
+
+function escapeCsvValue(value) {
+  const text = value === undefined || value === null ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function safeJsonObjectParse(value) {
+  try {
+    const parsed = JSON.parse(String(value || '{}'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
 }
 
 async function resolveEmailDomainWithDns(domain) {
@@ -1815,6 +1883,8 @@ function createInstantlyOutreachService(deps = {}) {
     coldmailingSettingsKey = DEFAULT_COLDMAILING_SETTINGS_KEY,
     coldmailAutopilotScope = DEFAULT_COLDMAIL_AUTOPILOT_SCOPE,
     coldmailAutopilotKey = DEFAULT_COLDMAIL_AUTOPILOT_KEY,
+    coldmailSendGuardScope = DEFAULT_COLDMAIL_SEND_GUARD_SCOPE,
+    coldmailSendGuardKey = DEFAULT_COLDMAIL_SEND_GUARD_KEY,
     normalizeString = defaultNormalizeString,
     truncateText = defaultTruncateText,
     logger = console,
@@ -1825,6 +1895,7 @@ function createInstantlyOutreachService(deps = {}) {
 
   const config = normalizeInstantlyConfig(instantlyConfig);
   let syncPromise = null;
+  let operationPromise = null;
   let syncTimer = null;
   let nextSyncAt = '';
   let lastSyncResult = null;
@@ -2077,15 +2148,65 @@ function createInstantlyOutreachService(deps = {}) {
     );
   }
 
+  function buildColdmailSendGuardIndex(guardState) {
+    const index = {
+      emails: new Set(),
+      domains: new Set(),
+      ids: new Set(),
+      keys: new Set(),
+    };
+    const entries = [
+      ...(Array.isArray(guardState && guardState.recipientEntries) ? guardState.recipientEntries : []),
+      ...(Array.isArray(guardState && guardState.entries) ? guardState.entries : []),
+    ];
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const email = normalizeEmailAddress(entry.recipientEmail || entry.email, normalizeString);
+      const domain = normalizeColdmailGuardKeyPart(entry.recipientDomain || entry.domain || entry.websiteDomain, normalizeString);
+      const id = normalizeColdmailGuardKeyPart(entry.recipientId || entry.customerId || entry.id, normalizeString);
+      const key = normalizeColdmailGuardKeyPart(entry.recipientKey || entry.key, normalizeString);
+      if (email) {
+        index.emails.add(email);
+        index.keys.add(`email:${email}`);
+      }
+      if (domain) index.domains.add(domain);
+      if (id) index.ids.add(id);
+      if (key) index.keys.add(key);
+    });
+    return index;
+  }
+
+  async function loadColdmailSendGuardIndex() {
+    const state = await getUiStateValues(coldmailSendGuardScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    return buildColdmailSendGuardIndex(safeJsonObjectParse(values[coldmailSendGuardKey]));
+  }
+
+  function hasColdmailSendGuardMatch(item, context = {}) {
+    const guardIndex = context.coldmailSendGuardIndex;
+    if (!guardIndex || typeof guardIndex !== 'object') return false;
+    const row = item && item.row;
+    const email = getRowEmail(row, normalizeString);
+    const domain = normalizeColdmailGuardKeyPart(getRowDomain(row, normalizeString) || getEmailDomain(email), normalizeString);
+    const id = normalizeColdmailGuardKeyPart(item && item.id, normalizeString);
+    return Boolean(
+      (email && (guardIndex.emails.has(email) || guardIndex.keys.has(`email:${email}`))) ||
+        (domain && guardIndex.domains.has(domain)) ||
+        (id && guardIndex.ids.has(id))
+    );
+  }
+
   async function loadPersonalizationContext(rows = []) {
-    const [photoMap, mailProfile] = await Promise.all([
+    const [photoMap, mailProfile, coldmailSendGuardIndex] = await Promise.all([
       loadCustomerPhotoMap(rows),
       loadColdmailProfile(),
+      loadColdmailSendGuardIndex(),
     ]);
     return {
       photoMap,
       photosByIdentity: buildPhotosByIdentity(photoMap, normalizeString),
       mailProfile,
+      coldmailSendGuardIndex,
     };
   }
 
@@ -2113,6 +2234,15 @@ function createInstantlyOutreachService(deps = {}) {
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
       if (hasActiveInstantlyOutreach(row)) continue;
+      if (hasColdmailSendGuardMatch({ id, index, row }, context)) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          error: 'Lead staat al in de permanente duplicate-guard; niet opnieuw naar Instantly gestuurd.',
+        });
+        continue;
+      }
       if (hasPriorColdmailOutreach(row)) {
         failed.push({
           id,
@@ -2720,6 +2850,257 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
+  function getManualUploadCampaignId(input = {}) {
+    return normalizeString(input.campaignId || input.campaign || input.defaultCampaignId || config.defaultCampaignId);
+  }
+
+  function buildSafeUploadId() {
+    return `instantly-upload-${now().toISOString().replace(/[^0-9a-z]+/gi, '').slice(0, 15)}`;
+  }
+
+  function buildSafeUploadFileName(count, uploadId) {
+    const cleanUploadId = normalizeString(uploadId).replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '');
+    return `softora-instantly-${Math.max(0, Number(count) || 0)}-leads-${cleanUploadId || 'upload'}.csv`;
+  }
+
+  function flattenInstantlyLeadForCsv(lead) {
+    const variables = lead && lead.custom_variables && typeof lead.custom_variables === 'object'
+      ? lead.custom_variables
+      : {};
+    return {
+      email: lead && lead.email,
+      first_name: lead && lead.first_name,
+      last_name: lead && lead.last_name,
+      company_name: lead && lead.company_name,
+      company: lead && lead.company_name,
+      phone: lead && lead.phone,
+      website: lead && lead.website,
+      personalization: lead && lead.personalization,
+      ...variables,
+    };
+  }
+
+  function buildInstantlyUploadCsv(leads) {
+    const rows = [INSTANTLY_SAFE_UPLOAD_CSV_HEADERS.join(',')];
+    (Array.isArray(leads) ? leads : []).forEach((lead) => {
+      const flat = flattenInstantlyLeadForCsv(lead);
+      rows.push(
+        INSTANTLY_SAFE_UPLOAD_CSV_HEADERS.map((header) => escapeCsvValue(flat[header])).join(',')
+      );
+    });
+    return rows.join('\n');
+  }
+
+  function buildPermanentInstantlyRecipientGuard(item, options = {}) {
+    const row = item && item.row;
+    const email = getRowEmail(row, normalizeString);
+    if (!email) return null;
+    const id = getRowId(row, item.index, normalizeString);
+    const company = getRowCompany(row, normalizeString);
+    const domain = getRowDomain(row, normalizeString) || getEmailDomain(email);
+    return {
+      at: normalizeString(options.at) || now().toISOString(),
+      senderEmail: '',
+      recipientKey: `email:${email}`,
+      recipientEmail: email,
+      recipientDomain: normalizeColdmailGuardKeyPart(domain, normalizeString),
+      recipientId: normalizeColdmailGuardKeyPart(id, normalizeString),
+      recipientCompanyKey: normalizeColdmailGuardKeyPart(company, normalizeString),
+      recipientCompany: truncateText(company, 160),
+      permanent: true,
+      source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+      provider: 'instantly',
+      campaignId: normalizeString(options.campaignId),
+      leadId: normalizeString(options.leadId),
+      uploadId: normalizeString(options.uploadId),
+    };
+  }
+
+  async function savePermanentInstantlyRecipientGuards(items, options = {}) {
+    const at = normalizeString(options.at) || now().toISOString();
+    const leadIdByEmail = options.leadIdByEmail instanceof Map ? options.leadIdByEmail : new Map();
+    const recipientEntries = (Array.isArray(items) ? items : [])
+      .map((item) => {
+        const email = getRowEmail(item && item.row, normalizeString);
+        return buildPermanentInstantlyRecipientGuard(item, {
+          ...options,
+          at,
+          leadId: leadIdByEmail.get(email) || normalizeString(options.leadId),
+        });
+      })
+      .filter(Boolean);
+    if (!recipientEntries.length) return { count: 0 };
+
+    const write = await setUiStateValues(
+      coldmailSendGuardScope,
+      {
+        [coldmailSendGuardKey]: JSON.stringify({
+          updatedAt: at,
+          source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+          actor: normalizeString(options.actor),
+          provider: 'instantly',
+          campaignId: normalizeString(options.campaignId),
+          uploadId: normalizeString(options.uploadId),
+          recipientEntries,
+          entries: [],
+        }),
+      },
+      {
+        source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+        actor: normalizeString(options.actor),
+      }
+    );
+    if (!write) {
+      throw createInstantlyError(
+        'Instantly upload kon niet veilig worden vastgezet in de duplicate-guard.',
+        'INSTANTLY_SAFE_GUARD_WRITE_FAILED',
+        502
+      );
+    }
+    return { count: recipientEntries.length };
+  }
+
+  function markRowsAsPreparedForInstantlyUpload(rows, selectedRows, options = {}) {
+    const preparedAt = normalizeString(options.at) || now().toISOString();
+    const campaignId = normalizeString(options.campaignId);
+    const uploadId = normalizeString(options.uploadId);
+    const selectedByIndex = new Map((Array.isArray(selectedRows) ? selectedRows : []).map((item) => [item.index, item]));
+    return (Array.isArray(rows) ? rows : []).map((row, index) => {
+      const item = selectedByIndex.get(index);
+      if (!item) return row;
+      const historyEntry = buildHistoryEntry(
+        {
+          type: 'gemaild',
+          label: INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL,
+          actor: options.actor,
+          source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+          messageKey: `${INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE}:${campaignId}:${uploadId}:${item.id}`,
+          subject: 'Instantly veilige upload',
+          preview:
+            'Lead is via de veilige Softora-route gereserveerd voor Instantly en permanent geblokkeerd voor dubbele Softora-coldmail.',
+        },
+        { normalizeString, truncateText, now: () => new Date(preparedAt) }
+      );
+      return {
+        ...row,
+        instantlyLeadId: normalizeString(row.instantlyLeadId),
+        instantlyCampaignId: campaignId,
+        instantlyStatus: chooseInstantlyStatus(row.instantlyStatus, 'queued'),
+        instantlySyncedAt: normalizeString(row.instantlySyncedAt) || preparedAt,
+        instantlyLastEventAt: preparedAt,
+        instantlyManualUploadId: uploadId,
+        instantlyManualUploadPreparedAt: preparedAt,
+        lastColdmailProvider: 'instantly',
+        lastColdmailProviderStatus: 'queued',
+        ...buildInstantlyApproachedFields(row, preparedAt),
+        updatedAt: preparedAt,
+        hist: mergeHistory(row, historyEntry, normalizeString),
+      };
+    });
+  }
+
+  async function prepareInstantlyUploadUnlocked(input = {}) {
+    const actor = normalizeString(input.actor) || 'Instantly veilige upload';
+    const campaignId = getManualUploadCampaignId(input);
+    if (!campaignId) {
+      throw createInstantlyError(
+        'Instantly campaign ID ontbreekt. Gebruik de veilige Softora-route met een campaignId, zodat guards goed worden vastgezet.',
+        'INSTANTLY_CAMPAIGN_ID_REQUIRED',
+        400
+      );
+    }
+    const limit = clampNumber(input.limit, DEFAULT_MANUAL_UPLOAD_LIMIT, 1, MAX_MANUAL_UPLOAD_LIMIT);
+    const uploadId = normalizeString(input.uploadId) || buildSafeUploadId();
+    const preparedAt = now().toISOString();
+    const state = await getUiStateValues(customerDbScope);
+    const values = state && typeof state.values === 'object' ? state.values : {};
+    const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
+    const personalizationContext = await loadPersonalizationContext(rows);
+    const { selectedRows, failed } = await collectEligibleRows(rows, limit, personalizationContext);
+    const leads = [];
+    const sendableRows = [];
+
+    for (const item of selectedRows) {
+      try {
+        const lead = assertInstantlyLeadReady(await buildInstantlyLead(item, personalizationContext));
+        leads.push(lead);
+        sendableRows.push(item);
+      } catch (error) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row, normalizeString),
+          email: getRowEmail(item.row, normalizeString),
+          error:
+            normalizeString(error && error.message) ||
+            'Instantly-lead mist verplichte Softora-variabelen.',
+          missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        });
+      }
+    }
+
+    if (!sendableRows.length) {
+      lastSyncResult = {
+        ok: true,
+        skipped: true,
+        reason: 'no_eligible_leads',
+        prepared: 0,
+        failed,
+        campaignId,
+        finishedAt: preparedAt,
+      };
+      return lastSyncResult;
+    }
+
+    const guardWrite = await savePermanentInstantlyRecipientGuards(sendableRows, {
+      at: preparedAt,
+      actor,
+      campaignId,
+      uploadId,
+      source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+    });
+    const nextRows = markRowsAsPreparedForInstantlyUpload(rows, sendableRows, {
+      at: preparedAt,
+      actor,
+      campaignId,
+      uploadId,
+    });
+    const customerWrite = await setUiStateValues(
+      customerDbScope,
+      buildCustomerRowsStateValues(values, nextRows, customerDbKey),
+      {
+        source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+        actor,
+      }
+    );
+    if (!customerWrite) {
+      throw createInstantlyError(
+        'Instantly upload is wel in de guard gezet, maar de database-status kon niet worden bijgewerkt.',
+        'INSTANTLY_SAFE_CUSTOMER_WRITE_FAILED',
+        502
+      );
+    }
+
+    lastSyncResult = {
+      ok: true,
+      prepared: sendableRows.length,
+      markedBenaderd: sendableRows.length,
+      permanentGuards: guardWrite.count,
+      failed,
+      campaignId,
+      uploadId,
+      fileName: buildSafeUploadFileName(sendableRows.length, uploadId),
+      csvHeaders: INSTANTLY_SAFE_UPLOAD_CSV_HEADERS,
+      csv: buildInstantlyUploadCsv(leads),
+      leads: sendableRows.map((item) => ({
+        id: item.id,
+        bedrijf: getRowCompany(item.row, normalizeString),
+        email: getRowEmail(item.row, normalizeString),
+      })),
+      finishedAt: preparedAt,
+    };
+    return lastSyncResult;
+  }
+
   function markRowsAsSynced(rows, selectedRows, data, actor) {
     const syncedAt = now().toISOString();
     const leadIdByEmail = buildLeadIdByEmail(data);
@@ -2897,11 +3278,31 @@ function createInstantlyOutreachService(deps = {}) {
 
   async function syncInstantlyLeads(input = {}) {
     if (syncPromise) return syncPromise;
-    syncPromise = syncInstantlyLeadsUnlocked(input);
+    syncPromise = runExclusiveInstantlyOperation(() => syncInstantlyLeadsUnlocked(input));
     try {
       return await syncPromise;
     } finally {
       syncPromise = null;
+    }
+  }
+
+  async function prepareInstantlyUpload(input = {}) {
+    return runExclusiveInstantlyOperation(() => prepareInstantlyUploadUnlocked(input));
+  }
+
+  async function runExclusiveInstantlyOperation(factory) {
+    if (operationPromise) {
+      throw createInstantlyError(
+        'Er loopt al een Instantly-operatie. Wacht tot die klaar is voordat je opnieuw leads klaarzet.',
+        'INSTANTLY_OPERATION_ALREADY_RUNNING',
+        409
+      );
+    }
+    operationPromise = Promise.resolve().then(factory);
+    try {
+      return await operationPromise;
+    } finally {
+      operationPromise = null;
     }
   }
 
@@ -3118,6 +3519,13 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
     const data = await addLeadsToInstantly(leads);
+    const leadIdByEmail = buildLeadIdByEmail(data);
+    await savePermanentInstantlyRecipientGuards(sendableRows, {
+      actor,
+      campaignId: config.defaultCampaignId,
+      leadIdByEmail,
+      source: 'instantly-sync',
+    });
     const nextRows = markRowsAsSynced(rows, sendableRows, data, actor);
     await setUiStateValues(
       customerDbScope,
@@ -3547,6 +3955,9 @@ function createInstantlyOutreachService(deps = {}) {
       batchSize: config.batchSize,
       dailyCap: config.dailyCap,
       dailyCapTimeZone: config.dailyCapTimeZone,
+      safeManualUploadEnabled: true,
+      safeManualUploadRequiresApi: false,
+      safeManualUploadMaxLimit: MAX_MANUAL_UPLOAD_LIMIT,
       verifyLeadsOnImport: config.verifyLeadsOnImport,
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
       requireWebdesignAssets: config.requireWebdesignAssets,
@@ -3558,7 +3969,7 @@ function createInstantlyOutreachService(deps = {}) {
       priorColdmailInstantlyRiskRows,
       syncedToday: getDailySyncCount(rows),
       nextSyncAt,
-      running: Boolean(syncPromise),
+      running: Boolean(syncPromise || operationPromise),
       lastSync: lastSyncResult,
     };
   }
@@ -3572,6 +3983,7 @@ function createInstantlyOutreachService(deps = {}) {
     getStatus,
     handleInstantlyWebhook,
     isConfigured,
+    prepareInstantlyUpload,
     startAutopilot,
     stopAutopilot,
     syncInstantlyLeads,
