@@ -69,10 +69,14 @@ test('marketing premium landing pages are not auth-gated', () => {
 });
 
 test('premium login page redirects authenticated users to a safe next path', async () => {
+  const resolverCalls = [];
   const controller = createPremiumHtmlPageAccessController({
     premiumPublicHtmlFiles: new Set(['premium-website.html', 'premium-personeel-login.html']),
     noindexHeaderValue: 'noindex',
-    getResolvedPremiumAuthState: async () => ({ configured: true, authenticated: true }),
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      return { configured: true, authenticated: true };
+    },
     getSafePremiumRedirectPath: (value, fallback = '/premium-personeel-dashboard') => {
       const target = String(value || '').trim();
       return target.startsWith('/') && !target.startsWith('//') && !target.includes('://') ? target : fallback;
@@ -92,6 +96,7 @@ test('premium login page redirects authenticated users to a safe next path', asy
   assert.equal(res.headers['X-Robots-Tag'], 'noindex');
   assert.equal(res.redirectCode, 302);
   assert.equal(res.redirectLocation, '/premium-users');
+  assert.deepEqual(resolverCalls, [{ allowAnonymousWithoutHydration: true }]);
 });
 
 test('premium login page logout mode clears the session cookie and stays on the page', async () => {

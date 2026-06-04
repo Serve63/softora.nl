@@ -94,6 +94,35 @@ test('premium auth manager resolves anonymous requests from cached users without
   assert.equal(resolved.authenticated, false);
 });
 
+test('premium auth manager can resolve anonymous login page requests without hydration wait', async () => {
+  let hydrateCalls = 0;
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => '',
+    verifySessionToken: () => ({ ok: false, expired: false, payload: null }),
+    premiumUsersStore: {
+      ...createPremiumUsersStoreStub([]),
+      async ensureUsersHydrated() {
+        hydrateCalls += 1;
+        return { users: [], source: 'supabase' };
+      },
+    },
+    getRequestPathname: () => '/premium-personeel-login',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState(
+    {},
+    { allowAnonymousWithoutHydration: true }
+  );
+
+  assert.equal(hydrateCalls, 0);
+  assert.equal(resolved.configured, true);
+  assert.equal(resolved.authenticated, false);
+});
+
 test('premium auth manager resolves authenticated user and session payload', async () => {
   const users = [
     {

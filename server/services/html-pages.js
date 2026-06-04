@@ -122,7 +122,7 @@ function createHtmlPageCoordinator(options = {}) {
     getSeoConfigCached = async () => ({}),
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
-    publicPageDependencyWaitMs = 1500,
+    publicPageDependencyWaitMs = 350,
     isProduction = process.env.NODE_ENV === 'production',
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;

@@ -159,9 +159,16 @@ function createPremiumAuthStateManager(options = {}) {
     return hydratedUsers.length > 0 ? hydratedUsers : premiumUsersStore.getCachedUsers();
   }
 
-  async function getResolvedPremiumAuthState(req) {
+  async function getResolvedPremiumAuthState(req, options = {}) {
     const basicAuthState = getPremiumAuthState(req);
+    const allowAnonymousWithoutHydration = Boolean(options?.allowAnonymousWithoutHydration);
     if (!basicAuthState.authenticated) {
+      if (allowAnonymousWithoutHydration) {
+        return buildConfiguredAnonymousState({
+          ...basicAuthState,
+          configured: Boolean(sessionSecret),
+        });
+      }
       const cachedUsers = premiumUsersStore.getCachedUsers();
       if (Array.isArray(cachedUsers) && cachedUsers.length > 0) {
         return buildConfiguredAnonymousState({
