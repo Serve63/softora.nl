@@ -480,16 +480,16 @@ function createHtmlPageCoordinator(options = {}) {
     try {
       const html = await readHtmlPageContent(fileName);
       if (!html) return next();
-      const config =
-        publicDependencyWaitMs > 0
-          ? await resolveWithSoftTimeout(() => getSeoConfigCached(), {
-              fileName,
-              label: 'SeoConfig',
-              timeoutMs: publicDependencyWaitMs,
-              fallbackValue: {},
-            })
-          : await getSeoConfigCached();
-      let rendered = applySeoOverridesToHtml(fileName, html, config);
+      const shouldApplySeoOverrides = !isLoginPage && !isProtectedPremiumPage;
+      const config = shouldApplySeoOverrides
+        ? await resolveWithSoftTimeout(() => getSeoConfigCached(), {
+            fileName,
+            label: 'SeoConfig',
+            timeoutMs: publicDependencyWaitMs || getSafePublicPageDependencyWaitMs(),
+            fallbackValue: {},
+          })
+        : {};
+      let rendered = shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html;
       try {
         const bootstrapData =
           publicDependencyWaitMs > 0

@@ -310,10 +310,12 @@ test('html page coordinator renders premium content-frame pages without an activ
   assert.match(res.headers['Content-Security-Policy'], /default-src 'self'/);
 });
 
-test('html page coordinator falls back to sendFile when rendering throws', async () => {
+test('html page coordinator serves login pages without seo config reads', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-fallback-'));
   const pagePath = path.join(pagesDir, 'premium-personeel-login.html');
-  fs.writeFileSync(pagePath, '<!DOCTYPE html><html><head><title>Login</title></head><body></body></html>');
+  fs.writeFileSync(pagePath, '<!DOCTYPE html><html><head><title>Login</title></head><body>Inloggen</body></html>');
+  let seoConfigCalls = 0;
+  let seoOverrideCalls = 0;
 
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
@@ -332,9 +334,13 @@ test('html page coordinator falls back to sendFile when rendering throws', async
       isProtectedPremiumPage: false,
     }),
     getSeoConfigCached: async () => {
+      seoConfigCalls += 1;
       throw new Error('boom');
     },
-    applySeoOverridesToHtml: (fileName, html) => `${fileName}:${html}`,
+    applySeoOverridesToHtml: (fileName, html) => {
+      seoOverrideCalls += 1;
+      return `${fileName}:${html}`;
+    },
   });
 
   const req = { originalUrl: '/premium-personeel-login' };
@@ -347,7 +353,10 @@ test('html page coordinator falls back to sendFile when rendering throws', async
 
   assert.equal(nextCalled, false);
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
-  assert.equal(res.sendFilePath, pagePath);
+  assert.equal(res.sendFilePath, null);
+  assert.equal(seoConfigCalls, 0);
+  assert.equal(seoOverrideCalls, 0);
+  assert.match(res.body, /Inloggen/);
 });
 
 test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
