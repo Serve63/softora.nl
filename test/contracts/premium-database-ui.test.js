@@ -369,6 +369,26 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   );
 });
 
+test('premium database toont Supabase-hapering zonder data als leeg te presenteren', () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const resiliencePath = path.join(__dirname, '../../assets/premium-database-resilience.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const resilienceSource = fs.readFileSync(resiliencePath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-database-resilience\.js\?v=20260604a/);
+  assert.match(resilienceSource, /const DEFAULT_TIMEOUT_MS = 6500;/);
+  assert.match(resilienceSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
+  assert.match(resilienceSource, /function fetchJsonWithTimeout\(url, options, timeoutMs\) \{/);
+  assert.match(resilienceSource, /controller\.abort\(\);/);
+  assert.match(resilienceSource, /throw new Error\("Supabase-data reageert niet op tijd\."\);/);
+  assert.match(resilienceSource, /function hasChunkedStateKey\(values, baseKey\) \{/);
+  assert.match(pageSource, /let loadFailed = false;/);
+  assert.match(pageSource, /if \(!window\.SoftoraDatabaseResilience\.hasChunkedStateKey\(remoteValues, CUSTOMER_DB_KEY\)\) throw new Error\("Geen Supabase-klantdata ontvangen\."\);/);
+  assert.match(pageSource, /loadFailed = true;[\s\S]*console\.error\("Klanten laden via Supabase mislukt:", error\);/);
+  assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
+  assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
+});
+
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
@@ -868,7 +888,8 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(importScriptSource, /\[getChunkMetaKey\(normalizedKey\)\]: JSON\.stringify\(\{/);
   assert.match(importScriptSource, /patch\[prefix \+ index\] = chunk;/);
   assert.match(pageSource, /patch: window\.SoftoraDatabaseImport\.buildChunkedStatePatch\(CUSTOMER_DB_KEY, JSON\.stringify\(normalizedCustomers\)\)/);
-  assert.match(pageSource, /parseCustomers\(window\.SoftoraDatabaseImport\.readChunkedStateValue\(remoteState && remoteState\.values, CUSTOMER_DB_KEY\)\)/);
+  assert.match(pageSource, /const remoteValues = remoteState && remoteState\.values && typeof remoteState\.values === "object" \? remoteState\.values : \{\};/);
+  assert.match(pageSource, /parseCustomers\(window\.SoftoraDatabaseImport\.readChunkedStateValue\(remoteValues, CUSTOMER_DB_KEY\)\)/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
   assert.match(pageSource, /function normalizeStoredAmount\(value\)/);
   assert.match(pageSource, /databaseStatus: status,/);

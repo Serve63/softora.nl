@@ -26,6 +26,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     runtimeStateSupabaseSyncCooldownMs = 4000,
     runtimeStateRemoteNewerThresholdMs = 250,
     supabaseClientPersistTimeoutMs = 12000,
+    supabaseHydrateReadTimeoutMs = 4500,
     // Agenda-acties ketenen vaak meerdere persists (upsert, mutatie, dismiss, dashboard-activiteit).
     // 15s was te kort op trage netwerken → false positieve "gedeelde opslag" fouten na "in agenda zetten".
     queuedRuntimePersistAwaitTimeoutMs = 60000,
@@ -152,6 +153,11 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
+  }
+
+  function getHydrateReadTimeoutLabel() {
+    const safeTimeoutMs = Math.max(1000, Math.min(30000, Number(supabaseHydrateReadTimeoutMs) || 4500));
+    return `${Math.round(safeTimeoutMs / 1000)}s`;
   }
 
   function markRuntimeStateObserved(atMs = Date.now()) {
@@ -341,7 +347,16 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
         }
 
         async function hydrateViaRest(primaryError = null) {
-          const fallback = await fetchSupabaseStateRowViaRest('payload,updated_at');
+          const fallback = await awaitWithTimeout(
+            fetchSupabaseStateRowViaRest('payload,updated_at'),
+            supabaseHydrateReadTimeoutMs,
+            `Supabase hydrate REST timeout na ${getHydrateReadTimeoutLabel()}`
+          ).catch((error) => ({
+            ok: false,
+            status: null,
+            body: null,
+            error: truncateText(error?.message || String(error), 500),
+          }));
           if (!fallback.ok) {
             logError('[Supabase][HydrateError]', primaryError?.message || primaryError);
             const fallbackMsg = fallback.error
@@ -367,11 +382,15 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
         }
 
         try {
-          const { data, error } = await client
-            .from(supabaseStateTable)
-            .select('payload, updated_at')
-            .eq('state_key', supabaseStateKey)
-            .maybeSingle();
+          const { data, error } = await awaitWithTimeout(
+            client
+              .from(supabaseStateTable)
+              .select('payload, updated_at')
+              .eq('state_key', supabaseStateKey)
+              .maybeSingle(),
+            supabaseHydrateReadTimeoutMs,
+            `Supabase hydrate client timeout na ${getHydrateReadTimeoutLabel()}`
+          );
 
           if (error) {
             return hydrateViaRest(error);

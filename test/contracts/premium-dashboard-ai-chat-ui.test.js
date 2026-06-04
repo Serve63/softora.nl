@@ -128,6 +128,8 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const corePath = path.join(__dirname, '../../assets/premium-dashboard-core.js');
   const coreSource = fs.readFileSync(corePath, 'utf8');
+  const dataStatusPath = path.join(__dirname, '../../assets/premium-dashboard-data-status.js');
+  const dataStatusSource = fs.readFileSync(dataStatusPath, 'utf8');
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_REVENUE -->/);
@@ -158,7 +160,12 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
+  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260604a/);
+  assert.match(dataStatusSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
+  assert.match(dataStatusSource, /function setKpisUnavailable\(\) \{/);
+  assert.match(dataStatusSource, /activeOrdersEl\.setAttribute\("aria-label", "Actieve opdrachten tijdelijk niet geladen"\);/);
   assert.match(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);
+  assert.match(pageSource, /window\.SoftoraDashboardDataStatus\.showUnavailable\(\)/);
   assert.doesNotMatch(pageSource, /premiumDashboardState\.(orders|customers) = \[\];/);
 });
 
