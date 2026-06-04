@@ -187,7 +187,12 @@ test('premium auth session response clears revoked cookies and returns stable pa
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.body.ok, true);
   assert.equal(cookieClears.length, 1);
-  assert.deepEqual(resolverCalls, [{ allowAnonymousWithoutHydration: true }]);
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
+    },
+  ]);
 });
 
 test('premium auth login returns 503 when auth is not fully configured', async () => {

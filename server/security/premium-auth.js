@@ -162,6 +162,7 @@ function createPremiumAuthStateManager(options = {}) {
   async function getResolvedPremiumAuthState(req, options = {}) {
     const basicAuthState = getPremiumAuthState(req);
     const allowAnonymousWithoutHydration = Boolean(options?.allowAnonymousWithoutHydration);
+    const allowTokenFallbackWithoutHydration = Boolean(options?.allowTokenFallbackWithoutHydration);
     if (!basicAuthState.authenticated) {
       if (allowAnonymousWithoutHydration) {
         return buildConfiguredAnonymousState({
@@ -176,6 +177,9 @@ function createPremiumAuthStateManager(options = {}) {
           configured: true,
         });
       }
+    }
+    if (basicAuthState.authenticated && allowTokenFallbackWithoutHydration) {
+      return buildTokenFallbackState(basicAuthState);
     }
     const timeoutMs = getSafeResolveTimeoutMs();
     let hydrated;
@@ -347,7 +351,9 @@ function createPremiumApiAccessGuard(options = {}) {
   async function requirePremiumApiAccess(req, res, next) {
     if (isPremiumPublicApiRequest(req)) return next();
 
-    const authState = await getResolvedPremiumAuthState(req);
+    const authState = await getResolvedPremiumAuthState(req, {
+      allowTokenFallbackWithoutHydration: true,
+    });
     res.setHeader('Cache-Control', 'no-store, private');
 
     if (!authState.configured) {

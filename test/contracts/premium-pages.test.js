@@ -96,7 +96,12 @@ test('premium login page redirects authenticated users to a safe next path', asy
   assert.equal(res.headers['X-Robots-Tag'], 'noindex');
   assert.equal(res.redirectCode, 302);
   assert.equal(res.redirectLocation, '/premium-users');
-  assert.deepEqual(resolverCalls, [{ allowAnonymousWithoutHydration: true }]);
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
+    },
+  ]);
 });
 
 test('premium login page logout mode clears the session cookie and stays on the page', async () => {
@@ -151,7 +156,12 @@ test('protected premium pages redirect to setup when auth is not configured', as
     res.redirectLocation,
     '/premium-personeel-login?setup=1&next=%2Fpremium-personeel-agenda'
   );
-  assert.deepEqual(resolverCalls, [{ allowAnonymousWithoutHydration: true }]);
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
+    },
+  ]);
 });
 
 test('internal premium tool pages require login for anonymous visitors', async () => {

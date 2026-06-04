@@ -169,6 +169,46 @@ test('premium auth manager resolves authenticated user and session payload', asy
   assert.equal(sessionPayload.canManageUsers, true);
 });
 
+test('premium auth manager can resolve authenticated token requests without hydration wait', async () => {
+  let hydrateCalls = 0;
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => 'token',
+    verifySessionToken: () => ({
+      ok: true,
+      expired: false,
+      payload: {
+        email: 'INFO@SOFTORA.NL',
+        uid: 'usr_1',
+        role: 'ADMIN',
+        exp: Date.now() + 60_000,
+      },
+    }),
+    premiumUsersStore: {
+      ...createPremiumUsersStoreStub([]),
+      async ensureUsersHydrated() {
+        hydrateCalls += 1;
+        return { users: [], source: 'supabase' };
+      },
+    },
+    getRequestPathname: () => '/api/auth/session',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState(
+    {},
+    { allowTokenFallbackWithoutHydration: true }
+  );
+
+  assert.equal(hydrateCalls, 0);
+  assert.equal(resolved.authenticated, true);
+  assert.equal(resolved.email, 'info@softora.nl');
+  assert.equal(resolved.isAdmin, true);
+  assert.equal(resolved.user, null);
+});
+
 test('premium auth manager rejects unsafe redirects and recognizes public api paths', () => {
   const manager = createPremiumAuthStateManager({
     sessionSecret: 'secret',
