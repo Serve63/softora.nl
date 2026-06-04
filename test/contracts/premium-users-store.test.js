@@ -91,6 +91,47 @@ test('premium users store does not overwrite users with bootstrap data when Supa
   }
 });
 
+test('premium users store times out hanging Supabase hydration instead of hanging login', async () => {
+  const store = createFixture({
+    config: {
+      premiumUsersReadTimeoutMs: 25,
+    },
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle() {
+                    return new Promise(() => {});
+                  },
+                };
+              },
+            };
+          },
+          async upsert() {
+            return { error: new Error('write should not happen') };
+          },
+        };
+      },
+    },
+  });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  try {
+    const startedAt = Date.now();
+    const hydrated = await store.ensureUsersHydrated();
+
+    assert.equal(hydrated.source, 'unavailable');
+    assert.equal(hydrated.users.length, 0);
+    assert.ok(Date.now() - startedAt < 1000);
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
 test('premium users store bootstraps only after Supabase confirms the users row is missing', async () => {
   let upsertedRow = null;
   const store = createFixture({

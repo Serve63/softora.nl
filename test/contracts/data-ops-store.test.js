@@ -146,6 +146,99 @@ test('data ops store paginates customer reads beyond Supabase default page size'
   ]);
 });
 
+test('data ops store returns quickly when customer reads hang', async () => {
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range() {
+                      return new Promise(() => {});
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadQueryTimeoutMs: 25,
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const startedAt = Date.now();
+  const customers = await store.listCustomers();
+
+  assert.equal(customers, null);
+  assert.ok(Date.now() - startedAt < 1000);
+});
+
+test('data ops store serves stale cached customers when a later read times out', async () => {
+  let nowMs = Date.parse('2026-05-22T10:00:00.000Z');
+  let readCalls = 0;
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range() {
+                      readCalls += 1;
+                      if (readCalls === 1) {
+                        return Promise.resolve({
+                          data: [
+                            {
+                              customer_id: 'lead-1',
+                              payload: { id: 'lead-1', bedrijf: 'Softora' },
+                              updated_at: '2026-05-22T10:00:00.000Z',
+                            },
+                          ],
+                          error: null,
+                        });
+                      }
+                      return new Promise(() => {});
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadQueryTimeoutMs: 25,
+    dataOpsReadCacheTtlMs: 1,
+    now: () => new Date(nowMs),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const first = await store.listCustomers();
+  nowMs += 10;
+  const second = await store.listCustomers();
+
+  assert.equal(readCalls, 2);
+  assert.equal(first[0].bedrijf, 'Softora');
+  assert.equal(second[0].bedrijf, 'Softora');
+});
+
 test('data ops store saves webdesign and device mockup as one photo record', async () => {
   const uploads = [];
   const upserts = [];

@@ -24,6 +24,8 @@ const TABLES = Object.freeze({
 const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
+const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
+const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
 
 function slugifyDesignPhotoMatchText(value) {
   return normalizeString(value)
@@ -141,9 +143,12 @@ function createSoftoraDataOpsStore(deps = {}) {
     getSupabaseClient = () => null,
     logger = console,
     bucketName = 'softora-design-photos',
+    dataOpsReadQueryTimeoutMs = DEFAULT_READ_QUERY_TIMEOUT_MS,
+    dataOpsReadCacheTtlMs = DEFAULT_READ_CACHE_TTL_MS,
     now = () => new Date(),
   } = deps;
   const signedUrlCache = new Map();
+  const readCache = new Map();
 
   function getClient() {
     if (!isSupabaseConfigured()) return null;
@@ -163,11 +168,79 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
-  async function run(label, operation) {
+  function createTimeoutError(label, timeoutMs) {
+    const error = new Error(`${label} timeout na ${timeoutMs}ms`);
+    error.code = 'DATA_OPS_TIMEOUT';
+    return error;
+  }
+
+  async function withTimeout(promise, timeoutMs, label) {
+    const durationMs = Math.max(0, Number(timeoutMs) || 0);
+    if (!durationMs) return promise;
+    let timeoutId = null;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(createTimeoutError(label, durationMs)), durationMs);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
+  function getFreshCachedRead(cacheKey) {
+    const cached = readCache.get(cacheKey);
+    if (!cached) return null;
+    if (currentTimeMs() - Number(cached.cachedAtMs || 0) <= Math.max(0, Number(dataOpsReadCacheTtlMs) || 0)) {
+      return cached.value;
+    }
+    return null;
+  }
+
+  function getAnyCachedRead(cacheKey) {
+    const cached = readCache.get(cacheKey);
+    return cached ? cached.value : null;
+  }
+
+  function rememberRead(cacheKey, value) {
+    if (value === null || value === undefined) return;
+    readCache.set(cacheKey, {
+      cachedAtMs: currentTimeMs(),
+      value,
+    });
+  }
+
+  function forgetReads(...cacheKeys) {
+    cacheKeys.forEach((cacheKey) => readCache.delete(cacheKey));
+  }
+
+  async function cachedRead(cacheKey, loader) {
+    const fresh = getFreshCachedRead(cacheKey);
+    if (fresh) return fresh;
+    const loaded = await loader();
+    if (loaded !== null && loaded !== undefined) {
+      rememberRead(cacheKey, loaded);
+      return loaded;
+    }
+    const stale = getAnyCachedRead(cacheKey);
+    if (stale) {
+      logger.warn(`[DataOps][cache-stale] ${cacheKey}`);
+      return stale;
+    }
+    return loaded;
+  }
+
+  async function run(label, operation, options = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, error: new Error('Supabase niet geconfigureerd') };
     try {
-      const result = await operation(client);
+      const result = await withTimeout(
+        Promise.resolve().then(() => operation(client)),
+        options.timeoutMs,
+        label
+      );
       if (result && result.error) throw result.error;
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
@@ -350,7 +423,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         if (query && typeof query.range === 'function') return query.range(from, to);
         if (query && typeof query.limit === 'function') return query.limit(to - from + 1);
         return query;
-      });
+      }, { timeoutMs: options.timeoutMs });
       if (!result.ok) return result;
 
       const pageRows = Array.isArray(result.data) ? result.data : [];
@@ -409,18 +482,20 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function listCustomers() {
-    const result = await collectPagedRows('list-customers', (client) =>
-      client
-        .from(TABLES.customers)
-        .select('customer_id,payload,updated_at')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
-    );
-    if (!result.ok) return null;
-    return (result.data || []).map((row) => ({
-      ...(row.payload && typeof row.payload === 'object' ? row.payload : {}),
-      id: normalizeString(row.payload?.id || row.customer_id),
-    }));
+    return cachedRead('customers', async () => {
+      const result = await collectPagedRows('list-customers', (client) =>
+        client
+          .from(TABLES.customers)
+          .select('customer_id,payload,updated_at')
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false }),
+      { timeoutMs: dataOpsReadQueryTimeoutMs });
+      if (!result.ok) return null;
+      return (result.data || []).map((row) => ({
+        ...(row.payload && typeof row.payload === 'object' ? row.payload : {}),
+        id: normalizeString(row.payload?.id || row.customer_id),
+      }));
+    });
   }
 
   async function replaceCustomers(customers, meta = {}) {
@@ -436,6 +511,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
+    forgetReads('customers');
     return markMissingDeleted(
       TABLES.customers,
       'customer_id',
@@ -464,16 +540,18 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function listActiveOrders() {
-    const result = await run('list-active-orders', (client) =>
-      client
-        .from(TABLES.activeOrders)
-        .select('order_id,payload,updated_at')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(5000)
-    );
-    if (!result.ok) return null;
-    return (result.data || []).map((row) => ({ ...(row.payload || {}), id: row.payload?.id || row.order_id }));
+    return cachedRead('active-orders', async () => {
+      const result = await run('list-active-orders', (client) =>
+        client
+          .from(TABLES.activeOrders)
+          .select('order_id,payload,updated_at')
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false })
+          .limit(5000),
+      { timeoutMs: dataOpsReadQueryTimeoutMs });
+      if (!result.ok) return null;
+      return (result.data || []).map((row) => ({ ...(row.payload || {}), id: row.payload?.id || row.order_id }));
+    });
   }
 
   async function replaceActiveOrders(orders, meta = {}) {
@@ -486,6 +564,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
+    forgetReads('active-orders');
     return markMissingDeleted(
       TABLES.activeOrders,
       'order_id',
@@ -495,20 +574,22 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function listOrderRuntime() {
-    const result = await run('list-order-runtime', (client) =>
-      client
-        .from(TABLES.orderRuntime)
-        .select('order_id,payload,updated_at')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(5000)
-    );
-    if (!result.ok) return null;
-    return (result.data || []).reduce((acc, row) => {
-      const id = normalizeString(row.order_id);
-      if (id) acc[id] = row.payload && typeof row.payload === 'object' ? row.payload : {};
-      return acc;
-    }, {});
+    return cachedRead('order-runtime', async () => {
+      const result = await run('list-order-runtime', (client) =>
+        client
+          .from(TABLES.orderRuntime)
+          .select('order_id,payload,updated_at')
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false })
+          .limit(5000),
+      { timeoutMs: dataOpsReadQueryTimeoutMs });
+      if (!result.ok) return null;
+      return (result.data || []).reduce((acc, row) => {
+        const id = normalizeString(row.order_id);
+        if (id) acc[id] = row.payload && typeof row.payload === 'object' ? row.payload : {};
+        return acc;
+      }, {});
+    });
   }
 
   async function replaceOrderRuntime(runtimeMap, meta = {}) {
@@ -536,6 +617,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
+    forgetReads('order-runtime');
     return markMissingDeleted(
       TABLES.orderRuntime,
       'order_id',
@@ -681,8 +763,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
-        .limit(500)
-    );
+        .limit(500),
+    { timeoutMs: dataOpsReadQueryTimeoutMs });
     if (!result.ok) return null;
     const client = getClient();
     const rows = result.data || [];
@@ -742,17 +824,23 @@ function createSoftoraDataOpsStore(deps = {}) {
         .filter(Boolean)
     ));
     const maxMatches = Math.max(1, Math.min(500, Number(options.maxMatches) || (identifiers.length ? 12 : 500)));
-    const result = await run('list-design-photos-signed-urls', (client) =>
-      client
-        .from(TABLES.designPhotos)
-        .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(500)
-    );
-    if (!result.ok) return null;
+    const cacheKey = identifiers.length
+      ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
+      : `design-photos-signed:all:${maxMatches}`;
+    const structuredRows = await cachedRead(cacheKey, async () => {
+      const result = await run('list-design-photos-signed-urls', (client) =>
+        client
+          .from(TABLES.designPhotos)
+          .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false })
+          .limit(500),
+      { timeoutMs: dataOpsReadQueryTimeoutMs });
+      return result.ok ? result.data || [] : null;
+    });
+    if (!structuredRows) return null;
     const client = getClient();
-    const rows = (result.data || [])
+    const rows = structuredRows
       .filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers))
       .slice(0, maxMatches);
     const entries = [];
@@ -798,9 +886,18 @@ function createSoftoraDataOpsStore(deps = {}) {
       const cacheKey = buildSignedUrlCacheKey(bucket, path, signOptions);
       const cached = readCachedSignedUrl(cacheKey);
       if (cached) return { data: { signedUrl: cached }, error: null, cached: true };
-      const signed = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds, signOptions);
-      if (!signed.error && signed.data?.signedUrl) rememberSignedUrl(cacheKey, normalizeString(signed.data.signedUrl));
-      return signed;
+      try {
+        const signed = await withTimeout(
+          client.storage.from(bucket).createSignedUrl(path, expiresInSeconds, signOptions),
+          dataOpsReadQueryTimeoutMs,
+          'create-signed-url'
+        );
+        if (!signed.error && signed.data?.signedUrl) rememberSignedUrl(cacheKey, normalizeString(signed.data.signedUrl));
+        return signed;
+      } catch (error) {
+        logger.warn('[DataOps][signed-url]', error?.message || error);
+        return { data: null, error };
+      }
     }
 
     let cursor = 0;
@@ -848,7 +945,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     await Promise.all(Array.from({ length: workerCount }, signNext));
 
     Object.defineProperty(entries, 'hadStructuredRows', {
-      value: (result.data || []).length > 0,
+      value: structuredRows.length > 0,
       enumerable: false,
     });
     Object.defineProperty(entries, 'targetedIdentifiersApplied', {
@@ -863,7 +960,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       let query = client.from(table).select('*', { count: 'exact', head: true });
       if (deletedColumn) query = query.is(deletedColumn, null);
       return query;
-    });
+    }, { timeoutMs: dataOpsReadQueryTimeoutMs });
     return result.ok ? Number(result.data?.count || result.count || 0) : null;
   }
 
