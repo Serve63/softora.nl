@@ -3165,8 +3165,8 @@
             }
 
             premiumDashboardState.refreshPromise = (async () => {
-                const results = await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
-                const loaded = results.some(Boolean) || premiumDashboardState.ordersHydrated || premiumDashboardState.customersHydrated;
+                await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
+                const loaded = premiumDashboardState.orders.length > 0 || premiumDashboardState.customers.length > 0;
                 if (loaded) renderPremiumDashboardOrders(); else if (!premiumDashboardState.ordersHydrated && !premiumDashboardState.customersHydrated && window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); premiumDashboardState.lastRefreshAt = Date.now();
                 return loaded;
             })().finally(() => {
