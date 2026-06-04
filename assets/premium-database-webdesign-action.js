@@ -7,12 +7,13 @@
     const POLL_INTERVAL_MS = 2200;
     const PHOTO_LOAD_FALLBACK_MS = 20000;
     const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
+    const PHOTO_LOAD_RECOVERY_DELAY_MS = 1200;
+    const PHOTO_LOAD_RECOVERY_LIMIT = 3;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
     const PHOTO_LOAD_CACHE_LIMIT = 2500;
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
-    const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\">!</span>";
     const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
 
     function normalizeString(value) {
@@ -27,7 +28,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0}.photo-drop{position:relative;flex:0 0 34px;aspect-ratio:1/1;overflow:hidden;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:default}.photo-drop[data-photo-error=\"true\"] .photo-drop-image,.photo-drop[data-photo-error=\"true\"] .photo-drop-loader{display:none}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-fallback-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:rgba(155,35,85,.1);color:var(--crimson);font:800 12px/1 Inter,sans-serif}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
+        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0}.photo-drop{position:relative;flex:0 0 34px;aspect-ratio:1/1;overflow:hidden;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:wait}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
         global.document.head.appendChild(style);
     }
 
@@ -54,6 +55,9 @@
         const loadedPhotoKeys = getSharedLoadedPhotoKeys();
         const failedPhotoKeys = new Set();
         const failedPhotoKeyTimes = new Map();
+        const photoRecoveryAttempts = new Map();
+        const photoRecoveryTimers = new Map();
+        const recoveringPhotoKeys = new Set();
         const failedMockupIds = new Set();
         const autoMockupQueuedIds = new Set();
         const autoMockupQueue = [];
@@ -128,6 +132,8 @@
             if (!normalized) return;
             failedPhotoKeys.delete(normalized);
             failedPhotoKeyTimes.delete(normalized);
+            photoRecoveryAttempts.delete(normalized);
+            clearPhotoRecoveryTimer(normalized);
             loadedPhotoKeys.add(normalized);
             trimLoadedPhotoKeys();
         }
@@ -152,6 +158,71 @@
             if (!normalized) return;
             failedPhotoKeys.delete(normalized);
             failedPhotoKeyTimes.delete(normalized);
+            photoRecoveryAttempts.delete(normalized);
+            clearPhotoRecoveryTimer(normalized);
+        }
+
+        function isRecoverablePhotoSource(source) {
+            return /^https?:\/\//i.test(normalizeString(source)) && typeof refreshPhotos === "function";
+        }
+
+        function getDropImageSource(drop) {
+            if (!drop || typeof drop.querySelector !== "function") return "";
+            const image = drop.querySelector(".photo-drop-image");
+            if (!image) return "";
+            if (typeof image.currentSrc === "string" && image.currentSrc) return image.currentSrc;
+            if (typeof image.src === "string" && image.src) return image.src;
+            return typeof image.getAttribute === "function" ? normalizeString(image.getAttribute("src")) : "";
+        }
+
+        function clearPhotoRecoveryTimer(key) {
+            const normalized = normalizeString(key);
+            if (!normalized || !photoRecoveryTimers.has(normalized)) return;
+            const timer = photoRecoveryTimers.get(normalized);
+            if (timer && typeof global.clearTimeout === "function") global.clearTimeout(timer);
+            photoRecoveryTimers.delete(normalized);
+        }
+
+        function schedulePhotoRecovery(key, debug, source) {
+            const normalized = normalizeString(key);
+            if (!normalized || !isRecoverablePhotoSource(source)) return false;
+            if (photoRecoveryTimers.has(normalized) || recoveringPhotoKeys.has(normalized)) return true;
+            const attempts = (Number(photoRecoveryAttempts.get(normalized)) || 0) + 1;
+            if (attempts > PHOTO_LOAD_RECOVERY_LIMIT) {
+                markPhotoKeyFailed(normalized);
+                return false;
+            }
+            photoRecoveryAttempts.set(normalized, attempts);
+            failedPhotoKeyTimes.set(normalized, now());
+            const delay = attempts === 1 ? 0 : Math.min(PHOTO_LOAD_RETRY_AFTER_MS, PHOTO_LOAD_RECOVERY_DELAY_MS * attempts);
+            const timer = global.setTimeout(function () {
+                photoRecoveryTimers.delete(normalized);
+                recoveringPhotoKeys.add(normalized);
+                Promise.resolve(refreshPhotos({
+                    customerId: debug && debug.customerId,
+                    kind: debug && debug.kind,
+                    key: normalized,
+                    reason: "image-load-retry"
+                })).catch(function (error) {
+                    logMediaDebug("image-load-retry-error", {
+                        customerId: debug && debug.customerId,
+                        kind: debug && debug.kind,
+                        key: normalized,
+                        message: String(error && error.message || error || "onbekende fout")
+                    });
+                }).finally(function () {
+                    recoveringPhotoKeys.delete(normalized);
+                });
+            }, delay);
+            photoRecoveryTimers.set(normalized, timer);
+            logMediaDebug("image-load-retry-scheduled", {
+                customerId: debug && debug.customerId,
+                kind: debug && debug.kind,
+                key: normalized,
+                attempt: attempts,
+                delay: delay
+            });
+            return true;
         }
 
         function createPhotoLoadBinding(drop, key) {
@@ -193,18 +264,32 @@
                 logMediaDebug("image-load-stale", getPhotoDropDebug(drop));
                 return;
             }
-            if (key) {
-                if (failed) markPhotoKeyFailed(key);
-                else markPhotoKeyLoaded(key);
+            const debug = getPhotoDropDebug(drop);
+            if (failed) {
+                const source = getDropImageSource(drop);
+                if (schedulePhotoRecovery(key, debug, source)) {
+                    logMediaDebug("image-load-retry", {
+                        customerId: debug.customerId,
+                        kind: debug.kind,
+                        key: debug.key
+                    });
+                    drop.setAttribute("data-photo-loaded", "false");
+                    drop.setAttribute("data-photo-error", "false");
+                    drop.removeAttribute("data-photo-loading-bound");
+                    return;
+                }
+                if (key) markPhotoKeyFailed(key);
+                logMediaDebug("image-load-error", debug);
+                drop.setAttribute("data-photo-loaded", "false");
+                drop.setAttribute("data-photo-error", "true");
+                drop.removeAttribute("data-photo-loading-bound");
+                return;
             }
-            logMediaDebug(failed ? "image-load-error" : "image-load-success", getPhotoDropDebug(drop));
+            if (key) markPhotoKeyLoaded(key);
+            logMediaDebug("image-load-success", debug);
             drop.setAttribute("data-photo-loaded", "true");
-            if (failed) drop.setAttribute("data-photo-error", "true");
-            else drop.setAttribute("data-photo-error", "false");
+            drop.setAttribute("data-photo-error", "false");
             drop.removeAttribute("data-photo-loading-bound");
-            if (failed && typeof drop.querySelector === "function" && !drop.querySelector(".photo-fallback-icon") && typeof drop.insertAdjacentHTML === "function") {
-                drop.insertAdjacentHTML("beforeend", FALLBACK_ICON);
-            }
         }
 
         function bindPhotoDropLoading(drop) {
@@ -222,12 +307,11 @@
                 markPhotoDropReady(drop, false, bindingId);
                 return;
             }
-            if (key && loadedPhotoKeys.has(key)) {
+            if (key && loadedPhotoKeys.has(key) && image.complete && Number(image.naturalWidth) > 0) {
                 markPhotoDropReady(drop, false, bindingId);
                 return;
             }
             if (key && failedPhotoKeys.has(key) && !shouldRetryFailedPhotoKey(key)) {
-                markPhotoDropReady(drop, true, bindingId);
                 return;
             }
             if (key && shouldRetryFailedPhotoKey(key)) clearFailedPhotoKey(key);
@@ -622,37 +706,37 @@
             const hasPhoto = assetState ? assetState.hasPhoto : isValidWebsitePhotoDataUrl(photo);
             const photoLoadKey = buildPhotoLoadKey("photo", customer && customer.id, photo);
             if (hasPhoto && shouldRetryFailedPhotoKey(photoLoadKey)) clearFailedPhotoKey(photoLoadKey);
-            const photoLoaded = !hasPhoto || isInlinePhotoSource(photo) || loadedPhotoKeys.has(photoLoadKey);
             const photoFailed = hasPhoto && failedPhotoKeys.has(photoLoadKey);
+            const photoLoaded = !hasPhoto || isInlinePhotoSource(photo) || (!photoFailed && loadedPhotoKeys.has(photoLoadKey));
             const isPending = pendingIds.has(customer.id);
             const isRestoring = !hasPhoto && !isPending && Boolean(isRestoringPhotos(customer));
             const isLoading = isPending || isRestoring;
             const canGenerate = !hasPhoto && !isLoading && Boolean(resolveCustomerWebsiteUrl(customer));
             const inner = hasPhoto
-                ? (photoFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">")
+                ? "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">"
                 : (isLoading ? LOADING_ICON : LIGHTNING_ICON);
             const remove = hasPhoto ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>" : "";
-            const ariaLabel = hasPhoto ? (photoFailed ? "Websitefoto kon niet geladen worden" : "Websitefoto bekijken") : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
+            const ariaLabel = hasPhoto ? (photoFailed ? "Websitefoto opnieuw laden" : "Websitefoto bekijken") : (isLoading ? (isPending ? "Webdesign wordt gemaakt" : "Websitefoto's worden hersteld") : (canGenerate ? "Webdesign maken" : "Geen geldige website gevonden"));
             const title = ariaLabel;
             const mockup = normalizeString(customer && customer.websiteMockup);
             const mockupLabel = normalizeString(customer && customer.websiteMockupName) || "Device mockup";
             const hasMockup = assetState ? assetState.hasMockup : isValidWebsitePhotoDataUrl(mockup);
             const mockupLoadKey = buildPhotoLoadKey("mockup", customer && customer.id, mockup);
             if (hasMockup && shouldRetryFailedPhotoKey(mockupLoadKey)) clearFailedPhotoKey(mockupLoadKey);
-            const mockupLoaded = !hasMockup || isInlinePhotoSource(mockup) || loadedPhotoKeys.has(mockupLoadKey);
             const mockupImageFailed = hasMockup && failedPhotoKeys.has(mockupLoadKey);
+            const mockupLoaded = !hasMockup || isInlinePhotoSource(mockup) || (!mockupImageFailed && loadedPhotoKeys.has(mockupLoadKey));
             const mockupGenerationFailed = isMockupFailed(customer && customer.id);
             const mockupFailed = mockupImageFailed || mockupGenerationFailed;
             const mockupLoading = assetState ? assetState.mockupPending : isMockupPending(customer && customer.id);
             const canGenerateMockup = assetState ? assetState.canRepairMockup : (hasPhoto && !hasMockup && !mockupLoading);
             const mockupInner = hasMockup
-                ? (mockupImageFailed ? FALLBACK_ICON : "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">")
+                ? "<span class=\"photo-drop-loader\" aria-hidden=\"true\">" + LOADING_ICON + "</span><img class=\"photo-drop-image\" src=\"" + escapeHtml(mockup) + "\" alt=\"" + escapeHtml(mockupLabel) + "\" loading=\"lazy\" fetchpriority=\"low\" decoding=\"async\" width=\"34\" height=\"34\">"
                 : (mockupLoading ? LOADING_ICON : MOCKUP_ICON);
-            const mockupAriaLabel = hasMockup ? (mockupImageFailed ? "Device mockup kon niet geladen worden" : (canGenerateMockup ? "Device mockup opnieuw maken" : "Device mockup bekijken")) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Device mockup maken is mislukt" : (canGenerateMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar")));
+            const mockupAriaLabel = hasMockup ? (mockupImageFailed ? "Device mockup opnieuw laden" : (canGenerateMockup ? "Device mockup opnieuw maken" : "Device mockup bekijken")) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Device mockup maken is mislukt" : (canGenerateMockup ? "Device mockup maken" : "Device mockup nog niet beschikbaar")));
             const mockupTitle = hasMockup ? (canGenerateMockup ? "Klik om device mockup opnieuw te maken" : mockupLabel) : (mockupLoading ? "Device mockup wordt gemaakt" : (mockupGenerationFailed ? "Mockup maken is mislukt. Klik om opnieuw te proberen." : (canGenerateMockup ? "Klik om device mockup te maken" : "Maak eerst een webdesign")));
-            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(mockupLoadKey) + "\" data-photo-loaded=\"" + (mockupLoaded || mockupFailed ? "true" : "false") + "\" data-photo-error=\"" + (mockupFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerateMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (hasMockup || canGenerateMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
+            const mockupSlot = "<div class=\"photo-drop photo-drop--mockup" + (mockupLoading ? " is-generating" : "") + "\" role=\"button\" tabindex=\"0\" data-mockup-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasMockup ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(mockupLoadKey) + "\" data-photo-loaded=\"" + (mockupLoaded ? "true" : "false") + "\" data-photo-error=\"" + (mockupFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerateMockup ? "true" : "false") + "\" data-mockup-disabled=\"" + (hasMockup || canGenerateMockup ? "false" : "true") + "\" aria-label=\"" + escapeHtml(mockupAriaLabel) + "\" title=\"" + escapeHtml(mockupTitle) + "\">" + mockupInner + "</div>";
             if (hasPhoto || hasMockup) schedulePhotoDropHydration();
-            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded || photoFailed ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + (global.SoftoraDatabaseWebdesignPreview && typeof global.SoftoraDatabaseWebdesignPreview.renderLink === "function" ? global.SoftoraDatabaseWebdesignPreview.renderLink(customer, { escapeHtml: escapeHtml, show: hasPhoto && hasMockup && !photoFailed && !mockupFailed }) : "") + "</div>";
+            return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + (global.SoftoraDatabaseWebdesignPreview && typeof global.SoftoraDatabaseWebdesignPreview.renderLink === "function" ? global.SoftoraDatabaseWebdesignPreview.renderLink(customer, { escapeHtml: escapeHtml, show: hasPhoto && hasMockup && !photoFailed && !mockupFailed }) : "") + "</div>";
         }
 
         async function generateForCustomer(customerId) {

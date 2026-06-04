@@ -519,7 +519,7 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260604a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
   assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
@@ -621,11 +621,12 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_FALLBACK_MS = 20000;/);
   assert.match(webdesignActionScriptSource, /function buildPhotoLoadKey\(kind, customerId, source\)/);
   assert.match(webdesignActionScriptSource, /function isInlinePhotoSource\(source\)/);
-  assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(photo\) \|\| loadedPhotoKeys\.has\(photoLoadKey\)/);
-  assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(mockup\) \|\| loadedPhotoKeys\.has\(mockupLoadKey\)/);
+  assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(photo\) \|\| \(!photoFailed && loadedPhotoKeys\.has\(photoLoadKey\)\)/);
+  assert.match(webdesignActionScriptSource, /isInlinePhotoSource\(mockup\) \|\| \(!mockupImageFailed && loadedPhotoKeys\.has\(mockupLoadKey\)\)/);
   assert.match(webdesignActionScriptSource, /data-photo-key=\\"/);
   assert.match(webdesignActionScriptSource, /data-photo-error=\\"/);
-  assert.match(webdesignActionScriptSource, /\.photo-drop\[data-photo-error=\\"true\\"\] \.photo-drop-image,\.photo-drop\[data-photo-error=\\"true\\"\] \.photo-drop-loader\{display:none\}/);
+  assert.doesNotMatch(webdesignActionScriptSource, /photo-fallback-icon/);
+  assert.match(webdesignActionScriptSource, /\.photo-drop\[data-photo-error=\\"true\\"\]\{background:rgba\(155,35,85,\.06\);cursor:wait\}/);
   assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
   assert.match(webdesignActionScriptSource, /photo-drop-image\{width:100%;height:100%;object-fit:cover;display:block;opacity:0;/);
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
@@ -638,7 +639,8 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
   assert.match(webdesignActionScriptSource, /function hydratePhotoDrops\(root\)/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_RETRY_AFTER_MS = 30000;/);
-  assert.match(webdesignActionScriptSource, /logMediaDebug\(failed \? "image-load-error" : "image-load-success", getPhotoDropDebug\(drop\)\);/);
+  assert.match(webdesignActionScriptSource, /image-load-retry-scheduled/);
+  assert.match(webdesignActionScriptSource, /logMediaDebug\("image-load-error", debug\);/);
   assert.match(webdesignActionScriptSource, /fetchpriority=\\"low\\"/);
   assert.match(webdesignActionScriptSource, /function createPhotoLoadBinding\(drop, key\)/);
   assert.match(webdesignActionScriptSource, /data-photo-load-binding/);
@@ -726,7 +728,7 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260604a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
@@ -1126,6 +1128,7 @@ test('premium database webdesign action keeps loaded photo slots stable across r
     ['data-photo-key', key],
     ['data-photo-loaded', 'false'],
     ['data-photo-error', 'false'],
+    ['data-photo-id', 'customer-1'],
   ]);
   const drop = {
     querySelector: (selector) => selector === '.photo-drop-image'
@@ -1264,6 +1267,7 @@ test('premium database webdesign action remembers loaded photos when the page co
     ['data-photo-key', key],
     ['data-photo-loaded', 'false'],
     ['data-photo-error', 'false'],
+    ['data-photo-id', 'customer-1'],
   ]);
   const drop = {
     querySelector: (selector) => selector === '.photo-drop-image'
@@ -1390,9 +1394,17 @@ test('premium database webdesign action keeps generation errors visible until th
   assert.equal(errorMessage.autoClear, undefined);
 });
 
-test('premium database webdesign action remembers failed photo slots as a quiet fallback', () => {
+test('premium database webdesign action retries failed signed photo slots without an exclamation fallback', async () => {
   const listeners = {};
-  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  let recoveryHandler = null;
+  const recoveryCalls = [];
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(handler) {
+      recoveryHandler = handler;
+      return 42;
+    },
+    clearTimeout() {},
+  });
   const customer = {
     id: 'customer-1',
     websitePhoto: 'https://assets.softora.test/customer-1.png',
@@ -1410,7 +1422,9 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
     openWebsitePhotoPreview() {},
     setStatusMessage() {},
     renderPage() {},
-    refreshPhotos: async () => {},
+    refreshPhotos: async (context) => {
+      recoveryCalls.push(context);
+    },
   });
   const html = controller.render(customer);
   const key = html.match(/data-photo-key="([^"]+)"/)[1];
@@ -1418,12 +1432,15 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
     ['data-photo-key', key],
     ['data-photo-loaded', 'false'],
     ['data-photo-error', 'false'],
+    ['data-photo-id', 'customer-1'],
   ]);
   const drop = {
     querySelector: (selector) => selector === '.photo-drop-image'
       ? {
           complete: false,
           naturalWidth: 0,
+          src: 'https://assets.softora.test/customer-1.png?token=old',
+          currentSrc: 'https://assets.softora.test/customer-1.png?token=old',
           addEventListener(eventName, handler) {
             listeners[eventName] = handler;
           },
@@ -1437,28 +1454,22 @@ test('premium database webdesign action remembers failed photo slots as a quiet 
   controller.hydratePhotoDrops({ querySelectorAll: () => [drop] });
   listeners.error();
 
-  assert.equal(attrs.get('data-photo-loaded'), 'true');
-  assert.equal(attrs.get('data-photo-error'), 'true');
-  assert.match(controller.render(customer), /class="photo-fallback-icon"/);
+  assert.equal(attrs.get('data-photo-loaded'), 'false');
+  assert.equal(attrs.get('data-photo-error'), 'false');
+  assert.equal(typeof recoveryHandler, 'function');
+  assert.doesNotMatch(controller.render(customer), /photo-fallback-icon/);
 
-  const fallbackAttrs = new Map([
-    ['data-photo-key', key],
-    ['data-photo-loaded', 'true'],
-    ['data-photo-error', 'true'],
-  ]);
-  const fallbackDrop = {
-    querySelector: () => null,
-    getAttribute: (name) => fallbackAttrs.get(name) || '',
-    setAttribute: (name, value) => fallbackAttrs.set(name, String(value)),
-    removeAttribute: (name) => fallbackAttrs.delete(name),
-  };
-  controller.hydratePhotoDrops({ querySelectorAll: () => [fallbackDrop] });
+  recoveryHandler();
+  await Promise.resolve();
+  await Promise.resolve();
 
-  assert.equal(fallbackAttrs.get('data-photo-error'), 'true');
-  assert.match(controller.render(customer), /class="photo-fallback-icon"/);
+  assert.equal(recoveryCalls.length, 1);
+  assert.equal(recoveryCalls[0].customerId, 'customer-1');
+  assert.equal(recoveryCalls[0].kind, 'webdesign');
+  assert.equal(recoveryCalls[0].reason, 'image-load-retry');
 });
 
-test('premium database webdesign action hides stalled saved photos behind a quiet fallback', () => {
+test('premium database webdesign action keeps stalled saved photos in retry state without an exclamation fallback', () => {
   let fallbackHandler = null;
   let clearedTimer = null;
   const webdesignActionClient = loadDatabaseWebdesignActionClient({
@@ -1510,10 +1521,11 @@ test('premium database webdesign action hides stalled saved photos behind a quie
   assert.equal(attrs.get('data-photo-loaded'), 'false');
   assert.equal(typeof fallbackHandler, 'function');
   fallbackHandler();
-  assert.equal(attrs.get('data-photo-loaded'), 'true');
+  assert.equal(attrs.get('data-photo-loaded'), 'false');
   assert.equal(attrs.get('data-photo-error'), 'true');
   assert.equal(clearedTimer, 42);
-  assert.match(controller.render(customer), /class="photo-fallback-icon"/);
+  assert.doesNotMatch(controller.render(customer), /photo-fallback-icon/);
+  assert.match(controller.render(customer), /class="photo-drop-loader"/);
 });
 
 test('premium database webdesign action ignores stale fallback timers from replaced photo nodes', () => {
