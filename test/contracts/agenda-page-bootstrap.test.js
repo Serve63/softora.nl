@@ -99,6 +99,8 @@ test('agenda page bootstrap service forceert altijd een verse runtime-state sync
     'bootstrap moet altijd een sync forceren, ook als de instance warm is');
   assert.equal(syncCalls[0]?.maxAgeMs, 0,
     'bootstrap moet cooldown omzeilen (maxAgeMs: 0), anders ziet gebruiker stale data');
+  assert.equal(syncCalls[0]?.skipPendingPersistWait, true,
+    'bootstrap mag niet wachten op een lopende runtime persist-queue');
   assert.equal(payload.appointments.length, 1);
 });
 
