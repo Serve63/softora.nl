@@ -68,6 +68,7 @@
         try {
             const payload = JSON.parse(String(element.textContent || "{}"));
             const values = payload && payload.activeOrdersState && payload.activeOrdersState.values && typeof payload.activeOrdersState.values === "object" ? payload.activeOrdersState.values : {};
+            if (payload && (payload.ok === false || payload.source === "unavailable")) return true;
             return payload && payload.ok === true && payload.source === "empty" && Array.isArray(payload.customers) && payload.customers.length === 0 && Object.keys(values).length === 0;
         } catch (_) {
             return false;

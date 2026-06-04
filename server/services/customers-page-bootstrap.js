@@ -398,6 +398,9 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   function buildDashboardActiveOrdersBootstrapScript(counts) {
+    if (counts === null) {
+      return `<script>(function markActiveOrdersUnavailable(){var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',markActiveOrdersUnavailable,{once:true});return;}root.querySelectorAll('[data-kpi-active-website],[data-kpi-active-business],[data-kpi-active-voice],[data-kpi-active-chatbot]').forEach(function(el){el.textContent='--';});root.setAttribute('aria-label','Actieve opdrachten tijdelijk niet geladen');})();</script>`;
+    }
     const safeCounts = {
       website: Math.max(0, Number(counts?.website) || 0),
       business: Math.max(0, Number(counts?.business) || 0),
@@ -589,6 +592,26 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   function buildDashboardHtmlReplacements(payload = {}) {
+    const payloadUnavailable =
+      !payload ||
+      payload.ok === false ||
+      payload.source === 'unavailable' ||
+      (payload.source === 'empty' &&
+        (!Array.isArray(payload.customers) || payload.customers.length === 0) &&
+        (!payload.activeOrdersState ||
+          !payload.activeOrdersState.values ||
+          Object.keys(payload.activeOrdersState.values || {}).length === 0));
+
+    if (payloadUnavailable) {
+      return {
+        SOFTORA_DASHBOARD_TOTAL_REVENUE: '--',
+        SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: '--',
+        SOFTORA_DASHBOARD_RECURRING_REVENUE: '--',
+        SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml([]),
+        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(null)}`,
+      };
+    }
+
     const summary = buildDashboardMetricSummary(payload.customers);
     const activeOrdersBreakdown = buildActiveOrdersBreakdown(payload.activeOrdersState);
     return {
@@ -601,10 +624,32 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
   }
 
+  async function readBootstrapUiState(scope) {
+    try {
+      return await getUiStateValues(scope);
+    } catch (error) {
+      return {
+        values: {},
+        source: 'unavailable',
+        error: normalizeString(error?.message || error),
+      };
+    }
+  }
+
+  function hasLoadedUiStateValues(state) {
+    return Boolean(
+      state &&
+        state.source !== 'unavailable' &&
+        state.values &&
+        typeof state.values === 'object' &&
+        !Array.isArray(state.values)
+    );
+  }
+
   async function buildCustomersBootstrapPayload() {
-    const remoteState = await getUiStateValues(customerScope);
+    const remoteState = await readBootstrapUiState(customerScope);
     const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
-    const orderState = await getUiStateValues(orderScope);
+    const orderState = await readBootstrapUiState(orderScope);
     const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
     if (remoteCustomers.length) {
@@ -617,6 +662,16 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
 
     const customers = deriveCustomersFromOrders(orders);
+
+    if (!customers.length && (!hasLoadedUiStateValues(remoteState) || !hasLoadedUiStateValues(orderState))) {
+      return {
+        ok: false,
+        loadedAt: new Date().toISOString(),
+        source: 'unavailable',
+        message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
+        customers: [],
+      };
+    }
 
     return {
       ok: true,
