@@ -474,6 +474,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /allerlaatste actuele `origin\/main`/);
   assert.match(agentsSource, /Deploy nooit vanuit een oude lokale kopie/);
   assert.match(agentsSource, /recente live wijzigingen behouden blijven/);
+  assert.match(agentsSource, /## Instantly-leads toevoegen/);
+  assert.match(agentsSource, /POST \/api\/outreach\/provider-upload/);
+  assert.match(agentsSource, /Maak nooit handmatig een losse CSV/);
+  assert.match(agentsSource, /permanente `provider=instantly` recipient guards/);
   assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
   assert.match(protocolSource, /check:live-production-version/);
   assert.match(protocolSource, /Elke push\/merge naar `main`/);

@@ -32,6 +32,12 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - In-memory state in [server.js](server.js) is legacy en mag niet verder worden uitgebouwd als business-truth.
 - Voeg geen nieuwe parallelle opslagpaden toe zonder expliciete compat-flag of rollback-pad.
 
+## Instantly-leads toevoegen
+- Als Servé vraagt om X nieuwe leads naar Instantly te zetten, gebruik altijd dezelfde veilige Softora-route: `POST /api/outreach/provider-upload` (of de dashboardactie "Veilige Instantly CSV maken"). Maak nooit handmatig een losse CSV vanuit Supabase/exports zonder eerst deze route te gebruiken.
+- Deze route moet de gekozen leads eerst in Softora reserveren, `lastColdmailProvider=instantly` zetten en permanente `provider=instantly` recipient guards schrijven voordat er een CSV/upload-stap richting Instantly gebeurt.
+- Na iedere Instantly-aanvulling controleer je minimaal: Softora mail-ready telling omlaag, permanente Instantly-guards compleet, Instantly-campaign bevat het verwachte aantal nieuwe leads, en geen nieuwe duplicate/cross-channel overlap.
+- Als de veilige route faalt of geen CSV geeft: stoppen en onderzoeken. Niet via een alternatieve handmatige route alsnog uploaden.
+
 ## Wijzigen zonder regressies
 - Verander bestaande routes niet zomaar; houd response-shapes stabiel.
 - Voeg nieuwe logica bij voorkeur toe via `server/routes`, `server/services`, `server/repositories`, `server/security`, `server/schemas`.
