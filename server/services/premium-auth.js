@@ -138,6 +138,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   async function sendSessionResponse(req, res) {
     const authState = await getResolvedPremiumAuthState(req, {
       allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
     });
     res.setHeader('Cache-Control', 'no-store, private');
     if (authState.revoked) {

@@ -50,6 +50,7 @@ function createPremiumHtmlPageAccessController(options = {}) {
       isLoginPage || isProtectedPremiumPage
         ? await getResolvedPremiumAuthState(req, {
             allowAnonymousWithoutHydration: isLoginPage || isProtectedPremiumPage,
+            allowTokenFallbackWithoutHydration: isLoginPage || isProtectedPremiumPage,
           })
         : null;
     const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));

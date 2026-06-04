@@ -111,6 +111,7 @@ test('premium api guard blocks authenticated requests from disallowed admin ips'
 });
 
 test('premium api guard attaches auth state for allowed authenticated requests', async () => {
+  const resolverCalls = [];
   const authState = {
     configured: true,
     authenticated: true,
@@ -119,7 +120,10 @@ test('premium api guard attaches auth state for allowed authenticated requests',
   };
   const guard = createPremiumApiAccessGuard({
     isPremiumPublicApiRequest: () => false,
-    getResolvedPremiumAuthState: async () => authState,
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      return authState;
+    },
     isPremiumAdminIpAllowed: () => true,
   });
 
@@ -135,6 +139,7 @@ test('premium api guard attaches auth state for allowed authenticated requests',
   assert.equal(req.premiumAuth, authState);
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.statusCode, null);
+  assert.deepEqual(resolverCalls, [{ allowTokenFallbackWithoutHydration: true }]);
 });
 
 test('premium api guard clears expired or revoked sessions before returning 401', async () => {
