@@ -106,6 +106,8 @@ test('agenda read coordinator forces a fresh shared-state sync for leads when re
   assert.equal(syncCalls.length, 2);
   assert.equal(syncCalls[0]?.maxAgeMs, 0);
   assert.equal(syncCalls[1]?.maxAgeMs, 0);
+  assert.equal(syncCalls[0]?.skipPendingPersistWait, true);
+  assert.equal(syncCalls[1]?.skipPendingPersistWait, true);
 });
 
 test('agenda read coordinator hydrate dedicated dismissed-leads bij ELKE lees (Vercel multi-instance regressietest)', async () => {
@@ -196,8 +198,12 @@ test('agenda read coordinator listAppointments forceert fresh shared-state sync 
   assert.equal(syncCalls.length, 2);
   assert.equal(syncCalls[0]?.maxAgeMs, 4000,
     'Standaardpad (achtergrond-poll) gebruikt de cooldown TTL');
+  assert.equal(syncCalls[0]?.skipPendingPersistWait, true,
+    'Leespad mag niet wachten op een lopende persist-keten');
   assert.equal(syncCalls[1]?.maxAgeMs, 0,
     'freshSharedState=true (bv. bij focus/pageshow) omzeilt de cooldown');
+  assert.equal(syncCalls[1]?.skipPendingPersistWait, true,
+    'Ook fresh reads moeten los blijven van de persist-keten');
 });
 
 test('agenda read coordinator falls back to current in-memory rows when preparation times out', async () => {

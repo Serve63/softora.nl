@@ -63,7 +63,10 @@ function createAgendaPageBootstrapService(deps = {}) {
       // state kan achterlopen op Supabase. We proberen daarom een verse sync,
       // maar laten de pagina niet vastlopen als Supabase traag reageert.
       if (isSupabaseConfigured()) {
-        await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: 0 });
+        await syncRuntimeStateFromSupabaseIfNewer({
+          maxAgeMs: 0,
+          skipPendingPersistWait: true,
+        });
       }
     });
 

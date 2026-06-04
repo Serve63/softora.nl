@@ -89,6 +89,7 @@ function createAgendaReadCoordinator(deps) {
       if (deps.isSupabaseConfigured()) {
         await deps.syncRuntimeStateFromSupabaseIfNewer({
           maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+          skipPendingPersistWait: true,
         });
       }
       if (deps.isImapMailConfigured()) {
@@ -122,6 +123,7 @@ function createAgendaReadCoordinator(deps) {
       await ensureHydratedIfNeeded();
       await deps.syncRuntimeStateFromSupabaseIfNewer({
         maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+        skipPendingPersistWait: true,
       });
       await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
       if (!quickMode && deps.isImapMailConfigured()) {
@@ -146,6 +148,7 @@ function createAgendaReadCoordinator(deps) {
       await ensureHydratedIfNeeded();
       await deps.syncRuntimeStateFromSupabaseIfNewer({
         maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+        skipPendingPersistWait: true,
       });
       await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
       deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
