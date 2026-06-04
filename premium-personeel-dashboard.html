@@ -2090,7 +2090,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260502a"></script><script src="assets/premium-dashboard-data-status.js?v=20260604a"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260502a"></script><script src="assets/premium-dashboard-data-status.js?v=20260604b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -3544,7 +3544,7 @@
 
         const hadPremiumDashboardBootstrapData = [hydratePremiumDashboardCustomersFromBootstrap(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload), typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap === 'function' && dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(premiumDashboardState, parsePremiumOrdersFromState, dashboardCustomersBootstrapPayload)].some(Boolean);
         renderConfirmationTasks();
-        if (hadPremiumDashboardBootstrapData) renderPremiumDashboardOrders();
+        if (hadPremiumDashboardBootstrapData) renderPremiumDashboardOrders(); else if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable();
         void (async () => { const bootStartedAt = Date.now();
             try {
                 await refreshPremiumDashboard(true);

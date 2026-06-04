@@ -375,8 +375,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const resilienceSource = fs.readFileSync(resiliencePath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-database-resilience\.js\?v=20260604a/);
-  assert.match(resilienceSource, /const DEFAULT_TIMEOUT_MS = 6500;/);
+  assert.match(pageSource, /assets\/premium-database-resilience\.js\?v=20260604b/);
+  assert.match(resilienceSource, /const DEFAULT_TIMEOUT_MS = 4000;/);
   assert.match(resilienceSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
   assert.match(resilienceSource, /function withTimeout\(task, timeoutMs, message\) \{/);
   assert.match(resilienceSource, /function fetchJsonWithTimeout\(url, options, timeoutMs\) \{/);
@@ -386,6 +386,13 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /let loadFailed = false;/);
   assert.match(pageSource, /if \(!window\.SoftoraDatabaseResilience\.hasChunkedStateKey\(remoteValues, CUSTOMER_DB_KEY\)\) throw new Error\("Geen Supabase-klantdata ontvangen\."\);/);
   assert.match(pageSource, /loadFailed = true;[\s\S]*console\.error\("Klanten laden via Supabase mislukt:", error\);/);
+  assert.match(pageSource, /dataLoading: true,/);
+  assert.match(pageSource, /dataUnavailable: false,/);
+  assert.match(pageSource, /nodes\.count\.textContent = state\.dataLoading \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten"/);
+  assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{[\s\S]*state\.dataLoading \? "Database laden\.\.\." : window\.SoftoraDatabaseResilience\.unavailableMessage/);
+  assert.match(pageSource, /state\.dataUnavailable = true; renderPage\(\); setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
+  assert.match(pageSource, /state\.dataLoading = true;[\s\S]*renderPage\(\);[\s\S]*setStatusMessage\("Database laden\.\.\.", "info"\);/);
+  assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
   assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 2200, "Coldmail send-guard reageert niet op tijd\."\)/);

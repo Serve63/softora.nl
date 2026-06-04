@@ -1576,7 +1576,7 @@
     <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604a"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1619,7 +1619,7 @@
             sortAsc: true,
             openId: null,
             modalEditId: null,
-            photoTargetId: null, photoRestorePending: true,
+            photoTargetId: null, photoRestorePending: true, dataLoading: true, dataUnavailable: false,
             lastMailReadyHeaderCount: null,
             lastPhotoHeaderCount: null,
             messageTimer: null
@@ -2326,11 +2326,11 @@
             const photoHeaderCount = getPhotoHeaderCount(filtered, showPhotoColumn);
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
-            nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
+            nodes.count.textContent = state.dataLoading || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : filtered.length.toLocaleString("nl-NL") + " resultaten";
             document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered); document.getElementById("photoHeaderCount").textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: baseFiltered.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), items: buildDatabaseMediaDebugItems(filtered) });
 
-            if (!filtered.length) {
+            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; return; } if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
@@ -3000,9 +3000,7 @@
         async function bootstrapCustomers() {
             const hadBootstrapCustomers = state.klanten.length > 0; let loadFailed = false;
 
-            if (!hadBootstrapCustomers) {
-                setStatusMessage("Database laden...", "info");
-            }
+            if (!hadBootstrapCustomers) { state.dataLoading = true; state.dataUnavailable = false; renderPage(); setStatusMessage("Database laden...", "info"); }
 
             try {
                 await refreshColdmailGuardState(); const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
@@ -3028,8 +3026,7 @@
                         console.error("Databasefoto's laden via Supabase mislukt:", error);
                     }
                     const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
-                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
-
+                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     setStatusMessage("");
                     return;
                 }
@@ -3037,13 +3034,13 @@
                 loadFailed = true; console.error("Klanten laden via Supabase mislukt:", error);
             }
 
-            if (!hadBootstrapCustomers) { if (loadFailed) setStatusMessage(window.SoftoraDatabaseResilience.unavailableMessage, "error"); else { state.klanten = []; renderPage(); setStatusMessage(""); } return; } if (loadFailed) { setStatusMessage(window.SoftoraDatabaseResilience.staleRefreshMessage, "error", true); return; } setStatusMessage("");
+            state.dataLoading = false; if (!hadBootstrapCustomers) { if (loadFailed) { state.dataUnavailable = true; renderPage(); setStatusMessage(window.SoftoraDatabaseResilience.unavailableMessage, "error"); } else { state.dataUnavailable = false; state.klanten = []; renderPage(); setStatusMessage(""); } return; } if (loadFailed) { state.dataUnavailable = false; setStatusMessage(window.SoftoraDatabaseResilience.staleRefreshMessage, "error", true); return; } state.dataUnavailable = false; setStatusMessage("");
         }
 
         let customerStateRefreshInFlight = false; function isDatabaseInteractionOpen() { return nodes.modalBg.classList.contains("on") || nodes.panel.classList.contains("on") || nodes.photoPreview.classList.contains("on") || (photoBatchController && typeof photoBatchController.isOpen === "function" && photoBatchController.isOpen()) || (databaseDeepSearchController && typeof databaseDeepSearchController.isOpen === "function" && databaseDeepSearchController.isOpen()); } async function refreshCustomerStateSilently() { if (customerStateRefreshInFlight || document.hidden || isDatabaseInteractionOpen()) return false; customerStateRefreshInFlight = true; try { await bootstrapCustomers(); return true; } catch (error) { console.error("Database live verversen mislukt:", error); return false; } finally { customerStateRefreshInFlight = false; } } function startCustomerStateAutoRefresh() { window.setInterval(function () { void refreshCustomerStateSilently(); }, CUSTOMER_DB_SYNC_INTERVAL_MS); window.addEventListener("focus", function () { void refreshCustomerStateSilently(); }); document.addEventListener("visibilitychange", function () { if (!document.hidden) void refreshCustomerStateSilently(); }); }
         const initialBootstrapCustomers = resolveBootstrapCustomers();
         if (initialBootstrapCustomers.length) {
-            state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers);
+            state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers); state.dataLoading = false; state.dataUnavailable = false;
         }
         applyDatabaseUrlIntent();
         renderPage();
