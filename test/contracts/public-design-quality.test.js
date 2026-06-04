@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '../..');
 const SEO_GROWTH_CSS_VERSION = '20260528a';
-const LOW_TRUST_PUBLIC_IMAGE_PATTERN = /\/assets\/(?:home-service-[^"']*-ai|home-over-office-meeting-ai|home-hero-generated-v2)\.jpg/i;
+const LOW_TRUST_PUBLIC_IMAGE_PATTERN = /\/assets\/(?:home-service-[^"']*-ai|home-over-office-meeting-ai|home-hero-generated-v2|softora-office-digital-growth)\.jpg/i;
 const { INDEXABLE_PUBLIC_SEO_PAGES } = require('../../server/services/public-seo');
 const {
   buildSeoContentArticleHtml,
@@ -116,7 +116,7 @@ test('seo-growth template images use trustworthy filenames and stable dimensions
     for (const tag of imgTags) {
       assert.doesNotMatch(
         tag,
-        /home-hero-generated-v2|home-over-office-meeting-ai|home-service-[^"']*-ai/i,
+        /home-hero-generated-v2|home-over-office-meeting-ai|home-service-[^"']*-ai|softora-office-digital-growth/i,
         `${fileName} gebruikt een zwakke AI/generated publieke beeldnaam: ${tag}`
       );
       assert.match(tag, /\balt="[^"]{18,}"/, `${fileName} mist betekenisvolle alt-tekst: ${tag}`);
