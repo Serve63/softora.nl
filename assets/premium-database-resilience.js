@@ -1,7 +1,7 @@
 (function (global) {
     "use strict";
 
-    const DEFAULT_TIMEOUT_MS = 6500;
+    const DEFAULT_TIMEOUT_MS = 4000;
     const unavailableMessage = "Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.";
     const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan.";
 
