@@ -3,6 +3,7 @@ const DEFAULT_OG_IMAGE_PATH = '/assets/softora-office-digital-growth.jpg';
 const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
 const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
 const SOFTORA_PUBLIC_PHONE = '+31643262792';
+const MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
 const SOFTORA_LOCALITY = 'Oisterwijk';
 const SOFTORA_REGION = 'Noord-Brabant';
 const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
@@ -312,6 +313,13 @@ function escapeHtmlText(valueRaw) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function getAttrValue(attrsRaw, attrName) {
+  const attrs = String(attrsRaw || '');
+  const escapedName = String(attrName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = attrs.match(new RegExp(`(?:^|\\s)${escapedName}=["']([^"']*)["']`, 'i'));
+  return match ? match[1] || '' : '';
 }
 
 function escapeHtmlJson(value) {
@@ -716,10 +724,34 @@ function addInternalLinksIfMissing(htmlRaw, entry) {
 function classifyConversionTarget(hrefRaw) {
   const href = String(hrefRaw || '').trim();
   if (/^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(href)) return 'whatsapp';
+  if (/^https:\/\/api\.whatsapp\.com\/send\?phone=31643262792\b/i.test(href)) return 'whatsapp';
   if (/^mailto:/i.test(href)) return 'mailto';
   if (/^tel:/i.test(href)) return 'phone';
   if (href === '#contact' || href === '/#contact' || href.endsWith('/#contact')) return 'contact';
   return '';
+}
+
+function setHtmlAttribute(attrsRaw, attrName, valueRaw) {
+  const attrs = String(attrsRaw || '');
+  const attr = String(attrName || '').trim();
+  const value = escapeHtmlAttribute(valueRaw);
+  if (!attr) return attrs;
+
+  const attrPattern = new RegExp(`(^|\\s)${attr}\\s*=\\s*["'][^"']*["']`, 'i');
+  if (attrPattern.test(attrs)) {
+    return attrs.replace(attrPattern, (match, prefix) => `${prefix}${attr}="${value}"`);
+  }
+
+  return `${attrs} ${attr}="${value}"`;
+}
+
+function addSafeRelToken(relRaw, token) {
+  const values = String(relRaw || '')
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!values.some((item) => item.toLowerCase() === token.toLowerCase())) values.push(token);
+  return values.join(' ');
 }
 
 function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
@@ -727,17 +759,22 @@ function addConversionTrackingAttributesIfMissing(htmlRaw, entry) {
   if (!entry) return html;
 
   return html.replace(/<a\b([^>]*\bhref=["']([^"']+)["'][^>]*)>/gi, (match, attrs, href) => {
-    if (/data-softora-conversion=/i.test(attrs)) return match;
-
     const target = classifyConversionTarget(href);
     if (!target) return match;
 
-    const trackingAttrs = [
-      'data-softora-conversion="public-cta"',
-      `data-softora-conversion-page="${escapeHtmlAttribute(entry.path)}"`,
-      `data-softora-conversion-target="${escapeHtmlAttribute(target)}"`,
-    ].join(' ');
-    return `<a ${trackingAttrs}${attrs}>`;
+    let nextAttrs = String(attrs || '');
+    const rel = addSafeRelToken(addSafeRelToken(getAttrValue(nextAttrs, 'rel'), 'noopener'), 'noreferrer');
+
+    nextAttrs = setHtmlAttribute(nextAttrs, 'href', MARTIJN_WHATSAPP_URL);
+    nextAttrs = setHtmlAttribute(nextAttrs, 'target', '_blank');
+    nextAttrs = setHtmlAttribute(nextAttrs, 'rel', rel);
+    if (!/data-softora-conversion=/i.test(nextAttrs)) {
+      nextAttrs = setHtmlAttribute(nextAttrs, 'data-softora-conversion', 'public-cta');
+    }
+    nextAttrs = setHtmlAttribute(nextAttrs, 'data-softora-conversion-page', entry.path);
+    nextAttrs = setHtmlAttribute(nextAttrs, 'data-softora-conversion-target', 'whatsapp');
+
+    return `<a${nextAttrs}>`;
   });
 }
 
