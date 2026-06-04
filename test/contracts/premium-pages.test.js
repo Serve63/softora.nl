@@ -125,10 +125,14 @@ test('premium login page logout mode clears the session cookie and stays on the 
 });
 
 test('protected premium pages redirect to setup when auth is not configured', async () => {
+  const resolverCalls = [];
   const controller = createPremiumHtmlPageAccessController({
     premiumPublicHtmlFiles: new Set(['premium-website.html', 'premium-personeel-login.html']),
     noindexHeaderValue: 'noindex',
-    getResolvedPremiumAuthState: async () => ({ configured: false, authenticated: false }),
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      return { configured: false, authenticated: false };
+    },
     getSafePremiumRedirectPath: (value, fallback = '/premium-personeel-dashboard') =>
       String(value || '').trim() || fallback,
   });
@@ -147,6 +151,7 @@ test('protected premium pages redirect to setup when auth is not configured', as
     res.redirectLocation,
     '/premium-personeel-login?setup=1&next=%2Fpremium-personeel-agenda'
   );
+  assert.deepEqual(resolverCalls, [{ allowAnonymousWithoutHydration: true }]);
 });
 
 test('internal premium tool pages require login for anonymous visitors', async () => {

@@ -48,7 +48,9 @@ function createPremiumHtmlPageAccessController(options = {}) {
     const isAdminOnlyPremiumPage = isProtectedPremiumPage && isPremiumAdminOnlyHtmlFile(fileName);
     const authState =
       isLoginPage || isProtectedPremiumPage
-        ? await getResolvedPremiumAuthState(req, { allowAnonymousWithoutHydration: isLoginPage })
+        ? await getResolvedPremiumAuthState(req, {
+            allowAnonymousWithoutHydration: isLoginPage || isProtectedPremiumPage,
+          })
         : null;
     const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
     const requestedPath = getSafePremiumRedirectPath(req.originalUrl || req.url || req.path || '/');

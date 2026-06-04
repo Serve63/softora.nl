@@ -111,13 +111,15 @@ function createFixture(options = {}) {
         ? target
         : '/premium-personeel-dashboard';
     },
-    getResolvedPremiumAuthState: async () =>
-      options.authState || {
-        configured: true,
-        authenticated: false,
-        revoked: false,
-        email: '',
-      },
+    getResolvedPremiumAuthState:
+      options.getResolvedPremiumAuthState ||
+      (async () =>
+        options.authState || {
+          configured: true,
+          authenticated: false,
+          revoked: false,
+          email: '',
+        }),
     buildPremiumAuthSessionPayload: (authState) => ({
       ok: true,
       configured: Boolean(authState.configured),
@@ -164,12 +166,16 @@ function createRequest(overrides = {}) {
 }
 
 test('premium auth session response clears revoked cookies and returns stable payload', async () => {
+  const resolverCalls = [];
   const { coordinator, cookieClears } = createFixture({
-    authState: {
-      configured: true,
-      authenticated: false,
-      revoked: true,
-      displayName: '',
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      return {
+        configured: true,
+        authenticated: false,
+        revoked: true,
+        displayName: '',
+      };
     },
   });
   const req = createRequest({ originalUrl: '/api/auth/session' });
@@ -181,6 +187,7 @@ test('premium auth session response clears revoked cookies and returns stable pa
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.body.ok, true);
   assert.equal(cookieClears.length, 1);
+  assert.deepEqual(resolverCalls, [{ allowAnonymousWithoutHydration: true }]);
 });
 
 test('premium auth login returns 503 when auth is not fully configured', async () => {
