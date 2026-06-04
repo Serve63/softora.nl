@@ -75,7 +75,7 @@ test('app middleware releases non-critical API requests after a short Supabase h
   assert.equal(nextCalls, 1, 'next() mag maar één keer worden aangeroepen');
 });
 
-test('app middleware blocks critical API requests when Supabase hydration times out', async () => {
+test('app middleware releases read-only critical API requests when Supabase hydration times out', async () => {
   const app = createAppRecorder();
   let nextCalls = 0;
   const res = {
@@ -102,7 +102,46 @@ test('app middleware blocks critical API requests when Supabase hydration times 
   const middleware = getLastMiddleware(app);
 
   await new Promise((resolve) => {
-    middleware({ path: '/api/ui-state-get' }, res, () => {
+    middleware({ method: 'GET', path: '/api/ui-state-get' }, res, () => {
+      nextCalls += 1;
+      resolve();
+    });
+    setTimeout(resolve, 280);
+  });
+
+  assert.equal(nextCalls, 1);
+  assert.equal(res.statusCode, null);
+  assert.equal(res.body, null);
+});
+
+test('app middleware blocks state-changing critical API requests when Supabase hydration times out', async () => {
+  const app = createAppRecorder();
+  let nextCalls = 0;
+  const res = {
+    statusCode: null,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  applyAppMiddleware(
+    app,
+    createDeps({
+      supabaseHydrateMiddlewareWaitMs: 5,
+      ensureRuntimeStateHydratedFromSupabase: () => new Promise(() => {}),
+    })
+  );
+
+  const middleware = getLastMiddleware(app);
+
+  await new Promise((resolve) => {
+    middleware({ method: 'POST', path: '/api/ui-state-set' }, res, () => {
       nextCalls += 1;
       resolve();
     });

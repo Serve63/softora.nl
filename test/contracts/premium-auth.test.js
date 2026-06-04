@@ -58,6 +58,42 @@ test('premium auth manager builds anonymous auth state when no session secret ex
   assert.equal(authState.authenticated, false);
 });
 
+test('premium auth manager resolves anonymous requests from cached users without hydration wait', async () => {
+  let hydrateCalls = 0;
+  const cachedUsers = [
+    {
+      id: 'usr_1',
+      email: 'info@softora.nl',
+      role: 'admin',
+      status: 'active',
+      firstName: 'Serve',
+      lastName: 'Creusen',
+    },
+  ];
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => '',
+    verifySessionToken: () => ({ ok: false, expired: false, payload: null }),
+    premiumUsersStore: {
+      ...createPremiumUsersStoreStub(cachedUsers),
+      async ensureUsersHydrated() {
+        hydrateCalls += 1;
+        return { users: cachedUsers, source: 'supabase' };
+      },
+    },
+    getRequestPathname: () => '/',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState({});
+
+  assert.equal(hydrateCalls, 0);
+  assert.equal(resolved.configured, true);
+  assert.equal(resolved.authenticated, false);
+});
+
 test('premium auth manager resolves authenticated user and session payload', async () => {
   const users = [
     {

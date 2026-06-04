@@ -161,6 +161,15 @@ function createPremiumAuthStateManager(options = {}) {
 
   async function getResolvedPremiumAuthState(req) {
     const basicAuthState = getPremiumAuthState(req);
+    if (!basicAuthState.authenticated) {
+      const cachedUsers = premiumUsersStore.getCachedUsers();
+      if (Array.isArray(cachedUsers) && cachedUsers.length > 0) {
+        return buildConfiguredAnonymousState({
+          ...basicAuthState,
+          configured: true,
+        });
+      }
+    }
     const timeoutMs = getSafeResolveTimeoutMs();
     let hydrated;
     if (!timeoutMs) {
