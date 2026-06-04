@@ -139,7 +139,12 @@ test('premium api guard attaches auth state for allowed authenticated requests',
   assert.equal(req.premiumAuth, authState);
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.statusCode, null);
-  assert.deepEqual(resolverCalls, [{ allowTokenFallbackWithoutHydration: true }]);
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
+    },
+  ]);
 });
 
 test('premium api guard clears expired or revoked sessions before returning 401', async () => {
