@@ -128,7 +128,11 @@
         throw new Error(getMessage(payload, 'Veilige Instantly upload mislukt.'));
       }
       if (payload.skipped) {
-        const message = 'Geen geschikte mockup-leads gevonden';
+        const requested = Number(payload.requested || limit || 0);
+        const available = Number(payload.available || payload.prepared || 0);
+        const message = payload.reason === 'insufficient_eligible_leads' || requested > available
+          ? 'Zet eerst genoeg mail-ready leads klaar. Gevraagd: ' + requested + ', veilig klaar: ' + available + '.'
+          : 'Geen geschikte mockup-leads gevonden';
         showToast(message, 5600);
         showButtonMessage(button, message);
         return;

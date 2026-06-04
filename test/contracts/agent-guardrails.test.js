@@ -477,6 +477,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /## Instantly-leads toevoegen/);
   assert.match(agentsSource, /POST \/api\/outreach\/provider-upload/);
   assert.match(agentsSource, /Maak nooit handmatig een losse CSV/);
+  assert.match(agentsSource, /minder dan X veilig mail-ready leads klaarstaan/);
+  assert.match(agentsSource, /Zet eerst genoeg mail-ready leads klaar/);
   assert.match(agentsSource, /permanente `provider=instantly` recipient guards/);
   assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
   assert.match(protocolSource, /check:live-production-version/);
