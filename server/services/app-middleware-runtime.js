@@ -24,6 +24,11 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/agenda',
       '/api/coldcalling',
     ],
+    skipSupabaseHydrateApiPrefixes = [
+      '/api/auth/',
+      '/api/health',
+      '/api/healthz',
+    ],
   } = deps;
 
   const safeSupabaseHydrateMiddlewareWaitMs = Math.max(
@@ -33,6 +38,11 @@ function applyAppMiddleware(app, deps = {}) {
 
   const normalizedStrictSupabaseHydrateApiPrefixes = (
     Array.isArray(strictSupabaseHydrateApiPrefixes) ? strictSupabaseHydrateApiPrefixes : []
+  )
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const normalizedSkipSupabaseHydrateApiPrefixes = (
+    Array.isArray(skipSupabaseHydrateApiPrefixes) ? skipSupabaseHydrateApiPrefixes : []
   )
     .map((item) => String(item || '').trim())
     .filter(Boolean);
@@ -46,6 +56,11 @@ function applyAppMiddleware(app, deps = {}) {
     if (isReadOnlyRequestMethod(method)) return false;
     const requestPath = String(pathname || '');
     return normalizedStrictSupabaseHydrateApiPrefixes.some((prefix) => requestPath.startsWith(prefix));
+  }
+
+  function skipsSupabaseHydration(pathname) {
+    const requestPath = String(pathname || '');
+    return normalizedSkipSupabaseHydrateApiPrefixes.some((prefix) => requestPath.startsWith(prefix));
   }
 
   app.disable('x-powered-by');
@@ -320,6 +335,7 @@ function applyAppMiddleware(app, deps = {}) {
     const requestPath = String(req.path || '');
     if (!isSupabaseConfigured()) return next();
     if (!requestPath.startsWith('/api/')) return next();
+    if (skipsSupabaseHydration(requestPath)) return next();
     const strictHydration = requiresStrictSupabaseHydration(requestPath, req.method);
 
     let released = false;

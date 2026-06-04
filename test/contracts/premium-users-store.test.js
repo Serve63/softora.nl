@@ -177,6 +177,54 @@ test('premium users store honors shorter login timeout while another hydrate is 
   }
 });
 
+test('premium users store uses bootstrap users only when fallback is explicitly allowed', async () => {
+  const store = createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return {
+                      data: null,
+                      error: new Error('read failed'),
+                    };
+                  },
+                };
+              },
+            };
+          },
+          async upsert() {
+            throw new Error('write should not happen');
+          },
+        };
+      },
+    },
+    fetchResult: {
+      ok: false,
+      error: 'upstream timeout',
+    },
+  });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  try {
+    const hydrated = await store.ensureUsersHydrated({
+      force: true,
+      allowBootstrapFallback: true,
+    });
+
+    assert.equal(hydrated.source, 'bootstrap_env');
+    assert.equal(hydrated.users.length, 1);
+    assert.equal(hydrated.users[0].email, 'servec321@gmail.com');
+    assert.equal(store.getCachedUsers().length, 1);
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
 test('premium users store bootstraps only after Supabase confirms the users row is missing', async () => {
   let upsertedRow = null;
   const store = createFixture({
