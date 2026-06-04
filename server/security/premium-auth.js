@@ -352,6 +352,7 @@ function createPremiumApiAccessGuard(options = {}) {
     if (isPremiumPublicApiRequest(req)) return next();
 
     const authState = await getResolvedPremiumAuthState(req, {
+      allowAnonymousWithoutHydration: true,
       allowTokenFallbackWithoutHydration: true,
     });
     res.setHeader('Cache-Control', 'no-store, private');
