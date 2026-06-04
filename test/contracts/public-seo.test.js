@@ -177,6 +177,28 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-website.html'), '/');
 });
 
+test('public seo renderer normalizes legacy contact CTAs to measured Martijn WhatsApp links', () => {
+  const source = [
+    '<!DOCTYPE html><html lang="nl"><head><title>Oud</title></head><body>',
+    '<a href="mailto:info@softora.nl">Neem contact op</a>',
+    '<a href="tel:+31643262792" rel="nofollow">Bel direct</a>',
+    '<a href="/#contact">Plan gesprek</a>',
+    '<a href="https://api.whatsapp.com/send?phone=31643262792">Start gesprek</a>',
+    '<a href="https://wa.me/31643262792?text=Hoi%20Martijn">Vraag advies</a>',
+    '</body></html>',
+  ].join('\n');
+  const html = applyPublicSeoHeadDefaults(source, 'diensten.html', {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.equal((html.match(/href="https:\/\/wa\.me\/31643262792"/g) || []).length, 5);
+  assert.equal((html.match(/target="_blank"/g) || []).length, 5);
+  assert.equal((html.match(/data-softora-conversion-page="\/diensten"/g) || []).length, 5);
+  assert.equal((html.match(/data-softora-conversion-target="whatsapp"/g) || []).length, 5);
+  assert.doesNotMatch(html, /href="mailto:|href="tel:|href="\/#contact|api\.whatsapp\.com|wa\.me\/31643262792\?/);
+  assert.match(html, /rel="nofollow noopener noreferrer"/);
+});
+
 test('public seo internal links use the existing footer when one is present', () => {
   const source = fs.readFileSync(path.join(root, 'premium-website.html'), 'utf8');
   const html = applyPublicSeoHeadDefaults(source, 'premium-website.html', {
