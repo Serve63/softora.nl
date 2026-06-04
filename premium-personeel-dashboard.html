@@ -2958,13 +2958,13 @@
             });
         }
 
-        function renderPremiumDashboardOrders() { if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.clear();
+        function renderPremiumDashboardOrders() {
             const orders = Array.isArray(premiumDashboardState.orders) ? premiumDashboardState.orders : [];
             const customers = Array.isArray(premiumDashboardState.customers) ? premiumDashboardState.customers : [];
-            const currentYear = now.getFullYear();
-            const currentMonth = now.getMonth();
-            const quarterStartMonth = getCurrentQuarterStartMonth(currentMonth);
-            const quarterEndMonth = quarterStartMonth + 2;
+            if (!orders.length && !customers.length) { if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); return; }
+            if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.clear();
+            const currentYear = now.getFullYear(); const currentMonth = now.getMonth();
+            const quarterStartMonth = getCurrentQuarterStartMonth(currentMonth); const quarterEndMonth = quarterStartMonth + 2;
             const revenueByMonth = Array.from({ length: 12 }, () => 0);
             const rollingMonthRevenue = new Map();
             const paidOrders = orders.filter((order) => order?.ui?.isPaid);
@@ -3167,7 +3167,7 @@
             premiumDashboardState.refreshPromise = (async () => {
                 await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
                 const loaded = premiumDashboardState.orders.length > 0 || premiumDashboardState.customers.length > 0;
-                if (loaded) renderPremiumDashboardOrders(); else if (!premiumDashboardState.ordersHydrated && !premiumDashboardState.customersHydrated && window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); premiumDashboardState.lastRefreshAt = Date.now();
+                if (loaded) renderPremiumDashboardOrders(); else if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); premiumDashboardState.lastRefreshAt = Date.now();
                 return loaded;
             })().finally(() => {
                 premiumDashboardState.refreshPromise = null;
