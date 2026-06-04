@@ -36,6 +36,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     getClientIpFromRequest = () => '',
     getRequestPathname = () => '/',
     getRequestOriginFromHeaders = () => '',
+    premiumLoginUsersReadTimeoutMs = 1200,
   } = deps;
 
   function getRequestUserAgent(req) {
@@ -143,23 +144,20 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     return res.status(200).json(buildPremiumAuthSessionPayload(authState));
   }
 
+  function getLoginUsersReadTimeoutMs() {
+    return Math.max(500, Math.min(2500, Number(premiumLoginUsersReadTimeoutMs) || 1200));
+  }
+
   async function loadUsersForLogin() {
-    const attempts = [{ force: true }, { force: false }];
-    let lastHydrated = null;
-
-    for (const options of attempts) {
-      lastHydrated = await premiumUsersStore.ensureUsersHydrated(options);
-      const hydratedUsers = Array.isArray(lastHydrated?.users) ? lastHydrated.users : [];
-      const cachedUsers = premiumUsersStore.getCachedUsers();
-      const users = hydratedUsers.length > 0 ? hydratedUsers : cachedUsers;
-      if (users.length > 0 || lastHydrated?.source !== 'unavailable') {
-        return { hydrated: lastHydrated, users };
-      }
-    }
-
+    const hydrated = await premiumUsersStore.ensureUsersHydrated({
+      force: true,
+      readTimeoutMs: getLoginUsersReadTimeoutMs(),
+    });
+    const hydratedUsers = Array.isArray(hydrated?.users) ? hydrated.users : [];
+    const cachedUsers = premiumUsersStore.getCachedUsers();
     return {
-      hydrated: lastHydrated,
-      users: premiumUsersStore.getCachedUsers(),
+      hydrated,
+      users: hydratedUsers.length > 0 ? hydratedUsers : cachedUsers,
     };
   }
 
