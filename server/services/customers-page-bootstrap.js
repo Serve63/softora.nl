@@ -636,6 +636,14 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
   }
 
+  function buildBootstrapStateSnapshot(state) {
+    return {
+      values: state && state.values && typeof state.values === 'object' ? state.values : {},
+      source: normalizeString(state && state.source),
+      updatedAt: normalizeString(state && state.updatedAt) || null,
+    };
+  }
+
   function hasLoadedUiStateValues(state) {
     return Boolean(
       state &&
@@ -658,6 +666,7 @@ function createCustomersPageBootstrapService(deps = {}) {
         loadedAt: new Date().toISOString(),
         source: 'customers',
         customers: mergeCustomersWithResponsible(remoteCustomers, orders),
+        activeOrdersState: buildBootstrapStateSnapshot(orderState),
       };
     }
 
@@ -670,6 +679,7 @@ function createCustomersPageBootstrapService(deps = {}) {
         source: 'unavailable',
         message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
         customers: [],
+        activeOrdersState: buildBootstrapStateSnapshot(orderState),
       };
     }
 
@@ -678,6 +688,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       loadedAt: new Date().toISOString(),
       source: customers.length ? 'orders' : 'empty',
       customers,
+      activeOrdersState: buildBootstrapStateSnapshot(orderState),
     };
   }
 

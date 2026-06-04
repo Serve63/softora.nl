@@ -68,6 +68,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.equal(payload.customers[0].instantlyCampaignId, 'instantly-campaign-1');
   assert.equal(payload.customers[0].instantlySyncedAt, '2026-05-25T21:36:48.980Z');
   assert.equal(payload.customers[1].datum, '2026-01-07');
+  assert.deepEqual(payload.activeOrdersState.values, {});
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 
   const replacements = service.buildDashboardHtmlReplacements(payload);
@@ -348,6 +349,10 @@ test('customers page bootstrap falls back to deriving customers from active orde
 
   assert.equal(payload.ok, true);
   assert.equal(payload.source, 'orders');
+  assert.match(
+    payload.activeOrdersState.values.softora_custom_orders_premium_v1,
+    /Servé Creusen/
+  );
   assert.equal(payload.customers.length, 1);
   assert.equal(payload.customers[0].naam, 'Servé Creusen');
   assert.equal(payload.customers[0].bedrijf, 'Breda');

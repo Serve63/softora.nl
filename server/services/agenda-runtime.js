@@ -498,21 +498,7 @@ function createAgendaRuntime(deps = {}) {
       fileName === 'premium-personeel-dashboard.html'
     ) {
       const isPremiumDashboard = fileName === 'premium-personeel-dashboard.html';
-      const [customersPayload, activeOrdersState] = await Promise.all([
-        customersPageBootstrapService.buildCustomersBootstrapPayload(),
-        isPremiumDashboard ? getUiStateValues(premiumActiveOrdersScope) : Promise.resolve(null),
-      ]);
-      const dashboardPayload =
-        isPremiumDashboard && activeOrdersState
-          ? {
-              ...customersPayload,
-              activeOrdersState: {
-                values: activeOrdersState.values || {},
-                source: activeOrdersState.source || '',
-                updatedAt: activeOrdersState.updatedAt || null,
-              },
-            }
-          : customersPayload;
+      const dashboardPayload = await customersPageBootstrapService.buildCustomersBootstrapPayload();
       const bootstrapData = {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
         scriptId: 'softoraCustomersBootstrap',
