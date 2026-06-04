@@ -49,7 +49,7 @@
         activeOrdersEl.setAttribute("aria-label", "Actieve opdrachten tijdelijk niet geladen");
     }
 
-    global.SoftoraDashboardDataStatus = Object.freeze({
+    const api = Object.freeze({
         clear() {
             setStatus("");
         },
@@ -60,4 +60,27 @@
         },
         unavailableMessage,
     });
+    global.SoftoraDashboardDataStatus = api;
+
+    function shouldShowUnavailableForEmptyBootstrap() {
+        const element = document.getElementById("softoraCustomersBootstrap");
+        if (!element) return false;
+        try {
+            const payload = JSON.parse(String(element.textContent || "{}"));
+            const values = payload && payload.activeOrdersState && payload.activeOrdersState.values && typeof payload.activeOrdersState.values === "object" ? payload.activeOrdersState.values : {};
+            return payload && payload.ok === true && payload.source === "empty" && Array.isArray(payload.customers) && payload.customers.length === 0 && Object.keys(values).length === 0;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function showUnavailableForEmptyBootstrap() {
+        if (shouldShowUnavailableForEmptyBootstrap()) api.showUnavailable();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", showUnavailableForEmptyBootstrap, { once: true });
+    } else {
+        showUnavailableForEmptyBootstrap();
+    }
 })(window);

@@ -160,10 +160,13 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
-  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260604b/);
+  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260604c/);
   assert.match(dataStatusSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
   assert.match(dataStatusSource, /function setKpisUnavailable\(\) \{/);
   assert.match(dataStatusSource, /activeOrdersEl\.setAttribute\("aria-label", "Actieve opdrachten tijdelijk niet geladen"\);/);
+  assert.match(dataStatusSource, /function shouldShowUnavailableForEmptyBootstrap\(\) \{/);
+  assert.match(dataStatusSource, /payload\.source === "empty"/);
+  assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap, \{ once: true \}\);/);
   assert.match(pageSource, /const loaded = premiumDashboardState\.orders\.length > 0 \|\| premiumDashboardState\.customers\.length > 0;/);
   assert.doesNotMatch(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);
   assert.match(pageSource, /if \(!orders\.length && !customers\.length\) \{/);
