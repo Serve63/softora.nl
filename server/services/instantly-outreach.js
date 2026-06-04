@@ -43,6 +43,7 @@ const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
+const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN = /je\s+kunt\s+je\s+webdesign\s+hier\s+bekijken\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
@@ -71,6 +72,24 @@ const DEFAULT_WEBDESIGN_BODY = [
   '📍 {{stad}}',
   '',
   '0629917185',
+].join('\n');
+const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
+  'Beste lezer,',
+  '',
+  'Afgelopen week kwam ik jullie website ({{website}}) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+  '',
+  'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening :)',
+  'Als je wilt, stuur ik je ook de online preview, zodat je zelf door het ontwerp kunt scrollen.',
+  'Laat me vooral weten of je dat zou willen.',
+  '',
+  'Mocht je er niks mee willen doen, lijkt het me alsnog tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van!',
+  '',
+  'Je kunt je webdesign hier bekijken 👈',
+  '',
+  'Met vriendelijke groet,',
+  '{{afzender}}',
+  '',
+  '📍 {{stad}}',
 ].join('\n');
 const DEFAULT_INSTANTLY_SENDER_EMAIL = 'serve@softora.nl';
 const INSTANTLY_SENDER_PROFILE_ALIASES = Object.freeze({
@@ -1127,6 +1146,23 @@ function buildMailText(body, row, normalizeString = defaultNormalizeString) {
     .trim();
 }
 
+function inferInstantlySenderName(profileBody, senderEmail = '', normalizeString = defaultNormalizeString) {
+  const body = normalizeString(profileBody);
+  const email = normalizeEmailAddress(senderEmail, normalizeString);
+  if (/\bMartijn\s+van\s+de\s+Ven\b/i.test(body) || /martijn/i.test(email)) return 'Martijn van de Ven';
+  if (/\bServ[ée]\s+Creusen\b/i.test(body) || /serve/i.test(email)) return 'Servé Creusen';
+  return 'Martijn van de Ven';
+}
+
+function buildInstantlyWebdesignMailText(row, city, senderName, normalizeString = defaultNormalizeString) {
+  const personalized = personalizeTemplate(DEFAULT_INSTANTLY_WEBDESIGN_BODY, row, normalizeString)
+    .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, normalizeString(senderName) || 'Martijn van de Ven')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+  return ensurePinnedCityInMailText(personalized, city, normalizeString);
+}
+
 function normalizeSenderNameInMailText(text, normalizeString = defaultNormalizeString) {
   return normalizeString(text).replace(/\bServe Creusen\b/g, 'Servé Creusen');
 }
@@ -1411,12 +1447,8 @@ function buildColdmailPreviewImageUrl(row, id, reference, config, type, normaliz
   return buildColdmailPreviewImageLink(row, id, reference, config, type, normalizeString, now).url;
 }
 
-function buildInstantlyBodyWithWebdesignLinks({ baseText, webdesignImageUrl, webdesignMockupUrl, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
-  const parts = [normalizeString(baseText)];
-  if (webdesignImageUrl) parts.push(webdesignImageUrl);
-  if (webdesignMockupUrl) parts.push(COLDMAIL_MOCKUP_CAPTION, webdesignMockupUrl);
-  const body = parts.filter(Boolean).join('\n\n');
-  return appendColdmailOptOutText(body, unsubscribeUrl, normalizeString);
+function buildInstantlyBodyWithWebdesignLinks({ baseText, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
+  return appendColdmailOptOutText(normalizeString(baseText), unsubscribeUrl, normalizeString);
 }
 
 function escapeHtml(value, normalizeString = defaultNormalizeString) {
@@ -1465,11 +1497,23 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
   )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
 }
 
+function renderInstantlyWebdesignPreviewCtaHtmlLine(line, normalizeString = defaultNormalizeString, options = {}) {
+  const href = normalizeString(options.webdesignPreviewUrl);
+  if (!href) return escapeHtml(line, normalizeString);
+  return `Je kunt je webdesign <a href="${escapeHtmlAttribute(
+    href,
+    normalizeString
+  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+}
+
 function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, options = {}) {
   const body = normalizeString(text)
     .split(/\n{2,}/)
     .map((paragraph) => {
       const cleanParagraph = normalizeString(paragraph);
+      if (INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN.test(cleanParagraph)) {
+        return `<p>${renderInstantlyWebdesignPreviewCtaHtmlLine(cleanParagraph, normalizeString, options)}</p>`;
+      }
       if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanParagraph)) {
         return `<p>${renderImageVisibilityPsHtmlLine(cleanParagraph, normalizeString, options)}</p>`;
       }
@@ -1477,6 +1521,9 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, op
           .split('\n')
           .map((line) => {
             const cleanLine = normalizeString(line);
+            if (INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN.test(cleanLine)) {
+              return renderInstantlyWebdesignPreviewCtaHtmlLine(cleanLine, normalizeString, options);
+            }
             if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
               return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString, options);
             }
@@ -1540,21 +1587,9 @@ function buildInstantlyEmailHtml(
         normalizeString
       )}</a></p>`
     : '';
-  const mockupHtml = webdesignMockupUrl
-    ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(
-        COLDMAIL_MOCKUP_CAPTION,
-        normalizeString
-      )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
-    : '';
   const content = `${renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
-  })}${renderImageHtml(
-    webdesignImageUrl,
-    'Webdesign',
-    '24px 0 0 0',
-    normalizeString,
-    webdesignImageDimensions
-  )}${mockupHtml}${optOut}`;
+  })}${optOut}`;
   return wrapInstantlyEmailHtml(content, normalizeString);
 }
 
@@ -2144,14 +2179,8 @@ function createInstantlyOutreachService(deps = {}) {
       normalizeString(context.mailProfile && context.mailProfile.body) || DEFAULT_WEBDESIGN_BODY;
     const city = getRowCity(row, normalizeString) || 'uw regio';
     const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
-    const baseMailBody = normalizeInstantlyMailText(
-      buildMailText(bodyTemplate, row, normalizeString),
-      city,
-      row,
-      item.id,
-      config,
-      normalizeString
-    );
+    const senderName = inferInstantlySenderName(bodyTemplate, config.defaultSenderEmail, normalizeString);
+    const baseMailBody = buildInstantlyWebdesignMailText(row, city, senderName, normalizeString);
     const assets = getReadyWebdesignAssets(item, context);
     const webdesignLink = assets.ready
       ? buildColdmailPreviewImageLink(row, item.id, reference, config, 'webdesign', normalizeString, now)
