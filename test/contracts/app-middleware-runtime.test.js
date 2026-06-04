@@ -42,7 +42,7 @@ function getLastMiddleware(app) {
   return lastUse[lastUse.length - 1];
 }
 
-test('app middleware releases non-critical API requests after a short Supabase hydration wait', async () => {
+test('app middleware releases non-critical API requests without waiting on Supabase hydration', async () => {
   const app = createAppRecorder();
   let resolveHydration = null;
   let nextCalls = 0;
@@ -60,11 +60,8 @@ test('app middleware releases non-critical API requests after a short Supabase h
 
   const middleware = getLastMiddleware(app);
 
-  await new Promise((resolve) => {
-    middleware({ path: '/api/non-critical-status' }, {}, () => {
-      nextCalls += 1;
-      resolve();
-    });
+  middleware({ path: '/api/non-critical-status' }, {}, () => {
+    nextCalls += 1;
   });
 
   assert.equal(nextCalls, 1);
@@ -110,7 +107,7 @@ test('app middleware skips Supabase hydration for isolated API requests', async 
   assert.equal(hydrateCalls, 0);
 });
 
-test('app middleware releases read-only critical API requests when Supabase hydration times out', async () => {
+test('app middleware releases read-only critical API requests without waiting on Supabase hydration', async () => {
   const app = createAppRecorder();
   let nextCalls = 0;
   const res = {
@@ -136,12 +133,8 @@ test('app middleware releases read-only critical API requests when Supabase hydr
 
   const middleware = getLastMiddleware(app);
 
-  await new Promise((resolve) => {
-    middleware({ method: 'GET', path: '/api/ui-state-get' }, res, () => {
-      nextCalls += 1;
-      resolve();
-    });
-    setTimeout(resolve, 280);
+  middleware({ method: 'GET', path: '/api/ui-state-get' }, res, () => {
+    nextCalls += 1;
   });
 
   assert.equal(nextCalls, 1);
