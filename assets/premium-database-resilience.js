@@ -17,6 +17,24 @@
         );
     }
 
+    function withTimeout(task, timeoutMs, message) {
+        const safeTimeoutMs = Math.max(1000, Math.min(30000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
+        let timeoutId = null;
+        return new Promise(function (resolve, reject) {
+            timeoutId = global.setTimeout(function () {
+                reject(new Error(message || "Supabase-data reageert niet op tijd."));
+            }, safeTimeoutMs);
+            Promise.resolve()
+                .then(function () {
+                    return typeof task === "function" ? task() : task;
+                })
+                .then(resolve, reject)
+                .finally(function () {
+                    if (timeoutId) global.clearTimeout(timeoutId);
+                });
+        });
+    }
+
     function fetchJsonWithTimeout(url, options, timeoutMs) {
         const safeTimeoutMs = Math.max(1000, Math.min(30000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
         const controller = typeof AbortController === "function" ? new AbortController() : null;
@@ -28,12 +46,12 @@
                 controller.abort();
             }, safeTimeoutMs);
         }
-        return global.fetch(url, requestOptions).catch(function (error) {
+        return withTimeout(global.fetch(url, requestOptions).catch(function (error) {
             if (error && error.name === "AbortError") {
                 throw new Error("Supabase-data reageert niet op tijd.");
             }
             throw error;
-        }).finally(function () {
+        }), safeTimeoutMs, "Supabase-data reageert niet op tijd.").finally(function () {
             if (timeoutId) global.clearTimeout(timeoutId);
         });
     }
@@ -44,5 +62,6 @@
         hasChunkedStateKey,
         staleRefreshMessage,
         unavailableMessage,
+        withTimeout,
     });
 })(window);

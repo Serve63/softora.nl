@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   buildAgendaSupportRuntimeCompositionOptions,
@@ -70,6 +72,50 @@ test('server app feature wiring writes data-ops scopes through the bridge first'
   assert.equal((await setter('premium_customers', { a: 1 }, { source: 'test' })).source, 'bridge');
   assert.equal((await setter('other_scope', { b: 2 }, { source: 'test' })).source, 'legacy');
   assert.deepEqual(calls.map((call) => call.target), ['bridge', 'legacy']);
+});
+
+test('server app feature wiring falls back when data-ops ui-state reads hang', async (t) => {
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const originalWarn = console.warn;
+  const warnings = [];
+  t.after(() => {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+    console.warn = originalWarn;
+  });
+  global.setTimeout = (fn) => {
+    queueMicrotask(fn);
+    return Symbol('timeout');
+  };
+  global.clearTimeout = () => {};
+  console.warn = (...args) => warnings.push(args);
+
+  const getter = featureCompositionBuilders.createDataOpsAwareUiStateGetter({
+    getUiStateValues: async (scope) => ({ source: 'legacy', scope }),
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers',
+      getUiStateValues: async () => new Promise(() => {}),
+    },
+  });
+
+  const state = await getter('premium_customers');
+
+  assert.equal(state.source, 'legacy');
+  assert.equal(state.scope, 'premium_customers');
+  assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
+});
+
+test('server app agenda bootstrap ui-state reads are timeboxed before legacy fallback', () => {
+  const sourcePath = path.join(
+    __dirname,
+    '../../server/services/server-app-runtime-agenda-composition-builders.js'
+  );
+  const source = fs.readFileSync(sourcePath, 'utf8');
+
+  assert.match(source, /const DATA_OPS_UI_STATE_BOOTSTRAP_TIMEOUT_MS = 2500;/);
+  assert.match(source, /awaitDataOpsUiStateWithBootstrapTimeout\(/);
+  assert.match(source, /\[DataOps\]\[bootstrap-ui-state-fallback\]/);
 });
 
 test('server app runtime composition builders preserve feature wiring groups and warmup callbacks', async (t) => {
