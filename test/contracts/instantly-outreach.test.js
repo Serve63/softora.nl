@@ -90,6 +90,10 @@ function extractImageTags(html) {
   return [...String(html || '').matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
 }
 
+function assertInstantlyHtmlUsesReadableWidth(html) {
+  assert.match(html, /<div style="max-width:580px;margin:0;">/);
+}
+
 function assertInstantlyImageTagsUseNaturalLayout(
   html,
   expected = [
@@ -97,6 +101,7 @@ function assertInstantlyImageTagsUseNaturalLayout(
     { alt: 'Mockup', width: 640, height: 640 },
   ]
 ) {
+  assertInstantlyHtmlUsesReadableWidth(html);
   const imageTags = extractImageTags(html);
   assert.equal(imageTags.length, 2);
   expected.forEach((item, index) => {
