@@ -726,6 +726,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function isRetryableWebdesignError(error) {
+    if (error && error.retryableWebdesignStorage === true) return true;
+
     const status = Number(error && error.status) || 0;
     const message = normalizeString(error && error.message).toLowerCase();
     const upstreamMessage = normalizeString(
@@ -744,6 +746,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       return true;
     }
     return /abort|timeout|timed out|duurde te lang|fetch failed|terminated|econnreset|socket|netwerkfout/i.test(combined);
+  }
+
+  function createRetryablePhotoStorageError(message, cause) {
+    const error = new Error(message);
+    error.status = 503;
+    error.retryableWebdesignStorage = true;
+    if (cause) error.cause = cause;
+    return error;
   }
 
   function isJobReadyToProcess(job) {
@@ -877,39 +887,52 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           repairedAt: checkedAt,
         }
       : null;
+    let structuredStorageError = null;
     if (dataOpsStore && typeof dataOpsStore.uploadDesignPhoto === 'function') {
-      const structured = await dataOpsStore.uploadDesignPhoto(
-        {
-          customerId: customer.id,
-          dataUrl: storageDataUrl,
-          websiteMockup: mockupDataUrl,
-          websiteMockupName,
-          mockupRenderer: DEVICE_MOCKUP_RENDERER,
-          mockupOrientation: 'upright',
-          mockupQualityStatus: 'checked',
-          mockupQualityCheckedAt: checkedAt,
-          identityKey,
-          fileName: websitePhotoName,
-          legacyMeta: {
-            id: customer.id,
-            identityKey,
-            websitePhotoName,
+      try {
+        const structured = await dataOpsStore.uploadDesignPhoto(
+          {
+            customerId: customer.id,
+            dataUrl: storageDataUrl,
+            websiteMockup: mockupDataUrl,
             websiteMockupName,
             mockupRenderer: DEVICE_MOCKUP_RENDERER,
             mockupOrientation: 'upright',
             mockupQualityStatus: 'checked',
             mockupQualityCheckedAt: checkedAt,
-            updatedAt: new Date().toISOString().slice(0, 10),
-            ...(canvasRepair ? { webdesignCanvasRepair: canvasRepair } : {}),
+            identityKey,
+            fileName: websitePhotoName,
+            legacyMeta: {
+              id: customer.id,
+              identityKey,
+              websitePhotoName,
+              websiteMockupName,
+              mockupRenderer: DEVICE_MOCKUP_RENDERER,
+              mockupOrientation: 'upright',
+              mockupQualityStatus: 'checked',
+              mockupQualityCheckedAt: checkedAt,
+              updatedAt: new Date().toISOString().slice(0, 10),
+              ...(canvasRepair ? { webdesignCanvasRepair: canvasRepair } : {}),
+            },
           },
-        },
-        { source: 'premium-database-webdesign-jobs' }
-      );
-      if (structured && structured.ok) return;
+          { source: 'premium-database-webdesign-jobs' }
+        );
+        if (structured && structured.ok) return;
+        structuredStorageError = structured && structured.error;
+      } catch (error) {
+        structuredStorageError = error;
+      }
     }
 
-    const state = await getUiStateValues(photoScope);
-    if (!state) throw new Error('Databasefoto-opslag kon niet worden geladen.');
+    let state = null;
+    try {
+      state = await getUiStateValues(photoScope);
+    } catch (error) {
+      throw createRetryablePhotoStorageError('Databasefoto-opslag kon niet worden geladen.', error);
+    }
+    if (!state) {
+      throw createRetryablePhotoStorageError('Databasefoto-opslag kon niet worden geladen.', structuredStorageError);
+    }
 
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const existingMap = safeParseJsonObject(values[photoKey]);
@@ -963,22 +986,27 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       },
     };
 
-    const saved = await setUiStateValues(
-      photoScope,
-      {
-        ...values,
-        ...patch,
-        [photoKey]: JSON.stringify(mergedMap),
-        [photoRemovalKey]: JSON.stringify(remainingRemovalIds),
-      },
-      {
-        source: 'premium-database-webdesign-jobs',
-        actor: 'Premium database',
-      }
-    );
+    let saved = null;
+    try {
+      saved = await setUiStateValues(
+        photoScope,
+        {
+          ...values,
+          ...patch,
+          [photoKey]: JSON.stringify(mergedMap),
+          [photoRemovalKey]: JSON.stringify(remainingRemovalIds),
+        },
+        {
+          source: 'premium-database-webdesign-jobs',
+          actor: 'Premium database',
+        }
+      );
+    } catch (error) {
+      throw createRetryablePhotoStorageError('Databasefoto opslaan is mislukt.', error);
+    }
 
     if (!saved) {
-      throw new Error('Databasefoto opslaan is mislukt.');
+      throw createRetryablePhotoStorageError('Databasefoto opslaan is mislukt.', structuredStorageError);
     }
   }
 
@@ -1054,7 +1082,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           };
           if (typeof logger.warn === 'function') {
             logger.warn(
-              `[PremiumDatabaseWebdesignJobs][retry] ${job.id} wacht ${Math.round(retryDelayMs / 1000)}s na tijdelijke OpenAI-fout`
+              `[PremiumDatabaseWebdesignJobs][retry] ${job.id} wacht ${Math.round(retryDelayMs / 1000)}s na tijdelijke webdesign-fout`
             );
           }
           await persistJob(job);

@@ -587,6 +587,86 @@ test('premium database webdesign jobs requeue retryable OpenAI rate limits and r
   assert.ok(persistedJobs.some((job) => job.status === 'queued' && job.retry?.nextAttemptAt === 1760000003000));
 });
 
+test('premium database webdesign jobs requeue transient photo storage failures instead of showing a hard banner', async () => {
+  let nowMs = 1760000000000;
+  let storageHealthy = false;
+  let pipelineCalls = 0;
+  const uploadedPhotos = [];
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    now: () => nowMs,
+    retryJitter: false,
+    dataOpsStore: {
+      upsertWebdesignJob: async () => ({ ok: true }),
+      uploadDesignPhoto: async (entry) => {
+        if (!storageHealthy) {
+          return { ok: false, unavailable: false, error: new Error('Supabase storage timeout') };
+        }
+        uploadedPhotos.push(entry);
+        return { ok: true };
+      },
+    },
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'storage-retry-preview.png' } };
+      },
+    },
+    getUiStateValues: async () => null,
+    setUiStateValues: async () => null,
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_storage123456',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-storage-retry', bedrijf: 'Softora' },
+      },
+    },
+    createResponseRecorder()
+  );
+
+  const firstPoll = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_storage123456' },
+    },
+    firstPoll
+  );
+
+  assert.equal(firstPoll.statusCode, 200);
+  assert.equal(firstPoll.body.job.status, 'queued');
+  assert.equal(firstPoll.body.job.error, null);
+  assert.equal(firstPoll.body.job.retryAttempts, 1);
+  assert.equal(firstPoll.body.job.nextAttemptAt, nowMs + 5000);
+  assert.equal(pipelineCalls, 1);
+  assert.equal(uploadedPhotos.length, 0);
+
+  storageHealthy = true;
+  nowMs = firstPoll.body.job.nextAttemptAt + 1;
+  const retryPoll = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_storage123456' },
+    },
+    retryPoll
+  );
+
+  assert.equal(retryPoll.statusCode, 200);
+  assert.equal(retryPoll.body.job.status, 'done');
+  assert.equal(retryPoll.body.job.error, null);
+  assert.equal(pipelineCalls, 2);
+  assert.equal(uploadedPhotos.length, 1);
+  assert.equal(uploadedPhotos[0].customerId, 'customer-storage-retry');
+});
+
 test('premium database webdesign jobs keep non-retryable OpenAI errors as hard errors', async () => {
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {}, warn() {} },
