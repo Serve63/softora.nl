@@ -60,6 +60,25 @@ test('data ops ui-state bridge reads customers in the legacy chunked shape', asy
   assert.match(state.values[KEYS.customers], /Softora/);
 });
 
+test('data ops ui-state bridge does not read heavy legacy customers when structured rows exist', async () => {
+  const store = createStore({
+    listCustomers: async () => [{ id: 'cust-1', bedrijf: 'Softora' }],
+  });
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+  let legacyRead = false;
+
+  const state = await bridge.getUiStateValues(SCOPES.customers, {
+    legacyGetUiStateValues: async () => {
+      legacyRead = true;
+      return { values: { legacy: 'yes' }, source: 'legacy' };
+    },
+  });
+
+  assert.equal(state.source, 'supabase:data_ops');
+  assert.equal(legacyRead, false);
+  assert.match(state.values[KEYS.customers], /Softora/);
+});
+
 test('data ops ui-state bridge falls back when structured customer rows are empty', async () => {
   const bridge = createSoftoraDataOpsUiStateBridge({ store: createStore() });
   const state = await bridge.getUiStateValues(SCOPES.customers, {
@@ -71,6 +90,7 @@ test('data ops ui-state bridge falls back when structured customer rows are empt
 
 test('data ops ui-state bridge overlays legacy mailed status onto structured customers', async () => {
   const bridge = createSoftoraDataOpsUiStateBridge({
+    legacyContactMergeEnabled: true,
     store: createStore({
       listCustomers: async () => [
         {

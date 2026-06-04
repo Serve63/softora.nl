@@ -65,6 +65,8 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
   const {
     enabled = true,
     store = createSoftoraDataOpsStore(deps),
+    legacyContactMergeEnabled = false,
+    legacyReadTimeoutMs = 1200,
     logger = console,
   } = deps;
 
@@ -82,6 +84,26 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
 
   async function readLegacy(legacyGetUiStateValues, scope) {
     return typeof legacyGetUiStateValues === 'function' ? legacyGetUiStateValues(scope) : null;
+  }
+
+  async function readLegacyWithTimeout(legacyGetUiStateValues, scope, reason = 'fallback') {
+    if (typeof legacyGetUiStateValues !== 'function') return null;
+    const timeoutMs = Math.max(0, Number(legacyReadTimeoutMs) || 0);
+    if (!timeoutMs) return null;
+    let timeoutId = null;
+    try {
+      return await Promise.race([
+        legacyGetUiStateValues(scope),
+        new Promise((resolve) => {
+          timeoutId = setTimeout(() => resolve(null), timeoutMs);
+        }),
+      ]);
+    } catch (error) {
+      logger.warn(`[DataOps][legacy-${reason}]`, error?.message || error);
+      return null;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
   }
 
   function buildState(scope, values, source = 'supabase:data_ops') {
@@ -215,26 +237,30 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
   }
 
   async function getCustomersState(legacyGetUiStateValues) {
-    const [customers, legacy] = await Promise.all([
-      store.listCustomers(),
-      readLegacy(legacyGetUiStateValues, SCOPES.customers),
-    ]);
-    if (!customers || customers.length === 0) return legacy;
-    const mergedCustomers = mergeLegacyCustomerContactState(customers, parseLegacyCustomerRows(legacy));
+    const customers = await store.listCustomers();
+    if (!customers || customers.length === 0) {
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-fallback');
+    }
+    const legacy = legacyContactMergeEnabled
+      ? await readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-overlay')
+      : null;
+    const mergedCustomers = legacy
+      ? mergeLegacyCustomerContactState(customers, parseLegacyCustomerRows(legacy))
+      : customers;
     return buildState(SCOPES.customers, buildChunkedStatePatch(KEYS.customers, JSON.stringify(mergedCustomers)));
   }
 
   async function getActiveOrdersState(legacyGetUiStateValues) {
-    const [orders, runtime, legacy] = await Promise.all([
+    const [orders, runtime] = await Promise.all([
       store.listActiveOrders(),
       store.listOrderRuntime(),
-      readLegacy(legacyGetUiStateValues, SCOPES.activeOrders),
     ]);
     const hasOrders = Array.isArray(orders) && orders.length > 0;
     const hasRuntime = runtime && typeof runtime === 'object' && Object.keys(runtime).length > 0;
-    if (!hasOrders && !hasRuntime) return legacy;
+    if (!hasOrders && !hasRuntime) {
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.activeOrders, 'active-orders-fallback');
+    }
     return buildState(SCOPES.activeOrders, {
-      ...((legacy && legacy.values) || {}),
       ...(hasOrders ? buildChunkedStatePatch(KEYS.activeOrders, JSON.stringify(orders)) : {}),
       ...(hasRuntime ? { [KEYS.orderRuntime]: JSON.stringify(runtime) } : {}),
     });
@@ -316,8 +342,10 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     const entries = typeof store.listDesignPhotosWithSignedUrls === 'function'
       ? await store.listDesignPhotosWithSignedUrls()
       : await store.listDesignPhotosWithDataUrls();
-    if (!entries) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
-    if (entries.length === 0 && !entries.hadStructuredRows) return readLegacy(legacyGetUiStateValues, SCOPES.photos);
+    if (!entries) return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-fallback');
+    if (entries.length === 0 && !entries.hadStructuredRows) {
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-empty-fallback');
+    }
     return buildState(SCOPES.photos, buildPhotoCompatValues(entries));
   }
 
@@ -330,7 +358,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     } catch (error) {
       logger.error('[DataOps][ui-state-get]', error?.message || error);
     }
-    return readLegacy(options.legacyGetUiStateValues, scope);
+    return readLegacyWithTimeout(options.legacyGetUiStateValues, scope, 'error-fallback');
   }
 
   function extractPhotoEntries(values) {
