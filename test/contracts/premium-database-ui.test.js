@@ -733,7 +733,9 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260526b/);
+  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-safe-upload/);
+  assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = '\/api\/outreach\/provider-upload'/);
+  assert.doesNotMatch(instantlySyncScriptSource, /SYNC_ENDPOINT = '\/api\/outreach\/provider-sync'/);
   assert.match(instantlySyncScriptSource, /window\.location\.reload\(\)/);
   assert.match(instantlySyncScriptSource, /Database wordt ververst/);
   assert.match(instantlySyncScriptSource, /window\.alert\(text\)/);

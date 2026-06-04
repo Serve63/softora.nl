@@ -140,6 +140,12 @@ function createService(overrides = {}) {
     overrides.customerValues || {
       softora_customers_premium_v1: JSON.stringify(rows),
     };
+  const scopeValues = new Map();
+  if (overrides.coldmailSendGuard) {
+    scopeValues.set('premium_coldmail_send_guard', {
+      softora_coldmail_send_guard_v1: JSON.stringify(overrides.coldmailSendGuard),
+    });
+  }
   const fetchCalls = [];
   const publicImageFetchCalls = [];
   const writes = [];
@@ -196,12 +202,21 @@ function createService(overrides = {}) {
           },
         };
       }
+      if (scopeValues.has(scope)) {
+        return {
+          values: scopeValues.get(scope),
+        };
+      }
       return {
         values: customerValues,
       };
     },
     setUiStateValues: async (scope, values, meta) => {
       writes.push({ scope, values, meta });
+      if (scope !== 'premium_customers_database') {
+        scopeValues.set(scope, values);
+        return { ok: true };
+      }
       customerValues = values;
       rows = JSON.parse(readChunkedStateValue(values, 'softora_customers_premium_v1') || '[]');
       return { ok: true };
@@ -328,7 +343,17 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(body.leads[0].custom_variables.softora_instantly_email_text, body.leads[0].custom_variables.softora_instantly_email_body);
   assert.equal(body.leads[0].personalization, body.leads[0].custom_variables.softora_instantly_email_html);
 
-  assert.equal(writes.length, 1);
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
+  assert.equal(writes[0].meta.source, 'instantly-sync');
+  const guardState = JSON.parse(writes[0].values.softora_coldmail_send_guard_v1);
+  assert.equal(guardState.recipientEntries.length, 1);
+  assert.equal(guardState.recipientEntries[0].provider, 'instantly');
+  assert.equal(guardState.recipientEntries[0].permanent, true);
+  assert.equal(guardState.recipientEntries[0].recipientEmail, 'ruben@example.test');
+  assert.equal(guardState.recipientEntries[0].campaignId, 'campaign-1');
+  assert.equal(guardState.recipientEntries[0].leadId, 'instantly-lead-1');
+  assert.equal(writes[1].scope, 'premium_customers_database');
   const rows = getRows();
   assert.equal(rows[0].instantlyLeadId, 'instantly-lead-1');
   assert.equal(rows[0].instantlyStatus, 'synced');
@@ -339,6 +364,135 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastMailSentAt, undefined);
   assert.equal(rows[2].databaseStatus, 'gemaild');
   assert.equal(rows[2].outreachStatus, 'benaderd');
+});
+
+test('safe Instantly upload prepares CSV only after reserving leads and permanent guards', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Slagerij Maan',
+        naam: 'Luna Slager',
+        email: 'luna@example.test',
+        website: 'https://slagerijmaan.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'prospect-2': {
+        id: 'prospect-2',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 2,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.prepared, 2);
+  assert.equal(result.markedBenaderd, 2);
+  assert.equal(result.permanentGuards, 2);
+  assert.equal(result.campaignId, 'campaign-manual');
+  assert.equal(result.fileName, 'softora-instantly-2-leads-upload-test.csv');
+  assert.match(result.csv, /^email,first_name,last_name,company_name/);
+  assert.match(result.csv, /"ruben@example\.test"/);
+  assert.match(result.csv, /"luna@example\.test"/);
+  assert.match(result.csv, /softora_customer_id/);
+  assert.equal(fetchCalls.length, 0, 'manual upload preparation must not call Instantly API');
+
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
+  assert.equal(writes[0].meta.source, 'instantly-safe-manual-upload');
+  const guardState = JSON.parse(writes[0].values.softora_coldmail_send_guard_v1);
+  assert.equal(guardState.recipientEntries.length, 2);
+  assert.deepEqual(
+    guardState.recipientEntries.map((entry) => entry.recipientEmail),
+    ['ruben@example.test', 'luna@example.test']
+  );
+  assert.ok(guardState.recipientEntries.every((entry) => entry.provider === 'instantly'));
+  assert.ok(guardState.recipientEntries.every((entry) => entry.permanent === true));
+  assert.ok(guardState.recipientEntries.every((entry) => entry.campaignId === 'campaign-manual'));
+
+  assert.equal(writes[1].scope, 'premium_customers_database');
+  const rows = getRows();
+  assert.equal(rows[0].lastColdmailProvider, 'instantly');
+  assert.equal(rows[0].instantlyStatus, 'queued');
+  assert.equal(rows[0].instantlyManualUploadId, 'upload-test');
+  assert.equal(rows[0].databaseStatus, 'gemaild');
+  assert.equal(rows[1].lastColdmailProvider, 'instantly');
+  assert.equal(rows[1].instantlyStatus, 'queued');
+  assert.equal(rows[1].databaseStatus, 'gemaild');
+});
+
+test('safe Instantly upload skips leads that are already protected by recipient guard', async () => {
+  const { service, getRows, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'guarded-1',
+        bedrijf: 'Guarded BV',
+        email: 'guarded@example.test',
+        website: 'https://guarded.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'guarded-1': {
+        id: 'guarded-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    coldmailSendGuard: {
+      recipientEntries: [
+        {
+          at: '2026-06-04T12:00:00.000Z',
+          recipientKey: 'email:guarded@example.test',
+          recipientEmail: 'guarded@example.test',
+          provider: 'instantly',
+          permanent: true,
+        },
+      ],
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.prepared, 0);
+  assert.equal(result.failed.length, 1);
+  assert.match(result.failed[0].error, /permanente duplicate-guard/);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].instantlyStatus, undefined);
 });
 
 test('instantly sync uses the public Softora image host even when the app base url is Render', async () => {
@@ -1051,11 +1205,13 @@ test('instantly sync reads and writes chunked customer database state', async ()
   assert.equal(result.ok, true);
   assert.equal(result.synced, 1);
   assert.equal(fetchCalls.length, 1);
-  assert.equal(writes.length, 1);
-  assert.ok(writes[0].values.softora_customers_premium_v1_chunks_v1);
-  assert.ok(writes[0].values.softora_customers_premium_v1_chunk_0);
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
+  assert.equal(writes[1].scope, 'premium_customers_database');
+  assert.ok(writes[1].values.softora_customers_premium_v1_chunks_v1);
+  assert.ok(writes[1].values.softora_customers_premium_v1_chunk_0);
   const savedRows = JSON.parse(
-    readChunkedStateValue(writes[0].values, 'softora_customers_premium_v1')
+    readChunkedStateValue(writes[1].values, 'softora_customers_premium_v1')
   );
   assert.equal(savedRows[0].instantlyStatus, 'synced');
   assert.equal(savedRows[0].databaseStatus, 'gemaild');
