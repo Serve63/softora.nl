@@ -75,7 +75,7 @@ test('app middleware releases non-critical API requests after a short Supabase h
   assert.equal(nextCalls, 1, 'next() mag maar één keer worden aangeroepen');
 });
 
-test('app middleware skips Supabase hydration for auth and health API requests', async () => {
+test('app middleware skips Supabase hydration for isolated API requests', async () => {
   const app = createAppRecorder();
   let hydrateCalls = 0;
   let nextCalls = 0;
@@ -91,7 +91,13 @@ test('app middleware skips Supabase hydration for auth and health API requests',
   );
 
   const middleware = getLastMiddleware(app);
-  for (const requestPath of ['/api/auth/login', '/api/auth/session', '/api/health/baseline']) {
+  for (const requestPath of [
+    '/api/auth/login',
+    '/api/auth/session',
+    '/api/health/baseline',
+    '/api/mailbox/sync',
+    '/api/coldmailing/autopilot/run',
+  ]) {
     await new Promise((resolve) => {
       middleware({ method: 'POST', path: requestPath }, {}, () => {
         nextCalls += 1;
@@ -100,7 +106,7 @@ test('app middleware skips Supabase hydration for auth and health API requests',
     });
   }
 
-  assert.equal(nextCalls, 3);
+  assert.equal(nextCalls, 5);
   assert.equal(hydrateCalls, 0);
 });
 

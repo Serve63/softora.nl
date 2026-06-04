@@ -28,6 +28,8 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/auth/',
       '/api/health',
       '/api/healthz',
+      '/api/mailbox/sync',
+      '/api/coldmailing/autopilot/run',
     ],
   } = deps;
 

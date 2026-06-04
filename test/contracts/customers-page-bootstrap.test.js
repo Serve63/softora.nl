@@ -159,6 +159,39 @@ test('customers page bootstrap vult dashboard actieve-opdrachten teller server-s
   assert.match(script, /data-kpi-active-website/);
 });
 
+test('customers page bootstrap toont dashboard data als tijdelijk niet geladen in plaats van nep-nullen', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async () => null,
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+  const replacements = service.buildDashboardHtmlReplacements({
+    ...payload,
+    activeOrdersState: null,
+  });
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.source, 'unavailable');
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^--<script>/);
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
+});
+
+test('customers page bootstrap behandelt geworpen Supabase-read errors als tijdelijk niet geladen', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async () => {
+      throw new Error('Supabase timeout');
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.source, 'unavailable');
+  assert.match(payload.message, /Supabase-data tijdelijk niet geladen/);
+});
+
 test('customers page bootstrap levert actieve-opdrachten state voor snelle paginastart', async () => {
   const service = createCustomersPageBootstrapService({
     getUiStateValues: async (scope) => {
