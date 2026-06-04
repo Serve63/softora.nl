@@ -483,6 +483,10 @@
             if (typeof renderPage === "function") renderPage();
         }
 
+        function isRestoredPendingJob(job) {
+            return Boolean(job && job.restored === true);
+        }
+
         async function pollJob(jobId) {
             const storedJob = readPendingJobs().find(function (item) {
                 return item.jobId === jobId;
@@ -501,11 +505,14 @@
                 });
                 const job = payload && payload.job ? payload.job : null;
                 if (response.status === 404) {
-                    if (now() - storedJob.startedAt < 15000) {
+                    if (!isRestoredPendingJob(storedJob) && now() - storedJob.startedAt < 15000) {
                         schedulePoll(jobId, POLL_INTERVAL_MS);
                         return;
                     }
-                    await finishPendingJob(storedJob, "Webdesign-opdracht niet gevonden. Probeer opnieuw.");
+                    await finishPendingJob(
+                        storedJob,
+                        isRestoredPendingJob(storedJob) ? "" : "Webdesign-opdracht niet gevonden. Probeer opnieuw."
+                    );
                     return;
                 }
                 if (!response.ok || !job) {
@@ -543,7 +550,8 @@
                     const pendingJob = {
                         customerId: normalizeString(job.customerId),
                         jobId: normalizeString(job.id),
-                        startedAt: Math.max(0, Number(job.createdAt) || now())
+                        startedAt: Math.max(0, Number(job.createdAt) || now()),
+                        restored: true
                     };
                     if (!pendingJob.customerId || !pendingJob.jobId) return;
                     setPendingJob(pendingJob);
