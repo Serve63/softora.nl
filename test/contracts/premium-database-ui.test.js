@@ -452,7 +452,9 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
   assert.match(pageSource, /<button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen<\/button>/);
   assert.match(pageSource, /<button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen<\/button>/);
-  assert.doesNotMatch(pageSource, /id="instantOutreachSyncButton"/);
+  assert.match(pageSource, /id="instantOutreachSyncButton"/);
+  assert.match(pageSource, />Veilige Instantly CSV maken<\/span>/);
+  assert.match(pageSource, />Reserveer eerst in Softora, download daarna CSV<\/span>/);
   assert.doesNotMatch(pageSource, />10 mockup-leads naar Instantly<\/button>/);
   assert.doesNotMatch(pageSource, /Volgende locatie doorzoeken/);
   assert.doesNotMatch(pageSource, /AI werkt de huidige plek automatisch af/);

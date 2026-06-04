@@ -251,6 +251,8 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/coldmailing/replies/sync',
       '/api/instantly/sync',
       '/api/outreach/provider-sync',
+      '/api/instantly/prepare-upload',
+      '/api/outreach/provider-upload',
       '/api/coldcalling/start',
       '/api/active-orders/generate-site',
       '/api/active-order-generate-site',
