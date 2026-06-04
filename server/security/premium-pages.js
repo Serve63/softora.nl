@@ -46,7 +46,10 @@ function createPremiumHtmlPageAccessController(options = {}) {
     const isLoginPage = fileName === 'premium-personeel-login.html';
     const isProtectedPremiumPage = isPremiumProtectedHtmlFile(fileName);
     const isAdminOnlyPremiumPage = isProtectedPremiumPage && isPremiumAdminOnlyHtmlFile(fileName);
-    const authState = isLoginPage || isProtectedPremiumPage ? await getResolvedPremiumAuthState(req) : null;
+    const authState =
+      isLoginPage || isProtectedPremiumPage
+        ? await getResolvedPremiumAuthState(req, { allowAnonymousWithoutHydration: isLoginPage })
+        : null;
     const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
     const requestedPath = getSafePremiumRedirectPath(req.originalUrl || req.url || req.path || '/');
 

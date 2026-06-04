@@ -64,6 +64,7 @@ function createUiSeoRuntime(deps = {}) {
     dataOpsUiStateEnabled = true,
     dataOpsUiStateReadTimeoutMs = 2500,
     uiStateReadTimeoutMsByScope = Object.freeze({
+      seo: 350,
       premium_database_photos: 8000,
     }),
     uiStateMemoryFallbackScopes = Object.freeze([
