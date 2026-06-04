@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '../..');
 const SEO_GROWTH_CSS_VERSION = '20260528a';
 const LOW_TRUST_PUBLIC_IMAGE_PATTERN = /\/assets\/(?:home-service-[^"']*-ai|home-over-office-meeting-ai|home-hero-generated-v2|softora-office-digital-growth)\.jpg/i;
-const { INDEXABLE_PUBLIC_SEO_PAGES } = require('../../server/services/public-seo');
+const { INDEXABLE_PUBLIC_SEO_PAGES, applyPublicSeoHeadDefaults } = require('../../server/services/public-seo');
 const {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
@@ -137,6 +137,41 @@ test('indexable public SEO pages avoid low-trust generated-looking image filenam
       source,
       LOW_TRUST_PUBLIC_IMAGE_PATTERN,
       `${fileName} gebruikt een zwakke AI/generated publieke beeldnaam`
+    );
+  }
+});
+
+test('rendered public SEO metadata avoids low-trust generated-looking images', () => {
+  const now = new Date('2026-06-03T12:00:00.000Z');
+  const renderedPages = [
+    ...INDEXABLE_PUBLIC_SEO_PAGES
+      .filter((entry) => entry.kind !== 'home')
+      .map((entry) => ({
+        label: entry.path,
+        html: applyPublicSeoHeadDefaults(readFile(entry.fileName), entry.fileName, {
+          siteOrigin: 'https://www.softora.nl',
+        }),
+      })),
+    ...getSeoContentCollectionPaths().map((collectionPath) => ({
+      label: collectionPath,
+      html: buildSeoContentIndexHtml(collectionPath.replace(/^\//, ''), {
+        siteOrigin: 'https://www.softora.nl',
+        now,
+      }),
+    })),
+    ...getSeoContentItems({ now }).map((item) => ({
+      label: `${item.collection}/${item.slug}`,
+      html: buildSeoContentArticleHtml(item, {
+        siteOrigin: 'https://www.softora.nl',
+      }),
+    })),
+  ];
+
+  for (const page of renderedPages) {
+    assert.doesNotMatch(
+      page.html,
+      LOW_TRUST_PUBLIC_IMAGE_PATTERN,
+      `${page.label} rendert een zwakke AI/generated publieke metadata-afbeelding`
     );
   }
 });
