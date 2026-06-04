@@ -446,6 +446,63 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[1].databaseStatus, 'gemaild');
 });
 
+test('safe Instantly upload refuses partial batches when fewer leads are ready than requested', async () => {
+  const { service, getRows, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Slagerij Maan',
+        naam: 'Luna Slager',
+        email: 'luna@example.test',
+        website: 'https://slagerijmaan.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'prospect-2': {
+        id: 'prospect-2',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 3,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'insufficient_eligible_leads');
+  assert.equal(result.requested, 3);
+  assert.equal(result.available, 2);
+  assert.equal(result.prepared, 0);
+  assert.match(result.message, /Zet eerst genoeg mail-ready leads klaar/);
+  assert.equal(result.csv, undefined);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+  assert.equal(getRows()[1].lastColdmailProvider, undefined);
+});
+
 test('safe Instantly upload skips leads that are already protected by recipient guard', async () => {
   const { service, getRows, writes } = createService({
     syncEnabled: false,

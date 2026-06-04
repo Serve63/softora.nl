@@ -3038,12 +3038,16 @@ function createInstantlyOutreachService(deps = {}) {
       }
     }
 
-    if (!sendableRows.length) {
+    if (sendableRows.length < limit) {
+      const available = sendableRows.length;
       lastSyncResult = {
         ok: true,
         skipped: true,
-        reason: 'no_eligible_leads',
+        reason: available > 0 ? 'insufficient_eligible_leads' : 'no_eligible_leads',
+        message: `Zet eerst genoeg mail-ready leads klaar. Gevraagd: ${limit}, veilig klaar: ${available}.`,
         prepared: 0,
+        available,
+        requested: limit,
         failed,
         campaignId,
         finishedAt: preparedAt,
