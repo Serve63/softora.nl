@@ -133,6 +133,13 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(stabilityJsSource, /NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1"/);
   assert.match(stabilityJsSource, /CONTENT_FRAME_PARAM = "softora_sidebar_content"/);
   assert.match(stabilityJsSource, /CONTENT_FRAME_ID = "softoraPremiumContentFrame"/);
+  assert.match(stabilityJsSource, /PERSISTENT_SIDEBAR_FRAME_OPT_IN_ATTR = "data-sidebar-persist-frame"/);
+  assert.match(stabilityJsSource, /anchor\.getAttribute\(PERSISTENT_SIDEBAR_FRAME_OPT_IN_ATTR\) !== "1"/);
+  assert.match(stabilityJsSource, /targetPath\.indexOf\("\/premium-website"\) === 0\) return false;/);
+  assert.match(stabilityJsSource, /function enforceDashboardAiChatScopeForHref\(href\) \{/);
+  assert.match(stabilityJsSource, /#dashboardAiChat, \.dashboard-ai-chat/);
+  assert.match(stabilityJsSource, /function removeContentFrame\(\) \{/);
+  assert.match(stabilityJsSource, /anchor\.setAttribute\("href", href\);[\s\S]*anchor\.setAttribute\("data-sidebar-href", href\);/);
   assert.match(stabilityJsSource, /function persistSidebarNavState\(sidebar, targetHref\) \{/);
   assert.match(stabilityJsSource, /function isCurrentTarget\(href\) \{/);
   assert.match(stabilityJsSource, /function navigatePersistentSidebarShell\(href, options\) \{/);
@@ -211,7 +218,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519d'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260604a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE/);
   assert.match(htmlPagesSource, /function isPremiumSidebarContentFrameRequest\(req\) \{/);

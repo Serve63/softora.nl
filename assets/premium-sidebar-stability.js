@@ -3,6 +3,7 @@
     var NAV_STATE_MAX_AGE_SECONDS = 30;
     var CONTENT_FRAME_PARAM = "softora_sidebar_content";
     var CONTENT_FRAME_ID = "softoraPremiumContentFrame";
+    var PERSISTENT_SIDEBAR_FRAME_OPT_IN_ATTR = "data-sidebar-persist-frame";
     var activeFrameNavigationUrl = "";
 
     function isPremiumPath() {
@@ -38,6 +39,20 @@
     function normalizeTarget(url) {
         var href = String(url || "").trim();
         if (!href) return "";
+        try {
+            var targetUrl = new URL(href, window.location.origin);
+            var targetPath = String(targetUrl.pathname || "").toLowerCase().replace(/\/+$/, "") || "/";
+            if (targetUrl.origin === window.location.origin) {
+                if (targetPath === "/premium-website" || targetPath === "/premium-website.html") {
+                    return "/" + targetUrl.search + targetUrl.hash;
+                }
+                if (targetPath === "/premium-ai-coldmailing") {
+                    return "/premium-leads" + targetUrl.search + targetUrl.hash;
+                }
+            }
+        } catch (_) {
+            /* ignore invalid target */
+        }
         return href === "/premium-ai-coldmailing" ? "/premium-leads" : href;
     }
 
@@ -46,8 +61,9 @@
         return normalizeTarget(anchor.getAttribute("data-sidebar-href") || anchor.getAttribute("href"));
     }
 
-    function shouldUsePersistentSidebarShell(href, event) {
+    function shouldUsePersistentSidebarShell(href, event, anchor) {
         if (!href || !isPremiumPath()) return false;
+        if (!anchor || anchor.getAttribute(PERSISTENT_SIDEBAR_FRAME_OPT_IN_ATTR) !== "1") return false;
         if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1)) {
             return false;
         }
@@ -56,6 +72,7 @@
             if (targetUrl.origin !== window.location.origin) return false;
             var targetPath = String(targetUrl.pathname || "").toLowerCase();
             if (targetPath.indexOf("/premium-") !== 0) return false;
+            if (targetPath.indexOf("/premium-website") === 0) return false;
             if (targetPath.indexOf("/premium-personeel-login") === 0) return false;
             return true;
         } catch (_) {
@@ -147,6 +164,34 @@
         return document.getElementById(CONTENT_FRAME_ID);
     }
 
+    function isPremiumDashboardTarget(href) {
+        try {
+            var targetUrl = new URL(href || window.location.href, window.location.origin);
+            var targetPath = String(targetUrl.pathname || "").toLowerCase().replace(/\/+$/, "") || "/";
+            return targetUrl.origin === window.location.origin &&
+                (targetPath === "/premium-personeel-dashboard" || targetPath === "/premium-personeel-dashboard.html");
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function enforceDashboardAiChatScopeForHref(href) {
+        if (isPremiumDashboardTarget(href) && !getContentFrame()) return;
+        document.querySelectorAll("#dashboardAiChat, .dashboard-ai-chat").forEach(function (element) {
+            if (element && element.parentNode) element.parentNode.removeChild(element);
+        });
+    }
+
+    function removeContentFrame() {
+        var frame = getContentFrame();
+        if (frame && frame.parentNode) {
+            frame.parentNode.removeChild(frame);
+        }
+        activeFrameNavigationUrl = "";
+        setRouteChanging(false);
+        enforceDashboardAiChatScopeForHref(window.location.pathname + window.location.search + window.location.hash);
+    }
+
     function ensureContentFrame() {
         var existing = getContentFrame();
         if (existing) return existing;
@@ -172,7 +217,7 @@
     }
 
     function navigatePersistentSidebarShell(href, options) {
-        if (!shouldUsePersistentSidebarShell(href, options && options.event)) return false;
+        if (!shouldUsePersistentSidebarShell(href, options && options.event, options && options.anchor)) return false;
         var visibleUrl = buildVisibleUrl(href);
         if (isCurrentTarget(visibleUrl) && (!options || options.pushHistory !== false)) return false;
         var sidebar = getSidebar();
@@ -213,7 +258,15 @@
         if (!anchor || !sidebar.contains(anchor)) return;
         var href = getAnchorTarget(anchor);
         if (!href) return;
+        if (anchor.getAttribute("href") !== href) {
+            anchor.setAttribute("href", href);
+            anchor.setAttribute("data-sidebar-href", href);
+        }
+        enforceDashboardAiChatScopeForHref(href);
         if (isCurrentTarget(href)) {
+            if (getContentFrame()) {
+                removeContentFrame();
+            }
             event.preventDefault();
             event.stopImmediatePropagation();
             return;
@@ -222,7 +275,7 @@
             markRouteChanging(sidebar, href);
             return;
         }
-        if (navigatePersistentSidebarShell(href, { event: event })) {
+        if (navigatePersistentSidebarShell(href, { event: event, anchor: anchor })) {
             event.preventDefault();
             event.stopImmediatePropagation();
             return;
@@ -243,8 +296,11 @@
             if (!frame) return;
             var href = window.location.pathname + window.location.search + window.location.hash;
             if (href === activeFrameNavigationUrl) return;
-            navigatePersistentSidebarShell(href, { pushHistory: false });
+            if (!navigatePersistentSidebarShell(href, { pushHistory: false })) {
+                removeContentFrame();
+            }
         });
+        enforceDashboardAiChatScopeForHref(window.location.pathname + window.location.search + window.location.hash);
     }
 
     if (document.readyState === "loading") {
