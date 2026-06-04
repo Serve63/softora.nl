@@ -1390,6 +1390,82 @@ test('premium database webdesign action keeps generation errors visible until th
   assert.equal(errorMessage.autoClear, undefined);
 });
 
+test('premium database webdesign action silently drops restored jobs that disappeared server-side', async () => {
+  const messages = [];
+  const timers = [];
+  const refreshed = [];
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async (url) => {
+      const target = String(url || '');
+      if (target === '/api/premium-database/webdesign-photo-jobs') {
+        return {
+          ok: true,
+          json: async () => ({
+            jobs: [{
+              id: 'stale-restored-job',
+              customerId: 'customer-1',
+              status: 'running',
+              createdAt: Date.now() - 60_000,
+            }],
+          }),
+        };
+      }
+      if (target === '/api/premium-database/webdesign-photo-jobs/stale-restored-job') {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({}),
+        };
+      }
+      return { ok: false, status: 500, json: async () => ({}) };
+    },
+  });
+  const controller = webdesignActionClient.createController({
+    state: {
+      klanten: [{
+        id: 'customer-1',
+        bedrijf: 'Softora Testmodus',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        websitePhoto: '',
+      }],
+    },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage(message, tone, autoClear) {
+      messages.push({ message, tone, autoClear });
+    },
+    renderPage() {},
+    refreshPhotos: async (context) => {
+      refreshed.push(context);
+    },
+  });
+
+  await controller.resumePendingJobs();
+  const pollTimer = timers.find((timer) => Number(timer.delay) === 0);
+  assert.ok(pollTimer, 'restored running job should schedule an immediate poll');
+
+  pollTimer.callback();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(messages.filter((item) => item.tone === 'error'), []);
+  assert.equal(refreshed.length, 1);
+  assert.equal(refreshed[0].customerId, 'customer-1');
+});
+
 test('premium database webdesign action remembers failed photo slots as a quiet fallback', () => {
   const listeners = {};
   const webdesignActionClient = loadDatabaseWebdesignActionClient();
