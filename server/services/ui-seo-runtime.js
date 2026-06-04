@@ -62,9 +62,15 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigKey,
     seoConfigCacheTtlMs,
     dataOpsUiStateEnabled = true,
+    dataOpsUiStateReadTimeoutMs = 2500,
     uiStateReadTimeoutMsByScope = Object.freeze({
       premium_database_photos: 8000,
     }),
+    uiStateMemoryFallbackScopes = Object.freeze([
+      'premium_customers_database',
+      'premium_active_orders',
+      'premium_database_photos',
+    ]),
   } = deps;
 
   const uiStateStore = createUiStateStore({
@@ -76,6 +82,7 @@ function createUiSeoRuntime(deps = {}) {
     fetchSupabaseRowByKeyViaRest,
     upsertSupabaseRowViaRest,
     uiStateReadTimeoutMsByScope,
+    uiStateMemoryFallbackScopes,
     normalizeString,
     truncateText,
     logger,
@@ -207,6 +214,8 @@ function createUiSeoRuntime(deps = {}) {
     sanitizeUiStateValues,
     setUiStateValues,
     dataOpsUiStateBridge,
+    dataOpsUiStateReadTimeoutMs,
+    logger,
   });
 
   const runtimeDebugOpsCoordinator = createRuntimeDebugOpsCoordinator({

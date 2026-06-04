@@ -67,11 +67,13 @@ function createFixture(overrides = {}) {
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
+    dataOpsUiStateReadTimeoutMs: overrides.dataOpsUiStateReadTimeoutMs,
     adminOnlyUiStateScopes: overrides.adminOnlyUiStateScopes || new Set(['premium_password_register']),
     appendSecurityAuditEvent: overrides.appendSecurityAuditEvent || ((payload, reason) => {
       securityAuditCalls.push({ payload, reason });
       return payload;
     }),
+    logger: overrides.logger,
   });
 
   return {
@@ -223,6 +225,36 @@ test('runtime ops coordinator prefers structured data ops reads and mirrors writ
   assert.equal(setRes.body.source, 'supabase:data_ops');
   assert.deepEqual(bridgeCalls.map((call) => call.type), ['get', 'get', 'set']);
   assert.equal(bridgeCalls[2].meta.source, 'premium-klanten');
+});
+
+test('runtime ops coordinator falls back to legacy ui-state when structured data ops reads hang', async () => {
+  const warnings = [];
+  const { coordinator } = createFixture({
+    dataOpsUiStateReadTimeoutMs: 5,
+    getUiStateValues: async () => ({
+      values: { softora_customers_premium_v1: '[{"id":"legacy-cust"}]' },
+      source: 'memory',
+      updatedAt: null,
+    }),
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      getUiStateValues: async () => new Promise(() => {}),
+    },
+    logger: {
+      warn: (...args) => warnings.push(args),
+      error: (...args) => warnings.push(args),
+    },
+  });
+  const res = createResponseRecorder();
+  const startedAt = Date.now();
+
+  await coordinator.sendUiStateGetResponse({}, res, 'premium_customers_database');
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'memory');
+  assert.equal(res.body.values.softora_customers_premium_v1, '[{"id":"legacy-cust"}]');
+  assert.ok(Date.now() - startedAt < 500);
+  assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
 });
 
 test('runtime ops coordinator treats values writes as patches unless replace is explicit', async () => {

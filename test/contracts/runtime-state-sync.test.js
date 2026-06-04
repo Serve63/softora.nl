@@ -88,6 +88,8 @@ function createFixture(overrides = {}) {
     runtimeStateRemoteNewerThresholdMs: 250,
     supabaseClientPersistTimeoutMs:
       overrides.supabaseClientPersistTimeoutMs === undefined ? 12000 : overrides.supabaseClientPersistTimeoutMs,
+    supabaseHydrateReadTimeoutMs:
+      overrides.supabaseHydrateReadTimeoutMs === undefined ? 4500 : overrides.supabaseHydrateReadTimeoutMs,
     queuedRuntimePersistAwaitTimeoutMs:
       overrides.queuedRuntimePersistAwaitTimeoutMs === undefined ? 60000 : overrides.queuedRuntimePersistAwaitTimeoutMs,
     normalizeString: (value) => String(value || '').trim(),
@@ -493,6 +495,38 @@ test('runtime state sync coordinator hydrates from REST fallback when the client
   assert.equal(ok, true);
   assert.equal(fixture.runtimeState.supabaseStateHydrated, true);
   assert.equal(fixture.runtimeState.supabaseLastHydrateError, '');
+});
+
+test('runtime state sync coordinator times out hung hydrate reads and releases the hydrate lock', async () => {
+  const fixture = createFixture({
+    supabaseHydrateReadTimeoutMs: 1000,
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle: async () => new Promise(() => {}),
+                };
+              },
+            };
+          },
+        };
+      },
+    }),
+    fetchSupabaseStateRowViaRest: async () => new Promise(() => {}),
+  });
+  const startedAt = Date.now();
+
+  const ok = await fixture.coordinator.ensureRuntimeStateHydratedFromSupabase({ force: true });
+
+  assert.equal(ok, false);
+  assert.equal(fixture.runtimeState.supabaseStateHydrated, false);
+  assert.equal(fixture.runtimeState.supabaseStateHydrationPromise, null);
+  assert.ok(fixture.runtimeState.supabaseHydrateRetryNotBeforeMs > Date.now());
+  assert.match(fixture.runtimeState.supabaseLastHydrateError, /Supabase hydrate client timeout|Supabase hydrate REST timeout/);
+  assert.ok(Date.now() - startedAt < 3000);
 });
 
 test('runtime state sync coordinator treats queued runtime snapshot await as a no-op when Supabase is disabled', async () => {

@@ -2090,7 +2090,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260502a"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260502a"></script><script src="assets/premium-dashboard-data-status.js?v=20260604a"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2958,7 +2958,7 @@
             });
         }
 
-        function renderPremiumDashboardOrders() {
+        function renderPremiumDashboardOrders() { if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.clear();
             const orders = Array.isArray(premiumDashboardState.orders) ? premiumDashboardState.orders : [];
             const customers = Array.isArray(premiumDashboardState.customers) ? premiumDashboardState.customers : [];
             const currentYear = now.getFullYear();
@@ -3167,7 +3167,7 @@
             premiumDashboardState.refreshPromise = (async () => {
                 const results = await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
                 const loaded = results.some(Boolean) || premiumDashboardState.ordersHydrated || premiumDashboardState.customersHydrated;
-                if (loaded) renderPremiumDashboardOrders(); premiumDashboardState.lastRefreshAt = Date.now();
+                if (loaded) renderPremiumDashboardOrders(); else if (!premiumDashboardState.ordersHydrated && !premiumDashboardState.customersHydrated && window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); premiumDashboardState.lastRefreshAt = Date.now();
                 return loaded;
             })().finally(() => {
                 premiumDashboardState.refreshPromise = null;

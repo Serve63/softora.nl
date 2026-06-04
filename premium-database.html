@@ -1576,7 +1576,7 @@
     <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1918,7 +1918,7 @@
 
             return urls.reduce(function (promise, url) {
                 return promise.catch(function () {
-                    return fetch(url, { method: "GET", cache: "no-store" }).then(function (response) {
+                    return window.SoftoraDatabaseResilience.fetchJsonWithTimeout(url, { method: "GET", cache: "no-store" }).then(function (response) {
                         if (!response.ok) {
                             throw new Error("UI-state GET mislukt (" + response.status + ")");
                         }
@@ -1945,7 +1945,7 @@
 
             return urls.reduce(function (promise, url) {
                 return promise.catch(function () {
-                    return fetch(url, {
+                    return window.SoftoraDatabaseResilience.fetchJsonWithTimeout(url, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(body || {})
@@ -2998,7 +2998,7 @@
         }
 
         async function bootstrapCustomers() {
-            const hadBootstrapCustomers = state.klanten.length > 0;
+            const hadBootstrapCustomers = state.klanten.length > 0; let loadFailed = false;
 
             if (!hadBootstrapCustomers) {
                 setStatusMessage("Database laden...", "info");
@@ -3006,7 +3006,7 @@
 
             try {
                 await refreshColdmailGuardState(); const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
-                const remoteCustomers = parseCustomers(window.SoftoraDatabaseImport.readChunkedStateValue(remoteState && remoteState.values, CUSTOMER_DB_KEY));
+                const remoteValues = remoteState && remoteState.values && typeof remoteState.values === "object" ? remoteState.values : {}; if (!window.SoftoraDatabaseResilience.hasChunkedStateKey(remoteValues, CUSTOMER_DB_KEY)) throw new Error("Geen Supabase-klantdata ontvangen."); const remoteCustomers = parseCustomers(window.SoftoraDatabaseImport.readChunkedStateValue(remoteValues, CUSTOMER_DB_KEY));
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
@@ -3034,11 +3034,10 @@
                     return;
                 }
             } catch (error) {
-                console.error("Klanten laden via Supabase mislukt:", error);
+                loadFailed = true; console.error("Klanten laden via Supabase mislukt:", error);
             }
 
-            if (!hadBootstrapCustomers) { state.klanten = []; renderPage(); }
-            setStatusMessage("");
+            if (!hadBootstrapCustomers) { if (loadFailed) setStatusMessage(window.SoftoraDatabaseResilience.unavailableMessage, "error"); else { state.klanten = []; renderPage(); setStatusMessage(""); } return; } if (loadFailed) { setStatusMessage(window.SoftoraDatabaseResilience.staleRefreshMessage, "error", true); return; } setStatusMessage("");
         }
 
         let customerStateRefreshInFlight = false; function isDatabaseInteractionOpen() { return nodes.modalBg.classList.contains("on") || nodes.panel.classList.contains("on") || nodes.photoPreview.classList.contains("on") || (photoBatchController && typeof photoBatchController.isOpen === "function" && photoBatchController.isOpen()) || (databaseDeepSearchController && typeof databaseDeepSearchController.isOpen === "function" && databaseDeepSearchController.isOpen()); } async function refreshCustomerStateSilently() { if (customerStateRefreshInFlight || document.hidden || isDatabaseInteractionOpen()) return false; customerStateRefreshInFlight = true; try { await bootstrapCustomers(); return true; } catch (error) { console.error("Database live verversen mislukt:", error); return false; } finally { customerStateRefreshInFlight = false; } } function startCustomerStateAutoRefresh() { window.setInterval(function () { void refreshCustomerStateSilently(); }, CUSTOMER_DB_SYNC_INTERVAL_MS); window.addEventListener("focus", function () { void refreshCustomerStateSilently(); }); document.addEventListener("visibilitychange", function () { if (!document.hidden) void refreshCustomerStateSilently(); }); }

@@ -15,8 +15,10 @@ function createRuntimeOpsCoordinator(deps = {}) {
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
     dataOpsUiStateBridge = null,
+    dataOpsUiStateReadTimeoutMs = 2500,
     adminOnlyUiStateScopes = createAdminOnlyUiStateScopesSet(),
     appendSecurityAuditEvent = () => {},
+    logger = console,
   } = deps;
 
   function normalizeListLimit(value, fallback = 100) {
@@ -50,6 +52,31 @@ function createRuntimeOpsCoordinator(deps = {}) {
     return Boolean(req?.premiumAuth?.authenticated && req?.premiumAuth?.isAdmin);
   }
 
+  function logDataOpsReadFallback(scope, error) {
+    const message = error?.message || String(error || 'onbekende fout');
+    const log = logger && (typeof logger.warn === 'function' ? logger.warn : logger.error);
+    if (typeof log === 'function') {
+      log.call(logger, '[DataOps][ui-state-read-fallback]', JSON.stringify({ scope, message }));
+    }
+  }
+
+  async function awaitWithTimeout(promise, timeoutMs, errorMessage) {
+    const safeTimeoutMs = Math.max(1, Math.min(30000, Number(timeoutMs) || 2500));
+    let timeoutId = null;
+    try {
+      return await Promise.race([
+        Promise.resolve(promise),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error(errorMessage || `Timeout na ${Math.round(safeTimeoutMs / 1000)}s`));
+          }, safeTimeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   function appendAdminScopeDeniedAuditEvent(req, scope) {
     appendSecurityAuditEvent(
       {
@@ -74,10 +101,18 @@ function createRuntimeOpsCoordinator(deps = {}) {
       dataOpsUiStateBridge.canHandleScope(scope) &&
       typeof dataOpsUiStateBridge.getUiStateValues === 'function'
     ) {
-      const bridged = await dataOpsUiStateBridge.getUiStateValues(scope, {
-        legacyGetUiStateValues: getUiStateValues,
-      });
-      if (bridged) return bridged;
+      try {
+        const bridged = await awaitWithTimeout(
+          dataOpsUiStateBridge.getUiStateValues(scope, {
+            legacyGetUiStateValues: getUiStateValues,
+          }),
+          dataOpsUiStateReadTimeoutMs,
+          `DataOps UI-state read timeout na ${Math.round(Math.max(1, Number(dataOpsUiStateReadTimeoutMs) || 2500) / 1000)}s`
+        );
+        if (bridged) return bridged;
+      } catch (error) {
+        logDataOpsReadFallback(scope, error);
+      }
     }
     return getUiStateValues(scope);
   }
