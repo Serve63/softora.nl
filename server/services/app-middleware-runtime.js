@@ -340,6 +340,13 @@ function applyAppMiddleware(app, deps = {}) {
     if (skipsSupabaseHydration(requestPath)) return next();
     const strictHydration = requiresStrictSupabaseHydration(requestPath, req.method);
 
+    if (!strictHydration) {
+      ensureRuntimeStateHydratedFromSupabase().catch((error) => {
+        console.error('[Supabase][HydrateMiddlewareBackgroundError]', error?.message || error);
+      });
+      return next();
+    }
+
     let released = false;
     const release = () => {
       if (released) return;
