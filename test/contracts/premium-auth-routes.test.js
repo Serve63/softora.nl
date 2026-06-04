@@ -444,7 +444,10 @@ test('premium auth login forces a fresh user hydrate before password checks', as
 
   assert.equal(res.statusCode, 200);
   assert.equal(fixture.premiumUsersStore.hydrationCalls.length, 1);
-  assert.deepEqual(fixture.premiumUsersStore.hydrationCalls[0], { force: true });
+  assert.deepEqual(fixture.premiumUsersStore.hydrationCalls[0], {
+    force: true,
+    readTimeoutMs: 1200,
+  });
 });
 
 test('premium auth login recovers stale stored hashes from bootstrap credentials', async () => {

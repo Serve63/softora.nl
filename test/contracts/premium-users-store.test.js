@@ -132,6 +132,51 @@ test('premium users store times out hanging Supabase hydration instead of hangin
   }
 });
 
+test('premium users store honors shorter login timeout while another hydrate is pending', async () => {
+  const store = createFixture({
+    config: {
+      premiumUsersReadTimeoutMs: 200,
+    },
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle() {
+                    return new Promise(() => {});
+                  },
+                };
+              },
+            };
+          },
+          async upsert() {
+            return { error: new Error('write should not happen') };
+          },
+        };
+      },
+    },
+  });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  try {
+    const pendingHydrate = store.ensureUsersHydrated();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const startedAt = Date.now();
+    const hydrated = await store.ensureUsersHydrated({ force: true, readTimeoutMs: 25 });
+
+    assert.equal(hydrated.source, 'unavailable');
+    assert.equal(hydrated.users.length, 0);
+    assert.ok(Date.now() - startedAt < 1000);
+    await pendingHydrate;
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
 test('premium users store bootstraps only after Supabase confirms the users row is missing', async () => {
   let upsertedRow = null;
   const store = createFixture({
