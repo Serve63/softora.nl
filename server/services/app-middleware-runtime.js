@@ -37,7 +37,13 @@ function applyAppMiddleware(app, deps = {}) {
     .map((item) => String(item || '').trim())
     .filter(Boolean);
 
-  function requiresStrictSupabaseHydration(pathname) {
+  function isReadOnlyRequestMethod(method) {
+    const normalizedMethod = String(method || 'GET').trim().toUpperCase();
+    return normalizedMethod === 'GET' || normalizedMethod === 'HEAD' || normalizedMethod === 'OPTIONS';
+  }
+
+  function requiresStrictSupabaseHydration(pathname, method = 'GET') {
+    if (isReadOnlyRequestMethod(method)) return false;
     const requestPath = String(pathname || '');
     return normalizedStrictSupabaseHydrateApiPrefixes.some((prefix) => requestPath.startsWith(prefix));
   }
@@ -312,7 +318,7 @@ function applyAppMiddleware(app, deps = {}) {
     const requestPath = String(req.path || '');
     if (!isSupabaseConfigured()) return next();
     if (!requestPath.startsWith('/api/')) return next();
-    const strictHydration = requiresStrictSupabaseHydration(requestPath);
+    const strictHydration = requiresStrictSupabaseHydration(requestPath, req.method);
 
     let released = false;
     const release = () => {
