@@ -152,6 +152,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     const hydrated = await premiumUsersStore.ensureUsersHydrated({
       force: true,
       readTimeoutMs: getLoginUsersReadTimeoutMs(),
+      allowBootstrapFallback: true,
     });
     const hydratedUsers = Array.isArray(hydrated?.users) ? hydrated.users : [];
     const cachedUsers = premiumUsersStore.getCachedUsers();
