@@ -68,6 +68,7 @@ function createFixture(overrides = {}) {
       })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
     dataOpsUiStateReadTimeoutMs: overrides.dataOpsUiStateReadTimeoutMs,
+    uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     adminOnlyUiStateScopes: overrides.adminOnlyUiStateScopes || new Set(['premium_password_register']),
     appendSecurityAuditEvent: overrides.appendSecurityAuditEvent || ((payload, reason) => {
       securityAuditCalls.push({ payload, reason });
@@ -124,6 +125,27 @@ test('runtime ops coordinator returns 400 or 503 for invalid or unavailable ui-s
 
   assert.equal(unavailableRes.statusCode, 503);
   assert.match(unavailableRes.body.error, /Kon UI state niet laden/i);
+});
+
+test('runtime ops coordinator timeboxt hanging ui-state reads', async () => {
+  const warnings = [];
+  const { coordinator } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    getUiStateValues: async () => new Promise(() => {}),
+    logger: {
+      warn: (...args) => warnings.push(args.join(' ')),
+    },
+  });
+  const res = createResponseRecorder();
+  const startedAt = Date.now();
+
+  await coordinator.sendUiStateGetResponse({ query: {} }, res, 'premium_customers_database');
+
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /Kon UI state niet laden/i);
+  assert.ok(Date.now() - startedAt < 250, 'ui-state read moet snel fail-fast teruggeven');
+  assert.match(warnings.join('\n'), /\[RuntimeOps\]\[ui-state-read-fallback\]/);
+  assert.match(warnings.join('\n'), /UI-state read timeout/);
 });
 
 test('runtime ops coordinator merges patches for ui-state writes', async () => {

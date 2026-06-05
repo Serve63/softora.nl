@@ -1,6 +1,8 @@
 (function (global) {
     "use strict";
 
+    var DEFAULT_TIMEOUT_MS = 5000;
+
     function normalizeScope(scope) {
         return encodeURIComponent(String(scope || ""));
     }
@@ -25,12 +27,42 @@
         return await response.json().catch(function () { return {}; });
     }
 
+    function getSafeTimeoutMs(timeoutMs) {
+        return Math.max(1000, Math.min(30000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
+    }
+
+    async function fetchWithTimeout(url, options, label, timeoutMs) {
+        var safeTimeoutMs = getSafeTimeoutMs(timeoutMs);
+        var AbortCtor = global && typeof global.AbortController === "function" ? global.AbortController : null;
+        var controller = AbortCtor ? new AbortCtor() : null;
+        var requestOptions = Object.assign({}, options || {});
+        var timeout = null;
+
+        if (controller) {
+            requestOptions.signal = controller.signal;
+            timeout = global.setTimeout(function () {
+                controller.abort();
+            }, safeTimeoutMs);
+        }
+
+        try {
+            return await global.fetch(url, requestOptions);
+        } catch (error) {
+            if (error && error.name === "AbortError") {
+                throw new Error(label + " reageert niet op tijd.");
+            }
+            throw error;
+        } finally {
+            if (timeout) global.clearTimeout(timeout);
+        }
+    }
+
     async function requestWithFallback(urls, options, label) {
         var lastError = null;
 
         for (var index = 0; index < urls.length; index += 1) {
             try {
-                var response = await fetch(urls[index], options);
+                var response = await fetchWithTimeout(urls[index], options, label);
                 if (!response.ok) throw new Error(label + " mislukt (" + response.status + ")");
                 return await parseJsonResponse(response);
             } catch (error) {
