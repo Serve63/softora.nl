@@ -145,6 +145,7 @@ test('app middleware releases read-only critical API requests without waiting on
 test('app middleware blocks state-changing critical API requests when Supabase hydration times out', async () => {
   const app = createAppRecorder();
   let nextCalls = 0;
+  const hydrateOptions = [];
   const res = {
     statusCode: null,
     body: null,
@@ -162,7 +163,10 @@ test('app middleware blocks state-changing critical API requests when Supabase h
     app,
     createDeps({
       supabaseHydrateMiddlewareWaitMs: 5,
-      ensureRuntimeStateHydratedFromSupabase: () => new Promise(() => {}),
+      ensureRuntimeStateHydratedFromSupabase: (options) => {
+        hydrateOptions.push(options);
+        return new Promise(() => {});
+      },
     })
   );
 
@@ -177,6 +181,7 @@ test('app middleware blocks state-changing critical API requests when Supabase h
   });
 
   assert.equal(nextCalls, 0);
+  assert.deepEqual(hydrateOptions, [{ strict: true }]);
   assert.equal(res.statusCode, 503);
   assert.equal(res.body.ok, false);
   assert.match(res.body.error, /Supabase-opslag/i);

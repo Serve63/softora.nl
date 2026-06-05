@@ -529,6 +529,44 @@ test('runtime state sync coordinator times out hung hydrate reads and releases t
   assert.ok(Date.now() - startedAt < 3000);
 });
 
+test('runtime state sync coordinator keeps non-forced hydrate timeouts out of hard error state', async () => {
+  const fixture = createFixture({
+    supabaseHydrateReadTimeoutMs: 5,
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle: async () => new Promise(() => {}),
+                };
+              },
+            };
+          },
+        };
+      },
+    }),
+    fetchSupabaseStateRowViaRest: async () => new Promise(() => {}),
+  });
+
+  const ok = await fixture.coordinator.ensureRuntimeStateHydratedFromSupabase();
+
+  assert.equal(ok, false);
+  assert.equal(fixture.runtimeState.supabaseStateHydrated, false);
+  assert.equal(fixture.runtimeState.supabaseStateHydrationPromise, null);
+  assert.ok(fixture.runtimeState.supabaseHydrateRetryNotBeforeMs > Date.now());
+  assert.equal(fixture.runtimeState.supabaseLastHydrateError, '');
+  assert.equal(
+    fixture.logs.some((args) => args[0] === 'log' && args[1] === '[Supabase][HydrateSoftError]'),
+    true
+  );
+  assert.equal(
+    fixture.logs.some((args) => args[0] === 'error' && args[1] === '[Supabase][HydrateError]'),
+    false
+  );
+});
+
 test('runtime state sync coordinator treats queued runtime snapshot await as a no-op when Supabase is disabled', async () => {
   const fixture = createFixture({
     isSupabaseConfigured: false,
