@@ -27,6 +27,16 @@ function getRegistryEntry(fileName) {
   return INDEXABLE_PUBLIC_SEO_PAGES.find((entry) => entry.fileName === fileName);
 }
 
+function getStructuredDataGraph(htmlRaw) {
+  const match = String(htmlRaw || '').match(
+    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*data-softora-public-seo=["']structured-data["'][^>]*>([\s\S]*?)<\/script>/i
+  );
+  assert.ok(match, 'Pagina mist expliciete structured data.');
+  const data = JSON.parse(match[1]);
+  assert.equal(data['@context'], 'https://schema.org');
+  return Array.isArray(data['@graph']) ? data['@graph'] : [];
+}
+
 const PUBLIC_ROADMAP_COPY_PATTERNS = [
   /De contentlaag krijgt straks/i,
   /Volgende contentblokken/i,
@@ -167,6 +177,10 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
     source,
     /<meta name="description" content="Laat AI automatisering maken voor leadopvolging, processen automatiseren met AI/
   );
+  assert.match(source, /<meta name="robots" content="index, follow">/);
+  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/ai-automatisering">/);
+  assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/ai-automatisering">/);
+  assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
   assert.match(source, /<h1>AI automatisering voor leads, taken en opvolging<\/h1>/);
   assert.match(source, /Leadopvolging/);
   assert.match(source, /Intake en mailbox/);
@@ -203,6 +217,24 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/blog/ai-automatisering-leadopvolging'));
+
+  const graph = getStructuredDataGraph(source);
+  const service = graph.find((item) => item['@type'] === 'Service');
+  const faq = graph.find((item) => item['@type'] === 'FAQPage');
+  const breadcrumb = graph.find((item) => item['@type'] === 'BreadcrumbList');
+
+  assert.equal(service && service['@id'], 'https://www.softora.nl/ai-automatisering#service');
+  assert.equal(service && service.serviceType, 'AI automatisering voor MKB');
+  assert.equal(faq && faq['@id'], 'https://www.softora.nl/ai-automatisering#faq');
+  assert.deepEqual(
+    faq.mainEntity.map((question) => question.name),
+    [
+      'Waar begin je met AI automatisering?',
+      'Kan AI automatisch klanten antwoorden?',
+      'Moet mijn bedrijf al een CRM hebben?',
+    ]
+  );
+  assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/ai-automatisering#breadcrumb');
 });
 
 test('chatbot money page is focused on leads, support and clean follow-up', () => {
