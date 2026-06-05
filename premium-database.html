@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605c">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605d">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -327,22 +327,16 @@
             cursor: pointer;
         }
 
-        .status-filter {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
         .sf-btn {
-            padding: 6px 14px;
+            padding: 5px 12px;
             border: 1px solid var(--border);
-            border-radius: 5px;
-            background: var(--card-soft);
-            font-size: 11px;
-            font-weight: 600;
-            line-height: 1.2;
-            min-height: 31px;
-            color: var(--light);
+            border-radius: 999px;
+            background: #fff;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.25;
+            min-height: 28px;
+            color: #5a5955;
             cursor: pointer;
             transition: border-color .15s ease, background .15s ease, color .15s ease;
             white-space: nowrap;
@@ -350,8 +344,9 @@
         }
 
         .sf-btn:hover {
-            border-color: rgba(139, 34, 82, 0.38);
-            color: var(--dark);
+            border-color: #c8c5be;
+            background: #f5f4f1;
+            color: #2c2c2a;
         }
 
         .sf-btn:focus-visible {
@@ -360,9 +355,9 @@
         }
 
         .sf-btn.act {
-            border-color: rgba(139, 34, 82, 0.4);
-            background: rgba(139, 34, 82, 0.12);
-            color: var(--dark);
+            border-color: var(--crimson);
+            background: var(--crimson);
+            color: #fff;
         }
 
         .f-count {
@@ -1418,7 +1413,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters"><span class="status-filter-label">Overig</span><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></div><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button></div><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></div>
+                            <div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters"><span class="status-filter-label">Algemeen</span><span class="status-filter-pills"><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><span class="status-filter-pills"><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><span class="status-filter-pills"><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></span></div>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
