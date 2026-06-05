@@ -13,14 +13,10 @@
     background: rgba(255, 255, 255, 0.58);
 }
 
-.status-filter-group--coldmail {
-    border-color: rgba(22, 115, 60, 0.18);
-    background: rgba(22, 115, 60, 0.04);
-}
-
+.status-filter-group--coldmail,
 .status-filter-group--coldcalling {
-    border-color: rgba(26, 95, 138, 0.18);
-    background: rgba(26, 95, 138, 0.04);
+    border-color: rgba(139, 34, 82, 0.18);
+    background: rgba(139, 34, 82, 0.04);
 }
 
 .status-filter-label {
@@ -34,10 +30,7 @@
     white-space: nowrap;
 }
 
-.status-filter-group--coldmail .status-filter-label {
-    color: var(--green);
-}
-
+.status-filter-group--coldmail .status-filter-label,
 .status-filter-group--coldcalling .status-filter-label {
-    color: var(--blue);
+    color: var(--crimson);
 }

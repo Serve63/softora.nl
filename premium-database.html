@@ -2309,11 +2309,11 @@
             });
         }
 
-        function renderPhotoCostLabel(customers) { const showPhotoBatchControl = state.activeStatus === "benaderbaar" || state.activeStatus === "alle"; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
-            const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length;
-            const totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
-            nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>";
-            nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. AI-foto kost " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + " per stuk.";
+        function isMailReadyCalculationPending() { return state.activeStatus === "benaderbaar" && (state.dataLoading || state.photoRestorePending || !hasLoadedColdmailGuard()); }
+        function renderPhotoCostLabel(customers, pending) { const showPhotoBatchControl = state.activeStatus === "benaderbaar" || state.activeStatus === "alle"; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
+            if (pending) { nodes.photoCostLabel.innerHTML = "<strong>--</strong>"; nodes.photoCostLabel.title = "Mailklare data wordt nog geladen."; return; }
+            const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length, totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
+            nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>"; nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. AI-foto kost " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + " per stuk.";
         }
 
         function renderWebsitePhotoDrop(customer) {
@@ -2322,14 +2322,14 @@
 
         function renderTable() {
             const baseFiltered = getSortedCustomers(getFilteredCustomers()), filtered = getVisibleTableCustomers(baseFiltered), showOutreachActionColumn = state.activeStatus === "benaderd" || state.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn;
-            const photoHeaderCount = getPhotoHeaderCount(filtered, showPhotoColumn);
+            const mailReadyPending = isMailReadyCalculationPending(), photoHeaderCount = mailReadyPending && showPhotoColumn ? null : getPhotoHeaderCount(filtered, showPhotoColumn);
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
-            nodes.count.textContent = state.dataLoading || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : filtered.length.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered); document.getElementById("photoHeaderCount").textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
+            nodes.count.textContent = mailReadyPending || state.dataLoading || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : filtered.length.toLocaleString("nl-NL") + " resultaten";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered, mailReadyPending); document.getElementById("photoHeaderCount").textContent = photoHeaderCount === null ? "(--)" : "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: baseFiltered.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), items: buildDatabaseMediaDebugItems(filtered) });
 
-            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; return; } if (!filtered.length) {
+            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; return; } if (mailReadyPending) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Mailklare data laden...</div></td></tr>"; return; } if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
@@ -3038,13 +3038,12 @@
         }
 
         let customerStateRefreshInFlight = false; function isDatabaseInteractionOpen() { return nodes.modalBg.classList.contains("on") || nodes.panel.classList.contains("on") || nodes.photoPreview.classList.contains("on") || (photoBatchController && typeof photoBatchController.isOpen === "function" && photoBatchController.isOpen()) || (databaseDeepSearchController && typeof databaseDeepSearchController.isOpen === "function" && databaseDeepSearchController.isOpen()); } async function refreshCustomerStateSilently() { if (customerStateRefreshInFlight || document.hidden || isDatabaseInteractionOpen()) return false; customerStateRefreshInFlight = true; try { await bootstrapCustomers(); return true; } catch (error) { console.error("Database live verversen mislukt:", error); return false; } finally { customerStateRefreshInFlight = false; } } function startCustomerStateAutoRefresh() { window.setInterval(function () { void refreshCustomerStateSilently(); }, CUSTOMER_DB_SYNC_INTERVAL_MS); window.addEventListener("focus", function () { void refreshCustomerStateSilently(); }); document.addEventListener("visibilitychange", function () { if (!document.hidden) void refreshCustomerStateSilently(); }); }
-        const initialBootstrapCustomers = resolveBootstrapCustomers();
+        const initialBootstrapCustomers = resolveBootstrapCustomers(), databaseBootStartedAt = Date.now(), databaseHadBootstrapCustomers = initialBootstrapCustomers.length > 0, releaseDatabaseBootShell = () => window.SoftoraPremiumBootTiming?.release(databaseBootStartedAt, 1000) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
         if (initialBootstrapCustomers.length) {
             state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers); state.dataLoading = false; state.dataUnavailable = false;
         }
         applyDatabaseUrlIntent();
-        renderPage();
-        const databaseBootStartedAt = Date.now(), databaseHadBootstrapCustomers = initialBootstrapCustomers.length > 0, releaseDatabaseBootShell = () => window.SoftoraPremiumBootTiming?.release(databaseBootStartedAt, 1000) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
+        renderPage(); releaseDatabaseBootShell();
 
         const databaseImportController = window.SoftoraDatabaseImport.createController({
             input: nodes.importFileInput,
@@ -3194,7 +3193,7 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); setStatusMessage("Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden.", "error", true); } } else { await bootstrapCustomers(); }
+                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); setStatusMessage("Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden.", "error", true); } } else { await bootstrapCustomers(); }
                 await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }
