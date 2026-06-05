@@ -232,7 +232,7 @@ test('page smoke: /favicon.ico serves the Softora favicon', async () => {
   const bytes = Buffer.from(await response.arrayBuffer());
 
   assert.equal(response.status, 200, '/favicon.ico');
-  assert.ok(response.url.endsWith('/assets/softora-favicon-round.png?v=20260513a'));
+  assert.ok(response.url.endsWith('/assets/softora-favicon-round.png?v=20260605c'));
   assert.match(response.headers.get('content-type') || '', /^image\/png\b/);
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
 });
