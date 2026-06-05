@@ -1,5 +1,4 @@
 const express = require('express');
-const path = require('node:path');
 const {
   buildPublicSeoRobotsTxt,
   buildPublicSeoSitemapXml,
@@ -87,13 +86,7 @@ function registerPublicPageRoutes(app, deps) {
   });
 
   app.get('/favicon.ico', (req, res, next) => {
-    const faviconPath = path.join(deps.assetsDirectory, 'favicon.ico');
-    res.setHeader('Content-Type', 'image/x-icon');
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-    return res.sendFile(faviconPath, (error) => {
-      if (error) return next(error);
-      return undefined;
-    });
+    return res.redirect(302, '/assets/softora-favicon-round.png?v=20260513a');
   });
 
   app.use(

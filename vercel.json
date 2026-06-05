@@ -68,15 +68,6 @@
   ],
   "headers": [
     {
-      "source": "/favicon.ico",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=60, stale-while-revalidate=300"
-        }
-      ]
-    },
-    {
       "source": "/assets/personnel-theme.js",
       "headers": [
         {
@@ -103,10 +94,6 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/favicon.ico",
-      "destination": "/assets/favicon.ico"
-    },
     {
       "source": "/api/agenda/confirmation-tasks/:taskId",
       "destination": "/api/agenda/confirmation-task?taskId=:taskId"
