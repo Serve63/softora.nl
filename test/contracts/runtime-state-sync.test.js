@@ -618,6 +618,36 @@ test('runtime state sync coordinator falls back when supabase client persist han
   assert.equal(persistedRows[0].meta.reason, 'hung_client_contract_test');
 });
 
+test('runtime state sync coordinator logs transient persist timeouts as soft errors', async () => {
+  const fixture = createFixture({
+    supabaseClientPersistTimeoutMs: 5,
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          upsert: async () => new Promise(() => {}),
+        };
+      },
+    }),
+    upsertSupabaseStateRowViaRest: async () => ({
+      ok: false,
+      error: 'Supabase REST timeout na 12s',
+    }),
+  });
+
+  const ok = await fixture.coordinator.persistRuntimeStateToSupabase('timeout_contract_test');
+
+  assert.equal(ok, false);
+  assert.match(fixture.runtimeState.supabaseLastPersistError, /timeout/i);
+  assert.equal(
+    fixture.logs.some((args) => args[0] === 'log' && args[1] === '[Supabase][PersistSoftError]'),
+    true
+  );
+  assert.equal(
+    fixture.logs.some((args) => args[0] === 'error' && args[1] === '[Supabase][PersistError]'),
+    false
+  );
+});
+
 test('runtime state sync coordinator persists merged runtime snapshots and updates sync markers', async () => {
   const fixture = createFixture({
     recentCallUpdates: [

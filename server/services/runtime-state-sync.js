@@ -123,6 +123,19 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     }
   }
 
+  function isSoftSupabaseSyncError(value) {
+    const text = normalizeString(value && (value.message || value.details || value.hint || value.code || value));
+    return /(?:abort|timeout|timed out|fetch failed|network|econnreset|etimedout|temporar)/i.test(text);
+  }
+
+  function logPersistFailure(label, error) {
+    if (isSoftSupabaseSyncError(error)) {
+      logInfo('[Supabase][PersistSoftError]', error?.message || error);
+      return;
+    }
+    logError(label, error?.message || error);
+  }
+
   const {
     getRuntimeSnapshotItemTimestampMs,
     mergeRuntimeSnapshotPayloads,
@@ -730,11 +743,11 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
         `primary=${primaryPersist.error || 'onbekend'} | compact=${compactPersist.error || 'onbekend'}`,
         500
       );
-      logError('[Supabase][PersistError]', combinedError);
+      logPersistFailure('[Supabase][PersistError]', combinedError);
       runtimeState.supabaseLastPersistError = combinedError;
       return false;
     } catch (error) {
-      logError('[Supabase][PersistCrash]', error?.message || error);
+      logPersistFailure('[Supabase][PersistCrash]', error);
       runtimeState.supabaseLastPersistError = truncateText(error?.message || String(error), 500);
       return false;
     }
@@ -748,7 +761,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       .catch(() => null)
       .then(() => persistRuntimeStateToSupabase(reason))
       .catch((error) => {
-        logError('[Supabase][PersistQueueError]', error?.message || error);
+        logPersistFailure('[Supabase][PersistQueueError]', error);
         return false;
       });
 
