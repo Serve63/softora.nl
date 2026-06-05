@@ -6,6 +6,7 @@ const { assertSafeProductionDeploySource } = require('./guard-production-deploy-
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const gitCmd = process.platform === 'win32' ? 'git.exe' : 'git';
 const tarCmd = process.platform === 'win32' ? 'tar.exe' : 'tar';
 const EXPECTED_VERCEL_PROJECT = Object.freeze({
   projectId: 'prj_RkOUrkRTAdkGNE3gxVlhAvS9TQgl',
@@ -72,6 +73,26 @@ function runQuiet(label, command, args) {
     throw new Error(`[production-deploy] ${label} mislukt.\n${stderr || stdout}`);
   }
   return result;
+}
+
+function listDirtyFiles() {
+  const result = runQuiet('git status', gitCmd, ['status', '--porcelain']);
+  return String(result.stdout || '')
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => line.slice(3).trim());
+}
+
+function restoreKnownProductionBuildSideEffects() {
+  const dirtyFiles = listDirtyFiles();
+  if (dirtyFiles.length === 0) return;
+
+  const knownBuildSideEffects = new Set(['package-lock.json']);
+  const canRestore = dirtyFiles.every((filePath) => knownBuildSideEffects.has(filePath));
+  if (!canRestore) return;
+
+  console.log('[production-deploy] Bekende npm lockfile-bijwerking hersteld vóór Vercel deploy.');
+  runQuiet('git restore package-lock.json', gitCmd, ['restore', '--', 'package-lock.json']);
 }
 
 function listVercelFunctionDirs(rootDir) {
@@ -148,6 +169,8 @@ ensureExpectedVercelProjectLink();
 run('Vercel productieomgeving ophalen', npxCmd, ['vercel', 'pull', '--yes', '--environment=production']);
 assertExpectedVercelProjectLink();
 run('Vercel productie-build', npxCmd, ['vercel', 'build', '--prod']);
+restoreKnownProductionBuildSideEffects();
 installVercelSharpLinuxArm64Output();
+assertSafeProductionDeploySource();
 run('Vercel productie-deploy', npxCmd, ['vercel', 'deploy', '--prebuilt', '--prod', '--yes']);
 run('live productieversie controleren', npmCmd, ['run', 'check:live-production-version']);
