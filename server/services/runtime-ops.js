@@ -126,7 +126,6 @@ function createRuntimeOpsCoordinator(deps = {}) {
         if (bridged) return bridged;
       } catch (error) {
         logDataOpsReadFallback(scope, error);
-        if (isTransientUiStateReadError(error)) return null;
       }
     }
     try {

@@ -74,7 +74,7 @@ test('server app feature wiring writes data-ops scopes through the bridge first'
   assert.deepEqual(calls.map((call) => call.target), ['bridge', 'legacy']);
 });
 
-test('server app feature wiring skips legacy fallback when data-ops ui-state reads hang', async (t) => {
+test('server app feature wiring uses legacy fallback when data-ops ui-state reads hang', async (t) => {
   const originalSetTimeout = global.setTimeout;
   const originalClearTimeout = global.clearTimeout;
   const originalWarn = console.warn;
@@ -105,10 +105,10 @@ test('server app feature wiring skips legacy fallback when data-ops ui-state rea
 
   const state = await getter('premium_customers');
 
-  assert.equal(state, null);
-  assert.equal(legacyRead, false);
+  assert.deepEqual(state, { source: 'legacy', scope: 'premium_customers' });
+  assert.equal(legacyRead, true);
   assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
-  assert.match(String(warnings[1]?.[0] || ''), /skip-legacy/);
+  assert.match(String(warnings[1]?.[0] || ''), /legacy-fallback/);
 });
 
 test('server app agenda bootstrap ui-state reads are timeboxed before legacy fallback', () => {
