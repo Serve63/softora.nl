@@ -2,6 +2,7 @@ const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
+const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 
@@ -222,6 +223,12 @@ function findCustomerById(customers, customerId) {
     const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId));
     return candidateId === id || candidateId.toLowerCase() === lowerId;
   }) || null;
+}
+
+function getPublicPreviewReadOptions(scope) {
+  return {
+    readFailureCooldownScope: `${PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX}_${normalizeString(scope)}`,
+  };
 }
 
 function findCustomerCandidates(customers, identifier) {
@@ -452,12 +459,12 @@ function createPublicWebdesignPreviewService(options = {}) {
     const structuredPreview = await resolveStructuredPreview(id);
     if (structuredPreview) return structuredPreview;
 
-    const state = await getUiStateValues(PHOTO_SCOPE);
+    const state = await getUiStateValues(PHOTO_SCOPE, getPublicPreviewReadOptions(PHOTO_SCOPE));
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const photoMap = safeParseObject(values[PHOTO_KEY]);
     let preview = buildPreviewFromRecord(id, values, findPhotoRecord(photoMap, id));
     if (!preview) {
-      const customerState = await getUiStateValues(CUSTOMER_SCOPE);
+      const customerState = await getUiStateValues(CUSTOMER_SCOPE, getPublicPreviewReadOptions(CUSTOMER_SCOPE));
       const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
       preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues));
     }
