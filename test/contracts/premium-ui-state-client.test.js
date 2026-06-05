@@ -18,6 +18,9 @@ test('premium ui-state client centraliseert gedeelde read/write fallback routes'
   assert.match(source, /headers: \{ "Content-Type": "application\/json" \}/);
   assert.match(source, /var DEFAULT_TIMEOUT_MS = 5000;/);
   assert.match(source, /function fetchWithTimeout\(url, options, label, timeoutMs\) \{/);
+  assert.match(source, /function shouldStopFallback\(error\) \{/);
+  assert.match(source, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
+  assert.match(source, /if \(shouldStopFallback\(error\)\) break;/);
   assert.match(source, /controller\.abort\(\);/);
   assert.match(source, /label \+ " reageert niet op tijd\."/);
   assert.doesNotMatch(source, /localStorage|sessionStorage/);

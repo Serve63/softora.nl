@@ -56,11 +56,18 @@
         });
     }
 
+    function shouldStopUiStateFallback(error) {
+        var status = Number(error && error.status);
+        if (status && (status === 401 || status === 403 || status === 429 || status >= 500)) return true;
+        return /reageert niet op tijd|timeout|timed out|mislukt \((?:401|403|429|5\d\d)\)/i.test(String(error && error.message || error || ""));
+    }
+
     global.SoftoraDatabaseResilience = Object.freeze({
         defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
         fetchJsonWithTimeout,
         hasChunkedStateKey,
         staleRefreshMessage,
+        shouldStopUiStateFallback,
         unavailableMessage,
         withTimeout,
     });

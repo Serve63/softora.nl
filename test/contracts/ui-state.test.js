@@ -21,6 +21,7 @@ function createFixture(overrides = {}) {
     supabaseStateTable: 'app_state',
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     uiStateReadTimeoutMsByScope: overrides.uiStateReadTimeoutMsByScope,
+    uiStateReadFailureCooldownMs: overrides.uiStateReadFailureCooldownMs,
     uiStateAllowMemoryFallback: overrides.uiStateAllowMemoryFallback,
     uiStateMemoryFallbackScopes: overrides.uiStateMemoryFallbackScopes,
     fetchSupabaseRowByKeyViaRest: async (rowKey, columns) => {
@@ -387,6 +388,29 @@ test('ui-state store only serves in-memory fallback for explicitly allowed scope
     updatedAt: null,
     source: 'memory',
   });
+});
+
+test('ui-state store opent na Supabase-timeout een read-circuit zodat vervolglezingen niet blijven hameren', async () => {
+  const { loggerInfos, restReads, store } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    uiStateReadFailureCooldownMs: 1000,
+    fetchResult: new Promise(() => {}),
+  });
+
+  const first = await store.getUiStateValues('dashboard');
+  const second = await store.getUiStateValues('orders');
+
+  assert.equal(first, null);
+  assert.equal(second, null);
+  assert.equal(restReads.length, 1);
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-open]'),
+    true
+  );
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-skip]'),
+    true
+  );
 });
 
 test('ui-state store supports a longer read timeout for heavy photo scopes', async () => {

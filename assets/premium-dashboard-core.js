@@ -394,6 +394,12 @@ function formatMoneyEUR(amount) {
         }
     }
 
+    function shouldStopUiStateFallback(error) {
+        const status = Number(error && error.status);
+        if (status && (status === 401 || status === 403 || status === 429 || status >= 500)) return true;
+        return /timeout|timed out|mislukt \((?:401|403|429|5\d\d)\)/i.test(String(error && error.message || error || ''));
+    }
+
     installPremiumDashboardBootFailSafe();
 
 	    return Object.freeze({
@@ -413,6 +419,7 @@ function formatMoneyEUR(amount) {
 	        formatMoneyEUR,
 	        formatProjectMeta,
             fetchPremiumDashboardJson,
+            shouldStopUiStateFallback,
             forcePremiumDashboardBootShellVisible,
             releasePremiumDashboardBootShell,
             releasePremiumDashboardBootShellAfterMinimum,

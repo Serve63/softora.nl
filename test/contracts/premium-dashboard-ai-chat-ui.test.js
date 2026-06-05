@@ -169,6 +169,9 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(dataStatusSource, /payload\.source === "empty"/);
   assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap, \{ once: true \}\);/);
   assert.match(pageSource, /const loaded = premiumDashboardState\.orders\.length > 0 \|\| premiumDashboardState\.customers\.length > 0;/);
+  assert.match(coreSource, /function shouldStopUiStateFallback\(error\) \{/);
+  assert.match(coreSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
+  assert.match(pageSource, /dashboardCore\.shouldStopUiStateFallback\?\.\(error\)/);
   assert.doesNotMatch(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);
   assert.match(pageSource, /if \(!orders\.length && !customers\.length\) \{/);
   assert.match(pageSource, /if \(window\.SoftoraDashboardDataStatus\) window\.SoftoraDashboardDataStatus\.showUnavailable\(\);\s+return;\s+\}/);
