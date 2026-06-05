@@ -581,6 +581,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /aria-label=\\"Website openen: " \+ escapeHtml\(websiteValue\)/);
   assert.match(pageSource, /class=\\"website-open-icon\\"/);
   assert.match(pageSource, /class=\\"c-mid website-cell\\"/);
+  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 6%; min-width: 68px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
   assert.doesNotMatch(pageSource, /target=\\"_blank\\" rel=\\"noopener\\">" \+ escapeHtml\(websiteValue\) \+ "<\/a>"/);
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
@@ -643,7 +644,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*getMailReadyCustomers\(customers\)\.length/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
-  assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
+  assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto's nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
   assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null;/);
   assert.match(pageSource, /const statusClassName = availableStatus \? availableStatus\.className : customer\.status;/);
   assert.match(pageSource, /"<td><div class=\\"s-wrap s-" \+ escapeHtml\(statusClassName\)/);
