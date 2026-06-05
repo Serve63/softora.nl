@@ -24,7 +24,7 @@
     "backup:runtime": "node scripts/export-runtime-backup.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",

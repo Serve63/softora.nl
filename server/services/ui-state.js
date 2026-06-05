@@ -232,7 +232,13 @@ function createUiStateStore(deps = {}) {
         };
 
         const timeoutHandle = setTimeout(() => {
-          logger.error('[UI State][Supabase][GetTimeout]', normalizedScope, `na ${timeoutMs}ms`);
+          const log =
+            typeof logger.info === 'function'
+              ? logger.info.bind(logger)
+              : typeof logger.log === 'function'
+                ? logger.log.bind(logger)
+                : null;
+          if (log) log('[UI State][Supabase][GetTimeout]', normalizedScope, `na ${timeoutMs}ms`);
           finish(fallbackState);
         }, timeoutMs);
 
