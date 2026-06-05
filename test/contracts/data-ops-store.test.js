@@ -475,7 +475,7 @@ test('data ops store saves webdesign and device mockup as one photo record', asy
   assert.match(upserts[0].row.legacy_meta.mockup.qualityCheckedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
-test('data ops store signs design photo URLs with bounded concurrency', async () => {
+test('data ops store signs design photo URLs in storage batches', async () => {
   const rows = Array.from({ length: 18 }, (_item, index) => ({
     customer_id: `customer-${index + 1}`,
     identity_key: `company ${index + 1}|contact|310000000${index}`,
@@ -492,19 +492,27 @@ test('data ops store signs design photo URLs with bounded concurrency', async ()
     },
     updated_at: '2026-05-26T12:00:00.000Z',
   }));
-  let inFlight = 0;
-  let maxInFlight = 0;
+  let bulkCalls = 0;
+  let singleCalls = 0;
   const signedPaths = [];
   const client = {
     storage: {
       from(bucket) {
         return {
+          async createSignedUrls(paths, expiresInSeconds) {
+            bulkCalls += 1;
+            signedPaths.push(...paths.map((path) => ({ bucket, path, expiresInSeconds })));
+            return {
+              data: paths.map((path) => ({
+                path,
+                signedUrl: `https://storage.example.test/${bucket}/${path}`,
+              })),
+              error: null,
+            };
+          },
           async createSignedUrl(path) {
-            inFlight += 1;
-            maxInFlight = Math.max(maxInFlight, inFlight);
+            singleCalls += 1;
             signedPaths.push({ bucket, path });
-            await new Promise((resolve) => setTimeout(resolve, 2));
-            inFlight -= 1;
             return {
               data: { signedUrl: `https://storage.example.test/${bucket}/${path}` },
               error: null,
@@ -545,7 +553,8 @@ test('data ops store signs design photo URLs with bounded concurrency', async ()
 
   assert.equal(entries.length, rows.length);
   assert.equal(signedPaths.length, rows.length * 2);
-  assert.equal(maxInFlight <= 6, true);
+  assert.equal(bulkCalls, 1);
+  assert.equal(singleCalls, 0);
   assert.equal(entries.every((entry) => entry.websitePhotoUrl.startsWith('https://')), true);
   assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
 });

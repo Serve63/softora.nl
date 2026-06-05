@@ -975,17 +975,27 @@ function createSoftoraDataOpsStore(deps = {}) {
       }
     }
 
-    async function createCachedSignedUrl(bucket, path, signOptions) {
+    async function createCachedSignedUrl(bucket, path, signOptions, signedUrlByCacheKey) {
       const cacheKey = buildSignedUrlCacheKey(bucket, path, signOptions);
+      if (signedUrlByCacheKey && signedUrlByCacheKey.has(cacheKey)) {
+        return { data: { signedUrl: signedUrlByCacheKey.get(cacheKey) }, error: null, cached: true };
+      }
       const cached = readCachedSignedUrl(cacheKey);
-      if (cached) return { data: { signedUrl: cached }, error: null, cached: true };
+      if (cached) {
+        if (signedUrlByCacheKey) signedUrlByCacheKey.set(cacheKey, cached);
+        return { data: { signedUrl: cached }, error: null, cached: true };
+      }
       try {
         const signed = await withTimeout(
           client.storage.from(bucket).createSignedUrl(path, expiresInSeconds, signOptions),
           dataOpsReadQueryTimeoutMs,
           'create-signed-url'
         );
-        if (!signed.error && signed.data?.signedUrl) rememberSignedUrl(cacheKey, normalizeString(signed.data.signedUrl));
+        if (!signed.error && signed.data?.signedUrl) {
+          const signedUrl = normalizeString(signed.data.signedUrl);
+          rememberSignedUrl(cacheKey, signedUrl);
+          if (signedUrlByCacheKey) signedUrlByCacheKey.set(cacheKey, signedUrl);
+        }
         return signed;
       } catch (error) {
         logger.warn('[DataOps][signed-url]', error?.message || error);
@@ -993,49 +1003,126 @@ function createSoftoraDataOpsStore(deps = {}) {
       }
     }
 
-    let cursor = 0;
-    const workerCount = Math.min(6, Math.max(1, rows.length));
-
-    async function signNext() {
-      while (cursor < rows.length) {
-        const row = rows[cursor];
-        cursor += 1;
+    function collectSignedUrlRequests() {
+      const requestsByCacheKey = new Map();
+      rows.forEach((row) => {
         const bucket = normalizeString(row.storage_bucket || bucketName);
         const path = normalizeString(row.storage_path);
-        if (!bucket || !path) continue;
-        const signed = await createCachedSignedUrl(bucket, path);
-        if (signed.error || !signed.data?.signedUrl) continue;
+        if (bucket && path) {
+          requestsByCacheKey.set(buildSignedUrlCacheKey(bucket, path), {
+            bucket,
+            path,
+            signOptions: undefined,
+          });
+        }
         const legacyMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
         const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : null;
-        let websiteMockupUrl = '';
         if (mockupMeta) {
           const mockupBucket = normalizeString(mockupMeta.storageBucket || bucketName);
           const mockupPath = normalizeString(mockupMeta.storagePath);
           if (mockupBucket && mockupPath) {
-            const mockupSigned = await createCachedSignedUrl(mockupBucket, mockupPath);
-            if (!mockupSigned.error && mockupSigned.data?.signedUrl) {
-              websiteMockupUrl = normalizeString(mockupSigned.data.signedUrl);
-            }
+            requestsByCacheKey.set(buildSignedUrlCacheKey(mockupBucket, mockupPath), {
+              bucket: mockupBucket,
+              path: mockupPath,
+              signOptions: undefined,
+            });
           }
         }
-        entries.push({
-          customerId: normalizeString(row.customer_id),
-          websitePhotoUrl: normalizeString(signed.data.signedUrl),
-          websiteMockupUrl,
-          storageBucket: bucket,
-          storagePath: path,
-          mimeType: normalizeString(row.mime_type || 'image/jpeg'),
-          fileName: normalizeString(row.file_name),
-          websiteMockupName: normalizeString(mockupMeta && mockupMeta.fileName || legacyMeta.websiteMockupName),
-          identityKey: normalizeString(row.identity_key),
-          legacyMeta,
-          updatedAt: normalizeString(row.updated_at),
-          signedUrlExpiresAt: new Date(currentTimeMs() + expiresInSeconds * 1000).toISOString(),
-        });
-      }
+      });
+      return Array.from(requestsByCacheKey.values());
     }
 
-    await Promise.all(Array.from({ length: workerCount }, signNext));
+    async function signRequestsIndividually(requests, signedUrlByCacheKey) {
+      let cursor = 0;
+      const workerCount = Math.min(6, Math.max(1, requests.length));
+      async function signNextRequest() {
+        while (cursor < requests.length) {
+          const request = requests[cursor];
+          cursor += 1;
+          await createCachedSignedUrl(request.bucket, request.path, request.signOptions, signedUrlByCacheKey);
+        }
+      }
+      await Promise.all(Array.from({ length: workerCount }, signNextRequest));
+    }
+
+    async function signRequestsInBulk(requests) {
+      const signedUrlByCacheKey = new Map();
+      const missingByBucket = new Map();
+      requests.forEach((request) => {
+        const cacheKey = buildSignedUrlCacheKey(request.bucket, request.path, request.signOptions);
+        const cached = readCachedSignedUrl(cacheKey);
+        if (cached) {
+          signedUrlByCacheKey.set(cacheKey, cached);
+          return;
+        }
+        const bucketKey = normalizeString(request.bucket);
+        if (!missingByBucket.has(bucketKey)) missingByBucket.set(bucketKey, []);
+        missingByBucket.get(bucketKey).push(request);
+      });
+
+      for (const [bucket, bucketRequests] of missingByBucket.entries()) {
+        const storage = client.storage.from(bucket);
+        if (typeof storage.createSignedUrls !== 'function') {
+          await signRequestsIndividually(bucketRequests, signedUrlByCacheKey);
+          continue;
+        }
+        for (let index = 0; index < bucketRequests.length; index += 100) {
+          const batch = bucketRequests.slice(index, index + 100);
+          const paths = batch.map((request) => request.path);
+          try {
+            const signed = await withTimeout(
+              storage.createSignedUrls(paths, expiresInSeconds),
+              dataOpsReadQueryTimeoutMs,
+              'create-signed-urls'
+            );
+            if (signed && signed.error) throw signed.error;
+            const signedRows = Array.isArray(signed && signed.data) ? signed.data : [];
+            signedRows.forEach((item, itemIndex) => {
+              const path = normalizeString(item && (item.path || item.name)) || paths[itemIndex];
+              const signedUrl = normalizeString(item && (item.signedUrl || item.signedURL || item.signed_url));
+              if (!path || !signedUrl) return;
+              const cacheKey = buildSignedUrlCacheKey(bucket, path);
+              rememberSignedUrl(cacheKey, signedUrl);
+              signedUrlByCacheKey.set(cacheKey, signedUrl);
+            });
+          } catch (error) {
+            logger.warn('[DataOps][signed-urls-bulk]', error?.message || error);
+            await signRequestsIndividually(batch, signedUrlByCacheKey);
+          }
+        }
+      }
+      return signedUrlByCacheKey;
+    }
+
+    const signedUrlByCacheKey = await signRequestsInBulk(collectSignedUrlRequests());
+
+    rows.forEach((row) => {
+      const bucket = normalizeString(row.storage_bucket || bucketName);
+      const path = normalizeString(row.storage_path);
+      const signedUrl = signedUrlByCacheKey.get(buildSignedUrlCacheKey(bucket, path));
+      if (!bucket || !path || !signedUrl) return;
+      const legacyMeta = row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
+      const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object' ? legacyMeta.mockup : null;
+      const mockupBucket = normalizeString(mockupMeta && (mockupMeta.storageBucket || bucketName));
+      const mockupPath = normalizeString(mockupMeta && mockupMeta.storagePath);
+      const websiteMockupUrl = mockupBucket && mockupPath
+        ? normalizeString(signedUrlByCacheKey.get(buildSignedUrlCacheKey(mockupBucket, mockupPath)))
+        : '';
+      entries.push({
+        customerId: normalizeString(row.customer_id),
+        websitePhotoUrl: signedUrl,
+        websiteMockupUrl,
+        storageBucket: bucket,
+        storagePath: path,
+        mimeType: normalizeString(row.mime_type || 'image/jpeg'),
+        fileName: normalizeString(row.file_name),
+        websiteMockupName: normalizeString(mockupMeta && mockupMeta.fileName || legacyMeta.websiteMockupName),
+        identityKey: normalizeString(row.identity_key),
+        legacyMeta,
+        updatedAt: normalizeString(row.updated_at),
+        signedUrlExpiresAt: new Date(currentTimeMs() + expiresInSeconds * 1000).toISOString(),
+      });
+    });
 
     Object.defineProperty(entries, 'hadStructuredRows', {
       value: structuredRows.length > 0,
