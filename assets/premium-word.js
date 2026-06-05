@@ -8,6 +8,9 @@
     var forePick = document.getElementById("wordForeColor");
     var hilitePick = document.getElementById("wordHiliteColor");
     var saveTimer = 0;
+    var remoteLoadComplete = false;
+    var remoteLoadFailed = false;
+    var isDirty = false;
 
     if (!editor || !ribbon) return;
 
@@ -184,13 +187,23 @@
         try {
             var state = await getUiStateClient().get(REMOTE_SCOPE);
             var html = String(state && state.values && state.values[REMOTE_KEY] || "");
+            editor.setAttribute("contenteditable", "true");
             if (html) editor.innerHTML = sanitizeWordHtml(html);
+            remoteLoadComplete = true;
+            remoteLoadFailed = false;
+            isDirty = false;
         } catch (error) {
+            remoteLoadComplete = false;
+            remoteLoadFailed = true;
+            isDirty = false;
+            editor.setAttribute("contenteditable", "false");
+            editor.setAttribute("data-placeholder", "Document kon niet geladen worden. Vernieuw de pagina.");
             console.error("Word-document laden mislukt:", error);
         }
     }
 
     async function save() {
+        if (!remoteLoadComplete || remoteLoadFailed || !isDirty) return;
         try {
             var patch = {};
             patch[REMOTE_KEY] = sanitizeWordHtml(editor.innerHTML);
@@ -199,12 +212,15 @@
                 source: "premium-word",
                 actor: "browser"
             });
+            isDirty = false;
         } catch (error) {
             console.error("Word-document opslaan mislukt:", error);
         }
     }
 
     function queueSave() {
+        if (!remoteLoadComplete || remoteLoadFailed) return;
+        isDirty = true;
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(function () {
             void save();
@@ -232,7 +248,7 @@
 
     window.addEventListener("beforeunload", function () {
         window.clearTimeout(saveTimer);
-        void save();
+        if (isDirty) void save();
     });
 
     void (async function () {

@@ -16,7 +16,7 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(pageSource, /contenteditable="true"/);
   assert.match(pageSource, /id="wordRibbon"/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260605a/);
-  assert.match(pageSource, /assets\/premium-word\.js\?v=20260427b/);
+  assert.match(pageSource, /assets\/premium-word\.js\?v=20260605a/);
   assert.doesNotMatch(pageSource, /REMOTE_SCOPE|softora_premium_word_html_v1|fetchUiStateGet|editor\.innerHTML/);
   assert.match(scriptSource, /REMOTE_SCOPE = "premium_word"/);
   assert.match(scriptSource, /softora_premium_word_html_v1/);
@@ -30,6 +30,13 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(scriptSource, /name\.indexOf\("on"\) === 0/);
   assert.match(scriptSource, /patch\[REMOTE_KEY\] = sanitizeWordHtml\(editor\.innerHTML\)/);
   assert.match(scriptSource, /editor\.innerHTML = sanitizeWordHtml\(html\)/);
+  assert.match(scriptSource, /var remoteLoadComplete = false;/);
+  assert.match(scriptSource, /var remoteLoadFailed = false;/);
+  assert.match(scriptSource, /var isDirty = false;/);
+  assert.match(scriptSource, /if \(!remoteLoadComplete \|\| remoteLoadFailed \|\| !isDirty\) return;/);
+  assert.match(scriptSource, /editor\.setAttribute\("contenteditable", "false"\)/);
+  assert.match(scriptSource, /editor\.setAttribute\("contenteditable", "true"\)/);
+  assert.match(scriptSource, /if \(isDirty\) void save\(\);/);
   assert.match(pageSource, /\.word-page\s*\{/);
   assert.match(pageSource, /\.word-ribbon\s*\{/);
 });

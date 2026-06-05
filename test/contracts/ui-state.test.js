@@ -683,6 +683,11 @@ test('ui-seo runtime keeps coldmail state reads critical and isolated by default
   assert.match(source, /premium_coldmail_autopilot:\s*8000/);
   assert.match(source, /premium_coldmail_send_guard:\s*10000/);
   assert.match(source, /premium_coldmailing_settings:\s*8000/);
+  assert.match(source, /dataOpsReadQueryTimeoutMs = 6000/);
+  assert.match(source, /premium_customers_database:\s*8000/);
+  assert.match(source, /premium_database_photos:\s*12000/);
+  assert.match(source, /legacyContactMergeEnabled:\s*true/);
+  assert.match(source, /legacyReadTimeoutMs:\s*2500/);
   assert.match(source, /preferSupabaseRestRead:\s*true/);
   assert.match(source, /ignoreSupabaseRestFailureCooldown:\s*true/);
   assert.match(source, /suppressSupabaseRestFailureCooldown:\s*true/);

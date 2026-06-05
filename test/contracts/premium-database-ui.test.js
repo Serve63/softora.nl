@@ -398,7 +398,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
-  assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 2200, "Coldmail send-guard reageert niet op tijd\."\)/);
+  assert.match(pageSource, /function getUiStateFetchTimeoutMs\(scope\) \{/);
+  assert.match(pageSource, /normalizedScope === CUSTOMER_PHOTO_SCOPE \|\| normalizedScope === COLDMAIL_SEND_GUARD_SCOPE\) return 12000/);
+  assert.match(pageSource, /const timeoutMs = getUiStateFetchTimeoutMs\(scope\);/);
+  assert.match(pageSource, /fetchJsonWithTimeout\(url, \{ method: "GET", cache: "no-store" \}, timeoutMs\)/);
+  assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 12000, "Coldmail send-guard reageert niet op tijd\."\)/);
+  assert.match(pageSource, /function hasLoadedColdmailGuard\(\)/);
+  assert.match(pageSource, /if \(!hasLoadedColdmailGuard\(\)\) return false;/);
+  assert.match(pageSource, /Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd\./);
 });
 
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
@@ -763,7 +770,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260527b/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260605a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
@@ -822,9 +829,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
   assert.match(webdesignActionScriptSource, /markPhotoKeyLoaded\(loadKey\)/);
   assert.match(pageSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length\) \{/);
-  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten\);/);
-  assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true \}\)/);
-  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true \}\);/);
+  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\);/);
+  assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\)/);
+  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true \}\);/);
+  assert.match(pageSource, /Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden\./);
+  assert.match(photoStorageScriptSource, /if \(loadOptions && loadOptions\.failOnError\) throw error;/);
   assert.match(pageSource, /applyCustomerList\(mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\), false\);/);
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
@@ -2216,6 +2225,32 @@ test('premium database photo storage reuses duplicate photo map reads until forc
 
   await controller.load(customers, { force: true });
   assert.equal(reads, 2);
+});
+
+test('premium database photo storage can fail closed when boot needs reliable photos', async () => {
+  const photoStorageClient = loadDatabasePhotoStorageClient();
+  const controller = photoStorageClient.createController({
+    getUiState: async () => {
+      throw new Error('photo read timeout');
+    },
+    setUiState: async () => ({ ok: true }),
+    normalizeCustomer: (customer) => customer,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    buildCustomerIdentityKey: (customer) => 'identity:' + customer.id,
+    formatDateForStorage: () => '2026-04-28',
+    scope: 'premium_database_photos',
+    key: 'photos',
+    dataPrefix: 'photo_',
+    chunkSize: 180000,
+  });
+
+  const fallback = await controller.load([{ id: 'customer1' }], { force: true });
+  assert.equal(Object.keys(fallback).length, 0);
+  await assert.rejects(
+    controller.load([{ id: 'customer1' }], { force: true, failOnError: true }),
+    /photo read timeout/
+  );
 });
 
 test('premium database deep search continues to the next location until the requested new-company count is reached', async () => {

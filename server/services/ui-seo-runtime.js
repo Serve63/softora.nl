@@ -80,8 +80,13 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigKey,
     seoConfigCacheTtlMs,
     dataOpsUiStateEnabled = true,
-    dataOpsReadQueryTimeoutMs = 1800,
+    dataOpsReadQueryTimeoutMs = 6000,
     dataOpsUiStateReadTimeoutMs = 2500,
+    dataOpsUiStateReadTimeoutMsByScope = Object.freeze({
+      premium_customers_database: 8000,
+      premium_database_photos: 12000,
+      premium_coldmail_send_guard: 12000,
+    }),
     uiStateReadTimeoutMsByScope = Object.freeze({
       seo: 350,
       premium_database_photos: 8000,
@@ -123,6 +128,8 @@ function createUiSeoRuntime(deps = {}) {
   const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({
     enabled: dataOpsUiStateEnabled,
     store: dataOpsStore,
+    legacyContactMergeEnabled: true,
+    legacyReadTimeoutMs: 2500,
     logger,
   });
   const dataOpsHealthReporter = createDataOpsHealthReporter({
@@ -239,6 +246,7 @@ function createUiSeoRuntime(deps = {}) {
     setUiStateValues,
     dataOpsUiStateBridge,
     dataOpsUiStateReadTimeoutMs,
+    dataOpsUiStateReadTimeoutMsByScope,
     logger,
   });
 
