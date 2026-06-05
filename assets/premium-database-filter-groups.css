@@ -1,5 +1,6 @@
 .status-filter {
     align-items: stretch;
+    flex: 1 1 auto;
 }
 
 .status-filter-group {
@@ -14,9 +15,14 @@
 }
 
 .status-filter-group--coldmail,
-.status-filter-group--coldcalling {
+.status-filter-group--coldcalling,
+.status-filter-group--shared {
     border-color: rgba(139, 34, 82, 0.18);
     background: rgba(139, 34, 82, 0.04);
+}
+
+.status-filter-group--shared {
+    margin-left: auto;
 }
 
 .status-filter-label {
@@ -31,6 +37,7 @@
 }
 
 .status-filter-group--coldmail .status-filter-label,
-.status-filter-group--coldcalling .status-filter-label {
+.status-filter-group--coldcalling .status-filter-label,
+.status-filter-group--shared .status-filter-label {
     color: var(--crimson);
 }
