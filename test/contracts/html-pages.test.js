@@ -427,6 +427,74 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
   );
 });
 
+test('html page coordinator gives protected premium bootstrap enough time for Supabase-backed data', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-protected-bootstrap-'));
+  const loggerInfos = [];
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-personeel-dashboard.html'),
+    [
+      '<!DOCTYPE html><html><head><title>Dashboard</title></head><body>',
+      '<div id="kpiRevenueYear"><!-- SOFTORA_DASHBOARD_TOTAL_REVENUE --></div>',
+      '<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->',
+      '</body></html>',
+    ].join('')
+  );
+
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    logger: {
+      info: (...args) => loggerInfos.push(args),
+      error: () => {},
+    },
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-personeel-dashboard.html'
+        ? 'premium-personeel-dashboard.html'
+        : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: { authenticated: true, email: 'serve@softora.nl', role: 'admin' },
+    }),
+    getSeoConfigCached: async () => {
+      throw new Error('protected pages should not read seo config');
+    },
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () =>
+      new Promise((resolve) => {
+        setTimeout(() => resolve({
+          marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
+          scriptId: 'softoraCustomersBootstrap',
+          htmlReplacements: {
+            SOFTORA_DASHBOARD_TOTAL_REVENUE: '€1.234',
+          },
+          data: { ok: true, customers: [{ id: 'cust-1' }] },
+        }), 650);
+      }),
+  });
+
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-personeel-dashboard' },
+    res,
+    () => {},
+    'premium-personeel-dashboard.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /€1\.234/);
+  assert.match(res.body, /id="softoraCustomersBootstrap"/);
+  assert.equal(
+    loggerInfos.some(
+      (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'
+    ),
+    false
+  );
+});
+
 test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-timeout-'));
   const loggerInfos = [];
