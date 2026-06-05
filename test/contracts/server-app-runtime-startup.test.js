@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   primeServerAppRuntime,
@@ -76,4 +78,16 @@ test('server app runtime startup reports when supabase persistence is disabled',
 
   assert.match(logs[0], /provider: twilio/);
   assert.match(logs[1], /Supabase state persistence uit/);
+});
+
+test('server app runtime does not prime heavy runtime hydration on serverless module load', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../../server/services/server-app-runtime.js'),
+    'utf8'
+  );
+
+  assert.match(
+    source,
+    /if \(!isServerlessRuntime\) \{\s*primeServerAppRuntime\(\{\s*ensureRuntimeStateHydratedFromSupabase,\s*\}\);\s*\}/s
+  );
 });

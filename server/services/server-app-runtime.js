@@ -199,11 +199,14 @@ const {
   },
 });
 
-// In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus hydrate
-// de runtime ook bij module-load.
-primeServerAppRuntime({
-  ensureRuntimeStateHydratedFromSupabase,
-});
+// Alleen long-running runtimes primen de legacy runtime-state bij startup. In
+// serverless (zoals Vercel) zou dit elke koude pagina/request onnodig laten
+// wachten op Supabase en premium pagina's traag of leeg laten voelen.
+if (!isServerlessRuntime) {
+  primeServerAppRuntime({
+    ensureRuntimeStateHydratedFromSupabase,
+  });
+}
 
 function startServer() {
   startServerAppRuntime({

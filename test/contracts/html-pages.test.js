@@ -362,6 +362,7 @@ test('html page coordinator serves login pages without seo config reads', async 
 test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-timeout-'));
   const loggerCalls = [];
+  const loggerErrors = [];
   fs.writeFileSync(
     path.join(pagesDir, 'premium-website.html'),
     '<!DOCTYPE html><html><head><title>Orig</title></head><body><main>Publieke pagina</main></body></html>'
@@ -370,7 +371,8 @@ test('html page coordinator serves public pages when seo config and bootstrap re
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
     logger: {
-      error: (...args) => loggerCalls.push(args),
+      warn: (...args) => loggerCalls.push(args),
+      error: (...args) => loggerErrors.push(args),
     },
     sanitizeKnownHtmlFileName: (value) =>
       String(value || '').trim() === 'premium-website.html' ? 'premium-website.html' : '',
@@ -414,6 +416,10 @@ test('html page coordinator serves public pages when seo config and bootstrap re
       (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-website.html'
     ),
     true
+  );
+  assert.equal(
+    loggerErrors.some((args) => /\[HTML\]\[(SeoConfig|Bootstrap)Timeout\]/.test(String(args[0] || ''))),
+    false
   );
 });
 
