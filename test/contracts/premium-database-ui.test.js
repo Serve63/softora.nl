@@ -834,9 +834,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--shared/);
   assert.doesNotMatch(filterGroupsCssSource, /margin-left: auto;/);
   assert.doesNotMatch(filterGroupsCssSource, /rgba\(139, 34, 82/);
-  assert.match(filterGroupsCssSource, /border: 1px solid rgba\(166, 173, 190, 0\.22\);/);
+  assert.match(filterGroupsCssSource, /background: transparent;/);
+  assert.match(filterGroupsCssSource, /border: 0;/);
   const labelCssBlock = filterGroupsCssSource.match(/\.status-filter-label\s*\{[\s\S]*?\}/)[0];
-  assert.match(labelCssBlock, /position: absolute;/);
+  assert.match(labelCssBlock, /position: static;/);
   assert.match(labelCssBlock, /display: inline-flex;/);
   assert.match(labelCssBlock, /color: var\(--dark\);/);
   assert.match(labelCssBlock, /pointer-events: none;/);
