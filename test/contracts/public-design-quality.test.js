@@ -176,6 +176,28 @@ test('rendered public SEO metadata avoids low-trust generated-looking images', (
   }
 });
 
+test('ai automation money page uses the realistic workflow image across hero and social metadata', () => {
+  const source = readFile('ai-automatisering.html');
+
+  assert.match(
+    source,
+    /<meta property="og:image" content="https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg">/
+  );
+  assert.match(
+    source,
+    /<meta name="twitter:image" content="https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg">/
+  );
+  assert.match(
+    source,
+    /<img class="seo-growth-hero-image" src="\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg\?v=20260605a" alt="Overleg aan tafel over AI automatisering, workflow en leadopvolging voor het MKB\." width="1600" height="1000" loading="eager" fetchpriority="high" decoding="async">/
+  );
+  assert.doesNotMatch(
+    source,
+    /softora-strategy-meeting\.jpg/,
+    'AI automatisering mag niet terugvallen naar het geconstrueerde Softora-kantoorbeeld'
+  );
+});
+
 test('legacy public hero line breaks keep readable text spacing', () => {
   const pages = [
     'premium-websites.html',
