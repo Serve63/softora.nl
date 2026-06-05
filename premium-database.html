@@ -431,15 +431,14 @@
             text-overflow: ellipsis;
         }
 
-        thead th:nth-child(1), tbody td:nth-child(1) { width: 14%; }
-        thead th:nth-child(2), tbody td:nth-child(2) { width: 9%; }
-        thead th:nth-child(3), tbody td:nth-child(3) { width: 14%; }
-        thead th:nth-child(4), tbody td:nth-child(4) { width: 12%; }
-        thead th:nth-child(5), tbody td:nth-child(5) { width: 11%; }
+        thead th:nth-child(1), tbody td:nth-child(1) { width: 15%; }
+        thead th:nth-child(2), tbody td:nth-child(2) { width: 13%; }
+        thead th:nth-child(3), tbody td:nth-child(3) { width: 16%; }
+        thead th:nth-child(4), tbody td:nth-child(4) { width: 13%; }
+        thead th:nth-child(5), tbody td:nth-child(5) { width: 17%; }
         thead th:nth-child(6), tbody td:nth-child(6) { width: 10%; }
-        thead th:nth-child(7), tbody td:nth-child(7) { width: 7%; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 12%; } table:not(.outreach-action-mode) thead th:nth-child(10), table:not(.outreach-action-mode) tbody td:nth-child(10) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { display: none; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { width: 25%; text-align: center; } table.outreach-action-mode thead th:nth-child(10), table.outreach-action-mode tbody td:nth-child(10) { width: 5%; min-width: 56px; text-align: center; }
-        thead th:nth-child(9), tbody td:nth-child(9) { width: 9%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(10), tbody td:nth-child(10) { width: 4%; text-align: center; }
+        table:not(.outreach-action-mode) thead th:nth-child(7), table:not(.outreach-action-mode) tbody td:nth-child(7), table:not(.outreach-action-mode) thead th:nth-child(9), table:not(.outreach-action-mode) tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(6), table.outreach-action-mode tbody td:nth-child(6) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { width: 24%; text-align: center; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { width: 5%; min-width: 56px; text-align: center; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 9%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(9), tbody td:nth-child(9) { width: 5%; text-align: center; }
 
         thead th:hover {
             color: var(--dark);
@@ -1389,9 +1388,8 @@
                                         <th data-sort-key="email">Mailadres</th>
                                         <th data-sort-key="tel">Telefoonnummer</th>
                                         <th data-sort-key="dom">Website</th>
-                                        <th>Kanaal</th>
                                         <th data-sort-key="status" id="statusHeader">Status</th>
-                                        <th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie</th>
+                                        <th id="outreachActionHeader" hidden>Acties</th>
                                         <th id="photoHeader"><span class="photo-header-title"><span id="photoHeaderLabel">Foto's</span> <span id="photoHeaderCount">(0)</span></span></th><th id="daysHeader" hidden>Dagen</th>
                                     </tr>
                                 </thead>
@@ -2262,12 +2260,12 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = mailReadyPending || state.dataLoading || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : visibleCustomers.length.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered, mailReadyPending); document.getElementById("photoHeaderCount").textContent = photoHeaderCount === null ? "(--)" : "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered, mailReadyPending); document.getElementById("photoHeaderCount").textContent = photoHeaderCount === null ? "(--)" : "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: visibleCustomers.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), items: buildDatabaseMediaDebugItems(filtered) });
 
             updateLoadMoreControl(visibleCustomers.length, filtered.length);
-            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; updateLoadMoreControl(0, 0); return; } if (mailReadyPending) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; updateLoadMoreControl(0, 0); return; } if (!visibleCustomers.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; updateLoadMoreControl(0, 0); return; } if (mailReadyPending) { nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; updateLoadMoreControl(0, 0); return; } if (!visibleCustomers.length) {
+                nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 updateLoadMoreControl(0, 0);
                 return;
             }
@@ -2286,11 +2284,8 @@
                         "<td class=\"c-mid\">" + escapeHtml(customer.email || "—") + "</td>",
                         "<td class=\"c-mid\">" + escapeHtml(formatPhoneNumber(customer.tel)) + "</td>",
                         "<td class=\"c-mid\">" + websiteHtml + "</td>",
-                        "<td><div class=\"kanalen\">",
-                            renderUsedChannelTags(customer),
-                        "</div></td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(statusLabel) + "</div></div></td>",
-                        "<td class=\"c-light\">" + (showOutreachActionColumn ? outreachController.renderActions(customer, { hideMailButton: state.activeStatus === "instantly" }) : (outreachController.isWebdesignOutreachCustomer(customer) ? outreachController.renderReplyInfo(customer) : escapeHtml(formatDisplayDate(customer.updatedAt)))) + "</td>",
+                        "<td class=\"c-light\">" + (showOutreachActionColumn ? outreachController.renderActions(customer, { hideMailButton: state.activeStatus === "instantly" }) : "") + "</td>",
                         "<td>" + (showPhotoColumn ? renderWebsitePhotoDrop(customer) : "") + "</td><td class=\"c-light days-cell\">" + (showOutreachActionColumn ? outreachController.renderDaysSinceSent(customer) : "") + "</td>",
                     "</tr>"
                 ].join("");
