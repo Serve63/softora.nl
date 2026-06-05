@@ -1573,7 +1573,7 @@
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-action.js?v=20260529d"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script>
     <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260527b"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260605a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script>
@@ -1908,17 +1908,16 @@
                 .replace(/'/g, "&#039;");
         }
 
+        function getUiStateFetchTimeoutMs(scope) { const normalizedScope = String(scope || ""); if (normalizedScope === CUSTOMER_PHOTO_SCOPE || normalizedScope === COLDMAIL_SEND_GUARD_SCOPE) return 12000; if (normalizedScope === CUSTOMER_DB_SCOPE) return 8000; return undefined; }
+
         function fetchUiStateGetWithFallback(scope) {
-            const encodedScope = encodeURIComponent(String(scope || ""));
-            const urls = [
-                "/api/ui-state-get?scope=" + encodedScope,
-                "/api/ui-state/" + encodedScope
-            ];
+            const encodedScope = encodeURIComponent(String(scope || "")); const timeoutMs = getUiStateFetchTimeoutMs(scope);
+            const urls = ["/api/ui-state-get?scope=" + encodedScope, "/api/ui-state/" + encodedScope];
             let lastError = null, stopFallback = false;
 
             return urls.reduce(function (promise, url) {
                 return promise.catch(function () { if (stopFallback) throw lastError || new Error("UI-state GET mislukt");
-                    return window.SoftoraDatabaseResilience.fetchJsonWithTimeout(url, { method: "GET", cache: "no-store" }).then(function (response) {
+                    return window.SoftoraDatabaseResilience.fetchJsonWithTimeout(url, { method: "GET", cache: "no-store" }, timeoutMs).then(function (response) {
                         if (!response.ok) {
                             throw new Error("UI-state GET mislukt (" + response.status + ")");
                         }
@@ -2154,7 +2153,7 @@
         const webdesignMockupController = window.SoftoraDatabaseWebdesignMockup.createController({ state, normalizeCustomer, sortCustomers, isValidWebsitePhotoSource, isValidWebsitePhotoDataUrl, persistCustomerPhotos, renderPage, setStatusMessage, toast });
         const webdesignActionController = window.SoftoraDatabaseWebdesignAction.createController({ state, escapeHtml, shouldShowWebsitePhoto, isValidWebsitePhotoDataUrl: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl, isWebdesignPhotoEligible, openWebsitePhotoPreview, getAssetState: buildCustomerWebdesignAssetState, ensureMockupForCustomer: function (customerId, ensureOptions) { return webdesignMockupController.ensureForCustomer(customerId, ensureOptions); }, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, refreshPhotos: async function (context) { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true }); state.klanten = sortCustomers(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten)); logDatabaseMediaDebug("refresh-photos", { customerId: context && context.customerId, photoMapCount: Object.keys(photoMap || {}).length, nextCount: state.klanten.length }); renderPage(); if (context && context.customerId) await webdesignMockupController.ensureForCustomer(context.customerId); }, logMediaDebug: logDatabaseMediaDebug, setStatusMessage, renderPage: renderPage, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR });
 
-        const outreachController = window.SoftoraDatabaseOutreach.createController({ state, nodes, escapeHtml, normalizeSearchValue, normalizeDatabaseStatus, formatDisplayDate, parseDateValue, normalizeCustomer, persistCustomerList, renderPage, setStatusMessage }); const coldmailGuardController = window.SoftoraDatabaseColdmailGuard && typeof window.SoftoraDatabaseColdmailGuard.createController === "function" ? window.SoftoraDatabaseColdmailGuard.createController({ getUiState: fetchUiStateGetWithFallback, scope: COLDMAIL_SEND_GUARD_SCOPE, key: COLDMAIL_SEND_GUARD_KEY }) : { load: async function () { return []; }, hasGuard: function () { return false; } }; async function refreshColdmailGuardState() { try { await window.SoftoraDatabaseResilience.withTimeout(coldmailGuardController.load(), 2200, "Coldmail send-guard reageert niet op tijd."); } catch (error) { console.error("Coldmail send-guard laden mislukt:", error); } } function hasColdmailSendGuardSignal(customer) { return coldmailGuardController.hasGuard(customer); }
+        const outreachController = window.SoftoraDatabaseOutreach.createController({ state, nodes, escapeHtml, normalizeSearchValue, normalizeDatabaseStatus, formatDisplayDate, parseDateValue, normalizeCustomer, persistCustomerList, renderPage, setStatusMessage }); const coldmailGuardController = window.SoftoraDatabaseColdmailGuard && typeof window.SoftoraDatabaseColdmailGuard.createController === "function" ? window.SoftoraDatabaseColdmailGuard.createController({ getUiState: fetchUiStateGetWithFallback, scope: COLDMAIL_SEND_GUARD_SCOPE, key: COLDMAIL_SEND_GUARD_KEY }) : { load: async function () { return []; }, hasGuard: function () { return false; }, getEntries: function () { return []; } }; let coldmailGuardReady = false; let coldmailGuardLoadError = false; function hasLoadedColdmailGuard() { return coldmailGuardReady || Boolean(coldmailGuardController.getEntries && coldmailGuardController.getEntries().length); } async function refreshColdmailGuardState() { try { await window.SoftoraDatabaseResilience.withTimeout(coldmailGuardController.load(), 12000, "Coldmail send-guard reageert niet op tijd."); coldmailGuardReady = true; coldmailGuardLoadError = false; } catch (error) { coldmailGuardLoadError = true; coldmailGuardReady = hasLoadedColdmailGuard(); console.error("Coldmail send-guard laden mislukt:", error); if (!coldmailGuardReady) setStatusMessage("Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd.", "error", true); } } function hasColdmailSendGuardSignal(customer) { return coldmailGuardController.hasGuard(customer); }
         function mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers) { return window.SoftoraDatabaseWebdesignAssetState.mergeCustomersWithPhotos(customers, photoMap, fallbackCustomers, { normalizeCustomer, sortCustomers, shouldShowWebsitePhoto, isValidWebsitePhotoSource, buildCustomerIdentityKey }); }
 
         function loadCustomerPhotoMap(customers, options) { const requestedCustomers = customers || state.klanten; logDatabaseMediaDebug("photo-map-load-start", { requestedCount: (requestedCustomers || []).length, force: Boolean(options && options.force) }); return customerPhotoStorageController.load(requestedCustomers, options).then(function (photoMap) { logDatabaseMediaDebug("photo-map-load-success", { requestedCount: (requestedCustomers || []).length, photoMapCount: Object.keys(photoMap || {}).length }); return photoMap; }, function (error) { logDatabaseMediaDebug("photo-map-load-error", { requestedCount: (requestedCustomers || []).length, message: String(error && error.message || error || "onbekende fout") }); throw error; }); }
@@ -2291,7 +2290,7 @@
             return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
         }
         function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); }
-        function isColdmailBaseLeadEligible(customer) { if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; if (hasColdmailSendGuardSignal(customer)) return false; if (hasUsedColdMailing(customer)) return false; return true; }
+        function isColdmailBaseLeadEligible(customer) { if (!hasLoadedColdmailGuard()) return false; if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; if (hasColdmailSendGuardSignal(customer)) return false; if (hasUsedColdMailing(customer)) return false; return true; }
         function buildCustomerWebdesignAssetState(customer) { return window.SoftoraDatabaseWebdesignAssetState.buildWebdesignAssetState(customer, { shouldShowWebsitePhoto: shouldShowWebsitePhoto, isValidWebsitePhotoSource: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl: resolveCustomerWebsiteUrl, isMailLeadEligible: isColdmailBaseLeadEligible, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, isMockupFailed: function (customerId) { return webdesignActionController.isMockupFailed(customerId); } }, state); }
         function hasApprovedWebdesignMockup(customer) { return buildCustomerWebdesignAssetState(customer).mockupApproved; }
         function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
@@ -3020,14 +3019,15 @@
                     const customersWithFallbackMedia = mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten);
                     let customersWithPhotos = customersWithFallbackMedia;
                     try {
-                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true });
+                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true });
                         customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, customersWithFallbackMedia);
                     } catch (error) {
                         console.error("Databasefoto's laden via Supabase mislukt:", error);
+                        setStatusMessage("Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden.", "error", true);
                     }
                     const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
                     const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
-                    setStatusMessage("");
+                    if (coldmailGuardLoadError && !coldmailGuardReady) setStatusMessage("Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd.", "error", true); else if (!coldmailGuardLoadError) setStatusMessage("");
                     return;
                 }
             } catch (error) {
@@ -3194,7 +3194,7 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { try { const photoMap = await loadCustomerPhotoMap(state.klanten); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); } } else { await bootstrapCustomers(); }
+                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); setStatusMessage("Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden.", "error", true); } } else { await bootstrapCustomers(); }
                 await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }

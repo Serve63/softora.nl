@@ -16,6 +16,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     setUiStateValues = async () => null,
     dataOpsUiStateBridge = null,
     dataOpsUiStateReadTimeoutMs = 2500,
+    dataOpsUiStateReadTimeoutMsByScope = {},
     uiStateReadTimeoutMs = 4500,
     adminOnlyUiStateScopes = createAdminOnlyUiStateScopesSet(),
     appendSecurityAuditEvent = () => {},
@@ -91,6 +92,19 @@ function createRuntimeOpsCoordinator(deps = {}) {
     }
   }
 
+  function getDataOpsUiStateReadTimeoutMs(scope) {
+    if (
+      dataOpsUiStateReadTimeoutMsByScope &&
+      Object.prototype.hasOwnProperty.call(dataOpsUiStateReadTimeoutMsByScope, scope)
+    ) {
+      return dataOpsUiStateReadTimeoutMsByScope[scope];
+    }
+    if (scope === 'premium_database_photos') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 12000);
+    if (scope === 'premium_coldmail_send_guard') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 12000);
+    if (scope === 'premium_customers_database') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 8000);
+    return dataOpsUiStateReadTimeoutMs;
+  }
+
   function appendAdminScopeDeniedAuditEvent(req, scope) {
     appendSecurityAuditEvent(
       {
@@ -116,12 +130,13 @@ function createRuntimeOpsCoordinator(deps = {}) {
       typeof dataOpsUiStateBridge.getUiStateValues === 'function'
     ) {
       try {
+        const bridgedTimeoutMs = getDataOpsUiStateReadTimeoutMs(scope);
         const bridged = await awaitWithTimeout(
           dataOpsUiStateBridge.getUiStateValues(scope, {
             legacyGetUiStateValues: getUiStateValues,
           }),
-          dataOpsUiStateReadTimeoutMs,
-          `DataOps UI-state read timeout na ${Math.round(Math.max(1, Number(dataOpsUiStateReadTimeoutMs) || 2500) / 1000)}s`
+          bridgedTimeoutMs,
+          `DataOps UI-state read timeout na ${Math.round(Math.max(1, Number(bridgedTimeoutMs) || 2500) / 1000)}s`
         );
         if (bridged) return bridged;
       } catch (error) {

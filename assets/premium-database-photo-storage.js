@@ -260,6 +260,7 @@
             }).catch(function (error) {
                 console.error("Databasefoto's laden via Supabase mislukt:", error);
                 clearLoadCache();
+                if (loadOptions && loadOptions.failOnError) throw error;
                 return {};
             });
             return cachedLoadPromise;

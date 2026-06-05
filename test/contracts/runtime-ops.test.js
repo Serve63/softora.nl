@@ -68,6 +68,7 @@ function createFixture(overrides = {}) {
       })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
     dataOpsUiStateReadTimeoutMs: overrides.dataOpsUiStateReadTimeoutMs,
+    dataOpsUiStateReadTimeoutMsByScope: overrides.dataOpsUiStateReadTimeoutMsByScope,
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     adminOnlyUiStateScopes: overrides.adminOnlyUiStateScopes || new Set(['premium_password_register']),
     appendSecurityAuditEvent: overrides.appendSecurityAuditEvent || ((payload, reason) => {
@@ -254,6 +255,9 @@ test('runtime ops coordinator uses legacy ui-state when structured data ops read
   let legacyRead = false;
   const { coordinator } = createFixture({
     dataOpsUiStateReadTimeoutMs: 5,
+    dataOpsUiStateReadTimeoutMsByScope: {
+      premium_customers_database: 5,
+    },
     getUiStateValues: async () => {
       legacyRead = true;
       return {
@@ -282,6 +286,47 @@ test('runtime ops coordinator uses legacy ui-state when structured data ops read
   assert.equal(legacyRead, true);
   assert.ok(Date.now() - startedAt < 500);
   assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
+});
+
+test('runtime ops coordinator honors scope-specific data ops read timeouts', async () => {
+  const warnings = [];
+  let legacyRead = false;
+  const { coordinator } = createFixture({
+    dataOpsUiStateReadTimeoutMs: 5,
+    dataOpsUiStateReadTimeoutMsByScope: {
+      premium_database_photos: 80,
+    },
+    getUiStateValues: async () => {
+      legacyRead = true;
+      return {
+        values: { softora_database_photos_v1: '{}' },
+        source: 'memory',
+        updatedAt: null,
+      };
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_database_photos',
+      getUiStateValues: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        return {
+          values: { softora_database_photos_v1: '{"cust-1":{"id":"cust-1"}}' },
+          source: 'supabase:data_ops',
+          updatedAt: '2026-06-05T12:00:00.000Z',
+        };
+      },
+    },
+    logger: {
+      warn: (...args) => warnings.push(args),
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateGetResponse({}, res, 'premium_database_photos');
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'supabase:data_ops');
+  assert.equal(legacyRead, false);
+  assert.equal(warnings.length, 0);
 });
 
 test('runtime ops coordinator treats values writes as patches unless replace is explicit', async () => {
