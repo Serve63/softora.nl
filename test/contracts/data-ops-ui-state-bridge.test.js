@@ -40,6 +40,8 @@ function createStore(overrides = {}) {
       calls.push({ type: 'photos-delete', customerIds, meta });
       return { ok: true };
     }),
+    getReadFailureCooldownStatus:
+      overrides.getReadFailureCooldownStatus || (() => ({ active: false, reason: '', untilMs: 0 })),
     ...(overrides.listDesignPhotosWithSignedUrls
       ? { listDesignPhotosWithSignedUrls: overrides.listDesignPhotosWithSignedUrls }
       : {}),
@@ -86,6 +88,30 @@ test('data ops ui-state bridge falls back when structured customer rows are empt
   });
 
   assert.deepEqual(state, { values: { legacy: 'yes' }, source: 'legacy' });
+});
+
+test('data ops ui-state bridge skips legacy fallback while structured reads are in cooldown', async () => {
+  let legacyRead = false;
+  const bridge = createSoftoraDataOpsUiStateBridge({
+    store: createStore({
+      listCustomers: async () => null,
+      getReadFailureCooldownStatus: () => ({
+        active: true,
+        reason: 'list-customers timeout na 1800ms',
+        untilMs: Date.now() + 60_000,
+      }),
+    }),
+  });
+
+  const state = await bridge.getUiStateValues(SCOPES.customers, {
+    legacyGetUiStateValues: async () => {
+      legacyRead = true;
+      return { values: { legacy: 'yes' }, source: 'legacy' };
+    },
+  });
+
+  assert.equal(state, null);
+  assert.equal(legacyRead, false);
 });
 
 test('data ops ui-state bridge overlays legacy mailed status onto structured customers', async () => {

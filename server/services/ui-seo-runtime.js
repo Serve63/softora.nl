@@ -62,6 +62,7 @@ function createUiSeoRuntime(deps = {}) {
     seoConfigKey,
     seoConfigCacheTtlMs,
     dataOpsUiStateEnabled = true,
+    dataOpsReadQueryTimeoutMs = 1800,
     dataOpsUiStateReadTimeoutMs = 2500,
     uiStateReadTimeoutMsByScope = Object.freeze({
       seo: 350,
@@ -95,6 +96,7 @@ function createUiSeoRuntime(deps = {}) {
   const dataOpsStore = createSoftoraDataOpsStore({
     isSupabaseConfigured,
     getSupabaseClient,
+    dataOpsReadQueryTimeoutMs,
     logger,
   });
   const dataOpsUiStateBridge = createSoftoraDataOpsUiStateBridge({

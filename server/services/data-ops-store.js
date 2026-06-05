@@ -196,6 +196,14 @@ function createSoftoraDataOpsStore(deps = {}) {
     return error;
   }
 
+  function getReadFailureCooldownStatus() {
+    return {
+      active: isReadFailureCooldownActive(),
+      reason: readFailureCooldownReason,
+      untilMs: readFailureCooldownUntilMs,
+    };
+  }
+
   function isTransientReadError(error) {
     const text = normalizeString(error && (error.message || error.details || error.hint || error.code || error));
     return (
@@ -1174,6 +1182,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listDesignPhotosWithSignedUrls,
     listVisibleWebdesignJobs,
     listOrderRuntime,
+    getReadFailureCooldownStatus,
     replaceActiveOrders,
     replaceCustomers,
     replaceDesignPhotos,

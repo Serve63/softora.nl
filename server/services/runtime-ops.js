@@ -69,6 +69,11 @@ function createRuntimeOpsCoordinator(deps = {}) {
     }
   }
 
+  function isTransientUiStateReadError(error) {
+    const text = normalizeString(error && (error.message || error.details || error.hint || error.code || error));
+    return /abort|timeout|timed out|statement timeout|504|522|fetch failed|network|econnreset|etimedout|connection terminated|temporar/i.test(text);
+  }
+
   async function awaitWithTimeout(promise, timeoutMs, errorMessage) {
     const safeTimeoutMs = Math.max(1, Math.min(30000, Number(timeoutMs) || 2500));
     let timeoutId = null;
@@ -121,6 +126,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
         if (bridged) return bridged;
       } catch (error) {
         logDataOpsReadFallback(scope, error);
+        if (isTransientUiStateReadError(error)) return null;
       }
     }
     try {
