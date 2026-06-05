@@ -1,16 +1,38 @@
 .status-filter {
-    align-items: center;
-    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    flex: 0 1 auto;
+    background: #fff;
+    border: 1px solid #e8e6e1;
+    border-radius: 10px;
+    padding: 10px 16px;
 }
 
 .status-filter-group {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 6px;
-    flex-wrap: wrap;
-    padding: 0;
+    padding: 0 16px;
     border: 0;
     background: transparent;
+}
+
+.status-filter-group:first-child {
+    padding-left: 0;
+}
+
+.status-filter-group:last-child {
+    padding-right: 0;
+}
+
+.status-filter-divider {
+    width: 1px;
+    background: #e8e6e1;
+    align-self: stretch;
+    flex-shrink: 0;
 }
 
 .status-filter-label {
@@ -18,45 +40,58 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 0 2px 0 0;
+    padding: 0;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 1;
-    letter-spacing: 0;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--dark);
+    color: #1a1a18;
     cursor: default;
     pointer-events: none;
     user-select: none;
     white-space: nowrap;
 }
 
+.status-filter-pills {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
 .status-filter-group.is-locked {
-    opacity: 0.76;
+    cursor: default;
+}
+
+.status-filter-group.is-locked .status-filter-label {
+    color: #aaa9a3;
+    opacity: 0.5;
 }
 
 .status-filter-lock {
     display: inline-flex;
-    width: 13px;
-    height: 13px;
-    color: var(--crimson);
+    width: 11px;
+    height: 11px;
+    color: currentColor;
 }
 
 .status-filter-lock-icon {
     display: block;
-    width: 13px;
-    height: 13px;
+    width: 11px;
+    height: 11px;
 }
 
 .status-filter-group.is-locked .sf-btn {
     cursor: not-allowed;
-    opacity: 0.58;
+    opacity: 0.38;
+    pointer-events: none;
 }
 
 .status-filter-group.is-locked .sf-btn:hover {
     border-color: var(--border);
-    background: var(--card-soft);
-    color: var(--light);
+    background: #fff;
+    color: #5a5955;
 }
 
 .table-load-more {
@@ -88,4 +123,18 @@
 .load-more-summary {
     color: var(--light);
     font-size: 12px;
+}
+
+@media (max-width: 860px) {
+    .status-filter {
+        width: 100%;
+    }
+
+    .status-filter-group {
+        padding: 0 10px 10px 0;
+    }
+
+    .status-filter-divider {
+        display: none;
+    }
 }
