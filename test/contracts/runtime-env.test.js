@@ -50,7 +50,7 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.imapPass, 'secret');
   assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 9);
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 9);
-  assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 60);
+  assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 81);
   assert.equal(runtimeEnv.mail.coldmailSendDelayMs, 90_000);
   assert.equal(runtimeEnv.mail.coldmailSafetyPauseMs, 21_600_000);
   assert.equal(runtimeEnv.mail.coldmailPersonalMailboxDailyLimit, 9);
@@ -143,7 +143,7 @@ test('loadRuntimeEnv clamps coldmail safety limits for Strato-safe sending', () 
 
   assert.equal(runtimeEnv.mail.coldmailCampaignSendLimit, 9);
   assert.equal(runtimeEnv.mail.coldmailDailySendLimit, 9);
-  assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 60);
+  assert.equal(runtimeEnv.mail.coldmailPackageDailySendLimit, 81);
   assert.equal(runtimeEnv.mail.coldmailSendDelayMs, 300_000);
   assert.equal(runtimeEnv.mail.coldmailSafetyPauseMs, 86_400_000);
   assert.equal(runtimeEnv.mail.coldmailPersonalMailboxDailyLimit, 9);
