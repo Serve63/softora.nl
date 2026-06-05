@@ -209,6 +209,7 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(customerReads, 0);
   assert.deepEqual(signedOptions.map((options) => options.identifiers), [['aagje-van-os']]);
   assert.equal(signedOptions[0].suppressReadFailureCooldown, true);
+  assert.equal(signedOptions[0].suppressStaleReadCacheLog, true);
   assert.equal(signedOptions[0].suppressTransientReadFailureLog, true);
   assert.equal(signedOptions[0].expiresInSeconds, 24 * 60 * 60);
   assert.equal(preview.id, 'manual-import-aagje-eu-0070');
@@ -258,12 +259,14 @@ test('public webdesign preview signs only targeted structured candidates after c
   assert.deepEqual(
     signedOptions.map((options) => [
       options.suppressReadFailureCooldown,
+      options.suppressStaleReadCacheLog,
       options.suppressTransientReadFailureLog,
     ]),
-    [[true, true], [true, true]]
+    [[true, true, true], [true, true, true]]
   );
   assert.deepEqual(customerOptions, [{
     suppressReadFailureCooldown: true,
+    suppressStaleReadCacheLog: true,
     suppressTransientReadFailureLog: true,
   }]);
 });

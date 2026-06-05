@@ -268,7 +268,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     cacheKeys.forEach((cacheKey) => readCache.delete(cacheKey));
   }
 
-  async function cachedRead(cacheKey, loader) {
+  async function cachedRead(cacheKey, loader, options = {}) {
     const fresh = getFreshCachedRead(cacheKey);
     if (fresh) return fresh;
     const loaded = await loader();
@@ -278,7 +278,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     }
     const stale = getAnyCachedRead(cacheKey);
     if (stale) {
-      logger.warn(`[DataOps][cache-stale] ${cacheKey}`);
+      if (!options.suppressStaleReadCacheLog && typeof logger.warn === 'function') {
+        logger.warn(`[DataOps][cache-stale] ${cacheKey}`);
+      }
       return stale;
     }
     return loaded;
@@ -578,6 +580,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         ...(row.payload && typeof row.payload === 'object' ? row.payload : {}),
         id: normalizeString(row.payload?.id || row.customer_id),
       }));
+    }, {
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
     });
   }
 
@@ -924,6 +928,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
       return result.ok ? result.data || [] : null;
+    }, {
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
     });
     if (!structuredRows) return null;
     const client = getClient();

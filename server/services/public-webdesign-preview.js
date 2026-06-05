@@ -5,6 +5,7 @@ const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
 const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
   suppressReadFailureCooldown: true,
+  suppressStaleReadCacheLog: true,
   suppressTransientReadFailureLog: true,
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
