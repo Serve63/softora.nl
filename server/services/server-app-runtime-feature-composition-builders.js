@@ -59,8 +59,8 @@ function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
       } catch (error) {
         console.warn('[DataOps][feature-ui-state-fallback]', error?.message || error);
         if (isTransientDataOpsUiStateReadError(error)) {
-          console.warn('[DataOps][feature-ui-state-skip-legacy]', scope);
-          return null;
+          console.warn('[DataOps][feature-ui-state-legacy-fallback]', scope);
+          return legacyGetUiStateValues(scope, ...args);
         }
       }
     }

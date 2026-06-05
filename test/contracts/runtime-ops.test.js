@@ -249,7 +249,7 @@ test('runtime ops coordinator prefers structured data ops reads and mirrors writ
   assert.equal(bridgeCalls[2].meta.source, 'premium-klanten');
 });
 
-test('runtime ops coordinator skips legacy ui-state when structured data ops reads hang', async () => {
+test('runtime ops coordinator uses legacy ui-state when structured data ops reads hang', async () => {
   const warnings = [];
   let legacyRead = false;
   const { coordinator } = createFixture({
@@ -276,8 +276,10 @@ test('runtime ops coordinator skips legacy ui-state when structured data ops rea
 
   await coordinator.sendUiStateGetResponse({}, res, 'premium_customers_database');
 
-  assert.equal(res.statusCode, 503);
-  assert.equal(legacyRead, false);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'memory');
+  assert.deepEqual(res.body.values, { softora_customers_premium_v1: '[{"id":"legacy-cust"}]' });
+  assert.equal(legacyRead, true);
   assert.ok(Date.now() - startedAt < 500);
   assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
 });
