@@ -173,6 +173,50 @@ test('mailbox index store logs Supabase timeouts as soft index errors', async ()
   );
 });
 
+test('mailbox index store timeboxes hanging Supabase index reads', async () => {
+  const loggerErrors = [];
+  const loggerInfos = [];
+  const hangingClient = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return this;
+            },
+            limit() {
+              return this;
+            },
+            maybeSingle() {
+              return new Promise(() => {});
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => hangingClient,
+    mailboxIndexQueryTimeoutMs: 25,
+    logger: {
+      error: (...args) => loggerErrors.push(args),
+      info: (...args) => loggerInfos.push(args),
+    },
+  });
+
+  const startedAt = Date.now();
+  const state = await store.getSyncState({ accountEmail: 'info@softora.nl', folder: 'inbox' });
+
+  assert.equal(state, null);
+  assert.ok(Date.now() - startedAt < 1000);
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[MailboxIndex][get-sync-state][SoftError]'),
+    true
+  );
+  assert.equal(loggerErrors.length, 0);
+});
+
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {
   const schema = fs.readFileSync(
     path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
