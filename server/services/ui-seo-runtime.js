@@ -12,6 +12,24 @@ const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridg
 const { createSoftoraDataOpsStore } = require('./data-ops-store');
 const { createDataOpsHealthReporter } = require('./data-ops-health');
 
+const COLDMAIL_CRITICAL_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
+  premium_coldmail_autopilot: 8000,
+  premium_coldmail_send_guard: 10000,
+  premium_coldmailing_settings: 8000,
+});
+const COLDMAIL_CRITICAL_UI_STATE_READ_OPTIONS_BY_SCOPE = Object.freeze(
+  Object.fromEntries(
+    Object.keys(COLDMAIL_CRITICAL_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE).map((scope) => [
+      scope,
+      Object.freeze({
+        preferSupabaseRestRead: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      }),
+    ])
+  )
+);
+
 function createUiSeoRuntime(deps = {}) {
   const {
     uiStateScopePrefix,
@@ -67,7 +85,9 @@ function createUiSeoRuntime(deps = {}) {
     uiStateReadTimeoutMsByScope = Object.freeze({
       seo: 350,
       premium_database_photos: 8000,
+      ...COLDMAIL_CRITICAL_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
     }),
+    uiStateReadOptionsByScope = COLDMAIL_CRITICAL_UI_STATE_READ_OPTIONS_BY_SCOPE,
     uiStateMemoryFallbackScopes = Object.freeze([
       'premium_customers_database',
       'premium_active_orders',
@@ -84,6 +104,7 @@ function createUiSeoRuntime(deps = {}) {
     fetchSupabaseRowByKeyViaRest,
     upsertSupabaseRowViaRest,
     uiStateReadTimeoutMsByScope,
+    uiStateReadOptionsByScope,
     uiStateMemoryFallbackScopes,
     normalizeString,
     truncateText,
