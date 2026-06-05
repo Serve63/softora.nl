@@ -32,6 +32,10 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
     supabaseMaintenanceRoutes,
     /app\.post\('\/api\/supabase\/database\/restart', requireMaintenance,/
   );
+  assert.ok(
+    featureRoutes.indexOf('registerSupabaseMaintenanceRoutes(app') < featureRoutes.indexOf('createPremiumRouteRuntime({'),
+    'Supabase maintenance restart route must stay before generic /api premium-auth middleware'
+  );
   assert.match(coldmailingRoutes, /app\.post\('\/api\/coldmailing\/outreach\/status', requirePremiumAdminApiAccess,/);
   assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/sync', requirePremiumAdminApiAccess,/);
   assert.match(instantlyRoutes, /app\.get\('\/api\/instantly\/status', requirePremiumAdminApiAccess,/);
