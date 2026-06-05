@@ -26,6 +26,7 @@ const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
 const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
+const DEFAULT_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
 
 function slugifyDesignPhotoMatchText(value) {
   return normalizeString(value)
@@ -145,10 +146,14 @@ function createSoftoraDataOpsStore(deps = {}) {
     bucketName = 'softora-design-photos',
     dataOpsReadQueryTimeoutMs = DEFAULT_READ_QUERY_TIMEOUT_MS,
     dataOpsReadCacheTtlMs = DEFAULT_READ_CACHE_TTL_MS,
+    dataOpsReadFailureCooldownMs = DEFAULT_READ_FAILURE_COOLDOWN_MS,
+    truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
   } = deps;
   const signedUrlCache = new Map();
   const readCache = new Map();
+  let readFailureCooldownUntilMs = 0;
+  let readFailureCooldownReason = '';
 
   function getClient() {
     if (!isSupabaseConfigured()) return null;
@@ -172,6 +177,45 @@ function createSoftoraDataOpsStore(deps = {}) {
     const error = new Error(`${label} timeout na ${timeoutMs}ms`);
     error.code = 'DATA_OPS_TIMEOUT';
     return error;
+  }
+
+  function getSafeReadFailureCooldownMs() {
+    return Math.max(0, Math.min(5 * 60_000, Number(dataOpsReadFailureCooldownMs) || 0));
+  }
+
+  function isReadFailureCooldownActive() {
+    return currentTimeMs() < readFailureCooldownUntilMs;
+  }
+
+  function createReadCooldownError() {
+    const secondsLeft = Math.max(1, Math.ceil((readFailureCooldownUntilMs - currentTimeMs()) / 1000));
+    const error = new Error(
+      `DataOps reads tijdelijk overgeslagen na Supabase timeout/504 (${secondsLeft}s cooldown${readFailureCooldownReason ? `, ${readFailureCooldownReason}` : ''})`
+    );
+    error.code = 'DATA_OPS_READ_COOLDOWN';
+    return error;
+  }
+
+  function isTransientReadError(error) {
+    const text = normalizeString(error && (error.message || error.details || error.hint || error.code || error));
+    return (
+      error?.code === 'DATA_OPS_TIMEOUT' ||
+      /abort|timeout|timed out|504|fetch failed|network|econnreset|etimedout|connection terminated/i.test(text)
+    );
+  }
+
+  function openReadFailureCooldown(error) {
+    const cooldownMs = getSafeReadFailureCooldownMs();
+    if (!cooldownMs) return;
+    readFailureCooldownUntilMs = currentTimeMs() + cooldownMs;
+    readFailureCooldownReason = truncateText(normalizeString(error?.message || error?.code || error), 160);
+    const log =
+      typeof logger.warn === 'function'
+        ? logger.warn.bind(logger)
+        : typeof logger.log === 'function'
+          ? logger.log.bind(logger)
+          : null;
+    if (log) log('[DataOps][read-circuit-open]', readFailureCooldownReason);
   }
 
   async function withTimeout(promise, timeoutMs, label) {
@@ -235,6 +279,10 @@ function createSoftoraDataOpsStore(deps = {}) {
   async function run(label, operation, options = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, error: new Error('Supabase niet geconfigureerd') };
+    const isReadOperation = Number(options.timeoutMs) > 0;
+    if (isReadOperation && isReadFailureCooldownActive()) {
+      return { ok: false, unavailable: false, error: createReadCooldownError() };
+    }
     try {
       const result = await withTimeout(
         Promise.resolve().then(() => operation(client)),
@@ -242,10 +290,23 @@ function createSoftoraDataOpsStore(deps = {}) {
         label
       );
       if (result && result.error) throw result.error;
+      if (isReadOperation) {
+        readFailureCooldownUntilMs = 0;
+        readFailureCooldownReason = '';
+      }
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
+      if (isReadOperation && isTransientReadError(error)) {
+        openReadFailureCooldown(error);
+      }
       if (!isUnavailableError(error)) {
-        logger.error(`[DataOps][${label}]`, error?.message || error);
+        const log =
+          isReadOperation && isTransientReadError(error) && typeof logger.warn === 'function'
+            ? logger.warn.bind(logger)
+            : typeof logger.error === 'function'
+              ? logger.error.bind(logger)
+              : null;
+        if (log) log(`[DataOps][${label}]`, error?.message || error);
       }
       return { ok: false, unavailable: isUnavailableError(error), error };
     }

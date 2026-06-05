@@ -19,7 +19,10 @@ function createMailboxIndexStore(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     mailboxIndexQueryTimeoutMs = 2500,
+    mailboxIndexFailureCooldownMs = 60_000,
   } = deps;
+  let failureCooldownUntilMs = 0;
+  let failureCooldownReason = '';
 
   function getClient() {
     if (!isSupabaseConfigured()) return null;
@@ -56,6 +59,31 @@ function createMailboxIndexStore(deps = {}) {
     if (log) log(`[MailboxIndex][${label}][SoftError]`, error?.message || error);
   }
 
+  function getSafeFailureCooldownMs() {
+    return Math.max(0, Math.min(5 * 60_000, Number(mailboxIndexFailureCooldownMs) || 0));
+  }
+
+  function isFailureCooldownActive() {
+    return now().getTime() < failureCooldownUntilMs;
+  }
+
+  function createFailureCooldownError() {
+    const secondsLeft = Math.max(1, Math.ceil((failureCooldownUntilMs - now().getTime()) / 1000));
+    const error = new Error(
+      `Mailbox index tijdelijk overgeslagen na Supabase timeout/504 (${secondsLeft}s cooldown${failureCooldownReason ? `, ${failureCooldownReason}` : ''})`
+    );
+    error.code = 'MAILBOX_INDEX_COOLDOWN';
+    return error;
+  }
+
+  function openFailureCooldown(error) {
+    const cooldownMs = getSafeFailureCooldownMs();
+    if (!cooldownMs) return;
+    failureCooldownUntilMs = now().getTime() + cooldownMs;
+    failureCooldownReason = truncateText(normalizeString(error?.message || error?.code || error), 160);
+    logSoftIndexError('circuit-open', failureCooldownReason);
+  }
+
   function createTimeoutError(label) {
     const timeoutMs = Math.max(250, Math.min(10_000, Number(mailboxIndexQueryTimeoutMs) || 2500));
     const error = new Error(`Mailbox index ${label} timeout na ${timeoutMs}ms`);
@@ -81,13 +109,19 @@ function createMailboxIndexStore(deps = {}) {
   async function run(label, operation) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
+    if (isFailureCooldownActive()) {
+      return { ok: false, unavailable: false, data: null, error: createFailureCooldownError() };
+    }
     try {
       const result = await withQueryTimeout(operation(client), label);
       if (result && result.error) throw result.error;
+      failureCooldownUntilMs = 0;
+      failureCooldownReason = '';
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
       if (!isUnavailableError(error)) {
         if (isSoftIndexError(error)) {
+          openFailureCooldown(error);
           logSoftIndexError(label, error);
         } else {
           logger.error(`[MailboxIndex][${label}]`, error?.message || error);

@@ -189,6 +189,57 @@ test('supabase state store aborts hung REST requests with a timeout error', asyn
   assert.match(result.error || '', /Supabase REST timeout na/);
 });
 
+test('supabase state store opens a short REST cooldown after a timeout', async () => {
+  let fetchCalls = 0;
+  const fixture = createFixture({
+    supabaseRestTimeoutMs: 5,
+    supabaseRestFailureCooldownMs: 1000,
+    fetchImpl: async (_url, options = {}) => {
+      fetchCalls += 1;
+      return new Promise((_, reject) => {
+        options.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      });
+    },
+  });
+
+  const first = await fixture.store.fetchSupabaseStateRowViaRest();
+  const second = await fixture.store.fetchSupabaseStateRowViaRest();
+
+  assert.equal(first.ok, false);
+  assert.match(first.error || '', /Supabase REST timeout na/);
+  assert.equal(second.ok, false);
+  assert.match(second.error || '', /Supabase REST tijdelijk overgeslagen/);
+  assert.equal(fetchCalls, 1);
+});
+
+test('supabase state store opens REST cooldown after 5xx responses', async () => {
+  let fetchCalls = 0;
+  const fixture = createFixture({
+    supabaseRestFailureCooldownMs: 1000,
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        ok: false,
+        status: 504,
+        text: async () => '{"message":"gateway timeout"}',
+      };
+    },
+  });
+
+  const first = await fixture.store.fetchSupabaseStateRowViaRest();
+  const second = await fixture.store.fetchSupabaseStateRowViaRest();
+
+  assert.equal(first.ok, false);
+  assert.equal(first.status, 504);
+  assert.equal(second.ok, false);
+  assert.match(second.error || '', /Supabase REST tijdelijk overgeslagen/);
+  assert.equal(fetchCalls, 1);
+});
+
 test('supabase state store wires a timeout-wrapped fetch into the Supabase client', async () => {
   let upstreamSignal = null;
   const fixture = createFixture({
