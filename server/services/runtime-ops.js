@@ -1,5 +1,73 @@
 const { createAdminOnlyUiStateScopesSet } = require('../config/admin-ui-state-scopes');
 
+const PREMIUM_WORD_SCOPE = 'premium_word';
+const PREMIUM_WORD_HTML_KEY = 'softora_premium_word_html_v1';
+const PREMIUM_WORD_BACKUPS_KEY = 'softora_premium_word_html_backups_v1';
+const PREMIUM_WORD_BACKUP_LIMIT = 8;
+const PREMIUM_WORD_BACKUPS_MAX_LENGTH = 180000;
+
+function parsePremiumWordBackups(value) {
+  let raw = value;
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch (_error) {
+      raw = [];
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const html = String(item.html || '');
+      if (!html.trim()) return null;
+      return {
+        html,
+        savedAt: String(item.savedAt || ''),
+        source: String(item.source || ''),
+        actor: String(item.actor || ''),
+      };
+    })
+    .filter(Boolean);
+}
+
+function serializePremiumWordBackups(backups) {
+  const safeBackups = backups
+    .filter((backup) => backup && String(backup.html || '').trim())
+    .slice(0, PREMIUM_WORD_BACKUP_LIMIT)
+    .map((backup) => ({
+      html: String(backup.html || ''),
+      savedAt: String(backup.savedAt || ''),
+      source: String(backup.source || ''),
+      actor: String(backup.actor || ''),
+    }));
+
+  let serialized = JSON.stringify(safeBackups);
+  while (serialized.length > PREMIUM_WORD_BACKUPS_MAX_LENGTH && safeBackups.length > 1) {
+    safeBackups.pop();
+    serialized = JSON.stringify(safeBackups);
+  }
+  if (serialized.length > PREMIUM_WORD_BACKUPS_MAX_LENGTH && safeBackups.length === 1) {
+    safeBackups[0].html = safeBackups[0].html.slice(0, PREMIUM_WORD_BACKUPS_MAX_LENGTH - 500);
+    serialized = JSON.stringify(safeBackups);
+  }
+  return serialized.length <= PREMIUM_WORD_BACKUPS_MAX_LENGTH ? serialized : '[]';
+}
+
+function buildPremiumWordBackupsValue(existingBackupsValue, previousHtml, meta = {}) {
+  const html = String(previousHtml || '');
+  if (!html.trim()) return '';
+  const previousBackup = {
+    html,
+    savedAt: String(meta.savedAt || new Date().toISOString()),
+    source: String(meta.source || 'frontend'),
+    actor: String(meta.actor || ''),
+  };
+  const existingBackups = parsePremiumWordBackups(existingBackupsValue)
+    .filter((backup) => backup.html !== html);
+  return serializePremiumWordBackups([previousBackup, ...existingBackups]);
+}
+
 function createRuntimeOpsCoordinator(deps = {}) {
   const {
     parseIntSafe = (value, fallback = 0) => {
@@ -219,27 +287,65 @@ function createRuntimeOpsCoordinator(deps = {}) {
       body.replace === true ||
       body.fullReplace === true ||
       normalizeString(body.mode || '').toLowerCase() === 'replace';
+    const source = normalizeString(body.source || 'frontend');
+    const actor = normalizeString(body.actor || '');
     let valuesToSave;
+    let currentState = null;
+    let currentValues = {};
 
     if (replaceRequested) {
+      if (scope === PREMIUM_WORD_SCOPE) {
+        currentState = await getUiStateValuesForScope(scope);
+        if (!currentState) {
+          return res.status(503).json({
+            ok: false,
+            error: 'Kon Word backup niet veilig maken zonder geldige Supabase-opslag.',
+          });
+        }
+        currentValues =
+          currentState && currentState.values && typeof currentState.values === 'object'
+            ? currentState.values
+            : {};
+      }
       valuesToSave = sanitizeUiStateValues(valuesProvided ? body.values : {});
     } else {
-      const current = await getUiStateValuesForScope(scope);
-      if (!current) {
+      currentState = await getUiStateValuesForScope(scope);
+      if (!currentState) {
         return res.status(503).json({
           ok: false,
           error: 'Kon UI state patch niet laden zonder geldige Supabase-opslag.',
         });
       }
-      const currentValues =
-        current && current.values && typeof current.values === 'object' ? current.values : {};
+      currentValues =
+        currentState && currentState.values && typeof currentState.values === 'object'
+          ? currentState.values
+          : {};
       const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
       valuesToSave = { ...currentValues, ...patchValues };
     }
 
+    if (
+      scope === PREMIUM_WORD_SCOPE &&
+      Object.prototype.hasOwnProperty.call(valuesToSave, PREMIUM_WORD_HTML_KEY)
+    ) {
+      const previousHtml = String(currentValues[PREMIUM_WORD_HTML_KEY] || '');
+      const nextHtml = String(valuesToSave[PREMIUM_WORD_HTML_KEY] || '');
+      if (previousHtml.trim() && previousHtml !== nextHtml) {
+        valuesToSave[PREMIUM_WORD_BACKUPS_KEY] = buildPremiumWordBackupsValue(
+          currentValues[PREMIUM_WORD_BACKUPS_KEY],
+          previousHtml,
+          {
+            savedAt: currentState && currentState.updatedAt,
+            source,
+            actor,
+          }
+        );
+      }
+    }
+
     const state = await setUiStateValues(scope, valuesToSave, {
-      source: normalizeString(body.source || 'frontend'),
-      actor: normalizeString(body.actor || ''),
+      source,
+      actor,
     });
     if (!state) {
       return res.status(503).json({
@@ -249,8 +355,8 @@ function createRuntimeOpsCoordinator(deps = {}) {
     }
 
     const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, {
-      source: normalizeString(body.source || 'frontend'),
-      actor: normalizeString(body.actor || ''),
+      source,
+      actor,
     });
 
     return res.status(200).json({

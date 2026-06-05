@@ -3,14 +3,17 @@
 
     var REMOTE_SCOPE = "premium_word";
     var REMOTE_KEY = "softora_premium_word_html_v1";
+    var BACKUP_KEY = "softora_premium_word_html_backups_v1";
     var editor = document.getElementById("wordEditor");
     var ribbon = document.getElementById("wordRibbon");
+    var restoreBackupButton = document.getElementById("wordRestoreBackup");
     var forePick = document.getElementById("wordForeColor");
     var hilitePick = document.getElementById("wordHiliteColor");
     var saveTimer = 0;
     var remoteLoadComplete = false;
     var remoteLoadFailed = false;
     var isDirty = false;
+    var wordBackups = [];
 
     if (!editor || !ribbon) return;
 
@@ -148,6 +151,56 @@
         return target && typeof target.closest === "function" ? target.closest(selector) : null;
     }
 
+    function parseWordBackups(value) {
+        var raw = value;
+        if (typeof raw === "string") {
+            try {
+                raw = JSON.parse(raw);
+            } catch (error) {
+                raw = [];
+            }
+        }
+        if (!Array.isArray(raw)) return [];
+        return raw.map(function (item) {
+            if (!item || typeof item !== "object") return null;
+            var html = String(item.html || "");
+            if (!html) return null;
+            return {
+                html: html,
+                savedAt: String(item.savedAt || ""),
+                source: String(item.source || ""),
+                actor: String(item.actor || "")
+            };
+        }).filter(Boolean);
+    }
+
+    function updateRestoreBackupButton() {
+        if (!restoreBackupButton) return;
+        restoreBackupButton.disabled = !wordBackups.length;
+        restoreBackupButton.title = wordBackups.length
+            ? "Laatste Word-backup terugzetten"
+            : "Nog geen Word-backup beschikbaar";
+    }
+
+    function refreshBackupsFromState(state) {
+        wordBackups = parseWordBackups(state && state.values && state.values[BACKUP_KEY]);
+        updateRestoreBackupButton();
+    }
+
+    async function restoreLatestBackup() {
+        if (!wordBackups.length || !restoreBackupButton || restoreBackupButton.disabled) return;
+        var latestBackup = wordBackups[0];
+        var confirmed = window.confirm("Laatste Word-backup terugzetten? Je huidige tekst wordt eerst als backup bewaard.");
+        if (!confirmed) return;
+        editor.setAttribute("contenteditable", "true");
+        editor.innerHTML = sanitizeWordHtml(latestBackup.html);
+        remoteLoadComplete = true;
+        remoteLoadFailed = false;
+        isDirty = true;
+        window.clearTimeout(saveTimer);
+        await save();
+    }
+
     function bindRibbon() {
         ribbon.addEventListener("mousedown", function (event) {
             if (closestElement(event.target, ".ribbon-btn")) event.preventDefault();
@@ -157,6 +210,10 @@
             var btn = closestElement(event.target, ".ribbon-btn");
             if (!btn) return;
             event.preventDefault();
+            if (btn === restoreBackupButton) {
+                void restoreLatestBackup();
+                return;
+            }
             var cmd = btn.getAttribute("data-cmd");
             var val = btn.getAttribute("data-val");
             if (cmd === "formatBlock" && val) {
@@ -189,6 +246,7 @@
             var html = String(state && state.values && state.values[REMOTE_KEY] || "");
             editor.setAttribute("contenteditable", "true");
             if (html) editor.innerHTML = sanitizeWordHtml(html);
+            refreshBackupsFromState(state);
             remoteLoadComplete = true;
             remoteLoadFailed = false;
             isDirty = false;
@@ -196,6 +254,8 @@
             remoteLoadComplete = false;
             remoteLoadFailed = true;
             isDirty = false;
+            wordBackups = [];
+            updateRestoreBackupButton();
             editor.setAttribute("contenteditable", "false");
             editor.setAttribute("data-placeholder", "Document kon niet geladen worden. Vernieuw de pagina.");
             console.error("Word-document laden mislukt:", error);
@@ -207,11 +267,12 @@
         try {
             var patch = {};
             patch[REMOTE_KEY] = sanitizeWordHtml(editor.innerHTML);
-            await getUiStateClient().set(REMOTE_SCOPE, {
+            var state = await getUiStateClient().set(REMOTE_SCOPE, {
                 patch: patch,
                 source: "premium-word",
                 actor: "browser"
             });
+            refreshBackupsFromState(state);
             isDirty = false;
         } catch (error) {
             console.error("Word-document opslaan mislukt:", error);

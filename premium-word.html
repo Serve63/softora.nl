@@ -149,6 +149,12 @@
             background: #e5e7eb;
         }
 
+        .ribbon-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
         .ribbon-select {
             font: inherit;
             font-size: 0.78rem;
@@ -374,6 +380,9 @@
                             <span class="ribbon-label">Markeer</span>
                             <input type="color" class="ribbon-color" id="wordHiliteColor" value="#fef08a" title="Markeren" aria-label="Markeerkleur">
                         </div>
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" id="wordRestoreBackup" title="Nog geen Word-backup beschikbaar" disabled>Backup</button>
+                        </div>
                     </div>
                     <div class="word-page-outer">
                         <div class="word-page">
@@ -394,6 +403,6 @@
     </div>
 
     <script src="assets/premium-ui-state-client.js?v=20260605a"></script>
-    <script src="assets/premium-word.js?v=20260605a"></script>
+    <script src="assets/premium-word.js?v=20260605b"></script>
 </body>
 </html>
