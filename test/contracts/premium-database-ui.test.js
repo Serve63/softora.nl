@@ -831,16 +831,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260605e/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260606a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--shared/);
   assert.doesNotMatch(filterGroupsCssSource, /margin-left: auto;/);
   assert.doesNotMatch(filterGroupsCssSource, /rgba\(139, 34, 82/);
-  assert.match(filterGroupsCssSource, /\.status-filter\s*\{[\s\S]*background: transparent;[\s\S]*border: 0;[\s\S]*border-radius: 0;[\s\S]*padding: 0;/);
-  assert.doesNotMatch(filterGroupsCssSource, /border: 1px solid #e8e6e1;/);
-  assert.doesNotMatch(filterGroupsCssSource, /border-radius: 10px;/);
+  assert.match(filterGroupsCssSource, /\.status-filter\s*\{[\s\S]*background: #fff;[\s\S]*border: 1px solid #e8e6e1;[\s\S]*border-radius: 10px;[\s\S]*padding: 10px 16px;/);
   assert.match(filterGroupsCssSource, /\.status-filter-divider\s*\{/);
   assert.match(filterGroupsCssSource, /\.status-filter-pills\s*\{/);
   const labelCssBlock = filterGroupsCssSource.match(/\.status-filter-label\s*\{[\s\S]*?\}/)[0];
