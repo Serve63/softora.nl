@@ -13,6 +13,8 @@ const {
   getSeoContentItem,
 } = require('../services/seo-content');
 
+const SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png';
+
 function appendOriginalQuery(pathname, originalUrl) {
   const basePath = String(pathname || '').trim() || '/';
   const original = String(originalUrl || '');
@@ -86,7 +88,7 @@ function registerPublicPageRoutes(app, deps) {
   });
 
   app.get('/favicon.ico', (req, res, next) => {
-    return res.redirect(302, '/assets/softora-favicon-round.png?v=20260605d');
+    return res.redirect(302, SEARCH_FAVICON_HREF);
   });
 
   app.use(

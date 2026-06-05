@@ -232,9 +232,11 @@ test('page smoke: /favicon.ico serves the Softora favicon', async () => {
   const bytes = Buffer.from(await response.arrayBuffer());
 
   assert.equal(response.status, 200, '/favicon.ico');
-  assert.ok(response.url.endsWith('/assets/softora-favicon-round.png?v=20260605d'));
+  assert.ok(response.url.endsWith('/assets/softora-search-favicon.png'));
   assert.match(response.headers.get('content-type') || '', /^image\/png\b/);
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(bytes.readUInt32BE(16), 96);
+  assert.equal(bytes.readUInt32BE(20), 96);
 });
 
 const repoRoot = path.resolve(__dirname, '..', '..');
