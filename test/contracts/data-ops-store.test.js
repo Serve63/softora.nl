@@ -334,6 +334,68 @@ test('data ops store serves stale cached customers when a later read times out',
   assert.equal(second[0].bedrijf, 'Softora');
 });
 
+test('data ops store can suppress stale cache warnings for public-preview fallbacks', async () => {
+  let nowMs = Date.parse('2026-05-22T10:00:00.000Z');
+  let readCalls = 0;
+  const warnings = [];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range() {
+                      readCalls += 1;
+                      if (readCalls === 1) {
+                        return Promise.resolve({
+                          data: [
+                            {
+                              customer_id: 'lead-1',
+                              payload: { id: 'lead-1', bedrijf: 'Softora' },
+                              updated_at: '2026-05-22T10:00:00.000Z',
+                            },
+                          ],
+                          error: null,
+                        });
+                      }
+                      return new Promise(() => {});
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadQueryTimeoutMs: 25,
+    dataOpsReadCacheTtlMs: 1,
+    now: () => new Date(nowMs),
+    logger: { error: () => {}, warn: (...args) => warnings.push(args.join(' ')) },
+  });
+
+  const first = await store.listCustomers();
+  nowMs += 10;
+  const second = await store.listCustomers({
+    suppressReadFailureCooldown: true,
+    suppressStaleReadCacheLog: true,
+    suppressTransientReadFailureLog: true,
+  });
+
+  assert.equal(readCalls, 2);
+  assert.equal(first[0].bedrijf, 'Softora');
+  assert.equal(second[0].bedrijf, 'Softora');
+  assert.equal(warnings.length, 0);
+});
+
 test('data ops store saves webdesign and device mockup as one photo record', async () => {
   const uploads = [];
   const upserts = [];
