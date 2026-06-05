@@ -138,6 +138,21 @@ function createUiStateStore(deps = {}) {
     return isMemoryFallbackAllowed(scope) ? buildInMemoryState(scope) : null;
   }
 
+  function isSoftReadFailure(value) {
+    const text = normalizeString(value && (value.message || value.details || value.hint || value.code || value));
+    return /(?:abort|timeout|timed out|fetch failed|network|econnreset|etimedout|temporar)/i.test(text);
+  }
+
+  function logReadFailure(label, message, ...extra) {
+    const log =
+      typeof logger.info === 'function'
+        ? logger.info.bind(logger)
+        : typeof logger.log === 'function'
+          ? logger.log.bind(logger)
+          : null;
+    if (log) log(label, message, ...extra);
+  }
+
   async function getUiStateValues(scope) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
@@ -158,10 +173,12 @@ function createUiStateStore(deps = {}) {
             : fallback.status
               ? ` | REST fallback status: ${fallback.status}`
               : '';
-          logger.error(
-            '[UI State][Supabase][GetError]',
-            `${clientError?.message || clientError || 'Supabase client ontbreekt.'}${fallbackMsg}`
-          );
+          const message = `${clientError?.message || clientError || 'Supabase client ontbreekt.'}${fallbackMsg}`;
+          if (isSoftReadFailure(clientError) || isSoftReadFailure(fallback.error)) {
+            logReadFailure('[UI State][Supabase][GetSoftError]', message);
+          } else {
+            logger.error('[UI State][Supabase][GetError]', message);
+          }
           return buildFallbackState(normalizedScope);
         }
         return Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
@@ -216,7 +233,11 @@ function createUiStateStore(deps = {}) {
       try {
         return await executeRead();
       } catch (error) {
-        logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+        if (isSoftReadFailure(error)) {
+          logReadFailure('[UI State][Supabase][GetSoftCrash]', error?.message || error);
+        } else {
+          logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+        }
         return fallbackState;
       }
     }
@@ -246,12 +267,20 @@ function createUiStateStore(deps = {}) {
           .then(executeRead)
           .then((value) => finish(value))
           .catch((error) => {
-            logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+            if (isSoftReadFailure(error)) {
+              logReadFailure('[UI State][Supabase][GetSoftCrash]', error?.message || error);
+            } else {
+              logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+            }
             finish(fallbackState);
           });
       });
     } catch (error) {
-      logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+      if (isSoftReadFailure(error)) {
+        logReadFailure('[UI State][Supabase][GetSoftCrash]', error?.message || error);
+      } else {
+        logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+      }
       return fallbackState;
     }
   }

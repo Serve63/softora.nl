@@ -286,6 +286,47 @@ test('ui-state store reads values through REST fallback when client read crashes
   });
 });
 
+test('ui-state store logs read timeouts as soft fallback instead of hard errors', async () => {
+  const timeoutClient = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  const error = new Error('Supabase client timeout na 12s');
+                  error.name = 'AbortError';
+                  throw error;
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { loggerErrors, loggerInfos, store } = createFixture({
+    client: timeoutClient,
+    fetchResult: {
+      ok: false,
+      error: 'Supabase REST timeout na 12s',
+    },
+  });
+
+  const state = await store.getUiStateValues('dashboard');
+
+  assert.equal(state, null);
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][GetSoftError]'),
+    true
+  );
+  assert.equal(
+    loggerErrors.some((args) => args[0] === '[UI State][Supabase][GetError]'),
+    false
+  );
+});
+
 test('ui-state store writes values through REST fallback when client upsert crashes', async () => {
   const crashingClient = {
     from() {

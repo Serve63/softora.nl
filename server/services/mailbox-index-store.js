@@ -40,6 +40,21 @@ function createMailboxIndexStore(deps = {}) {
     );
   }
 
+  function isSoftIndexError(error) {
+    const text = normalizeString(error && (error.message || error.details || error.hint || error.code || error));
+    return /(?:abort|timeout|timed out|fetch failed|network|econnreset|etimedout|temporar)/i.test(text);
+  }
+
+  function logSoftIndexError(label, error) {
+    const log =
+      typeof logger.info === 'function'
+        ? logger.info.bind(logger)
+        : typeof logger.log === 'function'
+          ? logger.log.bind(logger)
+          : null;
+    if (log) log(`[MailboxIndex][${label}][SoftError]`, error?.message || error);
+  }
+
   async function run(label, operation) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, data: null, error: new Error('Supabase niet geconfigureerd') };
@@ -48,7 +63,13 @@ function createMailboxIndexStore(deps = {}) {
       if (result && result.error) throw result.error;
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
-      if (!isUnavailableError(error)) logger.error(`[MailboxIndex][${label}]`, error?.message || error);
+      if (!isUnavailableError(error)) {
+        if (isSoftIndexError(error)) {
+          logSoftIndexError(label, error);
+        } else {
+          logger.error(`[MailboxIndex][${label}]`, error?.message || error);
+        }
+      }
       return { ok: false, unavailable: isUnavailableError(error), data: null, error };
     }
   }
