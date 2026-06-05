@@ -228,6 +228,56 @@ test('data ops store opens a short read cooldown after Supabase timeouts', async
   assert.match(warnings.join('\n'), /\[DataOps\]\[read-circuit-open\]/);
 });
 
+test('data ops store can suppress public-preview fallback read cooldowns', async () => {
+  let readCalls = 0;
+  const warnings = [];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range() {
+                      readCalls += 1;
+                      return new Promise(() => {});
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadQueryTimeoutMs: 25,
+    dataOpsReadFailureCooldownMs: 1000,
+    logger: { error: () => {}, warn: (...args) => warnings.push(args.join(' ')) },
+  });
+
+  const suppressed = await store.listCustomers({
+    suppressReadFailureCooldown: true,
+    suppressTransientReadFailureLog: true,
+  });
+  assert.equal(suppressed, null);
+  assert.equal(warnings.length, 0);
+
+  const normalStartedAt = Date.now();
+  const normal = await store.listCustomers();
+
+  assert.equal(normal, null);
+  assert.equal(readCalls, 2);
+  assert.ok(Date.now() - normalStartedAt >= 20);
+  assert.match(warnings.join('\n'), /\[DataOps\]\[read-circuit-open\]/);
+});
+
 test('data ops store serves stale cached customers when a later read times out', async () => {
   let nowMs = Date.parse('2026-05-22T10:00:00.000Z');
   let readCalls = 0;

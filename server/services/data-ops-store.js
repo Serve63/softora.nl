@@ -305,15 +305,21 @@ function createSoftoraDataOpsStore(deps = {}) {
       return { ok: true, data: result ? result.data : null, count: result ? result.count : null };
     } catch (error) {
       if (isReadOperation && isTransientReadError(error)) {
-        openReadFailureCooldown(error);
+        if (!options.suppressReadFailureCooldown) openReadFailureCooldown(error);
       }
       if (!isUnavailableError(error)) {
-        const log =
-          isReadOperation && isTransientReadError(error) && typeof logger.warn === 'function'
+        const shouldSuppressTransientLog =
+          isReadOperation &&
+          isTransientReadError(error) &&
+          Boolean(options.suppressTransientReadFailureLog);
+        let log = null;
+        if (!shouldSuppressTransientLog) {
+          log = isReadOperation && isTransientReadError(error) && typeof logger.warn === 'function'
             ? logger.warn.bind(logger)
             : typeof logger.error === 'function'
               ? logger.error.bind(logger)
               : null;
+        }
         if (log) log(`[DataOps][${label}]`, error?.message || error);
       }
       return { ok: false, unavailable: isUnavailableError(error), error };
@@ -492,7 +498,11 @@ function createSoftoraDataOpsStore(deps = {}) {
         if (query && typeof query.range === 'function') return query.range(from, to);
         if (query && typeof query.limit === 'function') return query.limit(to - from + 1);
         return query;
-      }, { timeoutMs: options.timeoutMs });
+      }, {
+        timeoutMs: options.timeoutMs,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
       if (!result.ok) return result;
 
       const pageRows = Array.isArray(result.data) ? result.data : [];
@@ -550,7 +560,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
-  async function listCustomers() {
+  async function listCustomers(options = {}) {
     return cachedRead('customers', async () => {
       const result = await collectPagedRows('list-customers', (client) =>
         client
@@ -558,7 +568,11 @@ function createSoftoraDataOpsStore(deps = {}) {
           .select('customer_id,payload,updated_at')
           .is('deleted_at', null)
           .order('updated_at', { ascending: false }),
-      { timeoutMs: dataOpsReadQueryTimeoutMs });
+      {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
       if (!result.ok) return null;
       return (result.data || []).map((row) => ({
         ...(row.payload && typeof row.payload === 'object' ? row.payload : {}),
@@ -904,7 +918,11 @@ function createSoftoraDataOpsStore(deps = {}) {
           .is('deleted_at', null)
           .order('updated_at', { ascending: false })
           .limit(500),
-      { timeoutMs: dataOpsReadQueryTimeoutMs });
+      {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
       return result.ok ? result.data || [] : null;
     });
     if (!structuredRows) return null;

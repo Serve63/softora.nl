@@ -208,6 +208,8 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(uiStateReads, 0);
   assert.equal(customerReads, 0);
   assert.deepEqual(signedOptions.map((options) => options.identifiers), [['aagje-van-os']]);
+  assert.equal(signedOptions[0].suppressReadFailureCooldown, true);
+  assert.equal(signedOptions[0].suppressTransientReadFailureLog, true);
   assert.equal(signedOptions[0].expiresInSeconds, 24 * 60 * 60);
   assert.equal(preview.id, 'manual-import-aagje-eu-0070');
   assert.equal(preview.photoSource, 'https://signed.softora.test/aagje-webdesign.png?token=test');
@@ -216,12 +218,14 @@ test('public webdesign preview reads structured data ops storage before ui-state
 
 test('public webdesign preview signs only targeted structured candidates after customer lookup', async () => {
   const signedOptions = [];
+  const customerOptions = [];
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {
       return { values: {} };
     },
     dataOpsStore: {
-      async listCustomers() {
+      async listCustomers(options) {
+        customerOptions.push(options);
         return [{
           id: 'manual-import-rvh-nl-0123',
           bedrijf: 'R VH Montage Constructie Reparatie',
@@ -251,6 +255,17 @@ test('public webdesign preview signs only targeted structured candidates after c
   assert.equal(preview.photoSource, 'https://signed.softora.test/rvh-webdesign.png?token=test');
   assert.equal(preview.mockupSource, 'https://signed.softora.test/rvh-mockup.jpg?token=test');
   assert.equal(signedOptions.length, 2);
+  assert.deepEqual(
+    signedOptions.map((options) => [
+      options.suppressReadFailureCooldown,
+      options.suppressTransientReadFailureLog,
+    ]),
+    [[true, true], [true, true]]
+  );
+  assert.deepEqual(customerOptions, [{
+    suppressReadFailureCooldown: true,
+    suppressTransientReadFailureLog: true,
+  }]);
 });
 
 test('public webdesign preview resolves sent company links from photo identity when customer stock is gone', async () => {
