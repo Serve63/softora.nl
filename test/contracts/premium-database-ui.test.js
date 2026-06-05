@@ -836,8 +836,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(filterGroupsCssSource, /rgba\(139, 34, 82/);
   assert.match(filterGroupsCssSource, /border: 1px solid rgba\(166, 173, 190, 0\.22\);/);
   const labelCssBlock = filterGroupsCssSource.match(/\.status-filter-label\s*\{[\s\S]*?\}/)[0];
+  assert.match(labelCssBlock, /display: inline-flex;/);
   assert.match(labelCssBlock, /color: var\(--light\);/);
   assert.doesNotMatch(labelCssBlock, /color: var\(--crimson\)|color: var\(--green\)|color: var\(--blue\)/);
+  assert.match(filterGroupsCssSource, /\.status-filter-group\.is-locked\s*\{/);
+  assert.match(filterGroupsCssSource, /\.status-filter-lock-icon\s*\{/);
   assert.match(filterGroupsCssSource, /\.table-load-more\s*\{/);
   assert.match(filterGroupsCssSource, /\.load-more-btn\s*\{/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-exact-upload/);
@@ -1781,7 +1784,7 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters">\s*<span class="status-filter-label">Coldcalling<\/span>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters">\s*<span class="status-filter-label">Overig<\/span>\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters">\s*<span class="status-filter-label">Overig<\/span>\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true">\s*<span class="status-filter-label">[\s\S]*status-filter-lock-icon[\s\S]*Coldcalling<\/span>\s*<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik<\/button>\s*<\/div>/
   );
   assert.match(pageSource, /activeStatus: "benaderbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
@@ -1805,6 +1808,8 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\)/);
   assert.match(pageSource, /nodes\.count\.textContent[\s\S]*visibleCustomers\.length\.toLocaleString\("nl-NL"\) \+ " resultaten"/);
   assert.match(pageSource, /nodes\.loadMoreButton\.addEventListener\("click", function \(\) \{ state\.visibleLimit = databaseTableHelpers\.getNextVisibleLimit\(state\.visibleLimit, TABLE_PAGE_SIZE\); renderPage\(\); \}\);/);
+  assert.match(pageSource, /function setStatus\(status, button\) \{\s*if \(button && button\.disabled\) return;/);
+  assert.match(pageSource, /if \(statusButton && !statusButton\.disabled\)/);
   assert.match(webdesignActionSource, /function hasInstantlyOutreachSignal\(customer\)/);
   assert.match(webdesignActionSource, /function isInstantlyTabCustomer\(customer\)/);
   assert.match(webdesignActionSource, /return !isInstantlyTabCustomer\(customer\) && \(usedColdCalling \|\| usedColdMailing\);/);
@@ -1818,6 +1823,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="klant" type="button">Klant<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, />Beide<\/span>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
@@ -1868,7 +1874,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="gemaild" type="button">Gemaild<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="afspraak" type="button">Afspraak<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="interesse" type="button">Interesse<\/button>/);
-  assert.match(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>/);
+  assert.match(pageSource, /<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>/);
   assert.match(pageSource, /<option value="interesse">Interesse<\/option>/);
   assert.match(pageSource, /<option value="afgehaakt">Afgehaakt<\/option>/);
   assert.match(pageSource, /const DATABASE_STATUS_OPTIONS = \[[^\]]*"interesse"[^\]]*\];/);
