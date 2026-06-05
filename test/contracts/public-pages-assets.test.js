@@ -6,8 +6,8 @@ const path = require('node:path');
 const { getStaticAssetCacheControl } = require('../../server/routes/public-pages');
 
 const REPO_ROOT = path.join(__dirname, '../..');
-const ICO_FAVICON_HREF = '/favicon.ico';
-const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260605a';
+const ICO_FAVICON_HREF = '/favicon.ico?v=20260605b';
+const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260605b';
 
 test('public asset cache keeps unhashed app js/css fresh even with version query strings', () => {
   assert.equal(
