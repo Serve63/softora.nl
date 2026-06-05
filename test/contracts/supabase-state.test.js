@@ -262,6 +262,54 @@ test('supabase state store opens a short REST cooldown after a timeout', async (
   assert.equal(fetchCalls, 1);
 });
 
+test('supabase state store lets critical REST reads ignore shared cooldown and use their own timeout', async () => {
+  const capturedTimeouts = [];
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const fixture = createFixture({
+    supabaseRestTimeoutMs: 5,
+    supabaseRestFailureCooldownMs: 1000,
+    fetchImpl: async (_url, options = {}) =>
+      new Promise((_, reject) => {
+        options.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      }),
+  });
+
+  global.setTimeout = (callback, ms) => {
+    capturedTimeouts.push(ms);
+    queueMicrotask(callback);
+    return { ms };
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    const first = await fixture.store.fetchSupabaseStateRowViaRest();
+    const skipped = await fixture.store.fetchSupabaseStateRowViaRest();
+    const critical = await fixture.store.fetchSupabaseRowByKeyViaRest(
+      'ui_state:premium_coldmail_autopilot',
+      'payload,updated_at',
+      {
+        timeoutMs: 8000,
+        ignoreFailureCooldown: true,
+        suppressFailureCooldown: true,
+      }
+    );
+
+    assert.match(first.error || '', /Supabase REST timeout na 1000ms/);
+    assert.match(skipped.error || '', /Supabase REST tijdelijk overgeslagen/);
+    assert.match(critical.error || '', /Supabase REST timeout na 8000ms/);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+
+  assert.deepEqual(capturedTimeouts, [1000, 8000]);
+});
+
 test('supabase state store opens REST cooldown after 5xx responses', async () => {
   let fetchCalls = 0;
   const fixture = createFixture({

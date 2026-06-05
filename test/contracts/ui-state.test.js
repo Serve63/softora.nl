@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { createUiStateStore } = require('../../server/services/ui-state');
 
@@ -21,13 +23,14 @@ function createFixture(overrides = {}) {
     supabaseStateTable: 'app_state',
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     uiStateReadTimeoutMsByScope: overrides.uiStateReadTimeoutMsByScope,
+    uiStateReadOptionsByScope: overrides.uiStateReadOptionsByScope,
     uiStateReadFailureCooldownMs: overrides.uiStateReadFailureCooldownMs,
     uiStateAllowMemoryFallback: overrides.uiStateAllowMemoryFallback,
     uiStateMemoryFallbackScopes: overrides.uiStateMemoryFallbackScopes,
-    fetchSupabaseRowByKeyViaRest: async (rowKey, columns) => {
-      restReads.push({ rowKey, columns });
+    fetchSupabaseRowByKeyViaRest: async (rowKey, columns, requestOptions) => {
+      restReads.push({ rowKey, columns, requestOptions });
       if (typeof overrides.fetchResult === 'function') {
-        return overrides.fetchResult(rowKey, columns, restReads.length);
+        return overrides.fetchResult(rowKey, columns, restReads.length, requestOptions);
       }
       if (overrides.fetchResult && typeof overrides.fetchResult.then === 'function') {
         return overrides.fetchResult;
@@ -114,6 +117,11 @@ test('ui-state store reads values through REST fallback when client is unavailab
   assert.deepEqual(restReads[0], {
     rowKey: 'ui_state:dashboard',
     columns: 'payload,updated_at',
+    requestOptions: {
+      timeoutMs: 1500,
+      ignoreFailureCooldown: false,
+      suppressFailureCooldown: false,
+    },
   });
   assert.deepEqual(state, {
     values: {
@@ -614,4 +622,68 @@ test('ui-state store supports a longer read timeout for heavy photo scopes', asy
     updatedAt: '2026-04-28T12:00:00.000Z',
     source: 'supabase',
   });
+});
+
+test('ui-state store can isolate critical reads through REST-first scoped options', async () => {
+  let clientUsed = false;
+  const { restReads, store } = createFixture({
+    client: {
+      from() {
+        clientUsed = true;
+        throw new Error('client should not be used for critical read');
+      },
+    },
+    uiStateReadTimeoutMsByScope: {
+      premium_coldmail_autopilot: 80,
+    },
+    uiStateReadOptionsByScope: {
+      premium_coldmail_autopilot: {
+        preferSupabaseRestRead: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      },
+    },
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: {
+          values: {
+            softora_coldmail_autopilot_v1: JSON.stringify({ enabled: true }),
+          },
+        },
+        updated_at: '2026-06-05T11:45:00.000Z',
+      },
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_coldmail_autopilot');
+
+  assert.equal(clientUsed, false);
+  assert.deepEqual(restReads[0], {
+    rowKey: 'ui_state:premium_coldmail_autopilot',
+    columns: 'payload,updated_at',
+    requestOptions: {
+      timeoutMs: 80,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    },
+  });
+  assert.deepEqual(state, {
+    values: {
+      softora_coldmail_autopilot_v1: JSON.stringify({ enabled: true }),
+    },
+    updatedAt: '2026-06-05T11:45:00.000Z',
+    source: 'supabase',
+  });
+});
+
+test('ui-seo runtime keeps coldmail state reads critical and isolated by default', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../server/services/ui-seo-runtime.js'), 'utf8');
+
+  assert.match(source, /premium_coldmail_autopilot:\s*8000/);
+  assert.match(source, /premium_coldmail_send_guard:\s*10000/);
+  assert.match(source, /premium_coldmailing_settings:\s*8000/);
+  assert.match(source, /preferSupabaseRestRead:\s*true/);
+  assert.match(source, /ignoreSupabaseRestFailureCooldown:\s*true/);
+  assert.match(source, /suppressSupabaseRestFailureCooldown:\s*true/);
 });

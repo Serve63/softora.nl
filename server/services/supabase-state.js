@@ -27,12 +27,16 @@ function createSupabaseStateStore(deps = {}) {
     return Boolean(supabaseUrl && supabaseServiceRoleKey);
   }
 
-  function getSafeSupabaseTimeoutMs() {
+  function getSafeSupabaseTimeoutMs(timeoutOverrideMs = null) {
+    const rawTimeout =
+      timeoutOverrideMs === null || timeoutOverrideMs === undefined
+        ? supabaseRestTimeoutMs
+        : timeoutOverrideMs;
     return Math.max(
       1000,
       Math.min(
         60000,
-        Number(supabaseRestTimeoutMs) || DEFAULT_SUPABASE_REST_TIMEOUT_MS
+        Number(rawTimeout) || DEFAULT_SUPABASE_REST_TIMEOUT_MS
       )
     );
   }
@@ -50,7 +54,8 @@ function createSupabaseStateStore(deps = {}) {
     return Date.now() < restFailureCooldownUntilMs;
   }
 
-  function openRestFailureCooldown(reason) {
+  function openRestFailureCooldown(reason, options = {}) {
+    if (options && options.suppressFailureCooldown) return;
     const cooldownMs = getSafeRestFailureCooldownMs();
     if (!cooldownMs) return;
     restFailureCooldownUntilMs = Date.now() + cooldownMs;
@@ -142,18 +147,19 @@ function createSupabaseStateStore(deps = {}) {
     return timedSupabaseFetch;
   }
 
-  async function performRestRequest(url, options = {}) {
+  async function performRestRequest(url, options = {}, requestOptions = {}) {
     if (!isSupabaseConfigured()) {
       return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
     }
     if (typeof fetchImpl !== 'function') {
       return { ok: false, status: null, body: null, error: 'Fetch is niet beschikbaar.' };
     }
-    if (isRestFailureCooldownActive()) {
+    const ignoreFailureCooldown = Boolean(requestOptions && requestOptions.ignoreFailureCooldown);
+    if (!ignoreFailureCooldown && isRestFailureCooldownActive()) {
       return { ok: false, status: null, body: null, error: buildRestCooldownError() };
     }
 
-    const timeoutMs = getSafeSupabaseTimeoutMs();
+    const timeoutMs = getSafeSupabaseTimeoutMs(requestOptions && requestOptions.timeoutMs);
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
@@ -171,12 +177,12 @@ function createSupabaseStateStore(deps = {}) {
       }
 
       if (!response.ok && response.status >= 500) {
-        openRestFailureCooldown(`status ${response.status}`);
+        openRestFailureCooldown(`status ${response.status}`, requestOptions);
       }
       return { ok: response.ok, status: response.status, body, error: null };
     } catch (error) {
       if (shouldOpenRestFailureCooldownFromError(error)) {
-        openRestFailureCooldown(error?.message || error?.name || 'REST timeout');
+        openRestFailureCooldown(error?.message || error?.name || 'REST timeout', requestOptions);
       }
       return {
         ok: false,
@@ -194,7 +200,7 @@ function createSupabaseStateStore(deps = {}) {
     }
   }
 
-  async function fetchStateRowViaRest(selectColumns = 'payload,updated_at') {
+  async function fetchStateRowViaRest(selectColumns = 'payload,updated_at', requestOptions = {}) {
     const baseUrl = supabaseUrl.replace(/\/+$/, '');
     const url =
       `${baseUrl}/rest/v1/${encodeURIComponent(supabaseStateTable)}` +
@@ -202,10 +208,14 @@ function createSupabaseStateStore(deps = {}) {
       `&state_key=eq.${encodeURIComponent(supabaseStateKey)}` +
       '&limit=1';
 
-    return performRestRequest(url, {
-      method: 'GET',
-      headers: buildRestHeaders(),
-    });
+    return performRestRequest(
+      url,
+      {
+        method: 'GET',
+        headers: buildRestHeaders(),
+      },
+      requestOptions
+    );
   }
 
   async function upsertStateRowViaRest(row) {
@@ -222,7 +232,7 @@ function createSupabaseStateStore(deps = {}) {
     });
   }
 
-  async function fetchRowByKeyViaRest(rowKey, selectColumns = 'payload,updated_at') {
+  async function fetchRowByKeyViaRest(rowKey, selectColumns = 'payload,updated_at', requestOptions = {}) {
     const normalizedRowKey = normalizeString(rowKey);
     if (!normalizedRowKey) {
       return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
@@ -235,10 +245,14 @@ function createSupabaseStateStore(deps = {}) {
       `&state_key=eq.${encodeURIComponent(normalizedRowKey)}` +
       '&limit=1';
 
-    return performRestRequest(url, {
-      method: 'GET',
-      headers: buildRestHeaders(),
-    });
+    return performRestRequest(
+      url,
+      {
+        method: 'GET',
+        headers: buildRestHeaders(),
+      },
+      requestOptions
+    );
   }
 
   async function upsertRowViaRest(row) {

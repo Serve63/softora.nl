@@ -438,7 +438,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   Object.values(vercelConfig.functions).forEach((functionConfig) => {
     assert.equal(
       functionConfig.includeFiles,
-      '{*.html,assets/fonts/**,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
+      '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
     );
   });
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
