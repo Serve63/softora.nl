@@ -17,6 +17,7 @@ const {
 } = require('../routes/public-webdesign-preview');
 const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
 const { registerSupabaseCostRoutes } = require('../routes/supabase-costs');
+const { registerSupabaseMaintenanceRoutes } = require('../routes/supabase-maintenance');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
@@ -50,6 +51,7 @@ function registerFeatureRoutes(app, deps = {}) {
     premiumDatabaseWebdesignJobsCoordinator = null,
     openAiCostSummary = null,
     supabaseCostSummary = null,
+    supabaseMaintenance = null,
     mailboxCoordinator = null,
     mailboxCronSecret = '',
     publicContactCoordinator = null,
@@ -113,6 +115,9 @@ function registerFeatureRoutes(app, deps = {}) {
   registerSupabaseCostRoutes(app, {
     ...(supabaseCostSummary || {}),
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
+  registerSupabaseMaintenanceRoutes(app, {
+    ...(supabaseMaintenance || {}),
   });
   registerMailboxRoutes(app, {
     coordinator: mailboxCoordinator,
