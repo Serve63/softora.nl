@@ -398,6 +398,34 @@ test('coldmailing autopilot cron route requires CRON_SECRET bearer access', asyn
   assert.equal(runs, 1);
 });
 
+test('coldmailing autopilot cron route skips safely during Supabase outage pause', async () => {
+  let runs = 0;
+  const autopilot = createAutopilotRouteHarness({
+    cronSecret: 'cron-secret',
+    supabaseOutageCronPause: 'true',
+    coldmailCampaignService: {
+      runColdmailAutopilot: async () => {
+        runs += 1;
+        return { ok: true, skipped: false, reason: 'sent' };
+      },
+      getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: true } }),
+      updateColdmailAutopilotSettings: async () => ({ ok: true, autopilot: { enabled: true } }),
+    },
+    getEffectivePublicBaseUrl: () => 'https://www.softora.nl',
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const paused = await autopilot.cronRun({
+    headers: { authorization: 'Bearer cron-secret' },
+  });
+
+  assert.equal(paused.statusCode, 200);
+  assert.equal(paused.body.ok, true);
+  assert.equal(paused.body.skipped, true);
+  assert.equal(paused.body.code, 'SUPABASE_OUTAGE_CRON_PAUSED');
+  assert.equal(runs, 0);
+});
+
 test('coldmailing autopilot run uses mail safety only and does not require the send pin or agenda capacity', async () => {
   let received = null;
   let agendaTouched = false;

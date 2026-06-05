@@ -1557,6 +1557,46 @@ test('mailbox cron sync route requires CRON_SECRET bearer access', () => {
   assert.equal(cronCalled, 1);
 });
 
+test('mailbox cron sync skips safely during Supabase outage pause', () => {
+  let cronCalled = 0;
+  const routes = [];
+  const app = {
+    get(path, ...handlers) {
+      routes.push(['GET', path, handlers]);
+    },
+    post(path, ...handlers) {
+      routes.push(['POST', path, handlers]);
+    },
+  };
+
+  registerMailboxRoutes(app, {
+    cronSecret: 'cron-secret',
+    supabaseOutageCronPause: 'true',
+    coordinator: {
+      accountsResponse() {},
+      listMessagesResponse() {},
+      getMessageResponse() {},
+      syncMailboxResponse(_req, res) {
+        cronCalled += 1;
+        res.status(200).json({ ok: true });
+      },
+      sendMessageResponse() {},
+    },
+  });
+
+  const route = routes.find(([method, path]) => method === 'GET' && path === '/api/mailbox/sync');
+  const paused = createResponseRecorder();
+  route[2][0]({ headers: { authorization: 'Bearer cron-secret' } }, paused, () => {
+    route[2][1]({}, paused);
+  });
+
+  assert.equal(paused.statusCode, 200);
+  assert.equal(paused.body.ok, true);
+  assert.equal(paused.body.skipped, true);
+  assert.equal(paused.body.code, 'SUPABASE_OUTAGE_CRON_PAUSED');
+  assert.equal(cronCalled, 0);
+});
+
 test('mailbox service exposes sync response handler for cron and admin routes', async () => {
   const service = createMailboxService({ mailConfig: {} });
 
