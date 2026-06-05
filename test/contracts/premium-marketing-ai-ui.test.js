@@ -16,7 +16,7 @@ test('premium advertenties toont een aparte AI beheer workspace boven de persone
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-marketing-management\.css\?v=20260423a">/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260427a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_advertenties_content_lock"/);
@@ -53,7 +53,7 @@ test('premium socialmedia toont een aparte AI beheer workspace boven de personee
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-marketing-management\.css\?v=20260423a">/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260427a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_socialmedia_content_lock"/);

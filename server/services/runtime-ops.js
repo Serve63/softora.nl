@@ -16,6 +16,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     setUiStateValues = async () => null,
     dataOpsUiStateBridge = null,
     dataOpsUiStateReadTimeoutMs = 2500,
+    uiStateReadTimeoutMs = 4500,
     adminOnlyUiStateScopes = createAdminOnlyUiStateScopesSet(),
     appendSecurityAuditEvent = () => {},
     logger = console,
@@ -57,6 +58,14 @@ function createRuntimeOpsCoordinator(deps = {}) {
     const log = logger && (typeof logger.warn === 'function' ? logger.warn : logger.error);
     if (typeof log === 'function') {
       log.call(logger, '[DataOps][ui-state-read-fallback]', JSON.stringify({ scope, message }));
+    }
+  }
+
+  function logUiStateReadFallback(scope, error) {
+    const message = error?.message || String(error || 'onbekende fout');
+    const log = logger && (typeof logger.warn === 'function' ? logger.warn : logger.error);
+    if (typeof log === 'function') {
+      log.call(logger, '[RuntimeOps][ui-state-read-fallback]', JSON.stringify({ scope, message }));
     }
   }
 
@@ -114,7 +123,16 @@ function createRuntimeOpsCoordinator(deps = {}) {
         logDataOpsReadFallback(scope, error);
       }
     }
-    return getUiStateValues(scope);
+    try {
+      return await awaitWithTimeout(
+        getUiStateValues(scope),
+        uiStateReadTimeoutMs,
+        `UI-state read timeout na ${Math.round(Math.max(1, Number(uiStateReadTimeoutMs) || 4500) / 1000)}s`
+      );
+    } catch (error) {
+      logUiStateReadFallback(scope, error);
+      return null;
+    }
   }
 
   async function mirrorUiStateValuesToDataOps(scope, values, meta) {

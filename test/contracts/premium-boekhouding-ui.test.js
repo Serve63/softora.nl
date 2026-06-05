@@ -18,7 +18,7 @@ test('premium boekhouding no longer shows ICP opgave rows', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
 
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260427a"><\/script>\s*<script src="assets\/premium-bookkeeping\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>\s*<script src="assets\/premium-bookkeeping\.js\?v=20260427a"><\/script>/);
   assert.match(scriptSource, /function aangiftes\(y\) \{/);
   assert.match(scriptSource, /naam: "BTW Aangifte"/);
   assert.match(scriptSource, /naam: "Inkomstenbelasting"/);

@@ -15,7 +15,7 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(pageSource, /id="wordEditor"/);
   assert.match(pageSource, /contenteditable="true"/);
   assert.match(pageSource, /id="wordRibbon"/);
-  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260605a/);
   assert.match(pageSource, /assets\/premium-word\.js\?v=20260427b/);
   assert.doesNotMatch(pageSource, /REMOTE_SCOPE|softora_premium_word_html_v1|fetchUiStateGet|editor\.innerHTML/);
   assert.match(scriptSource, /REMOTE_SCOPE = "premium_word"/);
