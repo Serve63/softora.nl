@@ -431,6 +431,7 @@ test('html page coordinator serves public pages when seo config and bootstrap re
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-timeout-'));
   const loggerInfos = [];
   const loggerErrors = [];
+  const seoConfigCalls = [];
   fs.writeFileSync(
     path.join(pagesDir, 'premium-website.html'),
     '<!DOCTYPE html><html><head><title>Orig</title></head><body><main>Publieke pagina</main></body></html>'
@@ -453,7 +454,10 @@ test('html page coordinator serves public pages when seo config and bootstrap re
       isProtectedPremiumPage: false,
       authState: null,
     }),
-    getSeoConfigCached: async () => new Promise(() => {}),
+    getSeoConfigCached: async (...args) => {
+      seoConfigCalls.push(args);
+      return new Promise(() => {});
+    },
     applySeoOverridesToHtml: (_fileName, html, config) => {
       assert.deepEqual(config, {});
       return html;
@@ -473,11 +477,15 @@ test('html page coordinator serves public pages when seo config and bootstrap re
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'public, max-age=300, stale-while-revalidate=900');
   assert.match(res.body, /Publieke pagina/);
+  assert.deepEqual(seoConfigCalls, [[false, {
+    suppressReadFailureCooldown: true,
+    suppressReadFailureLog: true,
+  }]]);
   assert.equal(
     loggerInfos.some(
       (args) => args[0] === '[HTML][SeoConfigTimeout]' && args[1] === 'premium-website.html'
     ),
-    true
+    false
   );
   assert.equal(
     loggerInfos.some(

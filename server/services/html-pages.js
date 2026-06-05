@@ -420,7 +420,7 @@ function createHtmlPageCoordinator(options = {}) {
     return renderedHtml;
   }
 
-  async function resolveWithSoftTimeout(run, { fileName, label, timeoutMs, fallbackValue }) {
+  async function resolveWithSoftTimeout(run, { fileName, label, timeoutMs, fallbackValue, logTimeout = true }) {
     const safeTimeoutMs = Math.max(0, Number(timeoutMs) || 0);
     if (!safeTimeoutMs) {
       return run();
@@ -442,7 +442,7 @@ function createHtmlPageCoordinator(options = {}) {
             : typeof logger.log === 'function'
               ? logger.log.bind(logger)
               : null;
-        if (log) log(`[HTML][${label}Timeout]`, fileName, `na ${safeTimeoutMs}ms`);
+        if (log && logTimeout) log(`[HTML][${label}Timeout]`, fileName, `na ${safeTimeoutMs}ms`);
         finish(fallbackValue);
       }, safeTimeoutMs);
 
@@ -495,11 +495,15 @@ function createHtmlPageCoordinator(options = {}) {
       if (!html) return next();
       const shouldApplySeoOverrides = !isLoginPage && !isProtectedPremiumPage;
       const config = shouldApplySeoOverrides
-        ? await resolveWithSoftTimeout(() => getSeoConfigCached(), {
+        ? await resolveWithSoftTimeout(() => getSeoConfigCached(false, {
+            suppressReadFailureCooldown: true,
+            suppressReadFailureLog: true,
+          }), {
             fileName,
             label: 'SeoConfig',
             timeoutMs: publicDependencyWaitMs || getSafePublicPageDependencyWaitMs(),
             fallbackValue: {},
+            logTimeout: false,
           })
         : {};
       let rendered = shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html;
