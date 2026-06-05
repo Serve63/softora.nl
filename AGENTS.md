@@ -39,6 +39,11 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Na iedere Instantly-aanvulling controleer je minimaal: Softora mail-ready telling omlaag, permanente Instantly-guards compleet, Instantly-campaign bevat het verwachte aantal nieuwe leads, en geen nieuwe duplicate/cross-channel overlap.
 - Als de veilige route faalt of geen CSV geeft: stoppen en onderzoeken. Niet via een alternatieve handmatige route alsnog uploaden.
 
+## Softora coldmail dagtempo
+- De live Softora/Gmail/Strato coldmail-autopilot is bedoeld voor maximaal 9 mails per mailbox per werkdag. Met negen mailboxen is het totale dagdoel 81, niet 60.
+- Het veilige verzendvenster is 07:00-17:00 Europe/Amsterdam. De globale autopilot-interval mag rond 5 minuten staan zodat die geen dagcap-rem wordt; de spreiding per mailbox komt uit `senderMinIntervalMinutes=70` en `senderMaxIntervalMinutes=82`.
+- Als het dagtempo te laag is, controleer eerst de effectieve scheduler/capaciteit: `count=1`, `minIntervalMinutes`, sender-cooldowns, rolling 24-uurs quota, echte mail-ready selectie en recipient guards. Noem ruwe assetvoorraad nooit automatisch verzendcapaciteit.
+
 ## Wijzigen zonder regressies
 - Verander bestaande routes niet zomaar; houd response-shapes stabiel.
 - Voeg nieuwe logica bij voorkeur toe via `server/routes`, `server/services`, `server/repositories`, `server/security`, `server/schemas`.

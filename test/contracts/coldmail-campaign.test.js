@@ -5914,7 +5914,7 @@ test('coldmail campaign caps preview volume to STRATO-safe campaign limit', asyn
   assert.equal(result.selected, 9);
   assert.equal(result.safetyLimits.campaignSendLimit, 9);
   assert.equal(result.safetyLimits.dailySendLimit, 9);
-  assert.equal(result.safetyLimits.packageDailySendLimit, 60);
+  assert.equal(result.safetyLimits.packageDailySendLimit, 81);
   assert.equal(result.safetyLimits.personalMailboxDailyLimit, 9);
 });
 
