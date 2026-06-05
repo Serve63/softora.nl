@@ -41,7 +41,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
     instantlyOutreachService: {
       async syncInstantlyLeads(input) {
         syncInput = input;
-        return { ok: true, synced: 10 };
+        return { ok: true, skipped: true, reason: 'reconcile_only', synced: 0 };
       },
       async prepareInstantlyUpload(input) {
         uploadInput = input;
@@ -75,9 +75,9 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   await syncRoute[2][1](request, response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, { ok: true, synced: 10 });
+  assert.deepEqual(response.body, { ok: true, skipped: true, reason: 'reconcile_only', synced: 0 });
   assert.equal(adminChecks, 1);
-  assert.equal(syncInput.limit, 10);
+  assert.equal(syncInput.limit, undefined);
   assert.equal(syncInput.refreshExistingVariables, true);
   assert.equal(syncInput.refreshExistingLimit, 4);
   assert.equal(syncInput.refreshExistingOnly, true);

@@ -54,12 +54,11 @@ function registerInstantlyRoutes(app, deps = {}) {
       }
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await instantlyOutreachService.syncInstantlyLeads({
-        limit: body.limit,
-        refreshExistingVariables: body.refreshExistingVariables,
+        refreshExistingVariables: body.refreshExistingVariables === true,
         refreshExistingLimit: body.refreshExistingLimit,
-        refreshExistingOnly: body.refreshExistingOnly,
-        reconcileOnly: body.reconcileOnly,
-        cleanupOnly: body.cleanupOnly,
+        refreshExistingOnly: body.refreshExistingOnly === true,
+        reconcileOnly: true,
+        cleanupOnly: body.cleanupOnly === true,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           normalizeString(body.actor) ||

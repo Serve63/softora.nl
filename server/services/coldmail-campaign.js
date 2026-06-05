@@ -1358,7 +1358,10 @@ function createColdmailCampaignService(deps = {}) {
 
   async function reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
-      return { ok: false, skipped: true };
+      const error = new Error('Centrale outbound duplicate-guard ontbreekt; coldmail niet verzonden.');
+      error.code = 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE';
+      error.status = 503;
+      throw error;
     }
     const reservation = await outboundRecipientGuardStore.reserveRecipients(
       [buildOutboundRecipientGuardIdentity(item)],
@@ -1382,6 +1385,12 @@ function createColdmailCampaignService(deps = {}) {
         conflict: buildSupabaseOutboundGuardFailure(item, reservation.conflict),
         reservationId: reservation.reservationId,
       };
+    }
+    if (!reservation || reservation.ok !== true) {
+      const error = new Error('Centrale outbound duplicate-guard kon niet reserveren; coldmail niet verzonden.');
+      error.code = 'COLDMAIL_OUTBOUND_GUARD_FAILED';
+      error.status = 502;
+      throw error;
     }
     return reservation;
   }
@@ -6672,6 +6681,7 @@ function createColdmailCampaignService(deps = {}) {
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
+          code: normalizeString(error && error.code),
           error: truncateText(normalizeString(error && error.message), 500),
         });
         const safetyReason = getSmtpSafetyStopReason(error);
@@ -6696,6 +6706,9 @@ function createColdmailCampaignService(deps = {}) {
     if (!sent.length && failed.length) {
       const firstFailure = pickFailureMessage(failed, selectedRows);
       const recipientGuardFailure = failed.every((item) => isColdmailRecipientGuardFailure(item));
+      const outboundGuardFailure = failed.every((item) =>
+        /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(normalizeString(item && item.code))
+      );
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
@@ -6704,6 +6717,8 @@ function createColdmailCampaignService(deps = {}) {
         ? 'COLDMAIL_SAFETY_PAUSED'
         : recipientGuardFailure
           ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
+          : outboundGuardFailure
+          ? 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE'
           : webdesignAssetFailure
           ? 'NO_WEBDESIGN_PHOTOS'
           : 'SMTP_SEND_FAILED';

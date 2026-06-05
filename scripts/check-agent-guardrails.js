@@ -300,6 +300,50 @@ function getQualityBaselineViolations() {
   return violations;
 }
 
+function getOutboundDuplicateSafetyViolations() {
+  const violations = [];
+  const agentsSource = readRepoFile('AGENTS.md');
+  const instantlyRoutesSource = readRepoFile('server/routes/instantly.js');
+  const instantlyServiceSource = readRepoFile('server/services/instantly-outreach.js');
+  const coldmailServiceSource = readRepoFile('server/services/coldmail-campaign.js');
+
+  if (!/provider-sync[\s\S]*maintenance\/reconcile\/cleanup/i.test(agentsSource)) {
+    violations.push('AGENTS.md mist de regel dat provider-sync/instantly-sync geen nieuwe leads mag toevoegen');
+  }
+
+  const instantlySyncHandlerSource =
+    instantlyRoutesSource.match(/async function handleSync[\s\S]*?async function handleStatus/)?.[0] || '';
+  if (/limit:\s*body\.limit/.test(instantlySyncHandlerSource)) {
+    violations.push('server/routes/instantly.js mag body.limit niet doorgeven aan legacy Instantly sync-routes');
+  }
+  if (!/syncInstantlyLeads\(\{[\s\S]*reconcileOnly:\s*true[\s\S]*\}\)/.test(instantlySyncHandlerSource)) {
+    violations.push('server/routes/instantly.js moet legacy Instantly sync-routes maintenance-only houden met reconcileOnly: true');
+  }
+
+  if (!/syncInstantlyLeads\(\{\s*actor:\s*'Instantly autopilot',\s*reconcileOnly:\s*true\s*\}\)/.test(instantlyServiceSource)) {
+    violations.push('Instantly autopilot mag alleen read-only/reconcile sync draaien');
+  }
+
+  const addLeadsIndex = instantlyServiceSource.indexOf('const data = await addLeadsToInstantly(leads);');
+  const centralInstantlyReserveIndex = addLeadsIndex >= 0
+    ? instantlyServiceSource.lastIndexOf('reserveSupabaseOutboundRecipientsForInstantly(sendableRows', addLeadsIndex)
+    : -1;
+  if (addLeadsIndex >= 0 && centralInstantlyReserveIndex < 0) {
+    violations.push('Instantly /leads/add mag niet bereikbaar zijn zonder centrale outbound-reservering');
+  }
+
+  if (/return\s+\{\s*ok:\s*false,\s*skipped:\s*true\s*\};/.test(
+    coldmailServiceSource.match(/async function reserveSupabaseOutboundRecipientForColdmail[\s\S]*?async function confirmSupabaseOutboundRecipientForColdmail/)?.[0] || ''
+  )) {
+    violations.push('Coldmail mag bij ontbrekende centrale outbound guard niet stil overslaan; hij moet stoppen vóór SMTP');
+  }
+  if (!/COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE/.test(coldmailServiceSource)) {
+    violations.push('Coldmail mist harde foutcode voor ontbrekende centrale outbound guard');
+  }
+
+  return violations;
+}
+
 function getMissingRequiredRepoFiles() {
   return [
     'AGENTS.md',
@@ -433,7 +477,10 @@ const violations = buildGuardrailViolations({
   oversizedFrontendGrowthViolations,
   protectedFrontendShellFiles,
   protectedQualityGateFiles,
-  qualityBaselineViolations: getQualityBaselineViolations(),
+  qualityBaselineViolations: [
+    ...getQualityBaselineViolations(),
+    ...getOutboundDuplicateSafetyViolations(),
+  ],
   premiumAuthUsersWriteViolations,
   behaviorDiffLineCount,
   maxBehaviorDiffLineCount: Number(process.env.GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES || 900),

@@ -218,6 +218,22 @@ function createService(overrides = {}) {
       mail: true,
     },
   ]).map(withCheckedMockupMeta);
+  const outboundGuardCalls = [];
+  const defaultOutboundRecipientGuardStore = {
+    findRecipientConflict: async () => null,
+    reserveRecipients: async (items, options) => {
+      outboundGuardCalls.push({ type: 'reserve', items, options });
+      return {
+        ok: true,
+        reservationId: `coldmail-reservation-${outboundGuardCalls.length}`,
+        count: (Array.isArray(items) ? items.length : 0) * 4,
+      };
+    },
+    confirmReservation: async (reservationId, options) => {
+      outboundGuardCalls.push({ type: 'confirm', reservationId, options });
+      return { ok: true };
+    },
+  };
   const service = createColdmailCampaignService({
     env: overrides.env || {},
     mailConfig: {
@@ -252,7 +268,10 @@ function createService(overrides = {}) {
       coldmailBlockPersonalMailboxDomains: overrides.coldmailBlockPersonalMailboxDomains,
       coldmailBounceProcessingEnabled: overrides.coldmailBounceProcessingEnabled,
     },
-    outboundRecipientGuardStore: overrides.outboundRecipientGuardStore,
+    outboundRecipientGuardStore:
+      overrides.outboundRecipientGuardStore === undefined
+        ? defaultOutboundRecipientGuardStore
+        : overrides.outboundRecipientGuardStore,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -399,6 +418,7 @@ function createService(overrides = {}) {
   return {
     service,
     sentMessages,
+    outboundGuardCalls,
     transportConfigs,
     sleeps,
     getSavedState: () => savedState,
@@ -6253,6 +6273,39 @@ test('coldmail campaign blocks recipients already reserved in the central outbou
     (error) => {
       assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
       assert.match(error.message, /Instantly/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+});
+
+test('coldmail campaign stops before SMTP when the central outbound guard is unavailable', async () => {
+  const { service, sentMessages } = createService({
+    outboundRecipientGuardStore: null,
+    rows: [
+      {
+        id: 'unguarded-row',
+        bedrijf: 'Geen Guard BV',
+        naam: 'Geen Guard BV',
+        email: 'info@geenguard.example',
+        website: 'https://geenguard.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE');
+      assert.match(error.message, /Centrale outbound duplicate-guard ontbreekt/);
       return true;
     }
   );
