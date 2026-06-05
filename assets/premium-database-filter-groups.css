@@ -24,3 +24,34 @@
     color: var(--light);
     white-space: nowrap;
 }
+
+.table-load-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 18px 0 4px;
+}
+
+.table-load-more[hidden] {
+    display: none !important;
+}
+
+.load-more-btn {
+    border: 1px solid rgba(155, 35, 85, 0.28);
+    background: rgba(155, 35, 85, 0.08);
+    color: var(--crimson);
+    border-radius: 6px;
+    padding: 11px 18px;
+    font: 700 12px/1 "Inter", sans-serif;
+    cursor: pointer;
+}
+
+.load-more-btn:hover {
+    background: rgba(155, 35, 85, 0.12);
+}
+
+.load-more-summary {
+    color: var(--light);
+    font-size: 12px;
+}

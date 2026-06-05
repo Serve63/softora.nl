@@ -44,6 +44,14 @@ function loadDatabaseContactStatusClient() {
   return sandbox.window.SoftoraDatabaseContactStatus;
 }
 
+function loadDatabaseTableHelpersClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-table-helpers.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseTableHelpers;
+}
+
 function loadDatabasePhotoStorageClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -224,6 +232,42 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.equal(contactStatusClient.getColdmailSentAt({ lastColdmailSentAt: '2026-05-19T17:02:00Z' }), '2026-05-19T17:02:00Z');
 });
 
+test('premium database table helpers keep coldcalling filters separate and paginate rows', () => {
+  const tableHelpers = loadDatabaseTableHelpersClient();
+  const helpers = {
+    normalizeString: (value) => String(value || '').trim(),
+    normalizeSearchValue: (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(),
+    normalizeDatabaseStatus: (value) => {
+      const normalized = String(value || '').trim().toLowerCase();
+      if (normalized === 'geen_interesse') return 'geblokkeerd';
+      if (normalized === 'geen_gehoor') return 'geengehoor';
+      return normalized;
+    },
+  };
+
+  assert.equal(tableHelpers.isColdcallingStatusFilter('geblokkeerd', helpers), true);
+  assert.equal(
+    tableHelpers.matchesColdcallingStatusFilter({ status: 'geblokkeerd', hist: [{ label: 'Geen interesse via coldmail', source: 'coldmailing' }] }, 'geblokkeerd', helpers),
+    false
+  );
+  assert.equal(
+    tableHelpers.matchesColdcallingStatusFilter({ status: 'geblokkeerd', hist: [{ label: 'Coldcalling belpoging - geen interesse' }] }, 'geblokkeerd', helpers),
+    true
+  );
+  assert.equal(
+    tableHelpers.matchesColdcallingStatusFilter({ status: 'geengehoor', lastColdcallAt: '2026-06-05' }, 'geengehoor', helpers),
+    true
+  );
+  assert.equal(tableHelpers.getVisibleRows(Array.from({ length: 65 }), 25, 25).length, 25);
+  assert.equal(tableHelpers.getNextVisibleLimit(25, 25), 50);
+  const firstLoadState = tableHelpers.getLoadMoreState(65, 25);
+  assert.equal(firstLoadState.hasMore, true);
+  assert.equal(firstLoadState.summary, 'Toont 25 van 65');
+  const completedLoadState = tableHelpers.getLoadMoreState(65, 65);
+  assert.equal(completedLoadState.hasMore, false);
+  assert.equal(completedLoadState.summary, '');
+});
+
 test('premium database webdesign asset state keeps mail-ready and photo-target definitions separated', () => {
   const assetStateClient = loadDatabaseWebdesignAssetStateClient();
   const helpers = {
@@ -389,7 +433,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{ return \(state\.activeStatus === "benaderbaar" \|\| state\.activeStatus === "beschikbaar"\) && \(state\.dataLoading \|\| state\.photoRestorePending \|\| !hasLoadedColdmailGuard\(\)\); \}/);
-  assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), photoHeaderCount = mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount\(filtered, showPhotoColumn\);/);
+  assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), photoHeaderCount = mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
   assert.match(pageSource, /nodes\.count\.textContent = mailReadyPending \|\| state\.dataLoading \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten"/);
   assert.match(pageSource, /photoHeaderCount === null \? "\(--\)"/);
   assert.match(pageSource, /Mailklare data laden\.\.\./);
@@ -549,12 +593,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailCandidate\);/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
   assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*if \(state\.activeStatus === "benaderbaar"\) return getMailReadyCustomers\(customers\); if \(state\.activeStatus === "beschikbaar"\) return getAvailableColdmailCandidates\(customers\); return customers \|\| \[\];/);
-  assert.match(pageSource, /const baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), filtered = getVisibleTableCustomers\(baseFiltered\)/);
+  assert.match(pageSource, /const baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\)/);
   assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
   assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered, mailReadyPending\);/);
-  assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), photoHeaderCount = mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount\(filtered, showPhotoColumn\);/);
+  assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), photoHeaderCount = mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = photoHeaderCount === null \? "\(--\)" : "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);
-  assert.match(pageSource, /logDatabaseMediaDebug\("render-table", \{ activeStatus: state\.activeStatus, databaseCount: state\.klanten\.length, filteredCount: baseFiltered\.length, renderedCount: filtered\.length, photoHeaderCount: photoHeaderCount/);
+  assert.match(pageSource, /logDatabaseMediaDebug\("render-table", \{ activeStatus: state\.activeStatus, databaseCount: state\.klanten\.length, filteredCount: visibleCustomers\.length, renderedCount: filtered\.length, photoHeaderCount: photoHeaderCount/);
   assert.match(pageSource, /colspan=\\"" \+ \(showOutreachActionColumn \? 8 : 9\) \+ "\\"/);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
@@ -791,8 +835,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(filterGroupsCssSource, /margin-left: auto;/);
   assert.doesNotMatch(filterGroupsCssSource, /rgba\(139, 34, 82/);
   assert.match(filterGroupsCssSource, /border: 1px solid rgba\(166, 173, 190, 0\.22\);/);
-  assert.match(filterGroupsCssSource, /color: var\(--light\);/);
-  assert.doesNotMatch(filterGroupsCssSource, /color: var\(--crimson\)|color: var\(--green\)|color: var\(--blue\)/);
+  const labelCssBlock = filterGroupsCssSource.match(/\.status-filter-label\s*\{[\s\S]*?\}/)[0];
+  assert.match(labelCssBlock, /color: var\(--light\);/);
+  assert.doesNotMatch(labelCssBlock, /color: var\(--crimson\)|color: var\(--green\)|color: var\(--blue\)/);
+  assert.match(filterGroupsCssSource, /\.table-load-more\s*\{/);
+  assert.match(filterGroupsCssSource, /\.load-more-btn\s*\{/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-exact-upload/);
   assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = '\/api\/outreach\/provider-upload'/);
   assert.doesNotMatch(instantlySyncScriptSource, /SYNC_ENDPOINT = '\/api\/outreach\/provider-sync'/);
@@ -1730,10 +1777,11 @@ test('premium database page combines contact filters into one benaderd step', ()
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const webdesignActionSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-action.js'), 'utf8');
   const contactStatusScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-contact-status.js'), 'utf8');
+  const tableHelpersSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-table-helpers.js'), 'utf8');
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters">\s*<span class="status-filter-label">Coldcalling<\/span>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters">\s*<span class="status-filter-label">Overig<\/span>\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alles<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>/
+    /<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters">\s*<span class="status-filter-label">Coldcalling<\/span>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters">\s*<span class="status-filter-label">Overig<\/span>\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/div>/
   );
   assert.match(pageSource, /activeStatus: "benaderbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
@@ -1742,7 +1790,21 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "beschikbaar" && !isAvailableColdmailCandidate\(customer\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
-  assert.match(pageSource, /state\.activeStatus !== "benaderbaar" && state\.activeStatus !== "beschikbaar" && !outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\)/);
+  assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\) && !matchesColdcallingStatusFilter\(customer, state\.activeStatus\)\) return false;/);
+  assert.match(pageSource, /state\.activeStatus !== "benaderbaar" && state\.activeStatus !== "beschikbaar" && !isColdcallingStatusFilter\(state\.activeStatus\) && !outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\)/);
+  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260605a/);
+  assert.match(pageSource, /function hasUsedColdCalling\(customer\) \{ return databaseTableHelpers\.hasUsedColdCalling\(customer, getTableHelperOptions\(\)\); \}/);
+  assert.match(pageSource, /function matchesColdcallingStatusFilter\(customer, activeStatus\) \{ return databaseTableHelpers\.matchesColdcallingStatusFilter\(customer, activeStatus, getTableHelperOptions\(\)\); \}/);
+  assert.match(tableHelpersSource, /function mapColdCallingOutcomeText\(text, helpers\)/);
+  assert.match(tableHelpersSource, /function matchesColdcallingStatusFilter\(customer, activeStatus, helpers\)/);
+  assert.match(tableHelpersSource, /if \(status === "gebeld"\) return true;/);
+  assert.doesNotMatch(pageSource, /if \(status === "gebeld" \|\| status === "geengehoor"\) return true;/);
+  assert.match(pageSource, /const TABLE_PAGE_SIZE = 25;/);
+  assert.match(pageSource, /visibleLimit: TABLE_PAGE_SIZE/);
+  assert.match(pageSource, /<button class="load-more-btn" id="loadMoreButton" type="button">Laad meer<\/button>/);
+  assert.match(pageSource, /databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\)/);
+  assert.match(pageSource, /nodes\.count\.textContent[\s\S]*visibleCustomers\.length\.toLocaleString\("nl-NL"\) \+ " resultaten"/);
+  assert.match(pageSource, /nodes\.loadMoreButton\.addEventListener\("click", function \(\) \{ state\.visibleLimit = databaseTableHelpers\.getNextVisibleLimit\(state\.visibleLimit, TABLE_PAGE_SIZE\); renderPage\(\); \}\);/);
   assert.match(webdesignActionSource, /function hasInstantlyOutreachSignal\(customer\)/);
   assert.match(webdesignActionSource, /function isInstantlyTabCustomer\(customer\)/);
   assert.match(webdesignActionSource, /return !isInstantlyTabCustomer\(customer\) && \(usedColdCalling \|\| usedColdMailing\);/);
@@ -1753,6 +1815,9 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(contactStatusScriptSource, /function hasColdmailSentSignal\(raw, helpers\)/);
   assert.match(contactStatusScriptSource, /function shouldInferMailedStatus\(storedStatus, raw, helpers\)/);
   assert.match(pageSource, /\.sf-btn\.act \{[\s\S]*border-color: rgba\(139, 34, 82, 0\.4\);[\s\S]*background: rgba\(139, 34, 82, 0\.12\);/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="alle" type="button">Alles<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="klant" type="button">Klant<\/button>/);
+  assert.doesNotMatch(pageSource, /<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alles<\/button>/);
   assert.doesNotMatch(pageSource, />Beide<\/span>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
