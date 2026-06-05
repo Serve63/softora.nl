@@ -33,6 +33,38 @@ test('seo config store caches parsed config within the ttl window', async () => 
   assert.equal(third.normalized, true);
 });
 
+test('seo config store forwards explicit read options to ui-state reads', async () => {
+  const uiStateCalls = [];
+  const store = createSeoConfigStore({
+    getUiStateValues: async (...args) => {
+      uiStateCalls.push(args);
+      return {
+        values: {
+          config_json: JSON.stringify({ version: 2, pages: {}, images: {}, automation: {} }),
+        },
+      };
+    },
+    normalizeString: (value) => String(value || '').trim(),
+    getDefaultSeoConfig: () => ({ version: 2, pages: {}, images: {}, automation: {} }),
+    normalizeSeoConfig: (value) => ({ ...value, normalized: true }),
+    now: () => 20_000,
+  });
+
+  const config = await store.getSeoConfigCached(false, {
+    suppressReadFailureCooldown: true,
+    suppressReadFailureLog: true,
+  });
+
+  assert.equal(config.normalized, true);
+  assert.deepEqual(uiStateCalls, [[
+    'seo',
+    {
+      suppressReadFailureCooldown: true,
+      suppressReadFailureLog: true,
+    },
+  ]]);
+});
+
 test('seo config store persists config and refreshes the cache immediately', async () => {
   const writes = [];
   const store = createSeoConfigStore({

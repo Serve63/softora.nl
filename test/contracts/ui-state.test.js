@@ -374,6 +374,43 @@ test('ui-state store does not silently serve in-memory values when remote reads 
   );
 });
 
+test('ui-state store can suppress non-critical public seo timeout logs and cooldowns', async () => {
+  const { loggerInfos, restReads, store } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    uiStateReadFailureCooldownMs: 1000,
+    fetchResult: new Promise(() => {}),
+  });
+
+  const first = await store.getUiStateValues('seo', {
+    suppressReadFailureCooldown: true,
+    suppressReadFailureLog: true,
+  });
+  const second = await store.getUiStateValues('seo', {
+    suppressReadFailureCooldown: true,
+    suppressReadFailureLog: true,
+  });
+
+  assert.equal(first, null);
+  assert.equal(second, null);
+  assert.equal(restReads.length, 2);
+  assert.deepEqual(
+    restReads.map((entry) => entry.rowKey),
+    ['ui_state:seo', 'ui_state:seo']
+  );
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
+    false
+  );
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-open]'),
+    false
+  );
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-skip]'),
+    false
+  );
+});
+
 test('ui-state store only serves in-memory fallback for explicitly allowed scopes', async () => {
   const { inMemoryUiStateByScope, store } = createFixture({
     uiStateReadTimeoutMs: 5,

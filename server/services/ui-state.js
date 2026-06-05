@@ -231,6 +231,22 @@ function createUiStateStore(deps = {}) {
     if (log) log(label, message, ...extra);
   }
 
+  function shouldSuppressReadFailureCooldown(options = {}) {
+    return Boolean(options && options.suppressReadFailureCooldown);
+  }
+
+  function shouldSuppressReadFailureLog(options = {}) {
+    return Boolean(options && options.suppressReadFailureLog);
+  }
+
+  function openReadFailureCooldownIfNeeded(scope, error, options = {}) {
+    if (!shouldSuppressReadFailureCooldown(options)) openReadFailureCooldown(scope, error);
+  }
+
+  function logReadFailureIfNeeded(label, message, options = {}, ...extra) {
+    if (!shouldSuppressReadFailureLog(options)) logReadFailure(label, message, ...extra);
+  }
+
   async function getUiStateValues(scope, options = {}) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
@@ -255,8 +271,8 @@ function createUiStateStore(deps = {}) {
           const message = `${clientError?.message || clientError || 'Supabase client ontbreekt.'}${fallbackMsg}`;
           const fallbackFailure = fallback.error || fallback.status || fallback.statusCode;
           if (isSoftReadFailure(clientError) || isSoftReadFailure(fallbackFailure)) {
-            openReadFailureCooldown(readFailureCooldownScope, fallbackFailure || clientError);
-            logReadFailure('[UI State][Supabase][GetSoftError]', message);
+            openReadFailureCooldownIfNeeded(readFailureCooldownScope, fallbackFailure || clientError, options);
+            logReadFailureIfNeeded('[UI State][Supabase][GetSoftError]', message, options);
           } else {
             logger.error('[UI State][Supabase][GetError]', message);
           }
@@ -313,7 +329,7 @@ function createUiStateStore(deps = {}) {
     const fallbackState = buildFallbackState(normalizedScope);
 
     if (isReadFailureCooldownActive(readFailureCooldownScope)) {
-      logReadFailureCooldown(readFailureCooldownScope);
+      if (!shouldSuppressReadFailureLog(options)) logReadFailureCooldown(readFailureCooldownScope);
       return fallbackState;
     }
 
@@ -322,8 +338,8 @@ function createUiStateStore(deps = {}) {
         return await executeRead();
       } catch (error) {
         if (isSoftReadFailure(error)) {
-          openReadFailureCooldown(readFailureCooldownScope, error);
-          logReadFailure('[UI State][Supabase][GetSoftCrash]', error?.message || error);
+          openReadFailureCooldownIfNeeded(readFailureCooldownScope, error, options);
+          logReadFailureIfNeeded('[UI State][Supabase][GetSoftCrash]', error?.message || error, options);
         } else {
           logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
         }
@@ -348,8 +364,14 @@ function createUiStateStore(deps = {}) {
               : typeof logger.log === 'function'
                 ? logger.log.bind(logger)
                 : null;
-          if (log) log('[UI State][Supabase][GetTimeout]', normalizedScope, `na ${timeoutMs}ms`);
-          openReadFailureCooldown(readFailureCooldownScope, new Error(`${normalizedScope} UI-state read timeout na ${timeoutMs}ms`));
+          if (log && !shouldSuppressReadFailureLog(options)) {
+            log('[UI State][Supabase][GetTimeout]', normalizedScope, `na ${timeoutMs}ms`);
+          }
+          openReadFailureCooldownIfNeeded(
+            readFailureCooldownScope,
+            new Error(`${normalizedScope} UI-state read timeout na ${timeoutMs}ms`),
+            options
+          );
           finish(fallbackState);
         }, timeoutMs);
 
@@ -358,8 +380,8 @@ function createUiStateStore(deps = {}) {
           .then((value) => finish(value))
           .catch((error) => {
             if (isSoftReadFailure(error)) {
-              openReadFailureCooldown(readFailureCooldownScope, error);
-              logReadFailure('[UI State][Supabase][GetSoftCrash]', error?.message || error);
+              openReadFailureCooldownIfNeeded(readFailureCooldownScope, error, options);
+              logReadFailureIfNeeded('[UI State][Supabase][GetSoftCrash]', error?.message || error, options);
             } else {
               logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
             }
@@ -368,8 +390,8 @@ function createUiStateStore(deps = {}) {
       });
     } catch (error) {
       if (isSoftReadFailure(error)) {
-        openReadFailureCooldown(readFailureCooldownScope, error);
-        logReadFailure('[UI State][Supabase][GetSoftCrash]', error?.message || error);
+        openReadFailureCooldownIfNeeded(readFailureCooldownScope, error, options);
+        logReadFailureIfNeeded('[UI State][Supabase][GetSoftCrash]', error?.message || error, options);
       } else {
         logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
       }

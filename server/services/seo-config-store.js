@@ -17,8 +17,8 @@ function createSeoConfigStore(deps = {}) {
     config: getDefaultSeoConfig(),
   };
 
-  async function readSeoConfigFromUiState() {
-    const state = await getUiStateValues(scope);
+  async function readSeoConfigFromUiState(options = {}) {
+    const state = await getUiStateValues(scope, options.uiStateReadOptions || options);
     const rawJson = normalizeString(state?.values?.[configKey] || '');
     if (!rawJson) return getDefaultSeoConfig();
 
@@ -33,13 +33,18 @@ function createSeoConfigStore(deps = {}) {
     }
   }
 
-  async function getSeoConfigCached(forceFresh = false) {
+  async function getSeoConfigCached(forceFresh = false, options = {}) {
+    const shouldForceFresh = typeof forceFresh === 'boolean' ? forceFresh : false;
+    const readOptions =
+      forceFresh && typeof forceFresh === 'object' && !Array.isArray(forceFresh)
+        ? forceFresh
+        : options;
     const nowMs = now();
-    if (!forceFresh && nowMs - seoConfigCache.loadedAtMs < cacheTtlMs) {
+    if (!shouldForceFresh && nowMs - seoConfigCache.loadedAtMs < cacheTtlMs) {
       return seoConfigCache.config;
     }
 
-    const config = await readSeoConfigFromUiState();
+    const config = await readSeoConfigFromUiState(readOptions);
     seoConfigCache = {
       loadedAtMs: nowMs,
       config,
