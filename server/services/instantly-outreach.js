@@ -2298,13 +2298,17 @@ function createInstantlyOutreachService(deps = {}) {
 
   async function reserveSupabaseOutboundRecipientsForInstantly(items, options = {}) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
-      return { ok: false, skipped: true };
+      throw createInstantlyError(
+        'Centrale outbound duplicate-guard ontbreekt. Nieuwe Instantly-leads kunnen alleen veilig via Softora worden klaargezet.',
+        'INSTANTLY_OUTBOUND_GUARD_UNAVAILABLE',
+        503
+      );
     }
     const identities = (Array.isArray(items) ? items : []).map(buildOutboundRecipientGuardIdentity);
     const reservation = await outboundRecipientGuardStore.reserveRecipients(identities, {
       provider: 'instantly',
       channel: 'instantly',
-      source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+      source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
       actor: options.actor,
       campaignId: options.campaignId,
       uploadId: options.uploadId,
@@ -2313,6 +2317,7 @@ function createInstantlyOutreachService(deps = {}) {
       payload: {
         campaignId: options.campaignId,
         uploadId: options.uploadId,
+        source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
       },
     });
     if (reservation && reservation.conflict) {
@@ -2320,6 +2325,13 @@ function createInstantlyOutreachService(deps = {}) {
         ...reservation,
         conflictFailure: buildSupabaseOutboundGuardFailure(items[0], reservation.conflict),
       };
+    }
+    if (!reservation || reservation.ok !== true) {
+      throw createInstantlyError(
+        'Centrale outbound duplicate-guard kon niet reserveren. Nieuwe Instantly-leads zijn niet klaargezet.',
+        'INSTANTLY_OUTBOUND_GUARD_FAILED',
+        502
+      );
     }
     return reservation;
   }
@@ -3716,6 +3728,32 @@ function createInstantlyOutreachService(deps = {}) {
       }
       return lastSyncResult;
     }
+    const outboundReservation = await reserveSupabaseOutboundRecipientsForInstantly(sendableRows, {
+      actor,
+      campaignId: config.defaultCampaignId,
+      source: 'instantly-sync',
+    });
+    if (outboundReservation && outboundReservation.conflict) {
+      for (const item of sendableRows) {
+        const supabaseGuardMatch = await getSupabaseOutboundRecipientBlock(item);
+        if (supabaseGuardMatch) failed.push(supabaseGuardMatch);
+      }
+      lastSyncResult = {
+        ok: true,
+        skipped: true,
+        reason: 'central_outbound_guard_conflict',
+        synced: 0,
+        markedBenaderd: existingApproached.marked,
+        remoteInstantlyLeadCount: remoteReconcile.remoteLeadCount,
+        remoteInstantlyUnmatchedCount: remoteReconcile.unmatched,
+        refreshedExistingVariables: existingVariableRefresh.refreshed,
+        attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        failed,
+        campaignId: config.defaultCampaignId,
+        finishedAt: now().toISOString(),
+      };
+      return lastSyncResult;
+    }
     const data = await addLeadsToInstantly(leads);
     const leadIdByEmail = buildLeadIdByEmail(data);
     await savePermanentInstantlyRecipientGuards(sendableRows, {
@@ -4105,7 +4143,7 @@ function createInstantlyOutreachService(deps = {}) {
     syncTimer = scheduleTask(() => {
       syncTimer = null;
       nextSyncAt = '';
-      void syncInstantlyLeads({ actor: 'Instantly autopilot' })
+      void syncInstantlyLeads({ actor: 'Instantly autopilot', reconcileOnly: true })
         .catch((error) => {
           lastSyncResult = {
             ok: false,

@@ -419,6 +419,11 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const liveWorkflowSource = readRepoFile('.github/workflows/live-production-version.yml');
   const agentsSource = readRepoFile('AGENTS.md');
   const protocolSource = readRepoFile('docs/quality-protocol.md');
+  const instantlyRoutesSource = readRepoFile('server/routes/instantly.js');
+  const instantlyServiceSource = readRepoFile('server/services/instantly-outreach.js');
+  const coldmailServiceSource = readRepoFile('server/services/coldmail-campaign.js');
+  const instantlySyncHandlerSource =
+    instantlyRoutesSource.match(/async function handleSync[\s\S]*?async function handleStatus/)?.[0] || '';
 
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
@@ -454,6 +459,18 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(guardrailsSource, /\['merge-base', baseRef, 'HEAD'\]/);
   assert.match(guardrailsSource, /\['diff', '--name-only', '--diff-filter=ACMR', branchDiffBase, '--'\]/);
   assert.match(guardrailsSource, /\['diff', '--unified=0', branchDiffBase, '--', filePath\]/);
+  assert.match(guardrailsSource, /function getOutboundDuplicateSafetyViolations\(\)/);
+  assert.match(guardrailsSource, /body\.limit niet doorgeven aan legacy Instantly sync-routes/);
+  assert.match(guardrailsSource, /Instantly \/leads\/add mag niet bereikbaar zijn zonder centrale outbound-reservering/);
+  assert.match(instantlySyncHandlerSource, /syncInstantlyLeads\(\{[\s\S]*reconcileOnly:\s*true/);
+  assert.doesNotMatch(instantlySyncHandlerSource, /limit:\s*body\.limit/);
+  assert.match(instantlyServiceSource, /syncInstantlyLeads\(\{\s*actor:\s*'Instantly autopilot',\s*reconcileOnly:\s*true\s*\}\)/);
+  assert.match(instantlyServiceSource, /reserveSupabaseOutboundRecipientsForInstantly\(sendableRows,[\s\S]*source:\s*'instantly-sync'/);
+  assert.match(coldmailServiceSource, /COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE/);
+  assert.doesNotMatch(
+    coldmailServiceSource.match(/async function reserveSupabaseOutboundRecipientForColdmail[\s\S]*?async function confirmSupabaseOutboundRecipientForColdmail/)?.[0] || '',
+    /return\s+\{\s*ok:\s*false,\s*skipped:\s*true\s*\};/
+  );
   assert.match(deployGuardSource, /mainRef\.stdout !== headRef\.stdout/);
   assert.match(deployGuardSource, /exact origin\/main/);
   assert.match(qualityLockSource, /curl/);
@@ -485,10 +502,12 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /permanente `provider=instantly` recipient guards/);
   assert.match(agentsSource, /send_guard `entries` en `recipientEntries` nooit overschrijven/);
   assert.match(agentsSource, /vlak voor CSV-aanmaak moet opnieuw live/);
+  assert.match(agentsSource, /provider-sync.*geen nieuwe leads toevoegen/);
   assert.match(agentsSource, /## Outbound duplicate-veiligheid/);
   assert.match(agentsSource, /softora_outbound_recipient_guards/);
   assert.match(agentsSource, /vóór SMTP `sendMail`/);
   assert.match(agentsSource, /vóór CSV-teruggave/);
+  assert.match(agentsSource, /vóór Instantly `\/leads\/add`/);
   assert.match(agentsSource, /ontvanger-email, ontvanger-domein, company key en stabiel customer id/);
   assert.match(agentsSource, /## Softora coldmail dagtempo/);
   assert.match(agentsSource, /totale dagdoel 81/);

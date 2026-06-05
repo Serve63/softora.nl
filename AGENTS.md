@@ -37,6 +37,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - X is een exact gevraagd aantal voor de actie, geen "pak maar wat er is". Als er minder dan X veilig mail-ready leads klaarstaan, stop dan zonder CSV/upload/reservering en zeg kort: "Zet eerst genoeg mail-ready leads klaar" met gevraagd en beschikbaar aantal.
 - Deze route moet de gekozen leads eerst in Softora reserveren, `lastColdmailProvider=instantly` zetten en permanente `provider=instantly` recipient guards schrijven voordat er een CSV/upload-stap richting Instantly gebeurt.
 - De route mag bestaande Softora send_guard `entries` en `recipientEntries` nooit overschrijven of leegmaken; vlak voor CSV-aanmaak moet opnieuw live op Softora/Instantly duplicate-guards worden gecontroleerd.
+- `/api/instantly/sync` en `/api/outreach/provider-sync` mogen geen nieuwe leads toevoegen; die routes zijn alleen maintenance/reconcile/cleanup. Nieuwe Instantly-leads mogen uitsluitend via `POST /api/outreach/provider-upload` worden klaargezet.
 - Na iedere Instantly-aanvulling controleer je minimaal: Softora mail-ready telling omlaag, permanente Instantly-guards compleet, Instantly-campaign bevat het verwachte aantal nieuwe leads, en geen nieuwe duplicate/cross-channel overlap.
 - Als de veilige route faalt of geen CSV geeft: stoppen en onderzoeken. Niet via een alternatieve handmatige route alsnog uploaden.
 
@@ -44,7 +45,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Bedrijven mogen nooit twee outbound-mails krijgen via verschillende kanalen. Iedere Softora/Gmail/Strato coldmail-send en iedere veilige Instantly-upload moet dezelfde centrale Supabase guard `softora_outbound_recipient_guards` gebruiken naast de bestaande JSON send_guard.
 - Reserveer ontvangers centraal voordat een extern effect plaatsvindt: vóór SMTP `sendMail`, vóór CSV-teruggave en vóór Instantly-upload. Bij conflict stop je de actie; niet later "corrigeren".
 - Bewaak meerdere identiteiten tegelijk: ontvanger-email, ontvanger-domein, company key en stabiel customer id. Alleen exact goedgekeurde test/demo-rijen mogen deze externe guard overslaan.
-- Als de centrale guard ontbreekt, faalt of conflict meldt, behandel dat als stopteken voor de betreffende outbound actie en onderzoek eerst. Maak geen handmatige CSV of losse resend buiten deze guard om.
+- Als de centrale guard ontbreekt, faalt of conflict meldt, behandel dat als stopteken voor de betreffende outbound actie en onderzoek eerst. De code hoort dan te weigeren vóór SMTP, vóór CSV-teruggave en vóór Instantly `/leads/add`; maak geen handmatige CSV of losse resend buiten deze guard om.
 
 ## Softora coldmail dagtempo
 - De live Softora/Gmail/Strato coldmail-autopilot is bedoeld voor maximaal 9 mails per mailbox per werkdag. Met negen mailboxen is het totale dagdoel 81, niet 60.

@@ -150,6 +150,18 @@ function createService(overrides = {}) {
   const fetchCalls = [];
   const publicImageFetchCalls = [];
   const writes = [];
+  const outboundGuardCalls = [];
+  const defaultOutboundRecipientGuardStore = {
+    findRecipientConflict: async () => null,
+    reserveRecipients: async (items, options) => {
+      outboundGuardCalls.push({ type: 'reserve', items, options });
+      return {
+        ok: true,
+        reservationId: `instantly-reservation-${outboundGuardCalls.length}`,
+        count: (Array.isArray(items) ? items.length : 0) * 4,
+      };
+    },
+  };
   const service = createInstantlyOutreachService({
     instantlyConfig: {
       enabled: true,
@@ -181,7 +193,10 @@ function createService(overrides = {}) {
       coldmailPreviewImageSecret: overrides.coldmailPreviewImageSecret,
       defaultSenderEmail: overrides.defaultSenderEmail || 'serve@softora.nl',
     },
-    outboundRecipientGuardStore: overrides.outboundRecipientGuardStore,
+    outboundRecipientGuardStore:
+      overrides.outboundRecipientGuardStore === undefined
+        ? defaultOutboundRecipientGuardStore
+        : overrides.outboundRecipientGuardStore,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -270,13 +285,14 @@ function createService(overrides = {}) {
     service,
     fetchCalls,
     publicImageFetchCalls,
+    outboundGuardCalls,
     getRows: () => rows,
     writes,
   };
 }
 
-test('instantly sync pushes eligible Softora leads with campaign dedupe options', async () => {
-  const { service, fetchCalls, getRows, writes } = createService({
+test('instantly sync pushes eligible Softora leads only after central guard reservation', async () => {
+  const { service, fetchCalls, outboundGuardCalls, getRows, writes } = createService({
     rows: [
       {
         id: 'prospect-1',
@@ -310,6 +326,10 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
 
   assert.equal(result.ok, true);
   assert.equal(result.synced, 1);
+  assert.equal(outboundGuardCalls.length, 1);
+  assert.equal(outboundGuardCalls[0].items[0].recipientEmail, 'ruben@example.test');
+  assert.equal(outboundGuardCalls[0].options.provider, 'instantly');
+  assert.equal(outboundGuardCalls[0].options.source, 'instantly-sync');
   assert.equal(result.markedBenaderd, 2);
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads/add');
@@ -375,6 +395,24 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(rows[0].lastMailSentAt, undefined);
   assert.equal(rows[2].databaseStatus, 'gemaild');
   assert.equal(rows[2].outreachStatus, 'benaderd');
+});
+
+test('instantly sync stops before Instantly API when the central outbound guard is unavailable', async () => {
+  const { service, fetchCalls, writes } = createService({
+    outboundRecipientGuardStore: null,
+  });
+
+  await assert.rejects(
+    () => service.syncInstantlyLeads({ actor: 'Test' }),
+    (error) => {
+      assert.equal(error.code, 'INSTANTLY_OUTBOUND_GUARD_UNAVAILABLE');
+      assert.equal(error.status, 503);
+      assert.match(error.message, /Centrale outbound duplicate-guard ontbreekt/);
+      return true;
+    }
+  );
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(writes.length, 0);
 });
 
 test('safe Instantly upload prepares CSV only after reserving leads and permanent guards', async () => {
@@ -787,6 +825,48 @@ test('safe Instantly upload skips leads already reserved in the central outbound
   assert.equal(result.prepared, 0);
   assert.match(result.failed[0].error, /centrale outbound duplicate-guard/);
   assert.equal(result.csv, undefined);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+});
+
+test('safe Instantly upload stops before CSV when the central outbound guard is unavailable', async () => {
+  const { service, fetchCalls, writes, getRows } = createService({
+    syncEnabled: false,
+    outboundRecipientGuardStore: null,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.prepareInstantlyUpload({
+        actor: 'Test',
+        campaignId: 'campaign-manual',
+        limit: 1,
+      }),
+    (error) => {
+      assert.equal(error.code, 'INSTANTLY_OUTBOUND_GUARD_UNAVAILABLE');
+      assert.equal(error.status, 503);
+      assert.match(error.message, /Centrale outbound duplicate-guard ontbreekt/);
+      return true;
+    }
+  );
+  assert.equal(fetchCalls.length, 0);
   assert.equal(writes.length, 0);
   assert.equal(getRows()[0].lastColdmailProvider, undefined);
 });

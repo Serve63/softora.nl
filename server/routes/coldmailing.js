@@ -542,6 +542,8 @@ function registerColdmailingRoutes(app, deps = {}) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_SEND_FAILED';
       const status = code === 'SMTP_NOT_CONFIGURED' || code === 'SENDER_SMTP_NOT_CONFIGURED'
         ? 503
+        : /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(code)
+          ? 503
         : code === 'COLDMAIL_SEND_IN_PROGRESS'
           ? 409
         : code === 'COLDMAIL_DAILY_LIMIT_REACHED' || code === 'COLDMAIL_SAFETY_PAUSED'
