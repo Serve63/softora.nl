@@ -123,12 +123,17 @@ function createHtmlPageCoordinator(options = {}) {
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
     publicPageDependencyWaitMs = 350,
+    protectedPageBootstrapWaitMs = 350,
     isProduction = process.env.NODE_ENV === 'production',
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;
 
   function getSafePublicPageDependencyWaitMs() {
     return Math.max(0, Math.min(10000, Number(publicPageDependencyWaitMs) || 0));
+  }
+
+  function getSafeProtectedPageBootstrapWaitMs() {
+    return Math.max(0, Math.min(10000, Number(protectedPageBootstrapWaitMs) || 0));
   }
 
   function escapeHtml(value) {
@@ -445,7 +450,9 @@ function createHtmlPageCoordinator(options = {}) {
         .then(run)
         .then((value) => finish(value))
         .catch((error) => {
-          logger.error(`[HTML][${label}Error]`, fileName, error?.message || error);
+          if (!settled) {
+            logger.error(`[HTML][${label}Error]`, fileName, error?.message || error);
+          }
           finish(fallbackValue);
         });
     });
@@ -497,15 +504,19 @@ function createHtmlPageCoordinator(options = {}) {
         : {};
       let rendered = shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html;
       try {
-        const bootstrapData =
-          publicDependencyWaitMs > 0
+        const shouldLoadBootstrapData = !isLoginPage;
+        const bootstrapTimeoutMs =
+          publicDependencyWaitMs || (isProtectedPremiumPage ? getSafeProtectedPageBootstrapWaitMs() : 0);
+        const bootstrapData = shouldLoadBootstrapData
+          ? bootstrapTimeoutMs > 0
             ? await resolveWithSoftTimeout(() => getPageBootstrapData(req, fileName), {
                 fileName,
                 label: 'Bootstrap',
-                timeoutMs: publicDependencyWaitMs,
+                timeoutMs: bootstrapTimeoutMs,
                 fallbackValue: null,
               })
-            : await getPageBootstrapData(req, fileName);
+            : await getPageBootstrapData(req, fileName)
+          : null;
         rendered = injectHtmlMarkerReplacements(rendered, bootstrapData);
         rendered = injectPageBootstrapHtml(rendered, bootstrapData);
       } catch (error) {
