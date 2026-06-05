@@ -316,8 +316,8 @@
           startHour: 7,
           endHour: 17,
           minIntervalMinutes: 5,
-          senderMinIntervalMinutes: 70,
-          senderMaxIntervalMinutes: 82,
+          senderMinIntervalMinutes: 60,
+          senderMaxIntervalMinutes: 74,
           sendJitterMinSeconds: 45,
           sendJitterMaxSeconds: 240,
         };

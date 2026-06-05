@@ -735,8 +735,8 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /startHour: 7/);
   assert.match(autopilotSource, /endHour: 17/);
   assert.match(autopilotSource, /minIntervalMinutes: 5/);
-  assert.match(autopilotSource, /senderMinIntervalMinutes: 70/);
-  assert.match(autopilotSource, /senderMaxIntervalMinutes: 82/);
+  assert.match(autopilotSource, /senderMinIntervalMinutes: 60/);
+  assert.match(autopilotSource, /senderMaxIntervalMinutes: 74/);
   assert.match(autopilotSource, /sendJitterMinSeconds: 45/);
   assert.match(autopilotSource, /sendJitterMaxSeconds: 240/);
   assert.doesNotMatch(autopilotSource, /Handmatige modus/);
