@@ -1418,7 +1418,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button></div><div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters"><span class="status-filter-label">Coldcalling</span><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button></div><div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters"><span class="status-filter-label">Overig</span><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></div>
+                            <div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters"><span class="status-filter-label">Overig</span><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></div><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button></div><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></div>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -2356,7 +2356,7 @@
 
         function renderPage() { renderTable(); }
 
-        function setStatus(status, button) {
+        function setStatus(status, button) { if (button && button.disabled) return;
             state.activeStatus = status;
             resetVisibleLimit();
             nodes.statusButtons.forEach(function (item) {
@@ -2364,7 +2364,7 @@
             });
             renderPage();
         }
-        function applyDatabaseUrlIntent() { let params; try { params = new URLSearchParams(window.location.search || ""); } catch (error) { return; } const requestedStatus = (["status", "filter", "tab"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || "").toLowerCase(); const statusButton = requestedStatus ? nodes.statusButtons.find(function (button) { return (button.dataset.s || "") === requestedStatus; }) : null; if (statusButton) { state.activeStatus = requestedStatus; nodes.statusButtons.forEach(function (button) { button.classList.toggle("act", button === statusButton); }); } const requestedQuery = ["q", "zoek", "search", "customer", "klant", "naam"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || ""; if (requestedQuery) { state.query = requestedQuery; nodes.query.value = requestedQuery; } }
+        function applyDatabaseUrlIntent() { let params; try { params = new URLSearchParams(window.location.search || ""); } catch (error) { return; } const requestedStatus = (["status", "filter", "tab"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || "").toLowerCase(); const statusButton = requestedStatus ? nodes.statusButtons.find(function (button) { return (button.dataset.s || "") === requestedStatus; }) : null; if (statusButton && !statusButton.disabled) { state.activeStatus = requestedStatus; nodes.statusButtons.forEach(function (button) { button.classList.toggle("act", button === statusButton); }); } const requestedQuery = ["q", "zoek", "search", "customer", "klant", "naam"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || ""; if (requestedQuery) { state.query = requestedQuery; nodes.query.value = requestedQuery; } }
         function sort(key) {
             state.sortKey = "distance";
             state.sortAsc = true;

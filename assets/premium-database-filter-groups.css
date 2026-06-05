@@ -15,6 +15,9 @@
 }
 
 .status-filter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     padding: 0 5px;
     font-size: 9px;
     font-weight: 700;
@@ -23,6 +26,35 @@
     text-transform: uppercase;
     color: var(--light);
     white-space: nowrap;
+}
+
+.status-filter-group.is-locked {
+    border-style: dashed;
+    background: rgba(255, 255, 255, 0.42);
+}
+
+.status-filter-lock {
+    display: inline-flex;
+    width: 13px;
+    height: 13px;
+    color: var(--crimson);
+}
+
+.status-filter-lock-icon {
+    display: block;
+    width: 13px;
+    height: 13px;
+}
+
+.status-filter-group.is-locked .sf-btn {
+    cursor: not-allowed;
+    opacity: 0.58;
+}
+
+.status-filter-group.is-locked .sf-btn:hover {
+    border-color: var(--border);
+    background: var(--card-soft);
+    color: var(--light);
 }
 
 .table-load-more {
