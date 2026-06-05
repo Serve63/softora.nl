@@ -390,7 +390,7 @@ test('ui-state store only serves in-memory fallback for explicitly allowed scope
   });
 });
 
-test('ui-state store opent na Supabase-timeout een read-circuit zodat vervolglezingen niet blijven hameren', async () => {
+test('ui-state store opent na Supabase-timeout een scoped read-circuit zodat dezelfde scope niet blijft hameren', async () => {
   const { loggerInfos, restReads, store } = createFixture({
     uiStateReadTimeoutMs: 5,
     uiStateReadFailureCooldownMs: 1000,
@@ -399,17 +399,88 @@ test('ui-state store opent na Supabase-timeout een read-circuit zodat vervolglez
 
   const first = await store.getUiStateValues('dashboard');
   const second = await store.getUiStateValues('orders');
+  const third = await store.getUiStateValues('dashboard');
 
   assert.equal(first, null);
   assert.equal(second, null);
-  assert.equal(restReads.length, 1);
+  assert.equal(third, null);
+  assert.equal(restReads.length, 2);
+  assert.deepEqual(
+    restReads.map((entry) => entry.rowKey),
+    ['ui_state:dashboard', 'ui_state:orders']
+  );
   assert.equal(
-    loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-open]'),
+    loggerInfos.some(
+      (args) =>
+        args[0] === '[UI State][Supabase][read-circuit-open]' &&
+        args[1] === 'dashboard'
+    ),
     true
   );
   assert.equal(
-    loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-skip]'),
+    loggerInfos.some(
+      (args) =>
+        args[0] === '[UI State][Supabase][read-circuit-skip]' &&
+        args[1] === 'dashboard'
+    ),
     true
+  );
+});
+
+test('ui-state store laat een seo read-circuit premium database scopes niet blokkeren', async () => {
+  let resolvePremiumRead;
+  const { loggerInfos, restReads, store } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    uiStateReadFailureCooldownMs: 1000,
+    uiStateReadTimeoutMsByScope: {
+      premium_customers_database: 50,
+    },
+    fetchResult: new Promise((resolve) => {
+      resolvePremiumRead = resolve;
+    }),
+  });
+
+  const seoState = await store.getUiStateValues('seo');
+  resolvePremiumRead({
+    ok: true,
+    body: {
+      payload: {
+        values: {
+          softora_customers_premium_v1: JSON.stringify([{ company: 'Softora' }]),
+        },
+      },
+      updated_at: '2026-06-05T05:20:00.000Z',
+    },
+  });
+  const premiumState = await store.getUiStateValues('premium_customers_database');
+
+  assert.equal(seoState, null);
+  assert.deepEqual(premiumState, {
+    values: {
+      softora_customers_premium_v1: JSON.stringify([{ company: 'Softora' }]),
+    },
+    updatedAt: '2026-06-05T05:20:00.000Z',
+    source: 'supabase',
+  });
+  assert.deepEqual(
+    restReads.map((entry) => entry.rowKey),
+    ['ui_state:seo', 'ui_state:premium_customers_database']
+  );
+  assert.equal(
+    loggerInfos.some(
+      (args) =>
+        args[0] === '[UI State][Supabase][read-circuit-open]' &&
+        args[1] === 'seo'
+    ),
+    true
+  );
+  assert.equal(
+    loggerInfos.some(
+      (args) =>
+        args[0] === '[UI State][Supabase][read-circuit-skip]' &&
+        args[1] === 'premium_customers_database'
+    ),
+    false
   );
 });
 
