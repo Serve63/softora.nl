@@ -42,19 +42,19 @@ function getLastMiddleware(app) {
   return lastUse[lastUse.length - 1];
 }
 
-test('app middleware releases non-critical API requests without waiting on Supabase hydration', async () => {
+test('app middleware releases non-critical API requests without starting Supabase hydration', async () => {
   const app = createAppRecorder();
-  let resolveHydration = null;
+  let hydrateCalls = 0;
   let nextCalls = 0;
 
   applyAppMiddleware(
     app,
     createDeps({
       supabaseHydrateMiddlewareWaitMs: 5,
-      ensureRuntimeStateHydratedFromSupabase: () =>
-        new Promise((resolve) => {
-          resolveHydration = resolve;
-        }),
+      ensureRuntimeStateHydratedFromSupabase: async () => {
+        hydrateCalls += 1;
+        return true;
+      },
     })
   );
 
@@ -65,11 +65,7 @@ test('app middleware releases non-critical API requests without waiting on Supab
   });
 
   assert.equal(nextCalls, 1);
-
-  resolveHydration(true);
-  await new Promise((resolve) => setTimeout(resolve, 20));
-
-  assert.equal(nextCalls, 1, 'next() mag maar één keer worden aangeroepen');
+  assert.equal(hydrateCalls, 0);
 });
 
 test('app middleware skips Supabase hydration for isolated API requests', async () => {
@@ -107,8 +103,9 @@ test('app middleware skips Supabase hydration for isolated API requests', async 
   assert.equal(hydrateCalls, 0);
 });
 
-test('app middleware releases read-only critical API requests without waiting on Supabase hydration', async () => {
+test('app middleware releases read-only critical API requests without starting Supabase hydration', async () => {
   const app = createAppRecorder();
+  let hydrateCalls = 0;
   let nextCalls = 0;
   const res = {
     statusCode: null,
@@ -127,7 +124,10 @@ test('app middleware releases read-only critical API requests without waiting on
     app,
     createDeps({
       supabaseHydrateMiddlewareWaitMs: 5,
-      ensureRuntimeStateHydratedFromSupabase: () => new Promise(() => {}),
+      ensureRuntimeStateHydratedFromSupabase: async () => {
+        hydrateCalls += 1;
+        return true;
+      },
     })
   );
 
@@ -138,6 +138,7 @@ test('app middleware releases read-only critical API requests without waiting on
   });
 
   assert.equal(nextCalls, 1);
+  assert.equal(hydrateCalls, 0);
   assert.equal(res.statusCode, null);
   assert.equal(res.body, null);
 });
