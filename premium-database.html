@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605a">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605b">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -1418,7 +1418,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button></div><div class="status-filter-group status-filter-group--shared" aria-label="Filters voor coldmailing en coldcalling"><span class="status-filter-label">Beide</span><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button></div><div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters"><span class="status-filter-label">Coldcalling</span><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button></div>
+                            <div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button></div><div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters"><span class="status-filter-label">Coldcalling</span><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button></div><div class="status-filter-group status-filter-group--shared" aria-label="Overige databasefilters"><span class="status-filter-label">Overig</span><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button></div>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -2198,7 +2198,7 @@
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
-                if (state.activeStatus !== "benaderbaar" && !outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing)) return false;
+                if ((state.activeStatus === "beschikbaar" && !isAvailableColdmailCandidate(customer)) || (state.activeStatus !== "benaderbaar" && state.activeStatus !== "beschikbaar" && !outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing))) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -2295,8 +2295,8 @@
         function hasApprovedWebdesignMockup(customer) { return buildCustomerWebdesignAssetState(customer).mockupApproved; }
         function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
         function isColdmailReadyWebdesignLead(customer) { return buildCustomerWebdesignAssetState(customer).isMailReady; }
-        function getMailReadyCustomers(customers) { return (customers || []).filter(isColdmailReadyWebdesignLead); }
-        function getVisibleTableCustomers(customers) { return state.activeStatus === "benaderbaar" ? getMailReadyCustomers(customers) : (customers || []); }
+        function isAvailableColdmailCandidate(customer) { return isColdmailBaseLeadEligible(customer) && !hasUsedColdCalling(customer) && !hasUsedColdMailing(customer) && !outreachController.hasInstantlyOutreachSignal(customer) && !isColdmailReadyWebdesignLead(customer); } function getAvailableColdmailCandidates(customers) { return (customers || []).filter(isAvailableColdmailCandidate); } function getMailReadyCustomers(customers) { return (customers || []).filter(isColdmailReadyWebdesignLead); }
+        function getVisibleTableCustomers(customers) { if (state.activeStatus === "benaderbaar") return getMailReadyCustomers(customers); if (state.activeStatus === "beschikbaar") return getAvailableColdmailCandidates(customers); return customers || []; }
         function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = getMailReadyCustomers(customers).length; state.lastMailReadyHeaderCount = count; return count; } const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
         function isWebdesignPhotoEligible(customer) { return buildCustomerWebdesignAssetState(customer).canGeneratePhoto; }
 
@@ -2309,9 +2309,9 @@
             });
         }
 
-        function isMailReadyCalculationPending() { return state.activeStatus === "benaderbaar" && (state.dataLoading || state.photoRestorePending || !hasLoadedColdmailGuard()); }
-        function renderPhotoCostLabel(customers, pending) { const showPhotoBatchControl = state.activeStatus === "benaderbaar" || state.activeStatus === "alle"; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
-            if (pending) { nodes.photoCostLabel.innerHTML = "<strong>--</strong>"; nodes.photoCostLabel.title = "Mailklare data wordt nog geladen."; return; }
+        function isMailReadyCalculationPending() { return (state.activeStatus === "benaderbaar" || state.activeStatus === "beschikbaar") && (state.dataLoading || state.photoRestorePending || !hasLoadedColdmailGuard()); }
+        function renderPhotoCostLabel(customers, pending) { const showPhotoBatchControl = state.activeStatus === "benaderbaar" || state.activeStatus === "beschikbaar" || state.activeStatus === "alle"; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
+            if (pending) { nodes.photoCostLabel.innerHTML = "<strong>--</strong>"; nodes.photoCostLabel.title = state.activeStatus === "beschikbaar" ? "Beschikbare data wordt nog geladen." : "Mailklare data wordt nog geladen."; return; }
             const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length, totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
             nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>"; nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. AI-foto kost " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + " per stuk.";
         }
@@ -2329,7 +2329,7 @@
             document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered, mailReadyPending); document.getElementById("photoHeaderCount").textContent = photoHeaderCount === null ? "(--)" : "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: baseFiltered.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), items: buildDatabaseMediaDebugItems(filtered) });
 
-            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; return; } if (mailReadyPending) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Mailklare data laden...</div></td></tr>"; return; } if (!filtered.length) {
+            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; return; } if (mailReadyPending) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; return; } if (!filtered.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
