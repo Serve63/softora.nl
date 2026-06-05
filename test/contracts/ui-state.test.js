@@ -26,6 +26,9 @@ function createFixture(overrides = {}) {
     uiStateMemoryFallbackScopes: overrides.uiStateMemoryFallbackScopes,
     fetchSupabaseRowByKeyViaRest: async (rowKey, columns) => {
       restReads.push({ rowKey, columns });
+      if (typeof overrides.fetchResult === 'function') {
+        return overrides.fetchResult(rowKey, columns, restReads.length);
+      }
       if (overrides.fetchResult && typeof overrides.fetchResult.then === 'function') {
         return overrides.fetchResult;
       }
@@ -471,6 +474,66 @@ test('ui-state store laat een seo read-circuit premium database scopes niet blok
       (args) =>
         args[0] === '[UI State][Supabase][read-circuit-open]' &&
         args[1] === 'seo'
+    ),
+    true
+  );
+  assert.equal(
+    loggerInfos.some(
+      (args) =>
+        args[0] === '[UI State][Supabase][read-circuit-skip]' &&
+        args[1] === 'premium_customers_database'
+    ),
+    false
+  );
+});
+
+test('ui-state store kan public-preview cooldowns isoleren van premium dashboard reads', async () => {
+  let calls = 0;
+  const { loggerInfos, restReads, store } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    uiStateReadFailureCooldownMs: 1000,
+    uiStateReadTimeoutMsByScope: {
+      premium_customers_database: 50,
+    },
+    fetchResult() {
+      calls += 1;
+      if (calls === 1) return new Promise(() => {});
+      return {
+        ok: true,
+        body: {
+          payload: {
+            values: {
+              softora_customers_premium_v1: JSON.stringify([{ company: 'Softora' }]),
+            },
+          },
+          updated_at: '2026-06-05T06:05:00.000Z',
+        },
+      };
+    },
+  });
+
+  const publicPreviewState = await store.getUiStateValues('premium_customers_database', {
+    readFailureCooldownScope: 'public_webdesign_preview_premium_customers_database',
+  });
+  const dashboardState = await store.getUiStateValues('premium_customers_database');
+
+  assert.equal(publicPreviewState, null);
+  assert.deepEqual(dashboardState, {
+    values: {
+      softora_customers_premium_v1: JSON.stringify([{ company: 'Softora' }]),
+    },
+    updatedAt: '2026-06-05T06:05:00.000Z',
+    source: 'supabase',
+  });
+  assert.deepEqual(
+    restReads.map((entry) => entry.rowKey),
+    ['ui_state:premium_customers_database', 'ui_state:premium_customers_database']
+  );
+  assert.equal(
+    loggerInfos.some(
+      (args) =>
+        args[0] === '[UI State][Supabase][read-circuit-open]' &&
+        args[1] === 'public_webdesign_preview_premium_customers_database'
     ),
     true
   );

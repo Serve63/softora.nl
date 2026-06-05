@@ -144,6 +144,34 @@ test('public webdesign preview resolves current database ids through customer id
   assert.equal(preview.mockupSource, 'https://cdn.softora.test/aagje-current-mockup.jpg');
 });
 
+test('public webdesign preview isoleert ui-state fallback cooldowns van premium dashboard scopes', async () => {
+  const reads = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues(scope, options) {
+      reads.push({ scope, options });
+      return { values: {} };
+    },
+  });
+
+  const preview = await service.resolvePreview('ontbrekende-preview');
+
+  assert.equal(preview, null);
+  assert.deepEqual(reads, [
+    {
+      scope: PHOTO_SCOPE,
+      options: {
+        readFailureCooldownScope: 'public_webdesign_preview_premium_database_photos',
+      },
+    },
+    {
+      scope: CUSTOMER_SCOPE,
+      options: {
+        readFailureCooldownScope: 'public_webdesign_preview_premium_customers_database',
+      },
+    },
+  ]);
+});
+
 test('public webdesign preview reads structured data ops storage before ui-state fallback', async () => {
   let uiStateReads = 0;
   let customerReads = 0;
