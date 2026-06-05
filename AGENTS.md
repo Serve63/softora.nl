@@ -36,13 +36,21 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Als Servé vraagt om X nieuwe leads naar Instantly te zetten, gebruik altijd dezelfde veilige Softora-route: `POST /api/outreach/provider-upload` (of de dashboardactie "Veilige Instantly CSV maken"). Maak nooit handmatig een losse CSV vanuit Supabase/exports zonder eerst deze route te gebruiken.
 - X is een exact gevraagd aantal voor de actie, geen "pak maar wat er is". Als er minder dan X veilig mail-ready leads klaarstaan, stop dan zonder CSV/upload/reservering en zeg kort: "Zet eerst genoeg mail-ready leads klaar" met gevraagd en beschikbaar aantal.
 - Deze route moet de gekozen leads eerst in Softora reserveren, `lastColdmailProvider=instantly` zetten en permanente `provider=instantly` recipient guards schrijven voordat er een CSV/upload-stap richting Instantly gebeurt.
+- De route mag bestaande Softora send_guard `entries` en `recipientEntries` nooit overschrijven of leegmaken; vlak voor CSV-aanmaak moet opnieuw live op Softora/Instantly duplicate-guards worden gecontroleerd.
+- `/api/instantly/sync` en `/api/outreach/provider-sync` mogen geen nieuwe leads toevoegen; die routes zijn alleen maintenance/reconcile/cleanup. Nieuwe Instantly-leads mogen uitsluitend via `POST /api/outreach/provider-upload` worden klaargezet.
 - Na iedere Instantly-aanvulling controleer je minimaal: Softora mail-ready telling omlaag, permanente Instantly-guards compleet, Instantly-campaign bevat het verwachte aantal nieuwe leads, en geen nieuwe duplicate/cross-channel overlap.
 - Als de veilige route faalt of geen CSV geeft: stoppen en onderzoeken. Niet via een alternatieve handmatige route alsnog uploaden.
 
+## Outbound duplicate-veiligheid
+- Bedrijven mogen nooit twee outbound-mails krijgen via verschillende kanalen. Iedere Softora/Gmail/Strato coldmail-send en iedere veilige Instantly-upload moet dezelfde centrale Supabase guard `softora_outbound_recipient_guards` gebruiken naast de bestaande JSON send_guard.
+- Reserveer ontvangers centraal voordat een extern effect plaatsvindt: vóór SMTP `sendMail`, vóór CSV-teruggave en vóór Instantly-upload. Bij conflict stop je de actie; niet later "corrigeren".
+- Bewaak meerdere identiteiten tegelijk: ontvanger-email, ontvanger-domein, company key en stabiel customer id. Alleen exact goedgekeurde test/demo-rijen mogen deze externe guard overslaan.
+- Als de centrale guard ontbreekt, faalt of conflict meldt, behandel dat als stopteken voor de betreffende outbound actie en onderzoek eerst. De code hoort dan te weigeren vóór SMTP, vóór CSV-teruggave en vóór Instantly `/leads/add`; maak geen handmatige CSV of losse resend buiten deze guard om.
+
 ## Softora coldmail dagtempo
 - De live Softora/Gmail/Strato coldmail-autopilot is bedoeld voor maximaal 9 mails per mailbox per werkdag. Met negen mailboxen is het totale dagdoel 81, niet 60.
-- Het veilige verzendvenster is 07:00-17:00 Europe/Amsterdam. De globale autopilot-interval mag rond 5 minuten staan zodat die geen dagcap-rem wordt; de spreiding per mailbox komt uit `senderMinIntervalMinutes=70` en `senderMaxIntervalMinutes=82`.
-- Als het dagtempo te laag is, controleer eerst de effectieve scheduler/capaciteit: `count=1`, `minIntervalMinutes`, sender-cooldowns, rolling 24-uurs quota, echte mail-ready selectie en recipient guards. Noem ruwe assetvoorraad nooit automatisch verzendcapaciteit.
+- Het veilige verzendvenster is 07:00-17:00 Europe/Amsterdam. De globale autopilot-interval hoort rond 5 minuten te staan zodat die geen dagcap-rem wordt; de spreiding per mailbox komt uit de dag-slot pacing in de scheduler met `senderMinIntervalMinutes=60` en `senderMaxIntervalMinutes=74`.
+- De scheduler hoort 9 dag-slots per mailbox over het hele venster te bewaken. Verlaag of verhoog niet blind een cooldown: controleer eerst `count=1`, `minIntervalMinutes`, sender-cooldowns, rolling 24-uurs quota, echte mail-ready selectie en recipient guards. Noem ruwe assetvoorraad nooit automatisch verzendcapaciteit.
 
 ## Wijzigen zonder regressies
 - Verander bestaande routes niet zomaar; houd response-shapes stabiel.
