@@ -6,6 +6,31 @@ function registerMailboxRoutes(app, deps = {}) {
       ? deps.requirePremiumAdminApiAccess
       : (_req, _res, next) => next();
   const cronSecret = String(deps.cronSecret || process.env.CRON_SECRET || '').trim();
+  const supabaseOutageCronPause = String(
+    deps.supabaseOutageCronPause || process.env.SUPABASE_OUTAGE_CRON_PAUSE || ''
+  ).trim();
+
+  function isEnabledFlag(value) {
+    if (typeof value === 'boolean') return value;
+    return /^(1|true|yes|on)$/i.test(String(value || '').trim());
+  }
+
+  function shouldSkipCronForSupabaseOutage() {
+    if (typeof deps.isSupabaseOutageCronPaused === 'function') {
+      return Boolean(deps.isSupabaseOutageCronPaused());
+    }
+    return isEnabledFlag(supabaseOutageCronPause || process.env.SUPABASE_OUTAGE_CRON_PAUSE);
+  }
+
+  function sendSupabaseOutageCronPauseResponse(res) {
+    return res.status(200).json({
+      ok: true,
+      skipped: true,
+      code: 'SUPABASE_OUTAGE_CRON_PAUSED',
+      reason: 'supabase_outage_cron_paused',
+      message: 'Mailbox cron tijdelijk overgeslagen vanwege Supabase outage-pauze.',
+    });
+  }
 
   function requireCronAccess(req, res, next) {
     if (!cronSecret) {
@@ -34,7 +59,13 @@ function registerMailboxRoutes(app, deps = {}) {
     coordinator.deleteMessageResponse(req, res)
   );
   app.post('/api/mailbox/sync', requireAdmin, (req, res) => coordinator.syncMailboxResponse(req, res));
-  app.get('/api/mailbox/sync', requireCronAccess, (req, res) => coordinator.syncMailboxResponse(req, res));
+  app.get('/api/mailbox/sync', requireCronAccess, (req, res) => {
+    if (shouldSkipCronForSupabaseOutage()) {
+      sendSupabaseOutageCronPauseResponse(res);
+      return;
+    }
+    coordinator.syncMailboxResponse(req, res);
+  });
   app.post('/api/mailbox/send', requireAdmin, (req, res) => coordinator.sendMessageResponse(req, res));
   app.post('/api/mailbox/rewrite', requireAdmin, (req, res) =>
     coordinator.rewriteDraftResponse(req, res)

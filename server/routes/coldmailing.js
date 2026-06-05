@@ -114,10 +114,34 @@ function registerColdmailingRoutes(app, deps = {}) {
     requirePremiumApiAccess = (_req, _res, next) => next(),
     requirePremiumAdminApiAccess = (_req, _res, next) => next(),
     cronSecret = process.env.CRON_SECRET || '',
+    supabaseOutageCronPause = process.env.SUPABASE_OUTAGE_CRON_PAUSE || '',
+    isSupabaseOutageCronPaused,
   } = deps;
   const coldmailingCronSecret = normalizeString(cronSecret || process.env.CRON_SECRET || '');
 
   if (!coldmailCampaignService) return;
+
+  function isEnabledFlag(value) {
+    if (typeof value === 'boolean') return value;
+    return /^(1|true|yes|on)$/i.test(normalizeString(value));
+  }
+
+  function shouldSkipCronForSupabaseOutage() {
+    if (typeof isSupabaseOutageCronPaused === 'function') {
+      return Boolean(isSupabaseOutageCronPaused());
+    }
+    return isEnabledFlag(supabaseOutageCronPause || process.env.SUPABASE_OUTAGE_CRON_PAUSE);
+  }
+
+  function sendSupabaseOutageCronPauseResponse(res) {
+    return res.status(200).json({
+      ok: true,
+      skipped: true,
+      code: 'SUPABASE_OUTAGE_CRON_PAUSED',
+      reason: 'supabase_outage_cron_paused',
+      message: 'Coldmail autopilot cron tijdelijk overgeslagen vanwege Supabase outage-pauze.',
+    });
+  }
 
   function requireColdmailingCronAccess(req, res, next) {
     if (!coldmailingCronSecret) {
@@ -366,6 +390,10 @@ function registerColdmailingRoutes(app, deps = {}) {
   });
 
   app.get('/api/coldmailing/autopilot/run', requireColdmailingCronAccess, async (req, res) => {
+    if (shouldSkipCronForSupabaseOutage()) {
+      sendSupabaseOutageCronPauseResponse(res);
+      return;
+    }
     await runColdmailAutopilotFromRoute(req, res, {
       actor: 'Coldmail Autopilot Cron',
       force: false,
