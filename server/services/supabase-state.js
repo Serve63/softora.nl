@@ -1,5 +1,7 @@
 const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
 
+const DEFAULT_SUPABASE_REST_TIMEOUT_MS = 1500;
+
 function createSupabaseStateStore(deps = {}) {
   const {
     supabaseUrl = '',
@@ -8,7 +10,7 @@ function createSupabaseStateStore(deps = {}) {
     supabaseStateKey = '',
     supabaseCallUpdateStateKeyPrefix = '',
     supabaseCallUpdateRowsFetchLimit = 1000,
-    supabaseRestTimeoutMs = 12000,
+    supabaseRestTimeoutMs = DEFAULT_SUPABASE_REST_TIMEOUT_MS,
     supabaseRestFailureCooldownMs = 60_000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -26,7 +28,13 @@ function createSupabaseStateStore(deps = {}) {
   }
 
   function getSafeSupabaseTimeoutMs() {
-    return Math.max(1000, Math.min(60000, Number(supabaseRestTimeoutMs) || 12000));
+    return Math.max(
+      1000,
+      Math.min(
+        60000,
+        Number(supabaseRestTimeoutMs) || DEFAULT_SUPABASE_REST_TIMEOUT_MS
+      )
+    );
   }
 
   function getSafeRestFailureCooldownMs() {
@@ -102,7 +110,7 @@ function createSupabaseStateStore(deps = {}) {
       if (controller) {
         timeout = setTimeout(() => {
           const timeoutError = new Error(
-            `Supabase client timeout na ${Math.round(timeoutMs / 1000)}s`
+            `Supabase client timeout na ${timeoutMs}ms`
           );
           timeoutError.name = 'AbortError';
           controller.abort(timeoutError);
@@ -176,7 +184,7 @@ function createSupabaseStateStore(deps = {}) {
         body: null,
         error: truncateText(
           error?.name === 'AbortError'
-            ? `Supabase REST timeout na ${Math.round(timeoutMs / 1000)}s`
+            ? `Supabase REST timeout na ${timeoutMs}ms`
             : (error?.message || String(error)),
           500
         ),

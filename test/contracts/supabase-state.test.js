@@ -189,6 +189,52 @@ test('supabase state store aborts hung REST requests with a timeout error', asyn
   assert.match(result.error || '', /Supabase REST timeout na/);
 });
 
+test('supabase state store defaults REST and client fetches to a short fail-fast timeout', async () => {
+  const capturedTimeouts = [];
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const createHangingFetch = () => async (_url, options = {}) =>
+    new Promise((_, reject) => {
+      options.signal?.addEventListener('abort', () => {
+        const reason = options.signal?.reason;
+        if (reason instanceof Error) {
+          reject(reason);
+          return;
+        }
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      });
+    });
+
+  global.setTimeout = (callback, ms) => {
+    capturedTimeouts.push(ms);
+    queueMicrotask(callback);
+    return { ms };
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    const restFixture = createFixture({ fetchImpl: createHangingFetch() });
+    const restResult = await restFixture.store.fetchSupabaseStateRowViaRest();
+    assert.equal(restResult.ok, false);
+    assert.match(restResult.error || '', /Supabase REST timeout na 1500ms/);
+
+    const clientFixture = createFixture({ fetchImpl: createHangingFetch() });
+    clientFixture.store.getSupabaseClient();
+    const fetchWithTimeout = clientFixture.clientCalls[0][2].global.fetch;
+    await assert.rejects(
+      fetchWithTimeout('https://example.supabase.co/rest/v1/runtime_state'),
+      /Supabase client timeout na 1500ms/
+    );
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+
+  assert.deepEqual(capturedTimeouts, [1500, 1500]);
+});
+
 test('supabase state store opens a short REST cooldown after a timeout', async () => {
   let fetchCalls = 0;
   const fixture = createFixture({
