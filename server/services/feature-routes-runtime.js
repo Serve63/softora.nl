@@ -79,6 +79,10 @@ function registerFeatureRoutes(app, deps = {}) {
 
   registerPublicContactRoutes(app, { coordinator: publicContactCoordinator });
 
+  registerSupabaseMaintenanceRoutes(app, {
+    ...(supabaseMaintenance || {}),
+  });
+
   createPremiumRouteRuntime({
     app,
     ...premiumRouteRuntime,
@@ -115,9 +119,6 @@ function registerFeatureRoutes(app, deps = {}) {
   registerSupabaseCostRoutes(app, {
     ...(supabaseCostSummary || {}),
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
-  });
-  registerSupabaseMaintenanceRoutes(app, {
-    ...(supabaseMaintenance || {}),
   });
   registerMailboxRoutes(app, {
     coordinator: mailboxCoordinator,
