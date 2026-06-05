@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605d">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605e">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -272,22 +272,6 @@
             flex-wrap: wrap;
         }
 
-        .search {
-            position: relative;
-        }
-
-        .search svg {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 13px;
-            height: 13px;
-            color: var(--light);
-            pointer-events: none;
-        }
-
-        .search input,
         .p-sel,
         .minp,
         .msel,
@@ -299,14 +283,6 @@
             transition: border-color .15s ease;
         }
 
-        .search input {
-            padding: 8px 12px 8px 30px;
-            border-radius: 5px;
-            font-size: 13px;
-            width: 260px;
-        }
-
-        .search input:focus,
         .p-sel:focus,
         .minp:focus,
         .msel:focus,
@@ -1283,15 +1259,6 @@
                 width: 100%;
             }
 
-            .search input {
-                width: 100%;
-                min-width: 0;
-            }
-
-            .search {
-                width: 100%;
-            }
-
             .table-card {
                 overflow-x: auto;
             }
@@ -1391,27 +1358,11 @@
                             <div class="page-title">Database</div>
                             <div class="page-sub" id="top-sub"></div>
                         </div>
-                        <div class="top-right">
-                            <div class="add-actions" id="addActions">
-                                <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
-                                    Acties
-                                    <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                                </button>
-                                <div class="add-actions-menu" id="addActionsMenu" role="menu">
-                                    <button class="add-actions-item" id="deepSearchButton" type="button" role="menuitem">Bedrijven toevoegen</button><button class="add-actions-item" id="manualAddButton" type="button" role="menuitem">Handmatig toevoegen</button><button class="add-actions-item" id="instantOutreachSyncButton" type="button" role="menuitem"><span class="add-actions-item-title">Veilige Instantly CSV maken</span><span class="add-actions-item-sub">Reserveer eerst in Softora, download daarna CSV</span></button>
-                                </div>
-                                <input type="file" id="importFileInput" accept=".csv,text/csv,.tsv,text/tab-separated-values,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="status-banner" id="statusBanner" aria-live="polite"></div>
 
                     <div class="filter-bar">
-                        <div class="search">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
-                        </div>
                         <div class="status-filter">
                             <div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters"><span class="status-filter-label">Algemeen</span><span class="status-filter-pills"><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><span class="status-filter-pills"><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><span class="status-filter-pills"><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></span></div>
                         </div>
@@ -2359,7 +2310,7 @@
             });
             renderPage();
         }
-        function applyDatabaseUrlIntent() { let params; try { params = new URLSearchParams(window.location.search || ""); } catch (error) { return; } const requestedStatus = (["status", "filter", "tab"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || "").toLowerCase(); const statusButton = requestedStatus ? nodes.statusButtons.find(function (button) { return (button.dataset.s || "") === requestedStatus; }) : null; if (statusButton && !statusButton.disabled) { state.activeStatus = requestedStatus; nodes.statusButtons.forEach(function (button) { button.classList.toggle("act", button === statusButton); }); } const requestedQuery = ["q", "zoek", "search", "customer", "klant", "naam"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || ""; if (requestedQuery) { state.query = requestedQuery; nodes.query.value = requestedQuery; } }
+        function applyDatabaseUrlIntent() { let params; try { params = new URLSearchParams(window.location.search || ""); } catch (error) { return; } const requestedStatus = (["status", "filter", "tab"].map(function (key) { return normalizeString(params.get(key)); }).find(Boolean) || "").toLowerCase(); const statusButton = requestedStatus ? nodes.statusButtons.find(function (button) { return (button.dataset.s || "") === requestedStatus; }) : null; if (statusButton && !statusButton.disabled) { state.activeStatus = requestedStatus; nodes.statusButtons.forEach(function (button) { button.classList.toggle("act", button === statusButton); }); } }
         function sort(key) {
             state.sortKey = "distance";
             state.sortAsc = true;
@@ -2725,16 +2676,19 @@
         }
 
         function openAddActions() {
+            if (!nodes.addActions || !nodes.addButton) return;
             nodes.addActions.classList.add("is-open");
             nodes.addButton.setAttribute("aria-expanded", "true");
         }
 
         function closeAddActions() {
+            if (!nodes.addActions || !nodes.addButton) return;
             nodes.addActions.classList.remove("is-open");
             nodes.addButton.setAttribute("aria-expanded", "false");
         }
 
         function toggleAddActions() {
+            if (!nodes.addActions) return;
             if (nodes.addActions.classList.contains("is-open")) {
                 closeAddActions();
             } else {
@@ -3062,7 +3016,7 @@
             toast: toast
         });
 
-        nodes.query.addEventListener("input", function (event) {
+        if (nodes.query) nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
             resetVisibleLimit();
             renderPage();
@@ -3141,7 +3095,7 @@
         nodes.overlay.addEventListener("click", closePanel);
         nodes.closePanelButton.addEventListener("click", closePanel);
         nodes.saveNoteButton.addEventListener("click", saveNota);
-        nodes.addButton.addEventListener("click", function (event) {
+        if (nodes.addButton) nodes.addButton.addEventListener("click", function (event) {
             event.stopPropagation();
             toggleAddActions();
         });
@@ -3149,8 +3103,8 @@
             photoBatchController.open();
         });
         photoBatchController.bind(); databaseDeepSearchController.bind(); startCustomerStateAutoRefresh();
-        nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) databaseDeepSearchController.open(); });
-        nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
+        if (nodes.addActionsMenu) nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) databaseDeepSearchController.open(); });
+        if (nodes.importFileInput) nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
         nodes.modalBg.addEventListener("click", function (event) {
@@ -3159,7 +3113,7 @@
             }
         });
         document.addEventListener("click", function (event) {
-            if (!nodes.addActions.contains(event.target)) {
+            if (nodes.addActions && !nodes.addActions.contains(event.target)) {
                 closeAddActions();
             }
         });

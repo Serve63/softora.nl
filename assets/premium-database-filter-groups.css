@@ -4,10 +4,10 @@
     gap: 0;
     flex-wrap: wrap;
     flex: 0 1 auto;
-    background: #fff;
-    border: 1px solid #e8e6e1;
-    border-radius: 10px;
-    padding: 10px 16px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
 }
 
 .status-filter-group {
