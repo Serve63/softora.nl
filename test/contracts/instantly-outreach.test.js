@@ -181,6 +181,7 @@ function createService(overrides = {}) {
       coldmailPreviewImageSecret: overrides.coldmailPreviewImageSecret,
       defaultSenderEmail: overrides.defaultSenderEmail || 'serve@softora.nl',
     },
+    outboundRecipientGuardStore: overrides.outboundRecipientGuardStore,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -688,6 +689,155 @@ test('safe Instantly upload skips leads that are already protected by recipient 
   assert.match(result.failed[0].error, /permanente duplicate-guard/);
   assert.equal(writes.length, 0);
   assert.equal(getRows()[0].instantlyStatus, undefined);
+});
+
+test('safe Instantly upload skips leads when the same company already has a guard', async () => {
+  const { service, getRows, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'same-company-1',
+        bedrijf: 'Cafetaria De Bank',
+        email: 'contact@cafetariadebank.nl',
+        website: 'https://cafetariadebank.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'same-company-1': {
+        id: 'same-company-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    coldmailSendGuard: {
+      recipientEntries: [
+        {
+          at: '2026-06-05T17:32:00.000Z',
+          recipientKey: 'email:info@cafetariadebank.nl',
+          recipientEmail: 'info@cafetariadebank.nl',
+          recipientDomain: 'cafetariadebank-nl',
+          recipientCompanyKey: 'cafetaria-de-bank',
+          provider: 'softora',
+          permanent: true,
+        },
+      ],
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.prepared, 0);
+  assert.match(result.failed[0].error, /permanente duplicate-guard/);
+  assert.equal(result.csv, undefined);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+});
+
+test('safe Instantly upload skips leads already reserved in the central outbound guard', async () => {
+  const { service, getRows, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'central-guard-1',
+        bedrijf: 'Wereldtekst',
+        email: 'info@wereldtekst.nl',
+        website: 'https://wereldtekst.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'central-guard-1': {
+        id: 'central-guard-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => ({
+        guard_key: 'domain:wereldtekst-nl',
+        provider: 'softora',
+        recipient_email: 'info@wereldtekst.nl',
+        recipient_domain: 'wereldtekst-nl',
+        recipient_company_key: 'wereldtekst',
+        recipient_company: 'Wereldtekst',
+        permanent: true,
+      }),
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.prepared, 0);
+  assert.match(result.failed[0].error, /centrale outbound duplicate-guard/);
+  assert.equal(result.csv, undefined);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+});
+
+test('safe Instantly upload reserves the whole batch centrally before returning CSV', async () => {
+  const calls = [];
+  const { service, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ items, options });
+        return { ok: true, reservationId: 'instantly-reservation-1', count: items.length * 4 };
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.prepared, 1);
+  assert.match(result.csv, /"ruben@example\.test"/);
+  assert.equal(result.centralGuards, 4);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].items[0].recipientEmail, 'ruben@example.test');
+  assert.equal(calls[0].options.provider, 'instantly');
+  assert.equal(calls[0].options.channel, 'instantly');
+  assert.equal(calls[0].options.permanent, true);
+  assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
 });
 
 test('instantly sync uses the public Softora image host even when the app base url is Render', async () => {
