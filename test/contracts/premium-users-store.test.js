@@ -78,7 +78,10 @@ function createFixture(overrides = {}) {
 test('premium users store does not overwrite users with bootstrap data when Supabase hydration fails', async () => {
   const store = createFixture();
   const originalConsoleError = console.error;
-  console.error = () => {};
+  const errorLogs = [];
+  console.error = (...args) => {
+    errorLogs.push(args);
+  };
 
   try {
     const hydrated = await store.ensureUsersHydrated();
@@ -86,6 +89,7 @@ test('premium users store does not overwrite users with bootstrap data when Supa
     assert.equal(hydrated.source, 'unavailable');
     assert.equal(hydrated.users.length, 0);
     assert.equal(store.getCachedUsers().length, 0);
+    assert.equal(errorLogs.length, 0);
   } finally {
     console.error = originalConsoleError;
   }
@@ -118,7 +122,10 @@ test('premium users store times out hanging Supabase hydration instead of hangin
     },
   });
   const originalConsoleError = console.error;
-  console.error = () => {};
+  const errorLogs = [];
+  console.error = (...args) => {
+    errorLogs.push(args);
+  };
 
   try {
     const startedAt = Date.now();
@@ -127,6 +134,7 @@ test('premium users store times out hanging Supabase hydration instead of hangin
     assert.equal(hydrated.source, 'unavailable');
     assert.equal(hydrated.users.length, 0);
     assert.ok(Date.now() - startedAt < 1000);
+    assert.equal(errorLogs.length, 0);
   } finally {
     console.error = originalConsoleError;
   }
@@ -159,7 +167,10 @@ test('premium users store honors shorter login timeout while another hydrate is 
     },
   });
   const originalConsoleError = console.error;
-  console.error = () => {};
+  const errorLogs = [];
+  console.error = (...args) => {
+    errorLogs.push(args);
+  };
 
   try {
     const pendingHydrate = store.ensureUsersHydrated();
@@ -171,6 +182,7 @@ test('premium users store honors shorter login timeout while another hydrate is 
     assert.equal(hydrated.source, 'unavailable');
     assert.equal(hydrated.users.length, 0);
     assert.ok(Date.now() - startedAt < 1000);
+    assert.equal(errorLogs.length, 0);
     await pendingHydrate;
   } finally {
     console.error = originalConsoleError;

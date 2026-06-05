@@ -828,14 +828,39 @@
             syncPasswordVisibility(false);
         }
 
+        const LOGIN_STATE_TIMEOUT_MS = 3500;
+        const LOGIN_SUBMIT_TIMEOUT_MS = 8000;
+
+        async function fetchWithTimeout(url, options = {}, timeoutMs = LOGIN_SUBMIT_TIMEOUT_MS) {
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            const safeTimeoutMs = Math.max(1000, Number(timeoutMs) || LOGIN_SUBMIT_TIMEOUT_MS);
+            const timeout = controller ? setTimeout(() => controller.abort(), safeTimeoutMs) : null;
+
+            try {
+                return await fetch(url, {
+                    ...options,
+                    signal: controller ? controller.signal : options.signal
+                });
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    const timeoutError = new Error('De server reageert te traag. Probeer het opnieuw.');
+                    timeoutError.name = 'TimeoutError';
+                    throw timeoutError;
+                }
+                throw error;
+            } finally {
+                if (timeout) clearTimeout(timeout);
+            }
+        }
+
         async function syncLoginState() {
             const params = new URLSearchParams(window.location.search);
             try {
-                const response = await fetch('/api/auth/session', {
+                const response = await fetchWithTimeout('/api/auth/session', {
                     method: 'GET',
                     credentials: 'same-origin',
                     cache: 'no-store'
-                });
+                }, LOGIN_STATE_TIMEOUT_MS);
 
                 if (!response.ok) return;
                 const payload = await response.json();
@@ -893,7 +918,7 @@
             }
 
             try {
-                const response = await fetch('/api/auth/login', {
+                const response = await fetchWithTimeout('/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -906,7 +931,7 @@
                         remember: remember.checked,
                         next: getNextPath()
                     })
-                });
+                }, LOGIN_SUBMIT_TIMEOUT_MS);
 
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok || !payload.ok) {
@@ -923,8 +948,10 @@
 
                 window.location.assign(payload.next || getNextPath());
                 return false;
-            } catch (_) {
-                showError('De server reageert niet. Probeer het opnieuw.');
+            } catch (error) {
+                showError(error && error.name === 'TimeoutError'
+                    ? error.message
+                    : 'De server reageert niet. Probeer het opnieuw.');
                 return false;
             } finally {
                 btn.textContent = originalBtnText;

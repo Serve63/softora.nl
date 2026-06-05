@@ -408,7 +408,7 @@ test('premium auth login reports temporary user store failures separately from c
 });
 
 test('premium auth login blocks disallowed admin ips before password checks', async () => {
-  const { auditEvents, coordinator } = createFixture({
+  const { auditEvents, coordinator, premiumUsersStore } = createFixture({
     ipAllowed: false,
   });
   const req = createRequest({
@@ -421,6 +421,7 @@ test('premium auth login blocks disallowed admin ips before password checks', as
   assert.equal(res.statusCode, 403);
   assert.equal(res.body.error, 'Inloggen is vanaf dit IP-adres niet toegestaan.');
   assert.equal(auditEvents[0].reason, 'security_login_ip_blocked');
+  assert.equal(premiumUsersStore.hydrationCalls.length, 0);
 });
 
 test('premium auth login requires credentials and rejects invalid passwords', async () => {
@@ -432,6 +433,7 @@ test('premium auth login requires credentials and rejects invalid passwords', as
 
   assert.equal(missingRes.statusCode, 400);
   assert.equal(missingRes.body.error, 'Vul je e-mailadres en wachtwoord in.');
+  assert.equal(missingFixture.premiumUsersStore.hydrationCalls.length, 0);
 
   const invalidFixture = createFixture();
   const invalidReq = createRequest({
@@ -445,7 +447,7 @@ test('premium auth login requires credentials and rejects invalid passwords', as
   assert.equal(invalidRes.body.error, 'Ongeldige inloggegevens.');
 });
 
-test('premium auth login forces a fresh user hydrate before password checks', async () => {
+test('premium auth login hydrates users only after cheap guards pass', async () => {
   const fixture = createFixture();
   const req = createRequest({
     body: { email: 'admin@softora.nl', password: 'secret123' },
@@ -458,7 +460,7 @@ test('premium auth login forces a fresh user hydrate before password checks', as
   assert.equal(fixture.premiumUsersStore.hydrationCalls.length, 1);
   assert.deepEqual(fixture.premiumUsersStore.hydrationCalls[0], {
     force: true,
-    readTimeoutMs: 1200,
+    readTimeoutMs: 450,
     allowBootstrapFallback: true,
   });
 });
