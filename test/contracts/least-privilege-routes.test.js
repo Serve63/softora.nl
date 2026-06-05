@@ -12,6 +12,7 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   const mailboxRoutes = readRepoFile('server/routes/mailbox.js');
   const openAiCostRoutes = readRepoFile('server/routes/openai-costs.js');
   const supabaseCostRoutes = readRepoFile('server/routes/supabase-costs.js');
+  const supabaseMaintenanceRoutes = readRepoFile('server/routes/supabase-maintenance.js');
   const coldcallingRoutes = readRepoFile('server/routes/coldcalling.js');
   const coldmailingRoutes = readRepoFile('server/routes/coldmailing.js');
   const instantlyRoutes = readRepoFile('server/routes/instantly.js');
@@ -26,6 +27,11 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   assert.match(openAiCostRoutes, /app\.get\('\/api\/api-cost-diagnostics', requireAdmin,/);
   assert.match(supabaseCostRoutes, /app\.get\('\/api\/supabase\/cost-summary', requireAdmin,/);
   assert.match(supabaseCostRoutes, /app\.get\('\/api\/supabase\/cost-diagnostics', requireAdmin,/);
+  assert.match(supabaseMaintenanceRoutes, /createSupabaseMaintenanceAccessGuard/);
+  assert.match(
+    supabaseMaintenanceRoutes,
+    /app\.post\('\/api\/supabase\/database\/restart', requireMaintenance,/
+  );
   assert.match(coldmailingRoutes, /app\.post\('\/api\/coldmailing\/outreach\/status', requirePremiumAdminApiAccess,/);
   assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/sync', requirePremiumAdminApiAccess,/);
   assert.match(instantlyRoutes, /app\.get\('\/api\/instantly\/status', requirePremiumAdminApiAccess,/);
