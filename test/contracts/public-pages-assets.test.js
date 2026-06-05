@@ -6,7 +6,8 @@ const path = require('node:path');
 const { getStaticAssetCacheControl } = require('../../server/routes/public-pages');
 
 const REPO_ROOT = path.join(__dirname, '../..');
-const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260513a';
+const ICO_FAVICON_HREF = '/favicon.ico';
+const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260605a';
 
 test('public asset cache keeps unhashed app js/css fresh even with version query strings', () => {
   assert.equal(
@@ -32,12 +33,15 @@ test('public asset cache still allows immutable caching for hashed assets and me
 
 test('html pages use the round Softora favicon asset sitewide', () => {
   const faviconPath = path.join(REPO_ROOT, 'assets/softora-favicon-round.png');
+  const icoFaviconPath = path.join(REPO_ROOT, 'assets/favicon.ico');
   const pngSignature = fs.readFileSync(faviconPath).subarray(0, 8).toString('hex');
+  const icoSignature = fs.readFileSync(icoFaviconPath).subarray(0, 4).toString('hex');
   const htmlFiles = fs.readdirSync(REPO_ROOT).filter((name) => name.endsWith('.html'));
   const pagesWithFavicons = [];
   const oldFaviconPattern = /D80D8A58-B985-491E-A39B-27879E4C593A\.PNG\?v=20260414f/;
 
   assert.equal(pngSignature, '89504e470d0a1a0a');
+  assert.equal(icoSignature, '00000100');
 
   htmlFiles.forEach((fileName) => {
     const source = fs.readFileSync(path.join(REPO_ROOT, fileName), 'utf8');
@@ -46,8 +50,8 @@ test('html pages use the round Softora favicon asset sitewide', () => {
     pagesWithFavicons.push(fileName);
     assert.match(
       source,
-      new RegExp(`<link rel="icon" type="image/png" href="${ROUND_FAVICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" sizes="any">`),
-      `${fileName} should load the round favicon`
+      new RegExp(`<link rel="icon" href="${ICO_FAVICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" sizes="any">`),
+      `${fileName} should load the ico favicon`
     );
     assert.match(
       source,
