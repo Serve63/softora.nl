@@ -252,6 +252,7 @@ function createService(overrides = {}) {
       coldmailBlockPersonalMailboxDomains: overrides.coldmailBlockPersonalMailboxDomains,
       coldmailBounceProcessingEnabled: overrides.coldmailBounceProcessingEnabled,
     },
+    outboundRecipientGuardStore: overrides.outboundRecipientGuardStore,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -6159,6 +6160,149 @@ test('coldmail campaign blocks the same recipient across different sender mailbo
     }
   );
   assert.equal(second.sentMessages.length, 0);
+});
+
+test('coldmail campaign blocks the same company even when the email address differs', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'same-company-new-mailbox',
+        bedrijf: 'Cafetaria De Bank',
+        naam: 'Cafetaria De Bank',
+        email: 'contact@cafetariadebank.nl',
+        website: 'https://cafetariadebank.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: {
+      entries: [],
+      recipientEntries: [
+        {
+          at: '2026-06-05T17:32:00.000Z',
+          senderEmail: 'martijnven@websoftora.com',
+          recipientKey: 'email:info@cafetariadebank.nl',
+          recipientEmail: 'info@cafetariadebank.nl',
+          recipientDomain: 'cafetariadebank-nl',
+          recipientCompanyKey: 'cafetaria-de-bank',
+          recipientCompany: 'Cafetaria De Bank',
+          provider: 'instantly',
+          permanent: true,
+        },
+      ],
+    },
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({ count: 1 });
+  assert.equal(preview.selected, 0);
+  assert.equal(preview.failedItems[0].code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+  assert.match(preview.failedItems[0].error, /Instantly/);
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /Instantly/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+});
+
+test('coldmail campaign blocks recipients already reserved in the central outbound guard', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'central-guard-row',
+        bedrijf: 'Cafetaria De Bank',
+        naam: 'Cafetaria De Bank',
+        email: 'info@cafetariadebank.nl',
+        website: 'https://cafetariadebank.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => ({
+        guard_key: 'email:info@cafetariadebank.nl',
+        provider: 'instantly',
+        recipient_email: 'info@cafetariadebank.nl',
+        recipient_domain: 'cafetariadebank-nl',
+        recipient_company_key: 'cafetaria-de-bank',
+        recipient_company: 'Cafetaria De Bank',
+        permanent: true,
+        source: 'instantly-safe-manual-upload',
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+      assert.match(error.message, /Instantly/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+});
+
+test('coldmail campaign reserves the recipient centrally before SMTP send and confirms after accept', async () => {
+  const calls = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'reservation-row',
+        bedrijf: 'Reservation BV',
+        naam: 'Reservation BV',
+        email: 'info@reservation.example',
+        website: 'https://reservation.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ type: 'reserve', items, options });
+        return { ok: true, reservationId: 'reservation-1', count: items.length * 4 };
+      },
+      confirmReservation: async (reservationId, options) => {
+        calls.push({ type: 'confirm', reservationId, options });
+        return { ok: true };
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(calls[0].type, 'reserve');
+  assert.equal(calls[0].items[0].recipientEmail, 'info@reservation.example');
+  assert.equal(calls[0].options.provider, 'softora');
+  assert.equal(calls[0].options.channel, 'coldmail');
+  assert.equal(calls[1].type, 'confirm');
+  assert.equal(calls[1].reservationId, 'reservation-1');
+  assert.equal(calls[1].options.status, 'sent');
+  assert.equal(calls[1].options.permanent, true);
 });
 
 test('coldmail campaign keeps old Instantly recipient guards permanently', async () => {

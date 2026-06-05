@@ -40,6 +40,12 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Na iedere Instantly-aanvulling controleer je minimaal: Softora mail-ready telling omlaag, permanente Instantly-guards compleet, Instantly-campaign bevat het verwachte aantal nieuwe leads, en geen nieuwe duplicate/cross-channel overlap.
 - Als de veilige route faalt of geen CSV geeft: stoppen en onderzoeken. Niet via een alternatieve handmatige route alsnog uploaden.
 
+## Outbound duplicate-veiligheid
+- Bedrijven mogen nooit twee outbound-mails krijgen via verschillende kanalen. Iedere Softora/Gmail/Strato coldmail-send en iedere veilige Instantly-upload moet dezelfde centrale Supabase guard `softora_outbound_recipient_guards` gebruiken naast de bestaande JSON send_guard.
+- Reserveer ontvangers centraal voordat een extern effect plaatsvindt: vóór SMTP `sendMail`, vóór CSV-teruggave en vóór Instantly-upload. Bij conflict stop je de actie; niet later "corrigeren".
+- Bewaak meerdere identiteiten tegelijk: ontvanger-email, ontvanger-domein, company key en stabiel customer id. Alleen exact goedgekeurde test/demo-rijen mogen deze externe guard overslaan.
+- Als de centrale guard ontbreekt, faalt of conflict meldt, behandel dat als stopteken voor de betreffende outbound actie en onderzoek eerst. Maak geen handmatige CSV of losse resend buiten deze guard om.
+
 ## Softora coldmail dagtempo
 - De live Softora/Gmail/Strato coldmail-autopilot is bedoeld voor maximaal 9 mails per mailbox per werkdag. Met negen mailboxen is het totale dagdoel 81, niet 60.
 - Het veilige verzendvenster is 07:00-17:00 Europe/Amsterdam. De globale autopilot-interval hoort rond 5 minuten te staan zodat die geen dagcap-rem wordt; de spreiding per mailbox komt uit de dag-slot pacing in de scheduler met `senderMinIntervalMinutes=60` en `senderMaxIntervalMinutes=74`.

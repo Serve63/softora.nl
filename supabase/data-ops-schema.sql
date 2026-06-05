@@ -166,6 +166,41 @@ create index if not exists softora_mailbox_sync_state_status_idx
 create index if not exists softora_mailbox_sync_state_account_folder_idx
   on public.softora_mailbox_sync_state (account_email, folder);
 
+create table if not exists public.softora_outbound_recipient_guards (
+  guard_key text primary key,
+  key_type text not null,
+  key_value text not null,
+  reservation_id text,
+  provider text,
+  channel text,
+  sender_email text,
+  recipient_email text,
+  recipient_domain text,
+  recipient_company_key text,
+  recipient_id text,
+  recipient_company text,
+  status text not null default 'reserved',
+  source text not null default 'unknown',
+  actor text,
+  permanent boolean not null default false,
+  payload jsonb not null default '{}'::jsonb,
+  expires_at timestamptz,
+  last_seen_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists softora_outbound_recipient_guards_key_idx
+  on public.softora_outbound_recipient_guards (key_type, key_value);
+create index if not exists softora_outbound_recipient_guards_reservation_idx
+  on public.softora_outbound_recipient_guards (reservation_id);
+create index if not exists softora_outbound_recipient_guards_email_idx
+  on public.softora_outbound_recipient_guards (recipient_email);
+create index if not exists softora_outbound_recipient_guards_domain_idx
+  on public.softora_outbound_recipient_guards (recipient_domain);
+create index if not exists softora_outbound_recipient_guards_updated_at_idx
+  on public.softora_outbound_recipient_guards (updated_at desc);
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'softora-design-photos',

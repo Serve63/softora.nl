@@ -327,6 +327,7 @@ function createColdmailCampaignService(deps = {}) {
     mailConfig = {},
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
+    outboundRecipientGuardStore = null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     leadDbScope = DEFAULT_LEAD_DB_SCOPE,
@@ -352,6 +353,7 @@ function createColdmailCampaignService(deps = {}) {
     openAiApiBaseUrl = 'https://api.openai.com/v1',
     coldmailAutoReplyModel = 'gpt-5.5-pro',
     coldmailAutoReplyEnabled = false,
+    logger = console,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
@@ -1288,6 +1290,7 @@ function createColdmailCampaignService(deps = {}) {
       if (guard.recipientKey && entry.recipientKey === guard.recipientKey) return true;
       if (guard.recipientEmail && entry.recipientEmail === guard.recipientEmail) return true;
       if (guard.recipientDomain && entry.recipientDomain === guard.recipientDomain) return true;
+      if (guard.recipientCompanyKey && entry.recipientCompanyKey === guard.recipientCompanyKey) return true;
       if (guard.recipientId && entry.recipientId === guard.recipientId) return true;
       return false;
     }) || null;
@@ -1295,13 +1298,16 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildColdmailRecipientGuardFailure(item, match) {
     const sender = normalizeEmailAddress(match && match.senderEmail);
+    const provider = normalizeString(match && match.provider).toLowerCase();
     return {
       id: item && item.id,
       bedrijf: getRowCompany(item && item.row),
       email: getRowEmail(item && item.row),
       code: 'COLDMAIL_RECIPIENT_RECENTLY_SENT',
       error: isPermanentColdmailRecipientGuardEntry(match)
-        ? sender
+        ? provider === 'instantly'
+          ? 'Dit bedrijf/e-mailadres is al eerder gemaild of gereserveerd via Instantly.'
+          : sender
           ? `Dit bedrijf/e-mailadres is al eerder gemaild via ${sender}.`
           : 'Dit bedrijf/e-mailadres is al eerder gemaild.'
         : sender
@@ -1314,9 +1320,139 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(item && item.code) === 'COLDMAIL_RECIPIENT_RECENTLY_SENT';
   }
 
-  async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
+  function buildOutboundRecipientGuardIdentity(item) {
+    const guard = buildColdmailRecipientGuard(item && item.row, item && item.id);
+    return {
+      recipientKey: guard.recipientKey,
+      recipientEmail: guard.recipientEmail,
+      recipientDomain: guard.recipientDomain || normalizeColdmailGuardKeyPart(getEmailDomain(guard.recipientEmail)),
+      recipientCompanyKey: guard.recipientCompanyKey,
+      recipientId: guard.recipientId,
+      recipientCompany: guard.recipientCompany,
+    };
+  }
+
+  function buildSupabaseOutboundGuardFailure(item, match) {
+    return buildColdmailRecipientGuardFailure(item, {
+      at: normalizeString(match && (match.last_seen_at || match.updated_at || match.created_at)),
+      senderEmail: normalizeEmailAddress(match && match.sender_email),
+      recipientKey: normalizeString(match && match.guard_key),
+      recipientEmail: normalizeEmailAddress(match && match.recipient_email),
+      recipientDomain: normalizeColdmailGuardKeyPart(match && match.recipient_domain),
+      recipientCompanyKey: normalizeColdmailGuardKeyPart(match && match.recipient_company_key),
+      recipientId: normalizeColdmailGuardKeyPart(match && match.recipient_id),
+      recipientCompany: normalizeString(match && match.recipient_company),
+      permanent: Boolean(match && match.permanent),
+      provider: normalizeString(match && match.provider),
+      source: normalizeString(match && match.source),
+    });
+  }
+
+  async function getSupabaseOutboundRecipientBlock(item) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.findRecipientConflict !== 'function') {
+      return null;
+    }
+    const match = await outboundRecipientGuardStore.findRecipientConflict(buildOutboundRecipientGuardIdentity(item));
+    return match ? buildSupabaseOutboundGuardFailure(item, match) : null;
+  }
+
+  async function reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
+      return { ok: false, skipped: true };
+    }
+    const reservation = await outboundRecipientGuardStore.reserveRecipients(
+      [buildOutboundRecipientGuardIdentity(item)],
+      {
+        provider: 'softora',
+        channel: 'coldmail',
+        senderEmail,
+        source: 'softora-coldmail-pre-send',
+        actor,
+        status: 'reserved',
+        permanent: false,
+        payload: {
+          customerId: item && item.id,
+          bedrijf: getRowCompany(item && item.row),
+        },
+      }
+    );
+    if (reservation && reservation.conflict) {
+      return {
+        ok: false,
+        conflict: buildSupabaseOutboundGuardFailure(item, reservation.conflict),
+        reservationId: reservation.reservationId,
+      };
+    }
+    return reservation;
+  }
+
+  async function confirmSupabaseOutboundRecipientForColdmail(reservationId, sentItem) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
+      return;
+    }
+    if (!reservationId) return;
+    try {
+      await outboundRecipientGuardStore.confirmReservation(reservationId, {
+        status: 'sent',
+        permanent: true,
+        payload: {
+          messageId: sentItem && sentItem.messageId,
+          email: sentItem && sentItem.email,
+          bedrijf: sentItem && sentItem.bedrijf,
+        },
+      });
+    } catch (error) {
+      logger.warn('[OutboundRecipientGuard][coldmail-confirm]', error && error.message ? error.message : error);
+    }
+  }
+
+  function hasPriorOutboundMailSignal(row) {
+    if (!row || typeof row !== 'object') return false;
+    if (normalizeContactStatus(row.outreachStatus, row) === 'gemaild') return true;
+    if (normalizeString(row.lastColdmailSentAt || row.lastMailSentAt || row.outreachSentAt || row.outreach_sent_at)) {
+      return true;
+    }
+    if (normalizeString(row.coldmailSentMessageId || row.outreachMessageId || row.sentMessageId || row.messageId)) {
+      return true;
+    }
+    if (Number(row.coldmailOpenCount || row.outreachOpenCount || 0) > 0) return true;
+    if (row.coldmailOpened === true || row.outreachOpened === true) return true;
+    return (Array.isArray(row.hist) ? row.hist : []).some((entry) => {
+      const text = normalizeString([
+        entry && entry.type,
+        entry && entry.status,
+        entry && entry.label,
+        entry && entry.source,
+        entry && entry.subject,
+        entry && entry.preview,
+        entry && entry.messageKey,
+      ].join(' ')).toLowerCase();
+      return /\b(gemaild|mail verstuurd|coldmail|cold mailing|instantly|email sent|email opened|open tracking)\b/.test(text);
+    });
+  }
+
+  async function getColdmailOutboundDuplicateBlock(item, recipientGuardEntries = []) {
+    const email = getRowEmail(item && item.row);
+    if (isTestRecipientRow(item && item.row, email)) return null;
     const recipientGuardMatch = getColdmailRecipientGuardMatch(item, recipientGuardEntries);
     if (recipientGuardMatch) return buildColdmailRecipientGuardFailure(item, recipientGuardMatch);
+    const supabaseGuardMatch = await getSupabaseOutboundRecipientBlock(item);
+    if (supabaseGuardMatch) return supabaseGuardMatch;
+    if (hasPriorOutboundMailSignal(item && item.row)) {
+      return {
+        id: item && item.id,
+        bedrijf: getRowCompany(item && item.row),
+        email: getRowEmail(item && item.row),
+        code: 'COLDMAIL_RECIPIENT_RECENTLY_SENT',
+        error: 'Dit bedrijf/e-mailadres heeft al outbound mailhistorie en wordt niet opnieuw gemaild.',
+      };
+    }
+    return null;
+  }
+
+  async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
+    const duplicateBlock = await getColdmailOutboundDuplicateBlock(item, recipientGuardEntries);
+    if (duplicateBlock) return duplicateBlock;
     const email = getRowEmail(item && item.row);
     if (!isTestRecipientRow(item && item.row, email) && shouldBlockPersonalMailboxDomains() && isPersonalMailboxDomain(email)) {
       return {
@@ -3936,7 +4072,8 @@ function createColdmailCampaignService(deps = {}) {
     if (!isLikelyValidEmail(email)) return false;
     if (isEmailBlocked(email, blockedEmailKeys)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
-    if (hasActiveInstantlyColdmailOutreach(row)) return false;
+    if (!isTestRecipientRow(row, email) && hasActiveInstantlyColdmailOutreach(row)) return false;
+    if (!isTestRecipientRow(row, email) && hasPriorOutboundMailSignal(row)) return false;
     if (!matchesBranch(row, branchFilter)) return false;
     if (!matchesRadius(row, radiusKm)) return false;
     if (isTestRecipientRow(row, email)) return true;
@@ -4062,9 +4199,9 @@ function createColdmailCampaignService(deps = {}) {
         if (selectedRows.length >= count) break;
         continue;
       }
-      const recipientGuardMatch = getColdmailRecipientGuardMatch(item, recipientGuardEntries);
-      if (recipientGuardMatch) {
-        failed.push(buildColdmailRecipientGuardFailure(item, recipientGuardMatch));
+      const duplicateBlock = await getColdmailOutboundDuplicateBlock(item, recipientGuardEntries);
+      if (duplicateBlock) {
+        failed.push(duplicateBlock);
         continue;
       }
       const email = getRowEmail(item.row);
@@ -6466,6 +6603,13 @@ function createColdmailCampaignService(deps = {}) {
         if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
           mail.bcc = auditBcc;
         }
+        const outboundReservation = !isTestRecipientRow(row, to)
+          ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor)
+          : null;
+        if (outboundReservation && outboundReservation.conflict) {
+          failed.push(outboundReservation.conflict);
+          continue;
+        }
         const info = await transporter.sendMail(mail);
         const accepted = Array.isArray(info && info.accepted)
           ? info.accepted.map(normalizeEmailAddress).filter(Boolean)
@@ -6518,6 +6662,10 @@ function createColdmailCampaignService(deps = {}) {
           );
           rows = updatedRows;
           persistedSentRowIds.add(item.id);
+          await confirmSupabaseOutboundRecipientForColdmail(
+            outboundReservation && outboundReservation.reservationId,
+            sentItem
+          );
         }
       } catch (error) {
         failed.push({

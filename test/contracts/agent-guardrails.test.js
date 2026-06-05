@@ -485,6 +485,11 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /permanente `provider=instantly` recipient guards/);
   assert.match(agentsSource, /send_guard `entries` en `recipientEntries` nooit overschrijven/);
   assert.match(agentsSource, /vlak voor CSV-aanmaak moet opnieuw live/);
+  assert.match(agentsSource, /## Outbound duplicate-veiligheid/);
+  assert.match(agentsSource, /softora_outbound_recipient_guards/);
+  assert.match(agentsSource, /vóór SMTP `sendMail`/);
+  assert.match(agentsSource, /vóór CSV-teruggave/);
+  assert.match(agentsSource, /ontvanger-email, ontvanger-domein, company key en stabiel customer id/);
   assert.match(agentsSource, /## Softora coldmail dagtempo/);
   assert.match(agentsSource, /totale dagdoel 81/);
   assert.match(agentsSource, /verzendvenster is 07:00-17:00 Europe\/Amsterdam/);

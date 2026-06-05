@@ -1871,6 +1871,7 @@ function createInstantlyOutreachService(deps = {}) {
     instantlyConfig = {},
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
+    outboundRecipientGuardStore = null,
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
     fetchImageWithTimeout = defaultFetchImageWithTimeout,
     fetchPublicPreviewImage = defaultFetchPublicPreviewImageWithTimeout,
@@ -2152,6 +2153,7 @@ function createInstantlyOutreachService(deps = {}) {
     const index = {
       emails: new Set(),
       domains: new Set(),
+      companyKeys: new Set(),
       ids: new Set(),
       keys: new Set(),
     };
@@ -2163,6 +2165,10 @@ function createInstantlyOutreachService(deps = {}) {
       if (!entry || typeof entry !== 'object') return;
       const email = normalizeEmailAddress(entry.recipientEmail || entry.email, normalizeString);
       const domain = normalizeColdmailGuardKeyPart(entry.recipientDomain || entry.domain || entry.websiteDomain, normalizeString);
+      const companyKey = normalizeColdmailGuardKeyPart(
+        entry.recipientCompanyKey || entry.companyKey || entry.company || entry.recipientCompany,
+        normalizeString
+      );
       const id = normalizeColdmailGuardKeyPart(entry.recipientId || entry.customerId || entry.id, normalizeString);
       const key = normalizeColdmailGuardKeyPart(entry.recipientKey || entry.key, normalizeString);
       if (email) {
@@ -2170,6 +2176,7 @@ function createInstantlyOutreachService(deps = {}) {
         index.keys.add(`email:${email}`);
       }
       if (domain) index.domains.add(domain);
+      if (companyKey) index.companyKeys.add(companyKey);
       if (id) index.ids.add(id);
       if (key) index.keys.add(key);
     });
@@ -2244,12 +2251,77 @@ function createInstantlyOutreachService(deps = {}) {
     const row = item && item.row;
     const email = getRowEmail(row, normalizeString);
     const domain = normalizeColdmailGuardKeyPart(getRowDomain(row, normalizeString) || getEmailDomain(email), normalizeString);
+    const companyKey = normalizeColdmailGuardKeyPart(getRowCompany(row, normalizeString), normalizeString);
     const id = normalizeColdmailGuardKeyPart(item && item.id, normalizeString);
     return Boolean(
       (email && (guardIndex.emails.has(email) || guardIndex.keys.has(`email:${email}`))) ||
         (domain && guardIndex.domains.has(domain)) ||
+        (companyKey && guardIndex.companyKeys && guardIndex.companyKeys.has(companyKey)) ||
         (id && guardIndex.ids.has(id))
     );
+  }
+
+  function buildOutboundRecipientGuardIdentity(item) {
+    const row = item && item.row;
+    const email = getRowEmail(row, normalizeString);
+    const domain = getRowDomain(row, normalizeString) || getEmailDomain(email);
+    const company = getRowCompany(row, normalizeString);
+    return {
+      recipientKey: email ? `email:${email}` : '',
+      recipientEmail: email,
+      recipientDomain: normalizeColdmailGuardKeyPart(domain, normalizeString),
+      recipientCompanyKey: normalizeColdmailGuardKeyPart(company, normalizeString),
+      recipientId: normalizeColdmailGuardKeyPart(item && item.id, normalizeString),
+      recipientCompany: company,
+    };
+  }
+
+  function buildSupabaseOutboundGuardFailure(item, match) {
+    return {
+      id: item && item.id,
+      bedrijf: getRowCompany(item && item.row, normalizeString),
+      email: getRowEmail(item && item.row, normalizeString),
+      error:
+        normalizeString(match && match.provider).toLowerCase() === 'instantly'
+          ? 'Lead staat al in de centrale Instantly/Softora duplicate-guard; niet opnieuw naar Instantly gestuurd.'
+          : 'Lead staat al in de centrale outbound duplicate-guard; niet opnieuw naar Instantly gestuurd.',
+    };
+  }
+
+  async function getSupabaseOutboundRecipientBlock(item) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.findRecipientConflict !== 'function') {
+      return null;
+    }
+    const match = await outboundRecipientGuardStore.findRecipientConflict(buildOutboundRecipientGuardIdentity(item));
+    return match ? buildSupabaseOutboundGuardFailure(item, match) : null;
+  }
+
+  async function reserveSupabaseOutboundRecipientsForInstantly(items, options = {}) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
+      return { ok: false, skipped: true };
+    }
+    const identities = (Array.isArray(items) ? items : []).map(buildOutboundRecipientGuardIdentity);
+    const reservation = await outboundRecipientGuardStore.reserveRecipients(identities, {
+      provider: 'instantly',
+      channel: 'instantly',
+      source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+      actor: options.actor,
+      campaignId: options.campaignId,
+      uploadId: options.uploadId,
+      status: 'queued',
+      permanent: true,
+      payload: {
+        campaignId: options.campaignId,
+        uploadId: options.uploadId,
+      },
+    });
+    if (reservation && reservation.conflict) {
+      return {
+        ...reservation,
+        conflictFailure: buildSupabaseOutboundGuardFailure(items[0], reservation.conflict),
+      };
+    }
+    return reservation;
   }
 
   async function loadPersonalizationContext(rows = []) {
@@ -2297,6 +2369,11 @@ function createInstantlyOutreachService(deps = {}) {
           email,
           error: 'Lead staat al in de permanente duplicate-guard; niet opnieuw naar Instantly gestuurd.',
         });
+        continue;
+      }
+      const supabaseGuardMatch = await getSupabaseOutboundRecipientBlock({ id, index, row });
+      if (supabaseGuardMatch) {
+        failed.push(supabaseGuardMatch);
         continue;
       }
       if (hasPriorColdmailOutreach(row)) {
@@ -3130,6 +3207,30 @@ function createInstantlyOutreachService(deps = {}) {
       leads = safeLeads;
     }
 
+    let outboundReservation = null;
+    if (sendableRows.length) {
+      outboundReservation = await reserveSupabaseOutboundRecipientsForInstantly(sendableRows, {
+        actor,
+        campaignId,
+        uploadId,
+      });
+      if (outboundReservation && outboundReservation.conflict) {
+        const stillSafeRows = [];
+        const stillSafeLeads = [];
+        for (const [index, item] of sendableRows.entries()) {
+          const supabaseGuardMatch = await getSupabaseOutboundRecipientBlock(item);
+          if (supabaseGuardMatch) {
+            failed.push(supabaseGuardMatch);
+            continue;
+          }
+          stillSafeRows.push(item);
+          stillSafeLeads.push(leads[index]);
+        }
+        sendableRows = stillSafeRows;
+        leads = stillSafeLeads;
+      }
+    }
+
     if (sendableRows.length < limit) {
       const available = sendableRows.length;
       lastSyncResult = {
@@ -3181,6 +3282,7 @@ function createInstantlyOutreachService(deps = {}) {
       prepared: sendableRows.length,
       markedBenaderd: sendableRows.length,
       permanentGuards: guardWrite.count,
+      centralGuards: outboundReservation && outboundReservation.ok ? outboundReservation.count : 0,
       failed,
       campaignId,
       uploadId,
