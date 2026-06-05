@@ -6,6 +6,14 @@ const { createInstantlyOutreachService } = require('./instantly-outreach');
 
 const DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
 
+function isTransientDataOpsUiStateReadError(error) {
+  const text = String(error?.message || error?.details || error?.hint || error?.code || error || '').trim();
+  return (
+    error?.code === 'DATA_OPS_FEATURE_UI_STATE_TIMEOUT' ||
+    /abort|timeout|timed out|statement timeout|504|522|fetch failed|network|econnreset|etimedout|connection terminated|temporar/i.test(text)
+  );
+}
+
 async function awaitDataOpsUiStateWithTimeout(promise, scope) {
   let timeoutId = null;
   try {
@@ -13,11 +21,11 @@ async function awaitDataOpsUiStateWithTimeout(promise, scope) {
       Promise.resolve(promise),
       new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
-          reject(
-            new Error(
-              `DataOps UI-state read timeout na ${Math.round(DATA_OPS_UI_STATE_READ_TIMEOUT_MS / 1000)}s voor ${scope}`
-            )
+          const error = new Error(
+            `DataOps UI-state read timeout na ${Math.round(DATA_OPS_UI_STATE_READ_TIMEOUT_MS / 1000)}s voor ${scope}`
           );
+          error.code = 'DATA_OPS_FEATURE_UI_STATE_TIMEOUT';
+          reject(error);
         }, DATA_OPS_UI_STATE_READ_TIMEOUT_MS);
       }),
     ]);
@@ -50,6 +58,10 @@ function createDataOpsAwareUiStateGetter(uiSeoRuntime = {}) {
         if (bridged) return bridged;
       } catch (error) {
         console.warn('[DataOps][feature-ui-state-fallback]', error?.message || error);
+        if (isTransientDataOpsUiStateReadError(error)) {
+          console.warn('[DataOps][feature-ui-state-skip-legacy]', scope);
+          return null;
+        }
       }
     }
     return legacyGetUiStateValues(scope, ...args);

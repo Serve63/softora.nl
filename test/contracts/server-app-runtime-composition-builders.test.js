@@ -74,11 +74,12 @@ test('server app feature wiring writes data-ops scopes through the bridge first'
   assert.deepEqual(calls.map((call) => call.target), ['bridge', 'legacy']);
 });
 
-test('server app feature wiring falls back when data-ops ui-state reads hang', async (t) => {
+test('server app feature wiring skips legacy fallback when data-ops ui-state reads hang', async (t) => {
   const originalSetTimeout = global.setTimeout;
   const originalClearTimeout = global.clearTimeout;
   const originalWarn = console.warn;
   const warnings = [];
+  let legacyRead = false;
   t.after(() => {
     global.setTimeout = originalSetTimeout;
     global.clearTimeout = originalClearTimeout;
@@ -92,7 +93,10 @@ test('server app feature wiring falls back when data-ops ui-state reads hang', a
   console.warn = (...args) => warnings.push(args);
 
   const getter = featureCompositionBuilders.createDataOpsAwareUiStateGetter({
-    getUiStateValues: async (scope) => ({ source: 'legacy', scope }),
+    getUiStateValues: async (scope) => {
+      legacyRead = true;
+      return { source: 'legacy', scope };
+    },
     dataOpsUiStateBridge: {
       canHandleScope: (scope) => scope === 'premium_customers',
       getUiStateValues: async () => new Promise(() => {}),
@@ -101,9 +105,10 @@ test('server app feature wiring falls back when data-ops ui-state reads hang', a
 
   const state = await getter('premium_customers');
 
-  assert.equal(state.source, 'legacy');
-  assert.equal(state.scope, 'premium_customers');
+  assert.equal(state, null);
+  assert.equal(legacyRead, false);
   assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
+  assert.match(String(warnings[1]?.[0] || ''), /skip-legacy/);
 });
 
 test('server app agenda bootstrap ui-state reads are timeboxed before legacy fallback', () => {

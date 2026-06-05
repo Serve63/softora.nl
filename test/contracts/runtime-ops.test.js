@@ -249,15 +249,19 @@ test('runtime ops coordinator prefers structured data ops reads and mirrors writ
   assert.equal(bridgeCalls[2].meta.source, 'premium-klanten');
 });
 
-test('runtime ops coordinator falls back to legacy ui-state when structured data ops reads hang', async () => {
+test('runtime ops coordinator skips legacy ui-state when structured data ops reads hang', async () => {
   const warnings = [];
+  let legacyRead = false;
   const { coordinator } = createFixture({
     dataOpsUiStateReadTimeoutMs: 5,
-    getUiStateValues: async () => ({
-      values: { softora_customers_premium_v1: '[{"id":"legacy-cust"}]' },
-      source: 'memory',
-      updatedAt: null,
-    }),
+    getUiStateValues: async () => {
+      legacyRead = true;
+      return {
+        values: { softora_customers_premium_v1: '[{"id":"legacy-cust"}]' },
+        source: 'memory',
+        updatedAt: null,
+      };
+    },
     dataOpsUiStateBridge: {
       canHandleScope: (scope) => scope === 'premium_customers_database',
       getUiStateValues: async () => new Promise(() => {}),
@@ -272,9 +276,8 @@ test('runtime ops coordinator falls back to legacy ui-state when structured data
 
   await coordinator.sendUiStateGetResponse({}, res, 'premium_customers_database');
 
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.source, 'memory');
-  assert.equal(res.body.values.softora_customers_premium_v1, '[{"id":"legacy-cust"}]');
+  assert.equal(res.statusCode, 503);
+  assert.equal(legacyRead, false);
   assert.ok(Date.now() - startedAt < 500);
   assert.match(String(warnings[0]?.[0] || ''), /DataOps/);
 });

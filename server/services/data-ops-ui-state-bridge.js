@@ -106,6 +106,15 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     }
   }
 
+  function isStructuredReadCooldownActive() {
+    if (!store || typeof store.getReadFailureCooldownStatus !== 'function') return false;
+    return Boolean(store.getReadFailureCooldownStatus().active);
+  }
+
+  function shouldSkipLegacyAfterStructuredReadFailure() {
+    return isStructuredReadCooldownActive();
+  }
+
   function buildState(scope, values, source = 'supabase:data_ops') {
     return {
       values: values && typeof values === 'object' ? values : {},
@@ -239,6 +248,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
   async function getCustomersState(legacyGetUiStateValues) {
     const customers = await store.listCustomers();
     if (!customers || customers.length === 0) {
+      if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
       return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.customers, 'customers-fallback');
     }
     const legacy = legacyContactMergeEnabled
@@ -258,6 +268,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     const hasOrders = Array.isArray(orders) && orders.length > 0;
     const hasRuntime = runtime && typeof runtime === 'object' && Object.keys(runtime).length > 0;
     if (!hasOrders && !hasRuntime) {
+      if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
       return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.activeOrders, 'active-orders-fallback');
     }
     return buildState(SCOPES.activeOrders, {
@@ -342,8 +353,12 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     const entries = typeof store.listDesignPhotosWithSignedUrls === 'function'
       ? await store.listDesignPhotosWithSignedUrls()
       : await store.listDesignPhotosWithDataUrls();
-    if (!entries) return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-fallback');
+    if (!entries) {
+      if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
+      return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-fallback');
+    }
     if (entries.length === 0 && !entries.hadStructuredRows) {
+      if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
       return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.photos, 'photos-empty-fallback');
     }
     return buildState(SCOPES.photos, buildPhotoCompatValues(entries));
@@ -358,6 +373,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     } catch (error) {
       logger.error('[DataOps][ui-state-get]', error?.message || error);
     }
+    if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
     return readLegacyWithTimeout(options.legacyGetUiStateValues, scope, 'error-fallback');
   }
 
