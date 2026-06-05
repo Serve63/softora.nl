@@ -148,7 +148,7 @@ test('seo content linkt op publicatiedatum niet naar future-dated content', () =
   const brokenLinks = pages.flatMap((page) =>
     extractInternalLinksFromHtml(page.html)
       .filter((href) => !href.startsWith('/assets/'))
-      .filter((href) => href !== '/favicon.ico')
+      .filter((href) => !href.startsWith('/favicon.ico'))
       .filter((href) => !publicPaths.has(href))
       .map((href) => `${page.path} -> ${href}`)
   );
@@ -180,7 +180,7 @@ test('seo content renders the existing blog visual language with real links', ()
   });
 
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog">/);
-  assert.match(html, /<link rel="icon" href="\/favicon\.ico" sizes="any">/);
+  assert.match(html, /<link rel="icon" href="\/favicon\.ico\?v=20260605b" sizes="any">/);
   assert.match(html, /<meta name="robots" content="index, follow">/);
   assert.match(html, /data-softora-public-seo="structured-data"/);
   assert.match(html, /class="hero-banner"/);
