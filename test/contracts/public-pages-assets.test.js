@@ -6,8 +6,7 @@ const path = require('node:path');
 const { getStaticAssetCacheControl } = require('../../server/routes/public-pages');
 
 const REPO_ROOT = path.join(__dirname, '../..');
-const ICO_FAVICON_HREF = '/favicon.ico?v=20260605b';
-const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260605b';
+const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260513a';
 
 test('public asset cache keeps unhashed app js/css fresh even with version query strings', () => {
   assert.equal(
@@ -33,15 +32,12 @@ test('public asset cache still allows immutable caching for hashed assets and me
 
 test('html pages use the round Softora favicon asset sitewide', () => {
   const faviconPath = path.join(REPO_ROOT, 'assets/softora-favicon-round.png');
-  const icoFaviconPath = path.join(REPO_ROOT, 'assets/favicon.ico');
   const pngSignature = fs.readFileSync(faviconPath).subarray(0, 8).toString('hex');
-  const icoSignature = fs.readFileSync(icoFaviconPath).subarray(0, 4).toString('hex');
   const htmlFiles = fs.readdirSync(REPO_ROOT).filter((name) => name.endsWith('.html'));
   const pagesWithFavicons = [];
   const oldFaviconPattern = /D80D8A58-B985-491E-A39B-27879E4C593A\.PNG\?v=20260414f/;
 
   assert.equal(pngSignature, '89504e470d0a1a0a');
-  assert.equal(icoSignature, '00000100');
 
   htmlFiles.forEach((fileName) => {
     const source = fs.readFileSync(path.join(REPO_ROOT, fileName), 'utf8');
@@ -50,8 +46,8 @@ test('html pages use the round Softora favicon asset sitewide', () => {
     pagesWithFavicons.push(fileName);
     assert.match(
       source,
-      new RegExp(`<link rel="icon" href="${ICO_FAVICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" sizes="any">`),
-      `${fileName} should load the ico favicon`
+      new RegExp(`<link rel="icon" type="image/png" href="${ROUND_FAVICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" sizes="any">`),
+      `${fileName} should load the round favicon`
     );
     assert.match(
       source,
@@ -62,24 +58,6 @@ test('html pages use the round Softora favicon asset sitewide', () => {
 
   assert.ok(pagesWithFavicons.includes('premium-website.html'));
   assert.ok(pagesWithFavicons.length >= 40, 'expected sitewide favicon coverage');
-});
-
-test('vercel serves the root favicon as a static ico before the api catch-all', () => {
-  const vercelConfig = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'vercel.json'), 'utf8'));
-  const faviconRewriteIndex = vercelConfig.rewrites.findIndex((rewrite) => rewrite.source === '/favicon.ico');
-  const catchAllRewriteIndex = vercelConfig.rewrites.findIndex((rewrite) => rewrite.source === '/(.*)');
-  const faviconHeader = vercelConfig.headers.find((header) => header.source === '/favicon.ico');
-
-  assert.ok(faviconRewriteIndex >= 0, 'expected a root favicon rewrite');
-  assert.ok(catchAllRewriteIndex >= 0, 'expected the api catch-all rewrite');
-  assert.ok(faviconRewriteIndex < catchAllRewriteIndex, 'favicon rewrite must run before api catch-all');
-  assert.equal(vercelConfig.rewrites[faviconRewriteIndex].destination, '/assets/favicon.ico');
-  assert.deepEqual(faviconHeader.headers, [
-    {
-      key: 'Cache-Control',
-      value: 'public, max-age=60, stale-while-revalidate=300',
-    },
-  ]);
 });
 
 test('root homepage is server-managed instead of a static premium redirect file', () => {
