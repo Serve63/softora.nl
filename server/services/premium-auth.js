@@ -36,7 +36,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     getClientIpFromRequest = () => '',
     getRequestPathname = () => '/',
     getRequestOriginFromHeaders = () => '',
-    premiumLoginUsersReadTimeoutMs = 1200,
+    premiumLoginUsersReadTimeoutMs = 450,
   } = deps;
 
   function getRequestUserAgent(req) {
@@ -148,7 +148,7 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   function getLoginUsersReadTimeoutMs() {
-    return Math.max(500, Math.min(2500, Number(premiumLoginUsersReadTimeoutMs) || 1200));
+    return Math.max(250, Math.min(900, Number(premiumLoginUsersReadTimeoutMs) || 450));
   }
 
   async function loadUsersForLogin() {
@@ -221,8 +221,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
 
     res.setHeader('Cache-Control', 'no-store, private');
 
-    const { hydrated, users } = await loadUsersForLogin();
-
     if (!sessionSecret) {
       appendAuditEvent(
         req,
@@ -239,29 +237,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
         ok: false,
         error:
           'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Zet PREMIUM_SESSION_SECRET opnieuw in de productie-omgeving.',
-      });
-    }
-
-    if (users.length === 0) {
-      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
-      appendAuditEvent(
-        req,
-        {
-          type: 'login_rejected',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: isTemporaryUserStoreFailure
-            ? 'Premium login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
-            : 'Premium login niet geconfigureerd: geen premium gebruikers gevonden.',
-        },
-        'security_login_rejected'
-      );
-      return res.status(503).json({
-        ok: false,
-        error: isTemporaryUserStoreFailure
-          ? 'Premium login is tijdelijk niet beschikbaar omdat de gebruikerslijst niet kon worden geladen. Probeer het zo opnieuw.'
-          : 'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase.',
       });
     }
 
@@ -298,6 +273,31 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       return res.status(400).json({
         ok: false,
         error: 'Vul je e-mailadres en wachtwoord in.',
+      });
+    }
+
+    const { hydrated, users } = await loadUsersForLogin();
+
+    if (users.length === 0) {
+      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
+      appendAuditEvent(
+        req,
+        {
+          type: 'login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: isTemporaryUserStoreFailure
+            ? 'Premium login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
+            : 'Premium login niet geconfigureerd: geen premium gebruikers gevonden.',
+        },
+        'security_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error: isTemporaryUserStoreFailure
+          ? 'Premium login is tijdelijk niet beschikbaar omdat de gebruikerslijst niet kon worden geladen. Probeer het zo opnieuw.'
+          : 'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase.',
       });
     }
 
@@ -408,8 +408,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
 
     res.setHeader('Cache-Control', 'no-store, private');
 
-    const { hydrated, users } = await loadUsersForLogin();
-
     if (!sessionSecret) {
       appendAuditEvent(
         req,
@@ -448,29 +446,6 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       });
     }
 
-    if (users.length === 0) {
-      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
-      appendAuditEvent(
-        req,
-        {
-          type: 'agenda_app_login_rejected',
-          severity: 'warning',
-          success: false,
-          email,
-          detail: isTemporaryUserStoreFailure
-            ? 'Agenda-app login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
-            : 'Agenda-app login niet geconfigureerd: geen premium gebruikers gevonden.',
-        },
-        'security_agenda_app_login_rejected'
-      );
-      return res.status(503).json({
-        ok: false,
-        error: isTemporaryUserStoreFailure
-          ? 'Agenda-app toegang is tijdelijk niet beschikbaar. Probeer het zo opnieuw.'
-          : 'Agenda-app toegang is nog niet volledig ingesteld op de server.',
-      });
-    }
-
     if (!identity || !email) {
       appendAuditEvent(
         req,
@@ -504,6 +479,31 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
       return res.status(400).json({
         ok: false,
         error: 'Vul je pincode in.',
+      });
+    }
+
+    const { hydrated, users } = await loadUsersForLogin();
+
+    if (users.length === 0) {
+      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
+      appendAuditEvent(
+        req,
+        {
+          type: 'agenda_app_login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: isTemporaryUserStoreFailure
+            ? 'Agenda-app login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
+            : 'Agenda-app login niet geconfigureerd: geen premium gebruikers gevonden.',
+        },
+        'security_agenda_app_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error: isTemporaryUserStoreFailure
+          ? 'Agenda-app toegang is tijdelijk niet beschikbaar. Probeer het zo opnieuw.'
+          : 'Agenda-app toegang is nog niet volledig ingesteld op de server.',
       });
     }
 
