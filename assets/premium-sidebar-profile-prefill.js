@@ -126,6 +126,14 @@
         return String(value || "").trim().split(/\s+/).filter(Boolean).length;
     }
 
+    function buildDisplayNameFromParts(firstName, lastName, fallbackValue) {
+        return [firstName, lastName]
+            .map(function (part) { return String(part || "").trim(); })
+            .filter(Boolean)
+            .join(" ")
+            || String(fallbackValue || "").trim();
+    }
+
     function chooseRicherDisplayName(primaryValue, fallbackValue) {
         var primary = String(primaryValue || "").trim();
         var fallback = String(fallbackValue || "").trim();
@@ -187,13 +195,40 @@
         var profileUser = profilePayload && profilePayload.ok && profilePayload.user && typeof profilePayload.user === "object"
             ? profilePayload.user
             : null;
-        if (!profileUser) return merged;
+        var profileSession = profilePayload && profilePayload.ok && profilePayload.session && typeof profilePayload.session === "object"
+            ? profilePayload.session
+            : null;
+        if (!profileUser && !profileSession) return merged;
+        var firstName = String(
+            (profileSession && (profileSession.firstName || profileSession.voornaam)) ||
+            (profileUser && (profileUser.firstName || profileUser.voornaam)) ||
+            (merged && merged.firstName) ||
+            ""
+        ).trim();
+        var lastName = String(
+            (profileSession && (profileSession.lastName || profileSession.achternaam)) ||
+            (profileUser && (profileUser.lastName || profileUser.achternaam)) ||
+            (merged && merged.lastName) ||
+            ""
+        ).trim();
+        var displayName = String(
+            (profileSession && profileSession.displayName) ||
+            (profileUser && profileUser.displayName) ||
+            buildDisplayNameFromParts(firstName, lastName, "") ||
+            (merged && merged.displayName) ||
+            ""
+        ).trim();
         return mergeSessions({
             ...merged,
-            displayName: String(profileUser.displayName || (merged && merged.displayName) || "").trim(),
-            firstName: String(profileUser.voornaam || profileUser.firstName || (merged && merged.firstName) || "").trim(),
-            lastName: String(profileUser.achternaam || profileUser.lastName || (merged && merged.lastName) || "").trim(),
-            avatarDataUrl: String(profileUser.avatarDataUrl || (merged && merged.avatarDataUrl) || "").trim(),
+            displayName: displayName,
+            firstName: firstName,
+            lastName: lastName,
+            avatarDataUrl: String(
+                (profileSession && profileSession.avatarDataUrl) ||
+                (profileUser && profileUser.avatarDataUrl) ||
+                (merged && merged.avatarDataUrl) ||
+                ""
+            ).trim(),
         }, merged);
     }
 
@@ -202,41 +237,45 @@
         prefillPremiumSidebarScrollState();
 
         var raw = sessionStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        var s = JSON.parse(raw);
-        if (!s || typeof s !== "object" || !s.authenticated) return;
-        persistedSessionSnapshot = s;
+        if (raw) {
+            var s = JSON.parse(raw);
+            if (s && typeof s === "object" && s.authenticated) {
+                persistedSessionSnapshot = s;
 
-        var nameEl = document.querySelector("[data-sidebar-user-name]");
-        var roleEl = document.querySelector("[data-sidebar-user-role]");
-        var avatarEl = document.querySelector("[data-sidebar-avatar]");
-        var profileWrapEl = document.querySelector(".sidebar-user .sidebar-user-trigger");
-        var sidebarEl = document.querySelector(".sidebar");
-        if (sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-render-key") || "").trim()) return;
-        var renderKey = buildProfileRenderKey(s);
+                var nameEl = document.querySelector("[data-sidebar-user-name]");
+                var roleEl = document.querySelector("[data-sidebar-user-role]");
+                var avatarEl = document.querySelector("[data-sidebar-avatar]");
+                var profileWrapEl = document.querySelector(".sidebar-user .sidebar-user-trigger");
+                var sidebarEl = document.querySelector(".sidebar");
+                var hasServerRenderedProfile = sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-render-key") || "").trim();
+                if (!hasServerRenderedProfile) {
+                    var renderKey = buildProfileRenderKey(s);
 
-        var displayName = String(s.displayName || "Softora Premium");
-        if (nameEl) nameEl.textContent = displayName;
-        if (roleEl) roleEl.textContent = roleLabel(s.role);
-        if (profileWrapEl) {
-            profileWrapEl.setAttribute("aria-label", "Ingelogd als " + displayName);
-        }
-        if (avatarEl) {
-            var url = String(s.avatarDataUrl || "").trim();
-            avatarEl.replaceChildren();
-            if (url) {
-                var img = document.createElement("img");
-                img.src = url;
-                img.alt = String(s.displayName || "Profielfoto");
-                img.loading = "eager";
-                img.setAttribute("decoding", "async");
-                avatarEl.appendChild(img);
-            } else {
-                avatarEl.textContent = initialsFromSession(s);
+                    var displayName = String(s.displayName || "Softora Premium");
+                    if (nameEl) nameEl.textContent = displayName;
+                    if (roleEl) roleEl.textContent = roleLabel(s.role);
+                    if (profileWrapEl) {
+                        profileWrapEl.setAttribute("aria-label", "Ingelogd als " + displayName);
+                    }
+                    if (avatarEl) {
+                        var url = String(s.avatarDataUrl || "").trim();
+                        avatarEl.replaceChildren();
+                        if (url) {
+                            var img = document.createElement("img");
+                            img.src = url;
+                            img.alt = String(s.displayName || "Profielfoto");
+                            img.loading = "eager";
+                            img.setAttribute("decoding", "async");
+                            avatarEl.appendChild(img);
+                        } else {
+                            avatarEl.textContent = initialsFromSession(s);
+                        }
+                    }
+                    if (sidebarEl) {
+                        sidebarEl.setAttribute("data-sidebar-profile-render-key", renderKey);
+                    }
+                }
             }
-        }
-        if (sidebarEl) {
-            sidebarEl.setAttribute("data-sidebar-profile-render-key", renderKey);
         }
     } catch (_) {
         /* ignore */

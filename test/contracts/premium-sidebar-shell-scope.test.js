@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
 
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
@@ -267,6 +268,69 @@ test('premium dashboard keeps its first-paint boot overlay in the shell contract
   assert.match(coreSource, /root\.addEventListener\('pageshow', function \(event\) \{/);
   assert.match(coreSource, /event\.persisted[\s\S]*showPremiumDashboardBootShellForMinimum\(PREMIUM_DASHBOARD_BOOT_MINIMUM_MS\);/);
   assert.match(coreSource, /root\.addEventListener\('error', releaseAfterMinimum\);/);
+});
+
+test('premium sidebar profile helper stays available when tab profile cache is empty', async () => {
+  const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
+  const context = {
+    window: {
+      location: {
+        pathname: '/premium-personeel-dashboard',
+        hash: '',
+      },
+    },
+    document: {
+      cookie: '',
+      querySelector: () => null,
+    },
+    sessionStorage: {
+      getItem: () => null,
+    },
+  };
+  context.window.window = context.window;
+  context.window.document = context.document;
+  context.window.sessionStorage = context.sessionStorage;
+
+  vm.runInNewContext(prefillSource, context);
+
+  const helper = context.window.SoftoraPremiumSidebarProfileSession;
+  assert.equal(typeof helper?.enrichSession, 'function');
+
+  const enriched = await helper.enrichSession(
+    {
+      ok: true,
+      authenticated: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_serve',
+      displayName: 'serve@softora.nl',
+      avatarDataUrl: '',
+      role: 'admin',
+    },
+    async () => ({
+      ok: true,
+      user: {
+        id: 'usr_serve',
+        email: 'serve@softora.nl',
+        firstName: 'Servé',
+        lastName: 'Creusen',
+        avatarDataUrl: 'data:image/png;base64,abcd',
+      },
+      session: {
+        ok: true,
+        authenticated: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_serve',
+        firstName: 'Servé',
+        lastName: 'Creusen',
+        displayName: 'Servé Creusen',
+        avatarDataUrl: 'data:image/png;base64,abcd',
+        role: 'admin',
+      },
+    })
+  );
+
+  assert.equal(enriched.displayName, 'Servé Creusen');
+  assert.equal(enriched.avatarDataUrl, 'data:image/png;base64,abcd');
 });
 
 test('custom premium layouts stay outside the shared sidebar shell', () => {
