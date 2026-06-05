@@ -486,6 +486,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /## Softora coldmail dagtempo/);
   assert.match(agentsSource, /totale dagdoel 81/);
   assert.match(agentsSource, /verzendvenster is 07:00-17:00 Europe\/Amsterdam/);
+  assert.match(agentsSource, /dag-slot pacing/);
+  assert.match(agentsSource, /senderMinIntervalMinutes=60/);
+  assert.match(agentsSource, /senderMaxIntervalMinutes=74/);
+  assert.match(agentsSource, /9 dag-slots per mailbox/);
   assert.match(protocolSource, /Productie deploys lopen alleen via `npm run deploy:production`/);
   assert.match(protocolSource, /check:live-production-version/);
   assert.match(protocolSource, /Elke push\/merge naar `main`/);

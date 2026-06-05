@@ -48,8 +48,8 @@ const DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE = 'Europe/Amsterdam';
 const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 7;
 const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 17;
 const DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES = 5;
-const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 70;
-const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 82;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 60;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 74;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS = 45;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS = 240;
 const MAX_COLDMAIL_RADIUS_KM = 500;
@@ -2750,18 +2750,18 @@ function createColdmailCampaignService(deps = {}) {
       1,
       24
     );
-    const senderMinIntervalMinutes = parsePositiveInt(
+    const senderMinIntervalMinutesRaw = parsePositiveInt(
       raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
       DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES,
       0,
       240
     );
-    const senderMaxIntervalMinutes = parsePositiveInt(
+    const senderMaxIntervalMinutesRaw = parsePositiveInt(
       raw.senderMaxIntervalMinutes ?? raw.senderCooldownMaxMinutes ?? raw.mailboxMaxIntervalMinutes,
       hasSenderMinInterval
-        ? senderMinIntervalMinutes
-        : Math.max(senderMinIntervalMinutes, DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES),
-      senderMinIntervalMinutes,
+        ? senderMinIntervalMinutesRaw
+        : Math.max(senderMinIntervalMinutesRaw, DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES),
+      senderMinIntervalMinutesRaw,
       240
     );
     const sendJitterMinSeconds = parsePositiveInt(
@@ -2778,6 +2778,24 @@ function createColdmailCampaignService(deps = {}) {
       sendJitterMinSeconds,
       300
     );
+    const minIntervalMinutes = parsePositiveInt(
+      raw.minIntervalMinutes,
+      DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
+      5,
+      240
+    );
+    const isLegacyWorkdayPace =
+      startHour === DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR &&
+      endHour === DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR &&
+      minIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES &&
+      senderMinIntervalMinutesRaw === 70 &&
+      senderMaxIntervalMinutesRaw === 82;
+    const senderMinIntervalMinutes = isLegacyWorkdayPace
+      ? DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES
+      : senderMinIntervalMinutesRaw;
+    const senderMaxIntervalMinutes = isLegacyWorkdayPace
+      ? DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES
+      : senderMaxIntervalMinutesRaw;
     return {
       timezone: normalizeString(raw.timezone || raw.timeZone) || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
       weekdaysOnly: normalizeBooleanFlag(
@@ -2786,12 +2804,7 @@ function createColdmailCampaignService(deps = {}) {
       ),
       startHour,
       endHour: Math.max(startHour + 1, endHour),
-      minIntervalMinutes: parsePositiveInt(
-        raw.minIntervalMinutes,
-        DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
-        5,
-        240
-      ),
+      minIntervalMinutes,
       senderMinIntervalMinutes,
       senderMaxIntervalMinutes,
       sendJitterMinSeconds,
@@ -3214,6 +3227,85 @@ function createColdmailCampaignService(deps = {}) {
     return min + (seed % range);
   }
 
+  function isColdmailAutopilotDaySlotPacingSchedule(schedule) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    return normalized.timezone === DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE &&
+      normalized.weekdaysOnly &&
+      normalized.startHour === DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR &&
+      normalized.endHour === DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR &&
+      normalized.minIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES &&
+      normalized.senderMinIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES &&
+      normalized.senderMaxIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES;
+  }
+
+  function getColdmailAutopilotMinuteOfDay(schedule, date = now()) {
+    const parts = getZonedColdmailAutopilotParts(date, normalizeColdmailAutopilotSchedule(schedule).timezone);
+    return parts.hour * 60 + parts.minute;
+  }
+
+  function getColdmailAutopilotSlotJitterMinutes(schedule, senderEmail, slotIndex) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    const max = Math.max(0, Math.min(4, normalized.minIntervalMinutes - 1));
+    if (!max) return 0;
+    const seed = crypto
+      .createHash('sha256')
+      .update(`${normalizeEmailAddress(senderEmail)}:${slotIndex}:autopilot-day-slot`)
+      .digest()
+      .readUInt32BE(0);
+    return seed % (max + 1);
+  }
+
+  function getColdmailAutopilotDaySlotReadiness(schedule, senderEmail, lastSentAtMs, options = {}) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    if (!isColdmailAutopilotDaySlotPacingSchedule(normalized)) return null;
+    const quota = options.quota && typeof options.quota === 'object' ? options.quota : {};
+    const dailyLimit = Math.max(1, Number(quota.dailySendLimit) || DEFAULT_COLDMAIL_DAILY_SEND_LIMIT);
+    const senderSent = Math.max(0, Number(quota.senderSent) || 0);
+    if (!lastSentAtMs || senderSent <= 0 || senderSent >= dailyLimit || dailyLimit < 2) return null;
+    const windowMinutes = Math.max(
+      normalized.minIntervalMinutes,
+      (normalized.endHour - normalized.startHour) * 60
+    );
+    const senderIndex = Math.max(0, Number(options.senderIndex) || 0);
+    const slotIndex = Math.min(senderSent, dailyLimit - 1);
+    const slotJitterMaxMinutes = Math.max(0, Math.min(4, normalized.minIntervalMinutes - 1));
+    const finalBufferMinutes =
+      normalized.minIntervalMinutes +
+      Math.ceil(normalized.sendJitterMaxSeconds / 60) +
+      slotJitterMaxMinutes +
+      1;
+    const firstWaveOffsetMinutes = Math.min(
+      Math.max(0, windowMinutes - finalBufferMinutes),
+      senderIndex * normalized.minIntervalMinutes
+    );
+    const usableWindowMinutes = Math.max(
+      dailyLimit - 1,
+      windowMinutes - firstWaveOffsetMinutes - finalBufferMinutes
+    );
+    const slotSpacingMinutes = usableWindowMinutes / (dailyLimit - 1);
+    const targetMinuteOfDay =
+      normalized.startHour * 60 +
+      firstWaveOffsetMinutes +
+      slotIndex * slotSpacingMinutes +
+      getColdmailAutopilotSlotJitterMinutes(normalized, senderEmail, slotIndex);
+    const currentMs = now().getTime();
+    const currentMinuteOfDay = getColdmailAutopilotMinuteOfDay(normalized, now());
+    const targetWaitMinutes = Math.max(0, targetMinuteOfDay - currentMinuteOfDay);
+    const targetReadyAtMs = currentMs + targetWaitMinutes * 60 * 1000;
+    const minimumCooldownMinutes = Math.max(
+      45,
+      normalized.senderMinIntervalMinutes - normalized.minIntervalMinutes
+    );
+    const floorReadyAtMs = lastSentAtMs + minimumCooldownMinutes * 60 * 1000;
+    const readyAtMs = Math.max(targetReadyAtMs, floorReadyAtMs);
+    if (readyAtMs <= currentMs) return { ok: true, readyAtMs, cooldownMinutes: 0 };
+    return {
+      ok: false,
+      readyAtMs,
+      cooldownMinutes: Math.max(0, Math.ceil((readyAtMs - lastSentAtMs) / (60 * 1000))),
+    };
+  }
+
   function getColdmailAutopilotSendJitterSeconds(schedule, senderEmail, startedAt) {
     const min = Math.max(0, Number(schedule && schedule.sendJitterMinSeconds) || 0);
     const max = Math.max(min, Number(schedule && schedule.sendJitterMaxSeconds) || min);
@@ -3256,8 +3348,18 @@ function createColdmailCampaignService(deps = {}) {
         }
         if (schedule.senderMinIntervalMinutes > 0) {
           const lastSentAtMs = getLastColdmailSendAtMsForSender(quota, senderEmail);
-          const cooldownMinutes = getSenderCooldownMinutes(schedule, senderEmail, lastSentAtMs);
-          const readyAtMs = lastSentAtMs + cooldownMinutes * 60 * 1000;
+          const daySlotReadiness = getColdmailAutopilotDaySlotReadiness(
+            schedule,
+            senderEmail,
+            lastSentAtMs,
+            { quota, senderIndex: index, senderCount: candidates.length }
+          );
+          const cooldownMinutes = daySlotReadiness
+            ? daySlotReadiness.cooldownMinutes
+            : getSenderCooldownMinutes(schedule, senderEmail, lastSentAtMs);
+          const readyAtMs = daySlotReadiness
+            ? daySlotReadiness.readyAtMs
+            : lastSentAtMs + cooldownMinutes * 60 * 1000;
           if (lastSentAtMs && readyAtMs > currentMs) {
             skipped.push({
               senderEmail,
