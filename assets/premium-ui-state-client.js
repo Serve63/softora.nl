@@ -57,16 +57,27 @@
         }
     }
 
+    function shouldStopFallback(error) {
+        var status = Number(error && error.status);
+        if (status && (status === 401 || status === 403 || status === 429 || status >= 500)) return true;
+        return /reageert niet op tijd|timeout|timed out|mislukt \((?:401|403|429|5\d\d)\)/i.test(String(error && error.message || error || ""));
+    }
+
     async function requestWithFallback(urls, options, label) {
         var lastError = null;
 
         for (var index = 0; index < urls.length; index += 1) {
             try {
                 var response = await fetchWithTimeout(urls[index], options, label);
-                if (!response.ok) throw new Error(label + " mislukt (" + response.status + ")");
+                if (!response.ok) {
+                    var statusError = new Error(label + " mislukt (" + response.status + ")");
+                    statusError.status = response.status;
+                    throw statusError;
+                }
                 return await parseJsonResponse(response);
             } catch (error) {
                 lastError = error;
+                if (shouldStopFallback(error)) break;
             }
         }
 

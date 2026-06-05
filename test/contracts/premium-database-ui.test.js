@@ -392,6 +392,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{[\s\S]*state\.dataLoading \? "Database laden\.\.\." : window\.SoftoraDatabaseResilience\.unavailableMessage/);
   assert.match(pageSource, /state\.dataUnavailable = true; renderPage\(\); setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(pageSource, /state\.dataLoading = true;[\s\S]*renderPage\(\);[\s\S]*setStatusMessage\("Database laden\.\.\.", "info"\);/);
+  assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
+  assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
+  assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);

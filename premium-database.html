@@ -1914,10 +1914,10 @@
                 "/api/ui-state-get?scope=" + encodedScope,
                 "/api/ui-state/" + encodedScope
             ];
-            let lastError = null;
+            let lastError = null, stopFallback = false;
 
             return urls.reduce(function (promise, url) {
-                return promise.catch(function () {
+                return promise.catch(function () { if (stopFallback) throw lastError || new Error("UI-state GET mislukt");
                     return window.SoftoraDatabaseResilience.fetchJsonWithTimeout(url, { method: "GET", cache: "no-store" }).then(function (response) {
                         if (!response.ok) {
                             throw new Error("UI-state GET mislukt (" + response.status + ")");
@@ -1927,7 +1927,7 @@
                         });
                     });
                 }).catch(function (error) {
-                    lastError = error;
+                    lastError = error; if (window.SoftoraDatabaseResilience.shouldStopUiStateFallback(error)) stopFallback = true;
                     throw error;
                 });
             }, Promise.reject()).catch(function () {
@@ -1941,10 +1941,10 @@
                 "/api/ui-state-set?scope=" + encodedScope,
                 "/api/ui-state/" + encodedScope
             ];
-            let lastError = null;
+            let lastError = null, stopFallback = false;
 
             return urls.reduce(function (promise, url) {
-                return promise.catch(function () {
+                return promise.catch(function () { if (stopFallback) throw lastError || new Error("UI-state POST mislukt");
                     return window.SoftoraDatabaseResilience.fetchJsonWithTimeout(url, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1958,7 +1958,7 @@
                         });
                     });
                 }).catch(function (error) {
-                    lastError = error;
+                    lastError = error; if (window.SoftoraDatabaseResilience.shouldStopUiStateFallback(error)) stopFallback = true;
                     throw error;
                 });
             }, Promise.reject()).catch(function () {

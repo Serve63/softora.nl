@@ -2608,7 +2608,7 @@
                     if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
                     return await res.json().catch(() => ({}));
                 } catch (error) {
-                    lastError = error;
+                    lastError = error; if (dashboardCore.shouldStopUiStateFallback?.(error)) break;
                 }
             }
 
@@ -2629,7 +2629,7 @@
                     if (!res.ok) throw new Error(`UI-state SET mislukt (${res.status})`);
                     return await res.json().catch(() => ({}));
                 } catch (error) {
-                    lastError = error;
+                    lastError = error; if (dashboardCore.shouldStopUiStateFallback?.(error)) break;
                 }
             }
 
