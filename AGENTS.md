@@ -36,6 +36,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Als Servé vraagt om X nieuwe leads naar Instantly te zetten, gebruik altijd dezelfde veilige Softora-route: `POST /api/outreach/provider-upload` (of de dashboardactie "Veilige Instantly CSV maken"). Maak nooit handmatig een losse CSV vanuit Supabase/exports zonder eerst deze route te gebruiken.
 - X is een exact gevraagd aantal voor de actie, geen "pak maar wat er is". Als er minder dan X veilig mail-ready leads klaarstaan, stop dan zonder CSV/upload/reservering en zeg kort: "Zet eerst genoeg mail-ready leads klaar" met gevraagd en beschikbaar aantal.
 - Deze route moet de gekozen leads eerst in Softora reserveren, `lastColdmailProvider=instantly` zetten en permanente `provider=instantly` recipient guards schrijven voordat er een CSV/upload-stap richting Instantly gebeurt.
+- De route mag bestaande Softora send_guard `entries` en `recipientEntries` nooit overschrijven of leegmaken; vlak voor CSV-aanmaak moet opnieuw live op Softora/Instantly duplicate-guards worden gecontroleerd.
 - Na iedere Instantly-aanvulling controleer je minimaal: Softora mail-ready telling omlaag, permanente Instantly-guards compleet, Instantly-campaign bevat het verwachte aantal nieuwe leads, en geen nieuwe duplicate/cross-channel overlap.
 - Als de veilige route faalt of geen CSV geeft: stoppen en onderzoeken. Niet via een alternatieve handmatige route alsnog uploaden.
 
