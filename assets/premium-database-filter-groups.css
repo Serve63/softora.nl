@@ -8,23 +8,30 @@
     align-items: center;
     gap: 4px;
     flex-wrap: wrap;
-    padding: 4px;
+    position: relative;
+    padding: 15px 4px 4px;
     border: 1px solid rgba(166, 173, 190, 0.22);
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.58);
 }
 
 .status-filter-label {
+    position: absolute;
+    top: 5px;
+    left: 9px;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 0 5px;
-    font-size: 9px;
+    padding: 0;
+    font-size: 8px;
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0;
     text-transform: uppercase;
     color: var(--dark);
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
     white-space: nowrap;
 }
 

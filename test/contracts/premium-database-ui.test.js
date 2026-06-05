@@ -836,8 +836,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(filterGroupsCssSource, /rgba\(139, 34, 82/);
   assert.match(filterGroupsCssSource, /border: 1px solid rgba\(166, 173, 190, 0\.22\);/);
   const labelCssBlock = filterGroupsCssSource.match(/\.status-filter-label\s*\{[\s\S]*?\}/)[0];
+  assert.match(labelCssBlock, /position: absolute;/);
   assert.match(labelCssBlock, /display: inline-flex;/);
   assert.match(labelCssBlock, /color: var\(--dark\);/);
+  assert.match(labelCssBlock, /pointer-events: none;/);
+  assert.match(labelCssBlock, /user-select: none;/);
   assert.doesNotMatch(labelCssBlock, /color: var\(--crimson\)|color: var\(--green\)|color: var\(--blue\)/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\.is-locked\s*\{/);
   assert.match(filterGroupsCssSource, /\.status-filter-lock-icon\s*\{/);
