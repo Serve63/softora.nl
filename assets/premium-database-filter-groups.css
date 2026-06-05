@@ -24,7 +24,7 @@
     line-height: 1;
     letter-spacing: 0;
     text-transform: uppercase;
-    color: var(--light);
+    color: var(--dark);
     white-space: nowrap;
 }
 
