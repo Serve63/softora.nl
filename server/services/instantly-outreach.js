@@ -2176,10 +2176,66 @@ function createInstantlyOutreachService(deps = {}) {
     return index;
   }
 
+  function getColdmailSendGuardStateFromValues(values = {}) {
+    const parsed = safeJsonObjectParse(values[coldmailSendGuardKey]);
+    return {
+      ...parsed,
+      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+      recipientEntries: Array.isArray(parsed.recipientEntries) ? parsed.recipientEntries : [],
+    };
+  }
+
+  function getColdmailRecipientGuardMergeKey(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    const email = normalizeEmailAddress(entry.recipientEmail || entry.email, normalizeString);
+    const domain = normalizeColdmailGuardKeyPart(
+      entry.recipientDomain || entry.domain || entry.websiteDomain,
+      normalizeString
+    );
+    const id = normalizeColdmailGuardKeyPart(entry.recipientId || entry.customerId || entry.id, normalizeString);
+    const key = normalizeColdmailGuardKeyPart(entry.recipientKey || entry.key, normalizeString);
+    const provider = normalizeString(entry.provider || entry.lastColdmailProvider).toLowerCase();
+    const campaignId = normalizeString(entry.campaignId || entry.instantlyCampaignId);
+    const leadId = normalizeString(entry.leadId || entry.instantlyLeadId);
+    const at = normalizeString(entry.at);
+    const senderEmail = normalizeEmailAddress(entry.senderEmail, normalizeString);
+    return [at, senderEmail, key, email, domain, id, provider, campaignId, leadId].join('|');
+  }
+
+  function getColdmailSendGuardEntryMergeKey(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    const at = normalizeString(entry.at);
+    const senderEmail = normalizeEmailAddress(entry.senderEmail, normalizeString);
+    const email = normalizeEmailAddress(entry.recipientEmail || entry.email, normalizeString);
+    const domain = normalizeColdmailGuardKeyPart(
+      entry.recipientDomain || entry.domain || entry.websiteDomain,
+      normalizeString
+    );
+    const id = normalizeColdmailGuardKeyPart(entry.recipientId || entry.customerId || entry.id, normalizeString);
+    const count = Math.max(0, Number(entry.count || 0) || 0);
+    const pauseUntil = normalizeString(entry.safetyPauseUntil || entry.until);
+    const pauseReason = normalizeString(entry.safetyPauseReason || entry.reason);
+    return [at, senderEmail, count, email, domain, id, pauseUntil, pauseReason].join('|');
+  }
+
+  function mergeColdmailGuardEntries(existingEntries = [], nextEntries = [], keyFactory) {
+    const seen = new Set();
+    const merged = [];
+    [...(Array.isArray(existingEntries) ? existingEntries : []), ...(Array.isArray(nextEntries) ? nextEntries : [])]
+      .filter((entry) => entry && typeof entry === 'object')
+      .forEach((entry) => {
+        const key = keyFactory(entry);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        merged.push(entry);
+      });
+    return merged;
+  }
+
   async function loadColdmailSendGuardIndex() {
     const state = await getUiStateValues(coldmailSendGuardScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
-    return buildColdmailSendGuardIndex(safeJsonObjectParse(values[coldmailSendGuardKey]));
+    return buildColdmailSendGuardIndex(getColdmailSendGuardStateFromValues(values));
   }
 
   function hasColdmailSendGuardMatch(item, context = {}) {
@@ -2931,18 +2987,33 @@ function createInstantlyOutreachService(deps = {}) {
       .filter(Boolean);
     if (!recipientEntries.length) return { count: 0 };
 
+    const existingState = await getUiStateValues(coldmailSendGuardScope);
+    const existingValues = existingState && typeof existingState.values === 'object' ? existingState.values : {};
+    const existingGuardState = getColdmailSendGuardStateFromValues(existingValues);
+    const entries = mergeColdmailGuardEntries(
+      existingGuardState.entries,
+      [],
+      getColdmailSendGuardEntryMergeKey
+    ).slice(-1000);
+    const mergedRecipientEntries = mergeColdmailGuardEntries(
+      existingGuardState.recipientEntries,
+      recipientEntries,
+      getColdmailRecipientGuardMergeKey
+    ).slice(-2500);
+
     const write = await setUiStateValues(
       coldmailSendGuardScope,
       {
         [coldmailSendGuardKey]: JSON.stringify({
+          ...existingGuardState,
           updatedAt: at,
           source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
           actor: normalizeString(options.actor),
           provider: 'instantly',
           campaignId: normalizeString(options.campaignId),
           uploadId: normalizeString(options.uploadId),
-          recipientEntries,
-          entries: [],
+          entries,
+          recipientEntries: mergedRecipientEntries,
         }),
       },
       {
@@ -3017,8 +3088,8 @@ function createInstantlyOutreachService(deps = {}) {
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
     const personalizationContext = await loadPersonalizationContext(rows);
     const { selectedRows, failed } = await collectEligibleRows(rows, limit, personalizationContext);
-    const leads = [];
-    const sendableRows = [];
+    let leads = [];
+    let sendableRows = [];
 
     for (const item of selectedRows) {
       try {
@@ -3036,6 +3107,27 @@ function createInstantlyOutreachService(deps = {}) {
           missing: Array.isArray(error && error.missing) ? error.missing : undefined,
         });
       }
+    }
+
+    if (sendableRows.length) {
+      const freshColdmailSendGuardIndex = await loadColdmailSendGuardIndex();
+      const safeLeads = [];
+      const safeRows = [];
+      sendableRows.forEach((item, index) => {
+        if (hasColdmailSendGuardMatch(item, { coldmailSendGuardIndex: freshColdmailSendGuardIndex })) {
+          failed.push({
+            id: item.id,
+            bedrijf: getRowCompany(item.row, normalizeString),
+            email: getRowEmail(item.row, normalizeString),
+            error: 'Lead kreeg intussen een Softora/Instantly duplicate-guard; upload opnieuw afgebroken voor veiligheid.',
+          });
+          return;
+        }
+        safeRows.push(item);
+        safeLeads.push(leads[index]);
+      });
+      sendableRows = safeRows;
+      leads = safeLeads;
     }
 
     if (sendableRows.length < limit) {

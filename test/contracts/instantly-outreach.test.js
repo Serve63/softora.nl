@@ -141,6 +141,7 @@ function createService(overrides = {}) {
       softora_customers_premium_v1: JSON.stringify(rows),
     };
   const scopeValues = new Map();
+  let coldmailSendGuardReadIndex = 0;
   if (overrides.coldmailSendGuard) {
     scopeValues.set('premium_coldmail_send_guard', {
       softora_coldmail_send_guard_v1: JSON.stringify(overrides.coldmailSendGuard),
@@ -199,6 +200,15 @@ function createService(overrides = {}) {
         return {
           values: {
             softora_coldmail_autopilot_v1: JSON.stringify(autopilotState),
+          },
+        };
+      }
+      if (scope === 'premium_coldmail_send_guard' && Array.isArray(overrides.coldmailSendGuardSequence)) {
+        const index = Math.min(coldmailSendGuardReadIndex, overrides.coldmailSendGuardSequence.length - 1);
+        coldmailSendGuardReadIndex += 1;
+        return {
+          values: {
+            softora_coldmail_send_guard_v1: JSON.stringify(overrides.coldmailSendGuardSequence[index] || {}),
           },
         };
       }
@@ -444,6 +454,134 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[1].lastColdmailProvider, 'instantly');
   assert.equal(rows[1].instantlyStatus, 'queued');
   assert.equal(rows[1].databaseStatus, 'gemaild');
+});
+
+test('safe Instantly upload preserves existing Softora send guards when reserving leads', async () => {
+  const { service, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    coldmailSendGuard: {
+      entries: [
+        {
+          at: '2026-06-04T12:52:18.196Z',
+          senderEmail: 'martijnven123@gmail.com',
+          count: 1,
+          recipientEmail: 'info@tractorbumper.com',
+          recipientDomain: 'tractorbumper-com',
+          recipientId: 'import-260-db-mohsau64-kxmn82',
+          recipientCompany: 'Tractorbumper',
+        },
+      ],
+      recipientEntries: [
+        {
+          at: '2026-06-04T12:52:18.196Z',
+          senderEmail: 'martijnven123@gmail.com',
+          recipientEmail: 'info@tractorbumper.com',
+          recipientDomain: 'tractorbumper-com',
+          recipientId: 'import-260-db-mohsau64-kxmn82',
+          recipientCompany: 'Tractorbumper',
+        },
+      ],
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 1,
+  });
+
+  assert.equal(result.prepared, 1);
+  assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
+  const guardState = JSON.parse(writes[0].values.softora_coldmail_send_guard_v1);
+  assert.equal(guardState.entries.length, 1);
+  assert.equal(guardState.entries[0].recipientEmail, 'info@tractorbumper.com');
+  assert.equal(guardState.recipientEntries.length, 2);
+  assert.ok(guardState.recipientEntries.some((entry) => entry.recipientEmail === 'info@tractorbumper.com'));
+  assert.ok(guardState.recipientEntries.some((entry) => entry.recipientEmail === 'ruben@example.test'));
+});
+
+test('safe Instantly upload aborts when a live guard appears after lead preparation', async () => {
+  const { service, getRows, writes } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    coldmailSendGuardSequence: [
+      { entries: [], recipientEntries: [] },
+      {
+        entries: [
+          {
+            at: '2026-06-04T12:52:18.196Z',
+            senderEmail: 'serve@softora.nl',
+            count: 1,
+            recipientEmail: 'ruben@example.test',
+            recipientDomain: 'bakkerijzon-test',
+            recipientId: 'prospect-1',
+          },
+        ],
+        recipientEntries: [
+          {
+            at: '2026-06-04T12:52:18.196Z',
+            senderEmail: 'serve@softora.nl',
+            recipientKey: 'email:ruben@example.test',
+            recipientEmail: 'ruben@example.test',
+            recipientDomain: 'bakkerijzon-test',
+            recipientId: 'prospect-1',
+          },
+        ],
+      },
+    ],
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.requested, 1);
+  assert.equal(result.available, 0);
+  assert.equal(result.prepared, 0);
+  assert.match(result.failed[0].error, /intussen een Softora\/Instantly duplicate-guard/);
+  assert.equal(result.csv, undefined);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
 });
 
 test('safe Instantly upload refuses partial batches when fewer leads are ready than requested', async () => {
