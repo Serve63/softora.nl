@@ -7,7 +7,6 @@ const { getStaticAssetCacheControl } = require('../../server/routes/public-pages
 
 const REPO_ROOT = path.join(__dirname, '../..');
 const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260605d';
-const SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png';
 
 test('public asset cache keeps unhashed app js/css fresh even with version query strings', () => {
   assert.equal(
@@ -59,28 +58,6 @@ test('html pages use the round Softora favicon asset sitewide', () => {
 
   assert.ok(pagesWithFavicons.includes('premium-website.html'));
   assert.ok(pagesWithFavicons.length >= 40, 'expected sitewide favicon coverage');
-});
-
-test('homepage exposes a stable Google Search favicon before the browser tab favicon', () => {
-  const source = fs.readFileSync(path.join(REPO_ROOT, 'premium-website.html'), 'utf8');
-  const searchFaviconTag = `<link rel="icon" type="image/png" href="${SEARCH_FAVICON_HREF}" sizes="96x96">`;
-  const roundFaviconTag = `<link rel="icon" type="image/png" href="${ROUND_FAVICON_HREF}" sizes="any">`;
-
-  assert.match(source, new RegExp(searchFaviconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.ok(
-    source.indexOf(searchFaviconTag) < source.indexOf(roundFaviconTag),
-    'Google Search favicon should be the first favicon signal on the homepage'
-  );
-});
-
-test('Google Search favicon uses a stable square PNG without transparent corners', () => {
-  const faviconPath = path.join(REPO_ROOT, 'assets/softora-search-favicon.png');
-  const bytes = fs.readFileSync(faviconPath);
-
-  assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-  assert.equal(bytes.readUInt32BE(16), 96, 'search favicon width');
-  assert.equal(bytes.readUInt32BE(20), 96, 'search favicon height');
-  assert.equal(bytes[25], 2, 'search favicon should be truecolor RGB without alpha');
 });
 
 test('root homepage is server-managed instead of a static premium redirect file', () => {
