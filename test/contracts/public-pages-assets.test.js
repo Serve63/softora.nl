@@ -64,6 +64,24 @@ test('html pages use the round Softora favicon asset sitewide', () => {
   assert.ok(pagesWithFavicons.length >= 40, 'expected sitewide favicon coverage');
 });
 
+test('vercel serves the root favicon as a static ico before the api catch-all', () => {
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'vercel.json'), 'utf8'));
+  const faviconRewriteIndex = vercelConfig.rewrites.findIndex((rewrite) => rewrite.source === '/favicon.ico');
+  const catchAllRewriteIndex = vercelConfig.rewrites.findIndex((rewrite) => rewrite.source === '/(.*)');
+  const faviconHeader = vercelConfig.headers.find((header) => header.source === '/favicon.ico');
+
+  assert.ok(faviconRewriteIndex >= 0, 'expected a root favicon rewrite');
+  assert.ok(catchAllRewriteIndex >= 0, 'expected the api catch-all rewrite');
+  assert.ok(faviconRewriteIndex < catchAllRewriteIndex, 'favicon rewrite must run before api catch-all');
+  assert.equal(vercelConfig.rewrites[faviconRewriteIndex].destination, '/assets/favicon.ico');
+  assert.deepEqual(faviconHeader.headers, [
+    {
+      key: 'Cache-Control',
+      value: 'public, max-age=60, stale-while-revalidate=300',
+    },
+  ]);
+});
+
 test('root homepage is server-managed instead of a static premium redirect file', () => {
   assert.equal(
     fs.existsSync(path.join(REPO_ROOT, 'index.html')),
