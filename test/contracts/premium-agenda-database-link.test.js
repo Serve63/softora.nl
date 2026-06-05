@@ -17,15 +17,15 @@ test('premium agenda klantreminder opent de database direct op benaderd met zoek
   assert.match(pageSource, /wsKlantenLink\.href = buildCustomerDatabaseReminderUrl\(name\);/);
 });
 
-test('premium database leest agenda-url en activeert filter plus zoekveld', () => {
+test('premium database leest agenda-url en activeert alleen het filter', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /function applyDatabaseUrlIntent\(\)/);
   assert.match(pageSource, /new URLSearchParams\(window\.location\.search \|\| ""\)/);
   assert.match(pageSource, /\["status", "filter", "tab"\]/);
-  assert.match(pageSource, /\["q", "zoek", "search", "customer", "klant", "naam"\]/);
+  assert.doesNotMatch(pageSource, /\["q", "zoek", "search", "customer", "klant", "naam"\]/);
   assert.match(pageSource, /state\.activeStatus = requestedStatus;/);
-  assert.match(pageSource, /nodes\.query\.value = requestedQuery;/);
+  assert.doesNotMatch(pageSource, /nodes\.query\.value = requestedQuery;/);
   assert.match(pageSource, /applyDatabaseUrlIntent\(\);\s*renderPage\(\);/);
 });
