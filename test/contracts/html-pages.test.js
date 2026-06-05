@@ -310,12 +310,13 @@ test('html page coordinator renders premium content-frame pages without an activ
   assert.match(res.headers['Content-Security-Policy'], /default-src 'self'/);
 });
 
-test('html page coordinator serves login pages without seo config reads', async () => {
+test('html page coordinator serves login pages without seo config or bootstrap reads', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-fallback-'));
   const pagePath = path.join(pagesDir, 'premium-personeel-login.html');
   fs.writeFileSync(pagePath, '<!DOCTYPE html><html><head><title>Login</title></head><body>Inloggen</body></html>');
   let seoConfigCalls = 0;
   let seoOverrideCalls = 0;
+  let bootstrapCalls = 0;
 
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
@@ -341,6 +342,10 @@ test('html page coordinator serves login pages without seo config reads', async 
       seoOverrideCalls += 1;
       return `${fileName}:${html}`;
     },
+    getPageBootstrapData: async () => {
+      bootstrapCalls += 1;
+      throw new Error('login bootstrap should stay cold');
+    },
   });
 
   const req = { originalUrl: '/premium-personeel-login' };
@@ -356,7 +361,70 @@ test('html page coordinator serves login pages without seo config reads', async 
   assert.equal(res.sendFilePath, null);
   assert.equal(seoConfigCalls, 0);
   assert.equal(seoOverrideCalls, 0);
+  assert.equal(bootstrapCalls, 0);
   assert.match(res.body, /Inloggen/);
+});
+
+test('html page coordinator timeboxes protected premium bootstrap reads without late error logs', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-protected-timeout-'));
+  const loggerInfos = [];
+  const loggerErrors = [];
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-personeel-dashboard.html'),
+    '<!DOCTYPE html><html><head><title>Dashboard</title></head><body><main>Dashboard</main></body></html>'
+  );
+
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    protectedPageBootstrapWaitMs: 5,
+    logger: {
+      info: (...args) => loggerInfos.push(args),
+      error: (...args) => loggerErrors.push(args),
+    },
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-personeel-dashboard.html'
+        ? 'premium-personeel-dashboard.html'
+        : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: { authenticated: true, email: 'serve@softora.nl', role: 'admin' },
+    }),
+    getSeoConfigCached: async () => {
+      throw new Error('protected pages should not read seo config');
+    },
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () =>
+      new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new Error('late bootstrap failure')), 20);
+      }),
+  });
+
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-personeel-dashboard' },
+    res,
+    () => {},
+    'premium-personeel-dashboard.html'
+  );
+  await new Promise((resolve) => setTimeout(resolve, 35));
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /Dashboard/);
+  assert.equal(
+    loggerInfos.some(
+      (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'
+    ),
+    true
+  );
+  assert.equal(
+    loggerErrors.some((args) => /\[HTML\]\[(SeoConfig|Bootstrap)Error\]/.test(String(args[0] || ''))),
+    false
+  );
 });
 
 test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
