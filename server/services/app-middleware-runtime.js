@@ -374,7 +374,7 @@ function applyAppMiddleware(app, deps = {}) {
       release();
     }, safeSupabaseHydrateMiddlewareWaitMs);
 
-    ensureRuntimeStateHydratedFromSupabase()
+    ensureRuntimeStateHydratedFromSupabase({ strict: true })
       .then((hydrated) => {
         clearTimeout(timeout);
         if (strictHydration && hydrated === false) {

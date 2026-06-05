@@ -310,6 +310,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
   async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
     const force = Boolean(options && options.force);
+    const strictHydrate = force || Boolean(options && options.strict);
     if (!isSupabaseConfigured()) return false;
     if (runtimeState.supabaseStateHydrated) return true;
     if (runtimeState.supabaseStateHydrationPromise) return runtimeState.supabaseStateHydrationPromise;
@@ -358,16 +359,22 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
             error: truncateText(error?.message || String(error), 500),
           }));
           if (!fallback.ok) {
-            logError('[Supabase][HydrateError]', primaryError?.message || primaryError);
             const fallbackMsg = fallback.error
               ? ` | REST fallback: ${fallback.error}`
               : fallback.status
                 ? ` | REST fallback status: ${fallback.status}`
                 : '';
-            runtimeState.supabaseLastHydrateError = truncateText(
+            const hydrateMessage = truncateText(
               `${primaryError?.message || String(primaryError || 'Supabase client ontbreekt.')}${fallbackMsg}`,
               500
             );
+            if (strictHydrate) {
+              logError('[Supabase][HydrateError]', primaryError?.message || primaryError);
+              runtimeState.supabaseLastHydrateError = hydrateMessage;
+            } else {
+              logInfo('[Supabase][HydrateSoftError]', hydrateMessage);
+              runtimeState.supabaseLastHydrateError = '';
+            }
             runtimeState.supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
             return false;
           }
@@ -401,8 +408,14 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
           return hydrateViaRest(error);
         }
       } catch (error) {
-        logError('[Supabase][HydrateCrash]', error?.message || error);
-        runtimeState.supabaseLastHydrateError = truncateText(error?.message || String(error), 500);
+        const hydrateMessage = truncateText(error?.message || String(error), 500);
+        if (strictHydrate) {
+          logError('[Supabase][HydrateCrash]', error?.message || error);
+          runtimeState.supabaseLastHydrateError = hydrateMessage;
+        } else {
+          logInfo('[Supabase][HydrateSoftCrash]', hydrateMessage);
+          runtimeState.supabaseLastHydrateError = '';
+        }
         runtimeState.supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
         return false;
       } finally {
