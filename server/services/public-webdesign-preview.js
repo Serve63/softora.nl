@@ -3,6 +3,10 @@ const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
+const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
+  suppressReadFailureCooldown: true,
+  suppressTransientReadFailureLog: true,
+});
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 
@@ -426,6 +430,7 @@ function createPublicWebdesignPreviewService(options = {}) {
     }
 
     const directPhotoEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+      ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
       expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
       identifiers: [id],
       maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
@@ -433,7 +438,7 @@ function createPublicWebdesignPreviewService(options = {}) {
     let preview = resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(directPhotoEntries), []);
     if (preview) return preview;
 
-    const customers = await dataOpsStore.listCustomers();
+    const customers = await dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS);
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
       id,
@@ -442,6 +447,7 @@ function createPublicWebdesignPreviewService(options = {}) {
 
     if (identifiers.length > 1) {
       const photoEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+        ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
         expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
         identifiers,
         maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
