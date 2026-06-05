@@ -71,7 +71,9 @@ test('production deploy scripts and docs force the safe deployment path', () => 
   assert.match(deployScript, /ensureExpectedVercelProjectLink\(\);/);
   assert.match(deployScript, /assertExpectedVercelProjectLink\(\);/);
   assert.match(deployScript, /verify:critical/);
+  assert.match(deployScript, /restoreKnownProductionBuildSideEffects\(\);/);
   assert.match(deployScript, /installVercelSharpLinuxArm64Output\(\);/);
+  assert.match(deployScript, /assertSafeProductionDeploySource\(\);\s*run\('Vercel productie-deploy'/);
   assert.match(deployScript, /@img\/sharp-linux-arm64/);
   assert.match(deployScript, /@img\/sharp-libvips-linux-arm64/);
   assert.match(deployScript, /deploy', '--prebuilt', '--prod', '--yes'/);

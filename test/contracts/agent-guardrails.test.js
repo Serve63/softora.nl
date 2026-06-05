@@ -465,7 +465,9 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(liveWorkflowSource, /npm run check:live-production-version:wait/);
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
   assert.match(safeDeploySource, /verify:critical/);
+  assert.match(safeDeploySource, /restoreKnownProductionBuildSideEffects\(\);/);
   assert.match(safeDeploySource, /installVercelSharpLinuxArm64Output\(\);/);
+  assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\);\s*run\('Vercel productie-deploy'/);
   assert.match(safeDeploySource, /@img\/sharp-linux-arm64/);
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-arm64/);
   assert.match(safeDeploySource, /check:live-production-version/);
