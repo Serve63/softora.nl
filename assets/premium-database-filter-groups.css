@@ -1,0 +1,43 @@
+.status-filter {
+    align-items: stretch;
+}
+
+.status-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 4px;
+    border: 1px solid rgba(166, 173, 190, 0.22);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.58);
+}
+
+.status-filter-group--coldmail {
+    border-color: rgba(22, 115, 60, 0.18);
+    background: rgba(22, 115, 60, 0.04);
+}
+
+.status-filter-group--coldcalling {
+    border-color: rgba(26, 95, 138, 0.18);
+    background: rgba(26, 95, 138, 0.04);
+}
+
+.status-filter-label {
+    padding: 0 5px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    color: var(--light);
+    white-space: nowrap;
+}
+
+.status-filter-group--coldmail .status-filter-label {
+    color: var(--green);
+}
+
+.status-filter-group--coldcalling .status-filter-label {
+    color: var(--blue);
+}

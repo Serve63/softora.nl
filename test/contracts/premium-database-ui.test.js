@@ -420,6 +420,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const contactStatusScriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
+  const filterGroupsCssPath = path.join(__dirname, '../../assets/premium-database-filter-groups.css');
   const instantlySyncScriptPath = path.join(__dirname, '../../assets/premium-database-instantly-sync.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
@@ -432,6 +433,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
   const contactStatusScriptSource = fs.readFileSync(contactStatusScriptPath, 'utf8');
+  const filterGroupsCssSource = fs.readFileSync(filterGroupsCssPath, 'utf8');
   const instantlySyncScriptSource = fs.readFileSync(instantlySyncScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
@@ -774,6 +776,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260605a/);
+  assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
+  assert.match(filterGroupsCssSource, /\.status-filter-group--coldmail/);
+  assert.match(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-exact-upload/);
   assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = '\/api\/outreach\/provider-upload'/);
   assert.doesNotMatch(instantlySyncScriptSource, /SYNC_ENDPOINT = '\/api\/outreach\/provider-sync'/);
@@ -1712,11 +1718,11 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar<\/button>\s*<button class="sf-btn" data-s="alle" type="button">Alles<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
+    /<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<button class="sf-btn" data-s="instantly" type="button">Instantly<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--shared" aria-label="Filters voor coldmailing en coldcalling">\s*<span class="status-filter-label">Beide<\/span>\s*<button class="sf-btn" data-s="alle" type="button">Alles<\/button>\s*<button class="sf-btn" data-s="klant" type="button">Klant<\/button>\s*<button class="sf-btn" data-s="benaderd" type="button">Benaderd<\/button>\s*<\/div>\s*<div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters">\s*<span class="status-filter-label">Coldcalling<\/span>\s*<button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button">Buiten gebruik<\/button>/
   );
   assert.match(pageSource, /activeStatus: "benaderbaar"/);
-  assert.match(pageSource, /<option value="benaderbaar">Beschikbaar<\/option>/);
-  assert.match(pageSource, /benaderbaar: "Beschikbaar"/);
+  assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
+  assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
   assert.match(pageSource, /outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\)/);
@@ -1731,6 +1737,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(contactStatusScriptSource, /function shouldInferMailedStatus\(storedStatus, raw, helpers\)/);
   assert.match(pageSource, /\.sf-btn\.act \{[\s\S]*border-color: rgba\(139, 34, 82, 0\.4\);[\s\S]*background: rgba\(139, 34, 82, 0\.12\);/);
   assert.doesNotMatch(pageSource, /<button class="sf-btn act" data-s="alle" type="button">Alles<\/button>/);
+  assert.doesNotMatch(pageSource, />Beschikbaar<\/button>/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="klant"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="benaderd"\]\.act/);
   assert.doesNotMatch(pageSource, /\.sf-btn\[data-s="instantly"\]\.act/);

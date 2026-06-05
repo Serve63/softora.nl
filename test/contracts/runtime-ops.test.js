@@ -199,6 +199,62 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
+test('runtime ops coordinator stores previous Word content as backup before overwrite', async () => {
+  const writes = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: {
+        softora_premium_word_html_v1: '<p>Oude belangrijke tekst</p>',
+        softora_premium_word_html_backups_v1: JSON.stringify([
+          {
+            html: '<p>Nog oudere tekst</p>',
+            savedAt: '2026-06-04T10:00:00.000Z',
+            source: 'premium-word',
+            actor: 'browser',
+          },
+        ]),
+      },
+      source: 'supabase',
+      updatedAt: '2026-06-05T12:12:41.149Z',
+    }),
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return {
+        values,
+        source: meta.source,
+        updatedAt: '2026-06-05T12:30:00.000Z',
+      };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        patch: {
+          softora_premium_word_html_v1: '<p>Nieuwe tekst</p>',
+        },
+        source: 'premium-word',
+        actor: 'browser',
+      },
+    },
+    res,
+    'premium_word'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].values.softora_premium_word_html_v1, '<p>Nieuwe tekst</p>');
+
+  const backups = JSON.parse(writes[0].values.softora_premium_word_html_backups_v1);
+  assert.equal(backups.length, 2);
+  assert.equal(backups[0].html, '<p>Oude belangrijke tekst</p>');
+  assert.equal(backups[0].savedAt, '2026-06-05T12:12:41.149Z');
+  assert.equal(backups[0].source, 'premium-word');
+  assert.equal(backups[0].actor, 'browser');
+  assert.equal(backups[1].html, '<p>Nog oudere tekst</p>');
+});
+
 test('runtime ops coordinator prefers structured data ops reads and mirrors writes safely', async () => {
   const bridgeCalls = [];
   const { coordinator } = createFixture({

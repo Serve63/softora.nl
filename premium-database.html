@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260605a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -329,7 +329,7 @@
 
         .status-filter {
             display: flex;
-            gap: 4px;
+            gap: 8px;
             flex-wrap: wrap;
         }
 
@@ -1418,7 +1418,7 @@
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <div class="status-filter">
-                            <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                            <div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button></div><div class="status-filter-group status-filter-group--shared" aria-label="Filters voor coldmailing en coldcalling"><span class="status-filter-label">Beide</span><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button></div><div class="status-filter-group status-filter-group--coldcalling" aria-label="Coldcalling filters"><span class="status-filter-label">Coldcalling</span><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button></div>
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
@@ -1486,7 +1486,7 @@
             <div class="mrow"><label class="mlabel" for="m-stad">Adres</label><input class="minp" id="m-stad" placeholder="Tilburg"></div>
             <div class="mrow"><label class="mlabel" for="m-status">Status</label>
                 <select class="msel" id="m-status">
-                    <option value="benaderbaar">Beschikbaar</option>
+                    <option value="benaderbaar">Mailklaar</option>
                     <option value="prospect">Prospect</option>
                     <option value="gebeld">Gebeld</option>
                     <option value="geengehoor">Geen gehoor</option>
@@ -1761,7 +1761,7 @@
         function buildFallbackHistory(status, updatedAt) {
             const labelMap = {
                 prospect: "Toegevoegd als prospect",
-                benaderbaar: "Gemarkeerd als beschikbaar",
+                benaderbaar: "Gemarkeerd als mailklaar",
                 gebeld: "Gebeld",
                 geengehoor: "Geen gehoor",
                 gemaild: "Mail verstuurd",
@@ -1833,7 +1833,7 @@
         function createStatusTimelineLabel(status) {
             const labelMap = {
                 prospect: "Toegevoegd als prospect",
-                benaderbaar: "Gemarkeerd als beschikbaar",
+                benaderbaar: "Gemarkeerd als mailklaar",
                 gebeld: "Belpoging geregistreerd",
                 geengehoor: "Geen gehoor geregistreerd",
                 gemaild: "Mailcontact geregistreerd",
@@ -2234,7 +2234,7 @@
                 afgehaakt: "Afgehaakt",
                 geblokkeerd: "Geen interesse",
                 buiten: "Buiten gebruik",
-                benaderbaar: "Beschikbaar",
+                benaderbaar: "Mailklaar",
                 geengehoor: "Geen gehoor"
             };
             return labels[status] || "Prospect";
