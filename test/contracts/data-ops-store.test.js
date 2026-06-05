@@ -183,6 +183,51 @@ test('data ops store returns quickly when customer reads hang', async () => {
   assert.ok(Date.now() - startedAt < 1000);
 });
 
+test('data ops store opens a short read cooldown after Supabase timeouts', async () => {
+  let readCalls = 0;
+  const warnings = [];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range() {
+                      readCalls += 1;
+                      return new Promise(() => {});
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadQueryTimeoutMs: 25,
+    dataOpsReadFailureCooldownMs: 1000,
+    logger: { error: () => {}, warn: (...args) => warnings.push(args.join(' ')) },
+  });
+
+  const first = await store.listCustomers();
+  const secondStartedAt = Date.now();
+  const second = await store.listCustomers();
+
+  assert.equal(first, null);
+  assert.equal(second, null);
+  assert.equal(readCalls, 1);
+  assert.ok(Date.now() - secondStartedAt < 100);
+  assert.match(warnings.join('\n'), /\[DataOps\]\[read-circuit-open\]/);
+});
+
 test('data ops store serves stale cached customers when a later read times out', async () => {
   let nowMs = Date.parse('2026-05-22T10:00:00.000Z');
   let readCalls = 0;

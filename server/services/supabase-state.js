@@ -9,6 +9,7 @@ function createSupabaseStateStore(deps = {}) {
     supabaseCallUpdateStateKeyPrefix = '',
     supabaseCallUpdateRowsFetchLimit = 1000,
     supabaseRestTimeoutMs = 12000,
+    supabaseRestFailureCooldownMs = 60_000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createClient = createSupabaseClient,
@@ -17,6 +18,8 @@ function createSupabaseStateStore(deps = {}) {
 
   let supabaseClient = null;
   let timedSupabaseFetch = null;
+  let restFailureCooldownUntilMs = 0;
+  let restFailureCooldownReason = '';
 
   function isSupabaseConfigured() {
     return Boolean(supabaseUrl && supabaseServiceRoleKey);
@@ -24,6 +27,31 @@ function createSupabaseStateStore(deps = {}) {
 
   function getSafeSupabaseTimeoutMs() {
     return Math.max(1000, Math.min(60000, Number(supabaseRestTimeoutMs) || 12000));
+  }
+
+  function getSafeRestFailureCooldownMs() {
+    return Math.max(0, Math.min(5 * 60_000, Number(supabaseRestFailureCooldownMs) || 0));
+  }
+
+  function buildRestCooldownError() {
+    const secondsLeft = Math.max(1, Math.ceil((restFailureCooldownUntilMs - Date.now()) / 1000));
+    return `Supabase REST tijdelijk overgeslagen na timeout/504 (${secondsLeft}s cooldown${restFailureCooldownReason ? `, ${restFailureCooldownReason}` : ''}).`;
+  }
+
+  function isRestFailureCooldownActive() {
+    return Date.now() < restFailureCooldownUntilMs;
+  }
+
+  function openRestFailureCooldown(reason) {
+    const cooldownMs = getSafeRestFailureCooldownMs();
+    if (!cooldownMs) return;
+    restFailureCooldownUntilMs = Date.now() + cooldownMs;
+    restFailureCooldownReason = truncateText(normalizeString(reason), 160);
+  }
+
+  function shouldOpenRestFailureCooldownFromError(error) {
+    const text = normalizeString(error && (error.message || error.name || error.code || error));
+    return /abort|timeout|timed out|504|fetch failed|network|econnreset|etimedout|connection terminated/i.test(text);
   }
 
   function redactSupabaseUrlForDebug(url = supabaseUrl) {
@@ -50,6 +78,12 @@ function createSupabaseStateStore(deps = {}) {
     if (typeof fetchImpl !== 'function') return null;
 
     timedSupabaseFetch = async (url, options = {}) => {
+      if (isRestFailureCooldownActive()) {
+        const error = new Error(buildRestCooldownError());
+        error.code = 'SUPABASE_REST_COOLDOWN';
+        throw error;
+      }
+
       const timeoutMs = getSafeSupabaseTimeoutMs();
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const upstreamSignal = options?.signal;
@@ -76,10 +110,19 @@ function createSupabaseStateStore(deps = {}) {
       }
 
       try {
-        return await fetchImpl(url, {
+        const response = await fetchImpl(url, {
           ...options,
           signal: controller ? controller.signal : upstreamSignal,
         });
+        if (response && response.status >= 500) {
+          openRestFailureCooldown(`status ${response.status}`);
+        }
+        return response;
+      } catch (error) {
+        if (shouldOpenRestFailureCooldownFromError(error)) {
+          openRestFailureCooldown(error?.message || error?.name || 'fetch timeout');
+        }
+        throw error;
       } finally {
         if (timeout) clearTimeout(timeout);
         if (abortListener && typeof upstreamSignal?.removeEventListener === 'function') {
@@ -97,6 +140,9 @@ function createSupabaseStateStore(deps = {}) {
     }
     if (typeof fetchImpl !== 'function') {
       return { ok: false, status: null, body: null, error: 'Fetch is niet beschikbaar.' };
+    }
+    if (isRestFailureCooldownActive()) {
+      return { ok: false, status: null, body: null, error: buildRestCooldownError() };
     }
 
     const timeoutMs = getSafeSupabaseTimeoutMs();
@@ -116,8 +162,14 @@ function createSupabaseStateStore(deps = {}) {
         body = text;
       }
 
+      if (!response.ok && response.status >= 500) {
+        openRestFailureCooldown(`status ${response.status}`);
+      }
       return { ok: response.ok, status: response.status, body, error: null };
     } catch (error) {
+      if (shouldOpenRestFailureCooldownFromError(error)) {
+        openRestFailureCooldown(error?.message || error?.name || 'REST timeout');
+      }
       return {
         ok: false,
         status: null,

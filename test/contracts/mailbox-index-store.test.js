@@ -217,6 +217,54 @@ test('mailbox index store timeboxes hanging Supabase index reads', async () => {
   assert.equal(loggerErrors.length, 0);
 });
 
+test('mailbox index store opens a short cooldown after Supabase index timeouts', async () => {
+  let readCalls = 0;
+  const loggerInfos = [];
+  const hangingClient = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return this;
+            },
+            limit() {
+              return this;
+            },
+            maybeSingle() {
+              readCalls += 1;
+              return new Promise(() => {});
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => hangingClient,
+    mailboxIndexQueryTimeoutMs: 25,
+    mailboxIndexFailureCooldownMs: 1000,
+    logger: {
+      error: () => {},
+      info: (...args) => loggerInfos.push(args),
+    },
+  });
+
+  const first = await store.getSyncState({ accountEmail: 'info@softora.nl', folder: 'inbox' });
+  const secondStartedAt = Date.now();
+  const second = await store.getSyncState({ accountEmail: 'info@softora.nl', folder: 'inbox' });
+
+  assert.equal(first, null);
+  assert.equal(second, null);
+  assert.equal(readCalls, 1);
+  assert.ok(Date.now() - secondStartedAt < 100);
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[MailboxIndex][circuit-open][SoftError]'),
+    true
+  );
+});
+
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {
   const schema = fs.readFileSync(
     path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
