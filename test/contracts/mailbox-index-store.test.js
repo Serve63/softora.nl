@@ -127,6 +127,52 @@ test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', asy
   assert.equal(third.ok, true);
 });
 
+test('mailbox index store logs Supabase timeouts as soft index errors', async () => {
+  const loggerErrors = [];
+  const loggerInfos = [];
+  const timeoutClient = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return this;
+            },
+            limit() {
+              return this;
+            },
+            async maybeSingle() {
+              const error = new Error('Supabase client timeout na 12s');
+              error.name = 'AbortError';
+              return { data: null, error };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => timeoutClient,
+    logger: {
+      error: (...args) => loggerErrors.push(args),
+      info: (...args) => loggerInfos.push(args),
+    },
+  });
+
+  const state = await store.getSyncState({ accountEmail: 'info@softora.nl', folder: 'inbox' });
+
+  assert.equal(state, null);
+  assert.equal(
+    loggerInfos.some((args) => args[0] === '[MailboxIndex][get-sync-state][SoftError]'),
+    true
+  );
+  assert.equal(
+    loggerErrors.some((args) => String(args[0]).includes('[MailboxIndex][get-sync-state]')),
+    false
+  );
+});
+
 test('mailbox index schema declares tables, indexes, RLS and service-role access', () => {
   const schema = fs.readFileSync(
     path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
