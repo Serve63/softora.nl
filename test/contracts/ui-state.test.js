@@ -7,7 +7,8 @@ const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 
 function createFixture(overrides = {}) {
   const inMemoryUiStateByScope = new Map();
-  const loggerCalls = [];
+  const loggerErrors = [];
+  const loggerInfos = [];
   const restReads = [];
   const restWrites = [];
 
@@ -36,13 +37,15 @@ function createFixture(overrides = {}) {
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     logger: {
-      error: (...args) => loggerCalls.push(args),
+      error: (...args) => loggerErrors.push(args),
+      info: (...args) => loggerInfos.push(args),
     },
   });
 
   return {
     inMemoryUiStateByScope,
-    loggerCalls,
+    loggerErrors,
+    loggerInfos,
     restReads,
     restWrites,
     store,
@@ -305,7 +308,7 @@ test('ui-state store writes values through REST fallback when client upsert cras
 });
 
 test('ui-state store does not silently serve in-memory values when remote reads time out', async () => {
-  const { inMemoryUiStateByScope, loggerCalls, store } = createFixture({
+  const { inMemoryUiStateByScope, loggerErrors, loggerInfos, store } = createFixture({
     uiStateReadTimeoutMs: 5,
     fetchResult: new Promise(() => {}),
   });
@@ -317,8 +320,12 @@ test('ui-state store does not silently serve in-memory values when remote reads 
 
   assert.equal(state, null);
   assert.equal(
-    loggerCalls.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
+    loggerInfos.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
     true
+  );
+  assert.equal(
+    loggerErrors.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
+    false
   );
 });
 

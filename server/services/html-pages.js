@@ -431,8 +431,13 @@ function createHtmlPageCoordinator(options = {}) {
       };
 
       const timeoutHandle = setTimeout(() => {
-        const log = typeof logger.warn === 'function' ? logger.warn.bind(logger) : logger.error.bind(logger);
-        log(`[HTML][${label}Timeout]`, fileName, `na ${safeTimeoutMs}ms`);
+        const log =
+          typeof logger.info === 'function'
+            ? logger.info.bind(logger)
+            : typeof logger.log === 'function'
+              ? logger.log.bind(logger)
+              : null;
+        if (log) log(`[HTML][${label}Timeout]`, fileName, `na ${safeTimeoutMs}ms`);
         finish(fallbackValue);
       }, safeTimeoutMs);
 
