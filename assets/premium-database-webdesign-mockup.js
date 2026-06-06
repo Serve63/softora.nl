@@ -1,28 +1,9 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v12";
+    const DEVICE_MOCKUP_VERSION = "v11";
     const MOCKUP_BACKGROUND_SRC = "/assets/webdesign-preview-stage-bg.jpg";
-    const MOCKUP_TEMPLATE_SRC = "/assets/webdesign-device-mockup-template-v12.jpg";
-    const DEVICE_MOCKUP_SCREENS = [
-        {
-            id: "laptop",
-            points: [{ x: 224, y: 126 }, { x: 909, y: 150 }, { x: 930, y: 653 }, { x: 238, y: 631 }],
-            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.12,
-        },
-        {
-            id: "tablet",
-            points: [{ x: 1028, y: 174 }, { x: 1282, y: 183 }, { x: 1293, y: 641 }, { x: 1041, y: 637 }],
-            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.14,
-        },
-        {
-            id: "phone",
-            points: [{ x: 1374, y: 351 }, { x: 1508, y: 360 }, { x: 1518, y: 646 }, { x: 1385, y: 644 }],
-            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.16,
-        },
-    ];
     let mockupBackgroundPromise = null;
-    let mockupTemplatePromise = null;
     function normalizeString(value) {
         return String(value || "").trim();
     }
@@ -79,17 +60,6 @@
             image.src = MOCKUP_BACKGROUND_SRC;
         });
         return mockupBackgroundPromise;
-    }
-
-    function loadMockupTemplate() {
-        if (mockupTemplatePromise) return mockupTemplatePromise;
-        mockupTemplatePromise = new Promise(function (resolve) {
-            const image = new Image();
-            image.onload = function () { resolve(image); };
-            image.onerror = function () { resolve(null); };
-            image.src = MOCKUP_TEMPLATE_SRC;
-        });
-        return mockupTemplatePromise;
     }
 
     function roundRect(context, x, y, width, height, radius) {
@@ -328,130 +298,30 @@
         context.fillRect(0, 0, 1600, 1000);
     }
 
-    function getPointDistance(first, second) {
-        return Math.hypot((Number(second.x) || 0) - (Number(first.x) || 0), (Number(second.y) || 0) - (Number(first.y) || 0));
-    }
-
-    function getScreenTarget(screen) {
-        const points = Array.isArray(screen.points) ? screen.points : [];
-        const topLeft = points[0] || { x: 0, y: 0 };
-        const topRight = points[1] || { x: 1, y: 0 };
-        const bottomLeft = points[3] || { x: 0, y: 1 };
-        return {
-            width: Math.max(1, getPointDistance(topLeft, topRight)),
-            height: Math.max(1, getPointDistance(topLeft, bottomLeft)),
-        };
-    }
-
-    function clipScreenPolygon(context, screen) {
-        const points = Array.isArray(screen.points) ? screen.points : [];
-        context.beginPath();
-        points.forEach(function (point, index) {
-            if (index === 0) context.moveTo(point.x, point.y);
-            else context.lineTo(point.x, point.y);
-        });
-        context.closePath();
-        context.clip();
-    }
-
-    function fillScreenPolygon(context, screen) {
-        const points = Array.isArray(screen.points) ? screen.points : [];
-        context.beginPath();
-        points.forEach(function (point, index) {
-            if (index === 0) context.moveTo(point.x, point.y);
-            else context.lineTo(point.x, point.y);
-        });
-        context.closePath();
-        context.fill();
-    }
-
-    function resolveScreenImageCrop(image, width, height, screen) {
-        const sourceWidth = image.naturalWidth || image.width || 1;
-        const sourceHeight = image.naturalHeight || image.height || 1;
-        if (screen.fitMode === "viewport-width") {
-            const scale = width / sourceWidth;
-            const visibleSourceHeight = Math.min(sourceHeight, Math.max(1, height / scale));
-            const cropTopRatio = clamp(normalizeRatio(screen.cropTopRatio, 0), 0, 1);
-            return {
-                sx: 0,
-                sy: clamp((sourceHeight - visibleSourceHeight) * cropTopRatio, 0, Math.max(0, sourceHeight - visibleSourceHeight)),
-                sw: sourceWidth,
-                sh: visibleSourceHeight,
-            };
-        }
-
-        const targetRatio = width / height;
-        const viewportHeightRatio = clamp(normalizeRatio(screen.viewportHeightRatio, 0.68), 0.38, 1);
-        let sh = Math.max(1, sourceHeight * viewportHeightRatio);
-        let sw = sh * targetRatio;
-        if (sw > sourceWidth) {
-            sw = sourceWidth;
-            sh = sw / targetRatio;
-        }
-        sh = Math.min(sh, sourceHeight);
-        sw = Math.min(sw, sourceWidth);
-        const focusX = clamp(normalizeRatio(screen.cropFocusX, 0.5), 0, 1);
-        const cropTopRatio = clamp(normalizeRatio(screen.cropTopRatio, 0), 0, 1);
-        return {
-            sx: clamp((sourceWidth - sw) * focusX, 0, Math.max(0, sourceWidth - sw)),
-            sy: clamp((sourceHeight - sh) * cropTopRatio, 0, Math.max(0, sourceHeight - sh)),
-            sw: sw,
-            sh: sh,
-        };
-    }
-
-    function drawWebsiteOnTemplateScreen(context, image, screen) {
-        const points = Array.isArray(screen.points) ? screen.points : [];
-        const topLeft = points[0] || { x: 0, y: 0 };
-        const topRight = points[1] || { x: 1, y: 0 };
-        const bottomLeft = points[3] || { x: 0, y: 1 };
-        const target = getScreenTarget(screen);
-        const crop = resolveScreenImageCrop(image, target.width, target.height, screen);
-
-        context.save();
-        clipScreenPolygon(context, screen);
-        context.setTransform(
-            (topRight.x - topLeft.x) / target.width,
-            (topRight.y - topLeft.y) / target.width,
-            (bottomLeft.x - topLeft.x) / target.height,
-            (bottomLeft.y - topLeft.y) / target.height,
-            topLeft.x,
-            topLeft.y
-        );
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-        context.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, target.width, target.height);
-        context.restore();
-
-        context.save();
-        clipScreenPolygon(context, screen);
-        context.fillStyle = "rgba(0, 0, 0, " + (screen.glassOpacity || 0.12) + ")";
-        fillScreenPolygon(context, screen);
-        const glass = context.createLinearGradient(points[0].x, points[0].y, points[2].x, points[2].y);
-        glass.addColorStop(0, "rgba(255, 255, 255, 0.24)");
-        glass.addColorStop(0.36, "rgba(255, 255, 255, 0.02)");
-        glass.addColorStop(0.72, "rgba(0, 0, 0, 0.10)");
-        glass.addColorStop(1, "rgba(255, 255, 255, 0.10)");
-        context.fillStyle = glass;
-        fillScreenPolygon(context, screen);
-        context.restore();
-    }
-
     async function createMockupDataUrl(image) {
         const canvas = document.createElement("canvas");
         canvas.width = 1600;
-        canvas.height = 900;
+        canvas.height = 1000;
         const context = canvas.getContext("2d");
         if (!context) throw new Error("Device-mockup maken is mislukt.");
 
-        const template = await loadMockupTemplate();
-        if (template) {
-            context.drawImage(template, 0, 0, 1600, 900);
-        } else {
-            drawStageBackground(context, await loadMockupBackground());
-        }
-        DEVICE_MOCKUP_SCREENS.forEach(function (screen) {
-            drawWebsiteOnTemplateScreen(context, image, screen);
+        drawStageBackground(context, await loadMockupBackground());
+
+        drawDevice(context, image, {
+            x: 100, y: 92, w: 980, h: 545, pad: 30, padTop: 28, padBottom: 66, radius: 28, screenRadius: 16,
+            frame: "#0b1323", edge: "#1d2b42", shadow: "rgba(15,23,42,.26)", blur: 44, offsetY: 26,
+            fitMode: "viewport-width", cropTopRatio: 0,
+            baseStyle: "modern-laptop", baseX: 36, baseY: 642, baseW: 1195, baseH: 230,
+        });
+        drawDevice(context, image, {
+            x: 1095, y: 160, w: 305, h: 455, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
+            frame: "#1f2937", shadow: "rgba(15,23,42,.22)", blur: 34, offsetY: 22,
+            fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0.5, viewportHeightRatio: 1,
+        });
+        drawDevice(context, image, {
+            x: 1345, y: 350, w: 180, h: 380, pad: 10, padTop: 22, padBottom: 16, radius: 34, screenRadius: 20,
+            frame: "#030712", shadow: "rgba(15,23,42,.28)", blur: 30, offsetY: 18,
+            fitMode: "viewport", cropTopRatio: 0, cropFocusX: 0, viewportHeightRatio: 1,
         });
 
         return canvas.toDataURL("image/jpeg", 0.86);
