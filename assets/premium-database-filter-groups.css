@@ -99,6 +99,97 @@
     display: none !important;
 }
 
+.database-import-actions[hidden],
+.database-import-drop-overlay[hidden] {
+    display: none !important;
+}
+
+.database-import-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+}
+
+.database-import-button {
+    border: 1px solid rgba(139, 34, 82, 0.28);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--crimson);
+    cursor: pointer;
+    font: 700 12px/1 "Inter", sans-serif;
+    padding: 11px 15px;
+    transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease;
+}
+
+.database-import-button:hover:not(:disabled) {
+    border-color: rgba(139, 34, 82, 0.44);
+    background: rgba(139, 34, 82, 0.07);
+    transform: translateY(-1px);
+}
+
+.database-import-button:disabled {
+    cursor: wait;
+    opacity: .58;
+    transform: none;
+}
+
+.database-import-hint {
+    color: var(--light);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.database-import-drop-overlay {
+    position: fixed;
+    inset: 0 0 0 var(--premium-sidebar-width, 320px);
+    z-index: 130;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(248, 247, 244, .72);
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+}
+
+.database-import-drop-card {
+    width: min(420px, calc(100vw - 48px));
+    border: 1px dashed rgba(139, 34, 82, 0.42);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 18px 44px rgba(31, 31, 45, .16);
+    color: var(--dark);
+    padding: 28px;
+    text-align: center;
+}
+
+.database-import-drop-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 999px;
+    background: var(--crimson);
+    color: #fff;
+    font: 800 13px/1 "Inter", sans-serif;
+    letter-spacing: .08em;
+    margin-bottom: 14px;
+}
+
+.database-import-drop-title {
+    font: 800 22px/1.15 "Oswald", sans-serif;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+}
+
+.database-import-drop-sub {
+    margin-top: 8px;
+    color: var(--mid);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 .s-foto-nodig .s-dot,
 .s-mockup-nodig .s-dot {
     background: var(--orange);
@@ -181,11 +272,19 @@
         width: 100%;
     }
 
+    .database-import-actions {
+        width: 100%;
+    }
+
     .status-filter-group {
         padding: 0 10px 10px 0;
     }
 
     .status-filter-divider {
         display: none;
+    }
+
+    .database-import-hint {
+        white-space: normal;
     }
 }
