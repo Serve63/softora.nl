@@ -460,6 +460,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   test('premium database page renders the dedicated database UI while preserving persistence hooks', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const importScriptPath = path.join(__dirname, '../../assets/premium-database-import.js');
+  const availableImportScriptPath = path.join(__dirname, '../../assets/premium-database-available-import.js');
   const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
   const webdesignAssetStateScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
@@ -473,6 +474,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const instantlySyncScriptPath = path.join(__dirname, '../../assets/premium-database-instantly-sync.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
+  const availableImportScriptSource = fs.readFileSync(availableImportScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
   const webdesignAssetStateScriptSource = fs.readFileSync(webdesignAssetStateScriptPath, 'utf8');
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
@@ -493,10 +495,13 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
-  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 15%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 9%;/);
-  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 16%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 10%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 16%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(2\), tbody td:nth-child\(2\) \{ width: 17%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 17%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(4\), tbody td:nth-child\(4\) \{ width: 16%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 10%;/);
+  assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 12%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 12%;/);
   assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{[\s\S]*min-width: 118px;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
   assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(7\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(7\), table:not\(\.outreach-action-mode\) thead th:nth-child\(9\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(9\) \{ display: none; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{[\s\S]*width: 5%;[\s\S]*min-width: 56px;[\s\S]*text-align: center;/);
@@ -581,7 +586,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /aria-label=\\"Website openen: " \+ escapeHtml\(websiteValue\)/);
   assert.match(pageSource, /class=\\"website-open-icon\\"/);
   assert.match(pageSource, /class=\\"c-mid website-cell\\"/);
-  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 6%; min-width: 68px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
+  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 10%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
   assert.doesNotMatch(pageSource, /target=\\"_blank\\" rel=\\"noopener\\">" \+ escapeHtml\(websiteValue\) \+ "<\/a>"/);
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
@@ -843,7 +848,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260606b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260606d/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
@@ -995,9 +1000,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260521b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
-  assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
+  assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput"/);
+  assert.doesNotMatch(pageSource, /<div class="database-import-actions" id="databaseImportActions" hidden>/);
+  assert.doesNotMatch(pageSource, /<div class="database-import-drop-overlay" id="databaseImportDropOverlay" hidden aria-hidden="true">/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
   assert.match(importScriptSource, /function readChunkedStateValue\(values, baseKey\)/);
@@ -1041,7 +1048,18 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const databaseImportController = window\.SoftoraDatabaseImport\.createController\(\{/);
   assert.match(pageSource, /syncRows: syncCustomersFromRows/);
   assert.match(pageSource, /syncKey: CUSTOMER_DB_SYNC_KEY/);
-  assert.match(pageSource, /if \(nodes\.importFileInput\) nodes\.importFileInput\.addEventListener\("change", databaseImportController\.handleFileChange\)/);
+  assert.match(pageSource, /const availableImportController = window\.SoftoraDatabaseAvailableImport\.createController\(\{ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage \}\); availableImportController\.bind\(\);/);
+  assert.doesNotMatch(pageSource, /function renderAvailableImportControls\(\) \{/);
+  assert.match(pageSource, /function renderPage\(\) \{ renderTable\(\); \}/);
+  assert.match(pageSource, /function mapCsvRowToCustomer\(headers, row, index, options\) \{/);
+  assert.match(pageSource, /const defaultStatus = normalizeDatabaseStatus\(options && options\.defaultStatus \|\| "benaderbaar"\);/);
+  assert.match(availableImportScriptSource, /actions\.id = "databaseImportActions";/);
+  assert.match(availableImportScriptSource, /button\.textContent = "CSV uploaden";/);
+  assert.match(availableImportScriptSource, /input\.id = "importFileInput";/);
+  assert.match(availableImportScriptSource, /overlay\.id = "databaseImportDropOverlay";/);
+  assert.match(availableImportScriptSource, /return await importController\.importFile\(file, \{ defaultStatus: "prospect", source: "available-upload" \}\);/);
+  assert.match(availableImportScriptSource, /document\.addEventListener\("dragenter", function \(event\) \{/);
+  assert.match(availableImportScriptSource, /document\.addEventListener\("drop", function \(event\) \{/);
   assert.doesNotMatch(pageSource, /nodes\.addSyncButton\.addEventListener\("click"/);
   assert.doesNotMatch(pageSource, /addRealBusinessesButton: document\.getElementById\("addRealBusinessesButton"\)/);
   assert.match(pageSource, /realBusinessButton: null/);

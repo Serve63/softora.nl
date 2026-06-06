@@ -372,17 +372,23 @@
             if (input) input.value = "";
         }
 
-        function handleFileChange(event) {
-            const file = event.target.files && event.target.files[0];
-            if (!file) return;
+        function importFile(file, options) {
+            if (!file) return Promise.resolve(false);
             setStatusMessage(isExcelImportFile(file) ? "Spreadsheet verwerken..." : "Bestand verwerken...", "info");
-            (isExcelImportFile(file) ? readExcelRows(file) : readDelimitedRows(file))
-                .then(importRows)
+            return (isExcelImportFile(file) ? readExcelRows(file) : readDelimitedRows(file))
+                .then(function (rows) {
+                    return importRows(rows, options || {});
+                })
                 .catch(function (error) {
                     console.error("Database upload mislukt:", error);
                     setStatusMessage("Uploaden mislukt: " + String(error.message || "ongeldig bestand"), "error");
                 })
                 .finally(resetInput);
+        }
+
+        function handleFileChange(event) {
+            const file = event.target.files && event.target.files[0];
+            return importFile(file);
         }
 
         function loadSyncConfig() {
@@ -488,6 +494,7 @@
             handleFileChange: handleFileChange,
             handleRealBusinessAdd: handleRealBusinessAdd,
             handleSyncConnect: handleSyncConnect,
+            importFile: importFile,
             startAutoSync: startAutoSync
         };
     }

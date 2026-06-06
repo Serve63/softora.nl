@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260606b">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260606d">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -431,14 +431,14 @@
             text-overflow: ellipsis;
         }
 
-        thead th:nth-child(1), tbody td:nth-child(1) { width: 15%; }
-        thead th:nth-child(2), tbody td:nth-child(2) { width: 13%; }
-        thead th:nth-child(3), tbody td:nth-child(3) { width: 16%; }
-        thead th:nth-child(4), tbody td:nth-child(4) { width: 13%; }
-        thead th:nth-child(5), tbody td:nth-child(5) { width: 6%; min-width: 68px; text-align: center; padding-left: 6px; padding-right: 6px; }
-        thead th:nth-child(6), tbody td:nth-child(6) { width: 10%; }
+        thead th:nth-child(1), tbody td:nth-child(1) { width: 16%; }
+        thead th:nth-child(2), tbody td:nth-child(2) { width: 17%; }
+        thead th:nth-child(3), tbody td:nth-child(3) { width: 17%; }
+        thead th:nth-child(4), tbody td:nth-child(4) { width: 16%; }
+        thead th:nth-child(5), tbody td:nth-child(5) { width: 10%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; }
+        thead th:nth-child(6), tbody td:nth-child(6) { width: 12%; }
         table:not(.outreach-action-mode) thead th:nth-child(7), table:not(.outreach-action-mode) tbody td:nth-child(7), table:not(.outreach-action-mode) thead th:nth-child(9), table:not(.outreach-action-mode) tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(6), table.outreach-action-mode tbody td:nth-child(6) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { width: 24%; text-align: center; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { width: 5%; min-width: 56px; text-align: center; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 9%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(9), tbody td:nth-child(9) { width: 5%; text-align: center; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 12%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(9), tbody td:nth-child(9) { width: 5%; text-align: center; }
 
         thead th:hover {
             color: var(--dark);
@@ -1505,7 +1505,7 @@
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-action.js?v=20260529d"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script>
-    <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260605a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
@@ -1574,7 +1574,6 @@
             generatePhotosButton: document.getElementById("generatePhotosButton"), resultCountStack: document.querySelector(".result-count-stack"), photoHeaderLabel: document.getElementById("photoHeaderLabel"),
             loadMoreWrap: document.getElementById("loadMoreWrap"), loadMoreButton: document.getElementById("loadMoreButton"), loadMoreSummary: document.getElementById("loadMoreSummary"),
             deepSearchButton: document.getElementById("deepSearchButton"), manualAddButton: document.getElementById("manualAddButton"),
-            importFileInput: document.getElementById("importFileInput"),
             photoFileInput: document.getElementById("photoFileInput"),
             overlay: document.getElementById("ov"),
             panel: document.getElementById("panel"),
@@ -2698,7 +2697,7 @@
 
         const pickRecordValue = window.SoftoraDatabaseImport.pickRecordValue;
 
-        function mapCsvRowToCustomer(headers, row, index) {
+        function mapCsvRowToCustomer(headers, row, index, options) {
             const record = {};
             headers.forEach(function (header, headerIndex) {
                 record[header] = normalizeString(row[headerIndex]);
@@ -2708,7 +2707,8 @@
             if (!bedrijf) return null;
 
             const website = pickRecordValue(record, ["website", "domein", "domain", "url", "site"]);
-            const status = normalizeDatabaseStatus(pickRecordValue(record, ["status", "fase"]) || "benaderbaar");
+            const defaultStatus = normalizeDatabaseStatus(options && options.defaultStatus || "benaderbaar");
+            const status = normalizeDatabaseStatus(pickRecordValue(record, ["status", "fase"]) || defaultStatus);
             const updatedAt = pickRecordValue(record, ["laatste actie", "updatedat", "updated at", "datum"]) || formatDateForStorage(new Date());
 
             return normalizeCustomer({
@@ -2736,6 +2736,7 @@
         function applyCustomersFromRows(rows, options) {
             const isSync = Boolean(options && options.updateExisting);
             const silent = Boolean(options && options.silent);
+            const defaultStatus = normalizeDatabaseStatus(options && options.defaultStatus || "benaderbaar");
             if (rows.length < 2) {
                 setStatusMessage("Het bestand bevat geen bruikbare rijen.", "error");
                 return Promise.resolve(false);
@@ -2743,7 +2744,7 @@
 
             const headers = rows[0].map(normalizeCsvHeader);
             const importedCustomers = rows.slice(1).map(function (row, index) {
-                return mapCsvRowToCustomer(headers, row, index);
+                return mapCsvRowToCustomer(headers, row, index, { defaultStatus: defaultStatus });
             }).filter(Boolean);
 
             if (!importedCustomers.length) {
@@ -2786,8 +2787,8 @@
             });
         }
 
-        function importCustomersFromRows(rows) {
-            return applyCustomersFromRows(rows, { updateExisting: false });
+        function importCustomersFromRows(rows, options) {
+            return applyCustomersFromRows(rows, { updateExisting: false, defaultStatus: options && options.defaultStatus });
         }
 
         function syncCustomersFromRows(rows, options) {
@@ -2980,7 +2981,7 @@
         renderPage(); releaseDatabaseBootShell();
 
         const databaseImportController = window.SoftoraDatabaseImport.createController({
-            input: nodes.importFileInput,
+            input: null,
             setStatusMessage: setStatusMessage,
             importRows: importCustomersFromRows,
             syncRows: syncCustomersFromRows,
@@ -2991,7 +2992,7 @@
             syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS,
             realBusinessButton: null
         });
-
+        const availableImportController = window.SoftoraDatabaseAvailableImport.createController({ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage }); availableImportController.bind();
         const databaseDeepSearchController = window.SoftoraDatabaseDeepSearch.createController({
             nodes: nodes,
             getUiState: fetchUiStateGetWithFallback,
@@ -3095,7 +3096,6 @@
         });
         photoBatchController.bind(); databaseDeepSearchController.bind(); startCustomerStateAutoRefresh();
         if (nodes.addActionsMenu) nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) databaseDeepSearchController.open(); });
-        if (nodes.importFileInput) nodes.importFileInput.addEventListener("change", databaseImportController.handleFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
         nodes.modalBg.addEventListener("click", function (event) {
