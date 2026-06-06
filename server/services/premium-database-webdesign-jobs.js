@@ -2,9 +2,10 @@ const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v11';
-const DEVICE_MOCKUP_FILE_VERSION = 'v11';
+const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v12';
+const DEVICE_MOCKUP_FILE_VERSION = 'v12';
 const DEVICE_MOCKUP_BACKGROUND_PATH = path.join(__dirname, '../../assets/webdesign-preview-stage-bg.jpg');
+const DEVICE_MOCKUP_TEMPLATE_PATH = path.join(__dirname, '../../assets/webdesign-device-mockup-template-v12.jpg');
 const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
   'softora-browser-device-v6',
   'softora-server-device-v6',
@@ -21,6 +22,7 @@ const WEBDESIGN_GUTTER_CROP_MIN_PAD = 12;
 const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
 let cachedSharp = null;
 let cachedDeviceMockupBackgroundDataUri;
+let cachedDeviceMockupTemplateDataUri;
 
 function loadSharpModule() {
   if (cachedSharp) return cachedSharp;
@@ -36,6 +38,16 @@ function getDeviceMockupBackgroundDataUri() {
     cachedDeviceMockupBackgroundDataUri = '';
   }
   return cachedDeviceMockupBackgroundDataUri;
+}
+
+function getDeviceMockupTemplateDataUri() {
+  if (cachedDeviceMockupTemplateDataUri !== undefined) return cachedDeviceMockupTemplateDataUri;
+  try {
+    cachedDeviceMockupTemplateDataUri = `data:image/jpeg;base64,${fs.readFileSync(DEVICE_MOCKUP_TEMPLATE_PATH).toString('base64')}`;
+  } catch (_error) {
+    cachedDeviceMockupTemplateDataUri = '';
+  }
+  return cachedDeviceMockupTemplateDataUri;
 }
 
 function parseImageDataUrl(value) {
@@ -255,72 +267,30 @@ function getDeviceMockupRendererSpec() {
   return {
     renderer: DEVICE_MOCKUP_RENDERER,
     fileVersion: DEVICE_MOCKUP_FILE_VERSION,
-    canvas: { width: 1600, height: 1000 },
+    canvas: { width: 1600, height: 900 },
+    template: '/assets/webdesign-device-mockup-template-v12.jpg',
     devices: [
-      buildDeviceSpec({
+      {
         id: 'laptop',
-        x: 100,
-        y: 92,
-        w: 980,
-        h: 545,
-        pad: 30,
-        padTop: 28,
-        padBottom: 66,
-        radius: 28,
-        screenRadius: 16,
-        frame: '#0b1323',
-        edge: '#1d2b42',
-        shadow: 'rgba(15,23,42,.26)',
-        blur: 44,
-        offsetY: 26,
+        points: [{ x: 224, y: 126 }, { x: 909, y: 150 }, { x: 930, y: 653 }, { x: 238, y: 631 }],
         fitMode: 'viewport-width',
         cropTopRatio: 0,
-        baseStyle: 'modern-laptop',
-        baseX: 36,
-        baseY: 642,
-        baseW: 1195,
-        baseH: 230,
-      }),
-      buildDeviceSpec({
+        glassOpacity: 0.12,
+      },
+      {
         id: 'tablet',
-        x: 1095,
-        y: 160,
-        w: 305,
-        h: 455,
-        pad: 14,
-        padTop: 18,
-        padBottom: 18,
-        radius: 34,
-        screenRadius: 22,
-        frame: '#1f2937',
-        shadow: 'rgba(15,23,42,.22)',
-        blur: 34,
-        offsetY: 22,
-        fitMode: 'viewport',
+        points: [{ x: 1028, y: 174 }, { x: 1282, y: 183 }, { x: 1293, y: 641 }, { x: 1041, y: 637 }],
+        fitMode: 'viewport-width',
         cropTopRatio: 0,
-        cropFocusX: 0.5,
-        viewportHeightRatio: 1,
-      }),
-      buildDeviceSpec({
+        glassOpacity: 0.14,
+      },
+      {
         id: 'phone',
-        x: 1345,
-        y: 350,
-        w: 180,
-        h: 380,
-        pad: 10,
-        padTop: 22,
-        padBottom: 16,
-        radius: 34,
-        screenRadius: 20,
-        frame: '#030712',
-        shadow: 'rgba(15,23,42,.28)',
-        blur: 30,
-        offsetY: 18,
-        fitMode: 'viewport',
+        points: [{ x: 1374, y: 351 }, { x: 1508, y: 360 }, { x: 1518, y: 646 }, { x: 1385, y: 644 }],
+        fitMode: 'viewport-width',
         cropTopRatio: 0,
-        cropFocusX: 0,
-        viewportHeightRatio: 1,
-      }),
+        glassOpacity: 0.16,
+      },
     ],
   };
 }
@@ -346,6 +316,75 @@ function resolveViewportCrop(sourceSize, screen, device) {
     sw,
     sh,
   };
+}
+
+function getPointDistance(first, second) {
+  return Math.hypot((Number(second.x) || 0) - (Number(first.x) || 0), (Number(second.y) || 0) - (Number(first.y) || 0));
+}
+
+function getDeviceScreenTarget(device) {
+  const points = Array.isArray(device.points) ? device.points : [];
+  const topLeft = points[0] || { x: 0, y: 0 };
+  const topRight = points[1] || { x: 1, y: 0 };
+  const bottomLeft = points[3] || { x: 0, y: 1 };
+  return {
+    width: Math.max(1, getPointDistance(topLeft, topRight)),
+    height: Math.max(1, getPointDistance(topLeft, bottomLeft)),
+  };
+}
+
+function getDeviceScreenMatrix(device, target) {
+  const points = Array.isArray(device.points) ? device.points : [];
+  const topLeft = points[0] || { x: 0, y: 0 };
+  const topRight = points[1] || { x: target.width, y: 0 };
+  const bottomLeft = points[3] || { x: 0, y: target.height };
+  return {
+    a: ((Number(topRight.x) || 0) - (Number(topLeft.x) || 0)) / target.width,
+    b: ((Number(topRight.y) || 0) - (Number(topLeft.y) || 0)) / target.width,
+    c: ((Number(bottomLeft.x) || 0) - (Number(topLeft.x) || 0)) / target.height,
+    d: ((Number(bottomLeft.y) || 0) - (Number(topLeft.y) || 0)) / target.height,
+    e: Number(topLeft.x) || 0,
+    f: Number(topLeft.y) || 0,
+  };
+}
+
+function formatDevicePoints(device) {
+  return (Array.isArray(device.points) ? device.points : [])
+    .map((point) => `${Number(point.x) || 0},${Number(point.y) || 0}`)
+    .join(' ');
+}
+
+function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
+  const target = getDeviceScreenTarget(device);
+  const matrix = getDeviceScreenMatrix(device, target);
+  const screen = { width: target.width, height: target.height };
+  const sourceWidth = Math.max(1, normalizeFiniteNumber(sourceSize.width, 1));
+  const sourceHeight = Math.max(1, normalizeFiniteNumber(sourceSize.height, 1));
+  let crop;
+  if (device.fitMode === 'viewport-width') {
+    const scale = screen.width / sourceWidth;
+    const visibleSourceHeight = Math.min(sourceHeight, Math.max(1, screen.height / scale));
+    const cropTopRatio = clampNumber(normalizeFiniteNumber(device.cropTopRatio, 0), 0, 1);
+    crop = {
+      sx: 0,
+      sy: clampNumber((sourceHeight - visibleSourceHeight) * cropTopRatio, 0, Math.max(0, sourceHeight - visibleSourceHeight)),
+      sw: sourceWidth,
+      sh: visibleSourceHeight,
+    };
+  } else {
+    crop = resolveViewportCrop(sourceSize, screen, device);
+    crop = { sx: crop.sx, sy: crop.sy, sw: crop.sw, sh: crop.sh };
+  }
+  return `
+      <g clip-path="url(#${device.id}Screen)">
+        <g transform="matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})">
+          <svg x="0" y="0" width="${target.width}" height="${target.height}" viewBox="${crop.sx} ${crop.sy} ${crop.sw} ${crop.sh}" preserveAspectRatio="none" overflow="hidden">
+            <image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/>
+          </svg>
+        </g>
+        <polygon points="${formatDevicePoints(device)}" fill="#000000" opacity="${device.glassOpacity || 0.12}"/>
+        <polygon points="${formatDevicePoints(device)}" fill="url(#screenSheenGradient)" opacity="0.2"/>
+      </g>`;
 }
 
 function renderDeviceImageSvg(device, sourceSize, embeddedImage) {
@@ -432,45 +471,30 @@ async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
   };
   const embeddedImage = `data:${parsed.mimeType};base64,${parsed.base64}`;
   const spec = getDeviceMockupRendererSpec();
+  const templateDataUri = getDeviceMockupTemplateDataUri();
   const backgroundDataUri = getDeviceMockupBackgroundDataUri();
   return `
-    <svg width="1600" height="1000" viewBox="0 0 1600 1000" xmlns="http://www.w3.org/2000/svg">
+    <svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
-          <feDropShadow dx="0" dy="26" stdDeviation="44" flood-color="#0f172a" flood-opacity="0.24"/>
-        </filter>
-        <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="22" stdDeviation="34" flood-color="#0f172a" flood-opacity="0.22"/>
-        </filter>
-        ${spec.devices.map((device) => `<clipPath id="${device.id}Screen"><rect x="${device.screen.x}" y="${device.screen.y}" width="${device.screen.width}" height="${device.screen.height}" rx="${device.screen.radius}"/></clipPath>`).join('')}
-        <linearGradient id="backgroundGradient" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+        ${spec.devices.map((device) => `<clipPath id="${device.id}Screen" clipPathUnits="userSpaceOnUse"><polygon points="${formatDevicePoints(device)}"/></clipPath>`).join('')}
+        <linearGradient id="backgroundGradient" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
           <stop offset="0" stop-color="#f7f3ec"/>
           <stop offset="0.52" stop-color="#ffffff"/>
           <stop offset="1" stop-color="#dfe8ee"/>
         </linearGradient>
-        <linearGradient id="stageOverlay" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#0f172a" stop-opacity="0.12"/>
-          <stop offset="0.48" stop-color="#ffffff" stop-opacity="0.10"/>
-          <stop offset="1" stop-color="#0f172a" stop-opacity="0.16"/>
-        </linearGradient>
-        <linearGradient id="laptopBaseGradient" x1="36" y1="642" x2="1231" y2="872" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#202b3d"/>
-          <stop offset="0.48" stop-color="#121a2a"/>
-          <stop offset="1" stop-color="#070d17"/>
-        </linearGradient>
-        <linearGradient id="laptopHingeGradient" x1="182" y1="612" x2="998" y2="632" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#101827"/>
-          <stop offset="0.5" stop-color="#2b3648"/>
-          <stop offset="1" stop-color="#0b1220"/>
+        <linearGradient id="screenSheenGradient" x1="220" y1="120" x2="930" y2="650" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.24"/>
+          <stop offset="0.36" stop-color="#ffffff" stop-opacity="0.02"/>
+          <stop offset="0.72" stop-color="#000000" stop-opacity="0.10"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0.10"/>
         </linearGradient>
       </defs>
-      ${backgroundDataUri
-        ? `<image href="${backgroundDataUri}" x="0" y="0" width="1600" height="1000" preserveAspectRatio="xMidYMid slice"/>`
-        : `<rect width="1600" height="1000" fill="url(#backgroundGradient)"/>
-      <circle cx="1270" cy="185" r="330" fill="#89d5e7" fill-opacity="0.12"/>
-      <circle cx="245" cy="820" r="310" fill="#c5a86b" fill-opacity="0.13"/>`}
-      <rect width="1600" height="1000" fill="url(#stageOverlay)"/>
-      ${spec.devices.map((device) => renderDeviceSvg(device, sourceSize, embeddedImage)).join('')}
+      ${templateDataUri
+        ? `<image href="${templateDataUri}" x="0" y="0" width="1600" height="900" preserveAspectRatio="xMidYMid slice"/>`
+        : (backgroundDataUri
+          ? `<image href="${backgroundDataUri}" x="0" y="0" width="1600" height="900" preserveAspectRatio="xMidYMid slice"/>`
+          : `<rect width="1600" height="900" fill="url(#backgroundGradient)"/>`)}
+      ${spec.devices.map((device) => renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage)).join('')}
     </svg>`;
 }
 
