@@ -260,15 +260,17 @@ test('premium database system mail counter excludes Instantly and counts Softora
     { bedrijf: 'Gmail lead', lastColdmailProvider: 'gmail' },
     { bedrijf: 'SMTP lead', lastColdmailSenderEmail: 'serve@softora.nl' },
     { bedrijf: 'Message lead', coldmailSentMessageId: 'msg_1' },
+    { bedrijf: 'Two-message lead', hist: [{ label: 'Mail verstuurd' }, { type: 'gemaild', label: 'Mail verstuurd' }] },
+    { bedrijf: 'Instantly history lead', hist: [{ label: 'Mail verstuurd via Instantly' }] },
     { bedrijf: 'Instantly lead', lastColdmailProvider: 'softora', instantlyLeadId: 'inst_1' },
     { bedrijf: 'Provider Instantly', lastColdmailProvider: 'instantly', coldmailSentMessageId: 'msg_2' },
     { bedrijf: 'Softora testmodus', lastColdmailProvider: 'softora' },
     { bedrijf: 'Fresh lead' },
   ];
 
-  assert.equal(systemMailCountClient.getSoftoraSystemMailSentCount(customers, helpers), 4);
+  assert.equal(systemMailCountClient.getSoftoraSystemMailSentCount(customers, helpers), 6);
   systemMailCountClient.render(customers, helpers);
-  assert.equal(node.textContent, '4');
+  assert.equal(node.textContent, '6');
   systemMailCountClient.render([], { ...helpers, dataLoading: true });
   assert.equal(node.textContent, '--');
 });
@@ -563,7 +565,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="system-mail-count-stack" aria-label="Mails verstuurd door Softora"/);
   assert.match(pageSource, /id="systemMailSentCount"/);
   assert.match(pageSource, /class="system-mail-count-icon"/);
-  assert.match(pageSource, />mails verstuurd<\/div>/);
+  assert.match(pageSource, />Mails verstuurd<\/div>/);
   assert.match(pageSource, /id="photoCostLabel" aria-label="Kosten voor AI-foto's"/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.21;/);
   assert.match(pageSource, /<strong>€0,00<\/strong>/);
@@ -581,6 +583,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function formatEuroCost\(value\)/);
   assert.match(pageSource, /function renderPhotoCostLabel\(customers, pending\)/);
   assert.match(systemMailCountScriptSource, /function hasSoftoraSystemMailSignal\(customer, helpers\)/);
+  assert.match(systemMailCountScriptSource, /function getCustomerSoftoraSystemMailSentCount\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getSoftoraSystemMailSentCount\(customers, helpers\)/);
   assert.match(systemMailCountScriptSource, /function render\(customers, helpers\)/);
   assert.match(systemMailCountScriptSource, /hasInstantlyOutreachSignal\(customer\)/);
@@ -904,8 +907,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260606f/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260606a/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260606g/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260606b/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
@@ -915,6 +918,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(statusFilterCssBlock, /rgba\(139, 34, 82/);
   assert.doesNotMatch(statusFilterCssBlock, /margin-left: auto;/);
   assert.match(filterGroupsCssSource, /\.filter-metrics\s*\{[\s\S]*margin-left: auto;[\s\S]*gap: 24px;/);
+  assert.match(filterGroupsCssSource, /\.system-mail-count-stack\s*\{[\s\S]*display: inline-grid;[\s\S]*grid-template-columns: auto auto;/);
   assert.match(filterGroupsCssSource, /\.system-mail-count-icon\s*\{[\s\S]*width: 22px;[\s\S]*height: 22px;/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{[\s\S]*align-items: center;/);
   assert.match(filterGroupsCssSource, /\.status-filter-divider\s*\{/);
@@ -1059,7 +1063,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606c"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260606a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260606b"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput"/);
   assert.doesNotMatch(pageSource, /<div class="database-import-actions" id="databaseImportActions" hidden>/);
@@ -1113,6 +1117,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function mapCsvRowToCustomer\(headers, row, index, options\) \{/);
   assert.match(pageSource, /const defaultStatus = normalizeDatabaseStatus\(options && options\.defaultStatus \|\| "benaderbaar"\);/);
   assert.match(availableImportScriptSource, /actions\.id = "databaseImportActions";/);
+  assert.match(availableImportScriptSource, /createElement\("button", "sf-btn database-import-button"\)/);
   assert.match(availableImportScriptSource, /button\.textContent = "CSV uploaden";/);
   assert.match(availableImportScriptSource, /function findAvailablePills\(\)/);
   assert.match(availableImportScriptSource, /document\.querySelector\("\.status-filter-group--shared \[data-s=\\"beschikbaar\\"\]"\)/);
