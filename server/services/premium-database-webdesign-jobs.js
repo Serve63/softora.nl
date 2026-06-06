@@ -272,21 +272,21 @@ function getDeviceMockupRendererSpec() {
     devices: [
       {
         id: 'laptop',
-        points: [{ x: 222, y: 124 }, { x: 921, y: 149 }, { x: 952, y: 654 }, { x: 235, y: 630 }],
+        points: [{ x: 224, y: 126 }, { x: 909, y: 150 }, { x: 930, y: 653 }, { x: 238, y: 631 }],
         fitMode: 'viewport-width',
         cropTopRatio: 0,
         glassOpacity: 0.12,
       },
       {
         id: 'tablet',
-        points: [{ x: 1016, y: 168 }, { x: 1300, y: 178 }, { x: 1318, y: 652 }, { x: 1032, y: 646 }],
+        points: [{ x: 1028, y: 174 }, { x: 1282, y: 183 }, { x: 1293, y: 641 }, { x: 1041, y: 637 }],
         fitMode: 'viewport-width',
         cropTopRatio: 0,
         glassOpacity: 0.14,
       },
       {
         id: 'phone',
-        points: [{ x: 1378, y: 355 }, { x: 1502, y: 363 }, { x: 1511, y: 642 }, { x: 1387, y: 640 }],
+        points: [{ x: 1374, y: 351 }, { x: 1508, y: 360 }, { x: 1518, y: 646 }, { x: 1385, y: 644 }],
         fitMode: 'viewport-width',
         cropTopRatio: 0,
         glassOpacity: 0.16,
@@ -348,24 +348,6 @@ function getDeviceScreenMatrix(device, target) {
   };
 }
 
-function interpolatePoint(first, second, ratio) {
-  return {
-    x: (Number(first.x) || 0) + ((Number(second.x) || 0) - (Number(first.x) || 0)) * ratio,
-    y: (Number(first.y) || 0) + ((Number(second.y) || 0) - (Number(first.y) || 0)) * ratio,
-  };
-}
-
-function getStripMatrix(topLeft, topRight, bottomLeft, width, height) {
-  return {
-    a: ((Number(topRight.x) || 0) - (Number(topLeft.x) || 0)) / width,
-    b: ((Number(topRight.y) || 0) - (Number(topLeft.y) || 0)) / width,
-    c: ((Number(bottomLeft.x) || 0) - (Number(topLeft.x) || 0)) / height,
-    d: ((Number(bottomLeft.y) || 0) - (Number(topLeft.y) || 0)) / height,
-    e: Number(topLeft.x) || 0,
-    f: Number(topLeft.y) || 0,
-  };
-}
-
 function formatDevicePoints(device) {
   return (Array.isArray(device.points) ? device.points : [])
     .map((point) => `${Number(point.x) || 0},${Number(point.y) || 0}`)
@@ -374,7 +356,7 @@ function formatDevicePoints(device) {
 
 function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
   const target = getDeviceScreenTarget(device);
-  const points = Array.isArray(device.points) ? device.points : [];
+  const matrix = getDeviceScreenMatrix(device, target);
   const screen = { width: target.width, height: target.height };
   const sourceWidth = Math.max(1, normalizeFiniteNumber(sourceSize.width, 1));
   const sourceHeight = Math.max(1, normalizeFiniteNumber(sourceSize.height, 1));
@@ -393,29 +375,13 @@ function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
     crop = resolveViewportCrop(sourceSize, screen, device);
     crop = { sx: crop.sx, sy: crop.sy, sw: crop.sw, sh: crop.sh };
   }
-  const strips = device.id === 'phone' ? 24 : 36;
-  const stripHeight = target.height / strips;
-  const stripOverlap = 1.15;
-  const sourceOverlap = crop.sh / target.height * stripOverlap;
-  const imageStrips = Array.from({ length: strips }, (_item, index) => {
-    const topRatio = index / strips;
-    const bottomRatio = (index + 1) / strips;
-    const stripTopLeft = interpolatePoint(points[0], points[3], topRatio);
-    const stripTopRight = interpolatePoint(points[1], points[2], topRatio);
-    const stripBottomLeft = interpolatePoint(points[0], points[3], bottomRatio);
-    const sourceY = crop.sy + crop.sh * topRatio;
-    const sourceStripHeight = crop.sh / strips;
-    const matrix = getStripMatrix(stripTopLeft, stripTopRight, stripBottomLeft, target.width, stripHeight);
-    return `
-        <g transform="matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})">
-          <svg x="0" y="0" width="${target.width}" height="${stripHeight + stripOverlap}" viewBox="${crop.sx} ${sourceY} ${crop.sw} ${sourceStripHeight + sourceOverlap}" preserveAspectRatio="none" overflow="hidden">
-            <image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/>
-          </svg>
-        </g>`;
-  }).join('');
   return `
       <g clip-path="url(#${device.id}Screen)">
-        ${imageStrips}
+        <g transform="matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})">
+          <svg x="0" y="0" width="${target.width}" height="${target.height}" viewBox="${crop.sx} ${crop.sy} ${crop.sw} ${crop.sh}" preserveAspectRatio="none" overflow="hidden">
+            <image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/>
+          </svg>
+        </g>
         <polygon points="${formatDevicePoints(device)}" fill="#000000" opacity="${device.glassOpacity || 0.12}"/>
         <polygon points="${formatDevicePoints(device)}" fill="url(#screenSheenGradient)" opacity="0.2"/>
       </g>`;
