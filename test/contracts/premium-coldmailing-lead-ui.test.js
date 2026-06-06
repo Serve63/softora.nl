@@ -29,18 +29,11 @@ test('premium coldmailing lead page is its own page and uses only coldmailing fo
   assert.doesNotMatch(leadsPageSource, /premium-coldmailing-lead/);
 });
 
-test('premium sidebar exposes the separate coldmailing lead link above coldmailing', () => {
+test('premium sidebar keeps coldmailing lead out of the sidebar', () => {
   const themeSource = readRepoFile('assets/personnel-theme.js');
 
-  assert.match(themeSource, /function getColdmailingLeadSidebarLink\(\) \{/);
-  assert.match(themeSource, /key:\s*"coldmailing_lead"[\s\S]*href:\s*"\/premium-coldmailing-lead"[\s\S]*label:\s*"Lead"/);
-  assert.match(themeSource, /if \(p\.indexOf\("\/premium-coldmailing-lead"\) === 0\) return "coldmailing_lead";/);
-  assert.match(
-    themeSource,
-    /getColdmailingLeadSidebarLink\(\),[\s\S]*key:\s*"coldmailing"[\s\S]*href:\s*"\/premium-bevestigingsmails"/
-  );
-  assert.match(
-    themeSource,
-    /ensureStaticSidebarLink\([\s\S]*"overzicht"[\s\S]*getColdmailingLeadSidebarLink\(\)[\s\S]*\["coldmailing", "database"\]/
-  );
+  assert.doesNotMatch(themeSource, /function getColdmailingLeadSidebarLink\(\) \{/);
+  assert.doesNotMatch(themeSource, /key:\s*"coldmailing_lead"/);
+  assert.doesNotMatch(themeSource, /href:\s*"\/premium-coldmailing-lead"[\s\S]*label:\s*"Lead"/);
+  assert.match(themeSource, /if \(p\.indexOf\("\/premium-coldmailing-lead"\) === 0\) return "coldmailing";/);
 });
