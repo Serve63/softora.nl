@@ -134,12 +134,6 @@
     transform: none;
 }
 
-.database-import-hint {
-    color: var(--light);
-    font-size: 12px;
-    white-space: nowrap;
-}
-
 .database-import-drop-overlay {
     position: fixed;
     inset: 0 0 0 var(--premium-sidebar-width, 320px);
@@ -284,7 +278,4 @@
         display: none;
     }
 
-    .database-import-hint {
-        white-space: normal;
-    }
 }

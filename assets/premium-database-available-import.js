@@ -53,10 +53,7 @@
         button.type = "button";
         button.textContent = "CSV uploaden";
 
-        const hint = createElement("span", "database-import-hint");
-        hint.textContent = "of sleep bestand hierheen";
-
-        actions.append(button, hint);
+        actions.append(button);
         return { actions: actions, button: button };
     }
 
