@@ -46,9 +46,9 @@
     function createImportActions() {
         const actions = createElement("div", "database-import-actions");
         actions.id = "databaseImportActions";
-        actions.hidden = true;
+        actions.hidden = false;
 
-        const button = createElement("button", "database-import-button");
+        const button = createElement("button", "sf-btn database-import-button");
         button.id = "databaseImportButton";
         button.type = "button";
         button.textContent = "CSV uploaden";
@@ -102,13 +102,9 @@
         let input = null;
         let overlay = null;
 
-        function isAvailableImportActive() {
-            return state && state.activeStatus === "beschikbaar";
-        }
-
         function renderControls() {
             if (!actions || !button) return;
-            actions.hidden = !isAvailableImportActive();
+            actions.hidden = false;
             button.disabled = importBusy;
             button.textContent = importBusy ? "Uploaden..." : "CSV uploaden";
         }
@@ -120,16 +116,12 @@
         }
 
         function shouldShowDrop(event) {
-            if (!isAvailableImportActive() || isPhotoDropDragTarget(event && event.target)) return false;
+            if (isPhotoDropDragTarget(event && event.target)) return false;
             return Boolean(getDatabaseImportFile(event && event.dataTransfer) || hasDatabaseImportDrag(event && event.dataTransfer));
         }
 
         async function importAvailableFile(file) {
             if (!file) return false;
-            if (!isAvailableImportActive()) {
-                setStatusMessage("CSV uploaden kan alleen op Beschikbaar.", "info", true);
-                return false;
-            }
             if (!isDatabaseImportFile(file)) {
                 setStatusMessage("Gebruik een CSV-, TSV- of Excelbestand.", "error", true);
                 return false;
@@ -163,13 +155,11 @@
             });
 
             document.addEventListener("dragleave", function () {
-                if (!isAvailableImportActive()) return;
                 importDragDepth = Math.max(0, importDragDepth - 1);
                 if (!importDragDepth) setDropActive(false);
             });
 
             document.addEventListener("drop", function (event) {
-                if (!isAvailableImportActive()) return;
                 const file = getDatabaseImportFile(event.dataTransfer);
                 if (!file) {
                     if (shouldShowDrop(event)) {
@@ -203,7 +193,7 @@
             document.body.append(input, overlay);
 
             button.addEventListener("click", function () {
-                if (!isAvailableImportActive() || importBusy) return;
+                if (importBusy) return;
                 input.click();
             });
 
