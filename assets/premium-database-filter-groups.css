@@ -107,19 +107,20 @@
 .database-import-actions {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    min-height: 44px;
+    min-height: 28px;
 }
 
 .database-import-button {
-    border: 1px solid rgba(139, 34, 82, 0.28);
+    border: 1px solid rgba(139, 34, 82, 0.26);
     border-radius: 999px;
     background: #fff;
     color: var(--crimson);
     cursor: pointer;
-    font: 700 12px/1 "Inter", sans-serif;
-    padding: 11px 15px;
+    font: 700 12px/1.25 "Inter", sans-serif;
+    min-height: 28px;
+    padding: 5px 12px;
     transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease;
+    white-space: nowrap;
 }
 
 .database-import-button:hover:not(:disabled) {
@@ -132,6 +133,49 @@
     cursor: wait;
     opacity: .58;
     transform: none;
+}
+
+.filter-metrics {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 24px;
+    min-height: 44px;
+}
+
+.filter-metrics .result-count-stack {
+    margin-left: 0;
+}
+
+.system-mail-count-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--light);
+}
+
+.system-mail-count-value {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--crimson);
+    font-weight: 700;
+    text-align: center;
+}
+
+.system-mail-count-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--crimson);
+    filter: drop-shadow(0 5px 12px rgba(139, 34, 82, 0.22));
+}
+
+.system-mail-count-label {
+    font-size: 12px;
+    color: var(--light);
+    line-height: 1.25;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .database-import-drop-overlay {
@@ -276,6 +320,12 @@
 
     .status-filter-divider {
         display: none;
+    }
+
+    .filter-metrics {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-start;
     }
 
 }
