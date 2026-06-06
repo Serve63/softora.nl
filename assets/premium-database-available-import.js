@@ -57,6 +57,11 @@
         return { actions: actions, button: button };
     }
 
+    function findAvailablePills() {
+        const availableButton = document.querySelector(".status-filter-group--shared [data-s=\"beschikbaar\"]");
+        return availableButton && availableButton.closest ? availableButton.closest(".status-filter-pills") : null;
+    }
+
     function createImportInput() {
         const input = document.createElement("input");
         input.type = "file";
@@ -192,8 +197,9 @@
             input = createImportInput();
             overlay = createDropOverlay();
 
-            const resultStack = filterBar.querySelector(".result-count-stack");
-            filterBar.insertBefore(actions, resultStack || null);
+            const availablePills = findAvailablePills();
+            if (availablePills) availablePills.append(actions);
+            else filterBar.append(actions);
             document.body.append(input, overlay);
 
             button.addEventListener("click", function () {
