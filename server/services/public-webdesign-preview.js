@@ -3,6 +3,7 @@ const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
+const PREVIEW_STAGE_BACKGROUND_SRC = '/assets/webdesign-preview-stage-bg.jpg';
 const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
   suppressReadFailureCooldown: true,
   suppressStaleReadCacheLog: true,
@@ -377,15 +378,20 @@ function buildPreviewHtml(preview) {
 ${preconnectTags}
   <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
   <link rel="preload" as="image" href="${mockupSource}">
+  <link rel="preload" as="image" href="${PREVIEW_STAGE_BACKGROUND_SRC}">
   <title>Webdesign preview | Softora</title>
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#121212;color:#fff;font-family:Inter,Arial,sans-serif}
+    html,body{margin:0;min-height:100%;background:#f4f0ea;color:#111827;font-family:Inter,Arial,sans-serif}
+    body{isolation:isolate;overflow-x:hidden}
+    body::before{content:"";position:fixed;inset:0;z-index:-2;background:linear-gradient(90deg,rgba(12,18,28,.22),rgba(255,255,255,.10) 30%,rgba(255,255,255,.16) 70%,rgba(12,18,28,.24)),url("${PREVIEW_STAGE_BACKGROUND_SRC}") center/cover no-repeat;transform:scale(1.025)}
+    body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 50% 34%,rgba(255,255,255,.34),rgba(255,255,255,0) 46%),linear-gradient(180deg,rgba(255,255,255,.16),rgba(9,14,24,.20))}
     main{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(18px,2.8vw,46px)}
     .preview-grid{width:min(1660px,100%);height:min(920px,calc(100svh - clamp(36px,5.6vw,92px)));display:grid;grid-template-columns:minmax(280px,.78fr) minmax(420px,1.12fr);gap:clamp(22px,2.4vw,42px);align-items:center}
     .preview-frame{min-width:0;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .preview-frame img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;background:transparent}
-    .mockup-frame img{width:100%;max-height:86%}
+    .preview-frame img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;background:transparent;filter:drop-shadow(0 28px 50px rgba(15,23,42,.32))}
+    .website-frame img{border-radius:clamp(3px,.35vw,8px);box-shadow:0 0 0 1px rgba(255,255,255,.30),0 30px 90px rgba(15,23,42,.34)}
+    .mockup-frame img{width:100%;max-height:86%;filter:drop-shadow(0 34px 68px rgba(15,23,42,.28))}
     @media(max-width:900px){main{min-height:100vh;align-items:flex-start;padding:14px}.preview-grid{width:100%;height:auto;grid-template-columns:1fr;gap:14px}.preview-frame{height:auto;overflow:visible}.preview-frame img,.mockup-frame img{width:100%;max-height:none}}
   </style>
 </head>

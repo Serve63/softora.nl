@@ -1,7 +1,10 @@
 const { randomUUID } = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
-const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
-const DEVICE_MOCKUP_FILE_VERSION = 'v8';
+const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v11';
+const DEVICE_MOCKUP_FILE_VERSION = 'v11';
+const DEVICE_MOCKUP_BACKGROUND_PATH = path.join(__dirname, '../../assets/webdesign-preview-stage-bg.jpg');
 const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
   'softora-browser-device-v6',
   'softora-server-device-v6',
@@ -17,11 +20,22 @@ const WEBDESIGN_GUTTER_CROP_PAD_RATIO = 0.018;
 const WEBDESIGN_GUTTER_CROP_MIN_PAD = 12;
 const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
 let cachedSharp = null;
+let cachedDeviceMockupBackgroundDataUri;
 
 function loadSharpModule() {
   if (cachedSharp) return cachedSharp;
   cachedSharp = require('sharp');
   return cachedSharp;
+}
+
+function getDeviceMockupBackgroundDataUri() {
+  if (cachedDeviceMockupBackgroundDataUri !== undefined) return cachedDeviceMockupBackgroundDataUri;
+  try {
+    cachedDeviceMockupBackgroundDataUri = `data:image/jpeg;base64,${fs.readFileSync(DEVICE_MOCKUP_BACKGROUND_PATH).toString('base64')}`;
+  } catch (_error) {
+    cachedDeviceMockupBackgroundDataUri = '';
+  }
+  return cachedDeviceMockupBackgroundDataUri;
 }
 
 function parseImageDataUrl(value) {
@@ -245,26 +259,27 @@ function getDeviceMockupRendererSpec() {
     devices: [
       buildDeviceSpec({
         id: 'laptop',
-        x: 155,
-        y: 200,
-        w: 930,
-        h: 560,
-        pad: 18,
-        padTop: 18,
-        padBottom: 28,
+        x: 100,
+        y: 92,
+        w: 980,
+        h: 545,
+        pad: 30,
+        padTop: 28,
+        padBottom: 66,
         radius: 28,
-        screenRadius: 14,
-        frame: '#111827',
-        shadow: 'rgba(15,23,42,.24)',
+        screenRadius: 16,
+        frame: '#0b1323',
+        edge: '#1d2b42',
+        shadow: 'rgba(15,23,42,.26)',
         blur: 44,
         offsetY: 26,
         fitMode: 'viewport-width',
         cropTopRatio: 0,
-        base: '#e5e7eb',
-        baseX: 105,
-        baseY: 775,
-        baseW: 1170,
-        baseH: 42,
+        baseStyle: 'modern-laptop',
+        baseX: 36,
+        baseY: 642,
+        baseW: 1195,
+        baseH: 230,
       }),
       buildDeviceSpec({
         id: 'tablet',
@@ -359,18 +374,51 @@ function renderDeviceSvg(device, sourceSize, embeddedImage) {
     : device.id === 'phone'
       ? '<rect x="1346" y="442" width="82" height="9" rx="5" fill="#64748b"/>'
       : '';
-  const base = device.base
-    ? `<rect x="${device.baseX}" y="${device.baseY}" width="${device.baseW}" height="${device.baseH}" rx="16" fill="${device.base}"/>`
-    : '';
+  const base = device.baseStyle === 'modern-laptop'
+    ? renderModernLaptopBaseSvg(device)
+    : (device.base ? `<rect x="${device.baseX}" y="${device.baseY}" width="${device.baseW}" height="${device.baseH}" rx="16" fill="${device.base}"/>` : '');
   const filter = device.id === 'laptop' ? 'shadow' : 'softShadow';
   return `
       <g filter="url(#${filter})">
-        <rect x="${device.x}" y="${device.y}" width="${device.w}" height="${device.h}" rx="${device.radius}" fill="${device.frame}"/>
+        <rect x="${device.x}" y="${device.y}" width="${device.w}" height="${device.h}" rx="${device.radius}" fill="${device.frame}" stroke="${device.edge || device.frame}" stroke-width="${device.id === 'laptop' ? 3 : 0}"/>
         <rect x="${screen.x}" y="${screen.y}" width="${screen.width}" height="${screen.height}" rx="${screen.radius}" fill="#ffffff"/>
         ${renderDeviceImageSvg(device, sourceSize, embeddedImage)}
         ${base}
         ${notch}
       </g>`;
+}
+
+function renderModernLaptopBaseSvg(device) {
+  const hingeY = device.y + device.h - 15;
+  const deckTopY = device.baseY;
+  const deckBottomY = device.baseY + device.baseH;
+  const left = device.baseX;
+  const right = device.baseX + device.baseW;
+  const topLeft = device.x + 64;
+  const topRight = device.x + device.w - 64;
+  const bottomLeft = left + 24;
+  const bottomRight = right - 24;
+  const keyboardRows = [
+    { y: deckTopY + 42, count: 14, keyW: 38, gap: 9, h: 12 },
+    { y: deckTopY + 66, count: 13, keyW: 41, gap: 10, h: 13 },
+    { y: deckTopY + 92, count: 12, keyW: 45, gap: 10, h: 14 },
+    { y: deckTopY + 120, count: 10, keyW: 53, gap: 12, h: 15 },
+  ];
+  const keyboardSvg = keyboardRows.map((row) => {
+    const rowW = row.count * row.keyW + (row.count - 1) * row.gap;
+    const rowX = left + (device.baseW - rowW) / 2;
+    return Array.from({ length: row.count }, (_item, index) => (
+      `<rect x="${rowX + index * (row.keyW + row.gap)}" y="${row.y}" width="${row.keyW}" height="${row.h}" rx="4" fill="#94a3b8" fill-opacity="0.32" stroke="#ffffff" stroke-opacity="0.20" stroke-width="1"/>`
+    )).join('');
+  }).join('');
+  return `
+        <rect x="${device.x + 82}" y="${hingeY}" width="${device.w - 164}" height="22" rx="11" fill="url(#laptopHingeGradient)" opacity="0.96"/>
+        <path d="M ${topLeft} ${deckTopY} L ${topRight} ${deckTopY} L ${bottomRight} ${deckBottomY} L ${bottomLeft} ${deckBottomY} Z" fill="url(#laptopBaseGradient)"/>
+        <path d="M ${left + 86} ${deckTopY + 5} L ${right - 86} ${deckTopY + 5}" stroke="#ffffff" stroke-opacity="0.18" stroke-width="3" stroke-linecap="round"/>
+        <path d="M ${left + 20} ${deckBottomY - 18} L ${right - 20} ${deckBottomY - 18}" stroke="#ffffff" stroke-opacity="0.14" stroke-width="3" stroke-linecap="round"/>
+        ${keyboardSvg}
+        <rect x="${left + device.baseW * 0.39}" y="${deckBottomY - 72}" width="${device.baseW * 0.22}" height="48" rx="10" fill="#080d17" fill-opacity="0.66" stroke="#94a3b8" stroke-opacity="0.42" stroke-width="2"/>
+        <rect x="${left + device.baseW * 0.43}" y="${deckBottomY - 18}" width="${device.baseW * 0.14}" height="7" rx="4" fill="#94a3b8" opacity="0.24"/>`;
 }
 
 async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
@@ -384,6 +432,7 @@ async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
   };
   const embeddedImage = `data:${parsed.mimeType};base64,${parsed.base64}`;
   const spec = getDeviceMockupRendererSpec();
+  const backgroundDataUri = getDeviceMockupBackgroundDataUri();
   return `
     <svg width="1600" height="1000" viewBox="0 0 1600 1000" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -394,15 +443,33 @@ async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
           <feDropShadow dx="0" dy="22" stdDeviation="34" flood-color="#0f172a" flood-opacity="0.22"/>
         </filter>
         ${spec.devices.map((device) => `<clipPath id="${device.id}Screen"><rect x="${device.screen.x}" y="${device.screen.y}" width="${device.screen.width}" height="${device.screen.height}" rx="${device.screen.radius}"/></clipPath>`).join('')}
+        <linearGradient id="backgroundGradient" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#f7f3ec"/>
+          <stop offset="0.52" stop-color="#ffffff"/>
+          <stop offset="1" stop-color="#dfe8ee"/>
+        </linearGradient>
+        <linearGradient id="stageOverlay" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#0f172a" stop-opacity="0.12"/>
+          <stop offset="0.48" stop-color="#ffffff" stop-opacity="0.10"/>
+          <stop offset="1" stop-color="#0f172a" stop-opacity="0.16"/>
+        </linearGradient>
+        <linearGradient id="laptopBaseGradient" x1="36" y1="642" x2="1231" y2="872" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#202b3d"/>
+          <stop offset="0.48" stop-color="#121a2a"/>
+          <stop offset="1" stop-color="#070d17"/>
+        </linearGradient>
+        <linearGradient id="laptopHingeGradient" x1="182" y1="612" x2="998" y2="632" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#101827"/>
+          <stop offset="0.5" stop-color="#2b3648"/>
+          <stop offset="1" stop-color="#0b1220"/>
+        </linearGradient>
       </defs>
-      <linearGradient id="backgroundGradient" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#f7f9fc"/>
-        <stop offset="0.48" stop-color="#ffffff"/>
-        <stop offset="1" stop-color="#e8edf5"/>
-      </linearGradient>
-      <rect width="1600" height="1000" fill="url(#backgroundGradient)"/>
-      <circle cx="1260" cy="160" r="340" fill="#3b82f6" fill-opacity="0.10"/>
-      <circle cx="280" cy="820" r="300" fill="#0f172a" fill-opacity="0.08"/>
+      ${backgroundDataUri
+        ? `<image href="${backgroundDataUri}" x="0" y="0" width="1600" height="1000" preserveAspectRatio="xMidYMid slice"/>`
+        : `<rect width="1600" height="1000" fill="url(#backgroundGradient)"/>
+      <circle cx="1270" cy="185" r="330" fill="#89d5e7" fill-opacity="0.12"/>
+      <circle cx="245" cy="820" r="310" fill="#c5a86b" fill-opacity="0.13"/>`}
+      <rect width="1600" height="1000" fill="url(#stageOverlay)"/>
       ${spec.devices.map((device) => renderDeviceSvg(device, sourceSize, embeddedImage)).join('')}
     </svg>`;
 }
