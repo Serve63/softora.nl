@@ -8,17 +8,17 @@
         {
             id: "laptop",
             points: [{ x: 222, y: 124 }, { x: 921, y: 149 }, { x: 952, y: 654 }, { x: 235, y: 630 }],
-            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.12, edgeStrokeWidth: 10, edgeStrokeOpacity: 0.72,
+            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.12,
         },
         {
             id: "tablet",
             points: [{ x: 1016, y: 168 }, { x: 1300, y: 178 }, { x: 1318, y: 652 }, { x: 1032, y: 646 }],
-            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.14, edgeStrokeWidth: 8, edgeStrokeOpacity: 0.66,
+            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.14,
         },
         {
             id: "phone",
             points: [{ x: 1378, y: 355 }, { x: 1502, y: 363 }, { x: 1511, y: 642 }, { x: 1387, y: 640 }],
-            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.16, edgeStrokeWidth: 7, edgeStrokeOpacity: 0.72,
+            fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.16,
         },
     ];
     let mockupBackgroundPromise = null;
@@ -414,9 +414,9 @@
         const bottomLeft = points[3] || { x: 0, y: 1 };
         const target = getScreenTarget(screen);
         const crop = resolveScreenImageCrop(image, target.width, target.height, screen);
-        const strips = screen.id === "phone" ? 64 : 96;
+        const strips = screen.id === "phone" ? 24 : 36;
         const stripHeight = target.height / strips;
-        const stripOverlap = 1.2;
+        const stripOverlap = 1.15;
         const sourceOverlap = crop.sh / target.height * stripOverlap;
 
         context.save();
@@ -454,10 +454,6 @@
         glass.addColorStop(1, "rgba(255, 255, 255, 0.10)");
         context.fillStyle = glass;
         fillScreenPolygon(context, screen);
-        context.strokeStyle = "rgba(2, 6, 23, " + (screen.edgeStrokeOpacity || 0.7) + ")";
-        context.lineWidth = screen.edgeStrokeWidth || 8;
-        context.lineJoin = "round";
-        context.stroke();
         context.restore();
     }
 

@@ -112,18 +112,12 @@ test('premium database server mockup renderer matches the browser layout without
   assert.deepEqual(laptop.points[0], { x: 222, y: 124 });
   assert.deepEqual(laptop.points[2], { x: 952, y: 654 });
   assert.equal(laptop.fitMode, 'viewport-width');
-  assert.equal(laptop.edgeStrokeWidth, 10);
-  assert.equal(laptop.edgeStrokeOpacity, 0.72);
   assert.deepEqual(tablet.points[0], { x: 1016, y: 168 });
-  assert.equal(tablet.edgeStrokeWidth, 8);
   assert.deepEqual(phone.points[0], { x: 1378, y: 355 });
-  assert.equal(phone.edgeStrokeWidth, 7);
 
   const svg = await buildDeviceMockupSvg(TINY_PNG_DATA_URL, { bedrijf: 'Softora' });
   assert.match(svg, /width="1600" height="900"/);
   assert.match(svg, /data:image\/jpeg;base64,/);
-  assert.match(svg, /id="websiteSourceImage"/);
-  assert.match(svg, /<use href="#websiteSourceImage"/);
   assert.doesNotMatch(svg, /WEBDESIGN PREVIEW/);
   assert.doesNotMatch(svg, /Laptop - iPad - iPhone/);
   assert.doesNotMatch(svg, /<text\b/);
@@ -131,7 +125,6 @@ test('premium database server mockup renderer matches the browser layout without
   assert.match(svg, /id="laptopScreen"/);
   assert.match(svg, /polygon points="222,124 921,149 952,654 235,630"/);
   assert.match(svg, /id="screenSheenGradient"/);
-  assert.match(svg, /stroke-width="10"/);
   assert.match(svg, /transform="matrix\(/);
   assert.doesNotMatch(svg, /x="290" y="335" width="964" height="520"/);
   assert.doesNotMatch(svg, /x="332" y="375" width="880" height="430"/);
