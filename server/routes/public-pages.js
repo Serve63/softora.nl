@@ -86,7 +86,7 @@ function registerPublicPageRoutes(app, deps) {
   });
 
   app.get('/favicon.ico', (req, res, next) => {
-    return res.redirect(302, '/assets/softora-favicon-round.png?v=20260605d');
+    return res.redirect(302, '/assets/softora-favicon-round.png?v=20260606a');
   });
 
   app.use(
