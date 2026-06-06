@@ -495,13 +495,13 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /table-layout: fixed;/);
   assert.match(pageSource, /thead th \{[\s\S]*padding: 10px 9px;[\s\S]*letter-spacing: 1\.1px;/);
-  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 16%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(2\), tbody td:nth-child\(2\) \{ width: 17%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 17%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(4\), tbody td:nth-child\(4\) \{ width: 16%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 10%;/);
-  assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 12%; \}/);
-  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 12%;/);
+  assert.match(pageSource, /thead th:nth-child\(1\), tbody td:nth-child\(1\) \{ width: 14\.285%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(2\), tbody td:nth-child\(2\) \{ width: 14\.285%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(3\), tbody td:nth-child\(3\) \{ width: 14\.285%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(4\), tbody td:nth-child\(4\) \{ width: 14\.285%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 14\.285%;/);
+  assert.match(pageSource, /thead th:nth-child\(6\), tbody td:nth-child\(6\) \{ width: 14\.285%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{ width: 14\.285%;/);
   assert.match(pageSource, /thead th:nth-child\(8\), tbody td:nth-child\(8\) \{[\s\S]*min-width: 118px;[\s\S]*padding-left: 7px;[\s\S]*padding-right: 7px;/);
   assert.match(pageSource, /table:not\(\.outreach-action-mode\) thead th:nth-child\(7\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(7\), table:not\(\.outreach-action-mode\) thead th:nth-child\(9\), table:not\(\.outreach-action-mode\) tbody td:nth-child\(9\) \{ display: none; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{[\s\S]*width: 5%;[\s\S]*min-width: 56px;[\s\S]*text-align: center;/);
@@ -586,7 +586,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /aria-label=\\"Website openen: " \+ escapeHtml\(websiteValue\)/);
   assert.match(pageSource, /class=\\"website-open-icon\\"/);
   assert.match(pageSource, /class=\\"c-mid website-cell\\"/);
-  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 10%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
+  assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 14\.285%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
   assert.doesNotMatch(pageSource, /target=\\"_blank\\" rel=\\"noopener\\">" \+ escapeHtml\(websiteValue\) \+ "<\/a>"/);
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
   assert.match(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
@@ -1055,6 +1055,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const defaultStatus = normalizeDatabaseStatus\(options && options\.defaultStatus \|\| "benaderbaar"\);/);
   assert.match(availableImportScriptSource, /actions\.id = "databaseImportActions";/);
   assert.match(availableImportScriptSource, /button\.textContent = "CSV uploaden";/);
+  assert.doesNotMatch(availableImportScriptSource, /of sleep bestand hierheen/);
+  assert.doesNotMatch(availableImportScriptSource, /database-import-hint/);
   assert.match(availableImportScriptSource, /input\.id = "importFileInput";/);
   assert.match(availableImportScriptSource, /overlay\.id = "databaseImportDropOverlay";/);
   assert.match(availableImportScriptSource, /return await importController\.importFile\(file, \{ defaultStatus: "prospect", source: "available-upload" \}\);/);
