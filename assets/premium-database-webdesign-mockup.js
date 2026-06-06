@@ -7,17 +7,17 @@
     const DEVICE_MOCKUP_SCREENS = [
         {
             id: "laptop",
-            points: [{ x: 224, y: 126 }, { x: 909, y: 150 }, { x: 930, y: 653 }, { x: 238, y: 631 }],
+            points: [{ x: 222, y: 124 }, { x: 921, y: 149 }, { x: 952, y: 654 }, { x: 235, y: 630 }],
             fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.12,
         },
         {
             id: "tablet",
-            points: [{ x: 1028, y: 174 }, { x: 1282, y: 183 }, { x: 1293, y: 641 }, { x: 1041, y: 637 }],
+            points: [{ x: 1016, y: 168 }, { x: 1300, y: 178 }, { x: 1318, y: 652 }, { x: 1032, y: 646 }],
             fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.14,
         },
         {
             id: "phone",
-            points: [{ x: 1374, y: 351 }, { x: 1508, y: 360 }, { x: 1518, y: 646 }, { x: 1385, y: 644 }],
+            points: [{ x: 1378, y: 355 }, { x: 1502, y: 363 }, { x: 1511, y: 642 }, { x: 1387, y: 640 }],
             fitMode: "viewport-width", cropTopRatio: 0, glassOpacity: 0.16,
         },
     ];
@@ -365,6 +365,13 @@
         context.fill();
     }
 
+    function interpolatePoint(first, second, ratio) {
+        return {
+            x: (Number(first.x) || 0) + ((Number(second.x) || 0) - (Number(first.x) || 0)) * ratio,
+            y: (Number(first.y) || 0) + ((Number(second.y) || 0) - (Number(first.y) || 0)) * ratio,
+        };
+    }
+
     function resolveScreenImageCrop(image, width, height, screen) {
         const sourceWidth = image.naturalWidth || image.width || 1;
         const sourceHeight = image.naturalHeight || image.height || 1;
@@ -407,20 +414,33 @@
         const bottomLeft = points[3] || { x: 0, y: 1 };
         const target = getScreenTarget(screen);
         const crop = resolveScreenImageCrop(image, target.width, target.height, screen);
+        const strips = screen.id === "phone" ? 24 : 36;
+        const stripHeight = target.height / strips;
+        const stripOverlap = 1.15;
+        const sourceOverlap = crop.sh / target.height * stripOverlap;
 
         context.save();
         clipScreenPolygon(context, screen);
-        context.setTransform(
-            (topRight.x - topLeft.x) / target.width,
-            (topRight.y - topLeft.y) / target.width,
-            (bottomLeft.x - topLeft.x) / target.height,
-            (bottomLeft.y - topLeft.y) / target.height,
-            topLeft.x,
-            topLeft.y
-        );
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = "high";
-        context.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, target.width, target.height);
+        for (let index = 0; index < strips; index += 1) {
+            const topRatio = index / strips;
+            const bottomRatio = (index + 1) / strips;
+            const stripTopLeft = interpolatePoint(topLeft, bottomLeft, topRatio);
+            const stripTopRight = interpolatePoint(topRight, points[2] || topRight, topRatio);
+            const stripBottomLeft = interpolatePoint(topLeft, bottomLeft, bottomRatio);
+            const sourceY = crop.sy + crop.sh * topRatio;
+            const sourceHeight = crop.sh / strips;
+            context.setTransform(
+                (stripTopRight.x - stripTopLeft.x) / target.width,
+                (stripTopRight.y - stripTopLeft.y) / target.width,
+                (stripBottomLeft.x - stripTopLeft.x) / stripHeight,
+                (stripBottomLeft.y - stripTopLeft.y) / stripHeight,
+                stripTopLeft.x,
+                stripTopLeft.y
+            );
+            context.drawImage(image, crop.sx, sourceY, crop.sw, sourceHeight + sourceOverlap, 0, 0, target.width, stripHeight + stripOverlap);
+        }
         context.restore();
 
         context.save();

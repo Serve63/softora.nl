@@ -699,7 +699,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignMockupScriptSource, /canvas\.height = 900;/);
   assert.match(webdesignMockupScriptSource, /context\.drawImage\(template, 0, 0, 1600, 900\);/);
   assert.match(webdesignMockupScriptSource, /DEVICE_MOCKUP_SCREENS\.forEach\(function \(screen\)/);
-  assert.match(webdesignMockupScriptSource, /x: 224, y: 126/);
+  assert.match(webdesignMockupScriptSource, /x: 222, y: 124/);
   assert.doesNotMatch(webdesignMockupScriptSource, /drawDevice\(context, image, \{/);
   assert.match(webdesignMockupScriptSource, /gradient\.addColorStop\(0, "#f7f3ec"\);/);
   assert.match(webdesignMockupScriptSource, /rgba\(137, 213, 231, 0\.12\)/);
@@ -710,8 +710,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignMockupScriptSource, /const scale = width \/ sourceWidth;/);
   assert.match(webdesignMockupScriptSource, /context\.drawImage\(image, 0, 0, sourceWidth, sourceHeight, x, y, width, renderedHeight\);/);
   assert.match(webdesignMockupScriptSource, /fitMode: "viewport-width", cropTopRatio: 0,/);
-  assert.match(webdesignMockupScriptSource, /x: 1028, y: 174/);
-  assert.match(webdesignMockupScriptSource, /x: 1374, y: 351/);
+  assert.match(webdesignMockupScriptSource, /x: 1016, y: 168/);
+  assert.match(webdesignMockupScriptSource, /x: 1378, y: 355/);
+  assert.match(webdesignMockupScriptSource, /stripOverlap = 1\.15/);
   assert.doesNotMatch(webdesignMockupScriptSource, /fitMode: "viewport", cropTopRatio: 0, cropFocusX/);
   assert.doesNotMatch(webdesignMockupScriptSource, /fitMode: "viewport-width", cropTopRatio: 0\.02/);
   assert.doesNotMatch(webdesignMockupScriptSource, /fitMode: "viewport", cropTopRatio: 0\.02, cropFocusX: 0\.5, viewportHeightRatio/);
