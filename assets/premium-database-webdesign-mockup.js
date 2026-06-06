@@ -1,9 +1,7 @@
 (function (global) {
     "use strict";
 
-    const DEVICE_MOCKUP_VERSION = "v11";
-    const MOCKUP_BACKGROUND_SRC = "/assets/webdesign-preview-stage-bg.jpg";
-    let mockupBackgroundPromise = null;
+    const DEVICE_MOCKUP_VERSION = "v8";
     function normalizeString(value) {
         return String(value || "").trim();
     }
@@ -49,17 +47,6 @@
                 image.src = dataUrl;
             });
         });
-    }
-
-    function loadMockupBackground() {
-        if (mockupBackgroundPromise) return mockupBackgroundPromise;
-        mockupBackgroundPromise = new Promise(function (resolve) {
-            const image = new Image();
-            image.onload = function () { resolve(image); };
-            image.onerror = function () { resolve(null); };
-            image.src = MOCKUP_BACKGROUND_SRC;
-        });
-        return mockupBackgroundPromise;
     }
 
     function roundRect(context, x, y, width, height, radius) {
@@ -150,11 +137,6 @@
         roundRect(context, device.x, device.y, device.w, device.h, device.radius);
         context.fillStyle = device.frame;
         context.fill();
-        if (device.edge) {
-            context.strokeStyle = device.edge;
-            context.lineWidth = 3;
-            context.stroke();
-        }
         context.restore();
 
         roundRect(context, device.x, device.y, device.w, device.h, device.radius);
@@ -179,139 +161,41 @@
         }
         context.restore();
 
-        if (device.baseStyle === "modern-laptop") {
-            drawModernLaptopBase(context, device);
-        } else if (device.base) {
+        if (device.base) {
             context.fillStyle = device.base;
             roundRect(context, device.baseX, device.baseY, device.baseW, device.baseH, 16);
             context.fill();
         }
     }
 
-    function drawModernLaptopBase(context, device) {
-        const hingeY = device.y + device.h - 15;
-        const deckTopY = device.baseY;
-        const deckBottomY = device.baseY + device.baseH;
-        const left = device.baseX;
-        const right = device.baseX + device.baseW;
-        const topLeft = device.x + 64;
-        const topRight = device.x + device.w - 64;
-        const bottomLeft = left + 24;
-        const bottomRight = right - 24;
-
-        const hingeGradient = context.createLinearGradient(device.x + 82, hingeY, device.x + device.w - 82, hingeY + 22);
-        hingeGradient.addColorStop(0, "#101827");
-        hingeGradient.addColorStop(0.5, "#2b3648");
-        hingeGradient.addColorStop(1, "#0b1220");
-        context.fillStyle = hingeGradient;
-        roundRect(context, device.x + 82, hingeY, device.w - 164, 22, 11);
-        context.fill();
-
-        const deckGradient = context.createLinearGradient(left, deckTopY, right, deckBottomY);
-        deckGradient.addColorStop(0, "#202b3d");
-        deckGradient.addColorStop(0.48, "#121a2a");
-        deckGradient.addColorStop(1, "#070d17");
-        context.beginPath();
-        context.moveTo(topLeft, deckTopY);
-        context.lineTo(topRight, deckTopY);
-        context.lineTo(bottomRight, deckBottomY);
-        context.lineTo(bottomLeft, deckBottomY);
-        context.closePath();
-        context.fillStyle = deckGradient;
-        context.fill();
-
-        context.strokeStyle = "rgba(255, 255, 255, 0.18)";
-        context.lineWidth = 3;
-        context.lineCap = "round";
-        context.beginPath();
-        context.moveTo(left + 86, deckTopY + 5);
-        context.lineTo(right - 86, deckTopY + 5);
-        context.stroke();
-
-        context.strokeStyle = "rgba(255, 255, 255, 0.14)";
-        context.beginPath();
-        context.moveTo(left + 20, deckBottomY - 18);
-        context.lineTo(right - 20, deckBottomY - 18);
-        context.stroke();
-
-        drawLaptopKeyboard(context, device, left, deckTopY);
-
-        context.fillStyle = "rgba(8, 13, 23, 0.66)";
-        roundRect(context, left + device.baseW * 0.39, deckBottomY - 72, device.baseW * 0.22, 48, 10);
-        context.fill();
-        context.strokeStyle = "rgba(148, 163, 184, 0.42)";
-        context.lineWidth = 2;
-        context.stroke();
-
-        context.fillStyle = "rgba(148, 163, 184, 0.24)";
-        roundRect(context, left + device.baseW * 0.43, deckBottomY - 18, device.baseW * 0.14, 7, 4);
-        context.fill();
-    }
-
-    function drawLaptopKeyboard(context, device, left, deckTopY) {
-        const rows = [
-            { y: deckTopY + 42, count: 14, keyW: 38, gap: 9, h: 12 },
-            { y: deckTopY + 66, count: 13, keyW: 41, gap: 10, h: 13 },
-            { y: deckTopY + 92, count: 12, keyW: 45, gap: 10, h: 14 },
-            { y: deckTopY + 120, count: 10, keyW: 53, gap: 12, h: 15 },
-        ];
-        rows.forEach(function (row) {
-            const rowW = row.count * row.keyW + (row.count - 1) * row.gap;
-            const rowX = left + (device.baseW - rowW) / 2;
-            for (let index = 0; index < row.count; index += 1) {
-                roundRect(context, rowX + index * (row.keyW + row.gap), row.y, row.keyW, row.h, 4);
-                context.fillStyle = "rgba(148, 163, 184, 0.32)";
-                context.fill();
-                context.strokeStyle = "rgba(255, 255, 255, 0.20)";
-                context.lineWidth = 1;
-                context.stroke();
-            }
-        });
-    }
-
-    function drawStageBackground(context, backgroundImage) {
-        if (backgroundImage) {
-            context.drawImage(backgroundImage, 0, 0, 1600, 1000);
-        } else {
-            const gradient = context.createLinearGradient(0, 0, 1600, 1000);
-            gradient.addColorStop(0, "#f7f3ec");
-            gradient.addColorStop(0.52, "#ffffff");
-            gradient.addColorStop(1, "#dfe8ee");
-            context.fillStyle = gradient;
-            context.fillRect(0, 0, 1600, 1000);
-
-            context.fillStyle = "rgba(137, 213, 231, 0.12)";
-            context.beginPath();
-            context.arc(1270, 185, 330, 0, Math.PI * 2);
-            context.fill();
-            context.fillStyle = "rgba(197, 168, 107, 0.13)";
-            context.beginPath();
-            context.arc(245, 820, 310, 0, Math.PI * 2);
-            context.fill();
-        }
-
-        const overlay = context.createLinearGradient(0, 0, 1600, 1000);
-        overlay.addColorStop(0, "rgba(15, 23, 42, 0.12)");
-        overlay.addColorStop(0.48, "rgba(255, 255, 255, 0.10)");
-        overlay.addColorStop(1, "rgba(15, 23, 42, 0.16)");
-        context.fillStyle = overlay;
-        context.fillRect(0, 0, 1600, 1000);
-    }
-
-    async function createMockupDataUrl(image) {
+    function createMockupDataUrl(image) {
         const canvas = document.createElement("canvas");
         canvas.width = 1600;
         canvas.height = 1000;
         const context = canvas.getContext("2d");
         if (!context) throw new Error("Device-mockup maken is mislukt.");
 
-        drawStageBackground(context, await loadMockupBackground());
+        const gradient = context.createLinearGradient(0, 0, 1600, 1000);
+        gradient.addColorStop(0, "#f7f9fc");
+        gradient.addColorStop(0.48, "#ffffff");
+        gradient.addColorStop(1, "#e8edf5");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 1600, 1000);
+
+        context.fillStyle = "rgba(59, 130, 246, 0.10)";
+        context.beginPath();
+        context.arc(1260, 160, 340, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "rgba(15, 23, 42, 0.08)";
+        context.beginPath();
+        context.arc(280, 820, 300, 0, Math.PI * 2);
+        context.fill();
 
         drawDevice(context, image, {
-            x: 100, y: 92, w: 980, h: 545, pad: 30, padTop: 28, padBottom: 66, radius: 28, screenRadius: 16,
-            frame: "#0b1323", edge: "#1d2b42", shadow: "rgba(15,23,42,.26)", blur: 44, offsetY: 26,
+            x: 155, y: 200, w: 930, h: 560, pad: 18, padTop: 18, padBottom: 28, radius: 28, screenRadius: 14,
+            frame: "#111827", shadow: "rgba(15,23,42,.24)", blur: 44, offsetY: 26,
             fitMode: "viewport-width", cropTopRatio: 0,
-            baseStyle: "modern-laptop", baseX: 36, baseY: 642, baseW: 1195, baseH: 230,
+            base: "#e5e7eb", baseX: 105, baseY: 775, baseW: 1170, baseH: 42,
         });
         drawDevice(context, image, {
             x: 1095, y: 160, w: 305, h: 455, pad: 14, padTop: 18, padBottom: 18, radius: 34, screenRadius: 22,
@@ -375,7 +259,7 @@
             if (!pendingReserved && typeof renderPage === "function") renderPage();
             try {
                 const image = await loadImage(customer.websitePhoto);
-                const mockupDataUrl = await createMockupDataUrl(image);
+                const mockupDataUrl = createMockupDataUrl(image);
                 if (!isValidWebsitePhotoDataUrl(mockupDataUrl)) throw new Error("Device-mockup maken is mislukt.");
                 const checkedAt = new Date().toISOString();
                 const nextCustomer = normalizeCustomer({

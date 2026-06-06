@@ -66,10 +66,8 @@ test('public webdesign preview renders only the two images for a stored mail-rea
   assert.match(response.body, /fetchpriority="high"/);
   assert.match(response.body, /website-frame/);
   assert.match(response.body, /mockup-frame/);
-  assert.match(response.body, /webdesign-preview-stage-bg\.jpg/);
   assert.match(response.body, /background:transparent/);
   assert.doesNotMatch(response.body, /background:#fff/);
-  assert.doesNotMatch(response.body, /background:#121212/);
   assert.doesNotMatch(response.body, /Aagje van Os/);
   assert.doesNotMatch(response.body, /· naast elkaar/);
 });
