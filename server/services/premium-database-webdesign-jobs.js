@@ -276,6 +276,8 @@ function getDeviceMockupRendererSpec() {
         fitMode: 'viewport-width',
         cropTopRatio: 0,
         glassOpacity: 0.12,
+        edgeStrokeWidth: 10,
+        edgeStrokeOpacity: 0.72,
       },
       {
         id: 'tablet',
@@ -283,6 +285,8 @@ function getDeviceMockupRendererSpec() {
         fitMode: 'viewport-width',
         cropTopRatio: 0,
         glassOpacity: 0.14,
+        edgeStrokeWidth: 8,
+        edgeStrokeOpacity: 0.66,
       },
       {
         id: 'phone',
@@ -290,6 +294,8 @@ function getDeviceMockupRendererSpec() {
         fitMode: 'viewport-width',
         cropTopRatio: 0,
         glassOpacity: 0.16,
+        edgeStrokeWidth: 7,
+        edgeStrokeOpacity: 0.72,
       },
     ],
   };
@@ -378,6 +384,9 @@ function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
   const screen = { width: target.width, height: target.height };
   const sourceWidth = Math.max(1, normalizeFiniteNumber(sourceSize.width, 1));
   const sourceHeight = Math.max(1, normalizeFiniteNumber(sourceSize.height, 1));
+  const sourceImageMarkup = String(embeddedImage || '').startsWith('#')
+    ? `<use href="${embeddedImage}" x="0" y="0"/>`
+    : `<image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/>`;
   let crop;
   if (device.fitMode === 'viewport-width') {
     const scale = screen.width / sourceWidth;
@@ -393,9 +402,9 @@ function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
     crop = resolveViewportCrop(sourceSize, screen, device);
     crop = { sx: crop.sx, sy: crop.sy, sw: crop.sw, sh: crop.sh };
   }
-  const strips = device.id === 'phone' ? 24 : 36;
+  const strips = device.id === 'phone' ? 64 : 96;
   const stripHeight = target.height / strips;
-  const stripOverlap = 1.15;
+  const stripOverlap = 1.2;
   const sourceOverlap = crop.sh / target.height * stripOverlap;
   const imageStrips = Array.from({ length: strips }, (_item, index) => {
     const topRatio = index / strips;
@@ -409,7 +418,7 @@ function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
     return `
         <g transform="matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})">
           <svg x="0" y="0" width="${target.width}" height="${stripHeight + stripOverlap}" viewBox="${crop.sx} ${sourceY} ${crop.sw} ${sourceStripHeight + sourceOverlap}" preserveAspectRatio="none" overflow="hidden">
-            <image href="${embeddedImage}" x="0" y="0" width="${sourceWidth}" height="${sourceHeight}"/>
+            ${sourceImageMarkup}
           </svg>
         </g>`;
   }).join('');
@@ -418,6 +427,7 @@ function renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage) {
         ${imageStrips}
         <polygon points="${formatDevicePoints(device)}" fill="#000000" opacity="${device.glassOpacity || 0.12}"/>
         <polygon points="${formatDevicePoints(device)}" fill="url(#screenSheenGradient)" opacity="0.2"/>
+        <polygon points="${formatDevicePoints(device)}" fill="none" stroke="#020617" stroke-opacity="${device.edgeStrokeOpacity || 0.7}" stroke-width="${device.edgeStrokeWidth || 8}" stroke-linejoin="round"/>
       </g>`;
 }
 
@@ -522,13 +532,14 @@ async function buildDeviceMockupSvg(imageDataUrl, customer = {}, options = {}) {
           <stop offset="0.72" stop-color="#000000" stop-opacity="0.10"/>
           <stop offset="1" stop-color="#ffffff" stop-opacity="0.10"/>
         </linearGradient>
+        <image id="websiteSourceImage" href="${embeddedImage}" x="0" y="0" width="${sourceSize.width}" height="${sourceSize.height}"/>
       </defs>
       ${templateDataUri
         ? `<image href="${templateDataUri}" x="0" y="0" width="1600" height="900" preserveAspectRatio="xMidYMid slice"/>`
         : (backgroundDataUri
           ? `<image href="${backgroundDataUri}" x="0" y="0" width="1600" height="900" preserveAspectRatio="xMidYMid slice"/>`
           : `<rect width="1600" height="900" fill="url(#backgroundGradient)"/>`)}
-      ${spec.devices.map((device) => renderTemplateDeviceImageSvg(device, sourceSize, embeddedImage)).join('')}
+      ${spec.devices.map((device) => renderTemplateDeviceImageSvg(device, sourceSize, '#websiteSourceImage')).join('')}
     </svg>`;
 }
 

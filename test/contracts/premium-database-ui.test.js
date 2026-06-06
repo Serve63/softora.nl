@@ -710,9 +710,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignMockupScriptSource, /const scale = width \/ sourceWidth;/);
   assert.match(webdesignMockupScriptSource, /context\.drawImage\(image, 0, 0, sourceWidth, sourceHeight, x, y, width, renderedHeight\);/);
   assert.match(webdesignMockupScriptSource, /fitMode: "viewport-width", cropTopRatio: 0,/);
+  assert.match(webdesignMockupScriptSource, /edgeStrokeWidth: 10, edgeStrokeOpacity: 0\.72/);
   assert.match(webdesignMockupScriptSource, /x: 1016, y: 168/);
   assert.match(webdesignMockupScriptSource, /x: 1378, y: 355/);
-  assert.match(webdesignMockupScriptSource, /stripOverlap = 1\.15/);
+  assert.match(webdesignMockupScriptSource, /strips = screen\.id === "phone" \? 64 : 96/);
+  assert.match(webdesignMockupScriptSource, /stripOverlap = 1\.2/);
+  assert.match(webdesignMockupScriptSource, /context\.strokeStyle = "rgba\(2, 6, 23, " \+ \(screen\.edgeStrokeOpacity \|\| 0\.7\) \+ "\)";/);
   assert.doesNotMatch(webdesignMockupScriptSource, /fitMode: "viewport", cropTopRatio: 0, cropFocusX/);
   assert.doesNotMatch(webdesignMockupScriptSource, /fitMode: "viewport-width", cropTopRatio: 0\.02/);
   assert.doesNotMatch(webdesignMockupScriptSource, /fitMode: "viewport", cropTopRatio: 0\.02, cropFocusX: 0\.5, viewportHeightRatio/);
