@@ -105,6 +105,19 @@ test('public webdesign preview poster route renders a png poster', async () => {
   assert.equal(response.body.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
 });
 
+test('public webdesign preview poster keeps personal text in a baked image asset', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../../server/services/public-webdesign-preview.js'),
+    'utf8',
+  );
+  const chromeSvgBlock = source.match(/function buildPosterChromeSvg\(\) \{[\s\S]*?\n\}/);
+
+  assert.ok(chromeSvgBlock);
+  assert.doesNotMatch(chromeSvgBlock[0], /<text\b/);
+  assert.match(source, /PUBLIC_PREVIEW_PERSONAL_TEXT_FILE/);
+  assert.ok(fs.existsSync(path.join(__dirname, '../../assets/webdesign-preview-personal-text.png')));
+});
+
 test('public webdesign preview can read legacy chunked image data', async () => {
   const photo = 'data:image/png;base64,AAA';
   const mockup = 'data:image/jpeg;base64,BBB';
