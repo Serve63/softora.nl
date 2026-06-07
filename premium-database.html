@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260607a">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260607b">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -96,7 +96,7 @@
         .top {
             padding: 32px 48px 0;
             display: flex;
-            align-items: flex-end;
+            align-items: flex-start;
             justify-content: space-between;
             margin-bottom: 24px;
             gap: 16px;
@@ -121,7 +121,7 @@
             gap: 8px;
             flex-wrap: wrap;
             justify-content: flex-end;
-            align-items: flex-end;
+            align-items: flex-start; margin-left: auto;
         }
 
         .add-actions {
@@ -1345,6 +1345,7 @@
                             <div class="page-title">Database</div>
                             <div class="page-sub" id="top-sub"></div>
                         </div>
+                        <div class="top-right"><div class="filter-metrics" aria-label="Database statistieken"><div class="mail-roi-calculator" aria-label="Mail ROI calculator"><div class="mail-roi-card"><div class="mail-roi-label">Mails verstuurd</div><div class="mail-roi-value" id="systemMailSentCount">--</div></div><div class="mail-roi-card"><div class="mail-roi-label">&ge; €850 klanten</div><div class="mail-roi-row"><div class="mail-roi-value" id="mailRoiDealsCount">0</div><div class="mail-roi-stepper" aria-label="Aantal klanten aanpassen"><button class="mail-roi-step-button" type="button" data-mail-roi-action="-1" aria-label="Klant eraf">&minus;</button><span class="mail-roi-step-divider" aria-hidden="true"></span><button class="mail-roi-step-button" type="button" data-mail-roi-action="1" aria-label="Klant erbij">+</button></div></div></div><div class="mail-roi-card"><div class="mail-roi-label">Deal per mails</div><div class="mail-roi-value" id="mailRoiRatio">&mdash;</div></div></div><div class="result-count-stack" aria-label="Aantal resultaten" hidden><button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto"><svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/></svg></button><div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's"><strong>€0,00</strong></div><div class="f-count" id="f-count"></div></div></div></div>
                     </div>
 
                     <div class="status-banner" id="statusBanner" aria-live="polite"></div>
@@ -1353,7 +1354,6 @@
                         <div class="status-filter">
                             <div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters"><span class="status-filter-label">Algemeen</span><span class="status-filter-pills"><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><span class="status-filter-pills"><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><span class="status-filter-pills"><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></span></div>
                         </div>
-                        <div class="filter-metrics" aria-label="Database statistieken"><div class="mail-roi-calculator" aria-label="Mail ROI calculator"><div class="mail-roi-card"><div class="mail-roi-label">Mails verstuurd</div><div class="mail-roi-value" id="systemMailSentCount">--</div></div><div class="mail-roi-card"><div class="mail-roi-label">&ge; €850 klanten</div><div class="mail-roi-row"><div class="mail-roi-value" id="mailRoiDealsCount">0</div><div class="mail-roi-stepper" aria-label="Aantal klanten aanpassen"><button class="mail-roi-step-button" type="button" data-mail-roi-action="-1" aria-label="Klant eraf">&minus;</button><span class="mail-roi-step-divider" aria-hidden="true"></span><button class="mail-roi-step-button" type="button" data-mail-roi-action="1" aria-label="Klant erbij">+</button></div></div></div><div class="mail-roi-card"><div class="mail-roi-label">Deal per mails</div><div class="mail-roi-value" id="mailRoiRatio">&mdash;</div></div></div><div class="result-count-stack" aria-label="Aantal resultaten" hidden><button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto"><svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/></svg></button><div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's"><strong>€0,00</strong></div><div class="f-count" id="f-count"></div></div></div>
                     </div>
 
                     <div class="tbl-wrap">
@@ -2966,7 +2966,7 @@
         let customerStateRefreshInFlight = false; function isDatabaseInteractionOpen() { return nodes.modalBg.classList.contains("on") || nodes.panel.classList.contains("on") || nodes.photoPreview.classList.contains("on") || (photoBatchController && typeof photoBatchController.isOpen === "function" && photoBatchController.isOpen()) || (databaseDeepSearchController && typeof databaseDeepSearchController.isOpen === "function" && databaseDeepSearchController.isOpen()); } async function refreshCustomerStateSilently() { if (customerStateRefreshInFlight || document.hidden || isDatabaseInteractionOpen()) return false; customerStateRefreshInFlight = true; try { await bootstrapCustomers(); return true; } catch (error) { console.error("Database live verversen mislukt:", error); return false; } finally { customerStateRefreshInFlight = false; } } function startCustomerStateAutoRefresh() { window.setInterval(function () { void refreshCustomerStateSilently(); }, CUSTOMER_DB_SYNC_INTERVAL_MS); window.addEventListener("focus", function () { void refreshCustomerStateSilently(); }); document.addEventListener("visibilitychange", function () { if (!document.hidden) void refreshCustomerStateSilently(); }); }
         const initialBootstrapCustomers = resolveBootstrapCustomers(), databaseBootStartedAt = Date.now(), databaseHadBootstrapCustomers = initialBootstrapCustomers.length > 0, releaseDatabaseBootShell = () => window.SoftoraPremiumBootTiming?.release(databaseBootStartedAt, 1000) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
         if (initialBootstrapCustomers.length) {
-            state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers); state.dataLoading = false; state.dataUnavailable = false;
+            state.klanten = sortCustomers(outreachController.applyAutomation(initialBootstrapCustomers).customers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true;
         }
         applyDatabaseUrlIntent();
         renderPage(); releaseDatabaseBootShell();

@@ -125,7 +125,7 @@
 }
 
 .filter-metrics {
-    margin-left: auto;
+    margin-left: 0;
     display: inline-flex;
     align-items: center;
     gap: 24px;
