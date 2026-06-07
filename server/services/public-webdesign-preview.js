@@ -10,13 +10,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
-const PUBLIC_PREVIEW_BACKGROUND_PATH = '/assets/webdesign-preview-coastal-dunes-background.png?v=20260607a';
-const PUBLIC_PREVIEW_BACKGROUND_FILE = 'webdesign-preview-coastal-dunes-background.png';
-const PUBLIC_PREVIEW_PROFILE_FILE = 'serve-creusen-profile.jpg';
-const PUBLIC_PREVIEW_PERSONAL_TEXT_FILE = 'webdesign-preview-personal-text.png';
-const PREVIEW_POSTER_WIDTH = 2400;
-const PREVIEW_POSTER_HEIGHT = 1350;
-const PREVIEW_POSTER_FETCH_TIMEOUT_MS = 10000;
+const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260607a';
 
 const {
   buildCustomerIdentityKey,
@@ -288,7 +282,19 @@ function buildPreviewFromRecord(id, values, record) {
   const photoSource = resolvePreviewSource(values, record, 'photo');
   const mockupSource = resolvePreviewSource(values, record, 'mockup');
   if (!isValidImageSource(photoSource) || !isValidImageSource(mockupSource)) return null;
-  return { id, photoSource, mockupSource };
+  const legacyMeta = record && record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
+  const title = normalizeString(
+    record &&
+      (record.bedrijf ||
+        record.company ||
+        record.companyName ||
+        record.naam ||
+        legacyMeta.bedrijf ||
+        legacyMeta.company ||
+        legacyMeta.companyName ||
+        legacyMeta.naam)
+  );
+  return { id, photoSource, mockupSource, title };
 }
 
 function getUrlOrigin(value) {
@@ -299,128 +305,12 @@ function getUrlOrigin(value) {
   }
 }
 
-function encodePathSegment(value) {
-  return encodeURIComponent(normalizeCustomerId(value));
-}
-
-function buildPosterPathForRequest(req) {
-  const params = req && req.params && typeof req.params === 'object' ? req.params : {};
-  const query = req && req.query && typeof req.query === 'object' ? req.query : {};
-  const routeId = params.companySlug || params.customerId || '';
-  const routeBase = params.companySlug
-    ? `/webdesign/${encodePathSegment(routeId)}`
-    : `/mailklaar/${encodePathSegment(routeId)}`;
-  const posterQuery = new URLSearchParams();
-  ['cid', 'customerId', 'id'].forEach((key) => {
-    const value = normalizeString(query[key]);
-    if (value) posterQuery.set(key, value);
-  });
-  const suffix = posterQuery.toString();
-  return `${routeBase}/poster.png${suffix ? `?${suffix}` : ''}`;
-}
-
-function buildPosterChromeSvg() {
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${PREVIEW_POSTER_WIDTH}" height="${PREVIEW_POSTER_HEIGHT}" viewBox="0 0 ${PREVIEW_POSTER_WIDTH} ${PREVIEW_POSTER_HEIGHT}">
-  <defs>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="34" stdDeviation="30" flood-color="#4a3a24" flood-opacity=".24"/>
-    </filter>
-    <linearGradient id="warmVeil" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#fff8eb" stop-opacity=".38"/>
-      <stop offset=".55" stop-color="#fff1db" stop-opacity=".16"/>
-      <stop offset="1" stop-color="#604a2b" stop-opacity=".16"/>
-    </linearGradient>
-    <linearGradient id="cardShade" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>
-      <stop offset="1" stop-color="#f7efe2" stop-opacity=".91"/>
-    </linearGradient>
-    <linearGradient id="photoPanel" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#f1eadf" stop-opacity=".94"/>
-      <stop offset="1" stop-color="#ded2bf" stop-opacity=".88"/>
-    </linearGradient>
-  </defs>
-  <rect width="2400" height="1350" fill="url(#warmVeil)"/>
-  <rect width="2400" height="1350" fill="#21180f" opacity=".1"/>
-  <rect x="70" y="84" width="850" height="1190" rx="16" fill="#ffffff" opacity=".16" filter="url(#softShadow)"/>
-  <rect x="990" y="250" width="1325" height="730" rx="16" fill="#ffffff" opacity=".18" filter="url(#softShadow)"/>
-  <rect x="990" y="970" width="1325" height="300" rx="22" fill="url(#cardShade)" stroke="#ffffff" stroke-opacity=".72" filter="url(#softShadow)"/>
-  <rect x="1024" y="1008" width="224" height="216" rx="18" fill="url(#photoPanel)" stroke="#ffffff" stroke-opacity=".62"/>
-  <circle cx="1136" cy="1116" r="76" fill="#ffffff" opacity=".92"/>
-</svg>`);
-}
-
-function parseDataImageBuffer(source) {
-  const match = normalizeString(source).match(/^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/=\s]+)$/i);
-  return match ? Buffer.from(match[1].replace(/\s/g, ''), 'base64') : null;
-}
-
-async function fetchImageBuffer(source) {
-  const dataBuffer = parseDataImageBuffer(source);
-  if (dataBuffer) return dataBuffer;
-  const url = normalizeString(source);
-  if (!/^https?:\/\//i.test(url)) throw new Error('Ongeldige poster-afbeelding.');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PREVIEW_POSTER_FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response || !response.ok) throw new Error('Poster-afbeelding kon niet worden geladen.');
-    return Buffer.from(await response.arrayBuffer());
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function readPreviewAssetBuffer(fileName) {
-  const path = require('node:path');
-  const fs = require('node:fs/promises');
-  return fs.readFile(path.join(process.cwd(), 'assets', fileName));
-}
-
-async function createRoundImageBuffer(sharp, input, size) {
-  const image = await sharp(input)
-    .resize(size, size, { fit: 'cover' })
-    .png()
-    .toBuffer();
-  const mask = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#fff"/></svg>`);
-  return sharp(image)
-    .composite([{ input: mask, blend: 'dest-in' }])
-    .png()
-    .toBuffer();
-}
-
-async function buildPreviewPosterPng(preview) {
-  const sharp = require('sharp');
-  const [background, photo, mockup, profile] = await Promise.all([
-    readPreviewAssetBuffer(PUBLIC_PREVIEW_BACKGROUND_FILE),
-    fetchImageBuffer(preview.photoSource),
-    fetchImageBuffer(preview.mockupSource),
-    readPreviewAssetBuffer(PUBLIC_PREVIEW_PROFILE_FILE),
-  ]);
-  const personalText = await readPreviewAssetBuffer(PUBLIC_PREVIEW_PERSONAL_TEXT_FILE);
-  const base = await sharp(background)
-    .resize(PREVIEW_POSTER_WIDTH, PREVIEW_POSTER_HEIGHT, { fit: 'cover' })
-    .modulate({ brightness: 0.94, saturation: 0.82 })
-    .composite([{ input: buildPosterChromeSvg(), left: 0, top: 0 }])
-    .png()
-    .toBuffer();
-  const websiteImage = await sharp(photo)
-    .resize(820, 1160, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-  const mockupImage = await sharp(mockup)
-    .resize(1325, 730, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-  const profileImage = await createRoundImageBuffer(sharp, profile, 152);
-  return sharp(base)
-    .composite([
-      { input: websiteImage, left: 85, top: 95 },
-      { input: mockupImage, left: 990, top: 250 },
-      { input: profileImage, left: 1060, top: 1039 },
-      { input: personalText, left: 1284, top: 970 },
-    ])
-    .png()
-    .toBuffer();
+function titleFromIdentifier(value) {
+  const words = slugifyCompanyName(value)
+    .split('-')
+    .filter(Boolean)
+    .map((word) => (word.length <= 2 ? word.toUpperCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`));
+  return words.join(' ') || 'Webdesign Concept';
 }
 
 function buildPhotoMapFromStructuredEntries(entries) {
@@ -490,31 +380,124 @@ function resolvePreviewSource(values, record, type) {
   return readChunkedDataUrl(values, record.photoKey, record.chunkCount);
 }
 
-function buildPreviewHtml(preview, posterPath) {
-  const posterSource = escapeHtml(posterPath);
-  const backgroundSource = escapeHtml(PUBLIC_PREVIEW_BACKGROUND_PATH);
+function buildPreviewHtml(preview) {
+  const photoSource = escapeHtml(preview.photoSource);
+  const mockupSource = escapeHtml(preview.mockupSource);
+  const preconnectTags = Array.from(new Set([
+    getUrlOrigin(preview.photoSource),
+    getUrlOrigin(preview.mockupSource),
+  ].filter(Boolean)))
+    .map((origin) => `  <link rel="preconnect" href="${escapeHtml(origin)}" crossorigin>`)
+    .join('\n');
   return `<!doctype html>
 <html lang="nl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <link rel="preload" as="image" href="${backgroundSource}">
-  <link rel="preload" as="image" href="${posterSource}" fetchpriority="high">
+${preconnectTags}
+  <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
+  <link rel="preload" as="image" href="${mockupSource}">
   <title>Webdesign preview | Softora</title>
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background-color:#f1e6d3;color:#1a1a2e;font-family:Inter,Arial,sans-serif}
-    body{background:linear-gradient(180deg, rgba(255,249,239,.26), rgba(241,230,211,.44)),url("${backgroundSource}") center/cover fixed no-repeat}
-    main{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(12px,2vw,34px)}
-    .poster-image{display:block;width:min(100%,1940px);height:auto;max-height:calc(100svh - clamp(24px,4vw,68px));object-fit:contain;box-shadow:0 34px 90px rgba(73,58,36,.22)}
-    @media(max-width:900px){body{background-attachment:scroll}main{align-items:flex-start;padding:12px}.poster-image{width:100%;max-height:none}}
+    html,body{margin:0;min-height:100%;background:#121212;color:#fff;font-family:Inter,Arial,sans-serif}
+    main{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(18px,2.8vw,46px)}
+    .preview-grid{width:min(1660px,100%);height:min(920px,calc(100svh - clamp(36px,5.6vw,92px)));display:grid;grid-template-columns:minmax(280px,.78fr) minmax(420px,1.12fr);gap:clamp(22px,2.4vw,42px);align-items:center}
+    .preview-frame{min-width:0;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .preview-frame img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;background:transparent}
+    .mockup-frame img{width:100%;max-height:86%}
+    @media(max-width:900px){main{min-height:100vh;align-items:flex-start;padding:14px}.preview-grid{width:100%;height:auto;grid-template-columns:1fr;gap:14px}.preview-frame{height:auto;overflow:visible}.preview-frame img,.mockup-frame img{width:100%;max-height:none}}
   </style>
 </head>
 <body>
   <main>
-    <img class="poster-image" src="${posterSource}" alt="Webdesignpresentatie met persoonlijk bericht" loading="eager" decoding="async" fetchpriority="high">
+    <div class="preview-grid" aria-label="Webdesign en device mockup naast elkaar">
+      <div class="preview-frame website-frame"><img src="${photoSource}" alt="Webdesign" loading="eager" decoding="async" fetchpriority="high"></div>
+      <div class="preview-frame mockup-frame"><img src="${mockupSource}" alt="Device mockup" loading="eager" decoding="async"></div>
+    </div>
   </main>
+</body>
+</html>`;
+}
+
+function buildConceptHtml(preview) {
+  const photoSource = escapeHtml(preview.photoSource);
+  const mockupSource = escapeHtml(preview.mockupSource);
+  const profileSource = escapeHtml(PUBLIC_PREVIEW_PROFILE_PATH);
+  const title = escapeHtml(preview.title || titleFromIdentifier(preview.id));
+  const preconnectTags = Array.from(new Set([
+    getUrlOrigin(preview.photoSource),
+    getUrlOrigin(preview.mockupSource),
+  ].filter(Boolean)))
+    .map((origin) => `  <link rel="preconnect" href="${escapeHtml(origin)}" crossorigin>`)
+    .join('\n');
+  return `<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+${preconnectTags}
+  <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
+  <link rel="preload" as="image" href="${mockupSource}">
+  <link rel="preload" as="image" href="${profileSource}">
+  <title>${title} | Design presentatie</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--navy:#1c2b50;--teal:#5bada0;--cream:#f2ede6;--muted:#728095;--rule:#d8d2ca;--panel:#fffaf4}
+    html,body{min-height:100%;background:var(--cream);color:var(--navy);font-family:Inter,Arial,sans-serif}
+    body{overflow-x:hidden}
+    .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px clamp(18px,4vw,64px);gap:52px}
+    .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+    .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
+    .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
+    .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:28px;width:100%;max-width:1300px;padding:0 clamp(0px,4vw,64px)}
+    .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden}
+    .tall{width:44%;border-radius:14px}
+    .wide{width:53%;border-radius:14px}
+    .visual{display:block;width:100%;height:100%;background:var(--panel);object-fit:contain}
+    .tall .visual{aspect-ratio:7/8}
+    .wide .visual{aspect-ratio:16/10}
+    .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
+    .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
+    .about-photo{border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:#d8d2ca}
+    .about-photo img{display:block;width:100%;height:100%;object-fit:cover}
+    .about-text .label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800;margin-bottom:12px}
+    .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3vw,30px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
+    .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
+    .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
+    .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
+    .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
+    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.tall,.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.divider{width:calc(100% - 36px)}}
+  </style>
+</head>
+<body>
+  <section class="concept-hero">
+    <div class="hero-heading">
+      <span class="hero-label">Webdesign presentatie</span>
+      <h1 class="hero-title">${title}</h1>
+    </div>
+    <div class="mockup-stage">
+      <div class="stage-card tall"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" loading="eager" decoding="async" fetchpriority="high"></div>
+      <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
+    </div>
+  </section>
+  <div class="divider"></div>
+  <section class="about-section">
+    <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
+    <div class="about-text">
+      <div class="label">Over dit concept</div>
+      <h2>Gebouwd met nieuwsgierigheid en een beetje AI-magie.</h2>
+      <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek.</p>
+      <p>Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt.</p>
+      <p>Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
+      <div class="signature">
+        <strong>Servé Creusen</strong>
+        <span>Webdesigner</span>
+      </div>
+    </div>
+  </section>
 </body>
 </html>`;
 }
@@ -622,10 +605,10 @@ function createPublicWebdesignPreviewService(options = {}) {
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) return res.status(404).send(buildNotFoundHtml());
-    return res.status(200).send(buildPreviewHtml(preview, buildPosterPathForRequest(req)));
+    return res.status(200).send(buildPreviewHtml(preview));
   }
 
-  async function getPreviewPosterResponse(req, res) {
+  async function getConceptPageResponse(req, res) {
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
     const preview = await resolveFirstPreview([
       query.cid ||
@@ -633,21 +616,15 @@ function createPublicWebdesignPreviewService(options = {}) {
         query.id,
       req && req.params && (req.params.companySlug || req.params.customerId),
     ]);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-    if (!preview) return res.status(404).send('Poster niet gevonden.');
-    try {
-      const poster = await buildPreviewPosterPng(preview);
-      res.setHeader('Content-Type', 'image/png');
-      return res.status(200).send(poster);
-    } catch (error) {
-      console.error('[PublicWebdesignPreview] Poster genereren mislukt:', error && error.message ? error.message : error);
-      return res.status(502).send('Poster niet beschikbaar.');
-    }
+    if (!preview) return res.status(404).send(buildNotFoundHtml());
+    return res.status(200).send(buildConceptHtml(preview));
   }
 
   return {
-    getPreviewPosterResponse,
+    getConceptPageResponse,
     getPreviewPageResponse,
     resolvePreview,
   };
