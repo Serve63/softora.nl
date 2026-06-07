@@ -136,38 +136,86 @@
     margin-left: 0;
 }
 
-.system-mail-count-stack {
-    display: inline-grid;
-    grid-template-columns: auto auto;
-    align-items: center;
-    justify-items: center;
-    column-gap: 8px;
-    row-gap: 4px;
-    color: var(--light);
+.mail-roi-calculator {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 6px;
 }
 
-.system-mail-count-value {
-    font-size: 12px;
-    line-height: 1.35;
-    color: var(--crimson);
-    font-weight: 700;
-    text-align: center;
+.mail-roi-card {
+    min-width: 110px;
+    border: 1px solid #e0ddd8;
+    border-radius: 8px;
+    background: #fff;
+    padding: 8px 10px;
 }
 
-.system-mail-count-icon {
-    width: 22px;
-    height: 22px;
-    color: var(--crimson);
-    filter: drop-shadow(0 5px 12px rgba(139, 34, 82, 0.22));
-}
-
-.system-mail-count-label {
-    grid-column: 1 / -1;
-    font-size: 12px;
-    color: var(--light);
-    line-height: 1.25;
-    text-align: center;
+.mail-roi-label {
+    margin-bottom: 5px;
+    color: #6b6b6b;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     white-space: nowrap;
+}
+
+.mail-roi-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.mail-roi-value {
+    color: #1a1a1a;
+    font: 500 1.15rem/1 "Oswald", sans-serif;
+}
+
+.mail-roi-stepper {
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid #e0ddd8;
+    border-radius: 5px;
+}
+
+.mail-roi-step-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 0;
+    background: #f8f7f4;
+    color: #6b6b6b;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    user-select: none;
+    transition: background .1s ease, color .1s ease, transform .1s ease;
+}
+
+.mail-roi-step-button:hover {
+    background: #f5e9ef;
+    color: var(--crimson);
+}
+
+.mail-roi-step-button:active {
+    transform: scale(.92);
+}
+
+.mail-roi-step-button:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 1px var(--crimson);
+}
+
+.mail-roi-step-divider {
+    width: 1px;
+    height: 10px;
+    background: #e0ddd8;
 }
 
 .database-import-drop-overlay {
@@ -318,6 +366,10 @@
         margin-left: 0;
         width: 100%;
         justify-content: flex-start;
+    }
+
+    .mail-roi-calculator {
+        flex-wrap: wrap;
     }
 
 }
