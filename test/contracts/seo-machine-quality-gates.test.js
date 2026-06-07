@@ -154,6 +154,46 @@ test('weekly SEO batch heeft planning, money-page links, beelden en claim-safety
   assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
 });
 
+test('volgende weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
+  const nextWeeklyPaths = [
+    '/blog/ai-processen-automatiseren-zonder-controle-verliezen',
+    '/kennisbank/wat-is-een-ai-workflow',
+    '/blog/website-crm-koppeling-leadopvolging-mkb',
+    '/kennisbank/wat-is-een-sales-pipeline-crm',
+    '/vergelijkingen/crm-op-maat-vs-standaard-crm',
+  ];
+  const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-08T12:00:00.000Z') });
+  const weeklyPlan = plan.filter((entry) => nextWeeklyPaths.includes(entry.path));
+
+  assert.deepEqual(
+    weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
+    [
+      '2026-06-09:scheduled:/blog/ai-processen-automatiseren-zonder-controle-verliezen',
+      '2026-06-10:scheduled:/kennisbank/wat-is-een-ai-workflow',
+      '2026-06-11:scheduled:/blog/website-crm-koppeling-leadopvolging-mkb',
+      '2026-06-12:scheduled:/kennisbank/wat-is-een-sales-pipeline-crm',
+      '2026-06-15:scheduled:/vergelijkingen/crm-op-maat-vs-standaard-crm',
+    ]
+  );
+
+  const weeklyItems = getSeoContentItems({ now: new Date('2026-06-15T12:00:00.000Z') })
+    .filter((item) => nextWeeklyPaths.includes(getSeoContentPathForItem(item)))
+    .map((item) => ({
+      ...item,
+      cluster: getSeoContentClusterForItem(item).key,
+    }));
+  const weeklyPages = weeklyItems.map((item) => ({
+    path: getSeoContentPathForItem(item),
+    html: buildSeoContentArticleHtml(item, { siteOrigin }),
+  }));
+
+  assert.equal(weeklyItems.length, 5);
+  assert.deepEqual(auditContentQuality({ items: weeklyItems, clusters: getSeoContentClusters() }), []);
+  assert.deepEqual(auditClaimSafety({ items: weeklyItems, pages: weeklyPages }), []);
+  assert.deepEqual(auditSeoImages({ pages: weeklyPages }), []);
+  assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
+});
+
 test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
   assert.ok(DEFAULT_UNSUPPORTED_CLAIM_RULES.length >= 6);
 
