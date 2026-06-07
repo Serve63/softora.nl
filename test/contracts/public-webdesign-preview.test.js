@@ -33,7 +33,7 @@ function createResponseRecorder() {
   };
 }
 
-test('public webdesign preview renders a single poster image for a stored mail-ready customer', async () => {
+test('public webdesign preview renders only the two images for a stored mail-ready customer', async () => {
   let requestedScope = '';
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues(scope) {
@@ -60,26 +60,22 @@ test('public webdesign preview renders a single poster image for a stored mail-r
   assert.equal(requestedScope, PHOTO_SCOPE);
   assert.equal(response.statusCode, 200);
   assert.match(response.headers['Cache-Control'], /s-maxage=900/);
+  assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-webdesign\.png/);
+  assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-mockup\.jpg/);
   assert.match(response.body, /rel="preload" as="image"/);
   assert.match(response.body, /fetchpriority="high"/);
-  assert.match(response.body, /poster-image/);
-  assert.match(response.body, /\/mailklaar\/customer-1\/poster\.png/);
-  assert.match(response.body, /webdesign-preview-coastal-dunes-background\.png\?v=20260607a/);
-  assert.match(response.body, /background-color:#f1e6d3/);
-  assert.doesNotMatch(response.body, /https:\/\/cdn\.softora\.test\/aagje-webdesign\.png/);
-  assert.doesNotMatch(response.body, /https:\/\/cdn\.softora\.test\/aagje-mockup\.jpg/);
-  assert.doesNotMatch(response.body, /webdesign-preview-softora-purple-background/);
-  assert.doesNotMatch(response.body, /background:#121212/);
+  assert.match(response.body, /website-frame/);
+  assert.match(response.body, /mockup-frame/);
+  assert.match(response.body, /background:#121212/);
+  assert.match(response.body, /background:transparent/);
   assert.doesNotMatch(response.body, /background:#fff/);
+  assert.doesNotMatch(response.body, /concept-hero/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile/);
   assert.doesNotMatch(response.body, /Aagje van Os/);
   assert.doesNotMatch(response.body, /· naast elkaar/);
 });
 
-test('public webdesign preview poster route renders a png poster', async () => {
-  const makeImage = (width, height, color) => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="${color}"/></svg>`;
-    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-  };
+test('public webdesign preview concept route renders the experimental supplied layout separately', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {
       return {
@@ -87,8 +83,9 @@ test('public webdesign preview poster route renders a png poster', async () => {
           [PHOTO_KEY]: JSON.stringify({
             'customer-1': {
               id: 'customer-1',
-              websitePhotoUrl: makeImage(900, 1500, '#f8f7f4'),
-              websiteMockupUrl: makeImage(1600, 900, '#f4f1f6'),
+              bedrijf: 'Piggy’s Kadoshop Hilvarenbeek',
+              websitePhotoUrl: 'https://cdn.softora.test/piggy-webdesign.png',
+              websiteMockupUrl: 'https://cdn.softora.test/piggy-mockup.jpg',
             },
           }),
         },
@@ -97,25 +94,19 @@ test('public webdesign preview poster route renders a png poster', async () => {
   });
   const response = createResponseRecorder();
 
-  await service.getPreviewPosterResponse({ params: { customerId: 'customer-1' } }, response);
+  await service.getConceptPageResponse({ params: { customerId: 'customer-1' } }, response);
 
   assert.equal(response.statusCode, 200);
-  assert.equal(response.headers['Content-Type'], 'image/png');
-  assert.ok(Buffer.isBuffer(response.body));
-  assert.equal(response.body.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-});
-
-test('public webdesign preview poster keeps personal text in a baked image asset', () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, '../../server/services/public-webdesign-preview.js'),
-    'utf8',
-  );
-  const chromeSvgBlock = source.match(/function buildPosterChromeSvg\(\) \{[\s\S]*?\n\}/);
-
-  assert.ok(chromeSvgBlock);
-  assert.doesNotMatch(chromeSvgBlock[0], /<text\b/);
-  assert.match(source, /PUBLIC_PREVIEW_PERSONAL_TEXT_FILE/);
-  assert.ok(fs.existsSync(path.join(__dirname, '../../assets/webdesign-preview-personal-text.png')));
+  assert.match(response.body, /concept-hero/);
+  assert.match(response.body, /mockup-stage/);
+  assert.match(response.body, /Over dit concept/);
+  assert.match(response.body, /serve-creusen-profile\.jpg/);
+  assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
+  assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
+  assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
+  assert.doesNotMatch(response.body, /type="file"/);
+  assert.doesNotMatch(response.body, /function load/);
+  assert.doesNotMatch(response.body, /background:#121212/);
 });
 
 test('public webdesign preview can read legacy chunked image data', async () => {
@@ -404,8 +395,7 @@ test('public webdesign preview lets hidden customer id query rescue a company sl
   );
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /\/webdesign\/verkeerde-bedrijfsnaam\/poster\.png\?cid=manual-import-aagje-eu-0070/);
-  assert.doesNotMatch(response.body, /aagje-webdesign\.png\?token=test/);
+  assert.match(response.body, /aagje-webdesign\.png\?token=test/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });
 
@@ -418,13 +408,13 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
   };
 
   registerPublicWebdesignPreviewRoutes(app, {
-    coordinator: { getPreviewPageResponse() {}, getPreviewPosterResponse() {} },
+    coordinator: { getConceptPageResponse() {}, getPreviewPageResponse() {} },
   });
 
   assert.deepEqual(routes.map((route) => [route.method, route.path]), [
-    ['GET', '/webdesign/:companySlug/poster.png'],
+    ['GET', '/webdesign/:companySlug/concept'],
     ['GET', '/webdesign/:companySlug'],
-    ['GET', '/mailklaar/:customerId/poster.png'],
+    ['GET', '/mailklaar/:customerId/concept'],
     ['GET', '/mailklaar/:customerId'],
   ]);
 });
