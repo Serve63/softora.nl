@@ -173,6 +173,44 @@ test('seo content toont datumgebonden related links pas wanneer de steunpagina l
   assert.match(afterLeadQualification, /href="\/kennisbank\/wat-is-leadkwalificatie"/);
 });
 
+test('seo content houdt de volgende wekelijkse batch uit public routes tot publicatie', () => {
+  const beforeNextBatch = new Date('2026-06-08T23:59:59.000Z');
+  const firstNextBatchDay = new Date('2026-06-09T12:00:00.000Z');
+  const afterNextBatch = new Date('2026-06-15T12:00:00.000Z');
+  const nextBatchPaths = [
+    '/blog/ai-processen-automatiseren-zonder-controle-verliezen',
+    '/kennisbank/wat-is-een-ai-workflow',
+    '/blog/website-crm-koppeling-leadopvolging-mkb',
+    '/kennisbank/wat-is-een-sales-pipeline-crm',
+    '/vergelijkingen/crm-op-maat-vs-standaard-crm',
+  ];
+
+  const earlyPaths = getSeoContentPublicPaths({ now: beforeNextBatch });
+  const earlySitemap = getSeoContentSitemapEntries({ now: beforeNextBatch });
+  for (const pathName of nextBatchPaths) {
+    assert.ok(!earlyPaths.includes(pathName), `${pathName} mag voor publicatiedatum niet publiek zijn.`);
+    assert.ok(!earlySitemap.some((entry) => entry.path === pathName), `${pathName} mag voor publicatiedatum niet in sitemap staan.`);
+  }
+
+  assert.ok(
+    getSeoContentPublicPaths({ now: firstNextBatchDay }).includes(
+      '/blog/ai-processen-automatiseren-zonder-controle-verliezen'
+    )
+  );
+  assert.ok(
+    getSeoContentSitemapEntries({ now: firstNextBatchDay }).some(
+      (entry) => entry.path === '/blog/ai-processen-automatiseren-zonder-controle-verliezen'
+    )
+  );
+
+  const livePaths = getSeoContentPublicPaths({ now: afterNextBatch });
+  const liveSitemap = getSeoContentSitemapEntries({ now: afterNextBatch });
+  for (const pathName of nextBatchPaths) {
+    assert.ok(livePaths.includes(pathName), `${pathName} moet op of na publicatiedatum publiek zijn.`);
+    assert.ok(liveSitemap.some((entry) => entry.path === pathName), `${pathName} moet op of na publicatiedatum in sitemap staan.`);
+  }
+});
+
 test('seo content renders the existing blog visual language with real links', () => {
   const html = buildSeoContentIndexHtml('blog', {
     siteOrigin: 'https://www.softora.nl',
