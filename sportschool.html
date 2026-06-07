@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Servé's logboek">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon.png?v=20260513" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-favicon.png?v=20260513">
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/sportschool-logboek.css?v=20260607a">
+  <title>Servé's Logboek</title>
+</head>
+<body>
+  <main class="gym-app" data-gym-app>
+    <header class="gym-header">
+      <div class="gym-header-center">
+        <h1>SERVÉ'S LOGBOEK</h1>
+        <button class="day-trigger" type="button" data-day-trigger aria-expanded="false">VANDAAG</button>
+      </div>
+    </header>
+
+    <section class="gym-section" aria-labelledby="gym-section-title">
+      <div class="gym-section-head">
+        <h2 id="gym-section-title">OEFENINGEN</h2>
+        <button class="icon-button" type="button" data-add-exercise aria-label="Oefening toevoegen">+</button>
+      </div>
+      <div class="exercise-list" data-exercise-list></div>
+      <p class="rest-day" data-rest-day hidden>VANDAAG IS EEN RUSTDAG</p>
+    </section>
+
+    <section class="day-picker" data-day-picker hidden>
+      <button class="day-picker-backdrop" type="button" data-close-days aria-label="Dagkiezer sluiten"></button>
+      <div class="day-picker-sheet" role="dialog" aria-modal="true" aria-label="Kies dag">
+        <h2>KIES DAG</h2>
+        <div class="day-grid" data-day-grid></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/assets/sportschool-logboek.js?v=20260607a" defer></script>
+</body>
+</html>

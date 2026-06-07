@@ -1,0 +1,356 @@
+:root {
+  --softora-ink: #191827;
+  --softora-muted: #7f7d8d;
+  --softora-purple: #9b2355;
+  --softora-purple-soft: #faedf4;
+  --softora-purple-line: #f0dce6;
+  --softora-sheet: #fcf8fb;
+  --softora-white: #ffffff;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--softora-white);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
+  color: var(--softora-ink);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(155, 35, 85, 0.42);
+  outline-offset: 2px;
+}
+
+.gym-app {
+  width: min(100%, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
+}
+
+.gym-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  min-height: calc(94px + var(--safe-top));
+  padding: calc(18px + var(--safe-top)) 18px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+}
+
+.gym-header-center {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.gym-header h1,
+.gym-section h2,
+.day-picker-sheet h2,
+.day-trigger,
+.icon-button,
+.exercise-title,
+.exercise-notes,
+.metric-label,
+.delete-action,
+.day-choice,
+.rest-day {
+  font-family: Oswald, Inter, sans-serif;
+  text-transform: uppercase;
+}
+
+.gym-header h1 {
+  margin: 0;
+  max-width: 300px;
+  color: var(--softora-ink);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.day-trigger {
+  appearance: none;
+  border: 0;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--softora-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.7px;
+}
+
+.day-trigger::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.gym-section {
+  padding: 24px 18px calc(28px + var(--safe-bottom));
+}
+
+.gym-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.gym-section h2 {
+  margin: 0;
+  color: var(--softora-ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  border: 1px solid var(--softora-purple-line);
+  border-radius: 13px;
+  background: var(--softora-white);
+  color: var(--softora-purple);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.exercise-list {
+  display: grid;
+  gap: 11px;
+}
+
+.exercise-swipe {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.delete-action {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 108px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--softora-purple);
+  color: var(--softora-white);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.exercise-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--softora-purple-line);
+  border-radius: 16px;
+  background: var(--softora-white);
+  touch-action: pan-y;
+  transition: transform 180ms ease;
+}
+
+.exercise-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.exercise-title,
+.exercise-notes,
+.metric-input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.exercise-title {
+  width: 100%;
+  min-width: 0;
+  color: var(--softora-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: 0.35px;
+}
+
+.exercise-title::placeholder,
+.exercise-notes::placeholder,
+.metric-input::placeholder {
+  color: rgba(127, 125, 141, 0.52);
+}
+
+.metric-group {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.metric {
+  display: grid;
+  justify-items: center;
+  width: 38px;
+  padding: 5px 4px 4px;
+  border: 1px solid rgba(240, 220, 230, 0.86);
+  border-radius: 10px;
+  background: rgba(252, 248, 251, 0.75);
+}
+
+.metric-input {
+  width: 30px;
+  height: 19px;
+  color: var(--softora-ink);
+  font-family: Oswald, Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.metric-label {
+  color: rgba(127, 125, 141, 0.8);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+}
+
+.exercise-notes {
+  width: 100%;
+  min-width: 0;
+  color: var(--softora-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.15px;
+}
+
+.rest-day {
+  margin: 22px 0 0;
+  color: var(--softora-muted);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-align: center;
+}
+
+.day-picker[hidden] {
+  display: none;
+}
+
+.day-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  align-items: end;
+  pointer-events: none;
+}
+
+.day-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.day-picker-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 24px, 406px);
+  margin: 0 auto max(10px, var(--safe-bottom));
+  padding: 22px 18px 26px;
+  border: 1px solid rgba(139, 34, 82, 0.12);
+  border-radius: 28px;
+  background: var(--softora-white);
+  box-shadow: 0 24px 70px rgba(25, 24, 39, 0.14);
+  pointer-events: auto;
+}
+
+.day-picker-sheet h2 {
+  margin: 0 0 16px;
+  color: var(--softora-ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.day-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.day-choice {
+  min-height: 46px;
+  border: 1px solid var(--softora-purple-line);
+  border-radius: 14px;
+  background: var(--softora-white);
+  color: var(--softora-ink);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.day-choice.is-selected {
+  border-color: var(--softora-purple);
+  background: var(--softora-purple);
+  color: var(--softora-white);
+}
+
+@media (min-width: 760px) {
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(155, 35, 85, 0.10), transparent 32%),
+      #f7f4f6;
+  }
+
+  .gym-app {
+    margin-block: 22px;
+    min-height: calc(100vh - 44px);
+    border: 1px solid var(--softora-purple-line);
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 24px 70px rgba(25, 24, 39, 0.08);
+  }
+}

@@ -1,0 +1,39 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+
+const { createKnownPrettyPageSlugToFile } = require('../../server/config/page-routing');
+
+test('sportschool logboek page is available as installable pretty page', () => {
+  const pagePath = path.join(__dirname, '../../sportschool.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
+  const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
+  const prettyPages = createKnownPrettyPageSlugToFile(new Set(['sportschool.html']));
+
+  assert.equal(prettyPages.get('sportschool'), 'sportschool.html');
+  assert.match(pageSource, /<title>Servé's Logboek<\/title>/);
+  assert.match(pageSource, /apple-mobile-web-app-capable/);
+  assert.match(pageSource, /apple-mobile-web-app-title" content="Servé's logboek"/);
+  assert.match(pageSource, /noindex,nofollow/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js/);
+  assert.match(pageSource, /data-day-trigger/);
+  assert.match(pageSource, /data-add-exercise/);
+  assert.match(pageSource, /data-exercise-list/);
+  assert.doesNotMatch(pageSource, /<script>[\s\S]*<\/script>/i);
+  assert.match(stylesSource, /font-family: Oswald/);
+  assert.match(stylesSource, /\.delete-action/);
+  assert.match(stylesSource, /\.day-picker-backdrop/);
+  assert.match(scriptSource, /nl\.softora\.agenda\.gym/);
+  assert.match(scriptSource, /Bankdrukken/);
+  assert.match(scriptSource, /Schuine dumbbell press/);
+  assert.match(scriptSource, /Seated row/);
+  assert.match(scriptSource, /Lat pulldown/);
+  assert.match(scriptSource, /DEFAULT_EXERCISES\.slice\(0, 4\)/);
+  assert.match(scriptSource, /localStorage\.setItem/);
+  assert.match(scriptSource, /pointerdown/);
+  assert.match(scriptSource, /Verwijder/);
+  assert.match(scriptSource, /IS EEN RUSTDAG/);
+});
