@@ -68,6 +68,19 @@
         return window.document || (typeof document === "undefined" ? null : document);
     }
 
+    function parseRenderedMailCount(value) {
+        const normalized = fallbackNormalizeString(value).replace(/\./g, "").replace(/,/g, "");
+        const number = Number(normalized);
+        return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
+    }
+
+    function rememberRenderedMailCount(element) {
+        const renderedCount = parseRenderedMailCount(element && element.textContent);
+        if (renderedCount === null) return lastRenderedMailCount;
+        lastRenderedMailCount = Math.max(lastRenderedMailCount || 0, renderedCount);
+        return lastRenderedMailCount;
+    }
+
     function clampDealCount(value) {
         const number = Number(value);
         return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
@@ -118,12 +131,19 @@
         if (!element) return;
         const options = helpers || {};
         if (options.dataLoading) {
-            lastRenderedMailCount = null;
+            const rememberedCount = rememberRenderedMailCount(element);
+            if (rememberedCount !== null) {
+                element.textContent = rememberedCount.toLocaleString("nl-NL");
+                renderRoiCalculator(rememberedCount, false);
+                return;
+            }
             element.textContent = "--";
             renderRoiCalculator(null, true);
             return;
         }
-        lastRenderedMailCount = getSoftoraSystemMailSentCount(customers, options);
+        const calculatedCount = getSoftoraSystemMailSentCount(customers, options);
+        const rememberedCount = rememberRenderedMailCount(element);
+        lastRenderedMailCount = Math.max(rememberedCount || 0, calculatedCount);
         element.textContent = lastRenderedMailCount.toLocaleString("nl-NL");
         renderRoiCalculator(lastRenderedMailCount, false);
     }
