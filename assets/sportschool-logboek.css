@@ -16,6 +16,7 @@
 
 html {
   background: var(--softora-white);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -31,17 +32,24 @@ body {
 
 button,
 input {
+  appearance: none;
+  -webkit-appearance: none;
   font: inherit;
+  font-size: 16px;
+  border-radius: 0;
 }
 
 button {
   cursor: pointer;
 }
 
-button:focus-visible,
-input:focus-visible {
+button:focus-visible {
   outline: 2px solid rgba(155, 35, 85, 0.42);
   outline-offset: 2px;
+}
+
+input:focus-visible {
+  outline: none;
 }
 
 .gym-app {
@@ -150,6 +158,11 @@ input:focus-visible {
   line-height: 1;
 }
 
+.icon-button:focus-visible,
+.day-choice:focus-visible {
+  border-radius: 13px;
+}
+
 .exercise-list {
   display: grid;
   gap: 11px;
@@ -159,6 +172,7 @@ input:focus-visible {
   position: relative;
   overflow: hidden;
   border-radius: 16px;
+  touch-action: pan-y;
 }
 
 .delete-action {
@@ -186,6 +200,16 @@ input:focus-visible {
   background: var(--softora-white);
   touch-action: pan-y;
   transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.exercise-card.is-swiping {
+  transition: none;
+}
+
+.exercise-card:focus-within {
+  border-color: rgba(155, 35, 85, 0.48);
+  box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
 }
 
 .exercise-top {
@@ -207,7 +231,7 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-ink);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: 0.35px;
@@ -235,12 +259,17 @@ input:focus-visible {
   background: rgba(252, 248, 251, 0.75);
 }
 
+.metric:focus-within {
+  border-color: rgba(155, 35, 85, 0.46);
+  box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
+}
+
 .metric-input {
   width: 30px;
   height: 19px;
   color: var(--softora-ink);
   font-family: Oswald, Inter, sans-serif;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -257,7 +286,7 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-muted);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: 0.15px;

@@ -1,5 +1,10 @@
 (() => {
-  const STORAGE_PREFIX = 'nl.softora.agenda.gym';
+  const REMOTE_SCOPE = 'sportschool_logboek';
+  const REMOTE_STATE_KEY = 'sportschool_logboek_v1';
+  const DIRECT_SUPABASE_TABLE = 'softora_sportschool_logbook';
+  const DIRECT_SUPABASE_ROW_ID = 'serve_logbook';
+  const REMOTE_SAVE_DELAY_MS = 450;
+  const SWIPE_WIDTH = 108;
   const DEFAULT_EXERCISES = [
     { order: 1, title: 'Bankdrukken', notes: '4 sets - 8 tot 10 herhalingen', sets: '4', reps: '10', kg: '' },
     { order: 2, title: 'Schuine dumbbell press', notes: '3 sets - 10 herhalingen', sets: '3', reps: '10', kg: '' },
@@ -21,6 +26,7 @@
     { id: 'saturday', title: 'Zaterdag' },
     { id: 'sunday', title: 'Zondag' },
   ];
+  const STORAGE_DAYS = DAYS.filter((day) => day.id !== 'today').map((day) => day.id);
 
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
@@ -33,6 +39,10 @@
   const addButton = app.querySelector('[data-add-exercise]');
   const closeDays = app.querySelector('[data-close-days]');
   let selectedDay = 'today';
+  let isApplyingRemoteState = false;
+  let remoteSaveTimer = null;
+  let lastRemoteSnapshotJson = '';
+  let logbookState = createDefaultState();
 
   function upper(value) {
     return String(value || '').toLocaleUpperCase('nl-NL');
@@ -46,32 +56,6 @@
     return day === 'today' ? currentWeekday() : day;
   }
 
-  function orderKey(day) {
-    return `${STORAGE_PREFIX}.${storageDay(day)}.exercise.order`;
-  }
-
-  function fieldKey(day, order, field) {
-    return `${STORAGE_PREFIX}.${storageDay(day)}.exercise.${order}.${field}`;
-  }
-
-  function readOrders(day) {
-    const raw = localStorage.getItem(orderKey(day));
-    if (raw === null) return DEFAULT_ORDERS;
-    if (!raw.trim()) return [];
-    return raw
-      .split(',')
-      .map((part) => Number.parseInt(part.trim(), 10))
-      .filter(Number.isFinite);
-  }
-
-  function saveOrders(day, orders) {
-    const uniqueOrders = [];
-    orders.forEach((order) => {
-      if (Number.isFinite(order) && !uniqueOrders.includes(order)) uniqueOrders.push(order);
-    });
-    localStorage.setItem(orderKey(day), uniqueOrders.join(','));
-  }
-
   function defaultExercise(order) {
     return DEFAULT_EXERCISES.find((exercise) => exercise.order === order) || {
       order,
@@ -83,24 +67,271 @@
     };
   }
 
-  function readExercise(day, order) {
+  function normalizeExercise(order, exercise = {}) {
     const fallback = defaultExercise(order);
     return {
+      title: upper(exercise.title || fallback.title),
+      notes: upper(exercise.notes || fallback.notes),
+      sets: String(exercise.sets ?? fallback.sets ?? ''),
+      reps: String(exercise.reps ?? fallback.reps ?? ''),
+      kg: String(exercise.kg ?? fallback.kg ?? ''),
+    };
+  }
+
+  function createDefaultDayState() {
+    return {
+      orders: [...DEFAULT_ORDERS],
+      exercises: Object.fromEntries(
+        DEFAULT_ORDERS.map((order) => [String(order), normalizeExercise(order)])
+      ),
+    };
+  }
+
+  function createDefaultState() {
+    return {
+      version: 1,
+      days: Object.fromEntries(STORAGE_DAYS.map((day) => [day, createDefaultDayState()])),
+    };
+  }
+
+  function getDayState(day) {
+    const storedDay = storageDay(day);
+    if (!logbookState.days[storedDay]) logbookState.days[storedDay] = createDefaultDayState();
+    return logbookState.days[storedDay];
+  }
+
+  function readOrders(day) {
+    const dayState = getDayState(day);
+    return Array.isArray(dayState.orders) ? dayState.orders : [];
+  }
+
+  function saveOrders(day, orders, options = {}) {
+    const uniqueOrders = [];
+    orders.forEach((order) => {
+      if (Number.isFinite(order) && !uniqueOrders.includes(order)) uniqueOrders.push(order);
+    });
+    const dayState = getDayState(day);
+    dayState.orders = uniqueOrders;
+    uniqueOrders.forEach((order) => {
+      const key = String(order);
+      if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(order);
+    });
+    if (!options.silent) scheduleRemoteSave();
+  }
+
+  function readExercise(day, order) {
+    const dayState = getDayState(day);
+    const stored = dayState.exercises?.[String(order)] || {};
+    const normalized = normalizeExercise(order, stored);
+    return {
       order,
-      title: localStorage.getItem(fieldKey(day, order, 'name')) || upper(fallback.title),
-      notes: localStorage.getItem(fieldKey(day, order, 'notes')) || upper(fallback.notes),
-      sets: localStorage.getItem(fieldKey(day, order, 'sets')) ?? fallback.sets,
-      reps: localStorage.getItem(fieldKey(day, order, 'reps')) ?? fallback.reps,
-      kg: localStorage.getItem(fieldKey(day, order, 'kilograms')) ?? fallback.kg,
+      title: normalized.title,
+      notes: normalized.notes,
+      sets: normalized.sets,
+      reps: normalized.reps,
+      kg: normalized.kg,
     };
   }
 
   function writeField(day, order, field, value) {
-    localStorage.setItem(fieldKey(day, order, field), value);
+    const dayState = getDayState(day);
+    const key = String(order);
+    if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(order);
+    const targetField = field === 'name' ? 'title' : field === 'kilograms' ? 'kg' : field;
+    dayState.exercises[key][targetField] = targetField === 'title' || targetField === 'notes' ? upper(value) : value;
+    scheduleRemoteSave();
   }
 
   function dayTitle(day) {
     return DAYS.find((item) => item.id === day)?.title || 'Vandaag';
+  }
+
+  function buildSnapshotFromState() {
+    const days = {};
+    STORAGE_DAYS.forEach((day) => {
+      const dayState = logbookState.days[day] || createDefaultDayState();
+      const safeOrders = Array.isArray(dayState.orders) ? dayState.orders : [];
+      days[day] = {
+        orders: safeOrders,
+        exercises: Object.fromEntries(
+          safeOrders.map((order) => {
+            return [String(order), normalizeExercise(order, dayState.exercises?.[String(order)])];
+          })
+        ),
+      };
+    });
+
+    return {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      days,
+    };
+  }
+
+  function parseRemoteSnapshot(raw) {
+    if (!raw) return null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!parsed || typeof parsed !== 'object' || !parsed.days || typeof parsed.days !== 'object') return null;
+      return parsed;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function applyRemoteSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return false;
+    isApplyingRemoteState = true;
+    try {
+      const nextState = createDefaultState();
+      STORAGE_DAYS.forEach((day) => {
+        const dayState = snapshot.days?.[day];
+        if (!dayState || typeof dayState !== 'object') return;
+        const orders = Array.isArray(dayState.orders)
+          ? dayState.orders.map((order) => Number.parseInt(order, 10)).filter(Number.isFinite)
+          : [];
+        nextState.days[day] = {
+          orders,
+          exercises: Object.fromEntries(
+            orders.map((order) => [String(order), normalizeExercise(order, dayState.exercises?.[String(order)])])
+          ),
+        };
+      });
+      logbookState = nextState;
+      return true;
+    } finally {
+      isApplyingRemoteState = false;
+    }
+  }
+
+  function getDirectSupabaseConfig() {
+    const config = window.SoftoraSportschoolSupabase || {};
+    const url = String(config.url || '').replace(/\/+$/, '');
+    const key = String(config.publishableKey || config.anonKey || '');
+    return url && key ? { url, key } : null;
+  }
+
+  function buildDirectSupabaseHeaders(config) {
+    return {
+      apikey: config.key,
+      Authorization: `Bearer ${config.key}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async function fetchDirectSupabaseState(config) {
+    const endpoint =
+      `${config.url}/rest/v1/${DIRECT_SUPABASE_TABLE}` +
+      `?id=eq.${encodeURIComponent(DIRECT_SUPABASE_ROW_ID)}&select=payload,updated_at`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: buildDirectSupabaseHeaders(config),
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`Sportschool Supabase laden mislukt (${response.status})`);
+    const rows = await response.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    return {
+      ok: true,
+      scope: REMOTE_SCOPE,
+      values: row?.payload ? { [REMOTE_STATE_KEY]: JSON.stringify(row.payload) } : {},
+      source: 'supabase:sportschool',
+      updatedAt: row?.updated_at || null,
+    };
+  }
+
+  async function saveDirectSupabaseState(config, snapshotJson) {
+    const endpoint =
+      `${config.url}/rest/v1/${DIRECT_SUPABASE_TABLE}?on_conflict=id`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        ...buildDirectSupabaseHeaders(config),
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: DIRECT_SUPABASE_ROW_ID,
+        payload: JSON.parse(snapshotJson),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    if (!response.ok) throw new Error(`Sportschool Supabase opslaan mislukt (${response.status})`);
+    return {
+      ok: true,
+      scope: REMOTE_SCOPE,
+      source: 'supabase:sportschool',
+    };
+  }
+
+  async function fetchRemoteState() {
+    const directConfig = getDirectSupabaseConfig();
+    if (directConfig) return fetchDirectSupabaseState(directConfig);
+
+    if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === 'function') {
+      return window.SoftoraUiStateClient.get(REMOTE_SCOPE);
+    }
+
+    const response = await fetch(`/api/ui-state-get?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`Sportschool opslag laden mislukt (${response.status})`);
+    return response.json();
+  }
+
+  async function saveRemoteState(snapshotJson) {
+    const directConfig = getDirectSupabaseConfig();
+    if (directConfig) return saveDirectSupabaseState(directConfig, snapshotJson);
+
+    const body = {
+      patch: { [REMOTE_STATE_KEY]: snapshotJson },
+      source: 'sportschool-logboek',
+      actor: 'serve',
+    };
+
+    if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
+      return window.SoftoraUiStateClient.set(REMOTE_SCOPE, body);
+    }
+
+    const response = await fetch(`/api/ui-state-set?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(`Sportschool opslag opslaan mislukt (${response.status})`);
+    return response.json();
+  }
+
+  async function loadRemoteState() {
+    try {
+      const state = await fetchRemoteState();
+      const raw = state?.values?.[REMOTE_STATE_KEY] || state?.values?.gymLogbookJson || '';
+      const snapshot = parseRemoteSnapshot(raw);
+      if (!snapshot) {
+        scheduleRemoteSave();
+        return;
+      }
+      lastRemoteSnapshotJson = JSON.stringify(snapshot);
+      if (applyRemoteSnapshot(snapshot)) render();
+    } catch (_error) {
+      // Lokaal blijft de app direct werken; sync probeert later opnieuw.
+    }
+  }
+
+  function scheduleRemoteSave() {
+    if (isApplyingRemoteState) return;
+    window.clearTimeout(remoteSaveTimer);
+    remoteSaveTimer = window.setTimeout(async () => {
+      const snapshot = buildSnapshotFromState();
+      const snapshotJson = JSON.stringify(snapshot);
+      if (snapshotJson === lastRemoteSnapshotJson) return;
+      lastRemoteSnapshotJson = snapshotJson;
+      try {
+        await saveRemoteState(snapshotJson);
+      } catch (_error) {
+        lastRemoteSnapshotJson = '';
+      }
+    }, REMOTE_SAVE_DELAY_MS);
   }
 
   function renderDayChoices() {
@@ -198,36 +429,54 @@
     top.append(title, metricGroup);
     card.append(top, notes);
     swipe.append(deleteButton, card);
-    bindSwipe(card);
+    bindSwipe(swipe, card);
     return swipe;
   }
 
-  function bindSwipe(card) {
+  function bindSwipe(swipe, card) {
     let startX = 0;
     let startY = 0;
-    let active = false;
+    let startOffset = 0;
     let offset = 0;
+    let active = false;
+    let dragging = false;
+    let targetInput = null;
 
     const setOffset = (nextOffset, animated = false) => {
-      offset = Math.max(0, Math.min(108, nextOffset));
+      offset = Math.max(0, Math.min(SWIPE_WIDTH, nextOffset));
+      card.classList.toggle('is-swiping', !animated);
       card.style.transition = animated ? 'transform 180ms ease' : 'none';
       card.style.transform = `translateX(${offset}px)`;
+      swipe.dataset.open = offset > 0 ? 'true' : 'false';
     };
 
-    card.addEventListener('pointerdown', (event) => {
-      if (event.target instanceof HTMLInputElement) return;
+    swipe.addEventListener('pointerdown', (event) => {
       active = true;
+      dragging = false;
       startX = event.clientX;
       startY = event.clientY;
+      startOffset = offset;
+      targetInput = event.target instanceof HTMLInputElement ? event.target : null;
       card.setPointerCapture(event.pointerId);
     });
 
-    card.addEventListener('pointermove', (event) => {
+    swipe.addEventListener('pointermove', (event) => {
       if (!active) return;
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
-      if (Math.abs(dy) > Math.abs(dx)) return;
-      setOffset(dx, false);
+
+      if (!dragging) {
+        if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+          active = false;
+          return;
+        }
+        if (Math.abs(dx) < 9 || Math.abs(dx) <= Math.abs(dy)) return;
+        dragging = true;
+        if (targetInput) targetInput.blur();
+      }
+
+      event.preventDefault();
+      setOffset(startOffset + dx, false);
     });
 
     const end = (event) => {
@@ -238,11 +487,25 @@
       } catch (_error) {
         // De browser kan de pointer al vrijgegeven hebben.
       }
-      setOffset(offset > 48 ? 108 : 0, true);
+
+      if (!dragging) {
+        if (offset > 0 && !(event.target instanceof HTMLInputElement)) setOffset(0, true);
+        return;
+      }
+
+      const dx = event.clientX - startX;
+      const shouldOpen = offset > 54 || dx > 26;
+      setOffset(shouldOpen ? SWIPE_WIDTH : 0, true);
+      window.setTimeout(() => card.classList.remove('is-swiping'), 190);
     };
 
-    card.addEventListener('pointerup', end);
-    card.addEventListener('pointercancel', end);
+    swipe.addEventListener('pointerup', end);
+    swipe.addEventListener('pointercancel', end);
+    swipe.addEventListener('click', (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
   }
 
   function render() {
@@ -270,7 +533,7 @@
   addButton.addEventListener('click', () => {
     const orders = readOrders(selectedDay);
     const nextOrder = Math.max(100, ...orders) + 1;
-    saveOrders(selectedDay, [...orders, nextOrder]);
+    saveOrders(selectedDay, [...orders, nextOrder], { silent: true });
     const exercise = readExercise(selectedDay, nextOrder);
     writeField(selectedDay, exercise.order, 'name', upper(exercise.title));
     writeField(selectedDay, exercise.order, 'notes', upper(exercise.notes));
@@ -282,6 +545,8 @@
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeDayPicker();
   });
+  window.addEventListener('online', scheduleRemoteSave);
 
   render();
+  loadRemoteState();
 })();
