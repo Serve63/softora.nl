@@ -138,6 +138,20 @@
 
 .mail-roi-calculator {
     display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+}
+
+.mail-roi-note {
+    color: #8a877f;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.mail-roi-cards {
+    display: inline-flex;
     align-items: stretch;
     gap: 6px;
 }
@@ -369,7 +383,7 @@
         justify-content: flex-start;
     }
 
-    .mail-roi-calculator {
+    .mail-roi-cards {
         flex-wrap: wrap;
     }
 
