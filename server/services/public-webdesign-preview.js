@@ -10,6 +10,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
+const PUBLIC_PREVIEW_BACKGROUND_PATH = '/assets/webdesign-preview-softora-purple-background.png?v=20260607a';
 
 const {
   buildCustomerIdentityKey,
@@ -362,6 +363,7 @@ function resolvePreviewSource(values, record, type) {
 function buildPreviewHtml(preview) {
   const photoSource = escapeHtml(preview.photoSource);
   const mockupSource = escapeHtml(preview.mockupSource);
+  const backgroundSource = escapeHtml(PUBLIC_PREVIEW_BACKGROUND_PATH);
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
     getUrlOrigin(preview.mockupSource),
@@ -375,12 +377,14 @@ function buildPreviewHtml(preview) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
 ${preconnectTags}
+  <link rel="preload" as="image" href="${backgroundSource}">
   <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
   <link rel="preload" as="image" href="${mockupSource}">
   <title>Webdesign preview | Softora</title>
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#121212;color:#fff;font-family:Inter,Arial,sans-serif}
+    html,body{margin:0;min-height:100%;background-color:#160812;color:#fff;font-family:Inter,Arial,sans-serif}
+    body{background-image:radial-gradient(circle at 50% 46%, rgba(255,244,238,.16) 0, rgba(255,244,238,.08) 28%, rgba(22,8,18,0) 62%),linear-gradient(120deg, rgba(107,26,63,.52), rgba(16,8,22,.18) 52%, rgba(166,45,101,.26)),url("${backgroundSource}");background-position:center;background-repeat:no-repeat;background-size:cover}
     main{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(18px,2.8vw,46px)}
     .preview-grid{width:min(1660px,100%);height:min(920px,calc(100svh - clamp(36px,5.6vw,92px)));display:grid;grid-template-columns:minmax(280px,.78fr) minmax(420px,1.12fr);gap:clamp(22px,2.4vw,42px);align-items:center}
     .preview-frame{min-width:0;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
