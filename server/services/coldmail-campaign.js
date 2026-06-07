@@ -108,9 +108,9 @@ const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nBekijk het via hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -4801,7 +4801,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!publicLink.href) {
       return `<em style="font-style:italic;">${escapeHtml(cleanLine).replace(/\n/g, '<br>')}</em>`;
     }
-    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Open het via <a href="${escapeHtmlAttribute(
+    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Bekijk het via <a href="${escapeHtmlAttribute(
       publicLink.href
     )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
   }
