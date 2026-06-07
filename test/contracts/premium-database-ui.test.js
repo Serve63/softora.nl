@@ -614,7 +614,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
   assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*min-width: 132px;/);
-  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*justify-content: center;[\s\S]*column-gap: 7px;/);
+  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*justify-content: center;[\s\S]*column-gap: 1px;/);
   assert.match(pageSource, /\.photo-cost-label\s*\{[\s\S]*display: inline-flex;[\s\S]*line-height: 1;/);
   assert.match(pageSource, /\.result-count-button\s*\{[\s\S]*display: inline-flex;[\s\S]*justify-content: center;/);
   assert.match(pageSource, /class="mail-roi-label">Mails verstuurd<\/div>/);
