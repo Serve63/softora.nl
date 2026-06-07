@@ -612,6 +612,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
+  assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
+  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*min-width: 148px;/);
   assert.match(pageSource, /class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-label">&ge; €850 klanten<\/div>/);
   assert.match(pageSource, /id="mailRoiDealsCount"/);
