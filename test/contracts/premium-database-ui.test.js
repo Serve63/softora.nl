@@ -613,8 +613,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
-  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*min-width: 132px;/);
-  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*justify-content: center;[\s\S]*column-gap: 1px;/);
+  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*width: max-content;[\s\S]*max-width: 100%;/);
+  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*display: inline-flex;[\s\S]*flex-direction: column;[\s\S]*gap: 3px;/);
+  assert.match(pageSource, /\.result-count-action-row\s*\{[\s\S]*display: inline-flex;[\s\S]*gap: 5px;/);
+  assert.match(pageSource, /\.result-count-stack \.f-count\s*\{[\s\S]*margin-left: 0;[\s\S]*text-align: center;/);
+  assert.match(pageSource, /<div class="result-count-action-row"><button class="result-count-button" id="generatePhotosButton"/);
   assert.match(pageSource, /\.photo-cost-label\s*\{[\s\S]*display: inline-flex;[\s\S]*line-height: 1;/);
   assert.match(pageSource, /\.result-count-button\s*\{[\s\S]*display: inline-flex;[\s\S]*justify-content: center;/);
   assert.match(pageSource, /class="mail-roi-label">Mails verstuurd<\/div>/);
