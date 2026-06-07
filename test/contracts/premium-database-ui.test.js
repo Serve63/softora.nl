@@ -487,7 +487,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
-  assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
+  assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; state\.remoteCustomersLoaded = true; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
   assert.match(pageSource, /function getUiStateFetchTimeoutMs\(scope\) \{/);
@@ -565,7 +565,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="system-mail-count-stack" aria-label="Mails verstuurd door Softora"/);
   assert.match(pageSource, /id="systemMailSentCount"/);
   assert.match(pageSource, /class="system-mail-count-icon"/);
-  assert.match(pageSource, />Mails verstuurd<\/div>/);
+  assert.match(pageSource, />Verstuurd<\/div>/);
+  assert.match(pageSource, /remoteCustomersLoaded: false/);
+  assert.match(pageSource, /state\.remoteCustomersLoaded = true/);
+  assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded/);
   assert.match(pageSource, /id="photoCostLabel" aria-label="Kosten voor AI-foto's"/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.21;/);
   assert.match(pageSource, /<strong>€0,00<\/strong>/);
@@ -589,7 +592,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /hasInstantlyOutreachSignal\(customer\)/);
   assert.match(systemMailCountScriptSource, /provider === "instantly"/);
   assert.match(systemMailCountScriptSource, /\["softora", "gmail", "smtp", "strato"\]\.indexOf\(provider\) !== -1/);
-  assert.match(pageSource, /SoftoraDatabaseSystemMailCount\.render\(state\.klanten, \{ dataLoading: state\.dataLoading/);
+  assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded/);
   assert.match(pageSource, /SoftoraDatabaseSystemMailCount\.render\(state\.klanten,[\s\S]*nodes\.count\.textContent/);
   assert.match(pageSource, /const showPhotoBatchControl = state\.activeStatus === "beschikbaar";/);
   assert.match(pageSource, /nodes\.resultCountStack\.hidden = !showPhotoBatchControl;/);
