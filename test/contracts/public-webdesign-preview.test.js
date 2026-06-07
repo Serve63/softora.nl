@@ -99,6 +99,8 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /concept-hero/);
   assert.match(response.body, /mockup-stage/);
+  assert.match(response.body, /\.tall\{width:min\(36%,430px\)/);
+  assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
   assert.match(response.body, /Over dit concept/);
   assert.match(response.body, /serve-creusen-profile\.jpg/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
@@ -107,6 +109,35 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
+});
+
+test('public webdesign preview concept route cleans internal import ids from fallback titles', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return {
+        values: {
+          [PHOTO_KEY]: JSON.stringify({
+            'manual-import-piggys-nl-contact-0574': {
+              id: 'manual-import-piggys-nl-contact-0574',
+              websitePhotoUrl: 'https://cdn.softora.test/piggy-webdesign.png',
+              websiteMockupUrl: 'https://cdn.softora.test/piggy-mockup.jpg',
+            },
+          }),
+        },
+      };
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'piggy-s-kadoshop' },
+    query: { cid: 'manual-import-piggys-nl-contact-0574' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /Piggy&#39;s Kadoshop/);
+  assert.doesNotMatch(response.body, /Manual Import/i);
+  assert.doesNotMatch(response.body, /Contact 0574/i);
 });
 
 test('public webdesign preview can read legacy chunked image data', async () => {

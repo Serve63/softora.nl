@@ -306,11 +306,32 @@ function getUrlOrigin(value) {
 }
 
 function titleFromIdentifier(value) {
-  const words = slugifyCompanyName(value)
-    .split('-')
-    .filter(Boolean)
-    .map((word) => (word.length <= 2 ? word.toUpperCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`));
+  const cleaned = slugifyCompanyName(value)
+    .replace(/^manual-import-/, '')
+    .replace(/-(?:nl|be|de|com|eu|net|org)(?:-|$)/g, '-')
+    .replace(/-(?:contact|klant|customer|lead)-?\d*$/g, '')
+    .replace(/-\d+$/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const words = [];
+  cleaned.split('-').filter(Boolean).forEach((word) => {
+    if (word === 's' && words.length) {
+      words[words.length - 1] = `${words[words.length - 1]}'s`;
+      return;
+    }
+    if (word === 'piggys') {
+      words.push("Piggy's");
+      return;
+    }
+    words.push(word.length <= 2 ? word.toUpperCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`);
+  });
   return words.join(' ') || 'Webdesign Concept';
+}
+
+function cleanPublicPreviewTitle(value, fallback) {
+  const title = normalizeString(value);
+  if (!title || /^manual import\b/i.test(title)) return titleFromIdentifier(fallback || title);
+  return title;
 }
 
 function buildPhotoMapFromStructuredEntries(entries) {
@@ -421,11 +442,11 @@ ${preconnectTags}
 </html>`;
 }
 
-function buildConceptHtml(preview) {
+function buildConceptHtml(preview, titleFallback) {
   const photoSource = escapeHtml(preview.photoSource);
   const mockupSource = escapeHtml(preview.mockupSource);
   const profileSource = escapeHtml(PUBLIC_PREVIEW_PROFILE_PATH);
-  const title = escapeHtml(preview.title || titleFromIdentifier(preview.id));
+  const title = escapeHtml(cleanPublicPreviewTitle(preview.title, titleFallback || preview.id));
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
     getUrlOrigin(preview.mockupSource),
@@ -448,16 +469,17 @@ ${preconnectTags}
     :root{--navy:#1c2b50;--teal:#5bada0;--cream:#f2ede6;--muted:#728095;--rule:#d8d2ca;--panel:#fffaf4}
     html,body{min-height:100%;background:var(--cream);color:var(--navy);font-family:Inter,Arial,sans-serif}
     body{overflow-x:hidden}
-    .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px clamp(18px,4vw,64px);gap:52px}
+    .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp(18px,4vw,64px);gap:44px}
     .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
-    .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:28px;width:100%;max-width:1300px;padding:0 clamp(0px,4vw,64px)}
+    .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:32px;width:100%;max-width:1260px;padding:0 clamp(0px,4vw,64px)}
     .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden}
-    .tall{width:44%;border-radius:14px}
-    .wide{width:53%;border-radius:14px}
-    .visual{display:block;width:100%;height:100%;background:var(--panel);object-fit:contain}
-    .tall .visual{aspect-ratio:7/8}
+    .tall{width:min(36%,430px);border-radius:16px}
+    .wide{width:min(58%,720px);border-radius:14px}
+    .visual{display:block;width:100%;height:100%;background:var(--panel)}
+    .tall .visual{aspect-ratio:3/4.45;object-fit:cover;object-position:top center}
+    .wide .visual{object-fit:contain;object-position:center}
     .wide .visual{aspect-ratio:16/10}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
@@ -610,17 +632,19 @@ function createPublicWebdesignPreviewService(options = {}) {
 
   async function getConceptPageResponse(req, res) {
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+    const params = req && req.params && typeof req.params === 'object' ? req.params : {};
+    const routeIdentifier = params.companySlug || params.customerId;
     const preview = await resolveFirstPreview([
       query.cid ||
         query.customerId ||
         query.id,
-      req && req.params && (req.params.companySlug || req.params.customerId),
+      routeIdentifier,
     ]);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) return res.status(404).send(buildNotFoundHtml());
-    return res.status(200).send(buildConceptHtml(preview));
+    return res.status(200).send(buildConceptHtml(preview, routeIdentifier));
   }
 
   return {
