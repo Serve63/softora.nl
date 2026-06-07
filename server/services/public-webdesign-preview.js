@@ -13,6 +13,7 @@ const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 const PUBLIC_PREVIEW_BACKGROUND_PATH = '/assets/webdesign-preview-coastal-dunes-background.png?v=20260607a';
 const PUBLIC_PREVIEW_BACKGROUND_FILE = 'webdesign-preview-coastal-dunes-background.png';
 const PUBLIC_PREVIEW_PROFILE_FILE = 'serve-creusen-profile.jpg';
+const PUBLIC_PREVIEW_PERSONAL_TEXT_FILE = 'webdesign-preview-personal-text.png';
 const PREVIEW_POSTER_WIDTH = 2400;
 const PREVIEW_POSTER_HEIGHT = 1350;
 const PREVIEW_POSTER_FETCH_TIMEOUT_MS = 10000;
@@ -298,10 +299,6 @@ function getUrlOrigin(value) {
   }
 }
 
-function escapeSvg(value) {
-  return escapeHtml(value);
-}
-
 function encodePathSegment(value) {
   return encodeURIComponent(normalizeCustomerId(value));
 }
@@ -323,20 +320,6 @@ function buildPosterPathForRequest(req) {
 }
 
 function buildPosterChromeSvg() {
-  const titleLines = [
-    'Ik heb alvast een',
-    'webdesignconcept gemaakt.',
-  ];
-  const bodyLines = [
-    'Links zie je de volledige pagina; rechts de mockup op schermen.',
-    'Zo zie je direct hoe een frissere online uitstraling voelt.',
-  ];
-  const title = titleLines
-    .map((line, index) => `<tspan x="1284" dy="${index ? 50 : 0}">${escapeSvg(line)}</tspan>`)
-    .join('');
-  const body = bodyLines
-    .map((line, index) => `<tspan x="1284" dy="${index ? 32 : 0}">${escapeSvg(line)}</tspan>`)
-    .join('');
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${PREVIEW_POSTER_WIDTH}" height="${PREVIEW_POSTER_HEIGHT}" viewBox="0 0 ${PREVIEW_POSTER_WIDTH} ${PREVIEW_POSTER_HEIGHT}">
   <defs>
     <filter id="softShadow" x="-20%" y="-20%" width="140%" height="160%">
@@ -363,10 +346,6 @@ function buildPosterChromeSvg() {
   <rect x="990" y="970" width="1325" height="300" rx="22" fill="url(#cardShade)" stroke="#ffffff" stroke-opacity=".72" filter="url(#softShadow)"/>
   <rect x="1024" y="1008" width="224" height="216" rx="18" fill="url(#photoPanel)" stroke="#ffffff" stroke-opacity=".62"/>
   <circle cx="1136" cy="1116" r="76" fill="#ffffff" opacity=".92"/>
-  <text x="1284" y="1038" fill="#7a6a46" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="800" letter-spacing="4">PERSOONLIJK GEMAAKT</text>
-  <text x="1284" y="1088" fill="#1a1a2e" font-family="Inter, Arial, sans-serif" font-size="43" font-weight="800" letter-spacing="0">${title}</text>
-  <text x="1284" y="1196" fill="#4f5060" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="500" letter-spacing="0">${body}</text>
-  <text x="1284" y="1260" fill="#1a1a2e" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800" letter-spacing="0">Groet, Servé</text>
 </svg>`);
 }
 
@@ -417,6 +396,7 @@ async function buildPreviewPosterPng(preview) {
     fetchImageBuffer(preview.mockupSource),
     readPreviewAssetBuffer(PUBLIC_PREVIEW_PROFILE_FILE),
   ]);
+  const personalText = await readPreviewAssetBuffer(PUBLIC_PREVIEW_PERSONAL_TEXT_FILE);
   const base = await sharp(background)
     .resize(PREVIEW_POSTER_WIDTH, PREVIEW_POSTER_HEIGHT, { fit: 'cover' })
     .modulate({ brightness: 0.94, saturation: 0.82 })
@@ -437,6 +417,7 @@ async function buildPreviewPosterPng(preview) {
       { input: websiteImage, left: 85, top: 95 },
       { input: mockupImage, left: 990, top: 250 },
       { input: profileImage, left: 1060, top: 1039 },
+      { input: personalText, left: 1284, top: 970 },
     ])
     .png()
     .toBuffer();
