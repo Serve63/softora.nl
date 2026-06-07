@@ -47,7 +47,7 @@ function loadDatabaseContactStatusClient() {
 function loadDatabaseSystemMailCountClient(options = {}) {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-system-mail-count.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
-  const sandbox = { window: { document: options.document, localStorage: options.localStorage } };
+  const sandbox = { window: { document: options.document, localStorage: options.localStorage, SoftoraUiStateClient: options.SoftoraUiStateClient } };
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseSystemMailCount;
 }
@@ -315,6 +315,56 @@ test('premium database mail ROI calculator uses the live Softora mail count', ()
   plusHandler();
   assert.equal(nodes.mailRoiDealsCount.textContent, '2');
   assert.equal(nodes.mailRoiRatio.textContent, '1 op 3');
+});
+
+test('premium database mail ROI calculator persists the customer count', async () => {
+  let plusHandler = null;
+  const writes = [];
+  const nodes = {
+    systemMailSentCount: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const systemMailCountClient = loadDatabaseSystemMailCountClient({
+    document: {
+      getElementById: (id) => nodes[id] || null,
+      querySelectorAll: () => [{
+        getAttribute: () => '1',
+        addEventListener: (eventName, handler) => {
+          if (eventName === 'click') plusHandler = handler;
+        },
+      }],
+    },
+    SoftoraUiStateClient: {
+      get: async (scope) => {
+        assert.equal(scope, 'premium_database_mail_roi');
+        return { values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 2 }) } };
+      },
+      set: async (scope, body) => {
+        writes.push({ scope, body });
+        return { ok: true };
+      },
+    },
+  });
+  const customers = [
+    { bedrijf: 'Softora lead', lastColdmailProvider: 'softora' },
+    { bedrijf: 'Gmail lead', lastColdmailProvider: 'gmail' },
+    { bedrijf: 'SMTP lead', lastColdmailSenderEmail: 'serve@softora.nl' },
+    { bedrijf: 'Message lead', coldmailSentMessageId: 'msg_1' },
+    { bedrijf: 'Two-message lead', hist: [{ label: 'Mail verstuurd' }, { type: 'gemaild', label: 'Mail verstuurd' }] },
+  ];
+
+  systemMailCountClient.render(customers, { normalizeString: (value) => String(value || '').trim() });
+  await systemMailCountClient.loadPersistedDealCount();
+
+  assert.equal(nodes.mailRoiDealsCount.textContent, '2');
+  assert.equal(nodes.mailRoiRatio.textContent, '1 op 3');
+  plusHandler();
+  assert.equal(nodes.mailRoiDealsCount.textContent, '3');
+  assert.equal(nodes.mailRoiRatio.textContent, '1 op 2');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].scope, 'premium_database_mail_roi');
+  assert.equal(JSON.parse(writes[0].body.patch.premium_database_mail_roi_v1).dealCount, 3);
 });
 
 test('premium database table helpers keep coldcalling filters separate and paginate rows', () => {
@@ -612,6 +662,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
+  assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 3\.000 mails\.<\/div>/);
+  assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
   assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*width: max-content;[\s\S]*max-width: 100%;/);
   assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*display: inline-flex;[\s\S]*flex-direction: column;[\s\S]*gap: 3px;/);
@@ -652,6 +704,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /function rememberRenderedMailCount\(element\)/);
   assert.match(systemMailCountScriptSource, /Math\.max\(rememberedCount \|\| 0, calculatedCount\)/);
   assert.match(systemMailCountScriptSource, /function renderRoiCalculator\(mailCount, isLoading\)/);
+  assert.match(systemMailCountScriptSource, /const ROI_STATE_SCOPE = "premium_database_mail_roi";/);
+  assert.match(systemMailCountScriptSource, /const ROI_STATE_KEY = "premium_database_mail_roi_v1";/);
+  assert.match(systemMailCountScriptSource, /function loadPersistedDealCount\(\)/);
+  assert.match(systemMailCountScriptSource, /source: "premium-database-mail-roi"/);
   assert.match(systemMailCountScriptSource, /function render\(customers, helpers\)/);
   assert.match(systemMailCountScriptSource, /hasInstantlyOutreachSignal\(customer\)/);
   assert.match(systemMailCountScriptSource, /provider === "instantly"/);
@@ -974,8 +1030,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260607c/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260607b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260608a/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260608a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
@@ -985,7 +1041,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(statusFilterCssBlock, /rgba\(139, 34, 82/);
   assert.doesNotMatch(statusFilterCssBlock, /margin-left: auto;/);
   assert.match(filterGroupsCssSource, /\.filter-metrics\s*\{[\s\S]*margin-left: 0;[\s\S]*gap: 24px;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-flex;[\s\S]*gap: 6px;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-flex;[\s\S]*flex-direction: column;[\s\S]*gap: 5px;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: inline-flex;[\s\S]*gap: 6px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-label\s*\{[\s\S]*font-family: "Oswald", sans-serif;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-step-button\s*\{[\s\S]*width: 16px;[\s\S]*height: 16px;/);
@@ -1132,7 +1190,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260607b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260608a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput"/);
   assert.doesNotMatch(pageSource, /<div class="database-import-actions" id="databaseImportActions" hidden>/);

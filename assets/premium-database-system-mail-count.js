@@ -1,7 +1,11 @@
 (function () {
+    const ROI_STATE_SCOPE = "premium_database_mail_roi";
+    const ROI_STATE_KEY = "premium_database_mail_roi_v1";
     let roiControlsBound = false;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
+    let roiStateLoadPromise = null;
+    let roiDirtySinceLoad = false;
 
     function fallbackNormalizeString(value) {
         return value === null || value === undefined ? "" : String(value).trim();
@@ -90,8 +94,69 @@
         return roiDealsCount;
     }
 
-    function saveDealCount(value) {
+    function getUiStateClient() {
+        return window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === "function" && typeof window.SoftoraUiStateClient.set === "function"
+            ? window.SoftoraUiStateClient
+            : null;
+    }
+
+    function parseStoredDealCount(rawValue) {
+        if (rawValue === null || rawValue === undefined || rawValue === "") return null;
+        if (typeof rawValue === "number") return clampDealCount(rawValue);
+        if (typeof rawValue === "object") return clampDealCount(rawValue.dealCount || rawValue.dealsCount || rawValue.count);
+        try {
+            return parseStoredDealCount(JSON.parse(String(rawValue)));
+        } catch (error) {
+            return clampDealCount(rawValue);
+        }
+    }
+
+    function loadPersistedDealCount() {
+        if (roiStateLoadPromise) return roiStateLoadPromise;
+        const client = getUiStateClient();
+        if (!client) {
+            roiStateLoadPromise = Promise.resolve(roiDealsCount);
+            return roiStateLoadPromise;
+        }
+        roiStateLoadPromise = client.get(ROI_STATE_SCOPE).then(function (state) {
+            const values = state && state.values && typeof state.values === "object" ? state.values : {};
+            const storedCount = parseStoredDealCount(values[ROI_STATE_KEY]);
+            if (storedCount !== null && !roiDirtySinceLoad) {
+                roiDealsCount = storedCount;
+                renderRoiCalculator(lastRenderedMailCount, lastRenderedMailCount === null);
+            }
+            return roiDealsCount;
+        }).catch(function (error) {
+            if (typeof console !== "undefined" && typeof console.error === "function") console.error("Mail ROI laden mislukt:", error);
+            return roiDealsCount;
+        });
+        return roiStateLoadPromise;
+    }
+
+    function persistDealCount() {
+        const client = getUiStateClient();
+        if (!client) return Promise.resolve(null);
+        return client.set(ROI_STATE_SCOPE, {
+            patch: {
+                [ROI_STATE_KEY]: JSON.stringify({
+                    dealCount: roiDealsCount,
+                    updatedAt: new Date().toISOString()
+                })
+            },
+            source: "premium-database-mail-roi",
+            actor: "Premium database"
+        }).catch(function (error) {
+            if (typeof console !== "undefined" && typeof console.error === "function") console.error("Mail ROI opslaan mislukt:", error);
+            return { ok: false, error: error };
+        });
+    }
+
+    function saveDealCount(value, options) {
         roiDealsCount = clampDealCount(value);
+        if (!options || options.persist !== false) {
+            roiDirtySinceLoad = true;
+            void persistDealCount();
+        }
     }
 
     function renderRoiCalculator(mailCount, isLoading) {
@@ -110,6 +175,7 @@
     }
 
     function bindRoiControls() {
+        void loadPersistedDealCount();
         if (roiControlsBound) return;
         const rootDocument = getRootDocument();
         if (!rootDocument || typeof rootDocument.querySelectorAll !== "function") return;
@@ -152,6 +218,7 @@
         hasSoftoraSystemMailSignal: hasSoftoraSystemMailSignal,
         getCustomerSoftoraSystemMailSentCount: getCustomerSoftoraSystemMailSentCount,
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,
+        loadPersistedDealCount: loadPersistedDealCount,
         renderRoiCalculator: renderRoiCalculator,
         render: render
     };
