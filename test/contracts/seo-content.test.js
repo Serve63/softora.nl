@@ -249,6 +249,74 @@ test('seo content houdt de derde wekelijkse batch uit public routes tot publicat
   }
 });
 
+test('seo content houdt de vierde wekelijkse batch uit public routes en sitemap tot publicatie', () => {
+  const beforeFourthBatch = new Date('2026-06-22T23:59:59.000Z');
+  const firstFourthBatchDay = new Date('2026-06-23T12:00:00.000Z');
+  const afterFourthBatch = new Date('2026-06-29T12:00:00.000Z');
+  const fourthBatchPaths = [
+    '/blog/ai-automatisering-klantintake-mkb',
+    '/kennisbank/wat-is-procesautomatisering',
+    '/blog/website-laten-maken-tilburg-leadgeneratie',
+    '/kennisbank/wat-is-een-crm-integratie',
+    '/branches/adviesbureaus',
+  ];
+
+  const earlyPaths = getSeoContentPublicPaths({ now: beforeFourthBatch });
+  const earlySitemap = getSeoContentSitemapEntries({ now: beforeFourthBatch });
+  for (const pathName of fourthBatchPaths) {
+    assert.ok(!earlyPaths.includes(pathName), `${pathName} mag voor publicatiedatum niet publiek zijn.`);
+    assert.ok(!earlySitemap.some((entry) => entry.path === pathName), `${pathName} mag voor publicatiedatum niet in sitemap staan.`);
+  }
+
+  assert.ok(
+    getSeoContentPublicPaths({ now: firstFourthBatchDay }).includes('/blog/ai-automatisering-klantintake-mkb')
+  );
+  assert.ok(
+    getSeoContentSitemapEntries({ now: firstFourthBatchDay }).some(
+      (entry) => entry.path === '/blog/ai-automatisering-klantintake-mkb'
+    )
+  );
+
+  const livePaths = getSeoContentPublicPaths({ now: afterFourthBatch });
+  const liveSitemap = getSeoContentSitemapEntries({ now: afterFourthBatch });
+  for (const pathName of fourthBatchPaths) {
+    assert.ok(livePaths.includes(pathName), `${pathName} moet op of na publicatiedatum publiek zijn.`);
+    assert.ok(liveSitemap.some((entry) => entry.path === pathName), `${pathName} moet op of na publicatiedatum in sitemap staan.`);
+  }
+});
+
+test('seo content verbergt vierde-batch links naar steunpagina’s tot die live zijn', () => {
+  const beforeProcessAutomation = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-klantintake-mkb', {
+      now: new Date('2026-06-23T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const afterProcessAutomation = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-automatisering-klantintake-mkb', {
+      now: new Date('2026-06-24T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const beforeCrmIntegration = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'website-laten-maken-tilburg-leadgeneratie', {
+      now: new Date('2026-06-25T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const afterCrmIntegration = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'website-laten-maken-tilburg-leadgeneratie', {
+      now: new Date('2026-06-26T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.doesNotMatch(beforeProcessAutomation, /href="\/kennisbank\/wat-is-procesautomatisering"/);
+  assert.match(afterProcessAutomation, /href="\/kennisbank\/wat-is-procesautomatisering"/);
+  assert.doesNotMatch(beforeCrmIntegration, /href="\/kennisbank\/wat-is-een-crm-integratie"/);
+  assert.match(afterCrmIntegration, /href="\/kennisbank\/wat-is-een-crm-integratie"/);
+});
+
 test('seo content renders the existing blog visual language with real links', () => {
   const html = buildSeoContentIndexHtml('blog', {
     siteOrigin: 'https://www.softora.nl',

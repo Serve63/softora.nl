@@ -234,6 +234,46 @@ test('derde weekly SEO batch heeft planning, money-page links, beelden en claim-
   assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
 });
 
+test('vierde weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
+  const fourthWeeklyPaths = [
+    '/blog/ai-automatisering-klantintake-mkb',
+    '/kennisbank/wat-is-procesautomatisering',
+    '/blog/website-laten-maken-tilburg-leadgeneratie',
+    '/kennisbank/wat-is-een-crm-integratie',
+    '/branches/adviesbureaus',
+  ];
+  const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-22T12:00:00.000Z') });
+  const weeklyPlan = plan.filter((entry) => fourthWeeklyPaths.includes(entry.path));
+
+  assert.deepEqual(
+    weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
+    [
+      '2026-06-23:scheduled:/blog/ai-automatisering-klantintake-mkb',
+      '2026-06-24:scheduled:/kennisbank/wat-is-procesautomatisering',
+      '2026-06-25:scheduled:/blog/website-laten-maken-tilburg-leadgeneratie',
+      '2026-06-26:scheduled:/kennisbank/wat-is-een-crm-integratie',
+      '2026-06-29:scheduled:/branches/adviesbureaus',
+    ]
+  );
+
+  const weeklyItems = getSeoContentItems({ now: new Date('2026-06-29T12:00:00.000Z') })
+    .filter((item) => fourthWeeklyPaths.includes(getSeoContentPathForItem(item)))
+    .map((item) => ({
+      ...item,
+      cluster: getSeoContentClusterForItem(item).key,
+    }));
+  const weeklyPages = weeklyItems.map((item) => ({
+    path: getSeoContentPathForItem(item),
+    html: buildSeoContentArticleHtml(item, { siteOrigin }),
+  }));
+
+  assert.equal(weeklyItems.length, 5);
+  assert.deepEqual(auditContentQuality({ items: weeklyItems, clusters: getSeoContentClusters() }), []);
+  assert.deepEqual(auditClaimSafety({ items: weeklyItems, pages: weeklyPages }), []);
+  assert.deepEqual(auditSeoImages({ pages: weeklyPages }), []);
+  assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
+});
+
 test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
   assert.ok(DEFAULT_UNSUPPORTED_CLAIM_RULES.length >= 6);
 
