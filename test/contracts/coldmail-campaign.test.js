@@ -340,6 +340,9 @@ function createService(overrides = {}) {
     setUiStateValues: async (scope, values, meta) => {
       savedState = { scope, values, meta };
       savedStates.push(savedState);
+      if (typeof overrides.onSetUiStateValues === 'function') {
+        await overrides.onSetUiStateValues({ scope, values, meta, savedStates });
+      }
       if (scope === 'premium_coldmail_auto_replies') {
         replyState = JSON.parse(values.softora_coldmail_auto_replies_v1);
       }
@@ -6337,6 +6340,12 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
         return { ok: true };
       },
     },
+    onSendMail: async () => {
+      calls.push({ type: 'smtp' });
+    },
+    onSetUiStateValues: async ({ scope }) => {
+      calls.push({ type: `state:${scope}` });
+    },
   });
 
   const result = await service.sendColdmailCampaign({
@@ -6352,10 +6361,73 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
   assert.equal(calls[0].items[0].recipientEmail, 'info@reservation.example');
   assert.equal(calls[0].options.provider, 'softora');
   assert.equal(calls[0].options.channel, 'coldmail');
-  assert.equal(calls[1].type, 'confirm');
-  assert.equal(calls[1].reservationId, 'reservation-1');
-  assert.equal(calls[1].options.status, 'sent');
-  assert.equal(calls[1].options.permanent, true);
+  assert.equal(calls[1].type, 'smtp');
+  assert.equal(calls[2].type, 'confirm');
+  assert.equal(calls[2].reservationId, 'reservation-1');
+  assert.equal(calls[2].options.status, 'sent');
+  assert.equal(calls[2].options.permanent, true);
+  const confirmIndex = calls.findIndex((call) => call.type === 'confirm');
+  const sendGuardWriteIndex = calls.findIndex((call) => call.type === 'state:premium_coldmail_send_guard');
+  const customerWriteIndex = calls.findIndex((call) => call.type === 'state:premium_customers_database');
+  assert.ok(sendGuardWriteIndex > confirmIndex);
+  assert.ok(customerWriteIndex > confirmIndex);
+});
+
+test('coldmail campaign pauses immediately when central guard confirm fails after SMTP accept', async () => {
+  const calls = [];
+  const { service, sentMessages, getSavedStates, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'confirm-fail-row',
+        bedrijf: 'Confirm Fail BV',
+        naam: 'Confirm Fail BV',
+        email: 'info@confirm-fail.example',
+        website: 'https://confirm-fail.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items) => {
+        calls.push({ type: 'reserve', items });
+        return { ok: true, reservationId: 'reservation-fails', count: items.length * 4 };
+      },
+      confirmReservation: async () => {
+        calls.push({ type: 'confirm' });
+        throw new Error('Supabase confirm timeout');
+      },
+    },
+    onSendMail: async () => {
+      calls.push({ type: 'smtp' });
+    },
+    onSetUiStateValues: async ({ scope }) => {
+      calls.push({ type: `state:${scope}` });
+    },
+    coldmailSafetyPauseMs: 60_000,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /Centrale outbound duplicate-guard kon niet permanent worden bevestigd/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 1);
+  assert.deepEqual(calls.slice(0, 3).map((call) => call.type), ['reserve', 'smtp', 'confirm']);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_coldmail_send_guard'), true);
+  assert.equal(getSendGuardState().entries[0].count, 0);
+  assert.equal(getSendGuardState().entries[0].safetyPauseReason, 'central_outbound_guard_confirm_failed');
 });
 
 test('coldmail campaign keeps old Instantly recipient guards permanently', async () => {
