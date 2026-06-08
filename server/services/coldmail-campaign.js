@@ -1241,7 +1241,10 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
     const recipientEmail = getRowEmail(row);
-    const recipientDomain = normalizeColdmailGuardKeyPart(getRowDomain(row));
+    const emailDomain = getEmailDomain(recipientEmail);
+    const recipientDomain = normalizeColdmailGuardKeyPart(
+      getRowDomain(row) || (emailDomain && !PERSONAL_MAILBOX_DOMAINS.has(emailDomain) ? emailDomain : '')
+    );
     const recipientCompanyKey = normalizeColdmailGuardKeyPart(getRowCompany(row));
     const recipientId = normalizeColdmailGuardKeyPart(id || getExplicitRowId(row));
     const recipientKey = recipientEmail
@@ -1322,10 +1325,13 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildOutboundRecipientGuardIdentity(item) {
     const guard = buildColdmailRecipientGuard(item && item.row, item && item.id);
+    const emailDomain = getEmailDomain(guard.recipientEmail);
     return {
       recipientKey: guard.recipientKey,
       recipientEmail: guard.recipientEmail,
-      recipientDomain: guard.recipientDomain || normalizeColdmailGuardKeyPart(getEmailDomain(guard.recipientEmail)),
+      recipientDomain:
+        guard.recipientDomain ||
+        normalizeColdmailGuardKeyPart(emailDomain && !PERSONAL_MAILBOX_DOMAINS.has(emailDomain) ? emailDomain : ''),
       recipientCompanyKey: guard.recipientCompanyKey,
       recipientId: guard.recipientId,
       recipientCompany: guard.recipientCompany,

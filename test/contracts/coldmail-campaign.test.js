@@ -723,7 +723,7 @@ test('coldmail open tracking ignores tokens from before a metrics reset', async 
         id: 'prospect-1',
         bedrijf: 'Bakkerij Zon',
         naam: 'Ruben',
-        email: 'ruben@example.test',
+        email: 'ruben@bakkerij-zon.test',
         telefoon: '+31 6 12345678',
         status: 'prospect',
         branche: 'Horeca & Restaurants',
@@ -927,7 +927,7 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
         id: 'prospect-2',
         bedrijf: 'Kapsalon Luna',
         naam: 'Luna',
-        email: 'luna@example.test',
+        email: 'luna@kapsalon-luna.test',
         status: 'prospect',
         branche: 'Horeca & Restaurants',
         stad: 'Oisterwijk',
@@ -6131,7 +6131,7 @@ test('coldmail campaign caps preview volume to STRATO-safe campaign limit', asyn
     id: `prospect-${index + 1}`,
     bedrijf: `Prospect ${index + 1}`,
     naam: `Contact ${index + 1}`,
-    email: `contact${index + 1}@example.test`,
+    email: `contact@prospect-${index + 1}.test`,
     status: 'prospect',
     mail: true,
   }));
@@ -6151,7 +6151,7 @@ test('coldmail campaign enforces daily sender guard across campaigns', async () 
     id: `prospect-${index + 1}`,
     bedrijf: `Prospect ${index + 1}`,
     naam: `Contact ${index + 1}`,
-    email: `contact${index + 1}@example.test`,
+    email: `contact@sender-guard-${index + 1}.test`,
     status: 'prospect',
     mail: true,
   }));
@@ -6262,6 +6262,44 @@ test('coldmail campaign blocks the same recipient across different sender mailbo
     }
   );
   assert.equal(second.sentMessages.length, 0);
+});
+
+test('coldmail campaign blocks prior recipient domains even when the next row has no website field', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'de-hoevens-reimport',
+        bedrijf: 'Landgoed de Hoevens',
+        naam: 'Landgoed de Hoevens',
+        email: 'info@dehoevens.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    sendGuardState: {
+      entries: [],
+      recipientEntries: [
+        {
+          at: '2026-05-25T13:20:00.000Z',
+          senderEmail: 'servec321@gmail.com',
+          recipientKey: 'email:gastenverblijven@dehoevens.nl',
+          recipientEmail: 'gastenverblijven@dehoevens.nl',
+          recipientDomain: 'dehoevens-nl',
+          recipientCompanyKey: 'landgoed-de-hoevens',
+          recipientCompany: 'Landgoed de Hoevens',
+          permanent: true,
+        },
+      ],
+    },
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({ count: 1 });
+
+  assert.equal(preview.selected, 0);
+  assert.equal(preview.failedItems[0].code, 'COLDMAIL_RECIPIENT_RECENTLY_SENT');
+  assert.match(preview.failedItems[0].error, /eerder gemaild/);
+
+  assert.equal(sentMessages.length, 0);
 });
 
 test('coldmail campaign blocks the same company even when the email address differs', async () => {
@@ -6789,7 +6827,7 @@ test('coldmail campaign does not mark daily-limit skipped rows as mailed', async
     id: `prospect-${index + 1}`,
     bedrijf: `Prospect ${index + 1}`,
     naam: `Contact ${index + 1}`,
-    email: `contact${index + 1}@example.test`,
+    email: `contact@daily-limit-${index + 1}.test`,
     status: 'prospect',
     databaseStatus: 'prospect',
     mail: true,
@@ -6821,7 +6859,7 @@ test('coldmail campaign does not mark daily-limit skipped rows as mailed', async
   assert.equal(result.persisted, 2);
   assert.deepEqual(
     sentMessages.map((message) => message.to),
-    ['contact1@example.test', 'contact2@example.test']
+    ['contact@daily-limit-1.test', 'contact@daily-limit-2.test']
   );
   assert.match(result.failedItems[0].error, /Daglimiet/);
   assert.match(result.failedItems[1].error, /Daglimiet/);

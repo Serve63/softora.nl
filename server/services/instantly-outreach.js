@@ -2250,7 +2250,12 @@ function createInstantlyOutreachService(deps = {}) {
     if (!guardIndex || typeof guardIndex !== 'object') return false;
     const row = item && item.row;
     const email = getRowEmail(row, normalizeString);
-    const domain = normalizeColdmailGuardKeyPart(getRowDomain(row, normalizeString) || getEmailDomain(email), normalizeString);
+    const emailDomain = getEmailDomain(email);
+    const domain = normalizeColdmailGuardKeyPart(
+      getRowDomain(row, normalizeString) ||
+        (emailDomain && !PERSONAL_MAILBOX_DOMAINS.has(emailDomain) ? emailDomain : ''),
+      normalizeString
+    );
     const companyKey = normalizeColdmailGuardKeyPart(getRowCompany(row, normalizeString), normalizeString);
     const id = normalizeColdmailGuardKeyPart(item && item.id, normalizeString);
     return Boolean(
@@ -2264,7 +2269,10 @@ function createInstantlyOutreachService(deps = {}) {
   function buildOutboundRecipientGuardIdentity(item) {
     const row = item && item.row;
     const email = getRowEmail(row, normalizeString);
-    const domain = getRowDomain(row, normalizeString) || getEmailDomain(email);
+    const emailDomain = getEmailDomain(email);
+    const domain =
+      getRowDomain(row, normalizeString) ||
+      (emailDomain && !PERSONAL_MAILBOX_DOMAINS.has(emailDomain) ? emailDomain : '');
     const company = getRowCompany(row, normalizeString);
     return {
       recipientKey: email ? `email:${email}` : '',

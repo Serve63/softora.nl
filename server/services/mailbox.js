@@ -946,10 +946,9 @@ function createMailboxService(deps = {}) {
 
   function looksLikeWebdesignOutreach(parsed, text) {
     const haystack = `${normalizeString(parsed && parsed.subject)}\n${text}\n${sanitizeMailboxDisplayText(parsed && parsed.html || '')}`.toLowerCase();
-    return /\bnieuw(?:e)?\s+webdesign\b/.test(haystack) || (
-      /\bwebdesign\b/.test(haystack) &&
-      /(?:gemaakt|geen webdesign willen ontvangen|\/afmelden\?t=)/.test(haystack)
-    );
+    if (/\bnieuw(?:e)?\s+webdesign\b/.test(haystack)) return true;
+    if (!/\bwebdesign\b/.test(haystack)) return false;
+    return /(?:gemaakt|ontwerp|preview|eerste versie|bekijk|zichtbaar|geen webdesign willen ontvangen|\/afmelden\?t=|mocht je er niks mee willen doen)/.test(haystack);
   }
 
   function getParsedAddressEmails(address) {

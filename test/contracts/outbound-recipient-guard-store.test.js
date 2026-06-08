@@ -158,6 +158,26 @@ test('outbound recipient guard store reports exact reserve and confirm counts', 
   assert.equal(calls.some((call) => call.type === 'confirm'), true);
 });
 
+test('outbound recipient guard store does not treat personal mailbox providers as recipient domains', async () => {
+  const { client, calls } = createMockSupabaseClient();
+  const store = createStore(client);
+
+  const reservation = await store.reserveRecipients(
+    [
+      { recipientEmail: 'ruben@gmail.com', recipientCompany: 'Eenmanszaak Gmail', recipientId: 'gmail-1' },
+      { recipientEmail: 'info@bakkerijzon.nl', recipientCompany: 'Bakkerij Zon', recipientId: 'bakkerij-1' },
+    ],
+    { provider: 'softora', channel: 'coldmail', permanent: true, source: 'test' }
+  );
+
+  assert.equal(reservation.ok, true);
+  const insertedRows = calls.find((call) => call.type === 'insert').rows;
+  const keys = insertedRows.map((row) => row.guard_key).sort();
+  assert.equal(keys.includes('domain:gmail-com'), false);
+  assert.equal(keys.includes('domain:bakkerijzon-nl'), true);
+  assert.equal(keys.includes('email:ruben@gmail.com'), true);
+});
+
 test('outbound recipient guard store marks confirm empty when no reservation rows are updated', async () => {
   const { client } = createMockSupabaseClient({ confirmRows: 0 });
   const store = createStore(client);
