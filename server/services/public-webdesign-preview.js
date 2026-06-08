@@ -496,7 +496,7 @@ ${preconnectTags}
     .profile-signature{margin-top:18px;padding-top:18px;text-align:center}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
-    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.tall,.wide-stack{width:100%}.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.divider{width:calc(100% - 36px)}}
+    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{order:-1}.tall,.wide-stack{width:100%}.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:1px solid var(--rule)}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
 <body>
