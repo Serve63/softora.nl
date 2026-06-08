@@ -488,6 +488,7 @@ ${preconnectTags}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
     .about-profile{width:min(100%,340px);justify-self:center}
+    .desktop-profile-role{display:none}
     .about-photo{width:100%;border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
     .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
     .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(22px,1.9vw,28px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
@@ -497,10 +498,11 @@ ${preconnectTags}
     .profile-signature{margin-top:18px;padding-top:18px;text-align:center}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
+    @media(min-width:1121px){.desktop-profile-role{display:block;margin:0 0 18px;text-align:center;font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}.profile-signature span{display:none}}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:1px solid var(--rule)}}
     @media(max-width:700px){.about-text h2{font-size:clamp(13px,4.1vw,22px)}}
     @media(max-width:700px){.scroll-cue{display:none}}
-    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{order:-1}.tall,.wide-stack{width:100%}.wide{width:100%}.divider{width:calc(100% - 36px)}}
+    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%}.wide{width:100%}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
 <body>
@@ -520,6 +522,7 @@ ${preconnectTags}
   <div class="divider"></div>
   <section class="about-section" id="concept-about">
     <div class="about-profile">
+      <div class="desktop-profile-role">Webdesigner &amp; Software Ontwikkelaar</div>
       <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
       <div class="signature profile-signature">
         <strong>Servé Creusen</strong>
