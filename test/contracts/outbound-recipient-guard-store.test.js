@@ -3,7 +3,7 @@ const test = require('node:test');
 
 const { createOutboundRecipientGuardStore } = require('../../server/services/outbound-recipient-guard-store');
 
-function createMockSupabaseClient({ conflictKeys = [], conflictAfterInsert = false } = {}) {
+function createMockSupabaseClient({ conflictKeys = [], conflictAfterInsert = false, confirmRows = 1 } = {}) {
   const calls = [];
   let conflictCheckCount = 0;
   const conflicts = new Set(conflictKeys);
@@ -58,6 +58,23 @@ function createMockSupabaseClient({ conflictKeys = [], conflictAfterInsert = fal
                 return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } };
               }
               return { data: rows, error: null };
+            },
+          };
+        },
+        update(patch) {
+          return {
+            eq(column, value) {
+              return {
+                async select(columns) {
+                  calls.push({ type: 'confirm', table, patch, column, value, columns });
+                  return {
+                    data: Array.from({ length: Math.max(0, Number(confirmRows) || 0) }, (_, index) => ({
+                      guard_key: `confirmed:${index + 1}`,
+                    })),
+                    error: null,
+                  };
+                },
+              };
             },
           };
         },
@@ -116,4 +133,41 @@ test('outbound recipient guard store resolves the real conflict after a unique-k
   assert.equal(result.conflict.guard_key, 'email:blocked@example.test');
   assert.equal(calls.filter((call) => call.type === 'insert').length, 1);
   assert.equal(calls.filter((call) => call.type === 'conflict-check').length, 2);
+});
+
+test('outbound recipient guard store reports exact reserve and confirm counts', async () => {
+  const { client, calls } = createMockSupabaseClient({ confirmRows: 4 });
+  const store = createStore(client);
+
+  const reservation = await store.reserveRecipients(
+    [{ recipientEmail: 'fresh@example.test', recipientCompany: 'Fresh BV', recipientId: 'fresh-1' }],
+    { provider: 'softora', channel: 'coldmail', permanent: true, source: 'test' }
+  );
+
+  assert.equal(reservation.ok, true);
+  assert.equal(reservation.count, 4);
+  assert.equal(reservation.expectedCount, 4);
+
+  const confirmation = await store.confirmReservation(reservation.reservationId, {
+    status: 'sent',
+    permanent: true,
+  });
+
+  assert.equal(confirmation.ok, true);
+  assert.equal(confirmation.count, 4);
+  assert.equal(calls.some((call) => call.type === 'confirm'), true);
+});
+
+test('outbound recipient guard store marks confirm empty when no reservation rows are updated', async () => {
+  const { client } = createMockSupabaseClient({ confirmRows: 0 });
+  const store = createStore(client);
+
+  const confirmation = await store.confirmReservation('missing-reservation', {
+    status: 'sent',
+    permanent: true,
+  });
+
+  assert.equal(confirmation.ok, false);
+  assert.equal(confirmation.reason, 'reservation_not_found');
+  assert.equal(confirmation.count, 0);
 });

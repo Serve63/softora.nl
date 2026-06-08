@@ -1348,6 +1348,14 @@ function createColdmailCampaignService(deps = {}) {
     });
   }
 
+  function isCompleteOutboundGuardReservation(result) {
+    const actualCount = Number(result && result.count);
+    const expectedCount = Number(result && result.expectedCount);
+    if (!result || result.ok !== true) return false;
+    if (!Number.isFinite(actualCount) || actualCount <= 0) return false;
+    return !(Number.isFinite(expectedCount) && expectedCount > 0 && actualCount < expectedCount);
+  }
+
   async function getSupabaseOutboundRecipientBlock(item) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.findRecipientConflict !== 'function') {
       return null;
@@ -1386,7 +1394,7 @@ function createColdmailCampaignService(deps = {}) {
         reservationId: reservation.reservationId,
       };
     }
-    if (!reservation || reservation.ok !== true) {
+    if (!isCompleteOutboundGuardReservation(reservation)) {
       const error = new Error('Centrale outbound duplicate-guard kon niet reserveren; coldmail niet verzonden.');
       error.code = 'COLDMAIL_OUTBOUND_GUARD_FAILED';
       error.status = 502;
@@ -1413,7 +1421,7 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     try {
-      await outboundRecipientGuardStore.confirmReservation(reservationId, {
+      const confirmation = await outboundRecipientGuardStore.confirmReservation(reservationId, {
         status: 'sent',
         permanent: true,
         payload: {
@@ -1422,6 +1430,11 @@ function createColdmailCampaignService(deps = {}) {
           bedrijf: sentItem && sentItem.bedrijf,
         },
       });
+      if (!confirmation || confirmation.ok !== true || Number(confirmation.count || 0) <= 0) {
+        const error = new Error('Centrale outbound duplicate-guard bevestigde geen bestaande reservering.');
+        error.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_EMPTY';
+        throw error;
+      }
     } catch (error) {
       logger.error('[OutboundRecipientGuard][coldmail-confirm]', error && error.message ? error.message : error);
       const wrappedError = new Error(
@@ -6706,10 +6719,13 @@ function createColdmailCampaignService(deps = {}) {
           code: normalizeString(error && error.code),
           error: truncateText(normalizeString(error && error.message), 500),
         });
-        const guardConfirmFailed =
-          normalizeString(error && error.code) === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
+        const errorCode = normalizeString(error && error.code);
+        const guardConfirmFailed = errorCode === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
+        const guardPreflightFailed = /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(errorCode);
         const safetyReason = guardConfirmFailed
           ? 'central_outbound_guard_confirm_failed'
+          : guardPreflightFailed
+          ? 'central_outbound_guard_preflight_failed'
           : getSmtpSafetyStopReason(error);
         if (safetyReason) {
           safetyPause = await recordColdmailSafetyPause({

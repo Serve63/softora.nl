@@ -2288,6 +2288,14 @@ function createInstantlyOutreachService(deps = {}) {
     };
   }
 
+  function isCompleteOutboundGuardReservation(result) {
+    const actualCount = Number(result && result.count);
+    const expectedCount = Number(result && result.expectedCount);
+    if (!result || result.ok !== true) return false;
+    if (!Number.isFinite(actualCount) || actualCount <= 0) return false;
+    return !(Number.isFinite(expectedCount) && expectedCount > 0 && actualCount < expectedCount);
+  }
+
   async function getSupabaseOutboundRecipientBlock(item) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.findRecipientConflict !== 'function') {
       return null;
@@ -2326,7 +2334,7 @@ function createInstantlyOutreachService(deps = {}) {
         conflictFailure: buildSupabaseOutboundGuardFailure(items[0], reservation.conflict),
       };
     }
-    if (!reservation || reservation.ok !== true) {
+    if (!isCompleteOutboundGuardReservation(reservation)) {
       throw createInstantlyError(
         'Centrale outbound duplicate-guard kon niet reserveren. Nieuwe Instantly-leads zijn niet klaargezet.',
         'INSTANTLY_OUTBOUND_GUARD_FAILED',

@@ -195,10 +195,10 @@ function createOutboundRecipientGuardStore(deps = {}) {
 
   async function reserveRecipients(items = [], options = {}) {
     const client = getClient();
-    if (!client) return { ok: false, skipped: true, reason: 'supabase_not_configured' };
+    if (!client) return { ok: false, skipped: true, reason: 'supabase_not_configured', expectedCount: 0 };
     await pruneExpiredReservations(client);
     const { reservationId, rows } = buildRowsForReservation(items, options);
-    if (!rows.length) return { ok: false, skipped: true, reason: 'no_recipient_identity', reservationId };
+    if (!rows.length) return { ok: false, skipped: true, reason: 'no_recipient_identity', reservationId, expectedCount: 0 };
     const existingConflict = await findRecipientConflictByKeys(
       client,
       rows.map((row) => row.guard_key)
@@ -208,6 +208,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
         ok: false,
         conflict: existingConflict,
         reservationId,
+        expectedCount: rows.length,
       };
     }
     const { data, error } = await client
@@ -229,12 +230,13 @@ function createOutboundRecipientGuardStore(deps = {}) {
             recipient_company: rows[0].recipient_company,
           },
           reservationId,
+          expectedCount: rows.length,
         };
       }
       logger.warn('[OutboundRecipientGuard][reserve]', error && error.message ? error.message : error);
       throw error;
     }
-    return { ok: true, reservationId, count: Array.isArray(data) ? data.length : rows.length };
+    return { ok: true, reservationId, count: Array.isArray(data) ? data.length : rows.length, expectedCount: rows.length };
   }
 
   async function confirmReservation(reservationId, options = {}) {
@@ -250,9 +252,15 @@ function createOutboundRecipientGuardStore(deps = {}) {
       updated_at: at,
     };
     if (options.payload && typeof options.payload === 'object') patch.payload = options.payload;
-    const { error } = await client.from(table).update(patch).eq('reservation_id', id);
+    const { data, error } = await client
+      .from(table)
+      .update(patch)
+      .eq('reservation_id', id)
+      .select('guard_key');
     if (error) throw error;
-    return { ok: true };
+    const count = Array.isArray(data) ? data.length : 0;
+    if (count <= 0) return { ok: false, reason: 'reservation_not_found', count };
+    return { ok: true, count };
   }
 
   async function releaseReservation(reservationId) {
