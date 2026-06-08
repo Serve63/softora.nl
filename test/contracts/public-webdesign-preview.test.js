@@ -71,6 +71,7 @@ test('public webdesign preview renders only the two images for a stored mail-rea
   assert.doesNotMatch(response.body, /background:#fff/);
   assert.doesNotMatch(response.body, /concept-hero/);
   assert.doesNotMatch(response.body, /serve-creusen-profile/);
+  assert.doesNotMatch(response.body, /Serv[eé]\s+Creusen/);
   assert.doesNotMatch(response.body, /Aagje van Os/);
   assert.doesNotMatch(response.body, /· naast elkaar/);
 });
@@ -102,7 +103,12 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.tall\{width:min\(36%,430px\)/);
   assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
   assert.match(response.body, /Over dit concept/);
-  assert.match(response.body, /serve-creusen-profile\.jpg/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg/);
+  assert.match(response.body, /Softora strategiegesprek over webdesign en bedrijfssoftware/);
+  assert.match(response.body, /<strong>Softora<\/strong>/);
+  assert.match(response.body, /Webdesign en software/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile/);
+  assert.doesNotMatch(response.body, /Serv[eé]\s+Creusen/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);

@@ -10,7 +10,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
-const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260607a';
+const PUBLIC_PREVIEW_ABOUT_IMAGE_PATH = '/assets/softora-strategy-meeting.jpg?v=20260608a';
 
 const {
   buildCustomerIdentityKey,
@@ -445,7 +445,7 @@ ${preconnectTags}
 function buildConceptHtml(preview, titleFallback) {
   const photoSource = escapeHtml(preview.photoSource);
   const mockupSource = escapeHtml(preview.mockupSource);
-  const profileSource = escapeHtml(PUBLIC_PREVIEW_PROFILE_PATH);
+  const aboutImageSource = escapeHtml(PUBLIC_PREVIEW_ABOUT_IMAGE_PATH);
   const title = escapeHtml(cleanPublicPreviewTitle(preview.title, titleFallback || preview.id));
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
@@ -462,7 +462,7 @@ function buildConceptHtml(preview, titleFallback) {
 ${preconnectTags}
   <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
   <link rel="preload" as="image" href="${mockupSource}">
-  <link rel="preload" as="image" href="${profileSource}">
+  <link rel="preload" as="image" href="${aboutImageSource}">
   <title>${title} | Design presentatie</title>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -507,7 +507,7 @@ ${preconnectTags}
   </section>
   <div class="divider"></div>
   <section class="about-section">
-    <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
+    <div class="about-photo"><img src="${aboutImageSource}" alt="Softora strategiegesprek over webdesign en bedrijfssoftware" loading="lazy" decoding="async"></div>
     <div class="about-text">
       <div class="label">Over dit concept</div>
       <h2>Gebouwd met nieuwsgierigheid en een beetje AI-magie.</h2>
@@ -515,8 +515,8 @@ ${preconnectTags}
       <p>Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt.</p>
       <p>Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
       <div class="signature">
-        <strong>Servé Creusen</strong>
-        <span>Webdesigner</span>
+        <strong>Softora</strong>
+        <span>Webdesign en software</span>
       </div>
     </div>
   </section>
