@@ -3,6 +3,7 @@ const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softo
 const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
 const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
 const SOFTORA_PUBLIC_PHONE = '+31643262792';
+const MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
 const SOFTORA_LOCALITY = 'Oisterwijk';
 const SOFTORA_REGION = 'Noord-Brabant';
 
@@ -2033,6 +2034,16 @@ function buildAbsoluteUrl(siteOriginRaw, pathNameRaw) {
   return pathName === '/' ? `${siteOrigin}/` : `${siteOrigin}${pathName}`;
 }
 
+function getPathFromUrl(valueRaw) {
+  const raw = String(valueRaw || '').trim();
+  if (!raw) return '/';
+  try {
+    return normalizePath(new URL(raw, DEFAULT_SITE_ORIGIN).pathname) || '/';
+  } catch {
+    return normalizePath(raw) || '/';
+  }
+}
+
 function escapeHtml(valueRaw) {
   return String(valueRaw || '')
     .replace(/&/g, '&amp;')
@@ -2487,6 +2498,7 @@ function buildBreadcrumbItems(siteOrigin, entries) {
 }
 
 function buildContentShell({ title, description, canonicalUrl, structuredData, body, ogType = 'website', imagePath }) {
+  const conversionPage = getPathFromUrl(canonicalUrl);
   return [
     '<!DOCTYPE html>',
     '<html lang="nl">',
@@ -2507,6 +2519,7 @@ function buildContentShell({ title, description, canonicalUrl, structuredData, b
     '      <a href="/vergelijkingen">Vergelijkingen</a>',
     '      <a href="/branches">Branches</a>',
     '      <a href="/regio">Regio</a>',
+    `      <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-nav-contact" data-softora-conversion-page="${escapeHtml(conversionPage)}" data-softora-conversion-target="whatsapp">Contact</a>`,
     '    </div>',
     '  </nav>',
     '  <div class="seo-shell">',
@@ -2563,7 +2576,24 @@ function renderConversionCta(item) {
     '  </div>',
     '  <div class="content-cta-actions">',
     `    <a class="content-cta-primary" href="${escapeHtml(primary.href)}" data-softora-conversion="content-primary" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="service">${escapeHtml(primary.label)}</a>`,
-    `    <a class="content-cta-secondary" href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">Contact</a>`,
+    `    <a class="content-cta-secondary" href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">Contact</a>`,
+    '  </div>',
+    '</section>',
+  ].join('\n');
+}
+
+function renderCollectionConversionCta(collection) {
+  const contentPath = normalizePath(collection && collection.path) || '/blog';
+  return [
+    '<section class="content-cta content-cta--index" data-softora-public-seo="conversion-cta">',
+    '  <div>',
+    '    <div class="meer-label">Volgende stap</div>',
+    '    <h2>Van lezen naar betere opvolging</h2>',
+    '    <p>Kies een dienstpagina voor context of start direct een gesprek als je jouw leadflow wilt aanscherpen.</p>',
+    '  </div>',
+    '  <div class="content-cta-actions">',
+    `    <a class="content-cta-primary" href="/diensten" data-softora-conversion="content-index-primary" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="service">Bekijk diensten</a>`,
+    `    <a class="content-cta-secondary" href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-index-contact" data-softora-conversion-page="${escapeHtml(contentPath)}" data-softora-conversion-target="whatsapp">Contact</a>`,
     '  </div>',
     '</section>',
   ].join('\n');
@@ -2784,6 +2814,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
       { label: 'Bekijk regio', href: '/regio' },
       { label: collection.key === 'blog' ? 'Bekijk de kennisbank' : 'Bekijk de blog', href: collection.key === 'blog' ? '/kennisbank' : '/blog' },
     ]),
+    renderCollectionConversionCta(collection),
     '</main>',
   ].join('\n');
 
