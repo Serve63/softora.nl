@@ -133,18 +133,27 @@ function createOutboundRecipientGuardStore(deps = {}) {
       .lt('expires_at', current);
   }
 
+  async function findRecipientConflictByKeys(client, keys = []) {
+    const uniqueKeys = Array.from(new Set((Array.isArray(keys) ? keys : []).map(normalizeString).filter(Boolean)));
+    if (!uniqueKeys.length) return null;
+    for (let index = 0; index < uniqueKeys.length; index += 500) {
+      const keyChunk = uniqueKeys.slice(index, index + 500);
+      const { data, error } = await client
+        .from(table)
+        .select('*')
+        .in('guard_key', keyChunk)
+        .limit(1);
+      if (error) throw error;
+      if (Array.isArray(data) && data.length) return data[0];
+    }
+    return null;
+  }
+
   async function findRecipientConflict(identity = {}) {
     const client = getClient();
     if (!client) return null;
     const keys = getIdentityKeyRows(identity, normalizeString).map((row) => row.guardKey);
-    if (!keys.length) return null;
-    const { data, error } = await client
-      .from(table)
-      .select('*')
-      .in('guard_key', keys)
-      .limit(1);
-    if (error) throw error;
-    return Array.isArray(data) && data.length ? data[0] : null;
+    return findRecipientConflictByKeys(client, keys);
   }
 
   function buildRowsForReservation(items = [], options = {}) {
@@ -190,13 +199,27 @@ function createOutboundRecipientGuardStore(deps = {}) {
     await pruneExpiredReservations(client);
     const { reservationId, rows } = buildRowsForReservation(items, options);
     if (!rows.length) return { ok: false, skipped: true, reason: 'no_recipient_identity', reservationId };
+    const existingConflict = await findRecipientConflictByKeys(
+      client,
+      rows.map((row) => row.guard_key)
+    );
+    if (existingConflict) {
+      return {
+        ok: false,
+        conflict: existingConflict,
+        reservationId,
+      };
+    }
     const { data, error } = await client
       .from(table)
       .insert(rows)
       .select('*');
     if (error) {
       if (String(error.code || '') === '23505' || /duplicate key|unique/i.test(String(error.message || ''))) {
-        const conflict = await findRecipientConflict(items[0]);
+        const conflict = await findRecipientConflictByKeys(
+          client,
+          rows.map((row) => row.guard_key)
+        );
         return {
           ok: false,
           conflict: conflict || {
