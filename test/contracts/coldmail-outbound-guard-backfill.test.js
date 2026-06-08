@@ -473,17 +473,29 @@ test('coldmail outbound guard backfill reports repeated webdesign contacts witho
   assert.equal(contactDuplicates[0].domain, 'administratieportaal-nl');
   assert.equal(contactDuplicates[0].count, 2);
   assert.equal(contactDuplicates[0].hasReplyOrFollowup, true);
+  assert.deepEqual(
+    contactEvents[0].keyRows.map((row) => row.guardKey),
+    ['email:marco@administratieportaal.nl', 'domain:administratieportaal-nl']
+  );
+
+  const missing = findMissingGuardKeys(contactEvents, []);
+  assert.deepEqual(
+    [...new Set(missing.map((item) => item.guardKey))],
+    ['email:marco@administratieportaal.nl', 'domain:administratieportaal-nl']
+  );
 
   const report = buildReport({
     events: [],
     contactEvents,
     guards: [],
-    missing: [],
+    missing,
     insertedRows: [],
     options: parseArgs([]),
   });
-  assert.equal(report.ok, true);
+  assert.equal(report.ok, false);
+  assert.equal(report.summary.missingGuardKeys, 4);
   assert.equal(report.summary.webdesignContactDuplicateDomains, 1);
+  assert.equal(report.summary.softoraDuplicateRecipients, 0);
 });
 
 test('coldmail outbound guard audit keeps legacy dashboard sends visible without adding false duplicates', () => {
