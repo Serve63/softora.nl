@@ -515,7 +515,7 @@ ${preconnectTags}
           <span class="hero-label">Webdesign presentatie</span>
           <h1 class="hero-title">${title}</h1>
         </div>
-        <h2 class="mobile-mockup-intro"><span class="title-line">Een korte indruk van de eerste versie</span><span class="title-line">op verschillende schermen:</span></h2>
+        <h2 class="mobile-mockup-intro">Eerste indruk op elk schermformaat:</h2>
         <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
       </div>
     </div>

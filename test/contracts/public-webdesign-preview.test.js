@@ -128,7 +128,8 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.mobile-mockup-intro\{display:none\}/);
   assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.mobile-mockup-intro\{display:block;order:1;width:100%;margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp\(19px,5\.4vw,25px\);font-weight:600;line-height:1\.18;color:var\(--navy\);text-align:center\}\.mobile-mockup-intro \.title-line\{display:block\}\.wide\{width:100%;order:2\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
-  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<h2 class="mobile-mockup-intro"><span class="title-line">Een korte indruk van de eerste versie<\/span><span class="title-line">op verschillende schermen:<\/span><\/h2>\s*<div class="stage-card wide">/);
+  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<h2 class="mobile-mockup-intro">Eerste indruk op elk schermformaat:<\/h2>\s*<div class="stage-card wide">/);
+  assert.doesNotMatch(response.body, /Een korte indruk van de eerste versie/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
   assert.match(response.body, /\.scroll-cue\{position:fixed;right:clamp\(18px,4vw,56px\);bottom:clamp\(18px,3\.5vw,42px\);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center/);
