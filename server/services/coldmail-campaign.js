@@ -1372,7 +1372,7 @@ function createColdmailCampaignService(deps = {}) {
         source: 'softora-coldmail-pre-send',
         actor,
         status: 'reserved',
-        permanent: false,
+        permanent: true,
         payload: {
           customerId: item && item.id,
           bedrijf: getRowCompany(item && item.row),
