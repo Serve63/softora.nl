@@ -457,6 +457,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         extractOpenAiTextContent: aiHelpers.extractOpenAiTextContent,
         isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
         getSupabaseClient: platformRuntime.getSupabaseClient,
+        outboundRecipientGuardStore,
         mailConfig: {
           smtpHost: envConfig.MAIL_SMTP_HOST,
           smtpPort: envConfig.MAIL_SMTP_PORT,

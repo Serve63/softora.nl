@@ -53,6 +53,19 @@ const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nB
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)/i;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
+const PERSONAL_MAILBOX_DOMAINS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'icloud.com',
+  'me.com',
+  'msn.com',
+  'yahoo.com',
+  'proton.me',
+  'protonmail.com',
+]);
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
@@ -499,6 +512,7 @@ function createMailboxService(deps = {}) {
     },
     isSupabaseConfigured = () => false,
     getSupabaseClient = () => null,
+    outboundRecipientGuardStore = null,
     mailboxIndexStore = createMailboxIndexStore({
       isSupabaseConfigured,
       getSupabaseClient,
@@ -823,6 +837,16 @@ function createMailboxService(deps = {}) {
     return normalizeEmail(row.email || row.contactEmail || row.mail || row.emailadres || row.emailAddress);
   }
 
+  function getEmailDomain(email) {
+    const normalized = normalizeEmail(email);
+    const at = normalized.lastIndexOf('@');
+    return at >= 0 ? normalizeDomain(normalized.slice(at + 1)) : '';
+  }
+
+  function isPersonalMailboxDomain(domain) {
+    return PERSONAL_MAILBOX_DOMAINS.has(normalizeDomain(domain));
+  }
+
   function getCustomerId(row = {}, index = 0) {
     return normalizeString(row.id || row.customerId || row.databaseId || row.key || row.uuid || `customer-${index}`);
   }
@@ -945,6 +969,118 @@ function createMailboxService(deps = {}) {
       }
     });
     return matches.slice(0, 2);
+  }
+
+  function buildMailboxWebdesignOutboundIdentity({ to, parsed, text, matchedRow, matchedMeta, matchedId } = {}) {
+    const recipientEmail = normalizeEmail(to);
+    const emailDomain = getEmailDomain(recipientEmail);
+    const extractedDomains = extractMailDomains(parsed, text);
+    const recipientDomain =
+      getCustomerDomain(matchedRow || {}) ||
+      extractedDomains[0] ||
+      (isPersonalMailboxDomain(emailDomain) ? '' : emailDomain);
+    const recipientCompany = getCustomerCompany(matchedRow || {}) || getPhotoMetaCompany(matchedMeta || {});
+    const recipientId =
+      normalizeString(matchedId) ||
+      normalizeString(matchedMeta && (matchedMeta.id || matchedMeta.customerId)) ||
+      normalizeString(matchedRow && (matchedRow.id || matchedRow.customerId || matchedRow.databaseId));
+    return {
+      recipientKey: recipientEmail ? `email:${recipientEmail}` : '',
+      recipientEmail,
+      recipientDomain,
+      recipientCompanyKey: recipientCompany,
+      recipientId,
+      recipientCompany,
+    };
+  }
+
+  function buildMailboxWebdesignGuardError(message, code, status = 502, extra = {}) {
+    const error = new Error(message);
+    error.code = code;
+    error.status = status;
+    Object.assign(error, extra);
+    return error;
+  }
+
+  function buildMailboxWebdesignGuardConflictError(identity, conflict) {
+    const sender = normalizeEmail(conflict && conflict.sender_email);
+    const provider = normalizeString(conflict && conflict.provider).toLowerCase();
+    const target =
+      normalizeEmail(identity && identity.recipientEmail) ||
+      normalizeString(identity && identity.recipientCompany) ||
+      'deze ontvanger';
+    const source = provider === 'instantly'
+      ? 'Instantly'
+      : sender
+        ? sender
+        : 'de centrale outbound duplicate-guard';
+    return buildMailboxWebdesignGuardError(
+      `Webdesignmail geblokkeerd: ${target} is al eerder vastgezet via ${source}.`,
+      'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFLICT',
+      409,
+      { conflict }
+    );
+  }
+
+  async function reserveMailboxWebdesignOutboundRecipient(identity, { accountEmail, subject } = {}) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
+      throw buildMailboxWebdesignGuardError(
+        'Centrale outbound duplicate-guard ontbreekt; webdesignmail niet verzonden.',
+        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_UNAVAILABLE',
+        503
+      );
+    }
+    const reservation = await outboundRecipientGuardStore.reserveRecipients([identity], {
+      provider: 'softora',
+      channel: 'mailbox',
+      senderEmail: accountEmail,
+      source: 'softora-mailbox-webdesign-pre-send',
+      actor: 'premium-mailbox-send',
+      status: 'reserved',
+      permanent: true,
+      payload: {
+        subject,
+        manualMailboxSend: true,
+      },
+    });
+    if (reservation && reservation.conflict) {
+      throw buildMailboxWebdesignGuardConflictError(identity, reservation.conflict);
+    }
+    if (!reservation || reservation.ok !== true) {
+      throw buildMailboxWebdesignGuardError(
+        'Centrale outbound duplicate-guard kon niet reserveren; webdesignmail niet verzonden.',
+        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_FAILED',
+        502
+      );
+    }
+    return reservation;
+  }
+
+  async function confirmMailboxWebdesignOutboundRecipient(reservationId, sentItem = {}) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
+      throw buildMailboxWebdesignGuardError(
+        'Centrale outbound duplicate-guard kan niet permanent worden bevestigd na SMTP-acceptatie.',
+        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
+        502
+      );
+    }
+    if (!reservationId) {
+      throw buildMailboxWebdesignGuardError(
+        'Centrale outbound duplicate-guard mist een reservering na SMTP-acceptatie.',
+        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
+        502
+      );
+    }
+    await outboundRecipientGuardStore.confirmReservation(reservationId, {
+      status: 'sent',
+      permanent: true,
+      payload: {
+        messageId: sentItem.messageId,
+        email: sentItem.email,
+        subject: sentItem.subject,
+        manualMailboxSend: true,
+      },
+    });
   }
 
   function getPhotoMetaForRow(row, index, photoMap, photoByIdentity) {
@@ -1254,6 +1390,7 @@ function createMailboxService(deps = {}) {
     if (!rawText || !looksLikeWebdesignOutreach(parsed, rawText)) return null;
 
     const normalizedText = normalizeMailboxWebdesignText(rawText);
+    const fallbackIdentity = buildMailboxWebdesignOutboundIdentity({ to, parsed, text: rawText });
     try {
       const [photoState, customerState] = await Promise.all([
         getUiStateValues(customerPhotoScope),
@@ -1302,16 +1439,25 @@ function createMailboxService(deps = {}) {
         }
       }
 
+      const outboundIdentity = buildMailboxWebdesignOutboundIdentity({
+        to,
+        parsed,
+        text: rawText,
+        matchedRow,
+        matchedMeta,
+        matchedId,
+      });
       const previewUrl = matchedRow
         ? buildPublicWebdesignPreviewUrlForMatch(matchedRow, matchedMeta, matchedId)
         : matchedMeta
           ? buildPublicWebdesignPreviewUrlForMatch(null, matchedMeta, matchedId)
         : extractPublicWebdesignPreviewUrlFromText(rawText);
       const inlineImages = await prepareMailboxInlineWebdesignImages(images, matchedId);
-      if (!previewUrl && !inlineImages.length) return { text: normalizedText };
+      if (!previewUrl && !inlineImages.length) return { text: normalizedText, outboundIdentity };
 
       return {
         text: normalizedText,
+        outboundIdentity,
         html: renderMailboxWebdesignHtml(normalizedText, {
           webdesignPreviewUrl: previewUrl,
           inlineImages,
@@ -1321,7 +1467,7 @@ function createMailboxService(deps = {}) {
       };
     } catch (error) {
       logger.warn('[Mailbox][webdesign-send]', error && error.message ? error.message : error);
-      return { text: normalizedText };
+      return { text: normalizedText, outboundIdentity: fallbackIdentity };
     }
   }
 
@@ -1905,7 +2051,20 @@ function createMailboxService(deps = {}) {
     if (Array.isArray(webdesignParts?.attachments) && webdesignParts.attachments.length) {
       mail.attachments = webdesignParts.attachments;
     }
+    const outboundReservation = webdesignParts
+      ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
+          accountEmail: account.email,
+          subject: cleanSubject,
+        })
+      : null;
     const info = await transporter.sendMail(mail);
+    if (webdesignParts) {
+      await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
+        messageId: normalizeString(info?.messageId || ''),
+        email: normalizeEmail(to),
+        subject: cleanSubject,
+      });
+    }
     const sentCopySaved = await appendSentMessage({
       account,
       createImapClient,
