@@ -29,14 +29,27 @@ function normalizeGuardKeyPart(value, normalizeString = defaultNormalizeString) 
     .slice(0, 180);
 }
 
+function normalizeDomainKeyPart(value, normalizeString = defaultNormalizeString) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/.*$/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 180);
+}
+
 function normalizeDomain(value, normalizeString = defaultNormalizeString) {
   const raw = normalizeString(value);
   if (!raw) return '';
   const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
   try {
-    return normalizeGuardKeyPart(new URL(candidate).hostname, normalizeString);
+    return normalizeDomainKeyPart(new URL(candidate).hostname, normalizeString);
   } catch (_error) {
-    return normalizeGuardKeyPart(raw, normalizeString);
+    return normalizeDomainKeyPart(raw, normalizeString);
   }
 }
 

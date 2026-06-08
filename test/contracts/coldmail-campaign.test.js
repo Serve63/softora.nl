@@ -4769,6 +4769,84 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(Object.keys(getReplyState().processed).length, 1);
 });
 
+test('coldmail auto-reply does not send while a coldmail safety pause is active', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-paused@example.test>',
+    subject: 'Re: Kleine vraag over jullie website',
+    text: 'Hoi Servé, bedankt voor je bericht.',
+    from: { value: [{ address: 'reply-paused@example.test', name: 'Paused Prospect' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-paused@softora>',
+  };
+  let openAiCalled = false;
+  const { service, sentMessages, getReplyState } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    now: () => new Date('2026-06-08T09:31:00.000Z'),
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-08T08:27:00.000Z',
+          count: 0,
+          senderEmail: '',
+          safetyPauseUntil: '2026-06-10T08:28:00.000Z',
+          safetyPauseReason: 'manual_coldmail_global_pause_by_serve_duplicate_reports_2026_06_08',
+        },
+      ],
+      recipientEntries: [],
+    },
+    rows: [
+      {
+        id: 'prospect-paused',
+        bedrijf: 'Paused Prospect BV',
+        naam: 'Paused Prospect',
+        email: 'reply-paused@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-06-04T10:00:00.000Z',
+        lastColdmailSenderEmail: 'serve@softora.nl',
+        mail: true,
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => {
+      openAiCalled = true;
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: 'gpt-5.5-pro',
+          choices: [{ message: { content: 'Dit mag niet verstuurd worden.' } }],
+        },
+      };
+    },
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const processed = Object.values(getReplyState().processed)[0];
+
+  assert.equal(result.matched, 1);
+  assert.equal(result.replied, 0);
+  assert.equal(result.autoReplySkippedSafetyPaused, 1);
+  assert.equal(openAiCalled, false);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(processed.lifecycleIntent, 'auto_reply_skipped_safety_pause');
+});
+
 test('coldmail auto-reply uses the mailbox owner identity for Martijn replies', async () => {
   const parsedInbound = {
     messageId: '<incoming-martijn@example.test>',

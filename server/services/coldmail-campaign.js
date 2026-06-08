@@ -6835,6 +6835,7 @@ function createColdmailCampaignService(deps = {}) {
         bounceUpdated: 0,
         bounceSkipped: 0,
         providerWarnings: 0,
+        autoReplySkippedSafetyPaused: 0,
         errors: [],
       };
       const dbState = await getUiStateValues(customerDbScope);
@@ -7026,6 +7027,28 @@ function createColdmailCampaignService(deps = {}) {
                 }
 
                 const senderEmail = resolveInboundSenderEmail(parsedMail);
+                const autoReplyQuota = await getColdmailSendQuota(senderEmail);
+                if (autoReplyQuota.safetyPause) {
+                  stats.autoReplySkippedSafetyPaused += 1;
+                  stats.safetyPausedUntil = autoReplyQuota.safetyPause.until;
+                  replyState.processed[processedKey] = {
+                    at: now().toISOString(),
+                    from: from.address,
+                    company: getRowCompany(match.row),
+                    subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                    lifecycleStatus: normalizeString(classification.status),
+                    lifecycleIntent: 'auto_reply_skipped_safety_pause',
+                    safetyPauseUntil: autoReplyQuota.safetyPause.until,
+                    safetyPauseReason: autoReplyQuota.safetyPause.reason,
+                  };
+                  await saveColdmailReplyState(replyState, 'coldmail-auto-reply-safety-pause');
+                  const flagsSet =
+                    message.flags instanceof Set
+                      ? message.flags
+                      : new Set(Array.isArray(message.flags) ? message.flags : []);
+                  if (!flagsSet.has('\\Seen')) uidsToMarkSeen.push(message.uid);
+                  continue;
+                }
                 const aiReply = await generateColdmailAutoReplyWithOpenAi({
                   row: match.row,
                   inboundText,
