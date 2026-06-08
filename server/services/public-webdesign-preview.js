@@ -473,10 +473,10 @@ ${preconnectTags}
     .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
-    .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:32px;width:100%;max-width:1260px;padding:0 clamp(0px,4vw,64px)}
-    .wide-stack{width:min(58%,720px);display:flex;flex-direction:column;align-items:center;gap:22px}
+    .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp(0px,3vw,44px)}
+    .wide-stack{width:min(54%,780px);display:flex;flex-direction:column;align-items:center;gap:22px}
     .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden}
-    .tall{width:min(36%,430px);border-radius:16px}
+    .tall{width:min(42%,540px);border-radius:16px}
     .wide{width:100%;border-radius:14px}
     .visual{display:block;width:100%;height:100%;background:var(--panel)}
     .tall .visual{aspect-ratio:3/4.45;object-fit:cover;object-position:top center}
