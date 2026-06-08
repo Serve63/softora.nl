@@ -146,6 +146,21 @@ test('public webdesign preview profile image is exported sharp enough for the co
   assert.equal(width * 3, height * 4);
 });
 
+test('public webdesign preview does not cache unavailable preview responses', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'missing-preview' } }, response);
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.match(response.body, /Deze preview is niet beschikbaar/);
+});
+
 test('public webdesign preview concept route cleans internal import ids from fallback titles', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {

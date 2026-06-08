@@ -622,9 +622,12 @@ function createPublicWebdesignPreviewService(options = {}) {
       req && req.params && (req.params.companySlug || req.params.customerId),
     ]);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-    if (!preview) return res.status(404).send(buildNotFoundHtml());
+    if (!preview) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return res.status(404).send(buildNotFoundHtml());
+    }
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     return res.status(200).send(buildPreviewHtml(preview));
   }
 
@@ -639,9 +642,12 @@ function createPublicWebdesignPreviewService(options = {}) {
       routeIdentifier,
     ]);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-    if (!preview) return res.status(404).send(buildNotFoundHtml());
+    if (!preview) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return res.status(404).send(buildNotFoundHtml());
+    }
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
     return res.status(200).send(buildConceptHtml(preview, routeIdentifier));
   }
 
