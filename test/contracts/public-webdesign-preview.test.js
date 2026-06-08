@@ -101,9 +101,10 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /mockup-stage/);
   assert.match(response.body, /\.tall\{width:min\(36%,430px\)/);
   assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
-  assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:auto;object-fit:contain\}/);
+  assert.match(response.body, /\.about-photo\{border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
+  assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:contain;object-position:center\}/);
   assert.doesNotMatch(response.body, /Over dit concept/);
-  assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608b/);
+  assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608c/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
