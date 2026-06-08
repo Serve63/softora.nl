@@ -151,9 +151,13 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /@media\(max-width:1120px\)\{[\s\S]*\.about-profile\{display:flex;flex-direction:column\}\.profile-signature\{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0\}/);
   assert.match(response.body, /@media\(max-width:700px\)\{\.about-text h2\{font-size:clamp\(13px,4\.1vw,22px\)\}\}/);
   assert.match(response.body, /<div class="about-profile">\s*<div class="desktop-profile-role">Webdesign &amp; Software Ontwikkeling<\/div>\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesign &amp; Software Ontwikkeling<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
-  assert.match(response.body, /<h2><span class="title-line">Gebouwd met software, nieuwsgierigheid<\/span><span class="title-line">en een beetje AI-magie\.<\/span><\/h2>/);
-  assert.doesNotMatch(response.body, /Gebouwd met software, nieuwsgierigheid<br>/);
-  assert.match(response.body, /<p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen\. Een aanspreekpunt voor design en techniek\. Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat\. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt\. Kleine details kunnen nog afwijken, zoals een logo, tekst of adres\. Dat schaven we in de volgende ronde strak\.<\/p>/);
+  assert.match(response.body, /<h2>Hoe heb ik dit webdesign gebouwd\?<\/h2>/);
+  assert.match(response.body, /<p>Begonnen met HTML-code, een leeg scherm en een scherp oog voor wat werkt\.<\/p>/);
+  assert.match(response.body, /<p>De basis heb ik zelf opgebouwd: structuur, indeling en techniek\. Daarna heb ik met een vleugje AI-magie extra sfeer toegevoegd aan beelden en uitstraling\.<\/p>/);
+  assert.match(response.body, /<p>Ook heb ik gekeken naar hoe andere spelers in de markt zich presenteren en welke elementen aantoonbaar goed werken voor bezoekers\. Die inzichten heb ik meegenomen in dit ontwerp\. Zo ontstaat een website die niet alleen mooi oogt, maar ook logisch, overzichtelijk en klantgericht werkt\.<\/p>/);
+  assert.match(response.body, /<p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen\. Ook voor onderhoud en doorontwikkeling denk ik graag mee\.<\/p>/);
+  assert.doesNotMatch(response.body, /Gebouwd met software, nieuwsgierigheid/);
+  assert.doesNotMatch(response.body, /full-stack developer ook bedrijfssoftware op maat/);
   assert.doesNotMatch(response.body, /<p>Dit design is tot stand gekomen/);
   assert.doesNotMatch(response.body, /<p>Kleine details kunnen nog afwijken/);
   assert.doesNotMatch(response.body, /Over dit concept/);
