@@ -673,10 +673,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.photo-cost-label\s*\{[\s\S]*display: inline-flex;[\s\S]*line-height: 1;/);
   assert.match(pageSource, /\.result-count-button\s*\{[\s\S]*display: inline-flex;[\s\S]*justify-content: center;/);
   assert.match(pageSource, /class="mail-roi-label">Mails verstuurd<\/div>/);
-  assert.match(pageSource, /class="mail-roi-label">&ge; €850 klanten<\/div>/);
+  assert.match(pageSource, /class="mail-roi-label">€850 klanten<\/div>/);
   assert.match(pageSource, /id="mailRoiDealsCount"/);
   assert.match(pageSource, /data-mail-roi-action="-1"/);
   assert.match(pageSource, /data-mail-roi-action="1"/);
+  assert.match(pageSource, /class="mail-roi-label">Klant per mails<\/div>/);
   assert.match(pageSource, /id="mailRoiRatio"/);
   assert.match(pageSource, /id="systemMailSentCount"/);
   assert.match(pageSource, /remoteCustomersLoaded: false/);
