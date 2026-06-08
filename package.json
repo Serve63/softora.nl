@@ -18,6 +18,8 @@
     "check:production-deploy-source": "node scripts/guard-production-deploy-source.js",
     "check:live-production-version": "node scripts/check-live-production-version.js",
     "check:live-production-version:wait": "node scripts/wait-live-production-version.js",
+    "check:coldmail-outbound-guards": "node scripts/backfill-coldmail-outbound-guards.js",
+    "backfill:coldmail-outbound-guards": "node scripts/backfill-coldmail-outbound-guards.js --apply",
     "deploy:production": "node scripts/deploy-production-safe.js",
     "verify:critical": "node scripts/verify-critical.js",
     "verify:security": "npm run check:secrets && npm run check:deps",

@@ -1397,9 +1397,21 @@ function createColdmailCampaignService(deps = {}) {
 
   async function confirmSupabaseOutboundRecipientForColdmail(reservationId, sentItem) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
-      return;
+      const error = new Error(
+        'Centrale outbound duplicate-guard kan niet permanent worden bevestigd na SMTP-acceptatie; coldmailing gepauzeerd.'
+      );
+      error.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
+      error.status = 502;
+      throw error;
     }
-    if (!reservationId) return;
+    if (!reservationId) {
+      const error = new Error(
+        'Centrale outbound duplicate-guard mist een reservering na SMTP-acceptatie; coldmailing gepauzeerd.'
+      );
+      error.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
+      error.status = 502;
+      throw error;
+    }
     try {
       await outboundRecipientGuardStore.confirmReservation(reservationId, {
         status: 'sent',
@@ -1411,7 +1423,14 @@ function createColdmailCampaignService(deps = {}) {
         },
       });
     } catch (error) {
-      logger.warn('[OutboundRecipientGuard][coldmail-confirm]', error && error.message ? error.message : error);
+      logger.error('[OutboundRecipientGuard][coldmail-confirm]', error && error.message ? error.message : error);
+      const wrappedError = new Error(
+        'Centrale outbound duplicate-guard kon niet permanent worden bevestigd na SMTP-acceptatie; coldmailing gepauzeerd.'
+      );
+      wrappedError.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
+      wrappedError.status = 502;
+      wrappedError.cause = error;
+      throw wrappedError;
     }
   }
 
@@ -6629,7 +6648,6 @@ function createColdmailCampaignService(deps = {}) {
         if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
           throw new Error('SMTP accepteerde de ontvanger niet.');
         }
-        const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
         const sentItem = {
           id: item.id,
           bedrijf: getRowCompany(row),
@@ -6639,8 +6657,16 @@ function createColdmailCampaignService(deps = {}) {
           response: truncateText(normalizeString(info && info.response), 500),
           accepted,
           rejected,
-          sentCopySaved,
+          sentCopySaved: false,
         };
+        if (!isTestRecipientRow(row, to)) {
+          await confirmSupabaseOutboundRecipientForColdmail(
+            outboundReservation && outboundReservation.reservationId,
+            sentItem
+          );
+        }
+        const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
+        sentItem.sentCopySaved = sentCopySaved;
         sent.push(sentItem);
         if (!isTestRecipientRow(row, to)) {
           const recipientGuard = buildColdmailRecipientGuard(row, item.id);
@@ -6671,10 +6697,6 @@ function createColdmailCampaignService(deps = {}) {
           );
           rows = updatedRows;
           persistedSentRowIds.add(item.id);
-          await confirmSupabaseOutboundRecipientForColdmail(
-            outboundReservation && outboundReservation.reservationId,
-            sentItem
-          );
         }
       } catch (error) {
         failed.push({
@@ -6684,7 +6706,11 @@ function createColdmailCampaignService(deps = {}) {
           code: normalizeString(error && error.code),
           error: truncateText(normalizeString(error && error.message), 500),
         });
-        const safetyReason = getSmtpSafetyStopReason(error);
+        const guardConfirmFailed =
+          normalizeString(error && error.code) === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
+        const safetyReason = guardConfirmFailed
+          ? 'central_outbound_guard_confirm_failed'
+          : getSmtpSafetyStopReason(error);
         if (safetyReason) {
           safetyPause = await recordColdmailSafetyPause({
             senderEmail,
@@ -6707,7 +6733,7 @@ function createColdmailCampaignService(deps = {}) {
       const firstFailure = pickFailureMessage(failed, selectedRows);
       const recipientGuardFailure = failed.every((item) => isColdmailRecipientGuardFailure(item));
       const outboundGuardFailure = failed.every((item) =>
-        /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(normalizeString(item && item.code))
+        /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED|CONFIRM_FAILED)$/i.test(normalizeString(item && item.code))
       );
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))

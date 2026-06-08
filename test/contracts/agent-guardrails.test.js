@@ -416,6 +416,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const liveVersionSource = readRepoFile('scripts/check-live-production-version.js');
   const liveWaitSource = readRepoFile('scripts/wait-live-production-version.js');
   const safeDeploySource = readRepoFile('scripts/deploy-production-safe.js');
+  const coldmailGuardBackfillSource = readRepoFile('scripts/backfill-coldmail-outbound-guards.js');
   const liveWorkflowSource = readRepoFile('.github/workflows/live-production-version.yml');
   const agentsSource = readRepoFile('AGENTS.md');
   const protocolSource = readRepoFile('docs/quality-protocol.md');
@@ -430,6 +431,11 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
   assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
   assert.equal(packageJson.scripts['check:live-production-version:wait'], 'node scripts/wait-live-production-version.js');
+  assert.equal(packageJson.scripts['check:coldmail-outbound-guards'], 'node scripts/backfill-coldmail-outbound-guards.js');
+  assert.equal(
+    packageJson.scripts['backfill:coldmail-outbound-guards'],
+    'node scripts/backfill-coldmail-outbound-guards.js --apply'
+  );
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.equal(packageJson.engines.node, '22.x');
@@ -480,6 +486,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(liveWaitSource, /assertLiveProductionVersion/);
   assert.match(liveWorkflowSource, /push:\s*[\s\S]*branches:\s*[\s\S]*main/);
   assert.match(liveWorkflowSource, /npm run check:live-production-version:wait/);
+  assert.match(coldmailGuardBackfillSource, /mailbox-sent-webdesign-backfill-2026-06-08/);
+  assert.match(coldmailGuardBackfillSource, /central_outbound_guard_missing_monitor_2026_06_08/);
+  assert.match(coldmailGuardBackfillSource, /--pause-on-missing/);
+  assert.match(coldmailGuardBackfillSource, /softora_outbound_recipient_guards/);
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
   assert.match(safeDeploySource, /verify:critical/);
   assert.match(safeDeploySource, /restoreKnownProductionBuildSideEffects\(\);/);
