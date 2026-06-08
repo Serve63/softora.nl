@@ -33,6 +33,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /SoftoraUiStateClient/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /createDefaultState/);
+  assert.match(scriptSource, /async function boot/);
+  assert.match(scriptSource, /await loadRemoteState\(\)/);
+  assert.doesNotMatch(scriptSource, /render\(\);\s*loadRemoteState\(\);/);
   assert.match(scriptSource, /dayChoiceTitle/);
   assert.match(scriptSource, /day\.id === currentWeekday\(\) \? 'Vandaag' : day\.title/);
   assert.doesNotMatch(scriptSource, /\{\s*id:\s*'today'/);

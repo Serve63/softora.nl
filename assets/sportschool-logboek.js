@@ -39,9 +39,12 @@
   const closeDays = app.querySelector('[data-close-days]');
   let selectedDay = currentWeekday();
   let isApplyingRemoteState = false;
+  let isReady = false;
   let remoteSaveTimer = null;
   let lastRemoteSnapshotJson = '';
   let logbookState = createDefaultState();
+
+  addButton.disabled = true;
 
   function upper(value) {
     return String(value || '').toLocaleUpperCase('nl-NL');
@@ -316,7 +319,7 @@
         return;
       }
       lastRemoteSnapshotJson = JSON.stringify(snapshot);
-      if (applyRemoteSnapshot(snapshot)) render();
+      applyRemoteSnapshot(snapshot);
     } catch (_error) {
       // Lokaal blijft de app direct werken; sync probeert later opnieuw.
     }
@@ -535,6 +538,7 @@
   }
 
   addButton.addEventListener('click', () => {
+    if (!isReady) return;
     const orders = readOrders(selectedDay);
     const nextOrder = Math.max(100, ...orders) + 1;
     saveOrders(selectedDay, [...orders, nextOrder], { silent: true });
@@ -551,6 +555,15 @@
   });
   window.addEventListener('online', scheduleRemoteSave);
 
-  render();
-  loadRemoteState();
+  async function boot() {
+    try {
+      await loadRemoteState();
+    } finally {
+      isReady = true;
+      addButton.disabled = false;
+      render();
+    }
+  }
+
+  boot();
 })();
