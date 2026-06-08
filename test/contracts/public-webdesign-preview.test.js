@@ -148,9 +148,9 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.profile-signature\{margin-top:18px;padding-top:0;text-align:center;border-top:0\}/);
   assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
-  assert.match(response.body, /\.about-text h2\{font-family:Georgia,'Times New Roman',serif;font-size:clamp\(22px,1\.9vw,28px\);color:var\(--navy\);line-height:1\.3;margin-bottom:18px;font-weight:600;text-align:center\}/);
+  assert.match(response.body, /\.about-text h2\{font-family:Georgia,'Times New Roman',serif;font-size:clamp\(22px,1\.9vw,28px\);color:var\(--navy\);line-height:1\.3;margin-bottom:18px;font-weight:600\}/);
   assert.match(response.body, /\.about-text h2 \.title-line\{display:block;white-space:nowrap\}/);
-  assert.match(response.body, /\.about-text p\{font-size:14px;color:var\(--muted\);line-height:1\.85;margin-bottom:12px;text-align:left\}/);
+  assert.match(response.body, /\.about-text p\{font-size:14px;color:var\(--muted\);line-height:1\.85;margin-bottom:12px\}/);
   assert.match(response.body, /@media\(max-width:1120px\)\{[\s\S]*\.about-profile\{display:flex;flex-direction:column\}\.profile-signature\{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0\}/);
   assert.match(response.body, /@media\(max-width:700px\)\{\.about-text h2\{font-size:clamp\(13px,4\.1vw,22px\)\}\}/);
   assert.match(response.body, /<div class="about-profile">\s*<div class="desktop-profile-role">Webdesign &amp; Software Ontwikkeling<\/div>\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesign &amp; Software Ontwikkeling<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);

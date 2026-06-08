@@ -491,9 +491,9 @@ ${preconnectTags}
     .desktop-profile-role{display:none}
     .about-photo{width:100%;border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
     .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
-    .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(22px,1.9vw,28px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600;text-align:center}
+    .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(22px,1.9vw,28px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
     .about-text h2 .title-line{display:block;white-space:nowrap}
-    .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px;text-align:left}
+    .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
     .profile-signature{margin-top:18px;padding-top:0;text-align:center;border-top:0}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
