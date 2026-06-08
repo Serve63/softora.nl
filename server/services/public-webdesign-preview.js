@@ -469,7 +469,7 @@ ${preconnectTags}
     :root{--navy:#1c2b50;--teal:#5bada0;--cream:#f2ede6;--muted:#728095;--rule:#d8d2ca;--panel:#fffaf4}
     html,body{min-height:100%;background:var(--cream);color:var(--navy);font-family:Inter,Arial,sans-serif}
     body{overflow-x:hidden}
-    .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp(18px,4vw,64px);gap:44px}
+    .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp(18px,4vw,64px);gap:44px;position:relative}
     .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
@@ -482,6 +482,10 @@ ${preconnectTags}
     .tall .visual{aspect-ratio:3/4.45;object-fit:cover;object-position:top center}
     .wide .visual{object-fit:contain;object-position:center}
     .wide .visual{aspect-ratio:16/10}
+    .scroll-cue{position:fixed;right:clamp(18px,4vw,56px);bottom:clamp(18px,3.5vw,42px);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center;background:rgba(255,250,244,.92);color:var(--navy);border:1px solid rgba(28,43,80,.12);box-shadow:0 14px 32px rgba(28,43,80,.18);text-decoration:none;transition:transform .18s ease,background .18s ease}
+    .scroll-cue:hover{transform:translateY(2px);background:#fff}
+    .scroll-cue svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    @media(prefers-reduced-motion:no-preference){.scroll-cue svg{animation:scrollCue 1.4s ease-in-out infinite}@keyframes scrollCue{0%,100%{transform:translateY(-2px)}50%{transform:translateY(3px)}}}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
     .about-profile{width:min(100%,340px);justify-self:center}
@@ -508,9 +512,10 @@ ${preconnectTags}
         <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
       </div>
     </div>
+    <a class="scroll-cue" href="#concept-about" aria-label="Scroll naar meer informatie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></a>
   </section>
   <div class="divider"></div>
-  <section class="about-section">
+  <section class="about-section" id="concept-about">
     <div class="about-profile">
       <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
       <div class="signature profile-signature">
@@ -519,10 +524,8 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2>Gebouwd met nieuwsgierigheid en een beetje AI-magie.</h2>
-      <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek.</p>
-      <p>Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt.</p>
-      <p>Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
+      <h2>Gebouwd met code nieuwsgierigheid en een beetje AI-magie.</h2>
+      <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek. Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt. Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
     </div>
   </section>
 </body>
