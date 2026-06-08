@@ -131,6 +131,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
   assert.match(response.body, /\.scroll-cue\{position:fixed;right:clamp\(18px,4vw,56px\);bottom:clamp\(18px,3\.5vw,42px\);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center/);
   assert.match(response.body, /\.scroll-cue:hover\{background:#fff\}/);
+  assert.match(response.body, /@media\(max-width:700px\)\{\.scroll-cue\{display:none\}\}/);
   assert.doesNotMatch(response.body, /scrollCue/);
   assert.doesNotMatch(response.body, /animation:scrollCue/);
   assert.doesNotMatch(response.body, /translateY/);
