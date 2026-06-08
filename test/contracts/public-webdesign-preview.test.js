@@ -122,11 +122,15 @@ test('public webdesign preview concept route renders the experimental supplied l
 
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /concept-hero/);
+  assert.match(response.body, /\.concept-hero\{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp\(18px,4vw,64px\);gap:44px;position:relative\}/);
   assert.match(response.body, /\.mockup-stage\{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp\(0px,3vw,44px\)\}/);
   assert.match(response.body, /\.wide-stack\{width:min\(54%,780px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
   assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>[\s\S]*<div class="stage-card wide">/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);
   assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
+  assert.match(response.body, /\.scroll-cue\{position:fixed;right:clamp\(18px,4vw,56px\);bottom:clamp\(18px,3\.5vw,42px\);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center/);
+  assert.match(response.body, /<a class="scroll-cue" href="#concept-about" aria-label="Scroll naar meer informatie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"><\/path><path d="m19 12-7 7-7-7"><\/path><\/svg><\/a>/);
+  assert.match(response.body, /<section class="about-section" id="concept-about">/);
   assert.match(response.body, /\.about-profile\{width:min\(100%,340px\);justify-self:center\}/);
   assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
