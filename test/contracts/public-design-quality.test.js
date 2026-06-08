@@ -275,6 +275,26 @@ test('seo content mobile navigation keeps public route links in visible flow', (
   );
 });
 
+test('seo content conversion CTA labels can wrap without mobile overflow', () => {
+  const css = readFile('assets/seo-content.css');
+
+  assert.match(
+    css,
+    /\.content-cta-actions\s*\{[\s\S]*min-width:\s*0;/s,
+    'content CTA actions moeten als flex-container kunnen krimpen op mobiel'
+  );
+  assert.match(
+    css,
+    /\.content-cta-primary,\s*\.content-cta-secondary\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*flex:\s*0 1 auto;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;[\s\S]*white-space:\s*normal;/s,
+    'lange content CTA labels moeten kunnen afbreken in plaats van horizontale druk te maken'
+  );
+  assert.doesNotMatch(
+    css.match(/\.content-cta-primary,\s*\.content-cta-secondary\s*\{[\s\S]*?\}/)?.[0] || '',
+    /white-space:\s*nowrap;/,
+    'content CTA knoppen mogen niet terug naar nowrap'
+  );
+});
+
 test('diensten hero keeps the secondary insight CTA in the button system', () => {
   const source = readFile('diensten.html');
 

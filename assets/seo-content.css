@@ -633,18 +633,29 @@ nav {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .content-cta-primary,
 .content-cta-secondary {
+  align-items: center;
   border-radius: 999px;
+  display: inline-flex;
+  flex: 0 1 auto;
   font-family: Oswald, Inter, sans-serif;
   font-size: 12px;
   font-weight: 800;
+  justify-content: center;
   letter-spacing: 1px;
+  line-height: 1.15;
+  max-width: 100%;
+  min-height: 44px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 13px 18px;
+  text-align: center;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .content-cta-primary {
