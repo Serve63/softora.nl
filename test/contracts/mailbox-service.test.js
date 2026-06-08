@@ -85,6 +85,21 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   };
 }
 
+function createOutboundGuardStore(calls = [], overrides = {}) {
+  return {
+    reserveRecipients: async (items, options) => {
+      calls.push({ type: 'reserve', items, options });
+      if (overrides.reserveResult) return overrides.reserveResult;
+      return { ok: true, reservationId: 'mailbox-webdesign-reservation-1', count: items.length * 4 };
+    },
+    confirmReservation: async (reservationId, options) => {
+      calls.push({ type: 'confirm', reservationId, options });
+      if (overrides.confirmError) throw overrides.confirmError;
+      return { ok: true };
+    },
+  };
+}
+
 test('mailbox service exposes configured softora mailbox accounts', async () => {
   const service = createMailboxService({
     mailConfig: {
@@ -168,6 +183,7 @@ test('mailbox service sends mail through selected account smtp', async () => {
 
 test('mailbox service enriches normal webdesign sends with public link and inline images', async () => {
   const sent = [];
+  const guardCalls = [];
   const customerId = 'manual-import-pckbv-eu-privacy-0583';
   const service = createMailboxService({
     mailConfig: {},
@@ -217,10 +233,12 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
     },
     createTransport: (config) => ({
       sendMail: async (message) => {
+        guardCalls.push({ type: 'smtp' });
         sent.push({ config, message });
         return { messageId: 'm-1', accepted: [message.to], rejected: [] };
       },
     }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls),
   });
 
   await service.sendMessage({
@@ -242,6 +260,14 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   });
 
   assert.equal(sent.length, 1);
+  assert.deepEqual(guardCalls.slice(0, 3).map((call) => call.type), ['reserve', 'smtp', 'confirm']);
+  assert.equal(guardCalls[0].items[0].recipientEmail, 'info@pckbv.eu');
+  assert.equal(guardCalls[0].items[0].recipientDomain, 'pckbv.eu');
+  assert.equal(guardCalls[0].items[0].recipientCompany, 'PCK B.V.');
+  assert.equal(guardCalls[0].items[0].recipientId, customerId);
+  assert.equal(guardCalls[0].options.channel, 'mailbox');
+  assert.equal(guardCalls[0].options.permanent, true);
+  assert.equal(guardCalls[2].options.status, 'sent');
   assert.match(
     sent[0].message.text,
     /PS: Wordt het webdesign niet zichtbaar\?\nBekijk het via hier 👈/
@@ -264,6 +290,7 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
 
 test('mailbox service enriches webdesign sends from stored photo metadata when customer row is unavailable', async () => {
   const sent = [];
+  const guardCalls = [];
   const customerId = 'import-309-db-mohsau65-wp5f4v';
   const service = createMailboxService({
     mailConfig: {},
@@ -298,10 +325,12 @@ test('mailbox service enriches webdesign sends from stored photo metadata when c
     },
     createTransport: (config) => ({
       sendMail: async (message) => {
+        guardCalls.push({ type: 'smtp' });
         sent.push({ config, message });
         return { messageId: 'm-1', accepted: [message.to], rejected: [] };
       },
     }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls),
   });
 
   await service.sendMessage({
@@ -321,6 +350,11 @@ test('mailbox service enriches webdesign sends from stored photo metadata when c
   });
 
   assert.equal(sent.length, 1);
+  assert.deepEqual(guardCalls.slice(0, 3).map((call) => call.type), ['reserve', 'smtp', 'confirm']);
+  assert.equal(guardCalls[0].items[0].recipientEmail, 'info@podotherapi3.nl');
+  assert.equal(guardCalls[0].items[0].recipientDomain, 'podotherapi3.nl');
+  assert.equal(guardCalls[0].items[0].recipientCompany, 'Podotherapi3 Vissers');
+  assert.equal(guardCalls[0].items[0].recipientId, customerId);
   assert.match(
     sent[0].message.html,
     /href="https:\/\/www\.softora\.nl\/webdesign\/podotherapi3-vissers\?cid=import-309-db-mohsau65-wp5f4v"/
@@ -335,6 +369,100 @@ test('mailbox service enriches webdesign sends from stored photo metadata when c
       ['mockup-import-309-db-mohsau65-wp5f4v-2@softora', 'inline'],
     ]
   );
+});
+
+test('mailbox service blocks manual webdesign sends before SMTP when the central guard conflicts', async () => {
+  const sent = [];
+  const guardCalls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: 'm-should-not-send', accepted: [message.to], rejected: [] };
+      },
+    }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls, {
+      reserveResult: {
+        ok: false,
+        reservationId: 'conflict-reservation',
+        conflict: {
+          provider: 'softora',
+          sender_email: 'martijn@softora.nl',
+          recipient_email: 'info@blocked.example',
+        },
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage({
+        accountEmail: 'serve@softora.nl',
+        to: 'info@blocked.example',
+        subject: 'Kleine vraag over jullie website',
+        text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor blocked.example.',
+      }),
+    (error) => {
+      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFLICT');
+      assert.equal(error.status, 409);
+      return true;
+    }
+  );
+
+  assert.equal(sent.length, 0);
+  assert.equal(guardCalls.length, 1);
+  assert.equal(guardCalls[0].type, 'reserve');
+});
+
+test('mailbox service refuses manual webdesign sends when the central guard is unavailable', async () => {
+  const sent = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: 'm-should-not-send', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage({
+        accountEmail: 'serve@softora.nl',
+        to: 'info@unguarded.example',
+        subject: 'Kleine vraag over jullie website',
+        text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor unguarded.example.',
+      }),
+    (error) => {
+      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_UNAVAILABLE');
+      assert.equal(error.status, 503);
+      return true;
+    }
+  );
+
+  assert.equal(sent.length, 0);
 });
 
 test('mailbox service sends Martijn mail with the full display name', async () => {
