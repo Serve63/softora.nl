@@ -10,7 +10,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
-const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608d';
+const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608e';
 
 const {
   buildCustomerIdentityKey,
