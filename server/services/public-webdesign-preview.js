@@ -10,7 +10,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
-const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608c';
+const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608d';
 
 const {
   buildCustomerIdentityKey,
@@ -484,7 +484,7 @@ ${preconnectTags}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
     .about-photo{border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
-    .about-photo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}
+    .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
     .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3vw,30px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
     .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
