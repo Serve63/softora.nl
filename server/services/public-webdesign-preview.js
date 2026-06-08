@@ -474,34 +474,37 @@ ${preconnectTags}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
     .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:32px;width:100%;max-width:1260px;padding:0 clamp(0px,4vw,64px)}
+    .wide-stack{width:min(58%,720px);display:flex;flex-direction:column;align-items:center;gap:22px}
     .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden}
     .tall{width:min(36%,430px);border-radius:16px}
-    .wide{width:min(58%,720px);border-radius:14px}
+    .wide{width:100%;border-radius:14px}
     .visual{display:block;width:100%;height:100%;background:var(--panel)}
     .tall .visual{aspect-ratio:3/4.45;object-fit:cover;object-position:top center}
     .wide .visual{object-fit:contain;object-position:center}
     .wide .visual{aspect-ratio:16/10}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
-    .about-photo{border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
+    .about-photo{width:min(100%,400px);justify-self:center;border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
     .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
     .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3vw,30px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
     .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
-    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.tall,.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.divider{width:calc(100% - 36px)}}
+    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.tall,.wide-stack{width:100%}.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
 <body>
   <section class="concept-hero">
-    <div class="hero-heading">
-      <span class="hero-label">Webdesign presentatie</span>
-      <h1 class="hero-title">${title}</h1>
-    </div>
     <div class="mockup-stage">
       <div class="stage-card tall"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" loading="eager" decoding="async" fetchpriority="high"></div>
-      <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
+      <div class="wide-stack">
+        <div class="hero-heading">
+          <span class="hero-label">Webdesign presentatie</span>
+          <h1 class="hero-title">${title}</h1>
+        </div>
+        <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
+      </div>
     </div>
   </section>
   <div class="divider"></div>
