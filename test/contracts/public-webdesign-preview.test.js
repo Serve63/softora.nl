@@ -102,7 +102,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.tall\{width:min\(36%,430px\)/);
   assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
   assert.match(response.body, /Over dit concept/);
-  assert.match(response.body, /serve-creusen-profile\.jpg/);
+  assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608a/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
