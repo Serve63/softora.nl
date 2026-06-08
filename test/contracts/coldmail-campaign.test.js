@@ -6439,6 +6439,7 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
   assert.equal(calls[0].items[0].recipientEmail, 'info@reservation.example');
   assert.equal(calls[0].options.provider, 'softora');
   assert.equal(calls[0].options.channel, 'coldmail');
+  assert.equal(calls[0].options.permanent, true);
   assert.equal(calls[1].type, 'smtp');
   assert.equal(calls[2].type, 'confirm');
   assert.equal(calls[2].reservationId, 'reservation-1');
@@ -6467,8 +6468,8 @@ test('coldmail campaign pauses immediately when central guard confirm fails afte
     ],
     outboundRecipientGuardStore: {
       findRecipientConflict: async () => null,
-      reserveRecipients: async (items) => {
-        calls.push({ type: 'reserve', items });
+      reserveRecipients: async (items, options) => {
+        calls.push({ type: 'reserve', items, options });
         return { ok: true, reservationId: 'reservation-fails', count: items.length * 4 };
       },
       confirmReservation: async () => {
@@ -6502,6 +6503,7 @@ test('coldmail campaign pauses immediately when central guard confirm fails afte
 
   assert.equal(sentMessages.length, 1);
   assert.deepEqual(calls.slice(0, 3).map((call) => call.type), ['reserve', 'smtp', 'confirm']);
+  assert.equal(calls[0].options.permanent, true);
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_coldmail_send_guard'), true);
   assert.equal(getSendGuardState().entries[0].count, 0);
