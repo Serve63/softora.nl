@@ -141,7 +141,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /<section class="about-section" id="concept-about">/);
   assert.match(response.body, /\.about-profile\{width:min\(100%,340px\);justify-self:center\}/);
   assert.match(response.body, /\.desktop-profile-role\{display:none\}/);
-  assert.match(response.body, /@media\(min-width:1121px\)\{\.about-profile\{width:min\(100%,300px\)\}\.desktop-profile-role\{display:block;margin:0 0 18px;text-align:center;font-size:11px;color:var\(--teal\);font-weight:800;letter-spacing:2px;text-transform:uppercase\}\.profile-signature span\{display:none\}\}/);
+  assert.match(response.body, /@media\(min-width:1121px\)\{\.about-profile\{width:min\(100%,300px\)\}\.desktop-profile-role\{display:block;width:max-content;max-width:calc\(100vw - 48px\);margin:0 0 18px;position:relative;left:50%;transform:translateX\(-50%\);white-space:nowrap;text-align:center;font-size:11px;color:var\(--teal\);font-weight:800;letter-spacing:2px;text-transform:uppercase\}\.profile-signature span\{display:none\}\}/);
   assert.match(response.body, /\.profile-signature\{margin-top:18px;padding-top:0;text-align:center;border-top:0\}/);
   assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
