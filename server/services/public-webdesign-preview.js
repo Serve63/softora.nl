@@ -498,7 +498,7 @@ ${preconnectTags}
     .profile-signature{margin-top:18px;padding-top:0;text-align:center;border-top:0}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
-    @media(min-width:1121px){.about-profile{width:min(100%,300px)}.desktop-profile-role{display:block;width:max-content;max-width:calc(100vw - 48px);margin:0 0 18px;position:relative;left:50%;transform:translateX(-50%);white-space:nowrap;text-align:center;font-size:10.5px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}.profile-signature span{display:none}}
+    @media(min-width:1121px){.about-section{grid-template-columns:minmax(0,760px);gap:24px;max-width:860px}.about-profile{width:100%;justify-self:start;display:flex;align-items:center;gap:16px}.desktop-profile-role{display:none}.about-photo{width:86px;flex:0 0 86px;border-radius:16px;aspect-ratio:1/1}.profile-signature{margin-top:0;text-align:left}.profile-signature span{display:block;font-size:10.5px;line-height:1.35}}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0}}
     @media(max-width:700px){.about-text h2{font-size:clamp(13px,4.1vw,22px)}}
     @media(max-width:700px){.scroll-cue{display:none}}
