@@ -484,11 +484,13 @@ ${preconnectTags}
     .wide .visual{aspect-ratio:16/10}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
-    .about-photo{width:min(100%,400px);justify-self:center;border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
+    .about-profile{width:min(100%,340px);justify-self:center}
+    .about-photo{width:100%;border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
     .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
     .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3vw,30px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
     .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
+    .profile-signature{margin-top:18px;padding-top:18px;text-align:center}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
     @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.tall,.wide-stack{width:100%}.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.divider{width:calc(100% - 36px)}}
@@ -509,16 +511,18 @@ ${preconnectTags}
   </section>
   <div class="divider"></div>
   <section class="about-section">
-    <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
+    <div class="about-profile">
+      <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
+      <div class="signature profile-signature">
+        <strong>Servé Creusen</strong>
+        <span>Webdesigner</span>
+      </div>
+    </div>
     <div class="about-text">
       <h2>Gebouwd met nieuwsgierigheid en een beetje AI-magie.</h2>
       <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek.</p>
       <p>Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt.</p>
       <p>Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
-      <div class="signature">
-        <strong>Servé Creusen</strong>
-        <span>Webdesigner</span>
-      </div>
     </div>
   </section>
 </body>
