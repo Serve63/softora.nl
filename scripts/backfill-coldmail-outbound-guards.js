@@ -998,6 +998,144 @@ function summarizeMultiProviderGuardCompanies(guards = []) {
   );
 }
 
+function addConsolidatedRisk(risksByEmail, email, riskType, evidence = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail || INTERNAL_RECIPIENTS.has(normalizedEmail)) return;
+  const entry = risksByEmail.get(normalizedEmail) || {
+    email: normalizedEmail,
+    riskTypes: new Set(),
+    providers: new Set(),
+    sources: new Set(),
+    companies: new Set(),
+    evidence: [],
+  };
+  entry.riskTypes.add(riskType);
+  (Array.isArray(evidence.providers) ? evidence.providers : []).forEach((provider) => {
+    const value = normalizeString(provider).toLowerCase();
+    if (value) entry.providers.add(value);
+  });
+  (Array.isArray(evidence.sources) ? evidence.sources : []).forEach((source) => {
+    const value = normalizeString(source);
+    if (value) entry.sources.add(value);
+  });
+  (Array.isArray(evidence.companies) ? evidence.companies : []).forEach((company) => {
+    const value = normalizeString(company);
+    if (value) entry.companies.add(value);
+  });
+  const evidenceRow = {
+    riskTypes: [riskType],
+    at: normalizeString(evidence.at),
+    senderEmail: normalizeEmail(evidence.senderEmail),
+    sources: (Array.isArray(evidence.sources) ? evidence.sources : []).map(normalizeString).filter(Boolean).sort(),
+    providers: (Array.isArray(evidence.providers) ? evidence.providers : []).map((provider) =>
+      normalizeString(provider).toLowerCase()
+    ).filter(Boolean).sort(),
+    subjects: (Array.isArray(evidence.subjects) ? evidence.subjects : []).map(normalizeString).filter(Boolean),
+    companies: (Array.isArray(evidence.companies) ? evidence.companies : []).map(normalizeString).filter(Boolean),
+  };
+  const evidenceKey = JSON.stringify({ ...evidenceRow, riskTypes: [] });
+  const existingEvidence = entry.evidence.find((item) => item.evidenceKey === evidenceKey);
+  if (existingEvidence) {
+    existingEvidence.riskTypes = [...new Set([...existingEvidence.riskTypes, riskType])].sort();
+  } else {
+    entry.evidence.push({ ...evidenceRow, evidenceKey });
+  }
+  risksByEmail.set(normalizedEmail, entry);
+}
+
+function addSendRiskRows(risksByEmail, duplicate, riskType) {
+  (Array.isArray(duplicate && duplicate.sends) ? duplicate.sends : []).forEach((send) => {
+    const recipients = Array.isArray(send.recipients) ? send.recipients : [];
+    recipients.forEach((recipient) =>
+      addConsolidatedRisk(risksByEmail, recipient, riskType, {
+        at: send.at,
+        senderEmail: send.senderEmail,
+        sources: send.sources,
+        subjects: send.subjects,
+        companies: send.companies,
+      })
+    );
+  });
+}
+
+function addProviderRiskRows(risksByEmail, overlap, riskType) {
+  const providers = Array.isArray(overlap && overlap.providers) ? overlap.providers : [];
+  const emails = [
+    normalizeEmail(overlap && overlap.email),
+    ...(Array.isArray(overlap && overlap.emails) ? overlap.emails : []),
+  ].filter(Boolean);
+  emails.forEach((email) =>
+    addConsolidatedRisk(risksByEmail, email, riskType, {
+      providers,
+      sources: (Array.isArray(overlap && overlap.rows) ? overlap.rows : []).map((row) => row && row.source),
+    })
+  );
+  (Array.isArray(overlap && overlap.rows) ? overlap.rows : []).forEach((row) => {
+    const email = normalizeEmail(row && row.email);
+    if (!email) return;
+    addConsolidatedRisk(risksByEmail, email, riskType, {
+      at: row.lastSeenAt,
+      providers: [row.provider],
+      sources: [row.source],
+    });
+  });
+}
+
+function summarizeConsolidatedDuplicateRiskEmails({
+  softoraDuplicateRecipients = [],
+  softoraDuplicateDomains = [],
+  softoraDuplicateCompanies = [],
+  webdesignContactDuplicateDomains = [],
+  multiProviderGuardRecipients = [],
+  multiProviderGuardDomains = [],
+  multiProviderGuardCompanies = [],
+  legacyCombinedSoftoraDuplicateRecipients = [],
+  legacyCombinedSoftoraDuplicateDomains = [],
+  legacyCombinedSoftoraDuplicateCompanies = [],
+} = {}) {
+  const risksByEmail = new Map();
+  [
+    ...softoraDuplicateRecipients,
+    ...softoraDuplicateDomains,
+    ...softoraDuplicateCompanies,
+  ].forEach((duplicate) => addSendRiskRows(risksByEmail, duplicate, 'hard_softora_duplicate'));
+  [
+    ...legacyCombinedSoftoraDuplicateRecipients,
+    ...legacyCombinedSoftoraDuplicateDomains,
+    ...legacyCombinedSoftoraDuplicateCompanies,
+  ].forEach((duplicate) => addSendRiskRows(risksByEmail, duplicate, 'legacy_softora_duplicate'));
+  webdesignContactDuplicateDomains.forEach((duplicate) =>
+    addSendRiskRows(risksByEmail, duplicate, 'webdesign_contact_repeat')
+  );
+  [
+    ...multiProviderGuardRecipients,
+    ...multiProviderGuardDomains,
+    ...multiProviderGuardCompanies,
+  ].forEach((overlap) => addProviderRiskRows(risksByEmail, overlap, 'cross_provider_overlap'));
+
+  return [...risksByEmail.values()]
+    .map((entry) => {
+      const datedEvidence = entry.evidence
+        .filter((item) => item.at)
+        .sort((a, b) => a.at.localeCompare(b.at));
+      return {
+        email: entry.email,
+        riskTypes: [...entry.riskTypes].sort(),
+        providers: [...entry.providers].sort(),
+        sources: [...entry.sources].sort(),
+        companies: [...entry.companies].sort(),
+        evidenceCount: entry.evidence.length,
+        firstAt: datedEvidence[0]?.at || '',
+        lastAt: datedEvidence[datedEvidence.length - 1]?.at || '',
+        evidence: entry.evidence
+          .slice()
+          .map(({ evidenceKey, ...item }) => item)
+          .sort((a, b) => (a.at || '').localeCompare(b.at || '') || a.riskTypes.join(',').localeCompare(b.riskTypes.join(','))),
+      };
+    })
+    .sort((a, b) => a.email.localeCompare(b.email));
+}
+
 function summarizeMailboxCoverage(messages = [], syncStates = []) {
   const syncByAccountFolder = new Map();
   syncStates.forEach((state) => {
@@ -1071,15 +1209,29 @@ function buildReport({
     return acc;
   }, {});
   const mailboxEvents = events.filter((event) => !event.source || event.source === 'mailbox_sent');
+  const softoraDuplicateRecipients = summarizeSoftoraDuplicateRecipients(events);
   const softoraDuplicateDomains = summarizeSoftoraDuplicateDomains(events);
   const softoraDuplicateCompanies = summarizeSoftoraDuplicateCompanies(events);
   const webdesignContactDuplicateDomains = summarizeWebdesignContactDuplicateDomains(contactEvents);
   const multiProviderGuardDomains = summarizeMultiProviderGuardDomains(guards);
   const multiProviderGuardCompanies = summarizeMultiProviderGuardCompanies(guards);
+  const multiProviderGuardRecipients = summarizeMultiProviderGuards(guards);
   const legacyCombinedEvents = dedupeOutboundEvents([...events, ...legacyEvents]);
   const legacyCombinedDuplicateRecipients = summarizeSoftoraDuplicateRecipients(legacyCombinedEvents);
   const legacyCombinedDuplicateDomains = summarizeSoftoraDuplicateDomains(legacyCombinedEvents);
   const legacyCombinedDuplicateCompanies = summarizeSoftoraDuplicateCompanies(legacyCombinedEvents);
+  const consolidatedDuplicateRiskEmails = summarizeConsolidatedDuplicateRiskEmails({
+    softoraDuplicateRecipients,
+    softoraDuplicateDomains,
+    softoraDuplicateCompanies,
+    webdesignContactDuplicateDomains,
+    multiProviderGuardRecipients,
+    multiProviderGuardDomains,
+    multiProviderGuardCompanies,
+    legacyCombinedSoftoraDuplicateRecipients: legacyEvents.length ? legacyCombinedDuplicateRecipients : [],
+    legacyCombinedSoftoraDuplicateDomains: legacyEvents.length ? legacyCombinedDuplicateDomains : [],
+    legacyCombinedSoftoraDuplicateCompanies: legacyEvents.length ? legacyCombinedDuplicateCompanies : [],
+  });
   const mailboxCoverageWarnings = summarizeCoverageWarnings(mailboxCoverage);
   return {
     ok: missing.length === 0 && postPauseEvents.length === 0,
@@ -1100,13 +1252,14 @@ function buildReport({
       insertedGuardRows: insertedRows.length,
       postPauseInitialSends: postPauseEvents.length,
       mailboxDuplicateRecipients: summarizeMailboxDuplicates(events).length,
-      softoraDuplicateRecipients: summarizeSoftoraDuplicateRecipients(events).length,
+      softoraDuplicateRecipients: softoraDuplicateRecipients.length,
       softoraDuplicateDomains: softoraDuplicateDomains.length,
       softoraDuplicateCompanies: softoraDuplicateCompanies.length,
       webdesignContactDuplicateDomains: webdesignContactDuplicateDomains.length,
-      multiProviderGuardRecipients: summarizeMultiProviderGuards(guards).length,
+      multiProviderGuardRecipients: multiProviderGuardRecipients.length,
       multiProviderGuardDomains: multiProviderGuardDomains.length,
       multiProviderGuardCompanies: multiProviderGuardCompanies.length,
+      consolidatedDuplicateRiskEmails: consolidatedDuplicateRiskEmails.length,
       legacyCustomerSentEvents: legacyEvents.length,
       legacyCombinedSoftoraDuplicateRecipients: legacyCombinedDuplicateRecipients.length,
       legacyCombinedSoftoraDuplicateDomains: legacyCombinedDuplicateDomains.length,
@@ -1135,13 +1288,14 @@ function buildReport({
       subject: event.subject,
     })),
     mailboxDuplicateRecipients: summarizeMailboxDuplicates(events),
-    softoraDuplicateRecipients: summarizeSoftoraDuplicateRecipients(events),
+    softoraDuplicateRecipients,
     softoraDuplicateDomains,
     softoraDuplicateCompanies,
     webdesignContactDuplicateDomains,
-    multiProviderGuardRecipients: summarizeMultiProviderGuards(guards),
+    multiProviderGuardRecipients,
     multiProviderGuardDomains,
     multiProviderGuardCompanies,
+    consolidatedDuplicateRiskEmails,
     legacyCombinedSoftoraDuplicateRecipients: legacyCombinedDuplicateRecipients,
     legacyCombinedSoftoraDuplicateDomains: legacyCombinedDuplicateDomains,
     legacyCombinedSoftoraDuplicateCompanies: legacyCombinedDuplicateCompanies,
@@ -1180,6 +1334,7 @@ function printHuman(report) {
   console.log(`- Multi-provider guard ontvangers: ${report.summary.multiProviderGuardRecipients}`);
   console.log(`- Multi-provider guard domeinen: ${report.summary.multiProviderGuardDomains}`);
   console.log(`- Multi-provider guard bedrijven: ${report.summary.multiProviderGuardCompanies}`);
+  console.log(`- Geconsolideerde dubbelcontact-risico e-mails: ${report.summary.consolidatedDuplicateRiskEmails}`);
   console.log(`- Legacy customer-send events: ${report.summary.legacyCustomerSentEvents}`);
   console.log(`- Legacy-gecombineerde Softora-dubbel ontvangers: ${report.summary.legacyCombinedSoftoraDuplicateRecipients}`);
   console.log(`- Mailbox coverage waarschuwingen: ${report.summary.mailboxCoverageWarnings}`);
@@ -1206,6 +1361,18 @@ function printHuman(report) {
         bedrijf: item.company,
         verzonden: formatAmsterdam(item.sentAt),
         afzender: item.senderEmail,
+      }))
+    );
+  }
+  if (report.consolidatedDuplicateRiskEmails.length) {
+    console.log('\nGeconsolideerde dubbelcontact-risico e-mails:');
+    console.table(
+      report.consolidatedDuplicateRiskEmails.map((item) => ({
+        email: item.email,
+        types: item.riskTypes.join(', '),
+        eerste: formatAmsterdam(item.firstAt),
+        laatste: formatAmsterdam(item.lastAt),
+        bewijsregels: item.evidenceCount,
       }))
     );
   }
@@ -1417,6 +1584,8 @@ module.exports = {
   isInitialWebdesignMail,
   parseArgs,
   summarizeMailboxCoverage,
+  summarizeConsolidatedDuplicateRiskEmails,
+  summarizeMultiProviderGuards,
   summarizeMultiProviderGuardCompanies,
   summarizeMultiProviderGuardDomains,
   summarizeSoftoraDuplicateRecipients,
