@@ -126,9 +126,9 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.mockup-stage\{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp\(0px,3vw,44px\)\}/);
   assert.match(response.body, /\.wide-stack\{width:min\(54%,780px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
   assert.match(response.body, /\.mobile-mockup-intro\{display:none\}/);
-  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.mobile-mockup-intro\{display:block;order:1;width:100%;margin:2px 0 -2px;color:var\(--muted\);font-size:13px;line-height:1\.6;text-align:center\}\.wide\{width:100%;order:2\}/);
+  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.mobile-mockup-intro\{display:block;order:1;width:100%;margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp\(24px,7vw,32px\);font-weight:600;line-height:1\.18;color:var\(--navy\);text-align:center\}\.wide\{width:100%;order:2\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
-  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<p class="mobile-mockup-intro">Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>\s*<div class="stage-card wide">/);
+  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<h2 class="mobile-mockup-intro">Hieronder zie je een korte indruk van de eerste versie op verschillende schermen:<\/h2>\s*<div class="stage-card wide">/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
   assert.match(response.body, /\.scroll-cue\{position:fixed;right:clamp\(18px,4vw,56px\);bottom:clamp\(18px,3\.5vw,42px\);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center/);
@@ -141,7 +141,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /<section class="about-section" id="concept-about">/);
   assert.match(response.body, /\.about-profile\{width:min\(100%,340px\);justify-self:center\}/);
   assert.match(response.body, /\.desktop-profile-role\{display:none\}/);
-  assert.match(response.body, /@media\(min-width:1121px\)\{\.desktop-profile-role\{display:block;margin:0 0 18px;text-align:center;font-size:11px;color:var\(--teal\);font-weight:800;letter-spacing:2px;text-transform:uppercase\}\.profile-signature span\{display:none\}\}/);
+  assert.match(response.body, /@media\(min-width:1121px\)\{\.about-profile\{width:min\(100%,300px\)\}\.desktop-profile-role\{display:block;margin:0 0 18px;text-align:center;font-size:11px;color:var\(--teal\);font-weight:800;letter-spacing:2px;text-transform:uppercase\}\.profile-signature span\{display:none\}\}/);
   assert.match(response.body, /\.profile-signature\{margin-top:18px;padding-top:0;text-align:center;border-top:0\}/);
   assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
