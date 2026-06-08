@@ -528,6 +528,8 @@ function buildMailboxWebdesignContactEvents(messages = [], customerIndexes = {},
         recipientId: normalizeGuardKeyPart(customerId),
         recipientCompany: company,
       };
+      const keyRows = getIdentityKeyRows(identity, normalizeString)
+        .filter((keyRow) => identityDomain || keyRow.keyType !== 'domain');
       events.push({
         source: 'mailbox_webdesign_contact',
         eventKey: [
@@ -546,6 +548,7 @@ function buildMailboxWebdesignContactEvents(messages = [], customerIndexes = {},
         company,
         customerId,
         identity,
+        keyRows,
         replySubject: /^(?:re|fw|fwd)\s*:/i.test(normalizeString(message.subject)),
       });
     });
@@ -702,7 +705,7 @@ function findMissingGuardKeys(events = [], guards = []) {
   const guardMap = buildPermanentGuardMap(guards);
   const missing = [];
   events.forEach((event) => {
-    event.keyRows.forEach((keyRow) => {
+    (Array.isArray(event && event.keyRows) ? event.keyRows : []).forEach((keyRow) => {
       const guard = guardMap.get(keyRow.guardKey);
       if (!isPermanentSentGuard(guard)) {
         missing.push({
@@ -1357,7 +1360,8 @@ async function loadLiveData(client, stateTable, options = {}) {
     ...buildSendGuardEvents(sendGuardState, customerIndexes, options),
   ]);
   const contactEvents = buildMailboxWebdesignContactEvents(messages, customerIndexes, options);
-  const missing = findMissingGuardKeys(events, guards);
+  const guardEvidenceEvents = dedupeOutboundEvents([...events, ...contactEvents]);
+  const missing = findMissingGuardKeys(guardEvidenceEvents, guards);
   const mailboxCoverage = summarizeMailboxCoverage(messages, mailboxSyncStates);
   return { events, contactEvents, customers, guards, sendGuardState, missing, mailboxCoverage, legacyEvents };
 }
