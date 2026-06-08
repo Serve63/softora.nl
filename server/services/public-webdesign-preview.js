@@ -490,14 +490,17 @@ ${preconnectTags}
     .about-profile{width:min(100%,340px);justify-self:center}
     .about-photo{width:100%;border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:var(--panel)}
     .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
-    .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3vw,30px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
+    .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(22px,1.9vw,28px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
+    .about-text h2 .title-line{display:block;white-space:nowrap}
     .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
     .profile-signature{margin-top:18px;padding-top:18px;text-align:center}
     .signature strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
+    @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:1px solid var(--rule)}}
+    @media(max-width:700px){.about-text h2{font-size:clamp(13px,4.1vw,22px)}}
     @media(max-width:700px){.scroll-cue{display:none}}
-    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{order:-1}.tall,.wide-stack{width:100%}.wide{width:100%}.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:1px solid var(--rule)}.divider{width:calc(100% - 36px)}}
+    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{order:-1}.tall,.wide-stack{width:100%}.wide{width:100%}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
 <body>
@@ -524,7 +527,7 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2>Gebouwd met software, nieuwsgierigheid<br>en een beetje AI-magie.</h2>
+      <h2><span class="title-line">Gebouwd met software, nieuwsgierigheid</span><span class="title-line">en een beetje AI-magie.</span></h2>
       <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek. Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt. Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
     </div>
   </section>
