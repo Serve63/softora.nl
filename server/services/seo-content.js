@@ -1757,6 +1757,253 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Maatwerk software vs standaard software', href: '/vergelijkingen/maatwerk-software-vs-standaard-software' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-automatisering-offerte-opvolging-mkb',
+    title: 'AI automatisering voor offerte opvolging in het MKB',
+    description:
+      'Hoe MKB-bedrijven offerte opvolging slimmer kunnen voorbereiden met AI, CRM-taken en menselijke controle zonder drukker te worden.',
+    category: 'AI automatisering',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-16',
+    updatedAt: '2026-06-16',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-leadopvolging-workflow-mkb-softora.jpg',
+      alt: 'Werktafel met laptop en procesnotities voor AI automatisering van offerte opvolging en leadtaken in het MKB.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'AI kan offerte opvolging ondersteunen door signalen te ordenen, taken klaar te zetten en conceptberichten voor te bereiden.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Offertes blijven vaak liggen na het versturen',
+        paragraphs: Object.freeze([
+          'Veel MKB-bedrijven hebben genoeg aandacht voor de offerte zelf, maar minder voor de route erna. Een aanvraag komt binnen, er wordt een voorstel gemaakt en daarna verdwijnt opvolging soms in losse agenda’s, inboxen of geheugen van medewerkers.',
+          'Daar zit een kans voor AI automatisering. Niet omdat AI de commerciële keuze moet overnemen, maar omdat de voorbereiding beter kan. Denk aan een samenvatting van de aanvraag, een reminder op het juiste moment en een conceptbericht dat een medewerker kan controleren.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Gebruik AI als voorbereiding, niet als automatische drukknop',
+        paragraphs: Object.freeze([
+          'Offerte opvolging vraagt context. Soms is snel bellen logisch, soms eerst een korte mail en soms juist wachten omdat de klant nog informatie moest aanleveren. Daarom hoort AI hier vooral te ondersteunen: informatie verzamelen, prioriteit voorstellen en vervolgtaken zichtbaar maken.',
+          'De medewerker blijft eigenaar van toon, timing en inhoud. Dat maakt de workflow betrouwbaarder en voorkomt dat klanten onpersoonlijke opvolging krijgen die niet past bij het gesprek.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppel opvolging aan CRM en status',
+        paragraphs: Object.freeze([
+          'De sterkste verbetering ontstaat wanneer offerte opvolging niet los staat van CRM. Elke offerte krijgt dan een status, eigenaar, volgende actie en laatste contactmoment. AI kan helpen om ontbrekende informatie te signaleren of een korte samenvatting klaar te zetten.',
+          'Voor Softora-projecten is de kern meestal compact: aanvraag vastleggen, offertefase kiezen, taak plannen, concept opvolging maken en pas versturen nadat iemand heeft meegekeken. Zo wordt opvolging consistenter zonder dat het team grip verliest.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
+      Object.freeze({ label: 'Wat is offerte automatisering?', href: '/kennisbank/wat-is-offerte-automatisering', availableFrom: '2026-06-17' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-offerte-automatisering',
+    title: 'Wat is offerte automatisering?',
+    description:
+      'Een praktische uitleg van offerte automatisering: van aanvraag en voorstel tot opvolgtaak, CRM-status en controle door het team.',
+    category: 'CRM',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-17',
+    updatedAt: '2026-06-17',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-datakwaliteit-klantopvolging-softora.jpg',
+      alt: 'Medewerkers bespreken offerte automatisering met CRM-statussen, klantinformatie en opvolgtaken op een laptop.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Offerte automatisering is het slimmer voorbereiden, vastleggen en opvolgen van offertes zonder de menselijke beoordeling te verliezen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Offerte automatisering betekent dat terugkerende stappen rond offertes worden ondersteund door software. Denk aan aanvraaggegevens verzamelen, een voorstel voorbereiden, een status bijwerken, een taak plannen of een opvolgmail als concept klaarzetten.',
+          'Het doel is niet dat elke offerte automatisch uit een systeem rolt. Het doel is vooral dat informatie niet zoekraakt en dat medewerkers minder handwerk hebben rond dezelfde stappen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke onderdelen je kunt automatiseren',
+        paragraphs: Object.freeze([
+          'Een goede basis bestaat uit een duidelijke aanvraag, klantgegevens, gewenste dienst, offertefase, eigenaar en volgende actie. Vanuit die basis kun je templates, CRM-taken, herinneringen en samenvattingen toevoegen.',
+          'AI kan helpen bij tekst en context, bijvoorbeeld door een aanvraag samen te vatten of een concept voor opvolging te maken. Een medewerker controleert daarna of de inhoud klopt en past bij de klant.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer het zinvol wordt',
+        paragraphs: Object.freeze([
+          'Offerte automatisering wordt zinvol wanneer voorstellen vaak blijven liggen, informatie verspreid staat of opvolging afhankelijk is van losse notities. Vooral groeiende teams merken dat een vaste workflow rust geeft.',
+          'Begin compact. Leg eerst de offertefases, verantwoordelijkheden en opvolgmomenten vast. Daarna kun je koppelen met websiteformulieren, CRM, mailbox, agenda of maatwerk software.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'AI offerte opvolging', href: '/blog/ai-automatisering-offerte-opvolging-mkb' }),
+      Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
+      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'chatbot-crm-koppeling-leads-opvolgen',
+    title: 'Chatbot en CRM koppelen om leads beter op te volgen',
+    description:
+      'Waarom een chatbot sterker wordt wanneer gesprekken direct eindigen in CRM, leadstatus, samenvatting en een duidelijke opvolgtaak.',
+    category: 'Chatbots',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-18',
+    updatedAt: '2026-06-18',
+    image: Object.freeze({
+      src: '/assets/seo-content/chatbot-menselijke-overdracht-klantcontact-softora.jpg',
+      alt: 'Team bekijkt chatbotgesprekken en CRM-opvolging met duidelijke overdracht van leadvragen naar medewerkers.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een chatbot wordt waardevoller wanneer elk passend gesprek wordt samengevat, opgeslagen en opgevolgd in CRM.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Een chatbotgesprek moet ergens landen',
+        paragraphs: Object.freeze([
+          'Een chatbot kan bezoekers sneller helpen met vragen, intake en kwalificatie. Maar als het gesprek daarna alleen in een chatgeschiedenis blijft staan, mist het team alsnog context voor opvolging.',
+          'Door de chatbot aan CRM te koppelen, wordt het gesprek onderdeel van de commerciële route. De samenvatting, contactgegevens, interesse en vervolgstap staan dan op een plek waar iemand ermee verder kan.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Leg niet alles vast, maar wel het juiste',
+        paragraphs: Object.freeze([
+          'Een CRM-koppeling hoeft niet elk woord te bewaren. Meestal zijn de belangrijkste velden voldoende: naam, bedrijf, vraag, dienst, urgentie, bronpagina, samenvatting en voorgestelde actie.',
+          'AI kan helpen om die informatie uit het gesprek te halen. De workflow moet daarbij duidelijk aangeven wanneer een gesprek geschikt is voor opvolging en wanneer een medewerker eerst moet controleren.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak overdracht naar mensen expliciet',
+        paragraphs: Object.freeze([
+          'De beste chatbotflow heeft een duidelijke grens. Veelgestelde vragen kan de chatbot zelfstandig voorbereiden, maar bij twijfel, complexiteit of commerciële intentie moet overdracht naar een mens logisch zijn.',
+          'Softora bouwt chatbot en CRM daarom samen: de chatbot vangt de eerste laag op, CRM houdt status en taak vast en het team blijft verantwoordelijk voor de klantrelatie.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Chatbot vs livechat', href: '/vergelijkingen/chatbot-vs-livechat' }),
+      Object.freeze({ label: 'Website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-klantportaal',
+    title: 'Wat is een klantportaal?',
+    description:
+      'Heldere uitleg van klantportalen: wanneer een portal handig is, welke functies vaak nodig zijn en hoe het samenhangt met CRM.',
+    category: 'Bedrijfssoftware',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-19',
+    updatedAt: '2026-06-19',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+      alt: 'Dashboard op laptop voor klantportaal, CRM-informatie, taken en overzichtelijke digitale klantprocessen.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een klantportaal is een beveiligde digitale omgeving waar klanten informatie, documenten, status of acties kunnen terugvinden.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele definitie',
+        paragraphs: Object.freeze([
+          'Een klantportaal is een online omgeving waar klanten kunnen inloggen om informatie te bekijken of acties uit te voeren. Denk aan documenten, opdrachten, afspraken, berichten, statusupdates, formulieren of factuurinformatie.',
+          'Voor bedrijven is een portaal vooral interessant wanneer veel klantvragen gaan over dezelfde informatie. In plaats van steeds losse mails te sturen, staat de belangrijkste informatie op een vaste plek.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke functies vaak nodig zijn',
+        paragraphs: Object.freeze([
+          'De inhoud hangt af van het proces. Een eenvoudig portaal kan starten met status, documenten en berichten. Een uitgebreider portaal kan ook formulieren, goedkeuringen, taken, rapportages of koppelingen met CRM bevatten.',
+          'Belangrijk is dat het portaal niet los staat van de interne workflow. Als medewerkers informatie dubbel moeten invoeren, verschuift het probleem alleen naar een ander scherm.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer maatwerk logisch wordt',
+        paragraphs: Object.freeze([
+          'Maatwerk wordt logisch wanneer standaard klantportalen niet passen bij je proces, rollen of data. Bijvoorbeeld omdat klanten verschillende rechten hebben, statussen specifiek zijn of het portaal moet koppelen met CRM, planning of offertes.',
+          'Een goed klantportaal begint klein: welke informatie wil de klant terugzien, welke actie moet minder handmatig worden en welke gegevens moeten intern betrouwbaar blijven?',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/kennisbank/wat-is-bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'CRM op maat vs standaard CRM', href: '/vergelijkingen/crm-op-maat-vs-standaard-crm' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'regio',
+    slug: 'tilburg-ai-automatisering',
+    title: 'AI automatisering Tilburg voor MKB-processen',
+    description:
+      'Softora helpt bedrijven in Tilburg en omgeving met AI automatisering voor leadopvolging, klantcontact, CRM en terugkerende processen.',
+    category: 'AI automatisering Tilburg',
+    intent: 'Lokale koopintentie',
+    schemaType: 'Service',
+    areaServed: 'Tilburg',
+    publishedAt: '2026-06-22',
+    updatedAt: '2026-06-22',
+    image: Object.freeze({
+      src: '/assets/seo-content/midden-brabant-digitale-groei-softora.jpg',
+      alt: 'Kantooroverleg in Midden-Brabant over AI automatisering, CRM en digitale groei voor bedrijven in Tilburg.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Voor Tilburgse MKB-bedrijven is AI automatisering vooral waardevol wanneer klantvragen, leads en interne taken slimmer samenkomen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Lokale automatisering moet meer zijn dan een plaatsnaam',
+        paragraphs: Object.freeze([
+          'Een pagina over AI automatisering in Tilburg moet niet alleen zeggen dat Softora in de regio werkt. De inhoud moet laten zien welke processen voor lokale MKB-bedrijven herkenbaar zijn: aanvragen opvolgen, klantvragen verwerken, afspraken voorbereiden en CRM actueel houden.',
+          'Softora zit in Oisterwijk en werkt voor ondernemers in Midden-Brabant. Daardoor is Tilburg logisch als regiofocus, maar de waarde blijft hetzelfde: een praktische workflow die minder handwerk oplevert en betere opvolging mogelijk maakt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waar Tilburgse bedrijven vaak starten',
+        paragraphs: Object.freeze([
+          'Een goed startpunt is vaak leadopvolging. Websiteaanvragen, belnotities, chatbotgesprekken en mailvragen kunnen sneller worden samengevat en klaargezet voor opvolging in CRM of agenda.',
+          'Ook interne processen zijn geschikt: statusupdates, intake, offertevoorbereiding, rapportages en taakverdeling. AI ondersteunt dan de voorbereiding, terwijl medewerkers controle houden over de uiteindelijke beslissing.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppel AI aan website, CRM en team',
+        paragraphs: Object.freeze([
+          'Losse AI-tools leveren meestal weinig structurele rust op. Het wordt pas interessant wanneer de uitkomst op de juiste plek terechtkomt: een CRM-status, taak, mailboxconcept, agenda-actie of dashboardmelding.',
+          'Daarom bouwt Softora AI automatisering rond de bestaande groeiroute van het bedrijf. Voor Tilburg betekent dat lokale vindbaarheid combineren met goede opvolging, zodat verkeer, aanvragen en processen elkaar versterken.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Softora in Tilburg', href: '/regio/tilburg' }),
+      Object.freeze({ label: 'Website laten maken Oisterwijk', href: '/website-laten-maken-oisterwijk' }),
+      Object.freeze({ label: 'AI processen automatiseren', href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
