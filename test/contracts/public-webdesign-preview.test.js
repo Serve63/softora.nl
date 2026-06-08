@@ -14,6 +14,30 @@ const {
   registerPublicWebdesignPreviewRoutes,
 } = require('../../server/routes/public-webdesign-preview');
 
+function readJpegSize(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  let offset = 2;
+  if (buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+    throw new Error(`Expected JPEG image at ${filePath}`);
+  }
+
+  while (offset < buffer.length) {
+    while (buffer[offset] === 0xff) offset += 1;
+    const marker = buffer[offset];
+    offset += 1;
+    const length = buffer.readUInt16BE(offset);
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      return {
+        height: buffer.readUInt16BE(offset + 3),
+        width: buffer.readUInt16BE(offset + 5),
+      };
+    }
+    offset += length;
+  }
+
+  throw new Error(`Could not read JPEG dimensions for ${filePath}`);
+}
+
 function createResponseRecorder() {
   return {
     headers: {},
@@ -104,13 +128,22 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.about-photo\{border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
   assert.doesNotMatch(response.body, /Over dit concept/);
-  assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608d/);
+  assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
+});
+
+test('public webdesign preview profile image is exported sharp enough for the cover crop', () => {
+  const profilePath = path.join(__dirname, '../../assets/serve-creusen-profile.jpg');
+  const { width, height } = readJpegSize(profilePath);
+
+  assert.ok(width >= 1200);
+  assert.ok(height >= 900);
+  assert.equal(width * 3, height * 4);
 });
 
 test('public webdesign preview concept route cleans internal import ids from fallback titles', async () => {
