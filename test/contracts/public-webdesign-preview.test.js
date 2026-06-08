@@ -125,10 +125,11 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.concept-hero\{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp\(18px,4vw,64px\);gap:44px;position:relative\}/);
   assert.match(response.body, /\.mockup-stage\{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp\(0px,3vw,44px\)\}/);
   assert.match(response.body, /\.wide-stack\{width:min\(54%,780px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
-  assert.match(response.body, /\.mobile-mockup-intro\{display:none\}/);
-  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.mobile-mockup-intro\{display:block;order:1;width:100%;margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp\(19px,5\.4vw,25px\);font-weight:600;line-height:1\.18;color:var\(--navy\);text-align:center\}\.mobile-mockup-intro \.title-line\{display:block\}\.wide\{width:100%;order:2\}/);
+  assert.doesNotMatch(response.body, /mobile-mockup-intro/);
+  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.wide\{width:100%;order:1\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
-  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<h2 class="mobile-mockup-intro">Een eerste indruk\.\.\.<\/h2>\s*<div class="stage-card wide">/);
+  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<div class="stage-card wide">/);
+  assert.doesNotMatch(response.body, /Een eerste indruk/);
   assert.doesNotMatch(response.body, /Eerste indruk op elk schermformaat/);
   assert.doesNotMatch(response.body, /Een korte indruk van de eerste versie/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);

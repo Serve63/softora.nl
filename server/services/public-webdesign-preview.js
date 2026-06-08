@@ -473,7 +473,6 @@ ${preconnectTags}
     .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
-    .mobile-mockup-intro{display:none}
     .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp(0px,3vw,44px)}
     .wide-stack{width:min(54%,780px);display:flex;flex-direction:column;align-items:center;gap:22px}
     .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden}
@@ -503,7 +502,7 @@ ${preconnectTags}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0}}
     @media(max-width:700px){.about-text h2{font-size:clamp(13px,4.1vw,22px)}}
     @media(max-width:700px){.scroll-cue{display:none}}
-    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.mobile-mockup-intro{display:block;order:1;width:100%;margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp(19px,5.4vw,25px);font-weight:600;line-height:1.18;color:var(--navy);text-align:center}.mobile-mockup-intro .title-line{display:block}.wide{width:100%;order:2}.divider{width:calc(100% - 36px)}}
+    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
 <body>
@@ -515,7 +514,6 @@ ${preconnectTags}
           <span class="hero-label">Webdesign presentatie</span>
           <h1 class="hero-title">${title}</h1>
         </div>
-        <h2 class="mobile-mockup-intro">Een eerste indruk...</h2>
         <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
       </div>
     </div>
