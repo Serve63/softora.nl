@@ -519,7 +519,7 @@ ${preconnectTags}
       <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
       <div class="signature profile-signature">
         <strong>Servé Creusen</strong>
-        <span>Webdesigner</span>
+        <span>Webdesigner &amp; Software Ontwikkelaar</span>
       </div>
     </div>
     <div class="about-text">
