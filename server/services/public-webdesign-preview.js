@@ -10,7 +10,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
-const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608a';
+const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608b';
 
 const {
   buildCustomerIdentityKey,
@@ -482,10 +482,9 @@ ${preconnectTags}
     .wide .visual{object-fit:contain;object-position:center}
     .wide .visual{aspect-ratio:16/10}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
-    .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
-    .about-photo{border-radius:18px;aspect-ratio:4/3;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:#d8d2ca}
-    .about-photo img{display:block;width:100%;height:100%;object-fit:cover}
-    .about-text .label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800;margin-bottom:12px}
+    .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:minmax(260px,.86fr) minmax(320px,1fr);gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
+    .about-photo{width:min(100%,430px);justify-self:center;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px rgba(28,43,80,.1);background:#d8d2ca}
+    .about-photo img{display:block;width:100%;height:auto;object-fit:contain}
     .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(24px,3vw,30px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
     .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
@@ -509,7 +508,6 @@ ${preconnectTags}
   <section class="about-section">
     <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
     <div class="about-text">
-      <div class="label">Over dit concept</div>
       <h2>Gebouwd met nieuwsgierigheid en een beetje AI-magie.</h2>
       <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek.</p>
       <p>Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt.</p>
