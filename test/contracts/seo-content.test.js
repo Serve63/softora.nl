@@ -412,7 +412,7 @@ test('seo content article template keeps title, image, body and CTA on the same 
   );
   assert.doesNotMatch(extractCssRuleBlock(css, '.artikel-hero'), /max-width:\s*760px/);
   assert.doesNotMatch(extractCssRuleBlock(css, '.artikel-body'), /max-width:\s*680px/);
-  assert.match(html, /<link rel="stylesheet" href="\/assets\/seo-content\.css\?v=20260527a">/);
+  assert.match(html, /<link rel="stylesheet" href="\/assets\/seo-content\.css\?v=20260608a">/);
   assert.match(html, /<section class="artikel-hero">/);
   assert.match(html, /<figure class="artikel-img">/);
   assert.match(html, /<article class="artikel-body">/);
