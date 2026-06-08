@@ -479,13 +479,12 @@ ${preconnectTags}
     .tall{width:min(42%,540px);border-radius:16px}
     .wide{width:100%;border-radius:14px}
     .visual{display:block;width:100%;height:100%;background:var(--panel)}
-    .tall .visual{aspect-ratio:3/4.45;object-fit:cover;object-position:top center}
+    .tall .visual{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center}
     .wide .visual{object-fit:contain;object-position:center}
     .wide .visual{aspect-ratio:16/10}
-    .scroll-cue{position:fixed;right:clamp(18px,4vw,56px);bottom:clamp(18px,3.5vw,42px);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center;background:rgba(255,250,244,.92);color:var(--navy);border:1px solid rgba(28,43,80,.12);box-shadow:0 14px 32px rgba(28,43,80,.18);text-decoration:none;transition:transform .18s ease,background .18s ease}
-    .scroll-cue:hover{transform:translateY(2px);background:#fff}
+    .scroll-cue{position:fixed;right:clamp(18px,4vw,56px);bottom:clamp(18px,3.5vw,42px);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center;background:rgba(255,250,244,.92);color:var(--navy);border:1px solid rgba(28,43,80,.12);box-shadow:0 14px 32px rgba(28,43,80,.18);text-decoration:none;transition:background .18s ease}
+    .scroll-cue:hover{background:#fff}
     .scroll-cue svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-    @media(prefers-reduced-motion:no-preference){.scroll-cue svg{animation:scrollCue 1.4s ease-in-out infinite}@keyframes scrollCue{0%,100%{transform:translateY(-2px)}50%{transform:translateY(3px)}}}
     .divider{width:calc(100% - clamp(36px,8vw,128px));height:1px;background:var(--rule);margin:0 auto}
     .about-section{padding:96px clamp(18px,4vw,64px) 112px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:flex-start;max-width:1300px;margin:0 auto}
     .about-profile{width:min(100%,340px);justify-self:center}
@@ -524,7 +523,7 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2>Gebouwd met code nieuwsgierigheid en een beetje AI-magie.</h2>
+      <h2>Gebouwd met software, nieuwsgierigheid<br>en een beetje AI-magie.</h2>
       <p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen. Een aanspreekpunt voor design en techniek. Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt. Kleine details kunnen nog afwijken, zoals een logo, tekst of adres. Dat schaven we in de volgende ronde strak.</p>
     </div>
   </section>
