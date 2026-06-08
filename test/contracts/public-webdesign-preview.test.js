@@ -127,8 +127,10 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>[\s\S]*<div class="stage-card wide">/);
   assert.match(response.body, /\.tall\{width:min\(36%,430px\)/);
   assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
-  assert.match(response.body, /\.about-photo\{width:min\(100%,400px\);justify-self:center;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
+  assert.match(response.body, /\.about-profile\{width:min\(100%,340px\);justify-self:center\}/);
+  assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
+  assert.match(response.body, /<div class="about-profile">\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesigner<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
   assert.doesNotMatch(response.body, /Over dit concept/);
   assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
