@@ -662,7 +662,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
-  assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 3\.000 mails\.<\/div>/);
+  assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van &lt; €850 per 3\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
   assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*width: max-content;[\s\S]*max-width: 100%;/);
@@ -1042,7 +1042,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(statusFilterCssBlock, /margin-left: auto;/);
   assert.match(filterGroupsCssSource, /\.filter-metrics\s*\{[\s\S]*margin-left: 0;[\s\S]*gap: 24px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-flex;[\s\S]*flex-direction: column;[\s\S]*gap: 5px;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: center;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: inline-flex;[\s\S]*gap: 6px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-label\s*\{[\s\S]*font-family: "Oswald", sans-serif;/);
