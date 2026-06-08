@@ -211,6 +211,44 @@ test('seo content houdt de volgende wekelijkse batch uit public routes tot publi
   }
 });
 
+test('seo content houdt de derde wekelijkse batch uit public routes tot publicatie', () => {
+  const beforeThirdBatch = new Date('2026-06-15T23:59:59.000Z');
+  const firstThirdBatchDay = new Date('2026-06-16T12:00:00.000Z');
+  const afterThirdBatch = new Date('2026-06-22T12:00:00.000Z');
+  const thirdBatchPaths = [
+    '/blog/ai-automatisering-offerte-opvolging-mkb',
+    '/kennisbank/wat-is-offerte-automatisering',
+    '/blog/chatbot-crm-koppeling-leads-opvolgen',
+    '/kennisbank/wat-is-een-klantportaal',
+    '/regio/tilburg-ai-automatisering',
+  ];
+
+  const earlyPaths = getSeoContentPublicPaths({ now: beforeThirdBatch });
+  const earlySitemap = getSeoContentSitemapEntries({ now: beforeThirdBatch });
+  for (const pathName of thirdBatchPaths) {
+    assert.ok(!earlyPaths.includes(pathName), `${pathName} mag voor publicatiedatum niet publiek zijn.`);
+    assert.ok(!earlySitemap.some((entry) => entry.path === pathName), `${pathName} mag voor publicatiedatum niet in sitemap staan.`);
+  }
+
+  assert.ok(
+    getSeoContentPublicPaths({ now: firstThirdBatchDay }).includes(
+      '/blog/ai-automatisering-offerte-opvolging-mkb'
+    )
+  );
+  assert.ok(
+    getSeoContentSitemapEntries({ now: firstThirdBatchDay }).some(
+      (entry) => entry.path === '/blog/ai-automatisering-offerte-opvolging-mkb'
+    )
+  );
+
+  const livePaths = getSeoContentPublicPaths({ now: afterThirdBatch });
+  const liveSitemap = getSeoContentSitemapEntries({ now: afterThirdBatch });
+  for (const pathName of thirdBatchPaths) {
+    assert.ok(livePaths.includes(pathName), `${pathName} moet op of na publicatiedatum publiek zijn.`);
+    assert.ok(liveSitemap.some((entry) => entry.path === pathName), `${pathName} moet op of na publicatiedatum in sitemap staan.`);
+  }
+});
+
 test('seo content renders the existing blog visual language with real links', () => {
   const html = buildSeoContentIndexHtml('blog', {
     siteOrigin: 'https://www.softora.nl',

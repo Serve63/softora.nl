@@ -194,6 +194,46 @@ test('volgende weekly SEO batch heeft planning, money-page links, beelden en cla
   assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
 });
 
+test('derde weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
+  const thirdWeeklyPaths = [
+    '/blog/ai-automatisering-offerte-opvolging-mkb',
+    '/kennisbank/wat-is-offerte-automatisering',
+    '/blog/chatbot-crm-koppeling-leads-opvolgen',
+    '/kennisbank/wat-is-een-klantportaal',
+    '/regio/tilburg-ai-automatisering',
+  ];
+  const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-15T12:00:00.000Z') });
+  const weeklyPlan = plan.filter((entry) => thirdWeeklyPaths.includes(entry.path));
+
+  assert.deepEqual(
+    weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
+    [
+      '2026-06-16:scheduled:/blog/ai-automatisering-offerte-opvolging-mkb',
+      '2026-06-17:scheduled:/kennisbank/wat-is-offerte-automatisering',
+      '2026-06-18:scheduled:/blog/chatbot-crm-koppeling-leads-opvolgen',
+      '2026-06-19:scheduled:/kennisbank/wat-is-een-klantportaal',
+      '2026-06-22:scheduled:/regio/tilburg-ai-automatisering',
+    ]
+  );
+
+  const weeklyItems = getSeoContentItems({ now: new Date('2026-06-22T12:00:00.000Z') })
+    .filter((item) => thirdWeeklyPaths.includes(getSeoContentPathForItem(item)))
+    .map((item) => ({
+      ...item,
+      cluster: getSeoContentClusterForItem(item).key,
+    }));
+  const weeklyPages = weeklyItems.map((item) => ({
+    path: getSeoContentPathForItem(item),
+    html: buildSeoContentArticleHtml(item, { siteOrigin }),
+  }));
+
+  assert.equal(weeklyItems.length, 5);
+  assert.deepEqual(auditContentQuality({ items: weeklyItems, clusters: getSeoContentClusters() }), []);
+  assert.deepEqual(auditClaimSafety({ items: weeklyItems, pages: weeklyPages }), []);
+  assert.deepEqual(auditSeoImages({ pages: weeklyPages }), []);
+  assert.ok(weeklyPages.every((page) => /data-softora-conversion-target="service"/.test(page.html)));
+});
+
 test('seo machine blokkeert gevaarlijke of onbewezen contentclaims', () => {
   assert.ok(DEFAULT_UNSUPPORTED_CLAIM_RULES.length >= 6);
 
