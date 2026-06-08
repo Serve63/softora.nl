@@ -6,6 +6,7 @@ const {
   buildCustomerIndexes,
   buildCustomerSentEvents,
   buildMailboxSentEvents,
+  buildMailboxWebdesignContactEvents,
   buildReport,
   buildSendGuardEvents,
   extractRecipientEmails,
@@ -13,7 +14,12 @@ const {
   groupMissingRowsForInsert,
   isInitialWebdesignMail,
   parseArgs,
+  summarizeMultiProviderGuardCompanies,
+  summarizeMultiProviderGuardDomains,
+  summarizeSoftoraDuplicateCompanies,
+  summarizeSoftoraDuplicateDomains,
   summarizeSoftoraDuplicateRecipients,
+  summarizeWebdesignContactDuplicateDomains,
 } = require('../../scripts/backfill-coldmail-outbound-guards');
 
 test('coldmail outbound guard backfill detects initial mailbox-sent webdesign mails', () => {
@@ -325,6 +331,156 @@ test('coldmail outbound guard backfill detects duplicates across mailbox and cus
   assert.equal(duplicates.length, 1);
   assert.equal(duplicates[0].email, 'info@vandenbroekwitgoed.nl');
   assert.equal(duplicates[0].count, 2);
+});
+
+test('coldmail outbound guard backfill summarizes hard duplicates by domain and company', () => {
+  const customers = [
+    {
+      customer_id: 'import-339-db-mohsau65-o4xbci',
+      company: 'Van den Broek Witgoed',
+      email: 'info@vandenbroekwitgoed.nl',
+      website: 'vandenbroekwitgoed.nl',
+      database_status: 'gemaild',
+      lifecycle_status: 'gemaild',
+      payload: {
+        lastColdmailSentAt: '2026-06-08T06:32:23.412Z',
+        lastColdmailSenderEmail: 'servecreusen7@gmail.com',
+        coldmailSentMessageId: '<message-vdb@gmail.com>',
+        coldmailSpecialAction: 'webdesign',
+      },
+    },
+  ];
+  const mailboxEvents = buildMailboxSentEvents(
+    [
+      {
+        message_key: 'martijn:sent:vdb-domain',
+        account_email: 'martijn@softora.nl',
+        folder: 'sent',
+        uid: 89,
+        message_id: '<historical-vdb-domain@example.test>',
+        recipients_text: 'info@vandenbroekwitgoed.nl',
+        subject: 'Kleine vraag over jullie website',
+        body_text: 'Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+        date: '2026-06-05T13:49:14.000Z',
+        payload: {},
+      },
+    ],
+    buildCustomerIndexes(customers)
+  );
+  const events = [...mailboxEvents, ...buildCustomerSentEvents(customers)];
+
+  const domainDuplicates = summarizeSoftoraDuplicateDomains(events);
+  assert.equal(domainDuplicates.length, 1);
+  assert.equal(domainDuplicates[0].domain, 'vandenbroekwitgoed-nl');
+  assert.equal(domainDuplicates[0].count, 2);
+  assert.deepEqual(domainDuplicates[0].sends[0].recipients, ['info@vandenbroekwitgoed.nl']);
+
+  const companyDuplicates = summarizeSoftoraDuplicateCompanies(events);
+  assert.equal(companyDuplicates.length, 1);
+  assert.equal(companyDuplicates[0].companyKey, 'van-den-broek-witgoed');
+  assert.equal(companyDuplicates[0].count, 2);
+});
+
+test('coldmail outbound guard backfill reports cross-provider overlaps by domain and company', () => {
+  const guards = [
+    {
+      guard_key: 'email:info@tractorbumper.com',
+      provider: 'softora',
+      recipient_email: 'info@tractorbumper.com',
+      recipient_domain: 'tractorbumper-com',
+      recipient_company_key: 'tractor-bumper',
+      recipient_company: 'Tractor Bumper',
+      status: 'sent',
+      source: 'mailbox-sent-webdesign-backfill-2026-06-08',
+      permanent: true,
+      last_seen_at: '2026-06-04T12:52:18.196Z',
+    },
+    {
+      guard_key: 'domain:tractorbumper-com',
+      provider: 'instantly',
+      recipient_email: 'info@tractorbumper.com',
+      recipient_domain: 'tractorbumper-com',
+      recipient_company_key: 'tractor-bumper',
+      recipient_company: 'Tractor Bumper',
+      status: 'sent',
+      source: 'instantly-manual-upload-2026-06-04-codex-safety-guard',
+      permanent: true,
+      last_seen_at: '2026-06-04T14:24:01.889Z',
+    },
+    {
+      guard_key: 'domain:temporary-only.example',
+      provider: 'instantly',
+      recipient_email: 'info@temporary-only.example',
+      recipient_domain: 'temporary-only.example',
+      recipient_company_key: 'Temporary Only',
+      recipient_company: 'Temporary Only',
+      status: 'reserved',
+      source: 'temporary-test',
+      permanent: false,
+      last_seen_at: '2026-06-04T14:24:01.889Z',
+    },
+  ];
+
+  const domainOverlaps = summarizeMultiProviderGuardDomains(guards);
+  assert.equal(domainOverlaps.length, 1);
+  assert.equal(domainOverlaps[0].domain, 'tractorbumper-com');
+  assert.deepEqual(domainOverlaps[0].providers, ['instantly', 'softora']);
+
+  const companyOverlaps = summarizeMultiProviderGuardCompanies(guards);
+  assert.equal(companyOverlaps.length, 1);
+  assert.equal(companyOverlaps[0].companyKey, 'tractor-bumper');
+  assert.deepEqual(companyOverlaps[0].emails, ['info@tractorbumper.com']);
+});
+
+test('coldmail outbound guard backfill reports repeated webdesign contacts without hard duplicate classification', () => {
+  const messages = [
+    {
+      message_key: 'serve:thread:admin-1',
+      account_email: 'serve@softora.nl',
+      sender_email: 'martijnven123@gmail.com',
+      folder: 'inbox',
+      uid: 201,
+      message_id: '<admin-1@example.test>',
+      recipients_text: 'marco@administratieportaal.nl',
+      subject: 'Re: Nieuw webdesign gemaakt voor jullie website!',
+      body_text: 'Zoals besproken ontwerpen we een nieuwe website voor jullie administratieportaal.',
+      date: '2026-05-08T17:41:37.000Z',
+      payload: {},
+    },
+    {
+      message_key: 'serve:thread:admin-2',
+      account_email: 'serve@softora.nl',
+      sender_email: 'martijnven123@gmail.com',
+      folder: 'inbox',
+      uid: 202,
+      message_id: '<admin-2@example.test>',
+      recipients_text: 'marco@administratieportaal.nl',
+      subject: 'Re: Nieuw webdesign gemaakt voor jullie website!',
+      body_text: 'Bedankt voor het gesprek van vandaag over de nieuwe website.',
+      date: '2026-06-03T15:06:19.000Z',
+      payload: {},
+    },
+  ];
+
+  assert.deepEqual(buildMailboxSentEvents(messages, buildCustomerIndexes([])), []);
+
+  const contactEvents = buildMailboxWebdesignContactEvents(messages, buildCustomerIndexes([]));
+  const contactDuplicates = summarizeWebdesignContactDuplicateDomains(contactEvents);
+  assert.equal(contactDuplicates.length, 1);
+  assert.equal(contactDuplicates[0].domain, 'administratieportaal-nl');
+  assert.equal(contactDuplicates[0].count, 2);
+  assert.equal(contactDuplicates[0].hasReplyOrFollowup, true);
+
+  const report = buildReport({
+    events: [],
+    contactEvents,
+    guards: [],
+    missing: [],
+    insertedRows: [],
+    options: parseArgs([]),
+  });
+  assert.equal(report.ok, true);
+  assert.equal(report.summary.webdesignContactDuplicateDomains, 1);
 });
 
 test('coldmail outbound guard backfill includes old send guard state as outbound evidence', () => {

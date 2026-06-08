@@ -63,6 +63,10 @@ function normalizeGuardKeyPart(value) {
   return normalizeIdentity({ recipientCompanyKey: value }, normalizeString).recipientCompanyKey;
 }
 
+function normalizeRiskKey(value) {
+  return normalizeGuardKeyPart(value);
+}
+
 function stableHash(value, length = 20) {
   return createHash('sha256').update(String(value || '')).digest('hex').slice(0, length);
 }
@@ -192,6 +196,23 @@ function isInitialWebdesignMail(message = {}) {
     haystack.includes('nieuw webdesign') ||
     /webdesign[\s\S]{0,80}gemaakt/i.test(haystack) ||
     /website[\s\S]{0,80}gemaakt/i.test(haystack)
+  );
+}
+
+function isWebdesignRelatedMail(message = {}) {
+  if (message.deleted_at) return false;
+  const haystack = [
+    message.subject,
+    message.preview,
+    message.body_text,
+  ].map(normalizeString).join('\n').toLowerCase();
+  return (
+    haystack.includes('kleine vraag over jullie website') ||
+    haystack.includes('nieuw webdesign') ||
+    haystack.includes('fris webdesign') ||
+    haystack.includes('mocht je er niks mee willen doen') ||
+    /webdesign[\s\S]{0,120}(gemaakt|website|ontwerp|preview)/i.test(haystack) ||
+    /website[\s\S]{0,120}(gemaakt|ontwerp|preview)/i.test(haystack)
   );
 }
 
@@ -435,6 +456,58 @@ function buildMailboxSentEvents(messages = [], customerIndexes = {}, options = {
   return [...byEventKey.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function buildMailboxWebdesignContactEvents(messages = [], customerIndexes = {}, options = {}) {
+  const since = parseDate(options.since);
+  const events = [];
+  messages.forEach((message) => {
+    const date = parseDate(message.date || message.internal_date);
+    if (!date || (since && date < since)) return;
+    const senderEmail = normalizeEmail(message.sender_email || message.account_email);
+    if (!SENDERS.includes(senderEmail)) return;
+    if (!isWebdesignRelatedMail(message)) return;
+    extractRecipientEmails(message).forEach((recipientEmail) => {
+      const recipientDomain = getEmailDomain(recipientEmail);
+      const customer =
+        (customerIndexes.byEmail && customerIndexes.byEmail.get(recipientEmail)) ||
+        (customerIndexes.byDomain && customerIndexes.byDomain.get(recipientDomain)) ||
+        null;
+      const company = normalizeString(customer && customer.company);
+      const customerId = normalizeString(customer && customer.customerId);
+      const identityDomain =
+        normalizeString(customer && customer.domain) ||
+        (isSharedMailboxDomain(recipientDomain) ? '' : recipientDomain);
+      const identity = {
+        recipientEmail,
+        recipientDomain: identityDomain,
+        recipientCompanyKey: normalizeGuardKeyPart(company),
+        recipientId: normalizeGuardKeyPart(customerId),
+        recipientCompany: company,
+      };
+      events.push({
+        source: 'mailbox_webdesign_contact',
+        eventKey: [
+          normalizeString(message.message_key) || `${senderEmail}:${message.folder}:${message.uid || message.date}`,
+          recipientEmail,
+        ].join('|'),
+        accountEmail: senderEmail,
+        recipientEmail,
+        date: date.toISOString(),
+        subject: normalizeString(message.subject),
+        folder: normalizeString(message.folder),
+        uid: message.uid,
+        messageKey: normalizeString(message.message_key),
+        messageId: normalizeString(message.message_id),
+        providerId: normalizeString(message.provider_id),
+        company,
+        customerId,
+        identity,
+        replySubject: /^(?:re|fw|fwd)\s*:/i.test(normalizeString(message.subject)),
+      });
+    });
+  });
+  return dedupeOutboundEvents(events);
+}
+
 function buildCustomerSentEvents(customers = [], options = {}) {
   const since = parseDate(options.since);
   const events = [];
@@ -676,64 +749,126 @@ function summarizeMailboxDuplicates(events = []) {
 
 function summarizeSoftoraDuplicateRecipients(events = []) {
   const byEmail = new Map();
-  events
-    .filter((event) => {
-      if (!event.source || event.source === 'mailbox_sent') return true;
-      return event.source === 'customer_sent' && event.datePrecision !== 'day';
-    })
-    .forEach((event) => {
+  filterHardSoftoraEvidenceEvents(events).forEach((event) => {
     const email = normalizeEmail(event && event.recipientEmail);
     if (!email) return;
     const rows = byEmail.get(email) || [];
     rows.push(event);
     byEmail.set(email, rows);
   });
-  const duplicates = [];
-  byEmail.forEach((rows, email) => {
-    const sendBuckets = [];
-    rows
-      .slice()
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .forEach((event) => {
-        const eventAt = parseDate(event.date);
-        const messageId = normalizeString(event.messageId);
-        const sender = normalizeEmail(event.accountEmail);
-        const bucket = sendBuckets.find((item) => {
-          if (messageId && item.messageIds.has(messageId)) return true;
-          const itemAt = parseDate(item.sentAt);
-          return (
-            sender &&
-            item.senderEmail === sender &&
-            eventAt &&
-            itemAt &&
-            Math.abs(eventAt.getTime() - itemAt.getTime()) <= 120000
-          );
-        });
-        const target = bucket || {
-          sentAt: event.date,
-          senderEmail: sender,
-          messageIds: new Set(),
-          sources: new Set(),
-          events: [],
-        };
-        if (!bucket) sendBuckets.push(target);
-        if (messageId) target.messageIds.add(messageId);
-        target.sources.add(normalizeString(event.source) || 'unknown');
-        target.events.push(event);
-      });
-    if (sendBuckets.length <= 1) return;
-    duplicates.push({
-      email,
-      count: sendBuckets.length,
-      sends: sendBuckets.map((bucket) => ({
-        at: bucket.sentAt,
-        senderEmail: bucket.senderEmail,
-        sources: [...bucket.sources].sort(),
-        subjects: [...new Set(bucket.events.map((event) => normalizeString(event.subject)).filter(Boolean))],
-      })),
-    });
+  return summarizeGroupedDuplicateEvents(byEmail, 'email');
+}
+
+function filterHardSoftoraEvidenceEvents(events = []) {
+  return events.filter((event) => {
+    if (!event.source || event.source === 'mailbox_sent') return true;
+    return event.source === 'customer_sent' && event.datePrecision !== 'day';
   });
-  return duplicates.sort((a, b) => a.email.localeCompare(b.email));
+}
+
+function buildSendBuckets(rows = []) {
+  const sendBuckets = [];
+  rows
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .forEach((event) => {
+      const eventAt = parseDate(event.date);
+      const messageId = normalizeString(event.messageId);
+      const sender = normalizeEmail(event.accountEmail);
+      const bucket = sendBuckets.find((item) => {
+        if (messageId && item.messageIds.has(messageId)) return true;
+        const itemAt = parseDate(item.sentAt);
+        return (
+          sender &&
+          item.senderEmail === sender &&
+          eventAt &&
+          itemAt &&
+          Math.abs(eventAt.getTime() - itemAt.getTime()) <= 120000
+        );
+      });
+      const target = bucket || {
+        sentAt: event.date,
+        senderEmail: sender,
+        messageIds: new Set(),
+        sources: new Set(),
+        events: [],
+      };
+      if (!bucket) sendBuckets.push(target);
+      if (messageId) target.messageIds.add(messageId);
+      target.sources.add(normalizeString(event.source) || 'unknown');
+      target.events.push(event);
+    });
+  return sendBuckets;
+}
+
+function summarizeSendBucket(bucket) {
+  return {
+    at: bucket.sentAt,
+    senderEmail: bucket.senderEmail,
+    sources: [...bucket.sources].sort(),
+    subjects: [...new Set(bucket.events.map((event) => normalizeString(event.subject)).filter(Boolean))],
+    recipients: [...new Set(bucket.events.map((event) => normalizeEmail(event.recipientEmail)).filter(Boolean))].sort(),
+    companies: [...new Set(bucket.events.map((event) => normalizeString(event.company)).filter(Boolean))].sort(),
+  };
+}
+
+function summarizeGroupedDuplicateEvents(groupedEvents, keyName) {
+  const duplicates = [];
+  groupedEvents.forEach((rows, key) => {
+    const sendBuckets = buildSendBuckets(rows);
+    if (sendBuckets.length <= 1) return;
+    const duplicate = {
+      [keyName]: key,
+      count: sendBuckets.length,
+      sends: sendBuckets.map((bucket) => summarizeSendBucket(bucket)),
+    };
+    duplicates.push(duplicate);
+  });
+  return duplicates.sort((a, b) => String(a[keyName]).localeCompare(String(b[keyName])));
+}
+
+function summarizeSoftoraDuplicateDomains(events = []) {
+  const byDomain = new Map();
+  filterHardSoftoraEvidenceEvents(events).forEach((event) => {
+    const domain = normalizeDomain(event && event.identity && event.identity.recipientDomain);
+    if (!domain || isSharedMailboxDomain(domain)) return;
+    const rows = byDomain.get(domain) || [];
+    rows.push(event);
+    byDomain.set(domain, rows);
+  });
+  return summarizeGroupedDuplicateEvents(byDomain, 'domain');
+}
+
+function summarizeSoftoraDuplicateCompanies(events = []) {
+  const byCompany = new Map();
+  filterHardSoftoraEvidenceEvents(events).forEach((event) => {
+    const companyKey = normalizeRiskKey(
+      (event && event.identity && event.identity.recipientCompanyKey) || (event && event.company)
+    );
+    if (!companyKey) return;
+    const rows = byCompany.get(companyKey) || [];
+    rows.push(event);
+    byCompany.set(companyKey, rows);
+  });
+  return summarizeGroupedDuplicateEvents(byCompany, 'companyKey');
+}
+
+function summarizeWebdesignContactDuplicateDomains(events = []) {
+  const byDomain = new Map();
+  events.forEach((event) => {
+    if (!event || event.source !== 'mailbox_webdesign_contact') return;
+    const domain = normalizeDomain(event.identity && event.identity.recipientDomain);
+    if (!domain || isSharedMailboxDomain(domain)) return;
+    const rows = byDomain.get(domain) || [];
+    rows.push(event);
+    byDomain.set(domain, rows);
+  });
+  return summarizeGroupedDuplicateEvents(byDomain, 'domain').map((item) => ({
+    ...item,
+    hasReplyOrFollowup: item.sends.some((send) =>
+      send.subjects.some((subject) => /^(?:re|fw|fwd)\s*:/i.test(subject))
+    ),
+  }));
 }
 
 function summarizeMultiProviderGuards(guards = []) {
@@ -762,7 +897,60 @@ function summarizeMultiProviderGuards(guards = []) {
     }));
 }
 
-function buildReport({ events, guards, missing, insertedRows = [], options = {} }) {
+function summarizeMultiProviderGuardGroups(guards = [], keyName, resolveKey) {
+  const byKey = new Map();
+  guards.forEach((guard) => {
+    if (!guard || guard.permanent !== true) return;
+    const provider = normalizeString(guard.provider).toLowerCase();
+    if (!provider) return;
+    const key = normalizeRiskKey(resolveKey(guard));
+    if (!key) return;
+    const entry = byKey.get(key) || {
+      [keyName]: key,
+      providers: new Set(),
+      emails: new Set(),
+      rows: [],
+    };
+    entry.providers.add(provider);
+    const email = normalizeEmail(guard.recipient_email);
+    if (email) entry.emails.add(email);
+    entry.rows.push({
+      provider,
+      source: normalizeString(guard.source),
+      status: normalizeString(guard.status),
+      permanent: Boolean(guard.permanent),
+      lastSeenAt: normalizeString(guard.last_seen_at),
+      email,
+    });
+    byKey.set(key, entry);
+  });
+  return [...byKey.values()]
+    .filter((entry) => entry.providers.size > 1)
+    .map((entry) => ({
+      [keyName]: entry[keyName],
+      providers: [...entry.providers].sort(),
+      emails: [...entry.emails].sort(),
+      rows: entry.rows,
+    }))
+    .sort((a, b) => String(a[keyName]).localeCompare(String(b[keyName])));
+}
+
+function summarizeMultiProviderGuardDomains(guards = []) {
+  return summarizeMultiProviderGuardGroups(guards, 'domain', (guard) => {
+    const domain = normalizeDomain(guard.recipient_domain || getEmailDomain(guard.recipient_email));
+    return domain && !isSharedMailboxDomain(domain) ? domain : '';
+  });
+}
+
+function summarizeMultiProviderGuardCompanies(guards = []) {
+  return summarizeMultiProviderGuardGroups(
+    guards,
+    'companyKey',
+    (guard) => guard.recipient_company_key || guard.recipient_company
+  );
+}
+
+function buildReport({ events, contactEvents = [], guards, missing, insertedRows = [], options = {} }) {
   const postPauseAfter = parseDate(options.postPauseAfter);
   const missingEmails = [...new Set(missing.map((item) => item.event.recipientEmail))].sort();
   const postPauseEvents = postPauseAfter
@@ -782,6 +970,11 @@ function buildReport({ events, guards, missing, insertedRows = [], options = {} 
     return acc;
   }, {});
   const mailboxEvents = events.filter((event) => !event.source || event.source === 'mailbox_sent');
+  const softoraDuplicateDomains = summarizeSoftoraDuplicateDomains(events);
+  const softoraDuplicateCompanies = summarizeSoftoraDuplicateCompanies(events);
+  const webdesignContactDuplicateDomains = summarizeWebdesignContactDuplicateDomains(contactEvents);
+  const multiProviderGuardDomains = summarizeMultiProviderGuardDomains(guards);
+  const multiProviderGuardCompanies = summarizeMultiProviderGuardCompanies(guards);
   return {
     ok: missing.length === 0 && postPauseEvents.length === 0,
     mode: options.apply ? 'apply' : 'check',
@@ -802,7 +995,12 @@ function buildReport({ events, guards, missing, insertedRows = [], options = {} 
       postPauseInitialSends: postPauseEvents.length,
       mailboxDuplicateRecipients: summarizeMailboxDuplicates(events).length,
       softoraDuplicateRecipients: summarizeSoftoraDuplicateRecipients(events).length,
+      softoraDuplicateDomains: softoraDuplicateDomains.length,
+      softoraDuplicateCompanies: softoraDuplicateCompanies.length,
+      webdesignContactDuplicateDomains: webdesignContactDuplicateDomains.length,
       multiProviderGuardRecipients: summarizeMultiProviderGuards(guards).length,
+      multiProviderGuardDomains: multiProviderGuardDomains.length,
+      multiProviderGuardCompanies: multiProviderGuardCompanies.length,
     },
     missingRecipients: missingEmails,
     missingSamples: missing.slice(0, options.sample || 15).map((item) => ({
@@ -825,7 +1023,12 @@ function buildReport({ events, guards, missing, insertedRows = [], options = {} 
     })),
     mailboxDuplicateRecipients: summarizeMailboxDuplicates(events),
     softoraDuplicateRecipients: summarizeSoftoraDuplicateRecipients(events),
+    softoraDuplicateDomains,
+    softoraDuplicateCompanies,
+    webdesignContactDuplicateDomains,
     multiProviderGuardRecipients: summarizeMultiProviderGuards(guards),
+    multiProviderGuardDomains,
+    multiProviderGuardCompanies,
   };
 }
 
@@ -853,7 +1056,12 @@ function printHuman(report) {
   console.log(`- Sends na pauzemoment: ${report.summary.postPauseInitialSends}`);
   console.log(`- Mailbox-dubbel ontvangers: ${report.summary.mailboxDuplicateRecipients}`);
   console.log(`- Softora-dubbel ontvangers uit alle bewijsbronnen: ${report.summary.softoraDuplicateRecipients}`);
+  console.log(`- Softora-dubbel domeinen uit alle bewijsbronnen: ${report.summary.softoraDuplicateDomains}`);
+  console.log(`- Softora-dubbel bedrijven uit alle bewijsbronnen: ${report.summary.softoraDuplicateCompanies}`);
+  console.log(`- Webdesign-contact domeinen met meerdere outbound berichten: ${report.summary.webdesignContactDuplicateDomains}`);
   console.log(`- Multi-provider guard ontvangers: ${report.summary.multiProviderGuardRecipients}`);
+  console.log(`- Multi-provider guard domeinen: ${report.summary.multiProviderGuardDomains}`);
+  console.log(`- Multi-provider guard bedrijven: ${report.summary.multiProviderGuardCompanies}`);
   if (report.missingSamples.length) {
     console.log('\nOntbrekende voorbeelden:');
     console.table(
@@ -1007,8 +1215,9 @@ async function loadLiveData(client, stateTable, options = {}) {
     ...buildCustomerSentEvents(customers, options),
     ...buildSendGuardEvents(sendGuardState, customerIndexes, options),
   ]);
+  const contactEvents = buildMailboxWebdesignContactEvents(messages, customerIndexes, options);
   const missing = findMissingGuardKeys(events, guards);
-  return { events, customers, guards, sendGuardState, missing };
+  return { events, contactEvents, customers, guards, sendGuardState, missing };
 }
 
 async function run(options) {
@@ -1052,6 +1261,7 @@ module.exports = {
   buildCustomerIndexes,
   buildCustomerSentEvents,
   buildMailboxSentEvents,
+  buildMailboxWebdesignContactEvents,
   buildReport,
   buildSendGuardEvents,
   extractRecipientEmails,
@@ -1059,5 +1269,10 @@ module.exports = {
   groupMissingRowsForInsert,
   isInitialWebdesignMail,
   parseArgs,
+  summarizeMultiProviderGuardCompanies,
+  summarizeMultiProviderGuardDomains,
   summarizeSoftoraDuplicateRecipients,
+  summarizeSoftoraDuplicateCompanies,
+  summarizeSoftoraDuplicateDomains,
+  summarizeWebdesignContactDuplicateDomains,
 };
