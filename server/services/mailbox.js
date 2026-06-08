@@ -1002,6 +1002,86 @@ function createMailboxService(deps = {}) {
     return error;
   }
 
+  function hasPriorWebdesignOutboundSignal(row = {}) {
+    if (!row || typeof row !== 'object') return false;
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const statusText = normalizeString([
+      row.database_status,
+      row.lifecycle_status,
+      row.status,
+      row.outreachStatus,
+      row.mailStatus,
+      row.lastColdmailProvider,
+      row.instantlyStatus,
+      row.instantlyEmailStatus,
+      payload.database_status,
+      payload.lifecycle_status,
+      payload.status,
+      payload.outreachStatus,
+      payload.mailStatus,
+      payload.lastColdmailProvider,
+      payload.instantlyStatus,
+      payload.instantlyEmailStatus,
+    ].join(' ')).toLowerCase();
+    if (/\b(gemaild|mail verstuurd|coldmail|email sent|sent|opened|completed|instantly)\b/.test(statusText)) return true;
+    if (normalizeString(
+      row.lastColdmailSentAt ||
+        row.lastMailSentAt ||
+        row.outreachSentAt ||
+        row.outreach_sent_at ||
+        row.coldmailSentAt ||
+        row.instantlySyncedAt ||
+        row.instantlyEmailSentAt ||
+        row.instantlyLastEventAt ||
+        payload.lastColdmailSentAt ||
+        payload.lastMailSentAt ||
+        payload.outreachSentAt ||
+        payload.outreach_sent_at ||
+        payload.coldmailSentAt ||
+        payload.instantlySyncedAt ||
+        payload.instantlyEmailSentAt ||
+        payload.instantlyLastEventAt
+    )) {
+      return true;
+    }
+    if (normalizeString(
+      row.coldmailSentMessageId ||
+        row.outreachMessageId ||
+        row.sentMessageId ||
+        row.messageId ||
+        row.instantlyLeadId ||
+        row.instantlyCampaignId ||
+        payload.coldmailSentMessageId ||
+        payload.outreachMessageId ||
+        payload.sentMessageId ||
+        payload.messageId ||
+        payload.instantlyLeadId ||
+        payload.instantlyCampaignId
+    )) {
+      return true;
+    }
+    if (Number(row.coldmailOpenCount || row.outreachOpenCount || row.instantlyOpenCount || 0) > 0) return true;
+    if (row.coldmailOpened === true || row.outreachOpened === true || row.instantlyOpened === true) return true;
+    const history = [
+      ...(Array.isArray(row.hist) ? row.hist : []),
+      ...(Array.isArray(payload.hist) ? payload.hist : []),
+      ...(Array.isArray(row.history) ? row.history : []),
+      ...(Array.isArray(payload.history) ? payload.history : []),
+    ];
+    return history.some((entry) => {
+      const text = normalizeString([
+        entry && entry.type,
+        entry && entry.status,
+        entry && entry.label,
+        entry && entry.source,
+        entry && entry.subject,
+        entry && entry.preview,
+        entry && entry.messageKey,
+      ].join(' ')).toLowerCase();
+      return /\b(gemaild|mail verstuurd|coldmail|webdesign|instantly|email sent|email opened)\b/.test(text);
+    });
+  }
+
   function buildMailboxWebdesignGuardConflictError(identity, conflict) {
     const sender = normalizeEmail(conflict && conflict.sender_email);
     const provider = normalizeString(conflict && conflict.provider).toLowerCase();
@@ -1423,6 +1503,18 @@ function createMailboxService(deps = {}) {
       let matchedMeta = null;
       let images = [];
       for (const { row, index } of matches) {
+        if (hasPriorWebdesignOutboundSignal(row)) {
+          throw buildMailboxWebdesignGuardError(
+            'Webdesignmail geblokkeerd: deze klant heeft al webdesign/outbound mailhistorie.',
+            'MAILBOX_WEBDESIGN_PRIOR_OUTBOUND_HISTORY',
+            409,
+            {
+              customerId: getCustomerId(row, index),
+              email: getCustomerEmail(row),
+              company: getCustomerCompany(row),
+            }
+          );
+        }
         const id = getCustomerId(row, index);
         const photoMeta = getPhotoMetaForRow(row, index, photoMap, photoByIdentity);
         const candidateImages = await imagesFromPhotoMeta(
@@ -1481,6 +1573,9 @@ function createMailboxService(deps = {}) {
         attachments: inlineImages.map((image) => image.attachment),
       };
     } catch (error) {
+      if (normalizeString(error && error.code).startsWith('MAILBOX_WEBDESIGN_')) {
+        throw error;
+      }
       logger.warn('[Mailbox][webdesign-send]', error && error.message ? error.message : error);
       return { text: normalizedText, outboundIdentity: fallbackIdentity };
     }

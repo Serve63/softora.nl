@@ -431,6 +431,136 @@ test('mailbox service blocks manual webdesign sends before SMTP when the central
   assert.equal(guardCalls[0].type, 'reserve');
 });
 
+test('mailbox service blocks manual webdesign sends when customer history already shows outbound mail', async () => {
+  const sent = [];
+  const guardCalls = [];
+  const customerId = 'manual-import-vandenbroekwitgoed';
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    async getUiStateValues(scope) {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: customerId,
+                bedrijf: 'Van den Broek Witgoed',
+                email: 'info@vandenbroekwitgoed.nl',
+                website: 'https://vandenbroekwitgoed.nl',
+                database_status: 'gemaild',
+                lifecycle_status: 'gemaild',
+                lastColdmailSentAt: '2026-06-08T06:32:23.412Z',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: 'm-should-not-send', accepted: [message.to], rejected: [] };
+      },
+    }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls),
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage({
+        accountEmail: 'serve@softora.nl',
+        to: 'info@vandenbroekwitgoed.nl',
+        subject: 'Kleine vraag over jullie website',
+        text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor vandenbroekwitgoed.nl.',
+      }),
+    (error) => {
+      assert.equal(error.code, 'MAILBOX_WEBDESIGN_PRIOR_OUTBOUND_HISTORY');
+      assert.equal(error.status, 409);
+      assert.equal(error.customerId, customerId);
+      return true;
+    }
+  );
+
+  assert.equal(sent.length, 0);
+  assert.equal(guardCalls.length, 0);
+});
+
+test('mailbox service blocks manual webdesign sends when customer history shows instantly outreach', async () => {
+  const sent = [];
+  const guardCalls = [];
+  const customerId = 'manual-import-cafetariadebank';
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    async getUiStateValues(scope) {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: customerId,
+                bedrijf: 'Cafetaria De Bank',
+                email: 'info@cafetariadebank.nl',
+                website: 'https://cafetariadebank.nl',
+                lastColdmailProvider: 'instantly',
+                instantlyStatus: 'opened',
+                instantlyEmailSentAt: '2026-06-04T14:24:00.000Z',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: 'm-should-not-send', accepted: [message.to], rejected: [] };
+      },
+    }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls),
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage({
+        accountEmail: 'serve@softora.nl',
+        to: 'info@cafetariadebank.nl',
+        subject: 'Kleine vraag over jullie website',
+        text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor cafetariadebank.nl.',
+      }),
+    (error) => {
+      assert.equal(error.code, 'MAILBOX_WEBDESIGN_PRIOR_OUTBOUND_HISTORY');
+      assert.equal(error.status, 409);
+      assert.equal(error.customerId, customerId);
+      return true;
+    }
+  );
+
+  assert.equal(sent.length, 0);
+  assert.equal(guardCalls.length, 0);
+});
+
 test('mailbox service refuses manual webdesign sends when the central guard is unavailable', async () => {
   const sent = [];
   const service = createMailboxService({
