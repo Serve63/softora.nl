@@ -2005,6 +2005,261 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI processen automatiseren', href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-automatisering-klantintake-mkb',
+    title: 'AI automatisering voor klantintake in het MKB',
+    description:
+      'Hoe MKB-bedrijven klantintake slimmer kunnen voorbereiden met AI, duidelijke vragen, CRM-overdracht en menselijke controle.',
+    category: 'AI automatisering',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-23',
+    updatedAt: '2026-06-23',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-leadopvolging-workflow-mkb-softora.jpg',
+      alt: 'MKB-team bespreekt klantintake, AI samenvattingen en duidelijke opvolgtaken aan een kantoorwerktafel.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'AI kan klantintake vooral sterker maken door informatie te ordenen, ontbrekende vragen zichtbaar te maken en opvolging klaar te zetten.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Klantintake bepaalt de kwaliteit van opvolging',
+        paragraphs: Object.freeze([
+          'Veel commerciële processen worden rommelig omdat de intake niet scherp genoeg is. De klantvraag komt binnen via formulier, telefoon, chatbot, WhatsApp of mail, maar belangrijke context staat verspreid over meerdere plekken.',
+          'AI automatisering kan helpen om die eerste informatie samen te vatten, ontbrekende gegevens te signaleren en een duidelijke vervolgstap voor te bereiden. Zo hoeft een medewerker minder te zoeken voordat er contact wordt opgenomen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak de vragen vooraf concreet',
+        paragraphs: Object.freeze([
+          'Een goede intakeflow begint met de vraag welke informatie echt nodig is. Denk aan dienst, timing, regio, type organisatie, urgentie, beslisser en eventuele bijzonderheden. Hoe scherper die basis, hoe nuttiger AI kan ondersteunen.',
+          'De AI moet daarbij niet doen alsof elke aanvraag automatisch juist is. Hij kan signalen herkennen en een voorstel doen, maar het team moet kunnen controleren welke informatie is gebruikt en wat nog onzeker is.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Zorg dat intake direct in het werkproces landt',
+        paragraphs: Object.freeze([
+          'Een samenvatting is pas waardevol wanneer die ergens terechtkomt. Voor MKB-bedrijven is dat vaak CRM, agenda, mailbox, taakbeheer of een dashboard met open aanvragen.',
+          'Softora bouwt klantintake daarom als onderdeel van de hele route: website of klantcontact aan de voorkant, AI voor voorbereiding en CRM of maatwerk software voor opvolging. Zo blijft automatisering praktisch en controleerbaar.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'Wat is leadkwalificatie?', href: '/kennisbank/wat-is-leadkwalificatie' }),
+      Object.freeze({
+        label: 'Wat is procesautomatisering?',
+        href: '/kennisbank/wat-is-procesautomatisering',
+        availableFrom: '2026-06-24',
+      }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-procesautomatisering',
+    title: 'Wat is procesautomatisering?',
+    description:
+      'Een heldere uitleg van procesautomatisering: welke stappen je vastlegt, wanneer AI helpt en waarom controle belangrijk blijft.',
+    category: 'AI processen automatiseren',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-24',
+    updatedAt: '2026-06-24',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-automatisering-workflow-softora.jpg',
+      alt: 'Team bespreekt procesautomatisering met workflowstappen, overdracht en meetbare opvolging voor het MKB.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Procesautomatisering betekent dat terugkerende stappen volgens een vaste route worden voorbereid, uitgevoerd of doorgezet.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Procesautomatisering is het vastleggen en automatiseren van werk dat steeds terugkomt. Dat kan gaan om formulieren verwerken, taken aanmaken, klantvragen verdelen, rapportages voorbereiden of gegevens van het ene systeem naar het andere brengen.',
+          'AI kan daar een extra laag aan toevoegen wanneer de input tekst, gesprekken of context bevat. De automatisering blijft dan niet beperkt tot vaste velden, maar kan ook samenvatten, classificeren en een vervolgstap voorstellen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wat je eerst moet uittekenen',
+        paragraphs: Object.freeze([
+          'Een proces automatiseren begint met de route: welke informatie komt binnen, wie is eigenaar, welke status hoort erbij en wanneer is het klaar? Zonder die afspraken wordt automatisering vooral sneller chaos maken.',
+          'Daarom is het verstandig om eerst een klein proces te kiezen. Bijvoorbeeld intake, offertevoorbereiding, leadopvolging of klantvragen. Als die flow werkt, kun je daarna koppelingen met CRM, agenda, mailbox of dashboard toevoegen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waar AI wel en niet geschikt voor is',
+        paragraphs: Object.freeze([
+          'AI is sterk in taalwerk: samenvatten, vragen herkennen, ontbrekende informatie signaleren en conceptteksten voorbereiden. Dat maakt AI nuttig voor processen met veel variatie in tekst of gesprekken.',
+          'Belangrijke keuzes blijven beter controleerbaar wanneer een medewerker de laatste stap ziet. Zo combineer je snelheid met verantwoordelijkheid en voorkom je dat automatisering onduidelijk wordt voor het team.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'AI processen automatiseren', href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen' }),
+      Object.freeze({ label: 'AI klantintake', href: '/blog/ai-automatisering-klantintake-mkb' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Wat is AI automatisering?', href: '/kennisbank/wat-is-ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'website-laten-maken-tilburg-leadgeneratie',
+    title: 'Website laten maken in Tilburg met leadgeneratie als basis',
+    description:
+      'Waar Tilburgse MKB-bedrijven op moeten letten wanneer een nieuwe website niet alleen mooi moet zijn, maar ook aanvragen moet ondersteunen.',
+    category: 'Website laten maken',
+    intent: 'Lokale koopintentie',
+    publishedAt: '2026-06-25',
+    updatedAt: '2026-06-25',
+    image: Object.freeze({
+      src: '/assets/seo-content/website-leadgeneratie-wireframes-softora.jpg',
+      alt: 'Werktafel met website wireframes, leadroutes en lokale SEO-planning voor bedrijven rond Tilburg.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een website voor Tilburgse bedrijven wordt sterker wanneer lokale vindbaarheid, dienstenstructuur en opvolging vanaf het begin samenkomen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Lokale vindbaarheid vraagt meer dan een plaatsnaam',
+        paragraphs: Object.freeze([
+          'Een pagina over website laten maken in Tilburg moet niet alleen het woord Tilburg toevoegen. De inhoud moet duidelijk maken welke diensten relevant zijn, welke vragen bezoekers hebben en hoe de website nieuwe aanvragen helpt opvolgen.',
+          'Voor MKB-bedrijven rond Tilburg betekent dat meestal een combinatie van sterke dienstenpagina’s, regionale context, duidelijke CTA’s en content die twijfels wegneemt voordat iemand contact opneemt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Leadgeneratie begint bij structuur',
+        paragraphs: Object.freeze([
+          'Een website die aanvragen moet opleveren heeft een heldere route nodig. Bezoekers moeten snel zien wat je doet, voor wie het bedoeld is, welke voorbeelden of uitleg vertrouwen geven en welke vervolgstap logisch is.',
+          'Daarom kijkt Softora niet alleen naar design. De paginastructuur, interne links, formulieren, WhatsApp-route, CRM-koppeling en meetbaarheid bepalen samen of de website bruikbaar wordt als groeikanaal.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak opvolging onderdeel van het plan',
+        paragraphs: Object.freeze([
+          'Een aanvraag uit Tilburg of omgeving is pas waardevol wanneer opvolging snel en duidelijk gebeurt. Als leads na het formulier in losse mailboxen blijven hangen, verliest de website kracht.',
+          'Door website, CRM en eventueel AI automatisering te verbinden, kan een aanvraag direct worden samengevat, vastgelegd en opgevolgd. Zo blijft de website geen losse voorkant, maar onderdeel van het verkoopproces.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Softora in Tilburg', href: '/regio/tilburg' }),
+      Object.freeze({ label: 'Website leadgeneratie meten', href: '/blog/website-leadgeneratie-mkb-meten' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({
+        label: 'Wat is een CRM integratie?',
+        href: '/kennisbank/wat-is-een-crm-integratie',
+        availableFrom: '2026-06-26',
+      }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-een-crm-integratie',
+    title: 'Wat is een CRM integratie?',
+    description:
+      'Een praktische uitleg van CRM-integraties: hoe websites, formulieren, mailboxen en automatisering klantdata naar CRM brengen.',
+    category: 'CRM',
+    intent: 'Uitleg',
+    publishedAt: '2026-06-26',
+    updatedAt: '2026-06-26',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+      alt: 'CRM-dashboard met gekoppelde websiteaanvragen, klantdata en opvolgtaken voor een duidelijke integratie.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Een CRM integratie zorgt dat klantinformatie automatisch op de juiste plek komt, zodat opvolging minder afhankelijk is van handwerk.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Een CRM integratie is een koppeling tussen CRM en andere systemen. Denk aan je website, contactformulier, mailbox, agenda, chatbot, AI telefonist of dashboard.',
+          'Het doel is dat informatie niet steeds handmatig overgetypt hoeft te worden. Een aanvraag kan bijvoorbeeld direct een nieuw contact, taak, notitie of pipelinefase in CRM aanmaken.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke gegevens meestal worden gekoppeld',
+        paragraphs: Object.freeze([
+          'De basis bestaat vaak uit naam, bedrijf, e-mail, telefoonnummer, vraag, bronpagina, gewenste dienst en status. Voor commerciële opvolging zijn ook eigenaar, timing, prioriteit en volgende actie belangrijk.',
+          'Bij AI automatisering kan daar een samenvatting of kwalificatiesignaal bijkomen. Dat moet wel controleerbaar blijven: het team moet kunnen zien waar de informatie vandaan komt en wat nog ontbreekt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Waarom integratie sterker is dan losse exports',
+        paragraphs: Object.freeze([
+          'Losse exports en spreadsheets kunnen tijdelijk helpen, maar ze maken opvolging kwetsbaar. Gegevens raken verouderd, taken worden vergeten of meerdere medewerkers werken met verschillende versies.',
+          'Een goede CRM integratie houdt de route korter. De website verzamelt de vraag, CRM bewaart de status en automatisering helpt om de volgende stap klaar te zetten.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
+      Object.freeze({ label: 'Website laten maken in Tilburg', href: '/blog/website-laten-maken-tilburg-leadgeneratie' }),
+      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'branches',
+    slug: 'adviesbureaus',
+    schemaType: 'Service',
+    serviceType: 'Websites, CRM en AI automatisering voor adviesbureaus',
+    title: 'Websites, CRM en AI automatisering voor adviesbureaus',
+    description:
+      'Een branchepagina voor adviesbureaus die expertise beter willen tonen, intake willen verbeteren en opvolging overzichtelijker willen maken.',
+    category: 'Adviesbureaus',
+    intent: 'Branche',
+    publishedAt: '2026-06-29',
+    updatedAt: '2026-06-29',
+    image: Object.freeze({
+      src: '/assets/seo-content/branche-digitalisering-planning-softora.jpg',
+      alt: 'Adviesbureau bespreekt website, CRM en automatisering aan een werktafel met laptops en procesnotities.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Adviesbureaus winnen online vooral met duidelijke expertise, scherpe intake en een proces waarin aanvragen niet blijven liggen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Expertise moet snel vertrouwen geven',
+        paragraphs: Object.freeze([
+          'Bij adviesbureaus koopt een bezoeker geen standaardproduct. De website moet daarom snel duidelijk maken welk probleem het bureau oplost, voor wie de aanpak bedoeld is en welke route naar een eerste gesprek logisch is.',
+          'Sterke dienstenpagina’s, cases, kennisbankcontent en branche-uitleg helpen om expertise zichtbaar te maken zonder dat de site vaag of te algemeen wordt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Intake bepaalt de kwaliteit van de aanvraag',
+        paragraphs: Object.freeze([
+          'Een adviesaanvraag heeft vaak context nodig: type organisatie, vraagstuk, timing, gewenste ondersteuning en betrokken beslissers. Als die informatie pas na meerdere losse mails duidelijk wordt, vertraagt opvolging.',
+          'Een slimme intakeflow kan de vraag structureren. AI kan helpen met samenvatten en ontbrekende informatie signaleren, terwijl het team blijft bepalen welke commerciële vervolgstap past.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'CRM en automatisering houden opvolging scherp',
+        paragraphs: Object.freeze([
+          'Voor adviesbureaus is opvolging vaak relationeel en inhoudelijk. Juist daarom helpt een CRM met duidelijke pipeline, notities, taken en reminders.',
+          'Softora koppelt website, CRM en automatisering stap voor stap. Eerst de commerciële basis, daarna flows voor intake, offertevoorbereiding, klantopvolging of rapportage waar die echt waarde toevoegen.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
+      Object.freeze({ label: 'Wat is een CRM integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
