@@ -125,6 +125,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.concept-hero\{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp\(18px,4vw,64px\);gap:44px;position:relative\}/);
   assert.match(response.body, /\.mockup-stage\{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp\(0px,3vw,44px\)\}/);
   assert.match(response.body, /\.wide-stack\{width:min\(54%,780px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
+  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{order:-1\}/);
   assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>[\s\S]*<div class="stage-card wide">/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
@@ -138,6 +139,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.about-profile\{width:min\(100%,340px\);justify-self:center\}/);
   assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
+  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.about-profile\{display:flex;flex-direction:column\}\.profile-signature\{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:1px solid var\(--rule\)\}/);
   assert.match(response.body, /<div class="about-profile">\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesigner<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
   assert.match(response.body, /<h2>Gebouwd met software, nieuwsgierigheid<br>en een beetje AI-magie\.<\/h2>/);
   assert.match(response.body, /<p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen\. Een aanspreekpunt voor design en techniek\. Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat\. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt\. Kleine details kunnen nog afwijken, zoals een logo, tekst of adres\. Dat schaven we in de volgende ronde strak\.<\/p>/);
