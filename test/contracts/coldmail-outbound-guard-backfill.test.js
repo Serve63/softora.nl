@@ -17,6 +17,8 @@ const {
   isInitialWebdesignMail,
   parseArgs,
   summarizeMailboxCoverage,
+  summarizeConsolidatedDuplicateRiskEmails,
+  summarizeMultiProviderGuards,
   summarizeMultiProviderGuardCompanies,
   summarizeMultiProviderGuardDomains,
   summarizeSoftoraDuplicateCompanies,
@@ -334,6 +336,18 @@ test('coldmail outbound guard backfill detects duplicates across mailbox and cus
   assert.equal(duplicates.length, 1);
   assert.equal(duplicates[0].email, 'info@vandenbroekwitgoed.nl');
   assert.equal(duplicates[0].count, 2);
+  const report = buildReport({
+    events: [...mailboxEvents, ...customerEvents],
+    contactEvents: [],
+    guards: [],
+    missing: [],
+    insertedRows: [],
+    options: parseArgs([]),
+  });
+  const risk = report.consolidatedDuplicateRiskEmails.find((item) => item.email === 'info@vandenbroekwitgoed.nl');
+  assert.ok(risk);
+  assert.deepEqual(risk.riskTypes, ['hard_softora_duplicate']);
+  assert.equal(report.summary.consolidatedDuplicateRiskEmails, 1);
 });
 
 test('coldmail outbound guard backfill summarizes hard duplicates by domain and company', () => {
@@ -433,6 +447,15 @@ test('coldmail outbound guard backfill reports cross-provider overlaps by domain
   assert.equal(companyOverlaps.length, 1);
   assert.equal(companyOverlaps[0].companyKey, 'tractor-bumper');
   assert.deepEqual(companyOverlaps[0].emails, ['info@tractorbumper.com']);
+
+  const consolidated = summarizeConsolidatedDuplicateRiskEmails({
+    multiProviderGuardRecipients: summarizeMultiProviderGuards(guards),
+    multiProviderGuardDomains: domainOverlaps,
+    multiProviderGuardCompanies: companyOverlaps,
+  });
+  assert.equal(consolidated.length, 1);
+  assert.equal(consolidated[0].email, 'info@tractorbumper.com');
+  assert.deepEqual(consolidated[0].riskTypes, ['cross_provider_overlap']);
 });
 
 test('coldmail outbound guard backfill reports repeated webdesign contacts without hard duplicate classification', () => {
@@ -496,6 +519,10 @@ test('coldmail outbound guard backfill reports repeated webdesign contacts witho
   assert.equal(report.summary.missingGuardKeys, 4);
   assert.equal(report.summary.webdesignContactDuplicateDomains, 1);
   assert.equal(report.summary.softoraDuplicateRecipients, 0);
+  const contactRisk = report.consolidatedDuplicateRiskEmails.find((item) => item.email === 'marco@administratieportaal.nl');
+  assert.ok(contactRisk);
+  assert.deepEqual(contactRisk.riskTypes, ['webdesign_contact_repeat']);
+  assert.equal(report.summary.consolidatedDuplicateRiskEmails, 1);
 });
 
 test('coldmail outbound guard audit keeps legacy dashboard sends visible without adding false duplicates', () => {
@@ -551,6 +578,8 @@ test('coldmail outbound guard audit keeps legacy dashboard sends visible without
   assert.equal(report.summary.legacyCustomerSentEvents, 1);
   assert.equal(report.summary.legacyCombinedSoftoraDuplicateRecipients, 1);
   assert.equal(report.legacyCombinedSoftoraDuplicateRecipients[0].email, 'info@vandenbroekwitgoed.nl');
+  assert.equal(report.consolidatedDuplicateRiskEmails[0].email, 'info@vandenbroekwitgoed.nl');
+  assert.deepEqual(report.consolidatedDuplicateRiskEmails[0].riskTypes, ['legacy_softora_duplicate']);
 });
 
 test('coldmail outbound guard audit reports mailbox sent-index coverage gaps per sender', () => {
