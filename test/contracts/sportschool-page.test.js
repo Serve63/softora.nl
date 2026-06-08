@@ -33,6 +33,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /SoftoraUiStateClient/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /createDefaultState/);
+  assert.match(scriptSource, /dayChoiceTitle/);
+  assert.match(scriptSource, /day\.id === currentWeekday\(\) \? 'Vandaag' : day\.title/);
   assert.doesNotMatch(scriptSource, /\{\s*id:\s*'today'/);
   assert.match(scriptSource, /Bankdrukken/);
   assert.match(scriptSource, /Schuine dumbbell press/);

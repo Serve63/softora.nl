@@ -146,6 +146,10 @@
     return DAYS.find((item) => item.id === storageDay(day))?.title || 'Vandaag';
   }
 
+  function dayChoiceTitle(day) {
+    return day.id === currentWeekday() ? 'Vandaag' : day.title;
+  }
+
   function buildSnapshotFromState() {
     const days = {};
     STORAGE_DAYS.forEach((day) => {
@@ -340,7 +344,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `day-choice${day.id === selectedDay ? ' is-selected' : ''}`;
-        button.textContent = upper(day.title);
+        button.textContent = upper(dayChoiceTitle(day));
         button.addEventListener('click', () => {
           selectedDay = day.id;
           closeDayPicker();
