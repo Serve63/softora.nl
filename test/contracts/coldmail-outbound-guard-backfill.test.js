@@ -1,10 +1,12 @@
 const assert = require('assert');
 const test = require('node:test');
+const { buildChunkedStatePatch } = require('../../server/services/data-ops-serialization');
 
 const {
   BACKFILL_SOURCE,
   buildCustomerIndexes,
   buildCustomerSentEvents,
+  buildLegacyCustomerRowsFromUiState,
   buildMailboxSentEvents,
   buildMailboxWebdesignContactEvents,
   buildReport,
@@ -14,6 +16,7 @@ const {
   groupMissingRowsForInsert,
   isInitialWebdesignMail,
   parseArgs,
+  summarizeMailboxCoverage,
   summarizeMultiProviderGuardCompanies,
   summarizeMultiProviderGuardDomains,
   summarizeSoftoraDuplicateCompanies,
@@ -481,6 +484,112 @@ test('coldmail outbound guard backfill reports repeated webdesign contacts witho
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.webdesignContactDuplicateDomains, 1);
+});
+
+test('coldmail outbound guard audit keeps legacy dashboard sends visible without adding false duplicates', () => {
+  const legacyRows = [
+    {
+      id: 'import-339-db-mohsau65-o4xbci',
+      bedrijf: 'Van den Broek Witgoed',
+      email: 'info@vandenbroekwitgoed.nl',
+      website: 'vandenbroekwitgoed.nl',
+      status: 'gemaild',
+      lastColdmailSentAt: '2026-06-08T06:32:23.412Z',
+      lastColdmailSenderEmail: 'servecreusen7@gmail.com',
+      coldmailSentMessageId: '<message-vdb@gmail.com>',
+      coldmailSpecialAction: 'webdesign',
+    },
+  ];
+  const legacyState = {
+    payload: {
+      values: buildChunkedStatePatch('softora_customers_premium_v1', JSON.stringify(legacyRows), 80),
+    },
+  };
+  const legacyCustomers = buildLegacyCustomerRowsFromUiState(legacyState);
+  const legacyEvents = buildCustomerSentEvents(legacyCustomers);
+  const mailboxEvents = buildMailboxSentEvents(
+    [
+      {
+        message_key: 'martijn:sent:vdb-legacy',
+        account_email: 'martijn@softora.nl',
+        folder: 'sent',
+        uid: 90,
+        recipients_text: 'info@vandenbroekwitgoed.nl',
+        subject: 'Kleine vraag over jullie website',
+        body_text: 'Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+        date: '2026-06-05T13:49:14.000Z',
+        payload: {},
+      },
+    ],
+    buildCustomerIndexes(legacyCustomers)
+  );
+
+  assert.equal(legacyEvents.length, 1);
+  assert.equal(legacyEvents[0].recipientEmail, 'info@vandenbroekwitgoed.nl');
+  const report = buildReport({
+    events: mailboxEvents,
+    contactEvents: [],
+    guards: [],
+    missing: [],
+    insertedRows: [],
+    legacyEvents,
+    options: parseArgs([]),
+  });
+
+  assert.equal(report.summary.legacyCustomerSentEvents, 1);
+  assert.equal(report.summary.legacyCombinedSoftoraDuplicateRecipients, 1);
+  assert.equal(report.legacyCombinedSoftoraDuplicateRecipients[0].email, 'info@vandenbroekwitgoed.nl');
+});
+
+test('coldmail outbound guard audit reports mailbox sent-index coverage gaps per sender', () => {
+  const coverage = summarizeMailboxCoverage(
+    [
+      {
+        account_email: 'serve@softora.nl',
+        folder: 'sent',
+        uid: 87,
+        date: '2026-06-08T09:30:29.000Z',
+      },
+    ],
+    [
+      {
+        account_email: 'serve@softora.nl',
+        folder: 'sent',
+        status: 'ok',
+        last_synced_at: '2026-06-08T14:28:13.412Z',
+        last_uid: 87,
+        message_count: 50,
+      },
+      {
+        account_email: 'servecreusen7@gmail.com',
+        folder: 'sent',
+        status: 'ok',
+        last_synced_at: '2026-06-08T14:30:53.338Z',
+        last_uid: 0,
+        message_count: 0,
+      },
+    ]
+  );
+
+  const serve = coverage.find((item) => item.accountEmail === 'serve@softora.nl');
+  assert.equal(serve.sentIndexedRows, 1);
+  assert.ok(serve.warnings.includes('sent_sync_limit_reached'));
+
+  const gmail = coverage.find((item) => item.accountEmail === 'servecreusen7@gmail.com');
+  assert.equal(gmail.sentIndexedRows, 0);
+  assert.ok(gmail.warnings.includes('sent_index_empty'));
+
+  const report = buildReport({
+    events: [],
+    contactEvents: [],
+    guards: [],
+    missing: [],
+    insertedRows: [],
+    mailboxCoverage: coverage,
+    options: parseArgs([]),
+  });
+  assert.equal(report.summary.mailboxSentIndexEmpty >= 1, true);
+  assert.equal(report.summary.mailboxSentSyncLimitReached, 1);
 });
 
 test('coldmail outbound guard backfill includes old send guard state as outbound evidence', () => {
