@@ -383,6 +383,7 @@ function stripHtmlTags(valueRaw) {
 
 function isLeadCtaLabel(labelRaw) {
   const label = stripHtmlTags(labelRaw).toLowerCase();
+  if (/^ai\s+(?:klant)?contact\b/i.test(label)) return false;
   return /\b(neem contact op|contact opnemen|contact|stuur (?:een )?bericht|verstuur(?: bericht)?|whatsapp|start gesprek|plan gesprek|plan scan|vraag advies|offerte(?: aanvragen)?|bel direct|start project|pakket aanvragen|meer informatie|bespreken)\b/i.test(label);
 }
 
