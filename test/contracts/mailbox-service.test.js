@@ -90,12 +90,18 @@ function createOutboundGuardStore(calls = [], overrides = {}) {
     reserveRecipients: async (items, options) => {
       calls.push({ type: 'reserve', items, options });
       if (overrides.reserveResult) return overrides.reserveResult;
-      return { ok: true, reservationId: 'mailbox-webdesign-reservation-1', count: items.length * 4 };
+      return {
+        ok: true,
+        reservationId: 'mailbox-webdesign-reservation-1',
+        count: items.length * 4,
+        expectedCount: items.length * 4,
+      };
     },
     confirmReservation: async (reservationId, options) => {
       calls.push({ type: 'confirm', reservationId, options });
       if (overrides.confirmError) throw overrides.confirmError;
-      return { ok: true };
+      if (overrides.confirmResult) return overrides.confirmResult;
+      return { ok: true, count: 4 };
     },
   };
 }
@@ -463,6 +469,52 @@ test('mailbox service refuses manual webdesign sends when the central guard is u
   );
 
   assert.equal(sent.length, 0);
+});
+
+test('mailbox service fails webdesign sends when central guard confirm updates no rows after SMTP accept', async () => {
+  const sent = [];
+  const guardCalls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: 'm-confirm-empty', accepted: [message.to], rejected: [] };
+      },
+    }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls, {
+      confirmResult: { ok: false, reason: 'reservation_not_found', count: 0 },
+    }),
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage({
+        accountEmail: 'serve@softora.nl',
+        to: 'info@confirm-empty.example',
+        subject: 'Kleine vraag over jullie website',
+        text: 'Beste collega-ondernemer,\n\nIk heb een nieuw webdesign gemaakt voor confirm-empty.example.',
+      }),
+    (error) => {
+      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED');
+      assert.equal(error.status, 502);
+      assert.match(error.message, /bevestigde geen bestaande reservering/);
+      return true;
+    }
+  );
+
+  assert.equal(sent.length, 1);
+  assert.deepEqual(guardCalls.map((call) => call.type), ['reserve', 'confirm']);
 });
 
 test('mailbox service sends Martijn mail with the full display name', async () => {

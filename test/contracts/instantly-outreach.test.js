@@ -159,6 +159,7 @@ function createService(overrides = {}) {
         ok: true,
         reservationId: `instantly-reservation-${outboundGuardCalls.length}`,
         count: (Array.isArray(items) ? items.length : 0) * 4,
+        expectedCount: (Array.isArray(items) ? items.length : 0) * 4,
       };
     },
   };
@@ -896,7 +897,7 @@ test('safe Instantly upload reserves the whole batch centrally before returning 
       findRecipientConflict: async () => null,
       reserveRecipients: async (items, options) => {
         calls.push({ items, options });
-        return { ok: true, reservationId: 'instantly-reservation-1', count: items.length * 4 };
+        return { ok: true, reservationId: 'instantly-reservation-1', count: items.length * 4, expectedCount: items.length * 4 };
       },
     },
   });
@@ -918,6 +919,58 @@ test('safe Instantly upload reserves the whole batch centrally before returning 
   assert.equal(calls[0].options.channel, 'instantly');
   assert.equal(calls[0].options.permanent, true);
   assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
+});
+
+test('safe Instantly upload stops before CSV when the central outbound guard reservation is incomplete', async () => {
+  const calls = [];
+  const { service, fetchCalls, writes, getRows } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-incomplete-guard',
+        bedrijf: 'Incomplete Guard BV',
+        email: 'info@incomplete-guard.example',
+        website: 'https://incomplete-guard.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-incomplete-guard': {
+        id: 'prospect-incomplete-guard',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ items, options });
+        return { ok: true, reservationId: 'instantly-incomplete', count: 1, expectedCount: items.length * 4 };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.prepareInstantlyUpload({
+        actor: 'Test',
+        campaignId: 'campaign-manual',
+        uploadId: 'upload-incomplete',
+        limit: 1,
+      }),
+    (error) => {
+      assert.equal(error.code, 'INSTANTLY_OUTBOUND_GUARD_FAILED');
+      assert.equal(error.status, 502);
+      assert.match(error.message, /Centrale outbound duplicate-guard kon niet reserveren/);
+      return true;
+    }
+  );
+
+  assert.equal(calls.length, 1);
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
 });
 
 test('instantly sync uses the public Softora image host even when the app base url is Render', async () => {

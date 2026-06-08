@@ -227,11 +227,12 @@ function createService(overrides = {}) {
         ok: true,
         reservationId: `coldmail-reservation-${outboundGuardCalls.length}`,
         count: (Array.isArray(items) ? items.length : 0) * 4,
+        expectedCount: (Array.isArray(items) ? items.length : 0) * 4,
       };
     },
     confirmReservation: async (reservationId, options) => {
       outboundGuardCalls.push({ type: 'confirm', reservationId, options });
-      return { ok: true };
+      return { ok: true, count: 4 };
     },
   };
   const service = createColdmailCampaignService({
@@ -6360,8 +6361,8 @@ test('coldmail campaign blocks recipients already reserved in the central outbou
   assert.equal(sentMessages.length, 0);
 });
 
-test('coldmail campaign stops before SMTP when the central outbound guard is unavailable', async () => {
-  const { service, sentMessages } = createService({
+test('coldmail campaign stops before SMTP and safety-pauses when the central outbound guard is unavailable', async () => {
+  const { service, sentMessages, getSavedStates, getSendGuardState } = createService({
     outboundRecipientGuardStore: null,
     rows: [
       {
@@ -6374,6 +6375,7 @@ test('coldmail campaign stops before SMTP when the central outbound guard is una
         mail: true,
       },
     ],
+    coldmailSafetyPauseMs: 60_000,
   });
 
   await assert.rejects(
@@ -6385,12 +6387,15 @@ test('coldmail campaign stops before SMTP when the central outbound guard is una
         senderEmail: 'info@softora.nl',
       }),
     (error) => {
-      assert.equal(error.code, 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE');
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
       assert.match(error.message, /Centrale outbound duplicate-guard ontbreekt/);
       return true;
     }
   );
   assert.equal(sentMessages.length, 0);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_coldmail_send_guard'), true);
+  assert.equal(getSendGuardState().entries[0].count, 0);
+  assert.equal(getSendGuardState().entries[0].safetyPauseReason, 'central_outbound_guard_preflight_failed');
 });
 
 test('coldmail campaign reserves the recipient centrally before SMTP send and confirms after accept', async () => {
@@ -6411,11 +6416,11 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
       findRecipientConflict: async () => null,
       reserveRecipients: async (items, options) => {
         calls.push({ type: 'reserve', items, options });
-        return { ok: true, reservationId: 'reservation-1', count: items.length * 4 };
+        return { ok: true, reservationId: 'reservation-1', count: items.length * 4, expectedCount: items.length * 4 };
       },
       confirmReservation: async (reservationId, options) => {
         calls.push({ type: 'confirm', reservationId, options });
-        return { ok: true };
+        return { ok: true, count: 4 };
       },
     },
     onSendMail: async () => {
@@ -6470,7 +6475,7 @@ test('coldmail campaign pauses immediately when central guard confirm fails afte
       findRecipientConflict: async () => null,
       reserveRecipients: async (items, options) => {
         calls.push({ type: 'reserve', items, options });
-        return { ok: true, reservationId: 'reservation-fails', count: items.length * 4 };
+        return { ok: true, reservationId: 'reservation-fails', count: items.length * 4, expectedCount: items.length * 4 };
       },
       confirmReservation: async () => {
         calls.push({ type: 'confirm' });
@@ -6507,6 +6512,61 @@ test('coldmail campaign pauses immediately when central guard confirm fails afte
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_coldmail_send_guard'), true);
   assert.equal(getSendGuardState().entries[0].count, 0);
+  assert.equal(getSendGuardState().entries[0].safetyPauseReason, 'central_outbound_guard_confirm_failed');
+});
+
+test('coldmail campaign pauses when central guard confirm updates no rows after SMTP accept', async () => {
+  const calls = [];
+  const { service, sentMessages, getSavedStates, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'confirm-empty-row',
+        bedrijf: 'Confirm Empty BV',
+        naam: 'Confirm Empty BV',
+        email: 'info@confirm-empty.example',
+        website: 'https://confirm-empty.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ type: 'reserve', items, options });
+        return { ok: true, reservationId: 'reservation-empty', count: items.length * 4, expectedCount: items.length * 4 };
+      },
+      confirmReservation: async () => {
+        calls.push({ type: 'confirm' });
+        return { ok: false, reason: 'reservation_not_found', count: 0 };
+      },
+    },
+    onSendMail: async () => {
+      calls.push({ type: 'smtp' });
+    },
+    onSetUiStateValues: async ({ scope }) => {
+      calls.push({ type: `state:${scope}` });
+    },
+    coldmailSafetyPauseMs: 60_000,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /Centrale outbound duplicate-guard kon niet permanent worden bevestigd/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 1);
+  assert.deepEqual(calls.slice(0, 3).map((call) => call.type), ['reserve', 'smtp', 'confirm']);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
   assert.equal(getSendGuardState().entries[0].safetyPauseReason, 'central_outbound_guard_confirm_failed');
 });
 

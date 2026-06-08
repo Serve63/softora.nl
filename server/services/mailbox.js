@@ -1022,6 +1022,14 @@ function createMailboxService(deps = {}) {
     );
   }
 
+  function isCompleteOutboundGuardReservation(result) {
+    const actualCount = Number(result && result.count);
+    const expectedCount = Number(result && result.expectedCount);
+    if (!result || result.ok !== true) return false;
+    if (!Number.isFinite(actualCount) || actualCount <= 0) return false;
+    return !(Number.isFinite(expectedCount) && expectedCount > 0 && actualCount < expectedCount);
+  }
+
   async function reserveMailboxWebdesignOutboundRecipient(identity, { accountEmail, subject } = {}) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
       throw buildMailboxWebdesignGuardError(
@@ -1046,7 +1054,7 @@ function createMailboxService(deps = {}) {
     if (reservation && reservation.conflict) {
       throw buildMailboxWebdesignGuardConflictError(identity, reservation.conflict);
     }
-    if (!reservation || reservation.ok !== true) {
+    if (!isCompleteOutboundGuardReservation(reservation)) {
       throw buildMailboxWebdesignGuardError(
         'Centrale outbound duplicate-guard kon niet reserveren; webdesignmail niet verzonden.',
         'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_FAILED',
@@ -1071,7 +1079,7 @@ function createMailboxService(deps = {}) {
         502
       );
     }
-    await outboundRecipientGuardStore.confirmReservation(reservationId, {
+    const confirmation = await outboundRecipientGuardStore.confirmReservation(reservationId, {
       status: 'sent',
       permanent: true,
       payload: {
@@ -1081,6 +1089,13 @@ function createMailboxService(deps = {}) {
         manualMailboxSend: true,
       },
     });
+    if (!confirmation || confirmation.ok !== true || Number(confirmation.count || 0) <= 0) {
+      throw buildMailboxWebdesignGuardError(
+        'Centrale outbound duplicate-guard bevestigde geen bestaande reservering na SMTP-acceptatie.',
+        'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFIRM_FAILED',
+        502
+      );
+    }
   }
 
   function getPhotoMetaForRow(row, index, photoMap, photoByIdentity) {
