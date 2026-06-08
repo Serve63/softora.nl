@@ -123,9 +123,11 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /concept-hero/);
   assert.match(response.body, /mockup-stage/);
+  assert.match(response.body, /\.wide-stack\{width:min\(58%,720px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
+  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>[\s\S]*<div class="stage-card wide">/);
   assert.match(response.body, /\.tall\{width:min\(36%,430px\)/);
   assert.match(response.body, /\.tall \.visual\{aspect-ratio:3\/4\.45;object-fit:cover;object-position:top center\}/);
-  assert.match(response.body, /\.about-photo\{border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
+  assert.match(response.body, /\.about-photo\{width:min\(100%,400px\);justify-self:center;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
   assert.doesNotMatch(response.body, /Over dit concept/);
   assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
