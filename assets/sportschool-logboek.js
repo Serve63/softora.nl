@@ -17,7 +17,6 @@
   ];
   const DEFAULT_ORDERS = DEFAULT_EXERCISES.slice(0, 4).map((exercise) => exercise.order);
   const DAYS = [
-    { id: 'today', title: 'Vandaag' },
     { id: 'monday', title: 'Maandag' },
     { id: 'tuesday', title: 'Dinsdag' },
     { id: 'wednesday', title: 'Woensdag' },
@@ -26,7 +25,7 @@
     { id: 'saturday', title: 'Zaterdag' },
     { id: 'sunday', title: 'Zondag' },
   ];
-  const STORAGE_DAYS = DAYS.filter((day) => day.id !== 'today').map((day) => day.id);
+  const STORAGE_DAYS = DAYS.map((day) => day.id);
 
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
@@ -38,7 +37,7 @@
   const dayGrid = app.querySelector('[data-day-grid]');
   const addButton = app.querySelector('[data-add-exercise]');
   const closeDays = app.querySelector('[data-close-days]');
-  let selectedDay = 'today';
+  let selectedDay = currentWeekday();
   let isApplyingRemoteState = false;
   let remoteSaveTimer = null;
   let lastRemoteSnapshotJson = '';
@@ -143,7 +142,8 @@
   }
 
   function dayTitle(day) {
-    return DAYS.find((item) => item.id === day)?.title || 'Vandaag';
+    if (storageDay(day) === currentWeekday()) return 'Vandaag';
+    return DAYS.find((item) => item.id === storageDay(day))?.title || 'Vandaag';
   }
 
   function buildSnapshotFromState() {

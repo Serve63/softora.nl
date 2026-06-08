@@ -33,6 +33,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /SoftoraUiStateClient/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /createDefaultState/);
+  assert.doesNotMatch(scriptSource, /\{\s*id:\s*'today'/);
   assert.match(scriptSource, /Bankdrukken/);
   assert.match(scriptSource, /Schuine dumbbell press/);
   assert.match(scriptSource, /Seated row/);
@@ -45,4 +46,5 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /IS EEN RUSTDAG/);
   assert.match(stylesSource, /font-size: 16px/);
   assert.match(stylesSource, /:focus-within/);
+  assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
 });
