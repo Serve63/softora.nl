@@ -24,10 +24,27 @@ const KNOWN_FILES = new Set([
   'premium-websitegenerator.html',
 ]);
 
-function runPublicConversionTracker({ formIsValid = true } = {}) {
+function runPublicConversionTracker({ formIsValid = true, trigger = 'submit', linkAttrs = {} } = {}) {
   const listeners = {};
   const opened = [];
   const dispatched = [];
+  const fakeLinkAttrs = {
+    href: 'https://wa.me/31643262792',
+    ...linkAttrs,
+  };
+  const fakeLink = {
+    getAttribute(name) {
+      return fakeLinkAttrs[name] || '';
+    },
+    setAttribute(name, value) {
+      fakeLinkAttrs[name] = value;
+    },
+  };
+  const fakeClickTarget = {
+    closest(selector) {
+      return selector.includes('a[') ? fakeLink : null;
+    },
+  };
   const submitControl = {
     matches(selector) {
       return selector === '[data-softora-conversion][data-softora-whatsapp-action="submit"]';
@@ -76,20 +93,25 @@ function runPublicConversionTracker({ formIsValid = true } = {}) {
   vm.runInNewContext(trackerSource, context);
 
   let prevented = false;
-  listeners.submit({
-    target: fakeForm,
-    submitter: submitControl,
-    defaultPrevented: false,
-    preventDefault() {
-      prevented = true;
-      this.defaultPrevented = true;
-    },
-  });
+  if (trigger === 'click') {
+    listeners.click({ target: fakeClickTarget });
+  } else {
+    listeners.submit({
+      target: fakeForm,
+      submitter: submitControl,
+      defaultPrevented: false,
+      preventDefault() {
+        prevented = true;
+        this.defaultPrevented = true;
+      },
+    });
+  }
 
   return {
     opened,
     dispatched,
     prevented,
+    linkHref: fakeLinkAttrs.href,
     events: context.window.__softoraPublicConversionEvents || [],
     lastConversion: context.window.__softoraPublicLastConversion,
   };
@@ -247,6 +269,7 @@ test('public seo pages load first-party conversion tracking once', () => {
   assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(trackerSource, /softora:public-conversion/);
   assert.match(trackerSource, /recordConversion\(link\)/);
+  assert.match(trackerSource, /public-whatsapp-link/);
   assert.match(trackerSource, /document\.addEventListener\('submit', handleConversionSubmit\)/);
   assert.match(trackerSource, /recordConversion\(control\)/);
   assert.match(trackerSource, /window\.open\(MARTIJN_WHATSAPP_URL, '_blank', 'noopener,noreferrer'\)/);
@@ -266,6 +289,19 @@ test('public seo pages load first-party conversion tracking once', () => {
       `${entry.path} mist de publieke conversietracker.`
     );
   }
+});
+
+test('public conversion tracker measures bare Martijn WhatsApp links as fallback', () => {
+  const result = runPublicConversionTracker({ trigger: 'click' });
+
+  assert.equal(result.linkHref, 'https://wa.me/31643262792');
+  assert.equal(result.events.length, 1);
+  assert.equal(result.lastConversion.name, 'public-whatsapp-link');
+  assert.equal(result.lastConversion.page, '/contact?bron=seo');
+  assert.equal(result.lastConversion.target, 'whatsapp');
+  assert.equal(result.lastConversion.landing, '/contact?bron=seo');
+  assert.equal(result.lastConversion.referrer, '/diensten?utm=test');
+  assert.equal(result.dispatched[0].type, 'softora:public-conversion');
 });
 
 test('public conversion tracker records valid WhatsApp form submits without browser storage', () => {

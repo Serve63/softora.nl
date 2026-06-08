@@ -31,10 +31,11 @@
   }
 
   function recordConversion(element) {
+    var isWhatsappLink = isMartijnWhatsappUrl(getAttr(element, 'href'));
     var eventData = {
-      name: getAttr(element, 'data-softora-conversion'),
+      name: getAttr(element, 'data-softora-conversion') || (isWhatsappLink ? 'public-whatsapp-link' : ''),
       page: getAttr(element, 'data-softora-conversion-page') || getPagePath(),
-      target: getAttr(element, 'data-softora-conversion-target'),
+      target: getAttr(element, 'data-softora-conversion-target') || (isWhatsappLink ? 'whatsapp' : ''),
       landing: getLandingPath(),
       referrer: getReferrerPath(),
       path: getPagePath(),
@@ -56,7 +57,7 @@
 
   function handleConversionClick(event) {
     var link = event.target && event.target.closest
-      ? event.target.closest('a[data-softora-conversion][data-softora-conversion-target="whatsapp"]')
+      ? event.target.closest('a[data-softora-conversion][data-softora-conversion-target="whatsapp"],a[href]')
       : null;
     if (!link) return;
 
