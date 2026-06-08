@@ -128,7 +128,8 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.mobile-mockup-intro\{display:none\}/);
   assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.mobile-mockup-intro\{display:block;order:1;width:100%;margin:4px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp\(19px,5\.4vw,25px\);font-weight:600;line-height:1\.18;color:var\(--navy\);text-align:center\}\.mobile-mockup-intro \.title-line\{display:block\}\.wide\{width:100%;order:2\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
-  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<h2 class="mobile-mockup-intro">Eerste indruk op elk schermformaat:<\/h2>\s*<div class="stage-card wide">/);
+  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<h2 class="mobile-mockup-intro">Een eerste indruk\.\.\.<\/h2>\s*<div class="stage-card wide">/);
+  assert.doesNotMatch(response.body, /Eerste indruk op elk schermformaat/);
   assert.doesNotMatch(response.body, /Een korte indruk van de eerste versie/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
@@ -151,11 +152,10 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /@media\(max-width:1120px\)\{[\s\S]*\.about-profile\{display:flex;flex-direction:column\}\.profile-signature\{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0\}/);
   assert.match(response.body, /@media\(max-width:700px\)\{\.about-text h2\{font-size:clamp\(13px,4\.1vw,22px\)\}\}/);
   assert.match(response.body, /<div class="about-profile">\s*<div class="desktop-profile-role">Webdesign &amp; Software Ontwikkeling<\/div>\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesign &amp; Software Ontwikkeling<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
-  assert.match(response.body, /<h2>Hoe heb ik dit webdesign gebouwd\?<\/h2>/);
-  assert.match(response.body, /<p>Begonnen met HTML-code, een leeg scherm en een scherp oog voor wat werkt\.<\/p>/);
-  assert.match(response.body, /<p>De basis heb ik zelf opgebouwd: structuur, indeling en techniek\. Daarna heb ik met een vleugje AI-magie extra sfeer toegevoegd aan beelden en uitstraling\.<\/p>/);
-  assert.match(response.body, /<p>Ook heb ik gekeken naar hoe andere spelers in de markt zich presenteren en welke elementen aantoonbaar goed werken voor bezoekers\. Die inzichten heb ik meegenomen in dit ontwerp\. Zo ontstaat een website die niet alleen mooi oogt, maar ook logisch, overzichtelijk en klantgericht werkt\.<\/p>/);
-  assert.match(response.body, /<p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen\. Ook voor onderhoud en doorontwikkeling denk ik graag mee\.<\/p>/);
+  assert.match(response.body, /<h2>Zó heb ik het webdesign gebouwd!<\/h2>/);
+  assert.match(response.body, /<p>Begonnen met HTML-code, een leeg scherm en een scherp oog voor wat werkt\. De basis heb ik zelf opgebouwd: structuur, indeling en techniek\. Daarna heb ik met een vleugje AI-magie extra sfeer toegevoegd aan beelden en uitstraling\. Ook heb ik gekeken naar hoe andere spelers in de markt zich presenteren en welke elementen aantoonbaar goed werken voor bezoekers\. Die inzichten heb ik meegenomen in dit ontwerp\. Zo ontstaat een website die niet alleen mooi oogt, maar ook logisch, overzichtelijk en klantgericht werkt\. Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen\. Ook voor onderhoud en doorontwikkeling denk ik graag mee\.<\/p>/);
+  assert.doesNotMatch(response.body, /Hoe heb ik dit webdesign gebouwd/);
+  assert.doesNotMatch(response.body, /<p>De basis heb ik zelf opgebouwd/);
   assert.doesNotMatch(response.body, /Gebouwd met software, nieuwsgierigheid/);
   assert.doesNotMatch(response.body, /full-stack developer ook bedrijfssoftware op maat/);
   assert.doesNotMatch(response.body, /<p>Dit design is tot stand gekomen/);

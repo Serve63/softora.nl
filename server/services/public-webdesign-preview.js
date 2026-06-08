@@ -515,7 +515,7 @@ ${preconnectTags}
           <span class="hero-label">Webdesign presentatie</span>
           <h1 class="hero-title">${title}</h1>
         </div>
-        <h2 class="mobile-mockup-intro">Eerste indruk op elk schermformaat:</h2>
+        <h2 class="mobile-mockup-intro">Een eerste indruk...</h2>
         <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
       </div>
     </div>
@@ -532,11 +532,8 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2>Hoe heb ik dit webdesign gebouwd?</h2>
-      <p>Begonnen met HTML-code, een leeg scherm en een scherp oog voor wat werkt.</p>
-      <p>De basis heb ik zelf opgebouwd: structuur, indeling en techniek. Daarna heb ik met een vleugje AI-magie extra sfeer toegevoegd aan beelden en uitstraling.</p>
-      <p>Ook heb ik gekeken naar hoe andere spelers in de markt zich presenteren en welke elementen aantoonbaar goed werken voor bezoekers. Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook logisch, overzichtelijk en klantgericht werkt.</p>
-      <p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
+      <h2>Zó heb ik het webdesign gebouwd!</h2>
+      <p>Begonnen met HTML-code, een leeg scherm en een scherp oog voor wat werkt. De basis heb ik zelf opgebouwd: structuur, indeling en techniek. Daarna heb ik met een vleugje AI-magie extra sfeer toegevoegd aan beelden en uitstraling. Ook heb ik gekeken naar hoe andere spelers in de markt zich presenteren en welke elementen aantoonbaar goed werken voor bezoekers. Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook logisch, overzichtelijk en klantgericht werkt. Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
     </div>
   </section>
 </body>
