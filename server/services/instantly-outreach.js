@@ -1888,6 +1888,7 @@ function createInstantlyOutreachService(deps = {}) {
     normalizeString = defaultNormalizeString,
     truncateText = defaultTruncateText,
     logger = console,
+    outboundRecipientGuardService = null,
     now = () => new Date(),
     scheduleTask = (fn, delayMs) => setTimeout(fn, delayMs),
     clearScheduledTask = (timer) => clearTimeout(timer),
@@ -2960,6 +2961,67 @@ function createInstantlyOutreachService(deps = {}) {
     return { count: recipientEntries.length };
   }
 
+  function createInstantlyOutboundGuardPayload(item, options = {}) {
+    const guard = buildPermanentInstantlyRecipientGuard(item, options);
+    if (!guard) return null;
+    const source = normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE;
+    return {
+      senderEmail: guard.senderEmail,
+      recipientEmail: guard.recipientEmail,
+      recipientDomain: guard.recipientDomain,
+      recipientCompanyKey: guard.recipientCompanyKey,
+      recipientId: guard.recipientId,
+      recipientCompany: guard.recipientCompany,
+      payload: {
+        customerId: item && item.id,
+        campaignId: guard.campaignId,
+        uploadId: guard.uploadId,
+        source,
+      },
+    };
+  }
+
+  async function reserveInstantlyOutboundRecipients(items, options = {}) {
+    if (!outboundRecipientGuardService || typeof outboundRecipientGuardService.reserveRecipients !== 'function') {
+      throw createInstantlyError(
+        'Centrale outbound duplicate-guard is niet beschikbaar; er wordt geen Instantly CSV gemaakt.',
+        'OUTBOUND_RECIPIENT_GUARD_UNAVAILABLE',
+        503
+      );
+    }
+    const recipients = (Array.isArray(items) ? items : [])
+      .map((item) => createInstantlyOutboundGuardPayload(item, options))
+      .filter(Boolean);
+    if (recipients.length !== (Array.isArray(items) ? items.length : 0)) {
+      throw createInstantlyError(
+        'Niet alle gekozen Instantly-leads hebben een volledige centrale guard-identiteit.',
+        'OUTBOUND_RECIPIENT_GUARD_IDENTITY_MISSING',
+        400
+      );
+    }
+    try {
+      return await outboundRecipientGuardService.reserveRecipients(recipients, {
+        reservationId: normalizeString(options.reservationId),
+        provider: 'instantly',
+        channel: 'coldmail',
+        source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+        actor: options.actor,
+        permanent: true,
+        status: 'reserved',
+      });
+    } catch (error) {
+      throw createInstantlyError(
+        normalizeString(error && error.message) ||
+          'Centrale outbound duplicate-guard blokkeert deze Instantly CSV.',
+        normalizeString(error && error.code) || 'OUTBOUND_RECIPIENT_GUARD_FAILED',
+        error && error.code === 'OUTBOUND_RECIPIENT_GUARD_CONFLICT' ? 409 : 503,
+        {
+          conflicts: Array.isArray(error && error.conflicts) ? error.conflicts : undefined,
+        }
+      );
+    }
+  }
+
   function markRowsAsPreparedForInstantlyUpload(rows, selectedRows, options = {}) {
     const preparedAt = normalizeString(options.at) || now().toISOString();
     const campaignId = normalizeString(options.campaignId);
@@ -3055,6 +3117,13 @@ function createInstantlyOutreachService(deps = {}) {
       return lastSyncResult;
     }
 
+    const centralGuardWrite = await reserveInstantlyOutboundRecipients(sendableRows, {
+      at: preparedAt,
+      actor,
+      campaignId,
+      uploadId,
+      reservationId: `${INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE}:${campaignId}:${uploadId}`,
+    });
     const guardWrite = await savePermanentInstantlyRecipientGuards(sendableRows, {
       at: preparedAt,
       actor,
@@ -3089,6 +3158,8 @@ function createInstantlyOutreachService(deps = {}) {
       prepared: sendableRows.length,
       markedBenaderd: sendableRows.length,
       permanentGuards: guardWrite.count,
+      centralGuards: centralGuardWrite.guardRows,
+      centralGuardReservationId: centralGuardWrite.reservationId,
       failed,
       campaignId,
       uploadId,
@@ -3522,6 +3593,13 @@ function createInstantlyOutreachService(deps = {}) {
       }
       return lastSyncResult;
     }
+    const centralGuardWrite = await reserveInstantlyOutboundRecipients(sendableRows, {
+      at: now().toISOString(),
+      actor,
+      campaignId: config.defaultCampaignId,
+      reservationId: `instantly-sync:${config.defaultCampaignId}:${now().toISOString()}`,
+      source: 'instantly-sync-presend',
+    });
     const data = await addLeadsToInstantly(leads);
     const leadIdByEmail = buildLeadIdByEmail(data);
     await savePermanentInstantlyRecipientGuards(sendableRows, {
@@ -3549,6 +3627,8 @@ function createInstantlyOutreachService(deps = {}) {
       refreshedExistingVariables: existingVariableRefresh.refreshed,
       attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
       failed,
+      centralGuards: centralGuardWrite.guardRows,
+      centralGuardReservationId: centralGuardWrite.reservationId,
       campaignId: config.defaultCampaignId,
       dailyCap: config.dailyCap,
       syncedToday: syncedToday + sendableRows.length,

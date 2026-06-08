@@ -3,6 +3,7 @@ const {
 } = require('./server-app-runtime-composition-options');
 const { createColdmailCampaignService } = require('./coldmail-campaign');
 const { createInstantlyOutreachService } = require('./instantly-outreach');
+const { createOutboundRecipientGuardService } = require('./outbound-recipient-guard');
 
 const DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
 
@@ -120,6 +121,13 @@ function buildServerAppFeatureWiringRuntimeContext({
   );
   const dataOpsAwareUiStateGetter = createDataOpsAwareUiStateGetter(uiSeoRuntime);
   const dataOpsAwareUiStateSetter = createDataOpsAwareUiStateSetter(uiSeoRuntime);
+  const outboundRecipientGuardService = createOutboundRecipientGuardService({
+    isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+    getSupabaseClient: platformRuntime.getSupabaseClient,
+    normalizeString: shared.normalizeString,
+    truncateText: shared.truncateText,
+    logger: console,
+  });
 
   return buildServerAppFeatureWiringContext({
     app,
@@ -369,6 +377,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
+          outboundRecipientGuardService,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
           leadDbScope: 'coldcalling',
@@ -422,6 +431,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           },
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
+          outboundRecipientGuardService,
           fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,

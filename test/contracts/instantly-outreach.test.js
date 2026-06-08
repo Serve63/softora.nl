@@ -148,6 +148,7 @@ function createService(overrides = {}) {
   }
   const fetchCalls = [];
   const publicImageFetchCalls = [];
+  const centralGuardReservations = [];
   const writes = [];
   const service = createInstantlyOutreachService({
     instantlyConfig: {
@@ -251,6 +252,20 @@ function createService(overrides = {}) {
       }
       return { ok: true, status: 200, contentType: 'image/jpeg', bytes: 1234 };
     },
+    outboundRecipientGuardService:
+      overrides.outboundRecipientGuardService ||
+      {
+        reserveRecipients: async (recipients, options) => {
+          centralGuardReservations.push({ recipients, options });
+          if (overrides.centralGuardReserveError) throw overrides.centralGuardReserveError;
+          return {
+            ok: true,
+            reservationId: options && options.reservationId || `central-guard-${centralGuardReservations.length}`,
+            count: Array.isArray(recipients) ? recipients.length : 1,
+            guardRows: (Array.isArray(recipients) ? recipients.length : 1) * 4,
+          };
+        },
+      },
     resolveEmailDomain: async (domain) => !new Set(overrides.invalidDomains || []).has(domain),
     now: () => new Date(overrides.now || '2026-05-25T10:00:00.000Z'),
   });
@@ -259,6 +274,7 @@ function createService(overrides = {}) {
     service,
     fetchCalls,
     publicImageFetchCalls,
+    centralGuardReservations,
     getRows: () => rows,
     writes,
   };
@@ -367,7 +383,7 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
 });
 
 test('safe Instantly upload prepares CSV only after reserving leads and permanent guards', async () => {
-  const { service, fetchCalls, getRows, writes } = createService({
+  const { service, fetchCalls, getRows, writes, centralGuardReservations } = createService({
     syncEnabled: false,
     rows: [
       {
@@ -414,6 +430,8 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(result.prepared, 2);
   assert.equal(result.markedBenaderd, 2);
   assert.equal(result.permanentGuards, 2);
+  assert.equal(result.centralGuards, 8);
+  assert.equal(result.centralGuardReservationId, 'instantly-safe-manual-upload:campaign-manual:upload-test');
   assert.equal(result.campaignId, 'campaign-manual');
   assert.equal(result.fileName, 'softora-instantly-2-leads-upload-test.csv');
   assert.match(result.csv, /^email,first_name,last_name,company_name/);
@@ -421,6 +439,9 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.match(result.csv, /"luna@example\.test"/);
   assert.match(result.csv, /softora_customer_id/);
   assert.equal(fetchCalls.length, 0, 'manual upload preparation must not call Instantly API');
+  assert.equal(centralGuardReservations.length, 1);
+  assert.equal(centralGuardReservations[0].options.provider, 'instantly');
+  assert.equal(centralGuardReservations[0].recipients.length, 2);
 
   assert.equal(writes.length, 2);
   assert.equal(writes[0].scope, 'premium_coldmail_send_guard');
@@ -501,6 +522,52 @@ test('safe Instantly upload refuses partial batches when fewer leads are ready t
   assert.equal(writes.length, 0);
   assert.equal(getRows()[0].lastColdmailProvider, undefined);
   assert.equal(getRows()[1].lastColdmailProvider, undefined);
+});
+
+test('safe Instantly upload refuses CSV when the central outbound guard conflicts', async () => {
+  const conflict = new Error('Deze ontvanger is al eerder vastgezet in de centrale outbound duplicate-guard.');
+  conflict.code = 'OUTBOUND_RECIPIENT_GUARD_CONFLICT';
+  const { service, fetchCalls, writes, centralGuardReservations, getRows } = createService({
+    syncEnabled: false,
+    centralGuardReserveError: conflict,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.prepareInstantlyUpload({
+        actor: 'Test',
+        campaignId: 'campaign-manual',
+        uploadId: 'upload-test',
+        limit: 1,
+      }),
+    (error) => {
+      assert.equal(error.code, 'OUTBOUND_RECIPIENT_GUARD_CONFLICT');
+      return true;
+    }
+  );
+
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(writes.length, 0);
+  assert.equal(centralGuardReservations.length, 1);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
 });
 
 test('safe Instantly upload skips leads that are already protected by recipient guard', async () => {

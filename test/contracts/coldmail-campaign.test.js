@@ -185,6 +185,8 @@ function createService(overrides = {}) {
   const sentMessages = [];
   const transportConfigs = [];
   const sleeps = [];
+  const centralGuardReservations = [];
+  const centralGuardSentMarks = [];
   let savedState = null;
   const savedStates = [];
   let replyState = overrides.replyState || { processed: {} };
@@ -362,6 +364,25 @@ function createService(overrides = {}) {
         },
       };
     },
+    outboundRecipientGuardService:
+      overrides.outboundRecipientGuardService ||
+      {
+        reserveRecipients: async (recipients, options) => {
+          centralGuardReservations.push({ recipients, options });
+          if (overrides.centralGuardReserveError) throw overrides.centralGuardReserveError;
+          return {
+            ok: true,
+            reservationId: `central-guard-${centralGuardReservations.length}`,
+            count: Array.isArray(recipients) ? recipients.length : 1,
+            guardRows: (Array.isArray(recipients) ? recipients.length : 1) * 4,
+          };
+        },
+        markReservationSent: async (reservationId, options) => {
+          centralGuardSentMarks.push({ reservationId, options });
+          if (overrides.centralGuardMarkSentError) throw overrides.centralGuardMarkSentError;
+          return { ok: true, reservationId };
+        },
+      },
     mailboxAccountsRaw: overrides.mailboxAccountsRaw || '',
     createImapClient:
       overrides.createImapClient ||
@@ -400,6 +421,8 @@ function createService(overrides = {}) {
     sentMessages,
     transportConfigs,
     sleeps,
+    centralGuardReservations,
+    centralGuardSentMarks,
     getSavedState: () => savedState,
     getSavedStates: () => savedStates,
     getReplyState: () => replyState,
@@ -6034,6 +6057,114 @@ test('coldmail campaign blocks the same recipient across different sender mailbo
     }
   );
   assert.equal(second.sentMessages.length, 0);
+});
+
+test('coldmail campaign refuses SMTP when the central outbound guard already has the recipient', async () => {
+  const conflict = new Error('Deze ontvanger is al eerder vastgezet in de centrale outbound duplicate-guard.');
+  conflict.code = 'OUTBOUND_RECIPIENT_GUARD_CONFLICT';
+  conflict.conflicts = [
+    {
+      guardKey: 'email:gastenverblijven@dehoevens.nl',
+      keyType: 'email',
+      keyValue: 'gastenverblijven@dehoevens.nl',
+      provider: 'softora',
+    },
+  ];
+  const { service, sentMessages, centralGuardReservations, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'de-hoevens',
+        bedrijf: 'Landgoed de Hoevens',
+        naam: 'Landgoed de Hoevens',
+        email: 'gastenverblijven@dehoevens.nl',
+        website: 'dehoevens.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    centralGuardReserveError: conflict,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Beste collega-ondernemer,',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'OUTBOUND_RECIPIENT_GUARD_CONFLICT');
+      assert.equal(error.failedItems[0].code, 'OUTBOUND_RECIPIENT_GUARD_CONFLICT');
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+  assert.equal(centralGuardReservations.length, 1);
+  assert.equal(getSendGuardState().entries.length, 0);
+});
+
+test('coldmail campaign refuses SMTP when the central outbound guard is unavailable', async () => {
+  const unavailable = new Error('Centrale outbound duplicate-guard is niet beschikbaar; er wordt geen mail verstuurd.');
+  unavailable.code = 'OUTBOUND_RECIPIENT_GUARD_UNAVAILABLE';
+  const { service, sentMessages, centralGuardReservations, getSendGuardState } = createService({
+    centralGuardReserveError: unavailable,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Beste collega-ondernemer,',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'OUTBOUND_RECIPIENT_GUARD_UNAVAILABLE');
+      assert.equal(error.failedItems[0].code, 'OUTBOUND_RECIPIENT_GUARD_UNAVAILABLE');
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+  assert.equal(centralGuardReservations.length, 1);
+  assert.equal(getSendGuardState().entries.length, 0);
+});
+
+test('coldmail campaign reserves central outbound guard before SMTP and confirms it before customer write', async () => {
+  const order = [];
+  const { service, sentMessages, centralGuardReservations, centralGuardSentMarks, getSavedStates } = createService({
+    outboundRecipientGuardService: {
+      reserveRecipients: async (recipients, options) => {
+        order.push('central-reserve');
+        centralGuardReservations.push({ recipients, options });
+        return { ok: true, reservationId: 'central-reservation-1', count: 1, guardRows: 4 };
+      },
+      markReservationSent: async (reservationId, options) => {
+        order.push('central-sent');
+        centralGuardSentMarks.push({ reservationId, options });
+        return { ok: true, reservationId };
+      },
+    },
+    onSendMail: async () => {
+      order.push('smtp-send');
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Beste collega-ondernemer,',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.deepEqual(order, ['central-reserve', 'smtp-send', 'central-sent']);
+  assert.equal(centralGuardReservations[0].options.provider, 'softora');
+  assert.equal(centralGuardReservations[0].options.channel, 'coldmail');
+  assert.equal(centralGuardReservations[0].recipients[0].recipientEmail, 'ruben@example.test');
+  assert.equal(centralGuardSentMarks[0].reservationId, 'central-reservation-1');
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), true);
 });
 
 test('coldmail campaign keeps old Instantly recipient guards permanently', async () => {

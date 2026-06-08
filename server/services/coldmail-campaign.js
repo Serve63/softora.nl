@@ -65,6 +65,7 @@ const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'NO_SENDER_CAPACITY',
   'NO_VALID_RECIPIENT_DOMAINS',
   'NO_WEBDESIGN_PHOTOS',
+  'OUTBOUND_RECIPIENT_GUARD_CONFLICT',
   'SENDER_SMTP_NOT_CONFIGURED',
   'SMTP_NOT_CONFIGURED',
   'SMTP_TRANSPORT_UNAVAILABLE',
@@ -354,9 +355,11 @@ function createColdmailCampaignService(deps = {}) {
     coldmailAutoReplyEnabled = false,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    logger = console,
     now = () => new Date(),
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     webdesignPreparationCoordinator: initialWebdesignPreparationCoordinator = null,
+    outboundRecipientGuardService = null,
     loadPreviewImageSharp = loadColdmailPreviewSharpModule,
   } = deps;
 
@@ -1312,6 +1315,10 @@ function createColdmailCampaignService(deps = {}) {
 
   function isColdmailRecipientGuardFailure(item) {
     return normalizeString(item && item.code) === 'COLDMAIL_RECIPIENT_RECENTLY_SENT';
+  }
+
+  function isColdmailOutboundGuardFailure(item) {
+    return /^OUTBOUND_RECIPIENT_GUARD_/i.test(normalizeString(item && item.code));
   }
 
   async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
@@ -3765,6 +3772,66 @@ function createColdmailCampaignService(deps = {}) {
     });
     await saveColdmailSendGuardState(state, actor || 'coldmail-safety-pause');
     return { until, reason: safetyReason };
+  }
+
+  function createColdmailOutboundGuardPayload(row, item, senderEmail, extra = {}) {
+    const recipientGuard = buildColdmailRecipientGuard(row, item && item.id);
+    return {
+      senderEmail,
+      recipientEmail: recipientGuard.recipientEmail,
+      recipientDomain: recipientGuard.recipientDomain,
+      recipientCompanyKey: recipientGuard.recipientCompanyKey,
+      recipientId: recipientGuard.recipientId,
+      recipientCompany: recipientGuard.recipientCompany,
+      payload: {
+        customerId: item && item.id,
+        source: 'softora-coldmail',
+        specialAction: extra.specialAction || '',
+        subject: extra.subject || '',
+      },
+    };
+  }
+
+  async function reserveColdmailOutboundRecipient({ row, item, senderEmail, actor, subject, specialAction }) {
+    if (!outboundRecipientGuardService || typeof outboundRecipientGuardService.reserveRecipients !== 'function') {
+      const error = new Error('Centrale outbound duplicate-guard is niet beschikbaar; er wordt geen mail verstuurd.');
+      error.code = 'OUTBOUND_RECIPIENT_GUARD_UNAVAILABLE';
+      throw error;
+    }
+    return outboundRecipientGuardService.reserveRecipients(
+      [
+        createColdmailOutboundGuardPayload(row, item, senderEmail, {
+          subject,
+          specialAction,
+        }),
+      ],
+      {
+        provider: 'softora',
+        channel: 'coldmail',
+        source: 'softora-coldmail-presend',
+        actor,
+        senderEmail,
+        permanent: true,
+      }
+    );
+  }
+
+  async function markColdmailOutboundReservationSent(reservation, senderEmail) {
+    const reservationId = normalizeString(reservation && reservation.reservationId);
+    if (!reservationId) return { ok: false, skipped: true };
+    if (!outboundRecipientGuardService || typeof outboundRecipientGuardService.markReservationSent !== 'function') {
+      return { ok: false, skipped: true };
+    }
+    try {
+      return await outboundRecipientGuardService.markReservationSent(reservationId, {
+        senderEmail,
+        provider: 'softora',
+        channel: 'coldmail',
+      });
+    } catch (error) {
+      logger.warn('[Coldmail][outbound-guard-mark-sent]', error && error.message ? error.message : error);
+      return { ok: false, error };
+    }
   }
 
   function getSmtpSafetyStopReason(error) {
@@ -6364,6 +6431,16 @@ function createColdmailCampaignService(deps = {}) {
         if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
           mail.bcc = auditBcc;
         }
+        const outboundReservation = !isTestRecipientRow(row, to)
+          ? await reserveColdmailOutboundRecipient({
+              row,
+              item,
+              senderEmail,
+              actor,
+              subject,
+              specialAction: effectiveSpecialAction,
+            })
+          : null;
         const info = await transporter.sendMail(mail);
         const accepted = Array.isArray(info && info.accepted)
           ? info.accepted.map(normalizeEmailAddress).filter(Boolean)
@@ -6374,6 +6451,7 @@ function createColdmailCampaignService(deps = {}) {
         if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
           throw new Error('SMTP accepteerde de ontvanger niet.');
         }
+        const centralGuardConfirmed = await markColdmailOutboundReservationSent(outboundReservation, senderEmail);
         const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
         const sentItem = {
           id: item.id,
@@ -6385,6 +6463,8 @@ function createColdmailCampaignService(deps = {}) {
           accepted,
           rejected,
           sentCopySaved,
+          centralGuardReservationId: normalizeString(outboundReservation && outboundReservation.reservationId),
+          centralGuardConfirmed: Boolean(centralGuardConfirmed && centralGuardConfirmed.ok),
         };
         sent.push(sentItem);
         if (!isTestRecipientRow(row, to)) {
@@ -6422,6 +6502,7 @@ function createColdmailCampaignService(deps = {}) {
           id: item.id,
           bedrijf: getRowCompany(row),
           email: to,
+          code: normalizeString(error && error.code),
           error: truncateText(normalizeString(error && error.message), 500),
         });
         const safetyReason = getSmtpSafetyStopReason(error);
@@ -6446,6 +6527,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!sent.length && failed.length) {
       const firstFailure = pickFailureMessage(failed, selectedRows);
       const recipientGuardFailure = failed.every((item) => isColdmailRecipientGuardFailure(item));
+      const outboundGuardFailure = failed.every((item) => isColdmailOutboundGuardFailure(item));
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
@@ -6454,6 +6536,8 @@ function createColdmailCampaignService(deps = {}) {
         ? 'COLDMAIL_SAFETY_PAUSED'
         : recipientGuardFailure
           ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
+          : outboundGuardFailure
+          ? normalizeString(failed[0] && failed[0].code) || 'OUTBOUND_RECIPIENT_GUARD_FAILED'
           : webdesignAssetFailure
           ? 'NO_WEBDESIGN_PHOTOS'
           : 'SMTP_SEND_FAILED';
