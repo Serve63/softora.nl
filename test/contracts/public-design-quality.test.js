@@ -75,7 +75,12 @@ test('seo-growth hero keeps titles broad and hero secondary CTAs visible', () =>
   );
   assert.match(
     css,
-    /@media \(max-width:\s*520px\)\s*\{[\s\S]*\.seo-growth-hero h1\s*\{[\s\S]*font-size:\s*clamp\(42px,\s*11vw,\s*48px\);[\s\S]*line-height:\s*1;/s,
+    /\.seo-growth-hero h1\s*\{[\s\S]*text-wrap:\s*balance;/s,
+    'hero H1 moet regels visueel balanceren zodat money-page koppen niet hakkelig breken'
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*520px\)\s*\{[\s\S]*\.seo-growth-hero h1\s*\{[\s\S]*font-size:\s*clamp\(38px,\s*10vw,\s*44px\);[\s\S]*line-height:\s*1\.02;/s,
     'mobiele hero H1 moet compacter worden voordat titels in vijf regels vallen'
   );
 });
