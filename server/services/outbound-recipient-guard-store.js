@@ -1,5 +1,18 @@
 const DEFAULT_TABLE = 'softora_outbound_recipient_guards';
 const DEFAULT_RESERVATION_TTL_MS = 2 * 60 * 60 * 1000;
+const PERSONAL_MAILBOX_DOMAINS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'icloud.com',
+  'me.com',
+  'msn.com',
+  'yahoo.com',
+  'proton.me',
+  'protonmail.com',
+]);
 
 function defaultNormalizeString(value) {
   return String(value || '').trim();
@@ -53,11 +66,22 @@ function normalizeDomain(value, normalizeString = defaultNormalizeString) {
   }
 }
 
+function getEmailDomain(email) {
+  const normalized = normalizeEmailAddress(email);
+  const parts = normalized.split('@');
+  return parts.length === 2 ? parts[1].replace(/\.+$/g, '') : '';
+}
+
+function getNonPersonalEmailDomain(email) {
+  const domain = getEmailDomain(email);
+  return domain && !PERSONAL_MAILBOX_DOMAINS.has(domain) ? domain : '';
+}
+
 function normalizeIdentity(identity = {}, normalizeString = defaultNormalizeString) {
   const recipientEmail = normalizeEmailAddress(identity.recipientEmail || identity.email, normalizeString);
   const recipientDomain =
     normalizeDomain(identity.recipientDomain || identity.domain || identity.websiteDomain, normalizeString) ||
-    normalizeDomain(recipientEmail.split('@')[1] || '', normalizeString);
+    normalizeDomain(getNonPersonalEmailDomain(recipientEmail), normalizeString);
   const recipientCompanyKey = normalizeGuardKeyPart(
     identity.recipientCompanyKey || identity.companyKey || identity.company || identity.recipientCompany,
     normalizeString

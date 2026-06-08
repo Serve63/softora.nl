@@ -431,6 +431,70 @@ test('mailbox service blocks manual webdesign sends before SMTP when the central
   assert.equal(guardCalls[0].type, 'reserve');
 });
 
+test('mailbox service guards webdesign sends even when the copy uses preview wording', async () => {
+  const sent = [];
+  const guardCalls = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: 'm-should-not-send', accepted: [message.to], rejected: [] };
+      },
+    }),
+    outboundRecipientGuardStore: createOutboundGuardStore(guardCalls, {
+      reserveResult: {
+        ok: false,
+        reservationId: 'preview-copy-conflict',
+        conflict: {
+          provider: 'softora',
+          sender_email: 'martijn@softora.nl',
+          recipient_email: 'info@previewcopy.example',
+        },
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage({
+        accountEmail: 'serve@softora.nl',
+        to: 'info@previewcopy.example',
+        subject: 'Kleine vraag over jullie website',
+        text: [
+          'Beste collega-ondernemer,',
+          '',
+          'Ik ben benieuwd wat je van het webdesign vindt.',
+          'Als je wilt stuur ik ook de online preview, zodat je zelf door het ontwerp kunt scrollen.',
+          '',
+          'PS: Wordt het webdesign niet zichtbaar?',
+          'Bekijk het via hier 👈',
+        ].join('\n'),
+      }),
+    (error) => {
+      assert.equal(error.code, 'MAILBOX_WEBDESIGN_OUTBOUND_GUARD_CONFLICT');
+      assert.equal(error.status, 409);
+      return true;
+    }
+  );
+
+  assert.equal(sent.length, 0);
+  assert.equal(guardCalls.length, 1);
+  assert.equal(guardCalls[0].type, 'reserve');
+  assert.equal(guardCalls[0].items[0].recipientEmail, 'info@previewcopy.example');
+  assert.equal(guardCalls[0].items[0].recipientDomain, 'previewcopy.example');
+});
+
 test('mailbox service blocks manual webdesign sends when customer history already shows outbound mail', async () => {
   const sent = [];
   const guardCalls = [];
