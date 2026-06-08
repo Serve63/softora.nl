@@ -131,6 +131,10 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.about-photo\{width:100%;border-radius:18px;aspect-ratio:4\/3;overflow:hidden/);
   assert.match(response.body, /\.about-photo img\{display:block;width:100%;height:100%;object-fit:cover;object-position:center\}/);
   assert.match(response.body, /<div class="about-profile">\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesigner<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
+  assert.match(response.body, /<h2>Gebouwd met code nieuwsgierigheid en een beetje AI-magie\.<\/h2>/);
+  assert.match(response.body, /<p>Naast webdesign bouw ik als full-stack developer ook bedrijfssoftware op maat: van dashboards en klantportalen tot volledige softwareplatformen\. Een aanspreekpunt voor design en techniek\. Dit design is tot stand gekomen met de nieuwste AI-technologieën, aangevuld met onderzoek naar wat er al in de markt bestaat\. Zo kom je tot iets dat er niet alleen goed uitziet, maar ook klopt\. Kleine details kunnen nog afwijken, zoals een logo, tekst of adres\. Dat schaven we in de volgende ronde strak\.<\/p>/);
+  assert.doesNotMatch(response.body, /<p>Dit design is tot stand gekomen/);
+  assert.doesNotMatch(response.body, /<p>Kleine details kunnen nog afwijken/);
   assert.doesNotMatch(response.body, /Over dit concept/);
   assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
