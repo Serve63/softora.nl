@@ -7,7 +7,7 @@
   const DEFAULT_AI_INSTRUCTIONS = "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.";
   const DEFAULT_SUBJECT = "Kleine vraag over jullie website";
   const DEFAULT_WEBDESIGN_BODY = [
-    "Beste collega-ondernemer,",
+    "Goedendag,",
     "",
     "Afgelopen week kwam ik jullie website ({{website}}) tegen.",
     "",
