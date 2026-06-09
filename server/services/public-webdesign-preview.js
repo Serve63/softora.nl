@@ -708,20 +708,19 @@ ${preconnectTags}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{--navy:#1c2b50;--teal:#5bada0;--cream:#f2ede6;--muted:#728095;--rule:#d8d2ca;--panel:#fffaf4}
     html,body{min-height:100%;background:var(--cream);color:var(--navy);font-family:Inter,Arial,sans-serif}
-    body{overflow-x:hidden}
+    body{overflow-x:hidden;overflow-anchor:none}
     .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp(18px,4vw,64px);gap:44px;position:relative}
     .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
     .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp(0px,3vw,44px)}
     .wide-stack{width:min(54%,780px);display:flex;flex-direction:column;align-items:center;gap:22px}
-    .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden}
-    .tall{width:min(42%,540px);border-radius:16px}
-    .wide{width:100%;border-radius:14px}
+    .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden;flex-shrink:0}
+    .tall{width:min(42%,540px);border-radius:16px;aspect-ratio:5/8}
+    .wide{width:100%;border-radius:14px;aspect-ratio:16/10}
     .visual{display:block;width:100%;height:100%;background:var(--panel)}
     .tall .visual{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center}
-    .wide .visual{object-fit:contain;object-position:center}
-    .wide .visual{aspect-ratio:16/10}
+    .wide .visual{height:100%;object-fit:contain;object-position:center}
     .scroll-cue{position:fixed;right:clamp(18px,4vw,56px);bottom:clamp(18px,3.5vw,42px);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center;background:rgba(255,250,244,.92);color:var(--navy);border:1px solid rgba(28,43,80,.12);box-shadow:0 14px 32px rgba(28,43,80,.18);text-decoration:none;transition:background .18s ease}
     .scroll-cue:hover{background:#fff}
     .scroll-cue svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -742,19 +741,19 @@ ${preconnectTags}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:30px;padding-top:56px}.about-profile{width:min(100%,360px);justify-self:center;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:14px}.about-photo{width:68px;flex:0 0 68px;border-radius:999px;aspect-ratio:1/1;box-shadow:0 8px 24px rgba(28,43,80,.1)}.profile-signature{margin:0;text-align:left;padding:0;border-top:0}.profile-signature span{display:block;font-size:10.5px;line-height:1.35}}
     @media(max-width:700px){.about-section{gap:28px}.about-profile{width:min(100%,320px);justify-content:flex-start}.about-photo{width:58px;flex-basis:58px}.profile-signature span{white-space:nowrap;font-size:clamp(8px,2.5vw,10px);letter-spacing:.7px}.about-text h2{font-size:clamp(13px,4.1vw,22px);text-align:center}}
     @media(max-width:700px){.scroll-cue{display:none}}
-    @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
+    @media(max-width:900px){.concept-hero{min-height:100svh;padding-top:34px;justify-content:flex-start}.mockup-stage{flex-direction:column;padding:0;gap:22px}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
 <body>
   <section class="concept-hero">
     <div class="mockup-stage">
-      <div class="stage-card tall"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" loading="eager" decoding="async" fetchpriority="high"></div>
+      <div class="stage-card tall"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high"></div>
       <div class="wide-stack">
         <div class="hero-heading">
           <span class="hero-label">Webdesign presentatie</span>
           <h1 class="hero-title">${title}</h1>
         </div>
-        <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" loading="eager" decoding="async"></div>
+        <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" width="1600" height="1000" loading="eager" decoding="async"></div>
       </div>
     </div>
     <a class="scroll-cue" href="#concept-about" aria-label="Scroll naar meer informatie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></a>
