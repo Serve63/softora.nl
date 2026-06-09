@@ -158,6 +158,22 @@ test('outbound recipient guard store reports exact reserve and confirm counts', 
   assert.equal(calls.some((call) => call.type === 'confirm'), true);
 });
 
+test('outbound recipient guard store normalizes company legal suffix punctuation like coldmail', async () => {
+  const { client, calls } = createMockSupabaseClient();
+  const store = createStore(client);
+
+  const reservation = await store.reserveRecipients(
+    [{ recipientEmail: 'info@idtravel.nl', recipientCompany: 'ID Travel B.V.', recipientId: 'idtravel-1' }],
+    { provider: 'softora', channel: 'coldmail', permanent: true, source: 'test' }
+  );
+
+  assert.equal(reservation.ok, true);
+  const insertedRows = calls.find((call) => call.type === 'insert').rows;
+  const keys = insertedRows.map((row) => row.guard_key).sort();
+  assert.equal(keys.includes('company:id-travel-b-v'), true);
+  assert.equal(keys.includes('company:id-travel-b.v.'), false);
+});
+
 test('outbound recipient guard store does not treat personal mailbox providers as recipient domains', async () => {
   const { client, calls } = createMockSupabaseClient();
   const store = createStore(client);
