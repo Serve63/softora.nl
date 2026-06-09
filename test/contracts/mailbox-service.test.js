@@ -187,7 +187,7 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
-test('mailbox service enriches normal webdesign sends with public link and inline images', async () => {
+test('mailbox service enriches normal webdesign sends with public link and no inline images by default', async () => {
   const sent = [];
   const guardCalls = [];
   const customerId = 'manual-import-pckbv-eu-privacy-0583';
@@ -284,15 +284,10 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
     sent[0].message.html,
     /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\/concept" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
   );
-  assert.match(sent[0].message.html, /cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora/);
-  assert.match(sent[0].message.html, /cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora/);
-  assert.match(sent[0].message.html, /max-height:960px;height:auto;object-fit:contain/);
-  assert.match(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
-  assert.equal(sent[0].message.attachments.length, 2);
-  assert.deepEqual(
-    sent[0].message.attachments.map((attachment) => attachment.contentDisposition),
-    ['inline', 'inline']
-  );
+  assert.doesNotMatch(sent[0].message.html, /<img src=/);
+  assert.doesNotMatch(sent[0].message.html, /cid:webdesign|cid:mockup/);
+  assert.doesNotMatch(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.equal(sent[0].message.attachments, undefined);
 });
 
 test('mailbox service enriches webdesign sends from stored photo metadata when customer row is unavailable', async () => {
@@ -300,6 +295,7 @@ test('mailbox service enriches webdesign sends from stored photo metadata when c
   const guardCalls = [];
   const customerId = 'import-309-db-mohsau65-wp5f4v';
   const service = createMailboxService({
+    webdesignImageDelivery: 'cid',
     mailConfig: {},
     mailboxAccountsRaw: JSON.stringify([
       {

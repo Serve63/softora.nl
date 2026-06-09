@@ -105,7 +105,7 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
-const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
+const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'link';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
@@ -4876,8 +4876,12 @@ function createColdmailCampaignService(deps = {}) {
 
   function getColdmailWebdesignImageDelivery(input = {}) {
     const explicit = normalizeString(input.webdesignImageDelivery || input.imageDelivery).toLowerCase();
-    const value = explicit || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
-    return value === 'remote' ? 'remote' : DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
+    const configured = normalizeString(env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY || env.WEBDESIGN_IMAGE_DELIVERY).toLowerCase();
+    const value = explicit || configured || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
+    if (['cid', 'inline', 'embedded'].includes(value)) return 'cid';
+    if (['remote', 'attachment', 'attachments'].includes(value)) return 'remote';
+    if (['link', 'link-only', 'link_only', 'none', 'off', 'false', '0'].includes(value)) return 'link';
+    return DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
   }
 
   function appendColdmailReference(text, reference) {
@@ -6575,7 +6579,8 @@ function createColdmailCampaignService(deps = {}) {
       let preparedMockupAttachment = null;
       let remoteWebdesignAttachment = null;
       let remoteMockupAttachment = null;
-      if (webdesignPhoto) {
+      const shouldSendWebdesignImages = Boolean(webdesignPhoto && webdesignImageDelivery !== 'link');
+      if (shouldSendWebdesignImages) {
         const preparedWebdesignImage = await preparePreviewImageForEmail(webdesignPhoto, 'webdesign');
         const preparedMockupImage = webdesignPhoto.mockup
           ? await preparePreviewImageForEmail(webdesignPhoto.mockup, 'mockup')
@@ -6590,7 +6595,7 @@ function createColdmailCampaignService(deps = {}) {
           mockup: preparedMockupAttachment || webdesignPhoto.mockup,
         };
       }
-      if (webdesignPhoto && webdesignImageDelivery === 'remote') {
+      if (shouldSendWebdesignImages && webdesignImageDelivery === 'remote') {
         const webdesignLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'webdesign');
         const mockupLink = buildColdmailPreviewImageLink(row, item.id, reference, input, 'mockup');
         remoteWebdesignAttachment = preparedWebdesignAttachment;
@@ -6627,14 +6632,14 @@ function createColdmailCampaignService(deps = {}) {
         }),
         reference
       );
-      const htmlWithContent = webdesignPhoto
+      const htmlWithContent = shouldSendWebdesignImages
         ? appendWebdesignImageHtml(htmlBase, webdesignPhotoForHtml, {
             optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
             optOutUrl: unsubscribeUrl,
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
       const html = htmlWithContent;
-      const attachments = webdesignPhoto
+      const attachments = shouldSendWebdesignImages
         ? buildWebdesignImageAttachments(
             webdesignPhoto,
             webdesignImageDelivery === 'cid'
