@@ -88,6 +88,14 @@ function designPhotoSlugMatchesIdentifier(candidate, identifier) {
   ) {
     return true;
   }
+  if (
+    identifierRootCompact.length >= 5 &&
+    candidateCompact.length >= identifierRootCompact.length &&
+    /^manual-import-/.test(candidateSlug) &&
+    candidateCompact.includes(identifierRootCompact)
+  ) {
+    return true;
+  }
   return Boolean(
     candidateRootCompact &&
       identifierRootCompact &&
