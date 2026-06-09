@@ -554,6 +554,15 @@ function cleanPublicPreviewTitle(value, fallback) {
   return title;
 }
 
+function cleanPublicPreviewNarrativeCompanyName(value) {
+  const title = normalizeString(value);
+  const cleaned = title
+    .replace(/\s*,?\s*(?:b\.?\s*v\.?|n\.?\s*v\.?|v\.?\s*o\.?\s*f\.?|c\.?\s*v\.?|ltd\.?|llc|inc\.?)\s*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return cleaned || title;
+}
+
 function buildPhotoMapFromStructuredEntries(entries) {
   return (Array.isArray(entries) ? entries : []).reduce((map, entry) => {
     const id = normalizeString(entry && (entry.customerId || entry.id));
@@ -674,7 +683,9 @@ function buildConceptHtml(preview, titleFallback) {
   const profileSource = escapeHtml(profile.photoSource);
   const profileName = escapeHtml(profile.name);
   const profileRole = escapeHtml(profile.role);
-  const title = escapeHtml(cleanPublicPreviewTitle(preview.title, titleFallback || preview.id));
+  const titleText = cleanPublicPreviewTitle(preview.title, titleFallback || preview.id);
+  const title = escapeHtml(titleText);
+  const narrativeCompanyName = escapeHtml(cleanPublicPreviewNarrativeCompanyName(titleText));
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
     getUrlOrigin(preview.mockupSource),
@@ -761,9 +772,9 @@ ${preconnectTags}
     <div class="about-text">
       <h2>Zó heb ik het webdesign gebouwd!</h2>
       <p>Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.</p>
-      <p>Ook heb ik de concurrenten van ${title} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
+      <p>Ook heb ik de concurrenten van ${narrativeCompanyName} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
       <p>Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.</p>
-      <p>Later in het proces heb ik moderne AI-technologie subtiel ingezet om de visuele sfeer en uitstraling verder te versterken. AI is een mooie en krachtige tool, maar kan soms kleine details verkeerd interpreteren. Vergeef me dus als er ergens een logo net niet helemaal klopt, een oud adres staat of een ander detail niet perfect is meegenomen. Dat soort punten pas ik natuurlijk graag netjes aan.</p>
+      <p>Later heb ik AI subtiel gebruikt om de uitstraling te versterken. AI is krachtig, maar kan kleine details missen. Vergeef me als iets niet helemaal klopt; zoals een adres of een logo.</p>
       <p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
     </div>
   </section>
