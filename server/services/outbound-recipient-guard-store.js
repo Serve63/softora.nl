@@ -55,6 +55,19 @@ function normalizeDomainKeyPart(value, normalizeString = defaultNormalizeString)
     .slice(0, 180);
 }
 
+function normalizeCompanyKeyPart(value, normalizeString = defaultNormalizeString) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/.*$/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 180);
+}
+
 function normalizeDomain(value, normalizeString = defaultNormalizeString) {
   const raw = normalizeString(value);
   if (!raw) return '';
@@ -82,7 +95,7 @@ function normalizeIdentity(identity = {}, normalizeString = defaultNormalizeStri
   const recipientDomain =
     normalizeDomain(identity.recipientDomain || identity.domain || identity.websiteDomain, normalizeString) ||
     normalizeDomain(getNonPersonalEmailDomain(recipientEmail), normalizeString);
-  const recipientCompanyKey = normalizeGuardKeyPart(
+  const recipientCompanyKey = normalizeCompanyKeyPart(
     identity.recipientCompanyKey || identity.companyKey || identity.company || identity.recipientCompany,
     normalizeString
   );
