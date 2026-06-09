@@ -930,7 +930,7 @@
         ]), premiumSessionSnapshot);
 
         return [
-            '<a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>',
+            '<a href="/" class="sidebar-logo magnetic">Softora.nl</a>',
             '<nav class="sidebar-nav">',
             '  <div class="sidebar-section sidebar-flow-section">',
             '    <div class="sidebar-section-label">Overzicht</div>',

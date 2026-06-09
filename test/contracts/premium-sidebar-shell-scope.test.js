@@ -488,6 +488,32 @@ test('static premium sidebars ship the database link in html', () => {
   }
 });
 
+test('static premium sidebar logo links to the clean public homepage', () => {
+  const themeJsSource = readRepoFile('assets/personnel-theme.js');
+
+  assert.match(
+    themeJsSource,
+    /'<a href="\/" class="sidebar-logo magnetic">Softora\.nl<\/a>'/,
+    'de gedeelde sidebar-template hoort het logo naar de homepage te sturen'
+  );
+  assert.doesNotMatch(
+    themeJsSource,
+    /'<a href="\/premium-website" class="sidebar-logo magnetic">Softora\.nl<\/a>'/
+  );
+
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    const logoLink = pageSource.match(/<a href="([^"]+)" class="sidebar-logo magnetic">Softora\.nl<\/a>/);
+    assert.ok(logoLink, `${relativePath} mist het premium sidebar-logo`);
+    assert.equal(logoLink[1], '/', `${relativePath} hoort het sidebar-logo naar / te laten gaan`);
+    assert.doesNotMatch(
+      pageSource,
+      /<a href="\/premium-website" class="sidebar-logo magnetic">Softora\.nl<\/a>/,
+      `${relativePath} mag het sidebar-logo niet naar /premium-website sturen`
+    );
+  }
+});
+
 test('logged-in premium sidebar pages always have a profile host for session refresh', () => {
   const profileCriticalPages = [
     'premium-ai-lead-generator.html',
