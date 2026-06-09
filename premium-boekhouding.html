@@ -126,16 +126,12 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
   border: 1px solid var(--border);
   border-radius: 6px;
   display: grid;
-  grid-template-columns: 40px 1fr 100px 160px 110px 32px;
+  grid-template-columns: 40px 1fr 100px 160px 110px;
   align-items: center;
   padding: 14px 18px;
-  cursor: pointer;
   transition: all .15s;
 }
-.aangifte-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.07); border-color: rgba(155,35,85,.2); }
 .aangifte-row.done { border-color: rgba(22,115,60,.2); background: rgba(22,115,60,.02); }
-.aangifte-row.urgent { border-color: rgba(192,57,43,.25); }
-.aangifte-row.soon { border-color: rgba(180,90,0,.2); }
 
 .check-cell { display: flex; align-items: center; }
 .check-box { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; flex-shrink: 0; background: transparent; padding: 0; appearance: none; }
@@ -158,12 +154,9 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 .badge-cell { display: flex; justify-content: flex-end; }
 .badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px; white-space: nowrap; font-family: 'Oswald', sans-serif; letter-spacing: .5px; }
 .badge-done     { background: rgba(22,115,60,.1); color: var(--green); }
-.badge-urgent   { background: rgba(192,57,43,.1); color: var(--red); }
-.badge-soon     { background: rgba(180,90,0,.1);  color: var(--orange); }
+.badge-urgent,
+.badge-soon,
 .badge-future   { background: rgba(0,0,0,.05);    color: var(--light); }
-
-.arrow-cell { display: flex; justify-content: flex-end; color: var(--light); }
-.aangifte-row:hover .arrow-cell { color: var(--crimson); }
 
 /* -- SCHERM 2: MAP -- */
 #screen-map { display: none; flex-direction: column; }
