@@ -5174,6 +5174,44 @@ function createColdmailCampaignService(deps = {}) {
     return escapeHtml(cleanLine);
   }
 
+  function isColdmailLinkOnlyImageArtifactLine(line) {
+    const cleanLine = normalizeString(line);
+    if (!cleanLine) return false;
+    if (cleanLine === COLDMAIL_MOCKUP_CAPTION) return true;
+    if (/^\[image:\s*[^\]]*(?:webdesign|device\s*mockup|mockup)[^\]]*\]$/i.test(cleanLine)) {
+      return true;
+    }
+    return /^<img\b/i.test(cleanLine) || /\bcid:webdesign[-\w@.]+/i.test(cleanLine);
+  }
+
+  function stripColdmailLinkOnlyImageArtifacts(text) {
+    const value = String(text || '');
+    if (!value) return '';
+    return value
+      .split(/\r?\n/)
+      .filter((line) => !isColdmailLinkOnlyImageArtifactLine(line))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function assertColdmailLinkOnlyMailIsImageFree(mail = {}) {
+    const combined = [mail.text, mail.html].map((value) => String(value || '')).join('\n');
+    const attachments = Array.isArray(mail.attachments) ? mail.attachments : [];
+    const hasImageArtifact =
+      attachments.length > 0 ||
+      /<img\b/i.test(combined) ||
+      /\bcid:webdesign[-\w@.]+/i.test(combined) ||
+      /\/coldmailing\/webdesign-foto\?t=/i.test(combined) ||
+      /\[image:\s*[^\]]*(?:webdesign|device\s*mockup|mockup)[^\]]*\]/i.test(combined) ||
+      combined.includes(COLDMAIL_MOCKUP_CAPTION);
+    if (!hasImageArtifact) return;
+    const error = new Error('Link-only webdesignmail bevat nog beeldmateriaal of beeld-placeholderregels.');
+    error.code = 'COLDMAIL_WEBDESIGN_LINK_ONLY_VIOLATION';
+    error.status = 500;
+    throw error;
+  }
+
   function toHtml(text, options = {}) {
     const body = normalizeString(text)
       .split(/\n{2,}/)
@@ -6594,7 +6632,10 @@ function createColdmailCampaignService(deps = {}) {
         reference,
         'subject'
       ) || subjectTemplate;
-      const baseText = buildMailText(selectedBodyTemplate, row, item.id, input);
+      const rawBaseText = buildMailText(selectedBodyTemplate, row, item.id, input);
+      const baseText = shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'link'
+        ? stripColdmailLinkOnlyImageArtifacts(rawBaseText)
+        : rawBaseText;
       const text = baseText;
       const subject = personalizeTemplate(selectedSubjectTemplate, row, { senderEmail });
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
@@ -6720,6 +6761,9 @@ function createColdmailCampaignService(deps = {}) {
         }
         if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
           mail.bcc = auditBcc;
+        }
+        if (shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'link') {
+          assertColdmailLinkOnlyMailIsImageFree(mail);
         }
         const outboundReservation = !isTestRecipientRow(row, to)
           ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor)

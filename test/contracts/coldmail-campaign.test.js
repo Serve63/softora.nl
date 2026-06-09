@@ -3306,6 +3306,68 @@ test('coldmail campaign sends webdesign mails link-only by default for owned mai
   assert.equal(sentMessages[0].attachments, undefined);
 });
 
+test('coldmail campaign strips legacy webdesign image placeholders before link-only send', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        stad: 'Rotterdam',
+        email: 'ruben@example.test',
+        website: 'bakkerijzon.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: [
+      'Goedendag,',
+      '',
+      'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+      '',
+      'Je kunt het webdesign hier bekijken 👈',
+      '',
+      'Met vriendelijke groet,',
+      '{{afzender}}',
+      '',
+      '📍 {{afzenderPlaats}}',
+      '',
+      '[image: bakkerijzon.nl webdesign]',
+      'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.',
+      '[image: Device mockup]',
+    ].join('\n'),
+    senderEmail: 'info@softora.nl',
+    specialAction: 'webdesign',
+    webdesignImageDelivery: 'link',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /^Goedendag,/);
+  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.doesNotMatch(sentMessages[0].text, /\[image:/i);
+  assert.doesNotMatch(sentMessages[0].text, /korte indruk van de eerste versie/i);
+  assert.doesNotMatch(sentMessages[0].html, /\[image:/i);
+  assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
+  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/i);
+  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
+  assert.equal(sentMessages[0].attachments, undefined);
+});
+
 test('coldmail autopilot lets dashboard link delivery override legacy image env', async () => {
   const { service, sentMessages } = createService({
     env: {
