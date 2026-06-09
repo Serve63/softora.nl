@@ -477,7 +477,7 @@
     const detail = normalizeString(payload.detail || payload.message || (error && error.message));
 
     if (isPremiumAuthCostError(statusCode, payload)) {
-      return statusCode === 401 ? 'Log opnieuw in om Supabase kosten op te halen' : 'Alleen Full Acces kan Supabase kosten bekijken';
+      return statusCode === 401 ? 'Log opnieuw in om Supabase kosten op te halen' : '';
     }
     if (errorCode === 'SUPABASE_ACCESS_TOKEN_MISSING') {
       return SUPABASE_COST_UNAVAILABLE_NOTE + ' · ' + SUPABASE_COST_TOKEN_NOTE;

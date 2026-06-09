@@ -106,6 +106,11 @@ test('premium terugkerende kosten verbergt coldcalling en api kosten uit de stan
   assert.doesNotMatch(combinedSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.doesNotMatch(combinedSource, /naam:'API kosten', note:'OpenAI kosten laden\.\.\.', freq:'maandelijks', bedrag:null, amountLabel:'\.\.\.', status:'loading', highlighted:true/);
   assert.match(combinedSource, /let nextId = 1;/);
+  assert.match(combinedSource, /const HIDDEN_MONTHLY_COST_NOTES = new Set\(\[/);
+  assert.match(combinedSource, /function cleanMonthlyCostNote\(value\) \{/);
+  assert.match(combinedSource, /HIDDEN_MONTHLY_COST_NOTES\.has\(note\) \? '' : note;/);
+  assert.match(combinedSource, /appendCostTextElement\(content, 'div', 'cost-note', cleanMonthlyCostNote\(item && item\.note\)\);/);
+  assert.match(combinedSource, /note: cleanMonthlyCostNote\(item && item\.note\),/);
   assert.doesNotMatch(pageSource, /naam:'Hostinger VPS'/);
   assert.doesNotMatch(pageSource, /naam:'softora\.nl domein'/);
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
@@ -224,9 +229,11 @@ test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze m
   assert.match(scriptSource, /function applyApiCostUnavailable\(error\)/);
   assert.match(scriptSource, /function applySupabaseCostSnapshot\(payload\)/);
   assert.match(scriptSource, /function buildSupabaseCostUnavailableNote\(error\)/);
+  assert.match(scriptSource, /return statusCode === 401 \? 'Log opnieuw in om Supabase kosten op te halen' : '';/);
   assert.match(scriptSource, /function applySupabaseCostUnavailable\(error\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'api kosten'/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'supabase'/);
+  assert.doesNotMatch(scriptSource, /Alleen Full Acces kan Supabase kosten bekijken/);
   assert.doesNotMatch(scriptSource, /softora_api_cost_events_v1/);
   assert.doesNotMatch(scriptSource, /premium_api_costs/);
   assert.doesNotMatch(scriptSource, /function applyApiCost\(amountEur, note\)/);

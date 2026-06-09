@@ -16,9 +16,17 @@ let monthlyCostsBootstrapDone = false;
 let monthlyCostsBootstrapPromise = null;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
+const HIDDEN_MONTHLY_COST_NOTES = new Set([
+  'Alleen Full Acces kan Supabase kosten bekijken',
+]);
 
 function normalizeString(value) {
   return String(value ?? '').trim();
+}
+
+function cleanMonthlyCostNote(value) {
+  const note = normalizeString(value).slice(0, 200);
+  return HIDDEN_MONTHLY_COST_NOTES.has(note) ? '' : note;
 }
 
 function cloneCostItem(item) {
@@ -96,7 +104,7 @@ function sanitizeStoredCostItem(item, index) {
   return {
     id: Math.max(1, Number.isFinite(rawId) && rawId > 0 ? rawId : index + 1),
     naam,
-    note: normalizeString(item && item.note).slice(0, 200),
+    note: cleanMonthlyCostNote(item && item.note),
     freq,
     bedrag,
     status: normalizeString(item && item.status) || 'active',
@@ -359,7 +367,7 @@ function createCostItemRow(item, key) {
 
   const content = document.createElement('div');
   appendCostTextElement(content, 'div', 'cost-name', item.naam);
-  appendCostTextElement(content, 'div', 'cost-note', item.note || '');
+  appendCostTextElement(content, 'div', 'cost-note', cleanMonthlyCostNote(item && item.note));
   row.appendChild(content);
 
   const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
