@@ -770,7 +770,7 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2>Zó heb ik het webdesign gebouwd!</h2>
+      <h2>Zó heb ik het webdesign gebouwd...</h2>
       <p>Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.</p>
       <p>Ook heb ik de concurrenten van ${narrativeCompanyName} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
       <p>Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.</p>
