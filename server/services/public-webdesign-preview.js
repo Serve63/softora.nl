@@ -10,7 +10,79 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
-const PUBLIC_PREVIEW_PROFILE_PATH = '/assets/serve-creusen-profile.jpg?v=20260608e';
+const PUBLIC_PREVIEW_PROFILE_ROLE = 'Webdesign & Software Ontwikkeling';
+const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'serve';
+const PUBLIC_PREVIEW_PROFILES = Object.freeze({
+  serve: Object.freeze({
+    key: 'serve',
+    name: 'Servé Creusen',
+    role: PUBLIC_PREVIEW_PROFILE_ROLE,
+    photoSource: '/assets/serve-creusen-profile.jpg?v=20260608e',
+  }),
+  martijn: Object.freeze({
+    key: 'martijn',
+    name: 'Martijn van de Ven',
+    role: PUBLIC_PREVIEW_PROFILE_ROLE,
+    photoSource: '/assets/martijn-van-de-ven-profile.png?v=20260609a',
+  }),
+});
+const PUBLIC_PREVIEW_PROFILE_SIGNAL_FIELDS = Object.freeze([
+  'senderProfileKey',
+  'senderKey',
+  'profileKey',
+  'leadOwnerKey',
+  'ownerKey',
+  'assignedOwnerKey',
+  'senderEmail',
+  'lastColdmailSenderEmail',
+  'fromEmail',
+  'mailFrom',
+  'leadOwnerEmail',
+  'ownerEmail',
+  'responsibleEmail',
+  'senderDisplayName',
+  'senderName',
+  'fromName',
+  'leadOwnerFullName',
+  'leadOwnerName',
+  'ownerFullName',
+  'ownerName',
+  'responsible',
+  'verantwoordelijk',
+  'claimedBy',
+  'assignedTo',
+]);
+const PUBLIC_PREVIEW_PROFILE_NAME_FIELDS = Object.freeze([
+  'senderDisplayName',
+  'senderName',
+  'fromName',
+  'leadOwnerFullName',
+  'leadOwnerName',
+  'ownerFullName',
+  'ownerName',
+]);
+const PUBLIC_PREVIEW_PROFILE_IMAGE_FIELDS = Object.freeze([
+  'senderProfilePhotoUrl',
+  'senderProfileImageUrl',
+  'profilePhotoUrl',
+  'profileImageUrl',
+  'senderPhotoUrl',
+  'ownerPhotoUrl',
+  'leadOwnerPhotoUrl',
+  'avatarUrl',
+  'photoUrl',
+]);
+const PUBLIC_PREVIEW_PROFILE_NESTED_FIELDS = Object.freeze([
+  'legacyMeta',
+  'payload',
+  'sender',
+  'senderProfile',
+  'profile',
+  'leadOwner',
+  'owner',
+  'responsibleUser',
+  'assignedUser',
+]);
 
 const {
   buildCustomerIdentityKey,
@@ -55,6 +127,106 @@ function clampChunkCount(value) {
 function isValidImageSource(value) {
   const source = normalizeString(value);
   return /^https?:\/\//i.test(source) || /^data:image\//i.test(source);
+}
+
+function isValidProfileImageSource(value) {
+  const source = normalizeString(value);
+  return isValidImageSource(source) || /^\/assets\/[a-z0-9._/-]+(?:\?[a-z0-9=&._-]+)?$/i.test(source);
+}
+
+function normalizeProfileSignal(value) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9@.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferPublicPreviewProfileKeyFromText(value) {
+  const signal = normalizeProfileSignal(value);
+  const compact = signal.replace(/[^a-z0-9]+/g, '');
+  if (!signal) return '';
+  if (signal.includes('martijn') || compact.includes('martijnvandeven')) return 'martijn';
+  if (signal.includes('serve') || signal.includes('creusen') || compact.includes('servecreusen')) return 'serve';
+  return '';
+}
+
+function collectProfileObjects(...sources) {
+  const objects = [];
+  const seen = new Set();
+  const pushObject = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || seen.has(value)) return;
+    seen.add(value);
+    objects.push(value);
+    PUBLIC_PREVIEW_PROFILE_NESTED_FIELDS.forEach((field) => pushObject(value[field]));
+  };
+  sources.forEach(pushObject);
+  return objects;
+}
+
+function findFirstProfileFieldValue(objects, fields) {
+  for (const object of objects) {
+    for (const field of fields) {
+      const value = normalizeString(object && object[field]);
+      if (value) return value;
+    }
+  }
+  return '';
+}
+
+function inferPublicPreviewProfileKey(objects) {
+  for (const object of objects) {
+    for (const field of PUBLIC_PREVIEW_PROFILE_SIGNAL_FIELDS) {
+      const key = inferPublicPreviewProfileKeyFromText(object && object[field]);
+      if (key) return key;
+    }
+  }
+  return '';
+}
+
+function findPublicPreviewProfileImageSource(objects) {
+  for (const object of objects) {
+    for (const field of PUBLIC_PREVIEW_PROFILE_IMAGE_FIELDS) {
+      const source = normalizeString(object && object[field]);
+      if (isValidProfileImageSource(source)) return source;
+    }
+  }
+  return '';
+}
+
+function normalizePublicPreviewProfileName(value, key) {
+  const name = normalizeString(value);
+  if (!name || /@/.test(name)) return '';
+  const signal = normalizeProfileSignal(name);
+  const profile = PUBLIC_PREVIEW_PROFILES[key];
+  if (profile && inferPublicPreviewProfileKeyFromText(name) === key) return profile.name;
+  if (profile && (signal === key || signal.replace(/\s+/g, '') === key)) return profile.name;
+  return name;
+}
+
+function resolvePublicPreviewProfile(record = null, customer = null) {
+  const objects = collectProfileObjects(record, customer);
+  const inferredKey = inferPublicPreviewProfileKey(objects);
+  const key = inferredKey || PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY;
+  const fallback = PUBLIC_PREVIEW_PROFILES[key] || PUBLIC_PREVIEW_PROFILES[PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY];
+  const profileImageSource = findPublicPreviewProfileImageSource(objects);
+  const profileName = normalizePublicPreviewProfileName(
+    findFirstProfileFieldValue(objects, PUBLIC_PREVIEW_PROFILE_NAME_FIELDS),
+    fallback.key
+  );
+  return {
+    key: fallback.key,
+    name: profileName || fallback.name,
+    role: fallback.role,
+    photoSource: profileImageSource || fallback.photoSource,
+    source: inferredKey || profileImageSource || profileName ? 'explicit' : 'default',
+  };
+}
+
+function hasExplicitPublicPreviewProfile(preview) {
+  return Boolean(preview && preview.profile && preview.profile.source !== 'default');
 }
 
 function readChunkedDataUrl(values, photoKey, chunkCount) {
@@ -267,6 +439,42 @@ function getCustomerIdentityKeys(customer) {
   ].filter(Boolean)));
 }
 
+function findCustomerForPreviewRecord(customers, identifier, record) {
+  const rows = Array.isArray(customers) ? customers : [];
+  if (!rows.length) return null;
+  const legacyMeta = record && record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
+  const directIds = Array.from(new Set([
+    normalizeString(identifier),
+    normalizeString(record && (record.id || record.customerId || record.databaseId)),
+    normalizeString(legacyMeta.id || legacyMeta.customerId || legacyMeta.databaseId),
+  ].filter(Boolean)));
+  for (const directId of directIds) {
+    const direct = findCustomerById(rows, directId);
+    if (direct) return direct;
+  }
+
+  const identityKeys = new Set([
+    normalizeString(record && record.identityKey),
+    normalizeString(legacyMeta.identityKey),
+  ].filter(Boolean));
+  if (identityKeys.size) {
+    const byIdentity = rows.find((customer) =>
+      getCustomerIdentityKeys(customer).some((identityKey) => identityKeys.has(normalizeString(identityKey)))
+    );
+    if (byIdentity) return byIdentity;
+  }
+
+  const recordSlugs = Array.from(new Set([
+    normalizeString(identifier),
+    ...collectPhotoRecordSlugCandidates(record),
+  ].map((value) => slugifyCompanyName(value)).filter(Boolean)));
+  if (!recordSlugs.length) return null;
+  return rows.find((customer) =>
+    collectCustomerStructuredPreviewIdentifiers(customer)
+      .some((candidate) => recordSlugs.some((slug) => slugMatchesIdentifier(candidate, slug)))
+  ) || null;
+}
+
 function collectCustomerStructuredPreviewIdentifiers(customer) {
   if (!customer || typeof customer !== 'object') return [];
   return Array.from(new Set([
@@ -278,11 +486,12 @@ function collectCustomerStructuredPreviewIdentifiers(customer) {
   ].filter(Boolean)));
 }
 
-function buildPreviewFromRecord(id, values, record) {
+function buildPreviewFromRecord(id, values, record, customer = null) {
   const photoSource = resolvePreviewSource(values, record, 'photo');
   const mockupSource = resolvePreviewSource(values, record, 'mockup');
   if (!isValidImageSource(photoSource) || !isValidImageSource(mockupSource)) return null;
   const legacyMeta = record && record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
+  const customerLegacyMeta = customer && customer.legacyMeta && typeof customer.legacyMeta === 'object' ? customer.legacyMeta : {};
   const title = normalizeString(
     record &&
       (record.bedrijf ||
@@ -293,8 +502,24 @@ function buildPreviewFromRecord(id, values, record) {
         legacyMeta.company ||
         legacyMeta.companyName ||
         legacyMeta.naam)
+  ) || normalizeString(
+    customer &&
+      (customer.bedrijf ||
+        customer.company ||
+        customer.companyName ||
+        customer.naam ||
+        customerLegacyMeta.bedrijf ||
+        customerLegacyMeta.company ||
+        customerLegacyMeta.companyName ||
+        customerLegacyMeta.naam)
   );
-  return { id, photoSource, mockupSource, title };
+  return {
+    id,
+    photoSource,
+    mockupSource,
+    title,
+    profile: resolvePublicPreviewProfile(record, customer),
+  };
 }
 
 function getUrlOrigin(value) {
@@ -354,11 +579,16 @@ function buildPhotoMapFromStructuredEntries(entries) {
 
 function resolvePreviewFromMaps(id, values, photoMap, customers) {
   let record = findPhotoRecord(photoMap, id);
-  let preview = buildPreviewFromRecord(id, values, record);
+  let preview = buildPreviewFromRecord(id, values, record, findCustomerForPreviewRecord(customers, id, record));
   if (preview) return preview;
 
   record = findPhotoRecordBySlug(photoMap, id);
-  preview = buildPreviewFromRecord(normalizeString(record && (record.id || record.customerId)) || id, values, record);
+  preview = buildPreviewFromRecord(
+    normalizeString(record && (record.id || record.customerId)) || id,
+    values,
+    record,
+    findCustomerForPreviewRecord(customers, id, record)
+  );
   if (preview) return preview;
 
   const directCustomer = findCustomerById(customers, id);
@@ -369,7 +599,7 @@ function resolvePreviewFromMaps(id, values, photoMap, customers) {
   for (const customer of candidates) {
     const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId)) || id;
     record = findPhotoRecordByIdentity(photoMap, getCustomerIdentityKeys(customer)) || findPhotoRecord(photoMap, candidateId) || record;
-    preview = buildPreviewFromRecord(candidateId, values, record);
+    preview = buildPreviewFromRecord(candidateId, values, record, customer);
     if (preview) return preview;
   }
   return null;
@@ -445,11 +675,15 @@ ${preconnectTags}
 function buildConceptHtml(preview, titleFallback) {
   const photoSource = escapeHtml(preview.photoSource);
   const mockupSource = escapeHtml(preview.mockupSource);
-  const profileSource = escapeHtml(PUBLIC_PREVIEW_PROFILE_PATH);
+  const profile = preview.profile || resolvePublicPreviewProfile();
+  const profileSource = escapeHtml(profile.photoSource);
+  const profileName = escapeHtml(profile.name);
+  const profileRole = escapeHtml(profile.role);
   const title = escapeHtml(cleanPublicPreviewTitle(preview.title, titleFallback || preview.id));
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
     getUrlOrigin(preview.mockupSource),
+    getUrlOrigin(profile.photoSource),
   ].filter(Boolean)))
     .map((origin) => `  <link rel="preconnect" href="${escapeHtml(origin)}" crossorigin>`)
     .join('\n');
@@ -522,11 +756,11 @@ ${preconnectTags}
   <div class="divider"></div>
   <section class="about-section" id="concept-about">
     <div class="about-profile">
-      <div class="desktop-profile-role">Webdesign &amp; Software Ontwikkeling</div>
-      <div class="about-photo"><img src="${profileSource}" alt="Servé Creusen" loading="lazy" decoding="async"></div>
+      <div class="desktop-profile-role">${profileRole}</div>
+      <div class="about-photo"><img src="${profileSource}" alt="${profileName}" loading="lazy" decoding="async"></div>
       <div class="signature profile-signature">
-        <strong>Servé Creusen</strong>
-        <span>Webdesign &amp; Software Ontwikkeling</span>
+        <strong>${profileName}</strong>
+        <span>${profileRole}</span>
       </div>
     </div>
     <div class="about-text">
@@ -563,7 +797,7 @@ function createPublicWebdesignPreviewService(options = {}) {
   const getUiStateValues = typeof options.getUiStateValues === 'function' ? options.getUiStateValues : async () => ({ values: {} });
   const dataOpsStore = options.dataOpsStore && typeof options.dataOpsStore === 'object' ? options.dataOpsStore : null;
 
-  async function resolveStructuredPreview(id) {
+  async function resolveStructuredPreview(id, options = {}) {
     if (
       !dataOpsStore ||
       typeof dataOpsStore.listCustomers !== 'function' ||
@@ -578,10 +812,16 @@ function createPublicWebdesignPreviewService(options = {}) {
       identifiers: [id],
       maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
     });
-    let preview = resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(directPhotoEntries), []);
-    if (preview) return preview;
+    const directPhotoMap = buildPhotoMapFromStructuredEntries(directPhotoEntries);
+    const includeProfileContext = Boolean(options.includeProfileContext);
+    let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, []);
+    if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) return preview;
 
     const customers = await dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS);
+    if (preview) {
+      const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers);
+      return enrichedPreview || preview;
+    }
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
       id,
@@ -602,32 +842,34 @@ function createPublicWebdesignPreviewService(options = {}) {
     return null;
   }
 
-  async function resolvePreview(identifier) {
+  async function resolvePreview(identifier, options = {}) {
     const id = normalizeCustomerId(identifier);
     if (!/^[a-z0-9_-]{2,160}$/i.test(id)) return null;
-    const structuredPreview = await resolveStructuredPreview(id);
+    const includeProfileContext = Boolean(options.includeProfileContext);
+    const structuredPreview = await resolveStructuredPreview(id, { includeProfileContext });
     if (structuredPreview) return structuredPreview;
 
     const state = await getUiStateValues(PHOTO_SCOPE, getPublicPreviewReadOptions(PHOTO_SCOPE));
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const photoMap = safeParseObject(values[PHOTO_KEY]);
     let preview = buildPreviewFromRecord(id, values, findPhotoRecord(photoMap, id));
-    if (!preview) {
+    if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) return preview;
+    if (!preview || includeProfileContext) {
       const customerState = await getUiStateValues(CUSTOMER_SCOPE, getPublicPreviewReadOptions(CUSTOMER_SCOPE));
       const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
-      preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues));
+      preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues)) || preview;
     }
     return preview;
   }
 
-  async function resolveFirstPreview(identifiers) {
+  async function resolveFirstPreview(identifiers, options = {}) {
     const seen = new Set();
     for (const identifier of identifiers) {
       const id = normalizeCustomerId(identifier);
       const key = id.toLowerCase();
       if (!id || seen.has(key)) continue;
       seen.add(key);
-      const preview = await resolvePreview(id);
+      const preview = await resolvePreview(id, options);
       if (preview) return preview;
     }
     return null;
@@ -660,7 +902,7 @@ function createPublicWebdesignPreviewService(options = {}) {
         query.customerId ||
         query.id,
       routeIdentifier,
-    ]);
+    ], { includeProfileContext: true });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) {
