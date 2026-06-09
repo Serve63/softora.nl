@@ -4,6 +4,7 @@ const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
 const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
+  bypassReadFailureCooldown: true,
   bypassReadCache: true,
   suppressReadFailureCooldown: true,
   suppressStaleReadCacheLog: true,
