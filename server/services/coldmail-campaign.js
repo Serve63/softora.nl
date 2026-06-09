@@ -6578,11 +6578,7 @@ function createColdmailCampaignService(deps = {}) {
         'subject'
       ) || subjectTemplate;
       const baseText = buildMailText(selectedBodyTemplate, row, item.id, input);
-      const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
-      const unsubscribeUrl = shouldAppendOptOut
-        ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
-        : '';
-      const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
+      const text = baseText;
       const subject = personalizeTemplate(selectedSubjectTemplate, row, { senderEmail });
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
@@ -6666,10 +6662,10 @@ function createColdmailCampaignService(deps = {}) {
       );
       const htmlWithContent = shouldSendWebdesignImages
         ? appendWebdesignImageHtml(htmlBase, webdesignPhotoForHtml, {
-            optOutText: shouldAppendOptOut ? COLDMAIL_OPT_OUT_LABEL : '',
-            optOutUrl: unsubscribeUrl,
+            optOutText: '',
+            optOutUrl: '',
           })
-        : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
+        : htmlBase;
       const html = htmlWithContent;
       const attachments = shouldSendWebdesignImages
         ? buildWebdesignImageAttachments(
