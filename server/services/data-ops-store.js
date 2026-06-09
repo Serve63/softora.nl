@@ -156,6 +156,23 @@ function designPhotoRowMatchesIdentifiers(row, identifiers = []) {
   );
 }
 
+function collectTargetedDesignPhotoSearchTerms(identifiers = []) {
+  const terms = [];
+  const addTerm = (value) => {
+    const term = slugifyDesignPhotoMatchText(value);
+    if (term.length >= 4 && term.length <= 90) terms.push(term);
+  };
+  (Array.isArray(identifiers) ? identifiers : []).forEach((identifier) => {
+    const slug = slugifyDesignPhotoMatchText(identifier);
+    const root = stripKnownDomainSuffix(slug);
+    addTerm(slug);
+    addTerm(root);
+    addTerm(compactDesignPhotoSlug(slug));
+    addTerm(compactDesignPhotoSlug(root));
+  });
+  return Array.from(new Set(terms)).slice(0, 12);
+}
+
 function createSoftoraDataOpsStore(deps = {}) {
   const {
     isSupabaseConfigured = () => false,
@@ -942,30 +959,63 @@ function createSoftoraDataOpsStore(deps = {}) {
     const scanLimit = identifiers.length
       ? DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT
       : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const selectDesignPhotoRows = (client) =>
+      client
+        .from(TABLES.designPhotos)
+        .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
+        .is('deleted_at', null);
+    async function readTargetedRows(buildQueryOptions) {
+      const searchTerms = collectTargetedDesignPhotoSearchTerms(identifiers);
+      if (!searchTerms.length) return [];
+      const rowsById = new Map();
+      for (const term of searchTerms) {
+        const result = await run(`list-design-photos-targeted-${term}`, (client) => {
+          let query = selectDesignPhotoRows(client);
+          if (query && typeof query.or === 'function') {
+            query = query.or([
+              `customer_id.ilike.%${term}%`,
+              `identity_key.ilike.%${term}%`,
+              `file_name.ilike.%${term}%`,
+            ].join(','));
+          } else {
+            return null;
+          }
+          if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+          if (query && typeof query.limit === 'function') return query.limit(100);
+          return query;
+        }, buildQueryOptions);
+        if (!result.ok) continue;
+        (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+          const rowId = normalizeString(row && row.customer_id);
+          if (rowId && !rowsById.has(rowId)) rowsById.set(rowId, row);
+        });
+      }
+      return Array.from(rowsById.values());
+    }
     const structuredRows = await cachedRead(cacheKey, async () => {
-      const buildQuery = (client) =>
-        client
-          .from(TABLES.designPhotos)
-          .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
-          .is('deleted_at', null)
-          .order('updated_at', { ascending: false });
+      const buildQueryOptions = {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      };
+      const buildQuery = (client) => selectDesignPhotoRows(client).order('updated_at', { ascending: false });
       let result = null;
       if (identifiers.length) {
+        const targetedRows = await readTargetedRows(buildQueryOptions);
+        const targetedMatches = targetedRows.filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers));
+        if (targetedMatches.length) return targetedMatches;
         result = await collectPagedRows('list-design-photos-signed-urls', buildQuery, {
           pageSize: DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT,
           maxRows: scanLimit,
-          timeoutMs: dataOpsReadQueryTimeoutMs,
-          bypassReadFailureCooldown: options.bypassReadFailureCooldown,
-          suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-          suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+          ...buildQueryOptions,
         });
       } else {
-        result = await run('list-design-photos-signed-urls', (client) => buildQuery(client).limit(scanLimit), {
-          timeoutMs: dataOpsReadQueryTimeoutMs,
-          bypassReadFailureCooldown: options.bypassReadFailureCooldown,
-          suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-          suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
-        });
+        result = await run(
+          'list-design-photos-signed-urls',
+          (client) => buildQuery(client).limit(scanLimit),
+          buildQueryOptions
+        );
       }
       return result.ok ? result.data || [] : null;
     }, {
