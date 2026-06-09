@@ -161,18 +161,23 @@ test('public webdesign preview concept route renders the experimental supplied l
 
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /concept-hero/);
+  assert.match(response.body, /body\{overflow-x:hidden;overflow-anchor:none\}/);
   assert.match(response.body, /\.concept-hero\{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp\(18px,4vw,64px\);gap:44px;position:relative\}/);
   assert.match(response.body, /\.mockup-stage\{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp\(0px,3vw,44px\)\}/);
   assert.match(response.body, /\.wide-stack\{width:min\(54%,780px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
   assert.doesNotMatch(response.body, /mobile-mockup-intro/);
-  assert.match(response.body, /@media\(max-width:900px\)\{[\s\S]*\.mockup-stage\{flex-direction:column;padding:0\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.wide\{width:100%;order:1\}/);
+  assert.match(response.body, /@media\(max-width:900px\)\{\.concept-hero\{min-height:100svh;padding-top:34px;justify-content:flex-start\}\.mockup-stage\{flex-direction:column;padding:0;gap:22px\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.wide\{width:100%;order:1\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
   assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<div class="stage-card wide">/);
   assert.doesNotMatch(response.body, /Een eerste indruk/);
   assert.doesNotMatch(response.body, /Eerste indruk op elk schermformaat/);
   assert.doesNotMatch(response.body, /Een korte indruk van de eerste versie/);
-  assert.match(response.body, /\.tall\{width:min\(42%,540px\)/);
+  assert.match(response.body, /\.stage-card\{background:rgba\(255,255,255,\.28\);box-shadow:0 20px 60px rgba\(28,43,80,\.14\);overflow:hidden;flex-shrink:0\}/);
+  assert.match(response.body, /\.tall\{width:min\(42%,540px\);border-radius:16px;aspect-ratio:5\/8\}/);
+  assert.match(response.body, /\.wide\{width:100%;border-radius:14px;aspect-ratio:16\/10\}/);
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
+  assert.match(response.body, /\.wide \.visual\{height:100%;object-fit:contain;object-position:center\}/);
+  assert.doesNotMatch(response.body, /\.wide \.visual\{aspect-ratio:16\/10\}/);
   assert.match(response.body, /\.scroll-cue\{position:fixed;right:clamp\(18px,4vw,56px\);bottom:clamp\(18px,3\.5vw,42px\);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center/);
   assert.match(response.body, /\.scroll-cue:hover\{background:#fff\}/);
   assert.match(response.body, /@media\(max-width:700px\)\{\.scroll-cue\{display:none\}\}/);
@@ -211,6 +216,8 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
+  assert.match(response.body, /<img class="visual" src="https:\/\/cdn\.softora\.test\/piggy-webdesign\.png" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high">/);
+  assert.match(response.body, /<img class="visual" src="https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg" alt="Device mockup preview" width="1600" height="1000" loading="eager" decoding="async">/);
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
