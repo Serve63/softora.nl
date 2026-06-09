@@ -763,7 +763,7 @@ ${preconnectTags}
       <p>Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.</p>
       <p>Ook heb ik de concurrenten van ${title} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
       <p>Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.</p>
-      <p>Later in het proces heb ik moderne AI-technologie subtiel ingezet om de visuele sfeer en uitstraling verder te versterken.</p>
+      <p>Later in het proces heb ik moderne AI-technologie subtiel ingezet om de visuele sfeer en uitstraling verder te versterken. AI is een mooie en krachtige tool, maar kan soms kleine details verkeerd interpreteren. Vergeef me dus als er ergens een logo net niet helemaal klopt, een oud adres staat of een ander detail niet perfect is meegenomen. Dat soort punten pas ik natuurlijk graag netjes aan.</p>
       <p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
     </div>
   </section>
