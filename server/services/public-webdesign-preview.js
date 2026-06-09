@@ -4,12 +4,14 @@ const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
 const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
+  bypassReadCache: true,
   suppressReadFailureCooldown: true,
   suppressStaleReadCacheLog: true,
   suppressTransientReadFailureLog: true,
 });
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
+const STRUCTURED_PREVIEW_READ_ATTEMPTS = 3;
 const PUBLIC_PREVIEW_PROFILE_ROLE = 'Webdesign & Software Ontwikkeling';
 const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'serve';
 const PUBLIC_PREVIEW_PROFILES = Object.freeze({
@@ -267,7 +269,15 @@ function compactCompanySlug(value) {
 }
 
 function stripKnownDomainSuffix(value) {
-  return slugifyCompanyName(value).replace(/-(?:nl|eu|com|be|de|net|org|info|io|co|bv)$/i, '');
+  let slug = slugifyCompanyName(value);
+  let previous = '';
+  while (slug && slug !== previous) {
+    previous = slug;
+    slug = slug
+      .replace(/-(?:nl|eu|com|be|de|net|org|info|io|co)$/i, '')
+      .replace(/-(?:b-v|n-v|v-o-f|c-v|bv|nv|vof|cv|ltd|llc|inc)$/i, '');
+  }
+  return slug;
 }
 
 function slugMatchesIdentifier(candidate, identifier) {
@@ -409,6 +419,19 @@ function getPublicPreviewReadOptions(scope) {
   return {
     readFailureCooldownScope: `${PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX}_${normalizeString(scope)}`,
   };
+}
+
+async function retryPublicPreviewRead(reader, attempts = STRUCTURED_PREVIEW_READ_ATTEMPTS) {
+  const maxAttempts = Math.max(1, Math.min(5, Number(attempts) || 1));
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const result = await reader();
+      if (result !== null && result !== undefined) return result;
+    } catch (_error) {
+      // Public preview links are opened from email; a transient read miss should not become a broken page.
+    }
+  }
+  return null;
 }
 
 function findCustomerCandidates(customers, identifier) {
@@ -819,20 +842,22 @@ function createPublicWebdesignPreviewService(options = {}) {
       return null;
     }
 
-    const directPhotoEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+    const directPhotoEntries = await retryPublicPreviewRead(() => dataOpsStore.listDesignPhotosWithSignedUrls({
       ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
       expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
       identifiers: [id],
       maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
-    });
+    }));
     const directPhotoMap = buildPhotoMapFromStructuredEntries(directPhotoEntries);
     const includeProfileContext = Boolean(options.includeProfileContext);
     let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, []);
     if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) return preview;
 
     let customers = [];
+    const loadedCustomers = await retryPublicPreviewRead(() =>
+      dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS)
+    );
     try {
-      const loadedCustomers = await dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS);
       customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
     } catch (_error) {
       customers = [];
@@ -848,12 +873,12 @@ function createPublicWebdesignPreviewService(options = {}) {
     ].filter(Boolean)));
 
     if (identifiers.length > 1) {
-      const photoEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+      const photoEntries = await retryPublicPreviewRead(() => dataOpsStore.listDesignPhotosWithSignedUrls({
         ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
         expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
         identifiers,
         maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
-      });
+      }));
       preview = resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(photoEntries), candidates);
       if (preview) return preview;
     }

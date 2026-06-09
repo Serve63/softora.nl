@@ -276,6 +276,46 @@ test('public webdesign preview uses a human company name in narrative copy', asy
   assert.doesNotMatch(body, /concurrenten van Autobedrijf Van Driel B\.V\./);
 });
 
+test('public webdesign preview retries transient reads and resolves BV slug variants', async () => {
+  let photoReads = 0;
+  let customerReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers(options) {
+        customerReads += 1;
+        assert.equal(options.bypassReadCache, true);
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls(options) {
+        photoReads += 1;
+        assert.equal(options.bypassReadCache, true);
+        assert.deepEqual(options.identifiers, ['van-gestel-steigerbouw-b-v']);
+        if (photoReads === 1) throw new Error('temporary design photo read failure');
+        return [{
+          customerId: 'manual-import-vangestelsteigerbouw-nl-contact-0420',
+          bedrijf: 'Van Gestel Steigerbouw B.V.',
+          fileName: 'hash.png',
+          websitePhotoUrl: 'https://signed.softora.test/van-gestel-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/van-gestel-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'van-gestel-steigerbouw-b-v' } }, response);
+
+  assert.equal(photoReads, 2);
+  assert.equal(customerReads, 1);
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<h1 class="hero-title">Van Gestel Steigerbouw B\.V\.<\/h1>/);
+  assert.match(response.body, /van-gestel-webdesign\.png\?token=test/);
+  assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
+});
+
 test('public webdesign preview maps every known sender alias to the canonical profile', async () => {
   const cases = [
     ['serve@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
@@ -608,6 +648,7 @@ test('public webdesign preview signs only targeted structured candidates after c
     [[true, true, true], [true, true, true]]
   );
   assert.deepEqual(customerOptions, [{
+    bypassReadCache: true,
     suppressReadFailureCooldown: true,
     suppressStaleReadCacheLog: true,
     suppressTransientReadFailureLog: true,
@@ -673,7 +714,7 @@ test('public webdesign preview renders compact import-id photo matches when cust
 
   await service.getConceptPageResponse({ params: { companySlug: 'cafe-schuttershof' } }, response);
 
-  assert.equal(customerReads, 1);
+  assert.equal(customerReads, 3);
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /cafe-schuttershof-webdesign\.png\?token=test/);
   assert.match(response.body, /cafe-schuttershof-mockup\.jpg\?token=test/);
