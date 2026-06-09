@@ -24,6 +24,8 @@ const TABLES = Object.freeze({
 const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
+const DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT = 500;
+const DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT = 5000;
 const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
 const DEFAULT_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
@@ -922,19 +924,32 @@ function createSoftoraDataOpsStore(deps = {}) {
     const cacheKey = identifiers.length
       ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
       : `design-photos-signed:all:${maxMatches}`;
+    const scanLimit = identifiers.length
+      ? DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT
+      : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
     const structuredRows = await cachedRead(cacheKey, async () => {
-      const result = await run('list-design-photos-signed-urls', (client) =>
+      const buildQuery = (client) =>
         client
           .from(TABLES.designPhotos)
           .select('customer_id,identity_key,storage_bucket,storage_path,mime_type,file_name,legacy_meta,updated_at')
           .is('deleted_at', null)
-          .order('updated_at', { ascending: false })
-          .limit(500),
-      {
-        timeoutMs: dataOpsReadQueryTimeoutMs,
-        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
-      });
+          .order('updated_at', { ascending: false });
+      let result = null;
+      if (identifiers.length) {
+        result = await collectPagedRows('list-design-photos-signed-urls', buildQuery, {
+          pageSize: DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT,
+          maxRows: scanLimit,
+          timeoutMs: dataOpsReadQueryTimeoutMs,
+          suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+          suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+        });
+      } else {
+        result = await run('list-design-photos-signed-urls', (client) => buildQuery(client).limit(scanLimit), {
+          timeoutMs: dataOpsReadQueryTimeoutMs,
+          suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+          suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+        });
+      }
       return result.ok ? result.data || [] : null;
     }, {
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,

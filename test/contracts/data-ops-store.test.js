@@ -653,7 +653,18 @@ test('data ops store signs only matching design photo rows for targeted preview 
 });
 
 test('data ops store matches compact manual-import design photo ids for clean public slugs', async () => {
+  const fillerRows = Array.from({ length: 500 }, (_item, index) => ({
+    customer_id: `manual-import-other-company-${index + 1}`,
+    identity_key: '',
+    storage_bucket: 'softora-design-photos',
+    storage_path: `customers/manual-import-other-company-${index + 1}/hash.png`,
+    mime_type: 'image/png',
+    file_name: `other-company-${index + 1}.png`,
+    legacy_meta: {},
+    updated_at: '2026-05-26T12:02:00.000Z',
+  }));
   const rows = [
+    ...fillerRows,
     {
       customer_id: 'manual-import-cafeschuttershof-nl-contact-0476',
       identity_key: '',
@@ -671,6 +682,7 @@ test('data ops store matches compact manual-import design photo ids for clean pu
       updated_at: '2026-05-26T12:01:00.000Z',
     },
   ];
+  const ranges = [];
   const signedPaths = [];
   const client = {
     storage: {
@@ -695,9 +707,9 @@ test('data ops store matches compact manual-import design photo ids for clean pu
               return {
                 order() {
                   return {
-                    limit(limit) {
-                      assert.equal(limit, 500);
-                      return Promise.resolve({ data: rows, error: null });
+                    range(from, to) {
+                      ranges.push([from, to]);
+                      return Promise.resolve({ data: rows.slice(from, to + 1), error: null });
                     },
                   };
                 },
@@ -719,6 +731,7 @@ test('data ops store matches compact manual-import design photo ids for clean pu
     expiresInSeconds: 24 * 60 * 60,
   });
 
+  assert.deepEqual(ranges, [[0, 499], [500, 999]]);
   assert.equal(entries.length, 1);
   assert.equal(entries[0].customerId, 'manual-import-cafeschuttershof-nl-contact-0476');
   assert.deepEqual(
