@@ -25,7 +25,7 @@ const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
 const DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT = 500;
-const DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT = 5000;
+const DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT = 25000;
 const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
 const DEFAULT_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
@@ -44,7 +44,15 @@ function compactDesignPhotoSlug(value) {
 }
 
 function stripKnownDomainSuffix(value) {
-  return slugifyDesignPhotoMatchText(value).replace(/-(?:nl|eu|com|be|de|net|org|info|io|co|bv)$/i, '');
+  let slug = slugifyDesignPhotoMatchText(value);
+  let previous = '';
+  while (slug && slug !== previous) {
+    previous = slug;
+    slug = slug
+      .replace(/-(?:nl|eu|com|be|de|net|org|info|io|co)$/i, '')
+      .replace(/-(?:b-v|n-v|v-o-f|c-v|bv|nv|vof|cv|ltd|llc|inc)$/i, '');
+  }
+  return slug;
 }
 
 function stripImageNameSuffix(value) {
@@ -279,13 +287,17 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function cachedRead(cacheKey, loader, options = {}) {
-    const fresh = getFreshCachedRead(cacheKey);
-    if (fresh) return fresh;
+    const bypassReadCache = Boolean(options.bypassReadCache);
+    if (!bypassReadCache) {
+      const fresh = getFreshCachedRead(cacheKey);
+      if (fresh) return fresh;
+    }
     const loaded = await loader();
     if (loaded !== null && loaded !== undefined) {
-      rememberRead(cacheKey, loaded);
+      if (!bypassReadCache) rememberRead(cacheKey, loaded);
       return loaded;
     }
+    if (bypassReadCache) return loaded;
     const stale = getAnyCachedRead(cacheKey);
     if (stale) {
       if (!options.suppressStaleReadCacheLog && typeof logger.warn === 'function') {
@@ -591,6 +603,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         id: normalizeString(row.payload?.id || row.customer_id),
       }));
     }, {
+      bypassReadCache: options.bypassReadCache,
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
     });
   }
@@ -952,6 +965,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       }
       return result.ok ? result.data || [] : null;
     }, {
+      bypassReadCache: options.bypassReadCache,
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
     });
     if (!structuredRows) return null;
