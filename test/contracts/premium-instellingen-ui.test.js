@@ -36,6 +36,21 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(260px,\s*1fr\)\)/);
   assert.match(source, /calc\(4 \* 320px \+ 3 \* 24px\)/);
   assert.match(source, /\.tegel \{[\s\S]*font:\s*inherit;[\s\S]*text-align:\s*left;/);
+  assert.match(source, /\.dashboard-layout\s*\{[\s\S]*display:\s*flex;[\s\S]*min-height:\s*100vh;[\s\S]*width:\s*100%;/);
+  assert.match(source, /main\.main\.is-premium-boot-host\s*\{[\s\S]*flex:\s*0 0 calc\(100% - var\(--premium-sidebar-width,\s*320px\)\);/);
+  assert.match(source, /\/\* Pagina-PIN: zelfde shell-centrering als premium-wachtwoordenregister \*\//);
+  assert.match(source, /\.settings-screen-pin\s*\{[\s\S]*width:\s*100%;[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*center;/);
+
+  const pinScreenRule = source.match(/#settings-screen-pin:not\(\[hidden\]\)\s*\{[\s\S]*?\}/);
+  assert.ok(pinScreenRule, 'Personeel PIN-scherm moet eigen layoutregel houden');
+  assert.match(pinScreenRule[0], /position:\s*static;/);
+  assert.match(pinScreenRule[0], /width:\s*min\(1000px,\s*100%\);/);
+  assert.match(pinScreenRule[0], /min-height:\s*calc\(100vh - 64px\);/);
+  assert.match(pinScreenRule[0], /margin:\s*0 auto;/);
+  assert.match(pinScreenRule[0], /padding:\s*0;/);
+  assert.match(pinScreenRule[0], /background:\s*transparent;/);
+  assert.doesNotMatch(pinScreenRule[0], /position:\s*fixed;/);
+  assert.doesNotMatch(pinScreenRule[0], /\b(?:left|right|top|bottom):/);
 
   assert.match(source, /function bindSettingsStaticActions\(\)/);
   assert.match(source, /button\.addEventListener\('click', function \(\) \{[\s\S]*settingsPagePinDigit\(button\.dataset\.settingsPinDigit \|\| ''\);/);

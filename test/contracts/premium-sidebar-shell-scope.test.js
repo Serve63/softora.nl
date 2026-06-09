@@ -721,3 +721,27 @@ test('unified premium sidebar splits ad channels from social media channels', ()
   assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-socialmedia#snapchat"/);
   assert.doesNotMatch(themeJsSource, /label:\s*"Snapchat"/);
 });
+
+test('premium instellingen centreert personeel PIN binnen de canonical shell', () => {
+  const pageSource = readRepoFile('premium-instellingen.html');
+  const layoutRule = pageSource.match(/\.dashboard-layout\s*\{[\s\S]*?\}/);
+  const mainBootRule = pageSource.match(/main\.main\.is-premium-boot-host\s*\{[\s\S]*?\}/);
+  const pinRule = pageSource.match(/#settings-screen-pin:not\(\[hidden\]\)\s*\{[\s\S]*?\}/);
+
+  assert.ok(layoutRule, 'premium instellingen moet dashboard-layout styling houden');
+  assert.match(layoutRule[0], /width:\s*100%;/);
+
+  assert.ok(mainBootRule, 'premium instellingen moet boot-host styling houden');
+  assert.match(
+    mainBootRule[0],
+    /flex:\s*0 0 calc\(100% - var\(--premium-sidebar-width,\s*320px\)\);/
+  );
+
+  assert.ok(pinRule, 'premium instellingen moet personeel PIN layoutregel houden');
+  assert.match(pinRule[0], /position:\s*static;/);
+  assert.match(pinRule[0], /width:\s*min\(1000px,\s*100%\);/);
+  assert.match(pinRule[0], /margin:\s*0 auto;/);
+  assert.match(pinRule[0], /background:\s*transparent;/);
+  assert.doesNotMatch(pinRule[0], /position:\s*fixed;/);
+  assert.doesNotMatch(pinRule[0], /\b(?:left|right|top|bottom):/);
+});
