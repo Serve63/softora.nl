@@ -1,0 +1,31 @@
+.sidebar-link.sidebar-link--autopilot {
+    pointer-events: none !important;
+    cursor: default !important;
+}
+
+.sidebar-link .sidebar-autopilot-badge {
+    margin-left: auto !important;
+    min-width: 0 !important;
+    height: 18px !important;
+    padding: 0 7px !important;
+    border: 1px solid rgba(139, 34, 82, 0.18) !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(139, 34, 82, 0.08) !important;
+    color: var(--accent, #8b2252) !important;
+    font-family: var(--premium-sidebar-font-display, "Oswald", sans-serif) !important;
+    font-size: 9px !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    letter-spacing: 0.04em !important;
+    text-transform: lowercase !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar[data-static-sidebar="1"] .sidebar-link .sidebar-autopilot-badge {
+    height: 16px !important;
+    padding: 0 6px !important;
+    font-size: 9px !important;
+}
