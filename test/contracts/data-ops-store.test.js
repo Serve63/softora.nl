@@ -652,6 +652,84 @@ test('data ops store signs only matching design photo rows for targeted preview 
   assert.equal(entries.targetedIdentifiersApplied, true);
 });
 
+test('data ops store matches compact manual-import design photo ids for clean public slugs', async () => {
+  const rows = [
+    {
+      customer_id: 'manual-import-cafeschuttershof-nl-contact-0476',
+      identity_key: '',
+      storage_bucket: 'softora-design-photos',
+      storage_path: 'customers/manual-import-cafeschuttershof-nl-contact-0476/hash.png',
+      mime_type: 'image/png',
+      file_name: 'hash.png',
+      legacy_meta: {
+        mockup: {
+          storageBucket: 'softora-design-photos',
+          storagePath: 'customers/manual-import-cafeschuttershof-nl-contact-0476/hash-mockup.jpg',
+          fileName: 'hash-mockup.jpg',
+        },
+      },
+      updated_at: '2026-05-26T12:01:00.000Z',
+    },
+  ];
+  const signedPaths = [];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path) {
+            signedPaths.push({ bucket, path });
+            return {
+              data: { signedUrl: `https://storage.example.test/${bucket}/${path}` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    limit(limit) {
+                      assert.equal(limit, 500);
+                      return Promise.resolve({ data: rows, error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    identifiers: ['cafe-schuttershof'],
+    expiresInSeconds: 24 * 60 * 60,
+  });
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].customerId, 'manual-import-cafeschuttershof-nl-contact-0476');
+  assert.deepEqual(
+    signedPaths.map((item) => item.path),
+    [
+      'customers/manual-import-cafeschuttershof-nl-contact-0476/hash.png',
+      'customers/manual-import-cafeschuttershof-nl-contact-0476/hash-mockup.jpg',
+    ]
+  );
+});
+
 test('data ops store reuses fresh signed design photo URLs per storage path', async () => {
   const rows = [{
     customer_id: 'customer-1',

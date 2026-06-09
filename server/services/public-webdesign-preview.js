@@ -289,6 +289,13 @@ function slugMatchesIdentifier(candidate, identifier) {
   ) {
     return true;
   }
+  if (
+    identifierRootCompact.length >= 5 &&
+    /^manual-import-/.test(candidateSlug) &&
+    candidateCompact.includes(identifierRootCompact)
+  ) {
+    return true;
+  }
   return Boolean(
     candidateRootCompact &&
       identifierRootCompact &&
@@ -732,6 +739,7 @@ ${preconnectTags}
     .about-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
     .about-text h2{font-family:Georgia,'Times New Roman',serif;font-size:clamp(22px,1.9vw,28px);color:var(--navy);line-height:1.3;margin-bottom:18px;font-weight:600}
     .about-text h2 .title-line{display:block;white-space:nowrap}
+    .about-title-mobile{display:none}
     .about-text p{font-size:14px;color:var(--muted);line-height:1.85;margin-bottom:12px}
     .signature{margin-top:28px;padding-top:24px;border-top:1px solid var(--rule)}
     .profile-signature{margin-top:18px;padding-top:0;text-align:center;border-top:0}
@@ -739,7 +747,7 @@ ${preconnectTags}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
     @media(min-width:1121px){.about-section{grid-template-columns:minmax(0,760px);gap:24px;max-width:860px}.about-profile{width:100%;justify-self:start;display:flex;align-items:center;gap:16px}.desktop-profile-role{display:none}.about-photo{width:86px;flex:0 0 86px;border-radius:16px;aspect-ratio:1/1}.profile-signature{margin-top:0;text-align:left}.profile-signature span{display:block;font-size:10.5px;line-height:1.35}}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:30px;padding-top:56px}.about-profile{width:min(100%,360px);justify-self:center;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:14px}.about-photo{width:68px;flex:0 0 68px;border-radius:999px;aspect-ratio:1/1;box-shadow:0 8px 24px rgba(28,43,80,.1)}.profile-signature{margin:0;text-align:left;padding:0;border-top:0}.profile-signature span{display:block;font-size:10.5px;line-height:1.35}}
-    @media(max-width:700px){.about-section{gap:28px}.about-profile{width:min(100%,320px);justify-content:flex-start}.about-photo{width:58px;flex-basis:58px}.profile-signature{display:flex;flex-direction:column;align-items:flex-start}.profile-signature span{order:-1;white-space:nowrap;font-size:clamp(8px,2.5vw,10px);letter-spacing:.7px;margin-bottom:2px}.about-text h2{font-size:clamp(13px,4.1vw,22px);text-align:center}}
+    @media(max-width:700px){.about-section{gap:28px}.about-profile{width:min(100%,320px);justify-content:flex-start}.about-photo{width:58px;flex-basis:58px}.profile-signature{display:flex;flex-direction:column;align-items:flex-start}.profile-signature span{order:-1;white-space:nowrap;font-size:clamp(8px,2.5vw,10px);letter-spacing:.7px;margin-bottom:2px}.about-text h2{font-size:clamp(13px,4.1vw,22px);text-align:center}.about-title-desktop{display:none}.about-title-mobile{display:inline}}
     @media(max-width:700px){.scroll-cue{display:none}}
     @media(max-width:900px){.concept-hero{min-height:100svh;padding-top:34px;justify-content:flex-start}.mockup-stage{flex-direction:column;padding:0;gap:22px}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
   </style>
@@ -769,7 +777,7 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2>Zó heb ik het webdesign gebouwd...</h2>
+      <h2><span class="about-title-desktop">Zó heb ik het webdesign gebouwd...</span><span class="about-title-mobile">Zó is het webdesign gebouwd!</span></h2>
       <p>Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.</p>
       <p>Ook heb ik de concurrenten van ${narrativeCompanyName} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
       <p>Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.</p>
@@ -822,7 +830,13 @@ function createPublicWebdesignPreviewService(options = {}) {
     let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, []);
     if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) return preview;
 
-    const customers = await dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS);
+    let customers = [];
+    try {
+      const loadedCustomers = await dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS);
+      customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
+    } catch (_error) {
+      customers = [];
+    }
     if (preview) {
       const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers);
       return enrichedPreview || preview;
