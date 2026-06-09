@@ -98,7 +98,7 @@ function assertInstantlyHtmlUsesTextPreviewLayout(html, expectedPath = '/webdesi
   assertInstantlyHtmlUsesReadableWidth(html);
   assert.equal(extractImageTags(html).length, 0);
   assert.match(html, /Beste lezer/);
-  assert.match(html, /Je kunt je webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\/concept(?:\?cid=[^"]+)?"/);
+  assert.match(html, /Je kunt je webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\/concept"/);
   assert.match(html, new RegExp(expectedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(html, /PS: Wordt het webdesign niet zichtbaar|<img\b|device mockup/i);
 }
@@ -357,7 +357,7 @@ test('instantly sync pushes eligible Softora leads only after central guard rese
     'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈'
   );
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon/concept');
-  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon/concept?cid=prospect-1');
+  assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon/concept');
   assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assertInstantlyHtmlUsesTextPreviewLayout(body.leads[0].custom_variables.softora_instantly_email_html);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
@@ -984,7 +984,7 @@ test('instantly sync uses the public Softora image host even when the app base u
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_unsubscribe_url, /^https:\/\/softora-nl-final\.onrender\.com\/afmelden\?t=/);
-  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon/concept?cid=prospect-1');
+  assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon/concept');
   assert.match(variables.softora_webdesign_image_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(variables.softora_webdesign_mockup_url, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertInstantlyHtmlUsesTextPreviewLayout(variables.softora_instantly_email_html);

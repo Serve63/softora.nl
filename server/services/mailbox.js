@@ -887,14 +887,10 @@ function createMailboxService(deps = {}) {
   function buildPublicWebdesignPreviewUrl(row, id) {
     const fallbackSlug = slugifyWebdesignCompany(id, 'uw-bedrijf');
     const slug = slugifyWebdesignCompany(getCustomerCompany(row), fallbackSlug);
-    const customerId = normalizeString(id || getCustomerId(row, 0));
     try {
-      const url = new URL(`/webdesign/${slug}/concept`, getPublicWebdesignPreviewBaseUrl());
-      if (customerId) url.searchParams.set('cid', customerId);
-      return url.toString();
+      return new URL(`/webdesign/${slug}/concept`, getPublicWebdesignPreviewBaseUrl()).toString();
     } catch (_) {
-      const query = customerId ? `?cid=${encodeURIComponent(customerId)}` : '';
-      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}/concept${query}`;
+      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}/concept`;
     }
   }
 

@@ -377,13 +377,10 @@ function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNorma
 
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
-  const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
   try {
-    const url = new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl);
-    if (customerId) url.searchParams.set('cid', customerId);
-    return url.toString();
+    return new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl).toString();
   } catch (_error) {
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
   }
 }
 
