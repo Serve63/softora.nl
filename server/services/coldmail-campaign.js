@@ -134,7 +134,7 @@ const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
 ].join('\n');
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -1069,7 +1069,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildPublicWebdesignPreviewPath(row, id) {
     const slug = slugifyWebdesignCompany(getRowCompany(row), slugifyWebdesignCompany(id, 'uw-bedrijf'));
-    return `/webdesign/${slug}`;
+    return `/webdesign/${slug}/concept`;
   }
 
   function buildPublicWebdesignPreviewUrl(row, id, input = {}) {
@@ -5085,12 +5085,13 @@ function createColdmailCampaignService(deps = {}) {
 
   function extractPublicWebdesignPreviewLinkFromPs(line) {
     const cleanLine = normalizeString(line);
-    const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?|\/?webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?)/i);
+    const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s<>"']*)?|\/?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s<>"']*)?)/i);
     if (!match) return null;
     const rawHref = match[1].replace(/[),.;!?]+$/g, '');
-    const href = /^https?:\/\//i.test(rawHref)
+    const absoluteHref = /^https?:\/\//i.test(rawHref)
       ? rawHref
       : `https://www.softora.nl/${rawHref.replace(/^\/+/, '')}`;
+    const href = absoluteHref.replace(/\/webdesign\/([^/?#]+)(?=([?#]|$))/i, '/webdesign/$1/concept');
     let label = rawHref.replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
     try {
       label = new URL(href).pathname.replace(/^\/+/, '') || label;
