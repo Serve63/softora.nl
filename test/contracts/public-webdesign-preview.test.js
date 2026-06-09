@@ -152,7 +152,7 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.about-text h2 \.title-line\{display:block;white-space:nowrap\}/);
   assert.match(response.body, /\.about-text p\{font-size:14px;color:var\(--muted\);line-height:1\.85;margin-bottom:12px\}/);
   assert.match(response.body, /@media\(max-width:1120px\)\{[\s\S]*\.about-profile\{display:flex;flex-direction:column\}\.profile-signature\{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0\}/);
-  assert.match(response.body, /@media\(max-width:700px\)\{\.about-photo\{width:min\(100%,250px\);align-self:center\}\.about-text h2\{font-size:clamp\(13px,4\.1vw,22px\)\}\}/);
+  assert.match(response.body, /@media\(max-width:700px\)\{\.about-photo\{width:min\(100%,250px\);align-self:center\}\.about-text h2\{font-size:clamp\(13px,4\.1vw,22px\);text-align:center\}\}/);
   assert.match(response.body, /<div class="about-profile">\s*<div class="desktop-profile-role">Webdesign &amp; Software Ontwikkeling<\/div>\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesign &amp; Software Ontwikkeling<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
   assert.match(response.body, /<h2>Zó heb ik het webdesign gebouwd!<\/h2>/);
   assert.match(response.body, /<p>Begonnen met HTML-code en een leeg scherm\. De structuur, indeling en techniek heb ik stap voor stap opgebouwd\. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers\.<\/p>/);

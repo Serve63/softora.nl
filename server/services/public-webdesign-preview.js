@@ -500,7 +500,7 @@ ${preconnectTags}
     .signature span{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
     @media(min-width:1121px){.about-section{grid-template-columns:minmax(0,760px);gap:24px;max-width:860px}.about-profile{width:100%;justify-self:start;display:flex;align-items:center;gap:16px}.desktop-profile-role{display:none}.about-photo{width:86px;flex:0 0 86px;border-radius:16px;aspect-ratio:1/1}.profile-signature{margin-top:0;text-align:left}.profile-signature span{display:block;font-size:10.5px;line-height:1.35}}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:34px;padding-top:56px}.about-profile{display:flex;flex-direction:column}.profile-signature{order:-1;margin:0 0 18px;padding:0 0 18px;border-top:0;border-bottom:0}}
-    @media(max-width:700px){.about-photo{width:min(100%,250px);align-self:center}.about-text h2{font-size:clamp(13px,4.1vw,22px)}}
+    @media(max-width:700px){.about-photo{width:min(100%,250px);align-self:center}.about-text h2{font-size:clamp(13px,4.1vw,22px);text-align:center}}
     @media(max-width:700px){.scroll-cue{display:none}}
     @media(max-width:900px){.concept-hero{min-height:auto;padding-top:34px}.mockup-stage{flex-direction:column;padding:0}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
   </style>
