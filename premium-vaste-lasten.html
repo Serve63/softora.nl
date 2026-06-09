@@ -183,163 +183,6 @@ body {
   margin-top: 0.38rem;
 }
 
-.coverage-panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 24px;
-}
-.coverage-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px;
-  border-bottom: 1px solid var(--border);
-}
-.coverage-kicker,
-.coverage-label,
-.coverage-row.head span {
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-light);
-}
-.coverage-title {
-  font-family: 'Oswald', sans-serif;
-  font-size: 1.2rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  line-height: 1.1;
-  margin: 3px 0 4px;
-}
-.coverage-sub {
-  color: var(--text-tertiary);
-  font-size: 0.82rem;
-  margin: 0;
-}
-.coverage-search {
-  width: min(250px, 100%);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text-dark);
-  font: inherit;
-  font-size: 0.86rem;
-  padding: 8px 10px;
-  outline: none;
-}
-.coverage-search:focus { border-color: var(--crimson); background: #fff; }
-.coverage-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-bottom: 1px solid var(--border);
-}
-.coverage-metric {
-  padding: 13px 18px;
-  border-right: 1px solid var(--border);
-}
-.coverage-metric:last-child { border-right: none; }
-.coverage-metric-value {
-  font-family: 'Oswald', sans-serif;
-  font-size: 1.55rem;
-  font-weight: 600;
-  line-height: 1;
-  margin-top: 4px;
-}
-.coverage-metric-value.warn { color: var(--red); }
-.coverage-metric-value.ok { color: var(--green); }
-.coverage-table-wrap { overflow-x: auto; }
-.coverage-table { min-width: 930px; }
-.coverage-row {
-  display: grid;
-  grid-template-columns: 1.1fr 1.45fr 1fr 1fr 0.9fr 86px;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
-}
-.coverage-row.head {
-  padding: 7px 18px;
-  background: var(--tag);
-}
-.coverage-row:last-child { border-bottom: none; }
-.coverage-name { font-size: 0.92rem; font-weight: 600; color: var(--text-dark); line-height: 1.25; }
-.coverage-meta,
-.coverage-cell-note { font-size: 0.78rem; color: var(--text-tertiary); margin-top: 1px; }
-.coverage-cell-main { font-size: 0.88rem; color: var(--text-dark); font-weight: 600; }
-.coverage-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  min-width: 78px;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.coverage-status.ok { color: var(--green); background: rgba(22, 115, 60, 0.09); }
-.coverage-status.warn { color: var(--red); background: rgba(192, 57, 43, 0.09); }
-.coverage-status.todo { color: var(--crimson); background: rgba(139, 34, 82, 0.09); }
-.coverage-actions { display: inline-flex; align-items: center; gap: 7px; justify-content: flex-end; }
-.coverage-empty { padding: 18px; color: var(--text-tertiary); font-size: 0.9rem; }
-.coverage-form {
-  display: grid;
-  gap: 12px;
-  padding: 16px 18px 18px;
-  border-top: 1px dashed var(--border);
-  background: var(--tag);
-}
-.coverage-form-grid {
-  display: grid;
-  grid-template-columns: 1.25fr 1.45fr repeat(3, minmax(120px, 1fr));
-  gap: 10px;
-}
-.coverage-field label {
-  display: block;
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-light);
-  margin-bottom: 4px;
-}
-.coverage-field input,
-.coverage-field select {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text-dark);
-  font: inherit;
-  font-size: 0.86rem;
-  padding: 8px 10px;
-  outline: none;
-}
-.coverage-field input:focus,
-.coverage-field select:focus { border-color: var(--crimson); background: #fff; }
-.coverage-field-note { grid-column: span 2; }
-.coverage-form-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.coverage-reset {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-mid);
-}
-
 .category {
   background: var(--card);
   border: 1px solid var(--border);
@@ -653,38 +496,12 @@ body {
   .totals-row {
     grid-template-columns: 1fr;
   }
-  .coverage-metrics {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .coverage-metric:nth-child(2n) {
-    border-right: none;
-  }
-  .coverage-form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 860px) {
   .header {
     flex-direction: column;
     align-items: flex-start;
-  }
-  .coverage-head {
-    flex-direction: column;
-  }
-  .coverage-search {
-    width: 100%;
-  }
-  .coverage-metrics,
-  .coverage-form-grid {
-    grid-template-columns: 1fr;
-  }
-  .coverage-metric {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-  .coverage-field-note {
-    grid-column: auto;
   }
   .cost-row,
   .add-inputs {
@@ -799,36 +616,6 @@ body {
 
           <div id="categories-wrap"></div>
 
-          <section class="coverage-panel" id="customer-cost-coverage" aria-labelledby="customer-cost-coverage-title">
-            <div class="coverage-head">
-              <div>
-                <div class="coverage-kicker">Klantkosten-check</div>
-                <h2 class="coverage-title" id="customer-cost-coverage-title">Worden alle kosten betaald?</h2>
-                <p class="coverage-sub">Kosten, inkomsten en contractvorm per klant.</p>
-              </div>
-              <input class="coverage-search" id="coverage-search" type="search" placeholder="Klant zoeken" aria-label="Klant zoeken">
-            </div>
-            <div class="coverage-metrics" id="coverage-metrics"></div>
-            <div class="coverage-table-wrap">
-              <div class="coverage-table" id="coverage-table"></div>
-            </div>
-            <form class="coverage-form" id="coverage-form">
-              <div class="coverage-form-grid">
-                <div class="coverage-field"><label for="coverage-customer">Klant</label><select id="coverage-customer"></select></div>
-                <div class="coverage-field"><label for="coverage-cost-description">Kosten die wij betalen</label><input id="coverage-cost-description" type="text" placeholder="Supabase, domeinnaam, hosting"></div>
-                <div class="coverage-field"><label for="coverage-cost-amount">Kostenbedrag</label><input id="coverage-cost-amount" type="number" min="0" step="0.01" placeholder="0,00"></div>
-                <div class="coverage-field"><label for="coverage-cost-frequency">Kostenritme</label><select id="coverage-cost-frequency"><option value="maandelijks">Maandelijks</option><option value="jaarlijks">Jaarlijks</option></select></div>
-                <div class="coverage-field"><label for="coverage-revenue-amount">Inkomsten</label><input id="coverage-revenue-amount" type="number" min="0" step="0.01" placeholder="0,00"></div>
-                <div class="coverage-field"><label for="coverage-revenue-frequency">Inkomstenritme</label><select id="coverage-revenue-frequency"><option value="maandelijks">Maandelijks</option><option value="jaarlijks">Jaarlijks</option></select></div>
-                <div class="coverage-field"><label for="coverage-term">Contract klant</label><select id="coverage-term"><option value="maandelijks_opzegbaar">Maandelijks opzegbaar</option><option value="jaarlijks">Jaarlijks</option></select></div>
-                <div class="coverage-field coverage-field-note"><label for="coverage-note">Notitie</label><input id="coverage-note" type="text" placeholder="Bijv. klant betaalt domein zelf vanaf verlenging"></div>
-              </div>
-              <div class="coverage-form-actions">
-                <button class="btn-add" id="coverage-save" type="submit">Check opslaan</button>
-                <button class="btn-modal coverage-reset" id="coverage-reset" type="button">Wissen</button>
-              </div>
-            </form>
-          </section>
         </div>
       </div>
     </div>
@@ -878,9 +665,7 @@ body {
   </div>
 </div>
 
-<script src="assets/premium-database-import.js?v=20260427c"></script>
 <script src="assets/premium-vaste-lasten.js?v=20260518b"></script>
-<script src="assets/premium-customer-cost-coverage.js?v=20260516a"></script>
 <script src="assets/premium-monthly-costs-dynamic.js?v=20260521d" defer></script>
 </body>
 </html>
