@@ -80,10 +80,7 @@ body {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-.dashboard-layout {
-    display: flex;
-    min-height: 100vh;
-}
+.dashboard-layout { display: flex; min-height: 100vh; width: 100%; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -256,6 +253,7 @@ body {
 
 /* Zelfde centering als premium-wachtwoordenregister (.main-content + #screen-pin) */
 main.main.is-premium-boot-host {
+  flex: 0 0 calc(100% - var(--premium-sidebar-width, 320px));
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -431,8 +429,9 @@ main.main.is-premium-boot-host {
   margin-top: 0;
 }
 
-/* Pagina-PIN: fixed over het hoofdvlak (naast sidebar) zodat de kaart echt gecentreerd is */
+/* Pagina-PIN: zelfde shell-centrering als premium-wachtwoordenregister */
 .settings-screen-pin {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -441,17 +440,14 @@ main.main.is-premium-boot-host {
   display: none !important;
 }
 #settings-screen-pin:not([hidden]) {
-  position: fixed;
+  position: static;
   z-index: 85;
-  left: 280px;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: auto;
-  min-height: 0;
-  padding: 40px 48px;
+  width: min(1000px, 100%);
+  min-height: calc(100vh - 64px);
+  margin: 0 auto;
+  padding: 0;
   box-sizing: border-box;
-  background: var(--bg-primary);
+  background: transparent;
   display: flex !important;
   align-items: center;
   justify-content: center;
@@ -1443,12 +1439,13 @@ main.main.is-premium-boot-host {
   }
 
   main.main.is-premium-boot-host {
+    flex: 0 0 auto;
     width: 100%;
   }
 
   #settings-screen-pin:not([hidden]) {
-    left: 0;
-    padding: 28px 22px;
+    width: 100%;
+    min-height: auto;
   }
 
   .form-row2 {
