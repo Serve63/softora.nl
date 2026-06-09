@@ -110,7 +110,7 @@ const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
 const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
-  'Beste collega-ondernemer,',
+  'Goedendag,',
   '',
   'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
   '',
@@ -2905,6 +2905,12 @@ function createColdmailCampaignService(deps = {}) {
     return parseRadiusKm(value);
   }
 
+  function normalizeColdmailWebdesignImageDeliveryOverride(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    if (normalized === 'cid' || normalized === 'remote' || normalized === 'link') return normalized;
+    return '';
+  }
+
   function normalizeColdmailAutopilotConfig(value = {}) {
     const raw = value && typeof value === 'object' ? value : {};
     const senderEmails = normalizeColdmailAutopilotSenderEmails(
@@ -2937,6 +2943,9 @@ function createColdmailCampaignService(deps = {}) {
       specialAction: normalizeString(raw.specialAction),
       durationDays: parsePositiveInt(raw.durationDays, 14, 1, 90),
       radiusKm: normalizeColdmailAutopilotRadiusKm(raw.radiusKm),
+      webdesignImageDelivery: normalizeColdmailWebdesignImageDeliveryOverride(
+        raw.webdesignImageDelivery || raw.imageDelivery
+      ),
     };
   }
 
@@ -3360,6 +3369,9 @@ function createColdmailCampaignService(deps = {}) {
       body: normalizeString(raw.body),
       aiInstructions: normalizeString(raw.aiInstructions),
       toneStyle: normalizeString(raw.toneStyle) || 'Vriendelijk & professioneel',
+      webdesignImageDelivery: normalizeColdmailWebdesignImageDeliveryOverride(
+        raw.webdesignImageDelivery || raw.imageDelivery
+      ),
       senders,
     };
   }
@@ -3378,6 +3390,7 @@ function createColdmailCampaignService(deps = {}) {
       body: settings.body,
       aiInstructions: settings.aiInstructions,
       toneStyle: settings.toneStyle,
+      webdesignImageDelivery: settings.webdesignImageDelivery,
     });
   }
 
@@ -3957,6 +3970,10 @@ function createColdmailCampaignService(deps = {}) {
         specialAction: state.config.specialAction,
         durationDays: state.config.durationDays,
         radiusKm: state.config.radiusKm,
+        webdesignImageDelivery:
+          normalizeColdmailWebdesignImageDeliveryOverride(state.config.webdesignImageDelivery) ||
+          normalizeColdmailWebdesignImageDeliveryOverride(settings.webdesignImageDelivery) ||
+          undefined,
         mode: 'mail',
         testMode: false,
         publicBaseUrl: input.publicBaseUrl,

@@ -525,6 +525,9 @@ function registerColdmailingRoutes(app, deps = {}) {
         database: body.database,
         senderEmail: body.senderEmail,
         specialAction: body.specialAction,
+        webdesignImageDelivery:
+          body.webdesignImageDelivery || body.imageDelivery ||
+          (normalizeString(body.specialAction) === 'webdesign' ? 'link' : undefined),
         testMode: body.testMode,
         testRecipientEmails: body.testRecipientEmails || body.testRecipients || body.testRecipientEmail,
         durationDays: body.durationDays,

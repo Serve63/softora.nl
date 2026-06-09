@@ -365,6 +365,32 @@ test('coldmailing campaign send forwards sender AI instructions to the service',
   assert.deepEqual(received.testRecipientEmails, ['servec321@gmail.com', 'serve@softora.nl']);
 });
 
+test('coldmailing campaign send forces webdesign delivery to link when UI omits image choice', async () => {
+  let received = null;
+  const callSend = createRouteHarness({
+    coldmailCampaignService: {
+      sendColdmailCampaign: async (payload) => {
+        received = payload;
+        return { ok: true, sent: 1 };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+    generatedAgendaAppointments: [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+  });
+
+  const res = await callSend({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag,',
+    senderEmail: 'serve@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(received.webdesignImageDelivery, 'link');
+});
+
 test('coldmailing autopilot cron route requires CRON_SECRET bearer access', async () => {
   let runs = 0;
   const autopilot = createAutopilotRouteHarness({

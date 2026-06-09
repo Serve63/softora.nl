@@ -3306,6 +3306,91 @@ test('coldmail campaign sends webdesign mails link-only by default for owned mai
   assert.equal(sentMessages[0].attachments, undefined);
 });
 
+test('coldmail autopilot lets dashboard link delivery override legacy image env', async () => {
+  const { service, sentMessages } = createService({
+    env: {
+      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
+    },
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        stad: 'Rotterdam',
+        website: 'bakkerijzon.nl',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      webdesignImageDelivery: 'link',
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Kleine vraag over jullie website',
+            body: [
+              'Goedendag,',
+              '',
+              'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+              '',
+              'Je kunt het webdesign hier bekijken 👈',
+              '',
+              'Met vriendelijke groet,',
+              '{{afzender}}',
+              '',
+              '📍 {{afzenderPlaats}}',
+            ].join('\n'),
+          },
+        },
+        specialAction: 'webdesign',
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /^Goedendag,/);
+  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(
+    sentMessages[0].html,
+    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+  );
+  assert.doesNotMatch(sentMessages[0].html, /<img src=/);
+  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
+  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
+  assert.equal(sentMessages[0].attachments, undefined);
+});
+
 test('coldmail campaign replaces sender signature variables from the selected mailbox', async () => {
   const { service, sentMessages } = createService({
     rows: [
@@ -3343,7 +3428,7 @@ test('coldmail campaign replaces sender signature variables from the selected ma
     count: 1,
     subject: 'Nieuwe website voor {{bedrijf}}',
     body: [
-      'Beste collega-ondernemer,',
+      'Goedendag,',
       '',
       'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
       '',
