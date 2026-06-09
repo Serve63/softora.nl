@@ -526,7 +526,7 @@ test('public seo url mapping exposes clean paths and keeps legacy redirects avai
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-bedrijfssoftware'), '/bedrijfssoftware-op-maat');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-chatbot'), '/chatbot-laten-maken');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-voicesoftware'), '/voicesoftware-op-maat');
-  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-pakketten'), '/pakketten');
+  assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-pakketten'), '');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-over-softora'), '/over-softora');
   assert.equal(getLegacyPublicSeoRedirectTargetPath('/premium-website'), '/');
 });
