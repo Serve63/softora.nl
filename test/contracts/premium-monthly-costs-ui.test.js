@@ -98,13 +98,14 @@ test('premium terugkerende kosten gebruikt modals en delegated acties voor bewer
   assert.match(combinedSource, /function editItem\(cat, id\) \{[\s\S]*edit-modal-overlay[\s\S]*document\.getElementById\('edit-naam'\)\.focus\(\);/s);
 });
 
-test('premium terugkerende kosten toont dynamische posten bovenaan met paarse stippelrand', () => {
+test('premium terugkerende kosten verbergt coldcalling en api kosten uit de standaardlijst', () => {
   const { pageSource, combinedSource } = readMonthlyCostsSources();
 
-  assert.match(combinedSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(combinedSource, /let data = \{\s*'Totale kosten:': \[\],\s*\};/);
+  assert.doesNotMatch(combinedSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.doesNotMatch(combinedSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
-  assert.match(combinedSource, /naam:'API kosten', note:'OpenAI kosten laden\.\.\.', freq:'maandelijks', bedrag:null, amountLabel:'\.\.\.', status:'loading', highlighted:true/);
-  assert.match(combinedSource, /let nextId = 4;/);
+  assert.doesNotMatch(combinedSource, /naam:'API kosten', note:'OpenAI kosten laden\.\.\.', freq:'maandelijks', bedrag:null, amountLabel:'\.\.\.', status:'loading', highlighted:true/);
+  assert.match(combinedSource, /let nextId = 1;/);
   assert.doesNotMatch(pageSource, /naam:'Hostinger VPS'/);
   assert.doesNotMatch(pageSource, /naam:'softora\.nl domein'/);
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
@@ -119,7 +120,6 @@ test('premium terugkerende kosten toont dynamische posten bovenaan met paarse st
   assert.match(combinedSource, /function createCostRowsHead\(\) \{/);
   assert.match(combinedSource, /const visibleItems = monthlyCostsBootstrapDone \? sortMonthlyCostItemsForDisplay\(items\) : \[\];/);
   assert.match(combinedSource, /function sortMonthlyCostItemsForDisplay\(items\) \{/);
-  assert.match(combinedSource, /const pinnedTopItems = source\.filter\(\(item\) => item && item\.highlighted\)\.slice\(0, 2\);/);
   assert.match(combinedSource, /function createLoadingCostRow\(\) \{[\s\S]*Kosten laden\.\.\.[\s\S]*actuele verbruikskosten worden opgehaald/);
   assert.match(combinedSource, /function createAddCostRow\(key\) \{[\s\S]*button\.textContent = '\+ Toevoegen';/);
   assert.match(pageSource, /\.cost-amount-wrap\.is-static\s*\{[\s\S]*justify-content:\s*flex-end;/);
@@ -151,8 +151,8 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(combinedSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
   assert.match(combinedSource, /await ensureMonthlyCostEntriesLoaded\(\);/);
   assert.match(combinedSource, /const refreshTasks = \[\];/);
-  assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyColdcallingCosts\(\)\);/);
-  assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyApiCosts\(\)\);/);
+  assert.doesNotMatch(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyColdcallingCosts\(\)\);/);
+  assert.doesNotMatch(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyApiCosts\(\)\);/);
   assert.match(combinedSource, /refreshTasks\.push\(window\.refreshMonthlySupabaseCosts\(\)\);/);
   assert.match(combinedSource, /void Promise\.allSettled\(refreshTasks\)\.then/);
   assert.match(combinedSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
