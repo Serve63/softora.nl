@@ -453,19 +453,15 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(sentMessages[0].bcc, undefined);
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor Bakkerij Zon');
   assert.match(sentMessages[0].text, /Goedemorgen Ruben/);
-  assert.match(
-    sentMessages[0].text,
-    /Geen webdesign willen ontvangen\? Laat het me weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
-  );
+  assert.doesNotMatch(sentMessages[0].text, /Geen webdesign willen ontvangen\? Laat het me weten!/);
+  assert.doesNotMatch(sentMessages[0].text, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif\?/);
-  assert.match(
-    sentMessages[0].html,
-    /<a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/
-  );
+  assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
+  assert.doesNotMatch(sentMessages[0].html, />Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/);
   assert.match(sentMessages[0].html, /<!-- Softora referentie SF-20260424-PROSPECT/);
   assert.doesNotMatch(sentMessages[0].html, />Referentie: SF-/);
 
@@ -2757,8 +2753,11 @@ test('coldmail campaign unsubscribe link marks the database row as no interest',
     senderEmail: 'info@softora.nl',
   });
 
-  const unsubscribeUrl = sentMessages[0].html.match(/href="([^"]*\/afmelden\?t=[^"]+)"/)[1].replace(/&amp;/g, '&');
-  const token = new URL(unsubscribeUrl).searchParams.get('t');
+  assert.doesNotMatch(sentMessages[0].html, /\/afmelden\?t=/);
+  const unsubscribeHeaderUrl = sentMessages[0].headers['List-Unsubscribe']
+    .match(/<([^>]*\/api\/coldmailing\/unsubscribe\?token=[^>]+)>/)[1]
+    .replace(/&amp;/g, '&');
+  const token = new URL(unsubscribeHeaderUrl).searchParams.get('token');
   const preview = await service.getColdmailUnsubscribePreview({ token });
 
   assert.equal(preview.ok, true);
@@ -3103,20 +3102,12 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
       sentMessages[0].html.lastIndexOf('/coldmailing/webdesign-foto?t=')
   );
   assert.doesNotMatch(sentMessages[0].html, /target="_blank"[^>]*><img/);
-  assert.match(
-    sentMessages[0].text,
-    /Geen webdesign willen ontvangen\? Laat het me weten!: https:\/\/www\.softora\.nl\/afmelden\?t=/
-  );
+  assert.doesNotMatch(sentMessages[0].text, /Geen webdesign willen ontvangen\? Laat het me weten!/);
+  assert.doesNotMatch(sentMessages[0].text, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].html, /<p>Geen interesse\? Reageer met/);
-  assert.match(
-    sentMessages[0].html,
-    /font-size:11px;line-height:1\.35;color:#9ca3af;"><a href="https:\/\/www\.softora\.nl\/afmelden\?t=[^"]+"[^>]*>Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/
-  );
-  assert.ok(
-    sentMessages[0].html.indexOf('>Geen webdesign willen ontvangen? Laat het me weten!</a>') >
-      sentMessages[0].html.lastIndexOf('/coldmailing/webdesign-foto?t=')
-  );
+  assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
+  assert.doesNotMatch(sentMessages[0].html, />Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
   assert.equal(sentMessages[0].attachments[1].contentDisposition, 'attachment');
