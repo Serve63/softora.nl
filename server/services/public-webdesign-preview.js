@@ -531,7 +531,11 @@ ${preconnectTags}
     </div>
     <div class="about-text">
       <h2>Zó heb ik het webdesign gebouwd!</h2>
-      <p>Begonnen met HTML-code, een leeg scherm en een scherp oog voor wat werkt. De basis heb ik zelf opgebouwd: structuur, indeling en techniek. Daarna heb ik met een vleugje AI-magie extra sfeer toegevoegd aan beelden en uitstraling. Ook heb ik gekeken naar hoe andere spelers in de markt zich presenteren en welke elementen aantoonbaar goed werken voor bezoekers. Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook logisch, overzichtelijk en klantgericht werkt. Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
+      <p>Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.</p>
+      <p>Ook heb ik de concurrenten van ${title} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
+      <p>Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.</p>
+      <p>Later in het proces heb ik moderne AI-technologie subtiel ingezet om de visuele sfeer en uitstraling verder te versterken.</p>
+      <p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
     </div>
   </section>
 </body>
