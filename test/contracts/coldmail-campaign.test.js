@@ -3279,6 +3279,7 @@ test('coldmail campaign sends webdesign mails link-only by default for owned mai
         id: 'prospect-1',
         bedrijf: 'Bakkerij Zon',
         naam: 'Ruben',
+        stad: 'Rotterdam',
         email: 'ruben@example.test',
         status: 'prospect',
         mail: true,
@@ -3312,6 +3313,65 @@ test('coldmail campaign sends webdesign mails link-only by default for owned mai
   assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(sentMessages[0].attachments, undefined);
+});
+
+test('coldmail campaign replaces sender signature variables from the selected mailbox', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Nieuwe website voor {{bedrijf}}',
+    body: [
+      'Beste collega-ondernemer,',
+      '',
+      'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+      '',
+      'Je kunt het webdesign hier bekijken 👈',
+      '',
+      'Met vriendelijke groet,',
+      'Martijn van de Ven',
+      '',
+      '📍 {{stad}}',
+    ].join('\n'),
+    senderEmail: 'serve@softora.nl',
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.match(sentMessages[0].text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Liempde/);
+  assert.doesNotMatch(sentMessages[0].text, /Martijn van de Ven/);
+  assert.doesNotMatch(sentMessages[0].text, /📍 Alphen/);
+  assert.doesNotMatch(sentMessages[0].text, /📍 Rotterdam/);
 });
 
 test('coldmail campaign refuses webdesign outreach when the device mockup is missing', async () => {

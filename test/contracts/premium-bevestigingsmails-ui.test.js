@@ -476,13 +476,15 @@ test('premium bevestigingsmails toont plaats en website als zichtbare variabelen
   assert.match(locationVariableSource, /\.mail-variable-note\{[\s\S]*color:var\(--crimson\);[\s\S]*border:1px solid rgba\(155,35,85,\.18\);/);
   assert.match(locationVariableSource, /function normalizeBodyTemplate\(value\)/);
   assert.match(locationVariableSource, /📍\[ \\t\]\*\)Haaren/);
-  assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische plaats en website uit database'\);/);
+  assert.match(locationVariableSource, /note\.setAttribute\('aria-label', 'Dynamische klantgegevens en afzender uit systeem'\);/);
   assert.match(locationVariableSource, /document\.querySelector\('#mail-panel-5 \.mail-fields'\)/);
   assert.match(locationVariableSource, /host\.appendChild\(note\);/);
   assert.doesNotMatch(locationVariableSource, /insertAdjacentElement\('afterend', note\)/);
   assert.match(locationVariableSource, /variable\.textContent = '\{\{stad\}\}';/);
   assert.match(locationVariableSource, /websiteVariable\.textContent = '\{\{website\}\}';/);
-  assert.match(locationVariableSource, /label\.textContent = 'Plaats en website uit database';/);
+  assert.match(locationVariableSource, /senderVariable\.textContent = '\{\{afzender\}\}';/);
+  assert.match(locationVariableSource, /senderLocationVariable\.textContent = '\{\{afzenderPlaats\}\}';/);
+  assert.match(locationVariableSource, /label\.textContent = 'Klantgegevens en afzender uit systeem';/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('applyColdmailingSettings'/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('getColdmailCampaignPayload'/);
 });
@@ -503,8 +505,8 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": DEFAULT_WEBDESIGN_BODY/);
   assert.match(senderSettingsSource, /Afgelopen week kwam ik jullie website \(\{\{website\}\}\) tegen\./);
   assert.match(senderSettingsSource, /Je kunt het webdesign hier bekijken 👈/);
-  assert.match(senderSettingsSource, /Martijn van de Ven/);
-  assert.match(senderSettingsSource, /📍 Alphen/);
+  assert.match(senderSettingsSource, /\{\{afzender\}\}/);
+  assert.match(senderSettingsSource, /📍 \{\{afzenderPlaats\}\}/);
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
   assert.match(pageSource, /function getColdmailingSettingsController\(\)/);

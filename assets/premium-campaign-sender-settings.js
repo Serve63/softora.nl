@@ -25,9 +25,9 @@
     "Je kunt het webdesign hier bekijken 👈",
     "",
     "Met vriendelijke groet,",
-    "Martijn van de Ven",
+    "{{afzender}}",
     "",
-    "📍 Alphen",
+    "📍 {{afzenderPlaats}}",
   ].join("\n");
   const DEFAULT_BODIES = {
     "serve@softora.nl": DEFAULT_WEBDESIGN_BODY,

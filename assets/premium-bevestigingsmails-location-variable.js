@@ -3,6 +3,10 @@
 
   function normalizeBodyTemplate(value) {
     return String(value || '')
+      .replace(
+        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie)\s*\}\})/gi,
+        '$1{{afzender}}$2{{afzenderPlaats}}'
+      )
       .replace(/(^|\n)([ \t]*📍[ \t]*)Haaren([ \t]*(?=\n|$))/gi, '$1$2{{stad}}$3')
       .replace(/(^|\n)([ \t]*📍[ \t]*)\{\{\s*(plaats|locatie)\s*\}\}/gi, '$1$2{{stad}}');
   }
@@ -32,7 +36,7 @@
     }
     const note = document.createElement('div');
     note.className = 'mail-variable-note';
-    note.setAttribute('aria-label', 'Dynamische plaats en website uit database');
+    note.setAttribute('aria-label', 'Dynamische klantgegevens en afzender uit systeem');
     const pin = document.createElement('span');
     pin.setAttribute('aria-hidden', 'true');
     pin.textContent = '📍';
@@ -42,9 +46,15 @@
     const websiteVariable = document.createElement('span');
     websiteVariable.className = 'var-tag';
     websiteVariable.textContent = '{{website}}';
+    const senderVariable = document.createElement('span');
+    senderVariable.className = 'var-tag';
+    senderVariable.textContent = '{{afzender}}';
+    const senderLocationVariable = document.createElement('span');
+    senderLocationVariable.className = 'var-tag';
+    senderLocationVariable.textContent = '{{afzenderPlaats}}';
     const label = document.createElement('span');
-    label.textContent = 'Plaats en website uit database';
-    note.append(pin, variable, websiteVariable, label);
+    label.textContent = 'Klantgegevens en afzender uit systeem';
+    note.append(pin, variable, websiteVariable, senderVariable, senderLocationVariable, label);
     host.appendChild(note);
   }
 

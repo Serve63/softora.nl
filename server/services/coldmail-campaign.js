@@ -128,9 +128,9 @@ const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   'Je kunt het webdesign hier bekijken 👈',
   '',
   'Met vriendelijke groet,',
-  'Martijn van de Ven',
+  '{{afzender}}',
   '',
-  '📍 Alphen',
+  '📍 {{afzenderPlaats}}',
 ].join('\n');
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
@@ -182,6 +182,17 @@ const SENDER_DISPLAY_NAMES = {
   'servecreusen7@gmail.com': 'Servé Creusen',
   'contact.venvisuals@gmail.com': 'Servé Creusen',
 };
+const SENDER_LOCATION_NAMES = {
+  'serve@softora.nl': 'Liempde',
+  'martijn@softora.nl': 'Alphen',
+  'servecreusen@softora.nl': 'Liempde',
+  'martijnvandeven@softora.nl': 'Alphen',
+  'servec321@gmail.com': 'Liempde',
+  'martijnven123@gmail.com': 'Alphen',
+  'serve290@gmail.com': 'Liempde',
+  'servecreusen7@gmail.com': 'Liempde',
+  'contact.venvisuals@gmail.com': 'Liempde',
+};
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
   'martijn@softora.nl',
@@ -216,43 +227,43 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
   'servecreusen@softora.nl': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijnvandeven@softora.nl': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servec321@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijnven123@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'serve290@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servecreusen7@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'contact.venvisuals@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
 };
@@ -4449,12 +4460,30 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function personalizeTemplate(template, row) {
+  function getSenderLocationName(senderEmail) {
+    const address = normalizeEmailAddress(senderEmail || mailFromAddress);
+    return SENDER_LOCATION_NAMES[address] || '';
+  }
+
+  function applySenderVariablesToTemplate(template, senderEmail) {
+    const senderName = getSenderDisplayName(senderEmail);
+    const senderLocation = getSenderLocationName(senderEmail);
+    return normalizeString(template)
+      .replace(/\{\{\s*(afzender|afzendernaam|sender|sendername)\s*\}\}/gi, senderName)
+      .replace(/\{\{\s*(afzender[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
+      .replace(
+        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie)\s*\}\})/gi,
+        `$1${senderName}$2${senderLocation}`
+      )
+      .replace(/\bServe Creusen\b/g, 'Servé Creusen');
+  }
+
+  function personalizeTemplate(template, row, options = {}) {
     const company = getRowCompany(row) || 'uw bedrijf';
     const contact = getRowContact(row) || company;
     const domain = getRowDomain(row);
     const city = getRowCity(row) || 'uw regio';
-    return normalizeString(template)
+    return applySenderVariablesToTemplate(template, options.senderEmail)
       .replace(/\{\{\s*bedrijf\s*\}\}/gi, company)
       .replace(/\{\{\s*naam\s*\}\}/gi, contact)
       .replace(/\{\{\s*(stad|plaats|locatie)\s*\}\}/gi, city)
@@ -4464,7 +4493,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildMailText(body, row, id, input = {}) {
     return normalizeColdmailMailText(
-      personalizeTemplate(body, row)
+      personalizeTemplate(body, row, { senderEmail: input.senderEmail })
         .replace(/\r\n?/g, '\n')
         .replace(/[ \t]+\n/g, '\n')
         .trim(),
@@ -6554,7 +6583,7 @@ function createColdmailCampaignService(deps = {}) {
         ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
         : '';
       const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
-      const subject = personalizeTemplate(selectedSubjectTemplate, row);
+      const subject = personalizeTemplate(selectedSubjectTemplate, row, { senderEmail });
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
