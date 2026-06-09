@@ -69,6 +69,33 @@ function createResponseRecorder() {
   };
 }
 
+async function renderConceptForStructuredCustomer(customer, photoOverrides = {}) {
+  const id = customer.id || customer.customerId || 'manual-import-alias-test-nl-0001';
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [customer];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: id,
+          fileName: 'alias-test-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/alias-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/alias-mockup.jpg?token=test',
+          ...photoOverrides,
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+  await service.getConceptPageResponse({ params: { companySlug: 'alias-test' } }, response);
+  assert.equal(response.statusCode, 200);
+  return response.body;
+}
+
 test('public webdesign preview renders only the two images for a stored mail-ready customer', async () => {
   let requestedScope = '';
   const service = createPublicWebdesignPreviewService({
@@ -227,6 +254,83 @@ test('public webdesign preview concept route switches the profile by sender cont
   assert.match(response.body, /<p>Ook heb ik de concurrenten van Bakkerij Janssen in kaart gebracht\./);
   assert.doesNotMatch(response.body, /Servé Creusen/);
   assert.doesNotMatch(response.body, /Piggy’s Kadoshop/);
+});
+
+test('public webdesign preview maps every known sender alias to the canonical profile', async () => {
+  const cases = [
+    ['serve@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servecreusen@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servec321@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['serve290@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servecreusen7@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['contact.venvisuals@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['serve@websoftora.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servecreusen@websoftora.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['martijn@softora.nl', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
+    ['martijnvandeven@softora.nl', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
+    ['martijnven123@gmail.com', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
+    ['martijn@websoftora.com', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
+    ['martijnven@websoftora.com', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
+    ['martijnvandeven@websoftora.com', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
+  ];
+
+  for (const [senderEmail, expectedName, expectedPhoto, unexpectedName] of cases) {
+    const body = await renderConceptForStructuredCustomer({
+      id: `manual-import-${senderEmail.replace(/[^a-z0-9]+/gi, '-')}`,
+      bedrijf: 'Alias Test',
+      lastColdmailSenderEmail: senderEmail,
+      leadOwnerKey: expectedName === 'Servé Creusen' ? 'martijn' : 'serve',
+      senderDisplayName: 'Niet tonen als variabele naam',
+      senderProfilePhotoUrl: 'https://wrong.softora.test/profile.jpg',
+      profilePhotoUrl: 'https://wrong.softora.test/other-profile.jpg',
+    });
+
+    assert.match(body, new RegExp(`<strong>${expectedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<\\/strong>`), senderEmail);
+    assert.match(body, new RegExp(expectedPhoto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), senderEmail);
+    assert.doesNotMatch(body, new RegExp(`<strong>${unexpectedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<\\/strong>`), senderEmail);
+    assert.doesNotMatch(body, /wrong\.softora\.test/, senderEmail);
+    assert.doesNotMatch(body, /Niet tonen als variabele naam/, senderEmail);
+  }
+});
+
+test('public webdesign preview lets the sent mailbox beat owner fallback fields', async () => {
+  const body = await renderConceptForStructuredCustomer({
+    id: 'manual-import-mail-sender-wins-nl-0001',
+    bedrijf: 'Mail Sender Wins',
+    leadOwnerKey: 'serve',
+    ownerName: 'Servé Creusen',
+    sentFromEmail: 'martijnven@websoftora.com',
+  });
+
+  assert.match(body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(body, /martijn-van-de-ven-profile\.png/);
+  assert.doesNotMatch(body, /<strong>Servé Creusen<\/strong>/);
+});
+
+test('public webdesign preview uses owner fields only when no sent mailbox is known', async () => {
+  const body = await renderConceptForStructuredCustomer({
+    id: 'manual-import-owner-fallback-nl-0001',
+    bedrijf: 'Owner Fallback',
+    leadOwnerKey: 'martijn',
+  });
+
+  assert.match(body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(body, /martijn-van-de-ven-profile\.png/);
+});
+
+test('public webdesign preview defaults to Serve for unknown sender variables', async () => {
+  const body = await renderConceptForStructuredCustomer({
+    id: 'manual-import-unknown-sender-nl-0001',
+    bedrijf: 'Unknown Sender',
+    lastColdmailSenderEmail: 'service@example.test',
+    senderDisplayName: 'Service Team',
+    profilePhotoUrl: 'https://wrong.softora.test/profile.jpg',
+  });
+
+  assert.match(body, /<strong>Servé Creusen<\/strong>/);
+  assert.match(body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(body, /Service Team/);
+  assert.doesNotMatch(body, /wrong\.softora\.test/);
 });
 
 test('public webdesign preview profile image is exported sharp enough for the cover crop', () => {

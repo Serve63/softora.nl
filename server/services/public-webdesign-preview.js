@@ -26,23 +26,48 @@ const PUBLIC_PREVIEW_PROFILES = Object.freeze({
     photoSource: '/assets/martijn-van-de-ven-profile.png?v=20260609a',
   }),
 });
-const PUBLIC_PREVIEW_PROFILE_SIGNAL_FIELDS = Object.freeze([
+const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
+  'serve@softora.nl': 'serve',
+  'servecreusen@softora.nl': 'serve',
+  'servec321@gmail.com': 'serve',
+  'serve290@gmail.com': 'serve',
+  'servecreusen7@gmail.com': 'serve',
+  'contact.venvisuals@gmail.com': 'serve',
+  'serve@websoftora.com': 'serve',
+  'servecreusen@websoftora.com': 'serve',
+  'martijn@softora.nl': 'martijn',
+  'martijnvandeven@softora.nl': 'martijn',
+  'martijnven123@gmail.com': 'martijn',
+  'martijn@websoftora.com': 'martijn',
+  'martijnven@websoftora.com': 'martijn',
+  'martijnvandeven@websoftora.com': 'martijn',
+});
+const PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS = Object.freeze([
+  'lastColdmailSenderEmail',
+  'senderEmail',
+  'sentFromEmail',
+  'sent_from_email',
+  'outreachSentFromEmail',
+  'outreach_sent_from_email',
+  'fromEmail',
+  'mailFrom',
+  'mail_from',
+]);
+const PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS = Object.freeze([
   'senderProfileKey',
   'senderKey',
   'profileKey',
-  'leadOwnerKey',
-  'ownerKey',
-  'assignedOwnerKey',
-  'senderEmail',
-  'lastColdmailSenderEmail',
-  'fromEmail',
-  'mailFrom',
-  'leadOwnerEmail',
-  'ownerEmail',
-  'responsibleEmail',
   'senderDisplayName',
   'senderName',
   'fromName',
+]);
+const PUBLIC_PREVIEW_PROFILE_OWNER_FIELDS = Object.freeze([
+  'leadOwnerKey',
+  'ownerKey',
+  'assignedOwnerKey',
+  'leadOwnerEmail',
+  'ownerEmail',
+  'responsibleEmail',
   'leadOwnerFullName',
   'leadOwnerName',
   'ownerFullName',
@@ -51,26 +76,6 @@ const PUBLIC_PREVIEW_PROFILE_SIGNAL_FIELDS = Object.freeze([
   'verantwoordelijk',
   'claimedBy',
   'assignedTo',
-]);
-const PUBLIC_PREVIEW_PROFILE_NAME_FIELDS = Object.freeze([
-  'senderDisplayName',
-  'senderName',
-  'fromName',
-  'leadOwnerFullName',
-  'leadOwnerName',
-  'ownerFullName',
-  'ownerName',
-]);
-const PUBLIC_PREVIEW_PROFILE_IMAGE_FIELDS = Object.freeze([
-  'senderProfilePhotoUrl',
-  'senderProfileImageUrl',
-  'profilePhotoUrl',
-  'profileImageUrl',
-  'senderPhotoUrl',
-  'ownerPhotoUrl',
-  'leadOwnerPhotoUrl',
-  'avatarUrl',
-  'photoUrl',
 ]);
 const PUBLIC_PREVIEW_PROFILE_NESTED_FIELDS = Object.freeze([
   'legacyMeta',
@@ -129,11 +134,6 @@ function isValidImageSource(value) {
   return /^https?:\/\//i.test(source) || /^data:image\//i.test(source);
 }
 
-function isValidProfileImageSource(value) {
-  const source = normalizeString(value);
-  return isValidImageSource(source) || /^\/assets\/[a-z0-9._/-]+(?:\?[a-z0-9=&._-]+)?$/i.test(source);
-}
-
 function normalizeProfileSignal(value) {
   return normalizeString(value)
     .toLowerCase()
@@ -144,7 +144,31 @@ function normalizeProfileSignal(value) {
     .trim();
 }
 
+function normalizeProfileEmail(value) {
+  return normalizeString(value)
+    .toLowerCase()
+    .replace(/^mailto:/i, '')
+    .replace(/^<|>$/g, '')
+    .replace(/[),.;!?]+$/g, '');
+}
+
+function inferPublicPreviewProfileKeyFromKnownEmail(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const emailMatches = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+  const emails = emailMatches.length ? emailMatches : [raw];
+  for (const email of emails) {
+    const key = PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES[normalizeProfileEmail(email)];
+    if (key) return key;
+  }
+  return '';
+}
+
 function inferPublicPreviewProfileKeyFromText(value) {
+  const raw = normalizeString(value);
+  const emailKey = inferPublicPreviewProfileKeyFromKnownEmail(raw);
+  if (emailKey) return emailKey;
+  if (/@/.test(raw)) return '';
   const signal = normalizeProfileSignal(value);
   const compact = signal.replace(/[^a-z0-9]+/g, '');
   if (!signal) return '';
@@ -166,19 +190,9 @@ function collectProfileObjects(...sources) {
   return objects;
 }
 
-function findFirstProfileFieldValue(objects, fields) {
+function inferPublicPreviewProfileKeyFromFields(objects, fields) {
   for (const object of objects) {
     for (const field of fields) {
-      const value = normalizeString(object && object[field]);
-      if (value) return value;
-    }
-  }
-  return '';
-}
-
-function inferPublicPreviewProfileKey(objects) {
-  for (const object of objects) {
-    for (const field of PUBLIC_PREVIEW_PROFILE_SIGNAL_FIELDS) {
       const key = inferPublicPreviewProfileKeyFromText(object && object[field]);
       if (key) return key;
     }
@@ -186,24 +200,10 @@ function inferPublicPreviewProfileKey(objects) {
   return '';
 }
 
-function findPublicPreviewProfileImageSource(objects) {
-  for (const object of objects) {
-    for (const field of PUBLIC_PREVIEW_PROFILE_IMAGE_FIELDS) {
-      const source = normalizeString(object && object[field]);
-      if (isValidProfileImageSource(source)) return source;
-    }
-  }
-  return '';
-}
-
-function normalizePublicPreviewProfileName(value, key) {
-  const name = normalizeString(value);
-  if (!name || /@/.test(name)) return '';
-  const signal = normalizeProfileSignal(name);
-  const profile = PUBLIC_PREVIEW_PROFILES[key];
-  if (profile && inferPublicPreviewProfileKeyFromText(name) === key) return profile.name;
-  if (profile && (signal === key || signal.replace(/\s+/g, '') === key)) return profile.name;
-  return name;
+function inferPublicPreviewProfileKey(objects) {
+  return inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS)
+    || inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS)
+    || inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_OWNER_FIELDS);
 }
 
 function resolvePublicPreviewProfile(record = null, customer = null) {
@@ -211,17 +211,12 @@ function resolvePublicPreviewProfile(record = null, customer = null) {
   const inferredKey = inferPublicPreviewProfileKey(objects);
   const key = inferredKey || PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY;
   const fallback = PUBLIC_PREVIEW_PROFILES[key] || PUBLIC_PREVIEW_PROFILES[PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY];
-  const profileImageSource = findPublicPreviewProfileImageSource(objects);
-  const profileName = normalizePublicPreviewProfileName(
-    findFirstProfileFieldValue(objects, PUBLIC_PREVIEW_PROFILE_NAME_FIELDS),
-    fallback.key
-  );
   return {
     key: fallback.key,
-    name: profileName || fallback.name,
+    name: fallback.name,
     role: fallback.role,
-    photoSource: profileImageSource || fallback.photoSource,
-    source: inferredKey || profileImageSource || profileName ? 'explicit' : 'default',
+    photoSource: fallback.photoSource,
+    source: inferredKey ? 'explicit' : 'default',
   };
 }
 
