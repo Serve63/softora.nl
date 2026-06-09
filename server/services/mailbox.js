@@ -49,9 +49,9 @@ const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nBekijk het via hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)/i;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
@@ -1349,10 +1349,10 @@ function createMailboxService(deps = {}) {
 
   function renderImageVisibilityPsHtmlLine(webdesignPreviewUrl) {
     const href = normalizeString(webdesignPreviewUrl);
-    if (!href) return `<em style="font-style:italic;">${escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS).replace(/\n/g, '<br>')}</em>`;
-    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Bekijk het via <a href="${escapeHtmlAttribute(
+    if (!href) return escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS);
+    return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
       href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
   }
 
   function renderMailboxWebdesignLineHtml(line, options = {}) {
