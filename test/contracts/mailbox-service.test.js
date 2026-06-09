@@ -282,7 +282,7 @@ test('mailbox service enriches normal webdesign sends with public link and no in
   assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
   assert.match(
     sent[0].message.html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\/concept" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
   );
   assert.doesNotMatch(sent[0].message.html, /<img src=/);
   assert.doesNotMatch(sent[0].message.html, /cid:webdesign|cid:mockup/);
@@ -360,7 +360,7 @@ test('mailbox service enriches webdesign sends from stored photo metadata when c
   assert.equal(guardCalls[0].items[0].recipientId, customerId);
   assert.match(
     sent[0].message.html,
-    /href="https:\/\/www\.softora\.nl\/webdesign\/podotherapi3-vissers\/concept"/
+    /href="https:\/\/www\.softora\.nl\/webdesign\/podotherapi3-vissers"/
   );
   assert.match(sent[0].message.html, /<img src="cid:webdesign-import-309-db-mohsau65-wp5f4v-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-import-309-db-mohsau65-wp5f4v-2@softora"/);

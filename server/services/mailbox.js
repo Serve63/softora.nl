@@ -894,9 +894,9 @@ function createMailboxService(deps = {}) {
     const fallbackSlug = slugifyWebdesignCompany(id, 'uw-bedrijf');
     const slug = slugifyWebdesignCompany(getCustomerCompany(row), fallbackSlug);
     try {
-      return new URL(`/webdesign/${slug}/concept`, getPublicWebdesignPreviewBaseUrl()).toString();
+      return new URL(`/webdesign/${slug}`, getPublicWebdesignPreviewBaseUrl()).toString();
     } catch (_) {
-      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}/concept`;
+      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}`;
     }
   }
 
@@ -1319,7 +1319,10 @@ function createMailboxService(deps = {}) {
     const absoluteUrl = /^https?:\/\//i.test(cleanUrl)
       ? cleanUrl
       : `${getPublicWebdesignPreviewBaseUrl()}/${cleanUrl.replace(/^\/+/, '')}`;
-    return absoluteUrl.replace(/\/webdesign\/([^/?#]+)(?=([?#]|$))/i, '/webdesign/$1/concept');
+    return absoluteUrl
+      .replace(/\/webdesign\/([^/?#]+)(?:\/concept)?(?=([?#]|$))/i, '/webdesign/$1')
+      .replace(/\?[^#]*/g, '')
+      .replace(/#.*$/g, '');
   }
 
   function isColdmailOptOutTextLine(line) {

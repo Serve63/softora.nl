@@ -1069,7 +1069,7 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildPublicWebdesignPreviewPath(row, id) {
     const slug = slugifyWebdesignCompany(getRowCompany(row), slugifyWebdesignCompany(id, 'uw-bedrijf'));
-    return `/webdesign/${slug}/concept`;
+    return `/webdesign/${slug}`;
   }
 
   function buildPublicWebdesignPreviewUrl(row, id, input = {}) {
@@ -5091,7 +5091,10 @@ function createColdmailCampaignService(deps = {}) {
     const absoluteHref = /^https?:\/\//i.test(rawHref)
       ? rawHref
       : `https://www.softora.nl/${rawHref.replace(/^\/+/, '')}`;
-    const href = absoluteHref.replace(/\/webdesign\/([^/?#]+)(?=([?#]|$))/i, '/webdesign/$1/concept');
+    const href = absoluteHref
+      .replace(/\/webdesign\/([^/?#]+)(?:\/concept)?(?=([?#]|$))/i, '/webdesign/$1')
+      .replace(/\?[^#]*/g, '')
+      .replace(/#.*$/g, '');
     let label = rawHref.replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
     try {
       label = new URL(href).pathname.replace(/^\/+/, '') || label;

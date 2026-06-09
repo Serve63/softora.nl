@@ -117,7 +117,7 @@
         const id = normalizeString(customer && customer.id);
         if (!options || !options.show || !id) return "";
         const slug = slugifyPublicPreview(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam), encodeURIComponent(id));
-        return "<a class=\"photo-compare-link\" href=\"https://www.softora.nl/webdesign/" + escapeHtml(slug) + "/concept\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a>";
+        return "<a class=\"photo-compare-link\" href=\"https://www.softora.nl/webdesign/" + escapeHtml(slug) + "\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a>";
     }
 
     ensureStyles();
