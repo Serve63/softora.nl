@@ -38,6 +38,18 @@ function readJpegSize(filePath) {
   throw new Error(`Could not read JPEG dimensions for ${filePath}`);
 }
 
+function readPngSize(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  const pngSignature = '89504e470d0a1a0a';
+  if (buffer.subarray(0, 8).toString('hex') !== pngSignature) {
+    throw new Error(`Expected PNG image at ${filePath}`);
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
+
 function createResponseRecorder() {
   return {
     headers: {},
@@ -177,6 +189,46 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /background:#121212/);
 });
 
+test('public webdesign preview concept route switches the profile by sender context', async () => {
+  let customerReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        customerReads += 1;
+        return [{
+          id: 'manual-import-bakkerij-janssen-nl-0001',
+          bedrijf: 'Bakkerij Janssen',
+          lastColdmailSenderEmail: 'martijn@softora.nl',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-bakkerij-janssen-nl-0001',
+          fileName: 'bakkerij-janssen-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/bakkerij-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/bakkerij-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'bakkerij-janssen' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(customerReads, 1);
+  assert.match(response.body, /<h1 class="hero-title">Bakkerij Janssen<\/h1>/);
+  assert.match(response.body, /<img src="\/assets\/martijn-van-de-ven-profile\.png\?v=20260609a" alt="Martijn van de Ven"/);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(response.body, /<span>Webdesign &amp; Software Ontwikkeling<\/span>/);
+  assert.match(response.body, /<p>Ook heb ik de concurrenten van Bakkerij Janssen in kaart gebracht\./);
+  assert.doesNotMatch(response.body, /Servé Creusen/);
+  assert.doesNotMatch(response.body, /Piggy’s Kadoshop/);
+});
+
 test('public webdesign preview profile image is exported sharp enough for the cover crop', () => {
   const profilePath = path.join(__dirname, '../../assets/serve-creusen-profile.jpg');
   const { width, height } = readJpegSize(profilePath);
@@ -184,6 +236,15 @@ test('public webdesign preview profile image is exported sharp enough for the co
   assert.ok(width >= 1200);
   assert.ok(height >= 900);
   assert.equal(width * 3, height * 4);
+});
+
+test('public webdesign preview includes Martijn profile image asset', () => {
+  const profilePath = path.join(__dirname, '../../assets/martijn-van-de-ven-profile.png');
+  const { width, height } = readPngSize(profilePath);
+
+  assert.ok(width >= 600);
+  assert.ok(height >= 600);
+  assert.equal(width, height);
 });
 
 test('public webdesign preview does not cache unavailable preview responses', async () => {
