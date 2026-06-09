@@ -51,7 +51,7 @@ const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
@@ -889,12 +889,12 @@ function createMailboxService(deps = {}) {
     const slug = slugifyWebdesignCompany(getCustomerCompany(row), fallbackSlug);
     const customerId = normalizeString(id || getCustomerId(row, 0));
     try {
-      const url = new URL(`/webdesign/${slug}`, getPublicWebdesignPreviewBaseUrl());
+      const url = new URL(`/webdesign/${slug}/concept`, getPublicWebdesignPreviewBaseUrl());
       if (customerId) url.searchParams.set('cid', customerId);
       return url.toString();
     } catch (_) {
       const query = customerId ? `?cid=${encodeURIComponent(customerId)}` : '';
-      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}${query}`;
+      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}/concept${query}`;
     }
   }
 
@@ -1310,12 +1310,14 @@ function createMailboxService(deps = {}) {
 
   function extractPublicWebdesignPreviewUrlFromText(text) {
     const source = String(text || '');
-    const match = source.match(/(https?:\/\/[^\s)\]]*\/webdesign\/[a-z0-9-]+(?:\?[^)\s\]]*)?|(?:^|[\s([])(\/?webdesign\/[a-z0-9-]+(?:\?[^)\s\]]*)?))/i);
+    const match = source.match(/(https?:\/\/[^\s)\]]*\/webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s\]]*)?|(?:^|[\s([])(\/?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s\]]*)?))/i);
     const rawUrl = normalizeString(match && (match[2] || match[1] || ''));
     if (!rawUrl) return '';
-    return /^https?:\/\//i.test(rawUrl)
-      ? rawUrl.replace(/[),.;!?]+$/g, '')
-      : `${getPublicWebdesignPreviewBaseUrl()}/${rawUrl.replace(/^\/+/, '').replace(/[),.;!?]+$/g, '')}`;
+    const cleanUrl = rawUrl.replace(/[),.;!?]+$/g, '');
+    const absoluteUrl = /^https?:\/\//i.test(cleanUrl)
+      ? cleanUrl
+      : `${getPublicWebdesignPreviewBaseUrl()}/${cleanUrl.replace(/^\/+/, '')}`;
+    return absoluteUrl.replace(/\/webdesign\/([^/?#]+)(?=([?#]|$))/i, '/webdesign/$1/concept');
   }
 
   function isColdmailOptOutTextLine(line) {

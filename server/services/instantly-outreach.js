@@ -44,7 +44,7 @@ const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
+  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
 const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
@@ -372,15 +372,18 @@ function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNorma
     slugifyWebdesignCompany(id, 'uw-bedrijf', normalizeString),
     normalizeString
   );
-  return `/webdesign/${slug}`;
+  return `/webdesign/${slug}/concept`;
 }
 
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+  const customerId = normalizeString(id || getRowId(row, 0, normalizeString));
   try {
-    return new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl).toString();
+    const url = new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl);
+    if (customerId) url.searchParams.set('cid', customerId);
+    return url.toString();
   } catch (_error) {
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
   }
 }
 
@@ -1533,12 +1536,13 @@ function escapeHtmlAttribute(value, normalizeString = defaultNormalizeString) {
 
 function extractPublicWebdesignPreviewLinkFromPs(line, normalizeString = defaultNormalizeString) {
   const cleanLine = normalizeString(line);
-  const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?|\/?webdesign\/[a-z0-9-]+(?:\?[^)\s<>"']*)?)/i);
+  const match = cleanLine.match(/(https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s<>"']*)?|\/?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s<>"']*)?)/i);
   if (!match) return null;
   const rawHref = match[1].replace(/[),.;!?]+$/g, '');
-  const href = /^https?:\/\//i.test(rawHref)
+  const absoluteHref = /^https?:\/\//i.test(rawHref)
     ? rawHref
     : `https://www.softora.nl/${rawHref.replace(/^\/+/, '')}`;
+  const href = absoluteHref.replace(/\/webdesign\/([^/?#]+)(?=([?#]|$))/i, '/webdesign/$1/concept');
   let label = rawHref.replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
   try {
     label = new URL(href).pathname.replace(/^\/+/, '') || label;

@@ -929,7 +929,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
   assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:98px;min-width:98px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
-  assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\//);
+  assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\/" \+ escapeHtml\(slug\) \+ "\/concept\?cid=/);
   assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
@@ -1538,7 +1538,7 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.equal(loadedFlags.length, 2);
   assert.doesNotMatch(html, /data-photo-loaded="false"/);
   assert.match(html, /class="photo-compare-link"/);
-  assert.match(html, /href="https:\/\/www\.softora\.nl\/webdesign\/aagje-van-os"/);
+  assert.match(html, /href="https:\/\/www\.softora\.nl\/webdesign\/aagje-van-os\/concept\?cid=customer-1"/);
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-public-preview-id="customer-1"/);
   assert.match(html, /aria-label="Open openbare previewpagina"/);
