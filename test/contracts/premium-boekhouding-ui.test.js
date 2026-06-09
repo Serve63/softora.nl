@@ -77,8 +77,33 @@ test('premium boekhouding houdt gedrag uit inline handlers', () => {
 
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
   assert.doesNotMatch(scriptSource, /onclick=/);
-  assert.match(scriptSource, /data-bookkeeping-action=\\"open-map\\"/);
+  assert.doesNotMatch(scriptSource, /data-bookkeeping-action=\\"open-map\\"/);
+  assert.doesNotMatch(scriptSource, /aangifte-row[\s\S]{0,140}role=\\"button\\" tabindex=\\"0\\"/);
+  assert.doesNotMatch(scriptSource, /case "open-map":/);
   assert.match(scriptSource, /data-bookkeeping-action=\\"toggle-check\\"/);
   assert.match(scriptSource, /data-bookkeeping-action=\\"open-file\\"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
+});
+
+test('premium boekhouding houdt aangiftebalken passief en deadline-kleuren neutraal', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+  const rowCss = pageSource.match(/\.aangifte-row\s*\{[\s\S]*?\}/);
+
+  assert.ok(rowCss, 'Aangifte-rij styling moet aanwezig zijn');
+  assert.match(rowCss[0], /grid-template-columns:\s*40px 1fr 100px 160px 110px;/);
+  assert.doesNotMatch(rowCss[0], /cursor:\s*pointer;/);
+  assert.doesNotMatch(pageSource, /\.aangifte-row:hover/);
+  assert.doesNotMatch(pageSource, /\.aangifte-row\.urgent/);
+  assert.doesNotMatch(pageSource, /\.aangifte-row\.soon/);
+  assert.doesNotMatch(pageSource, /\.arrow-cell/);
+  assert.match(pageSource, /\.badge-urgent,\s*[\s\S]*\.badge-soon,\s*[\s\S]*\.badge-future\s*\{[\s\S]*color:\s*var\(--light\);/);
+
+  assert.match(scriptSource, /if \(days < 0\) return \{ cls: "badge-urgent", txt: "Verlopen" \};/);
+  assert.match(scriptSource, /return \{ cls: "badge-future", txt: "Nog " \+ days \+ " dagen" \};/);
+  assert.match(scriptSource, /function rowClass\(id, deadline\) \{\s*var e = entry\(id\);\s*if \(e\.checked\) return "done";\s*return "";\s*\}/);
+  assert.match(scriptSource, /return "<div class=\\"aangifte-row " \+ escapeHtml\(rowClass\(a\.id, a\.deadline\)\) \+ "\\">"/);
+  assert.match(scriptSource, /"<div class=\\"dl-date\\">" \+ escapeHtml\(fmtDate\(a\.deadline\)\) \+ "<\/div>"/);
+  assert.doesNotMatch(scriptSource, /var dlColor/);
+  assert.doesNotMatch(scriptSource, /style=\\"color:/);
 });

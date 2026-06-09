@@ -172,9 +172,6 @@
     function rowClass(id, deadline) {
         var e = entry(id);
         if (e.checked) return "done";
-        var days = daysLeft(deadline);
-        if (days <= 14) return "urgent";
-        if (days <= 30) return "soon";
         return "";
     }
 
@@ -216,11 +213,9 @@
         var e = entry(a.id);
         var fileCount = (e.files || []).length;
         var b = badge(a.id, a.deadline);
-        var days = daysLeft(a.deadline);
-        var dlColor = e.checked ? "var(--green)" : days <= 14 ? "var(--red)" : days <= 30 ? "var(--orange)" : "var(--dark)";
         var checkedLabel = e.checked ? "Terugzetten naar openstaand" : "Markeren als ingediend";
 
-        return "<div class=\"aangifte-row " + escapeHtml(rowClass(a.id, a.deadline)) + "\" data-bookkeeping-action=\"open-map\" data-bookkeeping-id=\"" + escapeHtml(a.id) + "\" role=\"button\" tabindex=\"0\">"
+        return "<div class=\"aangifte-row " + escapeHtml(rowClass(a.id, a.deadline)) + "\">"
             + "<div class=\"check-cell\">"
             + "<button class=\"check-box " + (e.checked ? "checked" : "") + "\" type=\"button\" data-bookkeeping-action=\"toggle-check\" data-bookkeeping-id=\"" + escapeHtml(a.id) + "\" aria-label=\"" + escapeHtml(checkedLabel + ": " + a.naam + " " + a.period) + "\">"
             + "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><polyline points=\"20 6 9 17 4 12\"/></svg>"
@@ -233,10 +228,9 @@
             + "<div class=\"files-cell\"><strong>" + fileCount + "</strong>bestand" + (fileCount !== 1 ? "en" : "") + "</div>"
             + "<div class=\"deadline-cell\">"
             + "<div class=\"dl-label\">Deadline</div>"
-            + "<div class=\"dl-date\" style=\"color:" + dlColor + "\">" + escapeHtml(fmtDate(a.deadline)) + "</div>"
+            + "<div class=\"dl-date\">" + escapeHtml(fmtDate(a.deadline)) + "</div>"
             + "</div>"
             + "<div class=\"badge-cell\"><span class=\"badge " + escapeHtml(b.cls) + "\">" + escapeHtml(b.txt) + "</span></div>"
-            + "<div class=\"arrow-cell\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"9 18 15 12 9 6\"/></svg></div>"
             + "</div>";
     }
 
@@ -404,9 +398,6 @@
                 break;
             case "save-notes":
                 saveNotes();
-                break;
-            case "open-map":
-                openMap(actionEl.getAttribute("data-bookkeeping-id"));
                 break;
             case "toggle-check":
                 event.stopPropagation();
