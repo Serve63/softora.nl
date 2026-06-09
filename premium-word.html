@@ -110,6 +110,19 @@
             border-bottom: 1px solid #d1d5db;
         }
 
+        .word-status {
+            padding: 0.7rem 0.9rem;
+            border-bottom: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #7c2d12;
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+
+        .word-status[hidden] {
+            display: none;
+        }
+
         .ribbon-group {
             display: flex;
             flex-wrap: wrap;
@@ -352,6 +365,7 @@
                 </header>
 
                 <div class="word-app">
+                    <div class="word-status" id="wordStatus" hidden role="status" aria-live="polite"></div>
                     <div class="word-ribbon" id="wordRibbon" role="toolbar" aria-label="Document opmaak">
                         <div class="ribbon-group">
                             <button type="button" class="ribbon-btn" data-cmd="bold" title="Vet"><strong>B</strong></button>
@@ -403,6 +417,6 @@
     </div>
 
     <script src="assets/premium-ui-state-client.js?v=20260605a"></script>
-    <script src="assets/premium-word.js?v=20260605b"></script>
+    <script src="assets/premium-word.js?v=20260609a"></script>
 </body>
 </html>

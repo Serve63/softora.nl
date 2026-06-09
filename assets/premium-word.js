@@ -7,6 +7,7 @@
     var editor = document.getElementById("wordEditor");
     var ribbon = document.getElementById("wordRibbon");
     var restoreBackupButton = document.getElementById("wordRestoreBackup");
+    var wordStatus = document.getElementById("wordStatus");
     var forePick = document.getElementById("wordForeColor");
     var hilitePick = document.getElementById("wordHiliteColor");
     var saveTimer = 0;
@@ -14,6 +15,8 @@
     var remoteLoadFailed = false;
     var isDirty = false;
     var wordBackups = [];
+    var localDraftHtml = "";
+    var localDraftSavedAt = "";
 
     if (!editor || !ribbon) return;
 
@@ -183,8 +186,86 @@
     }
 
     function refreshBackupsFromState(state) {
-        wordBackups = parseWordBackups(state && state.values && state.values[BACKUP_KEY]);
+        wordBackups = mergeLocalDraftIntoBackups(parseWordBackups(state && state.values && state.values[BACKUP_KEY]));
         updateRestoreBackupButton();
+    }
+
+    function setWordStatus(message, type) {
+        if (!wordStatus) return;
+        var text = String(message || "").trim();
+        wordStatus.textContent = text;
+        wordStatus.hidden = !text;
+        wordStatus.className = "word-status" + (type ? " word-status--" + type : "");
+    }
+
+    function readLocalDraft() {
+        var html = String(localDraftHtml || "");
+        if (!html) return null;
+        return {
+            html: html,
+            savedAt: String(localDraftSavedAt || "")
+        };
+    }
+
+    function persistLocalDraft() {
+        var html = sanitizeWordHtml(editor.innerHTML);
+        localDraftHtml = html;
+        localDraftSavedAt = html ? new Date().toISOString() : "";
+    }
+
+    function clearLocalDraft() {
+        localDraftHtml = "";
+        localDraftSavedAt = "";
+    }
+
+    function buildLocalDraftBackup() {
+        var draft = readLocalDraft();
+        if (!draft || !draft.html) return null;
+        return {
+            html: draft.html,
+            savedAt: draft.savedAt,
+            source: "local-draft",
+            actor: "browser"
+        };
+    }
+
+    function getSanitizedCompareHtml(html) {
+        return sanitizeWordHtml(html).replace(/\s+/g, " ").trim();
+    }
+
+    function mergeLocalDraftIntoBackups(backups) {
+        var safeBackups = Array.isArray(backups) ? backups.slice() : [];
+        var localDraftBackup = buildLocalDraftBackup();
+        if (!localDraftBackup) return safeBackups;
+        var localHtml = getSanitizedCompareHtml(localDraftBackup.html);
+        var alreadyPresent = safeBackups.some(function (backup) {
+            return getSanitizedCompareHtml(backup && backup.html) === localHtml;
+        });
+        return alreadyPresent ? safeBackups : [localDraftBackup].concat(safeBackups);
+    }
+
+    function getLoadFailureMessage(error, restoredLocalDraft) {
+        var text = String(error && (error.message || error) || "");
+        if (/401|Niet ingelogd/i.test(text)) {
+            return restoredLocalDraft
+                ? "Je sessie is niet verbonden. Lokale hersteltekst is geladen; log opnieuw in om online op te slaan."
+                : "Je sessie is niet verbonden. Je kunt tijdelijk in dit tabblad typen; log opnieuw in om online op te slaan.";
+        }
+        return restoredLocalDraft
+            ? "Online opslag kon niet geladen worden. Hersteltekst is geladen en blijft beschikbaar zolang dit tabblad open blijft."
+            : "Online opslag kon niet geladen worden. Je kunt tijdelijk typen; je tekst blijft staan zolang dit tabblad open blijft.";
+    }
+
+    function enableLocalFallback(error) {
+        var localDraft = readLocalDraft();
+        var restoredLocalDraft = Boolean(localDraft && localDraft.html);
+        editor.setAttribute("contenteditable", "true");
+        editor.setAttribute(
+            "data-placeholder",
+            "Online opslag is tijdelijk niet verbonden. Typ gerust door; laat dit tabblad open tot de opslag weer werkt."
+        );
+        if (restoredLocalDraft) editor.innerHTML = sanitizeWordHtml(localDraft.html);
+        setWordStatus(getLoadFailureMessage(error, restoredLocalDraft), "warning");
     }
 
     async function restoreLatestBackup() {
@@ -243,21 +324,35 @@
     async function loadInitialValue() {
         try {
             var state = await getUiStateClient().get(REMOTE_SCOPE);
-            var html = String(state && state.values && state.values[REMOTE_KEY] || "");
+            var html = sanitizeWordHtml(String(state && state.values && state.values[REMOTE_KEY] || ""));
+            var localDraft = readLocalDraft();
+            var localHtml = localDraft && localDraft.html ? sanitizeWordHtml(localDraft.html) : "";
             editor.setAttribute("contenteditable", "true");
-            if (html) editor.innerHTML = sanitizeWordHtml(html);
+            if (html) {
+                editor.innerHTML = html;
+            } else if (localHtml) {
+                editor.innerHTML = localHtml;
+            }
             refreshBackupsFromState(state);
             remoteLoadComplete = true;
             remoteLoadFailed = false;
-            isDirty = false;
+            isDirty = Boolean(!html && localHtml);
+            if (isDirty) {
+                setWordStatus("Lokale hersteltekst is geladen. We proberen deze opnieuw online op te slaan.", "warning");
+                await save();
+            } else if (localHtml && getSanitizedCompareHtml(localHtml) !== getSanitizedCompareHtml(html)) {
+                setWordStatus("Online document geladen. Er staat ook lokale hersteltekst klaar via Backup.", "warning");
+            } else {
+                clearLocalDraft();
+                setWordStatus("", "");
+            }
         } catch (error) {
             remoteLoadComplete = false;
             remoteLoadFailed = true;
             isDirty = false;
             wordBackups = [];
             updateRestoreBackupButton();
-            editor.setAttribute("contenteditable", "false");
-            editor.setAttribute("data-placeholder", "Document kon niet geladen worden. Vernieuw de pagina.");
+            enableLocalFallback(error);
             console.error("Word-document laden mislukt:", error);
         }
     }
@@ -267,21 +362,32 @@
         try {
             var patch = {};
             patch[REMOTE_KEY] = sanitizeWordHtml(editor.innerHTML);
+            persistLocalDraft();
             var state = await getUiStateClient().set(REMOTE_SCOPE, {
                 patch: patch,
                 source: "premium-word",
                 actor: "browser"
             });
-            refreshBackupsFromState(state);
             isDirty = false;
+            clearLocalDraft();
+            refreshBackupsFromState(state);
+            setWordStatus("", "");
         } catch (error) {
+            remoteLoadComplete = false;
+            remoteLoadFailed = true;
+            persistLocalDraft();
+            setWordStatus(
+                "Online opslaan lukt nu niet. Je tekst blijft in dit tabblad staan; vernieuw of log opnieuw in om te synchroniseren.",
+                "warning"
+            );
             console.error("Word-document opslaan mislukt:", error);
         }
     }
 
     function queueSave() {
-        if (!remoteLoadComplete || remoteLoadFailed) return;
         isDirty = true;
+        persistLocalDraft();
+        if (!remoteLoadComplete || remoteLoadFailed) return;
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(function () {
             void save();
