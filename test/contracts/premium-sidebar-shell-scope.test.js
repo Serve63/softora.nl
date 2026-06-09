@@ -78,6 +78,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
   const stabilitySource = readRepoFile('assets/premium-sidebar-stability.css');
   const stabilityJsSource = readRepoFile('assets/premium-sidebar-stability.js');
+  const autopilotSource = readRepoFile('assets/premium-sidebar-autopilot.css');
+  const autopilotJsSource = readRepoFile('assets/premium-sidebar-autopilot.js');
   const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
   const htmlPagesSource = readRepoFile('server/services/html-pages.js');
 
@@ -115,11 +117,16 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /--premium-sidebar-font-display:\s*'SoftoraSidebarOswald', 'Oswald', sans-serif;/);
   assert.match(themeSource, /\.sidebar-logo\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-display\) !important;[\s\S]*font-synthesis:\s*none !important;/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans\) !important;/);
+  assert.match(autopilotSource, /\.sidebar-link\.sidebar-link--autopilot\s*\{[\s\S]*pointer-events:\s*none !important;[\s\S]*cursor:\s*default !important;/);
+  assert.match(autopilotSource, /\.sidebar-link \.sidebar-autopilot-badge\s*\{[\s\S]*margin-left:\s*auto !important;[\s\S]*text-transform:\s*lowercase !important;/);
+  assert.match(autopilotJsSource, /const AUTOPILOT_KEY = "coldmailing";/);
+  assert.match(autopilotJsSource, /link\.removeAttribute\("href"\);/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.2 !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-logo\s*\{[\s\S]*margin:\s*0 0 11px !important;[\s\S]*font-size:\s*25px !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\s*\{[\s\S]*min-height:\s*0 !important;[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.12 !important;/);
   assert.match(stabilitySource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\s*\{[\s\S]*transition:\s*none !important;[\s\S]*transform:\s*none !important;/);
   assert.match(stabilitySource, /html\[data-premium-sidebar-route-changing="true"\] \.sidebar\[data-static-sidebar="1"\],[\s\S]*body\[data-premium-sidebar-route-changing="true"\] \.sidebar\[data-static-sidebar="1"\]/);
+  assert.match(stabilityJsSource, /anchor\.getAttribute\("aria-disabled"\) === "true"/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-flow-section::before\s*\{[\s\S]*top:\s*59px !important;/);
   assert.match(themeSource, /\.sidebar\s*\{[\s\S]*transform:\s*none !important;[\s\S]*overflow-anchor:\s*none !important;[\s\S]*overscroll-behavior:\s*contain !important;/);
   assert.match(themeSource, /\.sidebar-nav\s*\{[\s\S]*overflow-anchor:\s*none !important;[\s\S]*scrollbar-gutter:\s*stable !important;/);
@@ -214,6 +221,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519d'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260609a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE/);
   assert.match(htmlPagesSource, /function isPremiumSidebarContentFrameRequest\(req\) \{/);
@@ -225,6 +233,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /frame-ancestors 'self'/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-stability\.js\?v=/);
+  assert.match(htmlPagesSource, /premium-sidebar-autopilot\.css\?v=/);
+  assert.match(htmlPagesSource, /premium-sidebar-autopilot\.js\?v=/);
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
   assert.match(htmlPagesSource, /@view-transition\{navigation:auto;\}/);
   assert.match(htmlPagesSource, /view-transition-name:softora-premium-sidebar !important;/);
@@ -396,7 +406,9 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
   );
   assert.match(pageSource, /<main class="main-content flynow-main">/);
   assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
+  assert.match(pageSource, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260609a"/);
   assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260519b" defer/);
+  assert.match(pageSource, /src="\/assets\/premium-sidebar-autopilot\.js\?v=20260609a" defer/);
   assert.doesNotMatch(pageSource, /data-static-sidebar="1"/);
   assert.match(
     flynowCssSource,
@@ -613,6 +625,16 @@ test('static premium sidebars share the same section order and public labels', (
     assert.doesNotMatch(seoLink[0], /sidebar-link-lock/);
     assert.doesNotMatch(seoLink[0], /aria-disabled/);
     assert.doesNotMatch(seoLink[0], /tabindex="-1"/);
+    const coldmailingLink = pageSource.match(
+      new RegExp(`<a [^>]*data-sidebar-key="coldmailing"[^>]*>[\\s\\S]*?<\\/a>`)
+    );
+    assert.ok(coldmailingLink, `${relativePath} mist coldmailing autopilot sidebar-link`);
+    assert.match(coldmailingLink[0], /sidebar-link--autopilot/);
+    assert.match(coldmailingLink[0], /aria-disabled="true"/);
+    assert.match(coldmailingLink[0], /tabindex="-1"/);
+    assert.match(coldmailingLink[0], /<span class="sidebar-autopilot-badge" aria-hidden="true">autopilot<\/span>/);
+    assert.doesNotMatch(coldmailingLink[0], /href=/);
+    assert.doesNotMatch(coldmailingLink[0], /sidebar-link-lock/);
     for (const lockedKey of [
       'leads',
       'coldcalling',

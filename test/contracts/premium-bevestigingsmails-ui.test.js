@@ -9,10 +9,15 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);
-  assert.match(
-    pageSource,
-    /<a href="\/premium-bevestigingsmails" class="sidebar-link magnetic active" data-sidebar-key="coldmailing"/
+  const coldmailingSidebarLink = pageSource.match(
+    /<a class="sidebar-link magnetic active sidebar-link--autopilot" data-sidebar-key="coldmailing"[^>]*>[\s\S]*?<\/a>/
   );
+  assert.ok(coldmailingSidebarLink, 'Coldmailing hoort als autopilot-sidebaritem actief te zijn');
+  assert.doesNotMatch(coldmailingSidebarLink[0], /href=/);
+  assert.match(coldmailingSidebarLink[0], /aria-disabled="true"/);
+  assert.match(coldmailingSidebarLink[0], /tabindex="-1"/);
+  assert.match(coldmailingSidebarLink[0], /<span class="sidebar-autopilot-badge" aria-hidden="true">autopilot<\/span>/);
+  assert.doesNotMatch(coldmailingSidebarLink[0], /sidebar-link-lock/);
   assert.match(pageSource, /<div class="page-section-inner">/);
   assert.doesNotMatch(pageSource, /<div class="zones-row">/);
   assert.doesNotMatch(pageSource, /id="z1-count"/);

@@ -211,6 +211,11 @@
         if (!sidebar || !event.target) return;
         var anchor = event.target.closest && event.target.closest(".sidebar a.sidebar-logo, .sidebar a.sidebar-link, .sidebar-footer a.logout-btn");
         if (!anchor || !sidebar.contains(anchor)) return;
+        if (anchor.getAttribute("aria-disabled") === "true") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
         var href = getAnchorTarget(anchor);
         if (!href) return;
         if (isCurrentTarget(href)) {
