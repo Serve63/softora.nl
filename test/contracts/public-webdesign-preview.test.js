@@ -694,7 +694,14 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
   };
 
   registerPublicWebdesignPreviewRoutes(app, {
-    coordinator: { getConceptPageResponse() {}, getPreviewPageResponse() {} },
+    coordinator: {
+      getConceptPageResponse(req) {
+        req.called = 'concept';
+      },
+      getPreviewPageResponse(req) {
+        req.called = 'preview';
+      },
+    },
   });
 
   assert.deepEqual(routes.map((route) => [route.method, route.path]), [
@@ -703,6 +710,10 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
     ['GET', '/mailklaar/:customerId/concept'],
     ['GET', '/mailklaar/:customerId'],
   ]);
+  const publicWebdesignRoute = routes.find((route) => route.path === '/webdesign/:companySlug');
+  const req = {};
+  publicWebdesignRoute.handler(req, {});
+  assert.equal(req.called, 'concept');
 });
 
 test('public webdesign preview is wired into feature routes', () => {

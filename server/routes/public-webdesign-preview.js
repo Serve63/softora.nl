@@ -6,7 +6,7 @@ function registerPublicWebdesignPreviewRoutes(app, deps = {}) {
   );
 
   app.get('/webdesign/:companySlug', (req, res) =>
-    coordinator.getPreviewPageResponse(req, res)
+    coordinator.getConceptPageResponse(req, res)
   );
 
   app.get('/mailklaar/:customerId/concept', (req, res) =>
