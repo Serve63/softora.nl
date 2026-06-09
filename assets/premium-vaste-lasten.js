@@ -1,8 +1,5 @@
 let data = {
-  'Totale kosten:': [
-    { id:1, naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
-    { id:3, naam:'API kosten', note:'OpenAI kosten laden...', freq:'maandelijks', bedrag:null, amountLabel:'...', status:'loading', highlighted:true },
-  ],
+  'Totale kosten:': [],
 };
 const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';
 const MONTHLY_COSTS_REMOTE_KEY = 'monthly_cost_entries_v1';
@@ -10,7 +7,7 @@ const DEFAULT_MONTHLY_COSTS_CATEGORY = 'Totale kosten:';
 const DEFAULT_MONTHLY_COSTS_HIGHLIGHTED_ITEMS = (data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [])
   .filter((item) => item.highlighted)
   .map((item) => ({ ...item }));
-let nextId = 4;
+let nextId = 1;
 let editingContext = null;
 let deletingContext = null;
 let monthlyCostsLoaded = false;
@@ -613,12 +610,6 @@ async function bootstrapMonthlyCostsPage() {
       releaseBoot();
 
       const refreshTasks = [];
-      if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
-        refreshTasks.push(window.refreshMonthlyColdcallingCosts());
-      }
-      if (typeof window.refreshMonthlyApiCosts === 'function') {
-        refreshTasks.push(window.refreshMonthlyApiCosts());
-      }
       if (typeof window.refreshMonthlySupabaseCosts === 'function') {
         refreshTasks.push(window.refreshMonthlySupabaseCosts());
       }
