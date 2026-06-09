@@ -257,7 +257,9 @@ test('mailbox service enriches normal webdesign sends with public link and no in
       'Afgelopen week kwam ik jullie website (pckbv.eu) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
       '',
       'Met vriendelijke groet,',
-      'Servé Creusen',
+      'Martijn van de Ven',
+      '',
+      '📍 {{stad}}',
       '',
       'PS: Zie je het webdesign niet? Klik dan even op ‘afbeeldingen tonen’ ergens in je scherm 😊',
       '',
@@ -278,6 +280,10 @@ test('mailbox service enriches normal webdesign sends with public link and no in
     sent[0].message.text,
     /Je kunt het webdesign hier bekijken 👈/
   );
+  assert.match(sent[0].message.text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Liempde/);
+  assert.doesNotMatch(sent[0].message.text, /Martijn van de Ven/);
+  assert.doesNotMatch(sent[0].message.text, /📍 Alphen/);
+  assert.doesNotMatch(sent[0].message.text, /📍 \{\{stad\}\}/);
   assert.doesNotMatch(sent[0].message.text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
   assert.match(

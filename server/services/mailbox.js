@@ -42,6 +42,17 @@ const MAILBOX_DISPLAY_NAMES = {
   'servecreusen7@gmail.com': 'Servé Creusen',
   'contact.venvisuals@gmail.com': 'Servé Creusen',
 };
+const MAILBOX_LOCATION_NAMES = {
+  'serve@softora.nl': 'Liempde',
+  'martijn@softora.nl': 'Alphen',
+  'servecreusen@softora.nl': 'Liempde',
+  'martijnvandeven@softora.nl': 'Alphen',
+  'servec321@gmail.com': 'Liempde',
+  'martijnven123@gmail.com': 'Alphen',
+  'serve290@gmail.com': 'Liempde',
+  'servecreusen7@gmail.com': 'Liempde',
+  'contact.venvisuals@gmail.com': 'Liempde',
+};
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
@@ -1362,6 +1373,28 @@ function createMailboxService(deps = {}) {
     )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
   }
 
+  function getMailboxSenderDisplayName(senderEmail) {
+    const email = normalizeEmail(senderEmail);
+    return MAILBOX_DISPLAY_NAMES[email] || normalizeString(getAccount(email)?.name) || email;
+  }
+
+  function getMailboxSenderLocationName(senderEmail) {
+    return MAILBOX_LOCATION_NAMES[normalizeEmail(senderEmail)] || '';
+  }
+
+  function applyMailboxSenderVariablesToText(text, senderEmail) {
+    const senderName = getMailboxSenderDisplayName(senderEmail);
+    const senderLocation = getMailboxSenderLocationName(senderEmail);
+    return String(text || '')
+      .replace(/\{\{\s*(afzender|afzendernaam|sender|sendername)\s*\}\}/gi, senderName)
+      .replace(/\{\{\s*(afzender[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
+      .replace(
+        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie)\s*\}\})/gi,
+        `$1${senderName}$2${senderLocation}`
+      )
+      .replace(/\bServe Creusen\b/g, 'Servé Creusen');
+  }
+
   function renderMailboxWebdesignLineHtml(line, options = {}) {
     const cleanLine = normalizeString(line);
     if (isMailboxImageVisibilityPsLine(cleanLine)) {
@@ -1488,8 +1521,8 @@ function createMailboxService(deps = {}) {
     return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${paragraphs}${imagesHtml}${optOutHtml}</div>`;
   }
 
-  async function buildMailboxWebdesignSendParts({ to, subject, text }) {
-    const rawText = normalizeString(text);
+  async function buildMailboxWebdesignSendParts({ accountEmail, to, subject, text }) {
+    const rawText = normalizeString(applyMailboxSenderVariablesToText(text, accountEmail));
     const parsed = {
       subject: normalizeString(subject),
       to: { value: [{ address: normalizeEmail(to) }] },
@@ -2162,6 +2195,7 @@ function createMailboxService(deps = {}) {
     });
     const normalizedText = normalizeString(text);
     const webdesignParts = await buildMailboxWebdesignSendParts({
+      accountEmail: account.email,
       to,
       subject: cleanSubject,
       text: normalizedText,
