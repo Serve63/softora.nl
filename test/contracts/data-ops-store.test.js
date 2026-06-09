@@ -888,6 +888,94 @@ test('data ops store can bypass stale targeted misses and match BV slug variants
   );
 });
 
+test('data ops store uses compact targeted lookups before broad public preview scans', async () => {
+  const matchingRow = {
+    customer_id: 'manual-import-vangestelsteigerbouw-nl-contact-0420',
+    identity_key: '',
+    storage_bucket: 'softora-design-photos',
+    storage_path: 'customers/manual-import-vangestelsteigerbouw-nl-contact-0420/hash.png',
+    mime_type: 'image/png',
+    file_name: 'hash.png',
+    legacy_meta: {
+      mockup: {
+        storageBucket: 'softora-design-photos',
+        storagePath: 'customers/manual-import-vangestelsteigerbouw-nl-contact-0420/hash-mockup.jpg',
+        fileName: 'hash-mockup.jpg',
+      },
+    },
+    updated_at: '2026-06-10T09:00:00.000Z',
+  };
+  const targetedFilters = [];
+  let broadPageReads = 0;
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path) {
+            return {
+              data: { signedUrl: `https://storage.example.test/${bucket}/${path}` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                or(filter) {
+                  targetedFilters.push(filter);
+                  return {
+                    order() {
+                      return {
+                        limit() {
+                          return Promise.resolve({
+                            data: /vangestelsteigerbouw/.test(filter) ? [matchingRow] : [],
+                            error: null,
+                          });
+                        },
+                      };
+                    },
+                  };
+                },
+                order() {
+                  return {
+                    range() {
+                      broadPageReads += 1;
+                      return Promise.resolve({ data: [matchingRow], error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    identifiers: ['van-gestel-steigerbouw-b-v'],
+    expiresInSeconds: 24 * 60 * 60,
+    bypassReadCache: true,
+    bypassReadFailureCooldown: true,
+  });
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].customerId, 'manual-import-vangestelsteigerbouw-nl-contact-0420');
+  assert.equal(broadPageReads, 0);
+  assert.ok(targetedFilters.some((filter) => /vangestelsteigerbouw/.test(filter)));
+});
+
 test('data ops store reuses fresh signed design photo URLs per storage path', async () => {
   const rows = [{
     customer_id: 'customer-1',
