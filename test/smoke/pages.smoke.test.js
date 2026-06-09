@@ -94,7 +94,6 @@ const publicSeoLegacyRedirectTargets = [
   { from: '/premium-voicesoftware', to: '/voicesoftware-op-maat' },
   { from: '/premium-chatbot', to: '/chatbot-laten-maken' },
   { from: '/premium-websites', to: '/website-laten-maken' },
-  { from: '/premium-pakketten', to: '/pakketten' },
   { from: '/premium-over-softora', to: '/over-softora' },
   { from: '/premium-algemene-voorwaarden', to: '/algemene-voorwaarden' },
   { from: '/premium-privacy-policy', to: '/privacybeleid' },
@@ -115,6 +114,22 @@ for (const target of publicSeoLegacyRedirectTargets) {
     );
   });
 }
+
+test('page smoke: /premium-pakketten blijft de interne premium pakkettenroute', async () => {
+  const response = await fetch(`${serverRef.baseUrl}/premium-pakketten`, {
+    cache: 'no-store',
+    redirect: 'manual',
+  });
+  const location = response.headers.get('location') || '';
+  const locationPath = location.startsWith('http')
+    ? `${new URL(location).pathname}${new URL(location).search}`
+    : location;
+
+  assert.equal(response.status, 302, '/premium-pakketten hoort achter de premium login te zitten.');
+  assert.match(locationPath, /^\/premium-personeel-login\?/);
+  assert.match(locationPath, /(?:\?|&)next=%2Fpremium-pakketten(?:&|$)/);
+  assert.notEqual(locationPath.split('?')[0], '/pakketten');
+});
 
 test('page smoke: /premium-blog redirects to the public blog foundation', async () => {
   const response = await fetch(`${serverRef.baseUrl}/premium-blog`, {
