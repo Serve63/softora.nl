@@ -278,6 +278,60 @@ test('data ops store can suppress public-preview fallback read cooldowns', async
   assert.match(warnings.join('\n'), /\[DataOps\]\[read-circuit-open\]/);
 });
 
+test('data ops store lets public preview reads bypass an active read cooldown', async () => {
+  let readCalls = 0;
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range() {
+                      readCalls += 1;
+                      if (readCalls === 1) return new Promise(() => {});
+                      return Promise.resolve({
+                        data: [{
+                          customer_id: 'lead-1',
+                          payload: { id: 'lead-1', bedrijf: 'Softora' },
+                          updated_at: '2026-06-10T09:00:00.000Z',
+                        }],
+                        error: null,
+                      });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadQueryTimeoutMs: 25,
+    dataOpsReadFailureCooldownMs: 1000,
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const timeout = await store.listCustomers();
+  const bypassed = await store.listCustomers({
+    bypassReadFailureCooldown: true,
+    bypassReadCache: true,
+    suppressReadFailureCooldown: true,
+    suppressTransientReadFailureLog: true,
+  });
+
+  assert.equal(timeout, null);
+  assert.equal(readCalls, 2);
+  assert.deepEqual(bypassed.map((customer) => customer.id), ['lead-1']);
+});
+
 test('data ops store serves stale cached customers when a later read times out', async () => {
   let nowMs = Date.parse('2026-05-22T10:00:00.000Z');
   let readCalls = 0;

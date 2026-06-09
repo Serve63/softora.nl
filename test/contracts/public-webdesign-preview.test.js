@@ -286,11 +286,13 @@ test('public webdesign preview retries transient reads and resolves BV slug vari
     dataOpsStore: {
       async listCustomers(options) {
         customerReads += 1;
+        assert.equal(options.bypassReadFailureCooldown, true);
         assert.equal(options.bypassReadCache, true);
         return [];
       },
       async listDesignPhotosWithSignedUrls(options) {
         photoReads += 1;
+        assert.equal(options.bypassReadFailureCooldown, true);
         assert.equal(options.bypassReadCache, true);
         assert.deepEqual(options.identifiers, ['van-gestel-steigerbouw-b-v']);
         if (photoReads === 1) throw new Error('temporary design photo read failure');
@@ -648,6 +650,7 @@ test('public webdesign preview signs only targeted structured candidates after c
     [[true, true, true], [true, true, true]]
   );
   assert.deepEqual(customerOptions, [{
+    bypassReadFailureCooldown: true,
     bypassReadCache: true,
     suppressReadFailureCooldown: true,
     suppressStaleReadCacheLog: true,

@@ -312,7 +312,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     const client = getClient();
     if (!client) return { ok: false, unavailable: true, error: new Error('Supabase niet geconfigureerd') };
     const isReadOperation = Number(options.timeoutMs) > 0;
-    if (isReadOperation && isReadFailureCooldownActive()) {
+    if (isReadOperation && isReadFailureCooldownActive() && !options.bypassReadFailureCooldown) {
       return { ok: false, unavailable: false, error: createReadCooldownError() };
     }
     try {
@@ -524,6 +524,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         return query;
       }, {
         timeoutMs: options.timeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
@@ -594,6 +595,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           .order('updated_at', { ascending: false }),
       {
         timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
@@ -953,12 +955,14 @@ function createSoftoraDataOpsStore(deps = {}) {
           pageSize: DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT,
           maxRows: scanLimit,
           timeoutMs: dataOpsReadQueryTimeoutMs,
+          bypassReadFailureCooldown: options.bypassReadFailureCooldown,
           suppressReadFailureCooldown: options.suppressReadFailureCooldown,
           suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
         });
       } else {
         result = await run('list-design-photos-signed-urls', (client) => buildQuery(client).limit(scanLimit), {
           timeoutMs: dataOpsReadQueryTimeoutMs,
+          bypassReadFailureCooldown: options.bypassReadFailureCooldown,
           suppressReadFailureCooldown: options.suppressReadFailureCooldown,
           suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
         });
