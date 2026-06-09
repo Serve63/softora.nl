@@ -2076,7 +2076,7 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
 test('coldmail autopilot treats fris webdesign dashboard text as a real image-backed webdesign send', async () => {
   const { service, sentMessages, getSavedStates } = createService({
     env: {
-      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'remote',
+      COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
     },
     rows: [
       {
@@ -3272,7 +3272,7 @@ test('coldmail preview image route strips decorative webdesign frames for existi
   assert.equal(metadata.height, 244);
 });
 
-test('coldmail campaign keeps CID webdesign images inline by default for owned mailbox sends', async () => {
+test('coldmail campaign sends webdesign mails link-only by default for owned mailbox sends', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -3304,14 +3304,14 @@ test('coldmail campaign keeps CID webdesign images inline by default for owned m
   });
 
   assert.equal(result.sent, 1);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
+  assert.match(
+    sentMessages[0].html,
+    /href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\/concept"/
+  );
+  assert.doesNotMatch(sentMessages[0].html, /<img src=/);
+  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-prospect-1@softora');
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
-  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
-  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments, undefined);
 });
 
 test('coldmail campaign refuses webdesign outreach when the device mockup is missing', async () => {
@@ -3390,7 +3390,8 @@ test('coldmail campaign accepts a webdesign mockup without quality approval meta
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.match(sentMessages[0].html, /cid:webdesign-mockup-prospect-1@softora/);
+  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
+  assert.equal(sentMessages[0].attachments, undefined);
 });
 
 test('coldmail campaign accepts a legacy webdesign mockup renderer when a mockup image exists', async () => {
@@ -3430,7 +3431,8 @@ test('coldmail campaign accepts a legacy webdesign mockup renderer when a mockup
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.match(sentMessages[0].html, /cid:webdesign-mockup-prospect-1@softora/);
+  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
+  assert.equal(sentMessages[0].attachments, undefined);
 });
 
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {

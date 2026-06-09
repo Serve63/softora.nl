@@ -47,6 +47,7 @@ const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
+const DEFAULT_MAILBOX_WEBDESIGN_IMAGE_DELIVERY = 'link';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
@@ -522,6 +523,11 @@ function createMailboxService(deps = {}) {
     }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
   } = deps;
+  const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
+    deps.webdesignImageDelivery ||
+      env.MAILBOX_WEBDESIGN_IMAGE_DELIVERY ||
+      env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY
+  );
 
   const baseAccount = {
     email: normalizeString(mailConfig.mailFromAddress || mailConfig.smtpUser || mailConfig.imapUser).toLowerCase(),
@@ -1425,6 +1431,13 @@ function createMailboxService(deps = {}) {
     return prepared.filter(Boolean);
   }
 
+  function normalizeMailboxWebdesignImageDelivery(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    if (['cid', 'inline', 'embedded'].includes(normalized)) return 'cid';
+    if (['link', 'link-only', 'link_only', 'none', 'off', 'false', '0'].includes(normalized)) return 'link';
+    return DEFAULT_MAILBOX_WEBDESIGN_IMAGE_DELIVERY;
+  }
+
   function renderMailboxEmailImage(image, margin) {
     if (!image || !image.src) return '';
     return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;"><img src="${escapeHtmlAttribute(
@@ -1556,7 +1569,9 @@ function createMailboxService(deps = {}) {
         : matchedMeta
           ? buildPublicWebdesignPreviewUrlForMatch(null, matchedMeta, matchedId)
         : extractPublicWebdesignPreviewUrlFromText(rawText);
-      const inlineImages = await prepareMailboxInlineWebdesignImages(images, matchedId);
+      const inlineImages = mailboxWebdesignImageDelivery === 'cid'
+        ? await prepareMailboxInlineWebdesignImages(images, matchedId)
+        : [];
       if (!previewUrl && !inlineImages.length) return { text: normalizedText, outboundIdentity };
 
       return {
@@ -1567,7 +1582,7 @@ function createMailboxService(deps = {}) {
           inlineImages,
           optOutUrl: extractColdmailOptOutUrlFromText(rawText) || extractColdmailOptOutUrlFromText(normalizedText),
         }),
-        attachments: inlineImages.map((image) => image.attachment),
+        attachments: inlineImages.length ? inlineImages.map((image) => image.attachment) : undefined,
       };
     } catch (error) {
       if (normalizeString(error && error.code).startsWith('MAILBOX_WEBDESIGN_')) {
