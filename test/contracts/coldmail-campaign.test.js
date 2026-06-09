@@ -2144,11 +2144,11 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(
     sentMessages[0].html,
-    /href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\/concept\?cid=import-5-db-mpfntuzo-cifdr3"/
+    /href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\/concept"/
   );
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\/concept\?cid=import-5-db-mpfntuzo-cifdr3" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\/concept" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
   );
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-import-5-db-mpfntuzo-cifdr3@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-import-5-db-mpfntuzo-cifdr3@softora"/);
@@ -3070,7 +3070,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.match(sentMessages[0].html, /📍 Alphen/);
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\/concept\?cid=prospect-1" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\/concept" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
   );
   assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);

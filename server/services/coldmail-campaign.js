@@ -1077,13 +1077,9 @@ function createColdmailCampaignService(deps = {}) {
       normalizePublicBaseUrl(input.webdesignPublicBaseUrl) ||
       DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
     try {
-      const url = new URL(buildPublicWebdesignPreviewPath(row, id), baseUrl);
-      const customerId = normalizeString(id || getExplicitRowId(row));
-      if (customerId) url.searchParams.set('cid', customerId);
-      return url.toString();
+      return new URL(buildPublicWebdesignPreviewPath(row, id), baseUrl).toString();
     } catch (_error) {
-      const customerId = normalizeString(id || getExplicitRowId(row));
-      return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}${customerId ? `?cid=${encodeURIComponent(customerId)}` : ''}`;
+      return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}`;
     }
   }
 
