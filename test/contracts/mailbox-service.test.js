@@ -276,12 +276,13 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   assert.equal(guardCalls[2].options.status, 'sent');
   assert.match(
     sent[0].message.text,
-    /PS: Wordt het webdesign niet zichtbaar\?\nBekijk het via hier 👈/
+    /Je kunt het webdesign hier bekijken 👈/
   );
+  assert.doesNotMatch(sent[0].message.text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
   assert.match(
     sent[0].message.html,
-    /<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar\?<br>Bekijk het via <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈<\/em>/
+    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
   );
   assert.match(sent[0].message.html, /cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora/);
   assert.match(sent[0].message.html, /cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora/);

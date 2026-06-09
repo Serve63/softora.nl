@@ -108,9 +108,33 @@ const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nBekijk het via hier 👈';
+const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
+const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
+  'Beste collega-ondernemer,',
+  '',
+  'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+  '',
+  'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+  '',
+  'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+  '',
+  'Als je wilt, stuur ik je ook de online preview,',
+  'zodat je zelf door het ontwerp kunt scrollen.',
+  '',
+  'Laat me vooral weten of je dat zou willen.',
+  '',
+  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
+  '',
+  'Je kunt het webdesign hier bekijken 👈',
+  '',
+  'Met vriendelijke groet,',
+  'Martijn van de Ven',
+  '',
+  '📍 Alphen',
+].join('\n');
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)/i;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -178,56 +202,56 @@ function loadColdmailPreviewSharpModule() {
 }
 const DEFAULT_COLDMAIL_SENDER_PROFILES = {
   'serve@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijn@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servecreusen@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijnvandeven@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servec321@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijnven123@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'serve290@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servecreusen7@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'contact.venvisuals@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
+    subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
+    body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
     aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
@@ -5085,11 +5109,11 @@ function createColdmailCampaignService(deps = {}) {
       href: normalizeString(options.webdesignPreviewUrl),
     };
     if (!publicLink.href) {
-      return `<em style="font-style:italic;">${escapeHtml(cleanLine).replace(/\n/g, '<br>')}</em>`;
+      return escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS);
     }
-    return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Bekijk het via <a href="${escapeHtmlAttribute(
+    return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
       publicLink.href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
   }
 
   function renderColdmailHtmlLine(line, options = {}) {
