@@ -378,6 +378,14 @@ test('public webdesign preview asset route optimizes mockups at wider display wi
   }
 });
 
+test('public webdesign preview keeps the heavy image optimizer lazy for HTML routes', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../server/services/public-webdesign-preview.js'), 'utf8');
+  assert.match(source, /let sharpModule = null;/);
+  assert.match(source, /function getSharp\(\) \{/);
+  assert.doesNotMatch(source, /const sharp = require\('sharp'\);/);
+  assert.match(source, /const buffer = await getSharp\(\)\(image\.buffer/);
+});
+
 test('public webdesign preview uses a human company name in narrative copy', async () => {
   const body = await renderConceptForStructuredCustomer({
     id: 'manual-import-vandriel-nl-contact-0274',
