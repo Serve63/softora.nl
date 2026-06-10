@@ -1534,6 +1534,30 @@ test('coldmail autopilot day-paces each mailbox across the full 07-17 workday', 
   assert.equal(onSlotResult.reason, 'sent');
   assert.equal(onSlot.sentMessages.length, 1);
   assert.equal(onSlot.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
+
+  const justBeforeFloorReady = createService({
+    ...baseSetup,
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-08T05:30:02.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+      ],
+    },
+    now: () => new Date('2026-06-08T06:25:00.000Z'),
+  });
+
+  const graceResult = await justBeforeFloorReady.service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(graceResult.reason, 'sent');
+  assert.equal(justBeforeFloorReady.sentMessages.length, 1);
+  assert.equal(justBeforeFloorReady.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
 });
 
 test('coldmail autopilot staggers senders by choosing the mailbox whose cooldown is ready', async () => {
