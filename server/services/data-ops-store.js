@@ -20,6 +20,7 @@ const TABLES = Object.freeze({
   webdesignJobs: 'softora_webdesign_jobs',
   mailboxMessages: 'softora_mailbox_messages',
   mailboxSyncState: 'softora_mailbox_sync_state',
+  outboundRecipientGuards: 'softora_outbound_recipient_guards',
 });
 const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
@@ -78,6 +79,24 @@ function domainNameCandidate(value) {
       .replace(/^www\./i, '')
       .split(/[/?#]/)[0]
       .split('.')[0];
+  }
+}
+
+function domainSlugCandidate(value) {
+  const raw = normalizeString(value)
+    .replace(/^<|>$/g, '')
+    .replace(/[),.;!?]+$/g, '');
+  if (!raw) return '';
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return slugifyDesignPhotoMatchText(new URL(candidate).hostname.replace(/^www\./i, ''));
+  } catch (_error) {
+    return slugifyDesignPhotoMatchText(
+      raw
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .split(/[/?#]/)[0]
+    );
   }
 }
 
@@ -171,6 +190,31 @@ function collectTargetedDesignPhotoSearchTerms(identifiers = []) {
     addTerm(compactDesignPhotoSlug(root));
   });
   return Array.from(new Set(terms)).slice(0, 12);
+}
+
+function collectOutboundRecipientGuardSearchTerms(identifiers = []) {
+  const terms = [];
+  const addTerm = (value) => {
+    const term = normalizeString(value).toLowerCase();
+    if (/^[a-z0-9@._-]{2,180}$/.test(term)) terms.push(term);
+  };
+  const addSlugTerm = (value) => {
+    const slug = slugifyDesignPhotoMatchText(value);
+    if (slug.length >= 2 && slug.length <= 180) terms.push(slug);
+  };
+  (Array.isArray(identifiers) ? identifiers : []).forEach((identifier) => {
+    const raw = normalizeString(identifier);
+    const slug = slugifyDesignPhotoMatchText(raw);
+    const root = stripKnownDomainSuffix(slug);
+    addTerm(raw);
+    addSlugTerm(slug);
+    addSlugTerm(root);
+    addSlugTerm(compactDesignPhotoSlug(slug));
+    addSlugTerm(compactDesignPhotoSlug(root));
+    addSlugTerm(domainNameCandidate(raw));
+    addSlugTerm(domainSlugCandidate(raw));
+  });
+  return Array.from(new Set(terms)).slice(0, 16);
 }
 
 function createSoftoraDataOpsStore(deps = {}) {
@@ -1226,6 +1270,62 @@ function createSoftoraDataOpsStore(deps = {}) {
     return entries;
   }
 
+  async function listOutboundRecipientGuardsForPreview(options = {}) {
+    const identifiers = Array.from(new Set(
+      (Array.isArray(options.identifiers) ? options.identifiers : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    ));
+    const searchTerms = collectOutboundRecipientGuardSearchTerms(identifiers);
+    if (!searchTerms.length) return [];
+    const maxMatches = Math.max(1, Math.min(200, Number(options.maxMatches) || 50));
+    const cacheKey = `outbound-recipient-guards-preview:${searchTerms.join('|')}:${maxMatches}`;
+    const rows = await cachedRead(cacheKey, async () => {
+      const rowsByGuardKey = new Map();
+      const buildQueryOptions = {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      };
+      for (const term of searchTerms) {
+        const result = await run(`list-outbound-recipient-guards-preview-${term}`, (client) => {
+          let query = client
+            .from(TABLES.outboundRecipientGuards)
+            .select('guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at')
+            .or([
+              `guard_key.ilike.%${term}%`,
+              `key_value.eq.${term}`,
+              `recipient_id.eq.${term}`,
+              `recipient_email.ilike.%${term}%`,
+              `recipient_domain.eq.${term}`,
+              `recipient_company_key.eq.${term}`,
+            ].join(','));
+          if (query && typeof query.in === 'function') query = query.in('status', ['sent', 'reserved']);
+          if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+          if (query && typeof query.limit === 'function') return query.limit(50);
+          return query;
+        }, buildQueryOptions);
+        if (!result.ok) continue;
+        (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+          const guardKey = normalizeString(row && row.guard_key);
+          if (guardKey && !rowsByGuardKey.has(guardKey)) rowsByGuardKey.set(guardKey, row);
+        });
+      }
+      return Array.from(rowsByGuardKey.values())
+        .filter((row) => normalizeString(row && row.sender_email))
+        .sort((left, right) =>
+          Math.max(Date.parse(normalizeString(right && right.updated_at)) || 0, Date.parse(normalizeString(right && right.created_at)) || 0) -
+            Math.max(Date.parse(normalizeString(left && left.updated_at)) || 0, Date.parse(normalizeString(left && left.created_at)) || 0)
+        )
+        .slice(0, maxMatches);
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+    return rows || [];
+  }
+
   async function countActiveRows(table, deletedColumn = 'deleted_at') {
     const result = await run(`count-${table}`, (client) => {
       let query = client.from(table).select('*', { count: 'exact', head: true });
@@ -1382,6 +1482,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listCustomers,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
+    listOutboundRecipientGuardsForPreview,
     listVisibleWebdesignJobs,
     listOrderRuntime,
     getReadFailureCooldownStatus,

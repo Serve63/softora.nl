@@ -276,6 +276,113 @@ test('public webdesign preview uses a human company name in narrative copy', asy
   assert.doesNotMatch(body, /concurrenten van Autobedrijf Van Driel B\.V\./);
 });
 
+test('public webdesign preview uses outbound send guards when customer sender fields are empty', async () => {
+  const guardIdentifierReads = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-idtravel-nl-0245',
+          bedrijf: 'ID Travel B.V.',
+          website: 'https://www.idtravel.nl',
+          lastColdmailSenderEmail: '',
+          sentFromEmail: '',
+          outreachSentFromEmail: '',
+          verantwoordelijk: 'Team',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-idtravel-nl-0245',
+          identityKey: 'id travel b v|id travel b v|073 511 23 14',
+          fileName: 'www.idtravel.nl-preview.png',
+          websitePhotoUrl: 'https://signed.softora.test/idtravel-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/idtravel-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview(options) {
+        guardIdentifierReads.push(options.identifiers);
+        return [{
+          guard_key: 'id:manual-import-idtravel-nl-0245',
+          sender_email: 'martijn@softora.nl',
+          recipient_email: 'info@idtravel.nl',
+          recipient_domain: 'idtravel-nl',
+          recipient_company_key: 'id-travel-b-v',
+          recipient_id: 'manual-import-idtravel-nl-0245',
+          recipient_company: 'ID Travel B.V.',
+          status: 'sent',
+          updated_at: '2026-06-09T17:17:38.634+00:00',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'idtravelbv' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.ok(guardIdentifierReads.some((identifiers) => identifiers.includes('manual-import-idtravel-nl-0245')));
+  assert.match(response.body, /<h1 class="hero-title">ID Travel B\.V\.<\/h1>/);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(response.body, /martijn-van-de-ven-profile\.png/);
+  assert.match(response.body, /<p>Ook heb ik de concurrenten van ID Travel in kaart gebracht\./);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
+});
+
+test('public webdesign preview uses outbound guards to rescue links when customer reads fail', async () => {
+  const signedIdentifierReads = [];
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        throw new Error('temporary customer read failure');
+      },
+      async listDesignPhotosWithSignedUrls(options) {
+        signedIdentifierReads.push(options.identifiers);
+        if (!options.identifiers.includes('manual-import-idtravel-nl-0245')) return [];
+        return [{
+          customerId: 'manual-import-idtravel-nl-0245',
+          identityKey: 'id travel b v|id travel b v|073 511 23 14',
+          fileName: 'www.idtravel.nl-preview.png',
+          websitePhotoUrl: 'https://signed.softora.test/idtravel-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/idtravel-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        return [{
+          guard_key: 'company:id-travel-b-v',
+          sender_email: 'martijn@softora.nl',
+          recipient_email: 'info@idtravel.nl',
+          recipient_domain: 'idtravel-nl',
+          recipient_company_key: 'id-travel-b-v',
+          recipient_id: 'manual-import-idtravel-nl-0245',
+          recipient_company: 'ID Travel B.V.',
+          status: 'sent',
+          updated_at: '2026-06-09T17:17:38.634+00:00',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'idtravelbv' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(signedIdentifierReads[0], ['idtravelbv']);
+  assert.ok(signedIdentifierReads.some((identifiers) => identifiers.includes('manual-import-idtravel-nl-0245')));
+  assert.match(response.body, /<h1 class="hero-title">ID Travel B\.V\.<\/h1>/);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(response.body, /idtravel-webdesign\.png\?token=test/);
+  assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
+});
+
 test('public webdesign preview retries transient reads and resolves BV slug variants', async () => {
   let photoReads = 0;
   let customerReads = 0;
