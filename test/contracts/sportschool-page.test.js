@@ -55,11 +55,11 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /pointerdown/);
   assert.match(scriptSource, /Verwijder/);
   assert.match(scriptSource, /IS EEN RUSTDAG/);
-  assert.match(stylesSource, /\.exercise-card\s*\{[\s\S]*?padding: 11px 12px;/);
-  assert.match(stylesSource, /\.exercise-list\s*\{[\s\S]*?gap: 8px;/);
-  assert.match(stylesSource, /\.metric\s*\{[\s\S]*?width: 34px;/);
-  assert.match(stylesSource, /\.exercise-title\s*\{[\s\S]*?font-size: 14px;/);
-  assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?font-size: 12px;/);
+  assert.match(stylesSource, /\.exercise-card\s*\{[\s\S]*?padding: 8px 10px;/);
+  assert.match(stylesSource, /\.exercise-list\s*\{[\s\S]*?gap: 6px;/);
+  assert.match(stylesSource, /\.metric\s*\{[\s\S]*?width: 30px;/);
+  assert.match(stylesSource, /\.exercise-title\s*\{[\s\S]*?font-size: 13px;/);
+  assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?font-size: 11px;/);
   assert.match(stylesSource, /:focus-within/);
   assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
 });

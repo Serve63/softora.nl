@@ -154,13 +154,13 @@ input:focus-visible {
 
 .exercise-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .exercise-swipe {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 12px;
   touch-action: pan-y;
 }
 
@@ -169,7 +169,7 @@ input:focus-visible {
   inset: 0 auto 0 0;
   width: 108px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--softora-purple);
   color: var(--softora-white);
   font-size: 12px;
@@ -181,11 +181,11 @@ input:focus-visible {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 5px;
+  gap: 3px;
   width: 100%;
-  padding: 11px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--softora-purple-line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--softora-white);
   touch-action: pan-y;
   transition: transform 180ms ease;
@@ -204,7 +204,7 @@ input:focus-visible {
 .exercise-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px;
+  gap: 5px;
   align-items: center;
 }
 
@@ -220,10 +220,10 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-ink);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: 0.35px;
+  line-height: 1.04;
+  letter-spacing: 0.28px;
 }
 
 .exercise-title::placeholder,
@@ -234,17 +234,17 @@ input:focus-visible {
 
 .metric-group {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
 }
 
 .metric {
   display: grid;
   justify-items: center;
-  width: 34px;
-  padding: 4px 3px 3px;
+  width: 30px;
+  padding: 3px 2px 2px;
   border: 1px solid rgba(240, 220, 230, 0.86);
-  border-radius: 9px;
+  border-radius: 8px;
   background: rgba(252, 248, 251, 0.75);
 }
 
@@ -254,11 +254,11 @@ input:focus-visible {
 }
 
 .metric-input {
-  width: 27px;
-  height: 17px;
+  width: 24px;
+  height: 15px;
   color: var(--softora-ink);
   font-family: Oswald, Inter, sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -266,7 +266,7 @@ input:focus-visible {
 
 .metric-label {
   color: rgba(127, 125, 141, 0.8);
-  font-size: 7px;
+  font-size: 6.5px;
   font-weight: 700;
   letter-spacing: 0.3px;
 }
@@ -275,9 +275,9 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.1;
   letter-spacing: 0.15px;
 }
 
