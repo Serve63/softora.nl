@@ -3,7 +3,6 @@ const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
-const sharp = require('sharp');
 const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
   bypassReadFailureCooldown: true,
   bypassReadCache: true,
@@ -34,6 +33,7 @@ const PUBLIC_PREVIEW_PROFILES = Object.freeze({
     photoSource: '/assets/martijn-van-de-ven-profile.png?v=20260609a',
   }),
 });
+let sharpModule = null;
 const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
   'serve@softora.nl': 'serve',
   'servecreusen@softora.nl': 'serve',
@@ -708,6 +708,11 @@ function getUrlOrigin(value) {
   }
 }
 
+function getSharp() {
+  if (!sharpModule) sharpModule = require('sharp');
+  return sharpModule;
+}
+
 function buildPublicPreviewAssetPath(identifier, type) {
   const id = normalizeCustomerId(identifier);
   const assetType = normalizeString(type).toLowerCase() === 'mockup' ? 'mockup' : 'webdesign';
@@ -763,7 +768,7 @@ async function optimizePublicPreviewImage(source, type) {
   const image = await fetchPublicPreviewImageBuffer(source);
   if (!image || !Buffer.isBuffer(image.buffer)) return null;
   const targetWidth = type === 'mockup' ? 1280 : 920;
-  const buffer = await sharp(image.buffer, { limitInputPixels: PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS })
+  const buffer = await getSharp()(image.buffer, { limitInputPixels: PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS })
     .rotate()
     .resize({
       width: targetWidth,
