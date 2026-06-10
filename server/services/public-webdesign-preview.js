@@ -877,7 +877,7 @@ ${preconnectTags}
     .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp(0px,3vw,44px)}
     .wide-stack{width:min(54%,780px);display:flex;flex-direction:column;align-items:center;gap:22px}
     .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden;flex-shrink:0}
-    .tall{width:min(42%,540px);border-radius:16px;aspect-ratio:5/8}
+    .tall{width:min(42%,540px);border-radius:16px}
     .wide{width:100%;border-radius:14px;aspect-ratio:16/10}
     .visual{display:block;width:100%;height:100%;background:var(--panel)}
     .tall .visual{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center}

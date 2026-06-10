@@ -173,7 +173,8 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /Eerste indruk op elk schermformaat/);
   assert.doesNotMatch(response.body, /Een korte indruk van de eerste versie/);
   assert.match(response.body, /\.stage-card\{background:rgba\(255,255,255,\.28\);box-shadow:0 20px 60px rgba\(28,43,80,\.14\);overflow:hidden;flex-shrink:0\}/);
-  assert.match(response.body, /\.tall\{width:min\(42%,540px\);border-radius:16px;aspect-ratio:5\/8\}/);
+  assert.match(response.body, /\.tall\{width:min\(42%,540px\);border-radius:16px\}/);
+  assert.doesNotMatch(response.body, /\.tall\{[^}]*aspect-ratio:5\/8/);
   assert.match(response.body, /\.wide\{width:100%;border-radius:14px;aspect-ratio:16\/10\}/);
   assert.match(response.body, /\.tall \.visual\{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center\}/);
   assert.match(response.body, /\.wide \.visual\{height:100%;object-fit:contain;object-position:center\}/);
