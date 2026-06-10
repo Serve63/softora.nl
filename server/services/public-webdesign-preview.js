@@ -48,10 +48,16 @@ const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
 const PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS = Object.freeze([
   'lastColdmailSenderEmail',
   'senderEmail',
+  'sender_email',
   'sentFromEmail',
   'sent_from_email',
   'outreachSentFromEmail',
   'outreach_sent_from_email',
+  'replyMailboxAccount',
+  'lastColdmailReplyMailboxAccount',
+  'mailboxAccount',
+  'accountEmail',
+  'account_email',
   'fromEmail',
   'mailFrom',
   'mail_from',
@@ -209,8 +215,8 @@ function inferPublicPreviewProfileKey(objects) {
     || inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_OWNER_FIELDS);
 }
 
-function resolvePublicPreviewProfile(record = null, customer = null) {
-  const objects = collectProfileObjects(record, customer);
+function resolvePublicPreviewProfile(record = null, customer = null, outboundContext = null) {
+  const objects = collectProfileObjects(outboundContext, record, customer);
   const inferredKey = inferPublicPreviewProfileKey(objects);
   const key = inferredKey || PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY;
   const fallback = PUBLIC_PREVIEW_PROFILES[key] || PUBLIC_PREVIEW_PROFILES[PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY];
@@ -512,12 +518,123 @@ function collectCustomerStructuredPreviewIdentifiers(customer) {
   ].filter(Boolean)));
 }
 
-function buildPreviewFromRecord(id, values, record, customer = null) {
+function getPreviewRecordList(photoMap) {
+  return Object.keys(photoMap || {}).map((key) => {
+    const item = photoMap[key];
+    return item && typeof item === 'object'
+      ? { ...item, id: normalizeString(item.id || item.customerId || key) }
+      : null;
+  }).filter(Boolean);
+}
+
+function collectPublicPreviewContextIdentifiers(identifier, records = [], customers = []) {
+  const values = [
+    normalizeString(identifier),
+    ...(Array.isArray(records) ? records : []).flatMap((record) => {
+      if (!record || typeof record !== 'object') return [];
+      const legacyMeta = record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
+      return [
+        normalizeString(record.id || record.customerId || record.databaseId),
+        normalizeString(record.identityKey),
+        normalizeString(legacyMeta.id || legacyMeta.customerId || legacyMeta.databaseId),
+        normalizeString(legacyMeta.identityKey),
+        ...collectPhotoRecordSlugCandidates(record),
+      ];
+    }),
+    ...(Array.isArray(customers) ? customers : []).flatMap(collectCustomerStructuredPreviewIdentifiers),
+  ];
+  return Array.from(new Set(values.map(normalizeString).filter(Boolean))).slice(0, 80);
+}
+
+function parsePublicPreviewContextTimestampMs(value) {
+  const parsed = Date.parse(normalizeString(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getOutboundContextSlugCandidates(context) {
+  if (!context || typeof context !== 'object') return [];
+  const payload = context.payload && typeof context.payload === 'object' ? context.payload : {};
+  return Array.from(new Set([
+    normalizeString(context.recipient_id || context.recipientId),
+    normalizeString(context.recipient_company_key || context.recipientCompanyKey),
+    normalizeString(context.recipient_domain || context.recipientDomain),
+    normalizeString(context.recipient_email || context.recipientEmail),
+    normalizeString(context.key_value || context.keyValue),
+    normalizeString(context.recipient_company || context.recipientCompany),
+    normalizeString(payload.bedrijf || payload.company || payload.companyName),
+    normalizeString(payload.website || payload.websiteUrl || payload.domain || payload.domein),
+    domainNameCandidate(context.recipient_email || context.recipientEmail),
+    domainNameCandidate(payload.website || payload.websiteUrl || payload.domain || payload.domein),
+  ].filter(Boolean)));
+}
+
+function collectOutboundContextStructuredPreviewIdentifiers(context) {
+  if (!context || typeof context !== 'object') return [];
+  const payload = context.payload && typeof context.payload === 'object' ? context.payload : {};
+  return Array.from(new Set([
+    normalizeString(context.recipient_id || context.recipientId),
+    normalizeString(context.recipient_company_key || context.recipientCompanyKey),
+    normalizeString(context.recipient_domain || context.recipientDomain),
+    normalizeString(context.recipient_email || context.recipientEmail),
+    normalizeString(context.recipient_company || context.recipientCompany),
+    normalizeString(payload.bedrijf || payload.company || payload.companyName),
+    normalizeString(payload.website || payload.websiteUrl || payload.domain || payload.domein),
+    domainNameCandidate(context.recipient_email || context.recipientEmail),
+    domainNameCandidate(payload.website || payload.websiteUrl || payload.domain || payload.domein),
+  ].filter(Boolean)));
+}
+
+function outboundContextMatchesPreview(context, identifier, record = null, customer = null) {
+  const identifiers = collectPublicPreviewContextIdentifiers(identifier, record ? [record] : [], customer ? [customer] : []);
+  if (!identifiers.length) return false;
+  const directIdentifiers = new Set(identifiers.map((value) => normalizeString(value).toLowerCase()));
+  const directCandidates = [
+    context && (context.recipient_id || context.recipientId),
+    context && (context.recipient_company_key || context.recipientCompanyKey),
+    context && (context.recipient_domain || context.recipientDomain),
+    context && (context.key_value || context.keyValue),
+  ].map((value) => normalizeString(value).toLowerCase()).filter(Boolean);
+  if (directCandidates.some((candidate) => directIdentifiers.has(candidate))) return true;
+  const slugCandidates = getOutboundContextSlugCandidates(context);
+  return identifiers.some((identifierCandidate) =>
+    slugCandidates.some((slugCandidate) =>
+      slugMatchesIdentifier(slugCandidate, identifierCandidate) ||
+        slugMatchesIdentifier(identifierCandidate, slugCandidate)
+    )
+  );
+}
+
+function findOutboundContextForPreview(contexts, identifier, record = null, customer = null) {
+  return (Array.isArray(contexts) ? contexts : [])
+    .filter((context) =>
+      inferPublicPreviewProfileKeyFromFields([context], PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS) &&
+        outboundContextMatchesPreview(context, identifier, record, customer)
+    )
+    .sort((left, right) =>
+      Math.max(
+        parsePublicPreviewContextTimestampMs(right && right.updated_at),
+        parsePublicPreviewContextTimestampMs(right && right.updatedAt),
+        parsePublicPreviewContextTimestampMs(right && right.created_at),
+        parsePublicPreviewContextTimestampMs(right && right.createdAt)
+      ) -
+        Math.max(
+          parsePublicPreviewContextTimestampMs(left && left.updated_at),
+          parsePublicPreviewContextTimestampMs(left && left.updatedAt),
+          parsePublicPreviewContextTimestampMs(left && left.created_at),
+          parsePublicPreviewContextTimestampMs(left && left.createdAt)
+        )
+    )[0] || null;
+}
+
+function buildPreviewFromRecord(id, values, record, customer = null, outboundContext = null) {
   const photoSource = resolvePreviewSource(values, record, 'photo');
   const mockupSource = resolvePreviewSource(values, record, 'mockup');
   if (!isValidImageSource(photoSource) || !isValidImageSource(mockupSource)) return null;
   const legacyMeta = record && record.legacyMeta && typeof record.legacyMeta === 'object' ? record.legacyMeta : {};
   const customerLegacyMeta = customer && customer.legacyMeta && typeof customer.legacyMeta === 'object' ? customer.legacyMeta : {};
+  const outboundPayload = outboundContext && outboundContext.payload && typeof outboundContext.payload === 'object'
+    ? outboundContext.payload
+    : {};
   const title = normalizeString(
     record &&
       (record.bedrijf ||
@@ -538,13 +655,20 @@ function buildPreviewFromRecord(id, values, record, customer = null) {
         customerLegacyMeta.company ||
         customerLegacyMeta.companyName ||
         customerLegacyMeta.naam)
+  ) || normalizeString(
+    outboundContext &&
+      (outboundContext.recipient_company ||
+        outboundContext.recipientCompany ||
+        outboundPayload.bedrijf ||
+        outboundPayload.company ||
+        outboundPayload.companyName)
   );
   return {
     id,
     photoSource,
     mockupSource,
     title,
-    profile: resolvePublicPreviewProfile(record, customer),
+    profile: resolvePublicPreviewProfile(record, customer, outboundContext),
   };
 }
 
@@ -612,17 +736,22 @@ function buildPhotoMapFromStructuredEntries(entries) {
   }, {});
 }
 
-function resolvePreviewFromMaps(id, values, photoMap, customers) {
+function resolvePreviewFromMaps(id, values, photoMap, customers, outboundContexts = []) {
   let record = findPhotoRecord(photoMap, id);
-  let preview = buildPreviewFromRecord(id, values, record, findCustomerForPreviewRecord(customers, id, record));
+  let customer = findCustomerForPreviewRecord(customers, id, record);
+  let outboundContext = findOutboundContextForPreview(outboundContexts, id, record, customer);
+  let preview = buildPreviewFromRecord(id, values, record, customer, outboundContext);
   if (preview) return preview;
 
   record = findPhotoRecordBySlug(photoMap, id);
+  customer = findCustomerForPreviewRecord(customers, id, record);
+  outboundContext = findOutboundContextForPreview(outboundContexts, id, record, customer);
   preview = buildPreviewFromRecord(
     normalizeString(record && (record.id || record.customerId)) || id,
     values,
     record,
-    findCustomerForPreviewRecord(customers, id, record)
+    customer,
+    outboundContext
   );
   if (preview) return preview;
 
@@ -634,7 +763,8 @@ function resolvePreviewFromMaps(id, values, photoMap, customers) {
   for (const customer of candidates) {
     const candidateId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId)) || id;
     record = findPhotoRecordByIdentity(photoMap, getCustomerIdentityKeys(customer)) || findPhotoRecord(photoMap, candidateId) || record;
-    preview = buildPreviewFromRecord(candidateId, values, record, customer);
+    outboundContext = findOutboundContextForPreview(outboundContexts, id, record, customer);
+    preview = buildPreviewFromRecord(candidateId, values, record, customer, outboundContext);
     if (preview) return preview;
   }
   return null;
@@ -851,8 +981,31 @@ function createPublicWebdesignPreviewService(options = {}) {
     }));
     const directPhotoMap = buildPhotoMapFromStructuredEntries(directPhotoEntries);
     const includeProfileContext = Boolean(options.includeProfileContext);
-    let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, []);
-    if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) return preview;
+    let outboundContexts = [];
+    const loadOutboundContexts = async (identifiers) => {
+      if (
+        !includeProfileContext ||
+        !dataOpsStore ||
+        typeof dataOpsStore.listOutboundRecipientGuardsForPreview !== 'function'
+      ) {
+        return [];
+      }
+      const loaded = await retryPublicPreviewRead(() =>
+        dataOpsStore.listOutboundRecipientGuardsForPreview({
+          ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
+          identifiers,
+          maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
+        })
+      );
+      return Array.isArray(loaded) ? loaded : [];
+    };
+    outboundContexts = await loadOutboundContexts(
+      collectPublicPreviewContextIdentifiers(id, getPreviewRecordList(directPhotoMap), [])
+    );
+    let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], outboundContexts);
+    if (preview && (!includeProfileContext || (hasExplicitPublicPreviewProfile(preview) && normalizeString(preview.title)))) {
+      return preview;
+    }
 
     let customers = [];
     const loadedCustomers = await retryPublicPreviewRead(() =>
@@ -864,13 +1017,20 @@ function createPublicWebdesignPreviewService(options = {}) {
       customers = [];
     }
     if (preview) {
-      const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers);
+      const matchedCustomers = getPreviewRecordList(directPhotoMap)
+        .map((record) => findCustomerForPreviewRecord(customers, id, record))
+        .filter(Boolean);
+      outboundContexts = await loadOutboundContexts(
+        collectPublicPreviewContextIdentifiers(id, getPreviewRecordList(directPhotoMap), matchedCustomers)
+      );
+      const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
       return enrichedPreview || preview;
     }
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
       id,
       ...candidates.flatMap(collectCustomerStructuredPreviewIdentifiers),
+      ...outboundContexts.flatMap(collectOutboundContextStructuredPreviewIdentifiers),
     ].filter(Boolean)));
 
     if (identifiers.length > 1) {
@@ -880,7 +1040,11 @@ function createPublicWebdesignPreviewService(options = {}) {
         identifiers,
         maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
       }));
-      preview = resolvePreviewFromMaps(id, {}, buildPhotoMapFromStructuredEntries(photoEntries), candidates);
+      const photoMap = buildPhotoMapFromStructuredEntries(photoEntries);
+      outboundContexts = await loadOutboundContexts(
+        collectPublicPreviewContextIdentifiers(id, getPreviewRecordList(photoMap), candidates)
+      );
+      preview = resolvePreviewFromMaps(id, {}, photoMap, candidates, outboundContexts);
       if (preview) return preview;
     }
 

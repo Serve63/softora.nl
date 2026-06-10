@@ -706,6 +706,80 @@ test('data ops store signs only matching design photo rows for targeted preview 
   assert.equal(entries.targetedIdentifiersApplied, true);
 });
 
+test('data ops store lists outbound sender guards for public preview profile fallback', async () => {
+  const orClauses = [];
+  const statusFilters = [];
+  const rows = [
+    {
+      guard_key: 'id:manual-import-idtravel-nl-0245',
+      key_type: 'id',
+      key_value: 'manual-import-idtravel-nl-0245',
+      provider: 'softora',
+      channel: 'coldmail',
+      sender_email: 'martijn@softora.nl',
+      recipient_email: 'info@idtravel.nl',
+      recipient_domain: 'idtravel-nl',
+      recipient_company_key: 'id-travel-b-v',
+      recipient_id: 'manual-import-idtravel-nl-0245',
+      recipient_company: 'ID Travel B.V.',
+      status: 'sent',
+      source: 'softora-coldmail-pre-send',
+      actor: 'Coldmail Autopilot Cron',
+      permanent: true,
+      payload: { bedrijf: 'ID Travel B.V.' },
+      created_at: '2026-06-09T17:17:36.739273+00:00',
+      updated_at: '2026-06-09T17:17:38.634+00:00',
+    },
+  ];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_outbound_recipient_guards');
+      return {
+        select(selection) {
+          assert.match(selection, /sender_email/);
+          return {
+            or(clause) {
+              orClauses.push(clause);
+              return {
+                in(column, values) {
+                  statusFilters.push([column, values]);
+                  return this;
+                },
+                order(column, options) {
+                  assert.equal(column, 'updated_at');
+                  assert.equal(options.ascending, false);
+                  return this;
+                },
+                limit(limit) {
+                  assert.equal(limit, 50);
+                  return Promise.resolve({ data: rows, error: null });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const guards = await store.listOutboundRecipientGuardsForPreview({
+    identifiers: ['idtravelbv', 'manual-import-idtravel-nl-0245', 'https://www.idtravel.nl'],
+    maxMatches: 12,
+    bypassReadCache: true,
+  });
+
+  assert.equal(guards.length, 1);
+  assert.equal(guards[0].sender_email, 'martijn@softora.nl');
+  assert.ok(orClauses.some((clause) => clause.includes('recipient_id.eq.manual-import-idtravel-nl-0245')));
+  assert.ok(orClauses.some((clause) => clause.includes('recipient_domain.eq.idtravel-nl')));
+  assert.deepEqual(statusFilters[0], ['status', ['sent', 'reserved']]);
+});
+
 test('data ops store matches compact manual-import design photo ids for clean public slugs', async () => {
   const fillerRows = Array.from({ length: 500 }, (_item, index) => ({
     customer_id: `manual-import-other-company-${index + 1}`,
