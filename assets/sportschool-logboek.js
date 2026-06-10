@@ -247,11 +247,12 @@
     };
   }
 
-  async function saveDirectSupabaseState(config, snapshotJson) {
+  async function saveDirectSupabaseState(config, snapshotJson, options = {}) {
     const endpoint =
       `${config.url}/rest/v1/${DIRECT_SUPABASE_TABLE}?on_conflict=id`;
     const response = await fetch(endpoint, {
       method: 'POST',
+      keepalive: options.keepalive === true,
       headers: {
         ...buildDirectSupabaseHeaders(config),
         Prefer: 'resolution=merge-duplicates',
@@ -286,9 +287,9 @@
     return response.json();
   }
 
-  async function saveRemoteState(snapshotJson) {
+  async function saveRemoteState(snapshotJson, options = {}) {
     const directConfig = getDirectSupabaseConfig();
-    if (directConfig) return saveDirectSupabaseState(directConfig, snapshotJson);
+    if (directConfig) return saveDirectSupabaseState(directConfig, snapshotJson, options);
 
     const body = {
       patch: { [REMOTE_STATE_KEY]: snapshotJson },
@@ -302,6 +303,7 @@
 
     const response = await fetch(`/api/ui-state-set?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
       method: 'POST',
+      keepalive: options.keepalive === true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -328,17 +330,27 @@
   function scheduleRemoteSave() {
     if (isApplyingRemoteState) return;
     window.clearTimeout(remoteSaveTimer);
-    remoteSaveTimer = window.setTimeout(async () => {
-      const snapshot = buildSnapshotFromState();
-      const snapshotJson = JSON.stringify(snapshot);
-      if (snapshotJson === lastRemoteSnapshotJson) return;
-      lastRemoteSnapshotJson = snapshotJson;
-      try {
-        await saveRemoteState(snapshotJson);
-      } catch (_error) {
-        lastRemoteSnapshotJson = '';
-      }
+    remoteSaveTimer = window.setTimeout(() => {
+      persistRemoteSave();
     }, REMOTE_SAVE_DELAY_MS);
+  }
+
+  async function persistRemoteSave(options = {}) {
+    if (isApplyingRemoteState) return;
+    const snapshot = buildSnapshotFromState();
+    const snapshotJson = JSON.stringify(snapshot);
+    if (snapshotJson === lastRemoteSnapshotJson) return;
+    try {
+      await saveRemoteState(snapshotJson, options);
+      lastRemoteSnapshotJson = snapshotJson;
+    } catch (_error) {
+      // De eerstvolgende wijziging of online-event probeert opnieuw.
+    }
+  }
+
+  function flushRemoteSave() {
+    window.clearTimeout(remoteSaveTimer);
+    persistRemoteSave({ keepalive: true });
   }
 
   function renderDayChoices() {
@@ -391,8 +403,9 @@
     deleteButton.className = 'delete-action';
     deleteButton.textContent = 'Verwijder';
     deleteButton.addEventListener('click', () => {
-      saveOrders(day, readOrders(day).filter((order) => order !== exercise.order));
+      saveOrders(day, readOrders(day).filter((order) => order !== exercise.order), { silent: true });
       render();
+      persistRemoteSave();
     });
 
     const card = document.createElement('article');
@@ -546,6 +559,7 @@
     writeField(selectedDay, exercise.order, 'name', upper(exercise.title));
     writeField(selectedDay, exercise.order, 'notes', upper(exercise.notes));
     render();
+    persistRemoteSave();
   });
 
   dayTrigger.addEventListener('click', openDayPicker);
@@ -554,6 +568,10 @@
     if (event.key === 'Escape') closeDayPicker();
   });
   window.addEventListener('online', scheduleRemoteSave);
+  window.addEventListener('pagehide', flushRemoteSave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushRemoteSave();
+  });
 
   async function boot() {
     try {

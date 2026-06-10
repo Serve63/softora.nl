@@ -275,9 +275,9 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.18;
+  line-height: 1.15;
   letter-spacing: 0.15px;
 }
 

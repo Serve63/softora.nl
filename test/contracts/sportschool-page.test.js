@@ -19,6 +19,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /noindex,nofollow/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
+  assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -32,6 +33,11 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /SoftoraSportschoolSupabase/);
   assert.match(scriptSource, /SoftoraUiStateClient/);
   assert.match(scriptSource, /scheduleRemoteSave/);
+  assert.match(scriptSource, /persistRemoteSave/);
+  assert.match(scriptSource, /keepalive: options\.keepalive === true/);
+  assert.match(scriptSource, /pagehide/);
+  assert.match(scriptSource, /visibilitychange/);
+  assert.match(scriptSource, /lastRemoteSnapshotJson = snapshotJson/);
   assert.match(scriptSource, /createDefaultState/);
   assert.match(scriptSource, /async function boot/);
   assert.match(scriptSource, /await loadRemoteState\(\)/);
@@ -53,7 +59,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.exercise-list\s*\{[\s\S]*?gap: 8px;/);
   assert.match(stylesSource, /\.metric\s*\{[\s\S]*?width: 34px;/);
   assert.match(stylesSource, /\.exercise-title\s*\{[\s\S]*?font-size: 14px;/);
-  assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?font-size: 13px;/);
+  assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?font-size: 12px;/);
   assert.match(stylesSource, /:focus-within/);
   assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
 });
