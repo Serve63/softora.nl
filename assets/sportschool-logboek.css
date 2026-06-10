@@ -154,13 +154,13 @@ input:focus-visible {
 
 .exercise-list {
   display: grid;
-  gap: 11px;
+  gap: 8px;
 }
 
 .exercise-swipe {
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 14px;
   touch-action: pan-y;
 }
 
@@ -169,7 +169,7 @@ input:focus-visible {
   inset: 0 auto 0 0;
   width: 108px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--softora-purple);
   color: var(--softora-white);
   font-size: 12px;
@@ -181,11 +181,11 @@ input:focus-visible {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 7px;
+  gap: 5px;
   width: 100%;
-  padding: 14px;
+  padding: 11px 12px;
   border: 1px solid var(--softora-purple-line);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--softora-white);
   touch-action: pan-y;
   transition: transform 180ms ease;
@@ -204,7 +204,7 @@ input:focus-visible {
 .exercise-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 7px;
   align-items: center;
 }
 
@@ -220,7 +220,7 @@ input:focus-visible {
   width: 100%;
   min-width: 0;
   color: var(--softora-ink);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: 0.35px;
@@ -234,17 +234,17 @@ input:focus-visible {
 
 .metric-group {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
 .metric {
   display: grid;
   justify-items: center;
-  width: 38px;
-  padding: 5px 4px 4px;
+  width: 34px;
+  padding: 4px 3px 3px;
   border: 1px solid rgba(240, 220, 230, 0.86);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(252, 248, 251, 0.75);
 }
 
@@ -254,11 +254,11 @@ input:focus-visible {
 }
 
 .metric-input {
-  width: 30px;
-  height: 19px;
+  width: 27px;
+  height: 17px;
   color: var(--softora-ink);
   font-family: Oswald, Inter, sans-serif;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -266,18 +266,18 @@ input:focus-visible {
 
 .metric-label {
   color: rgba(127, 125, 141, 0.8);
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
-  letter-spacing: 0.35px;
+  letter-spacing: 0.3px;
 }
 
 .exercise-notes {
   width: 100%;
   min-width: 0;
   color: var(--softora-muted);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.18;
   letter-spacing: 0.15px;
 }
 
