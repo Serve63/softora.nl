@@ -52,6 +52,7 @@ const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 60;
 const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 74;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS = 45;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS = 240;
+const COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS = 10 * 1000;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -3525,7 +3526,9 @@ function createColdmailCampaignService(deps = {}) {
     );
     const floorReadyAtMs = lastSentAtMs + minimumCooldownMinutes * 60 * 1000;
     const readyAtMs = Math.max(targetReadyAtMs, floorReadyAtMs);
-    if (readyAtMs <= currentMs) return { ok: true, readyAtMs, cooldownMinutes: 0 };
+    if (readyAtMs <= currentMs + COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS) {
+      return { ok: true, readyAtMs, cooldownMinutes: 0 };
+    }
     return {
       ok: false,
       readyAtMs,
@@ -3587,7 +3590,7 @@ function createColdmailCampaignService(deps = {}) {
           const readyAtMs = daySlotReadiness
             ? daySlotReadiness.readyAtMs
             : lastSentAtMs + cooldownMinutes * 60 * 1000;
-          if (lastSentAtMs && readyAtMs > currentMs) {
+          if (lastSentAtMs && readyAtMs > currentMs && !(daySlotReadiness && daySlotReadiness.ok)) {
             skipped.push({
               senderEmail,
               reason: 'sender_cooldown',
