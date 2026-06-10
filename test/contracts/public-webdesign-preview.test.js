@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
 
 const {
   CUSTOMER_KEY,
@@ -168,11 +169,12 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /mobile-mockup-intro/);
   assert.match(response.body, /@media\(max-width:900px\)\{\.concept-hero\{min-height:100svh;padding-top:34px;justify-content:flex-start\}\.mockup-stage\{flex-direction:column;padding:0;gap:22px\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.wide\{width:100%;order:1\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
-  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<div class="stage-card wide">/);
+  assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<div class="stage-card wide" data-loading="Mockup wordt geladen">/);
   assert.doesNotMatch(response.body, /Een eerste indruk/);
   assert.doesNotMatch(response.body, /Eerste indruk op elk schermformaat/);
   assert.doesNotMatch(response.body, /Een korte indruk van de eerste versie/);
-  assert.match(response.body, /\.stage-card\{background:rgba\(255,255,255,\.28\);box-shadow:0 20px 60px rgba\(28,43,80,\.14\);overflow:hidden;flex-shrink:0\}/);
+  assert.match(response.body, /\.stage-card\{background:rgba\(255,255,255,\.28\);box-shadow:0 20px 60px rgba\(28,43,80,\.14\);overflow:hidden;flex-shrink:0;position:relative\}/);
+  assert.match(response.body, /\.stage-card::before\{content:attr\(data-loading\);position:absolute;inset:0;display:grid;place-items:center/);
   assert.match(response.body, /\.tall\{width:min\(42%,540px\);border-radius:16px\}/);
   assert.doesNotMatch(response.body, /\.tall\{[^}]*aspect-ratio:5\/8/);
   assert.match(response.body, /\.wide\{width:100%;border-radius:14px;aspect-ratio:16\/10\}/);
@@ -216,10 +218,11 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /Over dit concept/);
   assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
-  assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
-  assert.match(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
-  assert.match(response.body, /<img class="visual" src="https:\/\/cdn\.softora\.test\/piggy-webdesign\.png" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high">/);
-  assert.match(response.body, /<img class="visual" src="https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg" alt="Device mockup preview" width="1600" height="1000" loading="eager" decoding="async">/);
+  assert.match(response.body, /<link rel="preload" as="image" href="\/webdesign\/customer-1\/asset\/webdesign" fetchpriority="high">/);
+  assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/webdesign" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high">/);
+  assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/mockup" alt="Device mockup preview" width="1600" height="1000" loading="lazy" decoding="async">/);
+  assert.doesNotMatch(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
+  assert.doesNotMatch(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
@@ -263,6 +266,116 @@ test('public webdesign preview concept route switches the profile by sender cont
   assert.match(response.body, /<p>Ook heb ik de concurrenten van Bakkerij Janssen in kaart gebracht\./);
   assert.doesNotMatch(response.body, /Servé Creusen/);
   assert.doesNotMatch(response.body, /Piggy’s Kadoshop/);
+});
+
+test('public webdesign preview asset route serves optimized cached webp images', async () => {
+  const originalFetch = global.fetch;
+  const pngBuffer = await sharp({
+    create: {
+      width: 1200,
+      height: 1800,
+      channels: 4,
+      background: { r: 28, g: 43, b: 80, alpha: 1 },
+    },
+  }).png().toBuffer();
+  let fetchedUrl = '';
+  global.fetch = async (url) => {
+    fetchedUrl = String(url);
+    return new Response(pngBuffer, {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'content-length': String(pngBuffer.length),
+      },
+    });
+  };
+  try {
+    const service = createPublicWebdesignPreviewService({
+      async getUiStateValues() {
+        return { values: {} };
+      },
+      dataOpsStore: {
+        async listCustomers() {
+          return [];
+        },
+        async listDesignPhotosWithSignedUrls() {
+          return [{
+            customerId: 'customer-1',
+            fileName: 'customer-webdesign.png',
+            websitePhotoUrl: 'https://signed.softora.test/customer-webdesign.png?token=test',
+            websiteMockupUrl: 'https://signed.softora.test/customer-mockup.jpg?token=test',
+          }];
+        },
+      },
+    });
+    const response = createResponseRecorder();
+
+    await service.getPreviewAssetResponse({
+      params: { companySlug: 'customer-1', assetType: 'webdesign' },
+    }, response);
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers['Content-Type'], 'image/webp');
+    assert.match(response.headers['Cache-Control'], /s-maxage=86400/);
+    assert.equal(fetchedUrl, 'https://signed.softora.test/customer-webdesign.png?token=test');
+    assert.ok(Buffer.isBuffer(response.body));
+    const metadata = await sharp(response.body).metadata();
+    assert.equal(metadata.format, 'webp');
+    assert.equal(metadata.width, 920);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('public webdesign preview asset route optimizes mockups at wider display width', async () => {
+  const originalFetch = global.fetch;
+  const jpgBuffer = await sharp({
+    create: {
+      width: 1800,
+      height: 1100,
+      channels: 3,
+      background: { r: 242, g: 237, b: 230 },
+    },
+  }).jpeg({ quality: 92 }).toBuffer();
+  global.fetch = async () => new Response(jpgBuffer, {
+    status: 200,
+    headers: {
+      'content-type': 'image/jpeg',
+      'content-length': String(jpgBuffer.length),
+    },
+  });
+  try {
+    const service = createPublicWebdesignPreviewService({
+      async getUiStateValues() {
+        return { values: {} };
+      },
+      dataOpsStore: {
+        async listCustomers() {
+          return [];
+        },
+        async listDesignPhotosWithSignedUrls() {
+          return [{
+            customerId: 'customer-1',
+            fileName: 'customer-webdesign.png',
+            websitePhotoUrl: 'https://signed.softora.test/customer-webdesign.png?token=test',
+            websiteMockupUrl: 'https://signed.softora.test/customer-mockup.jpg?token=test',
+          }];
+        },
+      },
+    });
+    const response = createResponseRecorder();
+
+    await service.getPreviewAssetResponse({
+      params: { companySlug: 'customer-1', assetType: 'mockup' },
+    }, response);
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers['Content-Type'], 'image/webp');
+    const metadata = await sharp(response.body).metadata();
+    assert.equal(metadata.width, 1280);
+  } finally {
+    global.fetch = originalFetch;
+  }
 });
 
 test('public webdesign preview uses a human company name in narrative copy', async () => {
@@ -380,7 +493,7 @@ test('public webdesign preview uses outbound guards to rescue links when custome
   assert.ok(signedIdentifierReads.some((identifiers) => identifiers.includes('manual-import-idtravel-nl-0245')));
   assert.match(response.body, /<h1 class="hero-title">ID Travel B\.V\.<\/h1>/);
   assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
-  assert.match(response.body, /idtravel-webdesign\.png\?token=test/);
+  assert.match(response.body, /\/webdesign\/idtravelbv\/asset\/webdesign/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });
 
@@ -422,7 +535,7 @@ test('public webdesign preview retries transient reads and resolves BV slug vari
   assert.equal(customerReads, 1);
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /<h1 class="hero-title">Van Gestel Steigerbouw B\.V\.<\/h1>/);
-  assert.match(response.body, /van-gestel-webdesign\.png\?token=test/);
+  assert.match(response.body, /\/webdesign\/van-gestel-steigerbouw-b-v\/asset\/webdesign/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });
 
@@ -827,8 +940,8 @@ test('public webdesign preview renders compact import-id photo matches when cust
 
   assert.equal(customerReads, 3);
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /cafe-schuttershof-webdesign\.png\?token=test/);
-  assert.match(response.body, /cafe-schuttershof-mockup\.jpg\?token=test/);
+  assert.match(response.body, /\/webdesign\/cafe-schuttershof\/asset\/webdesign/);
+  assert.match(response.body, /\/webdesign\/cafe-schuttershof\/asset\/mockup/);
   assert.match(response.body, /<h1 class="hero-title">Cafe Schuttershof<\/h1>/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });
@@ -909,13 +1022,18 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
       getPreviewPageResponse(req) {
         req.called = 'preview';
       },
+      getPreviewAssetResponse(req) {
+        req.called = 'asset';
+      },
     },
   });
 
   assert.deepEqual(routes.map((route) => [route.method, route.path]), [
+    ['GET', '/webdesign/:companySlug/asset/:assetType'],
     ['GET', '/webdesign/:companySlug/concept'],
     ['GET', '/webdesign/:companySlug'],
     ['GET', '/mailklaar/:customerId/concept'],
+    ['GET', '/mailklaar/:customerId/asset/:assetType'],
     ['GET', '/mailklaar/:customerId'],
   ]);
   const publicWebdesignRoute = routes.find((route) => route.path === '/webdesign/:companySlug');

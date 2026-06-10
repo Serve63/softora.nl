@@ -3,6 +3,7 @@ const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
 const CUSTOMER_KEY = 'softora_customers_premium_v1';
 const PUBLIC_PREVIEW_READ_FAILURE_COOLDOWN_PREFIX = 'public_webdesign_preview';
+const sharp = require('sharp');
 const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
   bypassReadFailureCooldown: true,
   bypassReadCache: true,
@@ -13,6 +14,10 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 const STRUCTURED_PREVIEW_READ_ATTEMPTS = 3;
+const PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS = 2600;
+const PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 5000;
+const PUBLIC_PREVIEW_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
+const PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS = 45_000_000;
 const PUBLIC_PREVIEW_PROFILE_ROLE = 'Webdesign & Software Ontwikkeling';
 const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'serve';
 const PUBLIC_PREVIEW_PROFILES = Object.freeze({
@@ -132,6 +137,25 @@ function safeParseArray(value) {
   } catch (_error) {
     return [];
   }
+}
+
+function withPublicPreviewTimeout(promise, timeoutMs, label = 'public-preview-read') {
+  const ms = Math.max(500, Math.min(10000, Number(timeoutMs) || PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS));
+  let timeout = null;
+  const timeoutPromise = new Promise((resolve) => {
+    timeout = setTimeout(() => resolve(undefined), ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise)
+      .catch((_error) => undefined)
+      .finally(() => {
+        if (timeout) clearTimeout(timeout);
+      }),
+    timeoutPromise,
+  ]).then((result) => {
+    if (result === undefined && label) return undefined;
+    return result;
+  });
 }
 
 function clampChunkCount(value) {
@@ -432,7 +456,11 @@ async function retryPublicPreviewRead(reader, attempts = STRUCTURED_PREVIEW_READ
   const maxAttempts = Math.max(1, Math.min(5, Number(attempts) || 1));
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      const result = await reader();
+      const result = await withPublicPreviewTimeout(
+        reader(),
+        PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS,
+        `public-preview-read-${attempt + 1}`
+      );
       if (result !== null && result !== undefined) return result;
     } catch (_error) {
       // Public preview links are opened from email; a transient read miss should not become a broken page.
@@ -680,6 +708,79 @@ function getUrlOrigin(value) {
   }
 }
 
+function buildPublicPreviewAssetPath(identifier, type) {
+  const id = normalizeCustomerId(identifier);
+  const assetType = normalizeString(type).toLowerCase() === 'mockup' ? 'mockup' : 'webdesign';
+  return `/webdesign/${encodeURIComponent(id || 'preview')}/asset/${assetType}`;
+}
+
+function getPublicPreviewAssetType(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  return normalized === 'mockup' || normalized === 'device' || normalized === 'device-mockup'
+    ? 'mockup'
+    : 'webdesign';
+}
+
+function parseDataImageSource(source) {
+  const match = normalizeString(source).match(/^data:(image\/(?:png|jpe?g|webp));base64,([a-z0-9+/=\s]+)$/i);
+  if (!match) return null;
+  return {
+    contentType: match[1].toLowerCase(),
+    buffer: Buffer.from(match[2].replace(/\s+/g, ''), 'base64'),
+  };
+}
+
+async function fetchPublicPreviewImageBuffer(source) {
+  const dataImage = parseDataImageSource(source);
+  if (dataImage) return dataImage;
+  const url = normalizeString(source);
+  if (!/^https?:\/\//i.test(url)) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
+      },
+    });
+    if (!response.ok) return null;
+    const contentType = normalizeString(response.headers.get('content-type')).split(';')[0].toLowerCase();
+    if (!/^image\/(?:png|jpe?g|webp)$/i.test(contentType)) return null;
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength > PUBLIC_PREVIEW_IMAGE_MAX_BYTES) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length || buffer.length > PUBLIC_PREVIEW_IMAGE_MAX_BYTES) return null;
+    return { buffer, contentType };
+  } catch (_error) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function optimizePublicPreviewImage(source, type) {
+  const image = await fetchPublicPreviewImageBuffer(source);
+  if (!image || !Buffer.isBuffer(image.buffer)) return null;
+  const targetWidth = type === 'mockup' ? 1280 : 920;
+  const buffer = await sharp(image.buffer, { limitInputPixels: PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS })
+    .rotate()
+    .resize({
+      width: targetWidth,
+      withoutEnlargement: true,
+      fit: 'inside',
+    })
+    .webp({
+      quality: type === 'mockup' ? 78 : 76,
+      effort: 4,
+    })
+    .toBuffer();
+  return {
+    buffer,
+    contentType: 'image/webp',
+  };
+}
+
 function titleFromIdentifier(value) {
   const cleaned = slugifyCompanyName(value)
     .replace(/^manual-import-/, '')
@@ -837,9 +938,9 @@ ${preconnectTags}
 </html>`;
 }
 
-function buildConceptHtml(preview, titleFallback) {
-  const photoSource = escapeHtml(preview.photoSource);
-  const mockupSource = escapeHtml(preview.mockupSource);
+function buildConceptHtml(preview, titleFallback, assetIdentifier) {
+  const photoSource = escapeHtml(buildPublicPreviewAssetPath(assetIdentifier || titleFallback || preview.id, 'webdesign'));
+  const mockupSource = escapeHtml(buildPublicPreviewAssetPath(assetIdentifier || titleFallback || preview.id, 'mockup'));
   const profile = preview.profile || resolvePublicPreviewProfile();
   const profileSource = escapeHtml(profile.photoSource);
   const profileName = escapeHtml(profile.name);
@@ -862,8 +963,6 @@ function buildConceptHtml(preview, titleFallback) {
   <meta name="robots" content="noindex,nofollow">
 ${preconnectTags}
   <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
-  <link rel="preload" as="image" href="${mockupSource}">
-  <link rel="preload" as="image" href="${profileSource}">
   <title>${title} | Design presentatie</title>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -876,10 +975,11 @@ ${preconnectTags}
     .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
     .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp(0px,3vw,44px)}
     .wide-stack{width:min(54%,780px);display:flex;flex-direction:column;align-items:center;gap:22px}
-    .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden;flex-shrink:0}
+    .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden;flex-shrink:0;position:relative}
+    .stage-card::before{content:attr(data-loading);position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;color:rgba(28,43,80,.5);font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;background:linear-gradient(135deg,rgba(255,250,244,.9),rgba(255,255,255,.56));z-index:0}
     .tall{width:min(42%,540px);border-radius:16px}
     .wide{width:100%;border-radius:14px;aspect-ratio:16/10}
-    .visual{display:block;width:100%;height:100%;background:var(--panel)}
+    .visual{display:block;width:100%;height:100%;background:var(--panel);position:relative;z-index:1}
     .tall .visual{height:auto;aspect-ratio:auto;object-fit:contain;object-position:top center}
     .wide .visual{height:100%;object-fit:contain;object-position:center}
     .scroll-cue{position:fixed;right:clamp(18px,4vw,56px);bottom:clamp(18px,3.5vw,42px);z-index:20;width:46px;height:46px;border-radius:999px;display:grid;place-items:center;background:rgba(255,250,244,.92);color:var(--navy);border:1px solid rgba(28,43,80,.12);box-shadow:0 14px 32px rgba(28,43,80,.18);text-decoration:none;transition:background .18s ease}
@@ -909,13 +1009,13 @@ ${preconnectTags}
 <body>
   <section class="concept-hero">
     <div class="mockup-stage">
-      <div class="stage-card tall"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high"></div>
+      <div class="stage-card tall" data-loading="Webdesign wordt geladen"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high"></div>
       <div class="wide-stack">
         <div class="hero-heading">
           <span class="hero-label">Webdesign presentatie</span>
           <h1 class="hero-title">${title}</h1>
         </div>
-        <div class="stage-card wide"><img class="visual" src="${mockupSource}" alt="Device mockup preview" width="1600" height="1000" loading="eager" decoding="async"></div>
+        <div class="stage-card wide" data-loading="Mockup wordt geladen"><img class="visual" src="${mockupSource}" alt="Device mockup preview" width="1600" height="1000" loading="lazy" decoding="async"></div>
       </div>
     </div>
     <a class="scroll-cue" href="#concept-about" aria-label="Scroll naar meer informatie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></a>
@@ -1106,10 +1206,10 @@ function createPublicWebdesignPreviewService(options = {}) {
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
     const params = req && req.params && typeof req.params === 'object' ? req.params : {};
     const routeIdentifier = params.companySlug || params.customerId;
+    const queryIdentifier = query.cid || query.customerId || query.id;
+    const assetIdentifier = queryIdentifier || routeIdentifier;
     const preview = await resolveFirstPreview([
-      query.cid ||
-        query.customerId ||
-        query.id,
+      queryIdentifier,
       routeIdentifier,
     ], { includeProfileContext: true });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1119,12 +1219,47 @@ function createPublicWebdesignPreviewService(options = {}) {
       return res.status(404).send(buildNotFoundHtml());
     }
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
-    return res.status(200).send(buildConceptHtml(preview, routeIdentifier));
+    return res.status(200).send(buildConceptHtml(preview, routeIdentifier, assetIdentifier));
+  }
+
+  async function getPreviewAssetResponse(req, res) {
+    const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+    const params = req && req.params && typeof req.params === 'object' ? req.params : {};
+    const routeIdentifier = params.companySlug || params.customerId;
+    const queryIdentifier = query.cid || query.customerId || query.id;
+    const preview = await resolveFirstPreview([
+      queryIdentifier,
+      routeIdentifier,
+    ]);
+    if (!preview) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return res.status(404).send('Preview image unavailable');
+    }
+    const assetType = getPublicPreviewAssetType(params.assetType || query.type);
+    const source = assetType === 'mockup' ? preview.mockupSource : preview.photoSource;
+    try {
+      const optimized = await optimizePublicPreviewImage(source, assetType);
+      if (optimized && Buffer.isBuffer(optimized.buffer)) {
+        res.setHeader('Content-Type', optimized.contentType);
+        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.status(200).send(optimized.buffer);
+      }
+    } catch (_error) {
+      // If optimization fails, keep the public page usable by falling back to the original signed source.
+    }
+    if (/^https?:\/\//i.test(source) && typeof res.redirect === 'function') {
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
+      return res.redirect(302, source);
+    }
+    res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+    return res.status(404).send('Preview image unavailable');
   }
 
   return {
     getConceptPageResponse,
     getPreviewPageResponse,
+    getPreviewAssetResponse,
     resolvePreview,
   };
 }
