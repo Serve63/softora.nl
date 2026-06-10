@@ -26,6 +26,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /data-exercise-list/);
   assert.doesNotMatch(pageSource, /<script>[\s\S]*<\/script>/i);
   assert.match(stylesSource, /font-family: Oswald/);
+  assert.match(stylesSource, /html\s*\{[\s\S]*?overflow: hidden;/);
+  assert.match(stylesSource, /body\s*\{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/);
+  assert.match(stylesSource, /\.gym-app\s*\{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/);
   assert.match(stylesSource, /\.delete-action/);
   assert.match(stylesSource, /\.day-picker-backdrop/);
   assert.match(scriptSource, /sportschool_logboek/);

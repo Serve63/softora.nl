@@ -15,17 +15,25 @@
 }
 
 html {
+  height: 100%;
+  overflow: hidden;
   background: var(--softora-white);
+  overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
   color: var(--softora-ink);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  overflow-x: hidden;
+  overflow: hidden;
+  overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -54,8 +62,12 @@ input:focus-visible {
 
 .gym-app {
   width: min(100%, 430px);
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
+  overflow: hidden;
   background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
 }
 
