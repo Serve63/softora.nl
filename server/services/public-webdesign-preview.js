@@ -1076,7 +1076,7 @@ ${preconnectTags}
   <script>
     (function(){
       var startedAt = Date.now();
-      var minimumDelay = 650;
+      var minimumDelay = 1100;
       var fallbackDelay = 5500;
       var revealed = false;
       function showPreview(){
@@ -1147,6 +1147,14 @@ ${preconnectTags}
     :root{--navy:#1c2b50;--teal:#5bada0;--cream:#f2ede6;--muted:#728095;--rule:#d8d2ca;--panel:#fffaf4}
     html,body{min-height:100%;background:var(--cream);color:var(--navy);font-family:Inter,Arial,sans-serif}
     body{overflow-x:hidden;overflow-anchor:none}
+    body.concept-loading{overflow:hidden}
+    .concept-hero,.divider,.about-section{opacity:0;transition:opacity .34s ease}
+    body.concept-ready .concept-hero,body.concept-ready .divider,body.concept-ready .about-section{opacity:1}
+    .concept-loader{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:var(--cream);color:var(--navy);transition:opacity .3s ease,visibility .3s ease}
+    .concept-loader-mark{width:52px;height:52px;border-radius:999px;border:1px solid rgba(28,43,80,.18);border-top-color:var(--teal);animation:conceptSpin .8s linear infinite}
+    .concept-loader-text{position:absolute;left:50%;top:calc(50% + 48px);transform:translateX(-50%);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800;white-space:nowrap}
+    body.concept-ready .concept-loader{opacity:0;visibility:hidden;pointer-events:none}
+    @keyframes conceptSpin{to{transform:rotate(360deg)}}
     .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp(18px,4vw,64px);gap:44px;position:relative}
     .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;max-width:920px}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
@@ -1182,10 +1190,15 @@ ${preconnectTags}
     @media(max-width:700px){.about-section{gap:28px}.about-profile{width:min(100%,320px);justify-content:flex-start}.about-photo{width:58px;flex-basis:58px}.profile-signature{display:flex;flex-direction:column;align-items:flex-start}.profile-signature span{order:-1;white-space:nowrap;font-size:clamp(8px,2.5vw,10px);letter-spacing:.7px;margin-bottom:2px}.about-text h2{font-size:clamp(13px,4.1vw,22px);text-align:center}.about-title-desktop{display:none}.about-title-mobile{display:inline}}
     @media(max-width:700px){.scroll-cue{display:none}}
     @media(max-width:700px){.hero-heading{gap:7px;max-width:calc(100vw - 36px)}.hero-title{font-size:clamp(24px,9.2vw,36px);line-height:1.08}}
+    @media(prefers-reduced-motion:reduce){.concept-hero,.divider,.about-section,.concept-loader{transition:none}.concept-loader-mark{animation:none}}
     @media(max-width:900px){.concept-hero{min-height:100svh;padding-top:34px;justify-content:flex-start}.mockup-stage{flex-direction:column;padding:0;gap:22px}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
-<body>
+<body class="concept-loading" aria-busy="true">
+  <div class="concept-loader" role="status" aria-live="polite">
+    <div class="concept-loader-mark" aria-hidden="true"></div>
+    <div class="concept-loader-text">Design laden</div>
+  </div>
   <section class="concept-hero">
     <div class="mockup-stage">
       <div class="stage-card tall" data-loading="Webdesign wordt geladen"><img class="visual" src="${photoSource}" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high"></div>
@@ -1194,7 +1207,7 @@ ${preconnectTags}
           <span class="hero-label">Webdesign presentatie</span>
           <h1 class="hero-title">${title}</h1>
         </div>
-        <div class="stage-card wide" data-loading="Mockup wordt geladen"><img class="visual" src="${mockupSource}" alt="Device mockup preview" width="1600" height="1000" loading="lazy" decoding="async"></div>
+        <div class="stage-card wide" data-loading="Mockup wordt geladen"><img class="visual" src="${mockupSource}" alt="Device mockup preview" width="1600" height="1000" loading="eager" decoding="async"></div>
       </div>
     </div>
     <a class="scroll-cue" href="#concept-about" aria-label="Scroll naar meer informatie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></a>
@@ -1220,6 +1233,10 @@ ${preconnectTags}
   </section>
   <script>
     (function(){
+      var startedAt = Date.now();
+      var minimumDelay = 1100;
+      var fallbackDelay = 7000;
+      var revealed = false;
       function fitHeroTitle(){
         var title = document.querySelector('.hero-title');
         if(!title)return;
@@ -1236,6 +1253,32 @@ ${preconnectTags}
           title.style.fontSize = size + 'px';
         }
       }
+      function revealConcept(){
+        if(revealed)return;
+        revealed = true;
+        fitHeroTitle();
+        var remaining = Math.max(0, minimumDelay - (Date.now() - startedAt));
+        window.setTimeout(function(){
+          document.body.classList.remove('concept-loading');
+          document.body.classList.add('concept-ready');
+          document.body.setAttribute('aria-busy','false');
+        }, remaining);
+      }
+      function waitForWindow(){
+        if(document.readyState === 'complete')return Promise.resolve();
+        return new Promise(function(resolve){window.addEventListener('load',resolve,{once:true});});
+      }
+      function waitForImage(image){
+        if(image.complete){
+          return image.decode ? image.decode().catch(function(){}) : Promise.resolve();
+        }
+        return new Promise(function(resolve){
+          image.addEventListener('load',resolve,{once:true});
+          image.addEventListener('error',resolve,{once:true});
+        }).then(function(){
+          return image.decode ? image.decode().catch(function(){}) : undefined;
+        });
+      }
       if(document.readyState === 'loading'){
         document.addEventListener('DOMContentLoaded',fitHeroTitle,{once:true});
       }else{
@@ -1244,6 +1287,10 @@ ${preconnectTags}
       if(document.fonts && document.fonts.ready)document.fonts.ready.then(fitHeroTitle).catch(function(){fitHeroTitle();});
       window.addEventListener('load',fitHeroTitle,{once:true});
       window.addEventListener('resize',fitHeroTitle);
+      var imageTasks = Array.prototype.map.call(document.querySelectorAll('.concept-hero img.visual'),waitForImage);
+      var fontTask = document.fonts && document.fonts.ready ? document.fonts.ready.catch(function(){}) : Promise.resolve();
+      Promise.allSettled([waitForWindow(),fontTask].concat(imageTasks)).then(revealConcept);
+      window.setTimeout(revealConcept,fallbackDelay);
     }());
   </script>
 </body>
