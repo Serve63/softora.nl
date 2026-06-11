@@ -806,8 +806,6 @@ function buildPublicPreviewAssetPath(identifier, type, width = null) {
 
 function resolvePublicPreviewDisplayAssetSource(preview, type, assetIdentifier, options = {}) {
   const assetType = getPublicPreviewAssetType(type);
-  const source = assetType === 'mockup' ? preview && preview.mockupSource : preview && preview.photoSource;
-  if (isRemoteImageSource(source)) return source;
   return buildPublicPreviewAssetPath(assetIdentifier || preview && preview.id, assetType, options.width);
 }
 
@@ -998,9 +996,10 @@ function resolvePreviewSource(values, record, type) {
   return readChunkedDataUrl(values, record.photoKey, record.chunkCount);
 }
 
-function buildPreviewHtml(preview) {
-  const photoSource = escapeHtml(preview.photoSource);
-  const mockupSource = escapeHtml(preview.mockupSource);
+function buildPreviewHtml(preview, assetIdentifier = null) {
+  const displayIdentifier = assetIdentifier || preview.id;
+  const photoSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'webdesign', displayIdentifier, { width: 840 }));
+  const mockupSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'mockup', displayIdentifier, { width: 1040 }));
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
     getUrlOrigin(preview.mockupSource),
@@ -1065,6 +1064,7 @@ function buildConceptHtml(preview, titleFallback, assetIdentifier) {
   <meta name="robots" content="noindex,nofollow">
 ${preconnectTags}
   <link rel="preload" as="image" href="${photoSource}" fetchpriority="high">
+  <link rel="preload" as="image" href="${mockupSource}">
   <title>${title} | Design presentatie</title>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1347,7 +1347,8 @@ function createPublicWebdesignPreviewService(options = {}) {
       return res.status(404).send(buildNotFoundHtml());
     }
     res.setHeader('Cache-Control', PUBLIC_PREVIEW_HTML_CACHE_CONTROL);
-    return res.status(200).send(buildPreviewHtml(preview));
+    const assetIdentifier = query.cid || query.customerId || query.id || (req && req.params && (req.params.companySlug || req.params.customerId));
+    return res.status(200).send(buildPreviewHtml(preview, assetIdentifier));
   }
 
   async function getConceptPageResponse(req, res) {
@@ -1386,10 +1387,6 @@ function createPublicWebdesignPreviewService(options = {}) {
     const assetType = getPublicPreviewAssetType(params.assetType || query.type);
     const assetWidth = normalizePublicPreviewAssetWidth(assetType, query.w || query.width);
     const source = assetType === 'mockup' ? preview.mockupSource : preview.photoSource;
-    if (isRemoteImageSource(source) && typeof res.redirect === 'function') {
-      res.setHeader('Cache-Control', PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL);
-      return res.redirect(302, source);
-    }
     try {
       const optimized = await optimizePublicPreviewImage(source, assetType, assetWidth);
       if (optimized && Buffer.isBuffer(optimized.buffer)) {
@@ -1400,6 +1397,10 @@ function createPublicWebdesignPreviewService(options = {}) {
       }
     } catch (_error) {
       // If optimization fails, keep the public page usable by falling back to the original signed source.
+    }
+    if (isRemoteImageSource(source) && typeof res.redirect === 'function') {
+      res.setHeader('Cache-Control', PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL);
+      return res.redirect(302, source);
     }
     res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
     return res.status(404).send('Preview image unavailable');
