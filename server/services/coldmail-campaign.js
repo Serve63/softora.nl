@@ -3121,7 +3121,7 @@ function createColdmailCampaignService(deps = {}) {
   function summarizeColdmailCentralGuardLiveStats(groups) {
     const recipientCounts = {};
     (Array.isArray(groups) ? groups : []).forEach((group) => {
-      addColdmailRecipientCount(
+      setColdmailRecipientCount(
         recipientCounts,
         buildColdmailStatsRecipientKey({
           recipientEmail: group.recipient_email || group.recipientEmail,
@@ -3257,6 +3257,13 @@ function createColdmailCampaignService(deps = {}) {
     if (!recipientKey || !safeCount) return 0;
     target[recipientKey] = (target[recipientKey] || 0) + safeCount;
     return safeCount;
+  }
+
+  function setColdmailRecipientCount(target, recipientKey, count) {
+    const safeCount = Math.max(0, Number(count) || 0);
+    if (!recipientKey || !safeCount) return 0;
+    target[recipientKey] = Math.max(Math.max(0, Number(target[recipientKey]) || 0), safeCount);
+    return target[recipientKey];
   }
 
   function mergeColdmailRecipientCountTotals(...statsList) {
