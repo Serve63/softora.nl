@@ -208,6 +208,16 @@ input:focus-visible {
   transition: none;
 }
 
+.exercise-swipe.is-reordering {
+  z-index: 20;
+  overflow: visible;
+}
+
+.exercise-card.is-reordering {
+  border-color: rgba(155, 35, 85, 0.55);
+  box-shadow: 0 12px 28px rgba(25, 24, 39, 0.14);
+}
+
 .exercise-card:focus-within {
   border-color: rgba(155, 35, 85, 0.48);
   box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
@@ -215,9 +225,41 @@ input:focus-visible {
 
 .exercise-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
   gap: 5px;
   align-items: center;
+}
+
+.drag-handle {
+  display: grid;
+  gap: 2px;
+  width: 14px;
+  height: 28px;
+  place-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle span {
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(127, 125, 141, 0.44);
+}
+
+.drag-handle:focus-visible {
+  outline-offset: 1px;
 }
 
 .exercise-title,

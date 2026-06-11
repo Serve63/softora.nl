@@ -5,17 +5,44 @@
   const DIRECT_SUPABASE_ROW_ID = 'serve_logbook';
   const REMOTE_SAVE_DELAY_MS = 450;
   const SWIPE_WIDTH = 108;
-  const DEFAULT_EXERCISES = [
-    { order: 1, title: 'Bankdrukken', notes: '4 sets - 8 tot 10 herhalingen', sets: '4', reps: '10', kg: '' },
-    { order: 2, title: 'Schuine dumbbell press', notes: '3 sets - 10 herhalingen', sets: '3', reps: '10', kg: '' },
-    { order: 3, title: 'Seated row', notes: '4 sets - 10 herhalingen', sets: '4', reps: '10', kg: '' },
-    { order: 4, title: 'Lat pulldown', notes: '3 sets - 10 herhalingen', sets: '3', reps: '10', kg: '' },
-    { order: 5, title: 'Shoulder press', notes: '3 sets - 8 tot 10 herhalingen', sets: '3', reps: '10', kg: '' },
-    { order: 6, title: 'Biceps curl', notes: '3 sets - 12 herhalingen', sets: '3', reps: '12', kg: '' },
-    { order: 7, title: 'Triceps pushdown', notes: '3 sets - 12 herhalingen', sets: '3', reps: '12', kg: '' },
-    { order: 8, title: 'Plank', notes: '3 rondes - 45 seconden', sets: '3', reps: '45', kg: '' },
-  ];
-  const DEFAULT_ORDERS = DEFAULT_EXERCISES.slice(0, 4).map((exercise) => exercise.order);
+  const REORDER_START_THRESHOLD = 6;
+  const DEFAULT_DAY_EXERCISES = {
+    monday: [
+      { order: 1, title: 'Chest Press', notes: '', sets: '3', reps: '8', kg: '82' },
+      { order: 2, title: 'Lat Pulldown', notes: '', sets: '3', reps: '8', kg: '68' },
+      { order: 3, title: 'Incline Chest Press', notes: '', sets: '3', reps: '8', kg: '70' },
+      { order: 4, title: 'Seated Row', notes: '', sets: '3', reps: '8', kg: '73' },
+      { order: 5, title: 'Overhead Tricep', notes: '', sets: '3', reps: '8', kg: '58/59' },
+      { order: 6, title: 'Tricep Dip', notes: '', sets: '3', reps: '8', kg: '104' },
+    ],
+    tuesday: [
+      { order: 1, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100/104' },
+      { order: 2, title: 'Seated Leg Curl', notes: '', sets: '3', reps: '8', kg: '91' },
+      { order: 3, title: 'Shoulder Press Machine', notes: '', sets: '3', reps: '8', kg: '50' },
+      { order: 4, title: 'Lateral Shoulder Machine', notes: '', sets: '3', reps: '8', kg: '68' },
+      { order: 5, title: 'Shrugs', notes: '', sets: '3', reps: '8', kg: '36' },
+      { order: 6, title: 'Abdominal Machine', notes: '', sets: '3', reps: '8', kg: '73' },
+    ],
+    wednesday: [
+      { order: 1, title: 'Incline Chest Press', notes: '', sets: '3', reps: '8', kg: '70' },
+      { order: 2, title: 'Seated Row', notes: '', sets: '3', reps: '8', kg: '73' },
+      { order: 3, title: 'Chest Press', notes: '', sets: '3', reps: '8', kg: '82' },
+      { order: 4, title: 'Lat Pulldown', notes: '', sets: '3', reps: '8', kg: '68' },
+      { order: 5, title: 'Hammer Curls', notes: '', sets: '3', reps: '8', kg: '50' },
+      { order: 6, title: 'Sitting Bicep', notes: '', sets: '3', reps: '8', kg: '14' },
+    ],
+    thursday: [
+      { order: 1, title: 'Seated Leg Curl', notes: '', sets: '3', reps: '8', kg: '91' },
+      { order: 2, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100/104' },
+      { order: 3, title: 'Lateral Shoulder Machine', notes: '', sets: '3', reps: '8', kg: '68' },
+      { order: 4, title: 'Shoulder Press Machine', notes: '', sets: '3', reps: '8', kg: '50' },
+      { order: 5, title: 'Shrugs', notes: '', sets: '3', reps: '8', kg: '36' },
+      { order: 6, title: 'Abdominal Machine', notes: '', sets: '3', reps: '8', kg: '73' },
+    ],
+    friday: [],
+    saturday: [],
+    sunday: [],
+  };
   const DAYS = [
     { id: 'monday', title: 'Maandag' },
     { id: 'tuesday', title: 'Dinsdag' },
@@ -58,33 +85,37 @@
     return day === 'today' ? currentWeekday() : day;
   }
 
-  function defaultExercise(order) {
-    return DEFAULT_EXERCISES.find((exercise) => exercise.order === order) || {
+  function defaultExerciseForDay(day, order) {
+    const storedDay = storageDay(day);
+    return DEFAULT_DAY_EXERCISES[storedDay]?.find((exercise) => exercise.order === order) || {
       order,
       title: 'Nieuwe oefening',
-      notes: 'Notities',
+      notes: '',
       sets: '',
       reps: '',
       kg: '',
     };
   }
 
-  function normalizeExercise(order, exercise = {}) {
-    const fallback = defaultExercise(order);
+  function normalizeExercise(day, order, exercise = {}) {
+    const fallback = defaultExerciseForDay(day, order);
+    const hasTitle = Object.prototype.hasOwnProperty.call(exercise, 'title') && String(exercise.title).trim() !== '';
+    const hasNotes = Object.prototype.hasOwnProperty.call(exercise, 'notes');
     return {
-      title: upper(exercise.title || fallback.title),
-      notes: upper(exercise.notes || fallback.notes),
+      title: upper(hasTitle ? exercise.title : fallback.title),
+      notes: upper(hasNotes ? exercise.notes : fallback.notes),
       sets: String(exercise.sets ?? fallback.sets ?? ''),
       reps: String(exercise.reps ?? fallback.reps ?? ''),
       kg: String(exercise.kg ?? fallback.kg ?? ''),
     };
   }
 
-  function createDefaultDayState() {
+  function createDefaultDayState(day) {
+    const exercises = DEFAULT_DAY_EXERCISES[storageDay(day)] || [];
     return {
-      orders: [...DEFAULT_ORDERS],
+      orders: exercises.map((exercise) => exercise.order),
       exercises: Object.fromEntries(
-        DEFAULT_ORDERS.map((order) => [String(order), normalizeExercise(order)])
+        exercises.map((exercise) => [String(exercise.order), normalizeExercise(day, exercise.order, exercise)])
       ),
     };
   }
@@ -92,13 +123,13 @@
   function createDefaultState() {
     return {
       version: 1,
-      days: Object.fromEntries(STORAGE_DAYS.map((day) => [day, createDefaultDayState()])),
+      days: Object.fromEntries(STORAGE_DAYS.map((day) => [day, createDefaultDayState(day)])),
     };
   }
 
   function getDayState(day) {
     const storedDay = storageDay(day);
-    if (!logbookState.days[storedDay]) logbookState.days[storedDay] = createDefaultDayState();
+    if (!logbookState.days[storedDay]) logbookState.days[storedDay] = createDefaultDayState(storedDay);
     return logbookState.days[storedDay];
   }
 
@@ -116,7 +147,7 @@
     dayState.orders = uniqueOrders;
     uniqueOrders.forEach((order) => {
       const key = String(order);
-      if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(order);
+      if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(day, order);
     });
     if (!options.silent) scheduleRemoteSave();
   }
@@ -124,7 +155,7 @@
   function readExercise(day, order) {
     const dayState = getDayState(day);
     const stored = dayState.exercises?.[String(order)] || {};
-    const normalized = normalizeExercise(order, stored);
+    const normalized = normalizeExercise(day, order, stored);
     return {
       order,
       title: normalized.title,
@@ -138,7 +169,7 @@
   function writeField(day, order, field, value) {
     const dayState = getDayState(day);
     const key = String(order);
-    if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(order);
+    if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(day, order);
     const targetField = field === 'name' ? 'title' : field === 'kilograms' ? 'kg' : field;
     dayState.exercises[key][targetField] = targetField === 'title' || targetField === 'notes' ? upper(value) : value;
     scheduleRemoteSave();
@@ -156,13 +187,13 @@
   function buildSnapshotFromState() {
     const days = {};
     STORAGE_DAYS.forEach((day) => {
-      const dayState = logbookState.days[day] || createDefaultDayState();
+      const dayState = logbookState.days[day] || createDefaultDayState(day);
       const safeOrders = Array.isArray(dayState.orders) ? dayState.orders : [];
       days[day] = {
         orders: safeOrders,
         exercises: Object.fromEntries(
           safeOrders.map((order) => {
-            return [String(order), normalizeExercise(order, dayState.exercises?.[String(order)])];
+            return [String(order), normalizeExercise(day, order, dayState.exercises?.[String(order)])];
           })
         ),
       };
@@ -200,7 +231,7 @@
         nextState.days[day] = {
           orders,
           exercises: Object.fromEntries(
-            orders.map((order) => [String(order), normalizeExercise(order, dayState.exercises?.[String(order)])])
+            orders.map((order) => [String(order), normalizeExercise(day, order, dayState.exercises?.[String(order)])])
           ),
         };
       });
@@ -397,6 +428,7 @@
   function createExerciseCard(day, exercise) {
     const swipe = document.createElement('div');
     swipe.className = 'exercise-swipe';
+    swipe.dataset.exerciseOrder = String(exercise.order);
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
@@ -413,6 +445,12 @@
 
     const top = document.createElement('div');
     top.className = 'exercise-top';
+
+    const dragHandle = document.createElement('button');
+    dragHandle.type = 'button';
+    dragHandle.className = 'drag-handle';
+    dragHandle.setAttribute('aria-label', `${exercise.title} verplaatsen`);
+    dragHandle.innerHTML = '<span></span><span></span><span></span>';
 
     const title = document.createElement('input');
     title.className = 'exercise-title';
@@ -446,11 +484,87 @@
       writeField(day, exercise.order, 'notes', notes.value);
     });
 
-    top.append(title, metricGroup);
+    top.append(dragHandle, title, metricGroup);
     card.append(top, notes);
     swipe.append(deleteButton, card);
+    bindReorder(swipe, card, dragHandle, day, exercise.order);
     bindSwipe(swipe, card);
     return swipe;
+  }
+
+  function targetIndexForPointer(pointerY, draggedSwipe) {
+    return Array.from(list.querySelectorAll('.exercise-swipe'))
+      .filter((item) => item !== draggedSwipe)
+      .reduce((targetIndex, item) => {
+        const rect = item.getBoundingClientRect();
+        return pointerY > rect.top + rect.height / 2 ? targetIndex + 1 : targetIndex;
+      }, 0);
+  }
+
+  function bindReorder(swipe, card, handle, day, order) {
+    let active = false;
+    let dragging = false;
+    let startY = 0;
+    let targetIndex = -1;
+
+    const stop = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    handle.addEventListener('pointerdown', (event) => {
+      if (!isReady) return;
+      stop(event);
+      active = true;
+      dragging = false;
+      startY = event.clientY;
+      targetIndex = readOrders(day).indexOf(order);
+      handle.setPointerCapture(event.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (event) => {
+      if (!active) return;
+      stop(event);
+      const dy = event.clientY - startY;
+      if (!dragging && Math.abs(dy) < REORDER_START_THRESHOLD) return;
+      dragging = true;
+      targetIndex = targetIndexForPointer(event.clientY, swipe);
+      swipe.classList.add('is-reordering');
+      card.classList.add('is-reordering');
+      card.style.transition = 'none';
+      card.style.transform = `translateY(${dy}px)`;
+    });
+
+    const finish = (event) => {
+      if (!active) return;
+      stop(event);
+      active = false;
+      try {
+        handle.releasePointerCapture(event.pointerId);
+      } catch (_error) {
+        // De browser kan de pointer al vrijgegeven hebben.
+      }
+
+      const orders = readOrders(day);
+      const fromIndex = orders.indexOf(order);
+      const nextIndex = Math.max(0, Math.min(targetIndex, orders.length - 1));
+      card.style.transition = '';
+      card.style.transform = '';
+      card.classList.remove('is-reordering');
+      swipe.classList.remove('is-reordering');
+
+      if (!dragging || fromIndex < 0 || nextIndex === fromIndex) return;
+      const nextOrders = [...orders];
+      const [movedOrder] = nextOrders.splice(fromIndex, 1);
+      nextOrders.splice(nextIndex, 0, movedOrder);
+      saveOrders(day, nextOrders, { silent: true });
+      render();
+      persistRemoteSave();
+    };
+
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', finish);
+    handle.addEventListener('click', stop);
   }
 
   function bindSwipe(swipe, card) {
@@ -471,6 +585,7 @@
     };
 
     swipe.addEventListener('pointerdown', (event) => {
+      if (event.target.closest?.('.drag-handle')) return;
       active = true;
       dragging = false;
       startX = event.clientX;
