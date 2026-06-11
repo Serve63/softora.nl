@@ -1038,21 +1038,70 @@ ${preconnectTags}
   <style>
     *{box-sizing:border-box}
     html,body{margin:0;min-height:100%;background:#121212;color:#fff;font-family:Inter,Arial,sans-serif}
+    body{overflow-x:hidden}
     main{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(18px,2.8vw,46px)}
-    .preview-grid{width:min(1660px,100%);height:min(920px,calc(100svh - clamp(36px,5.6vw,92px)));display:grid;grid-template-columns:minmax(280px,.78fr) minmax(420px,1.12fr);gap:clamp(22px,2.4vw,42px);align-items:center}
+    .preview-grid{width:min(1660px,100%);height:min(920px,calc(100svh - clamp(36px,5.6vw,92px)));display:grid;grid-template-columns:minmax(280px,.78fr) minmax(420px,1.12fr);gap:clamp(22px,2.4vw,42px);align-items:center;opacity:0;transform:translateY(10px);transition:opacity .38s ease,transform .38s ease}
+    body.preview-ready .preview-grid{opacity:1;transform:none}
     .preview-frame{min-width:0;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
     .preview-frame img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;background:transparent}
     .mockup-frame img{width:100%;max-height:86%}
+    .public-preview-loader{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:#121212;transition:opacity .32s ease,visibility .32s ease}
+    .loader-mark{width:52px;height:52px;border-radius:999px;border:1px solid rgba(255,255,255,.18);border-top-color:#fff;animation:previewSpin .8s linear infinite}
+    .loader-text{position:absolute;left:50%;top:calc(50% + 48px);transform:translateX(-50%);font-size:12px;letter-spacing:0;text-transform:uppercase;color:rgba(255,255,255,.72);white-space:nowrap}
+    body.preview-ready .public-preview-loader{opacity:0;visibility:hidden;pointer-events:none}
+    @keyframes previewSpin{to{transform:rotate(360deg)}}
+    @media(prefers-reduced-motion:reduce){.preview-grid,.public-preview-loader{transition:none}.loader-mark{animation:none}}
     @media(max-width:900px){main{min-height:100vh;align-items:flex-start;padding:14px}.preview-grid{width:100%;height:auto;grid-template-columns:1fr;gap:14px}.preview-frame{height:auto;overflow:visible}.preview-frame img,.mockup-frame img{width:100%;max-height:none}}
   </style>
 </head>
-<body>
+<body class="preview-loading" aria-busy="true">
+  <div class="public-preview-loader" role="status" aria-live="polite">
+    <div class="loader-mark" aria-hidden="true"></div>
+    <div class="loader-text">Preview laden</div>
+  </div>
   <main>
     <div class="preview-grid" aria-label="Webdesign en device mockup naast elkaar">
       <div class="preview-frame website-frame"><img src="${photoSource}" alt="Webdesign" loading="eager" decoding="async" fetchpriority="high"></div>
       <div class="preview-frame mockup-frame"><img src="${mockupSource}" alt="Device mockup" loading="eager" decoding="async"></div>
     </div>
   </main>
+  <script>
+    (function(){
+      var startedAt = Date.now();
+      var minimumDelay = 650;
+      var fallbackDelay = 5500;
+      var revealed = false;
+      function showPreview(){
+        if(revealed)return;
+        revealed = true;
+        var remaining = Math.max(0, minimumDelay - (Date.now() - startedAt));
+        window.setTimeout(function(){
+          document.body.classList.remove('preview-loading');
+          document.body.classList.add('preview-ready');
+          document.body.setAttribute('aria-busy','false');
+        }, remaining);
+      }
+      function waitForWindow(){
+        if(document.readyState === 'complete')return Promise.resolve();
+        return new Promise(function(resolve){window.addEventListener('load',resolve,{once:true});});
+      }
+      function waitForImage(image){
+        if(image.complete){
+          return image.decode ? image.decode().catch(function(){}) : Promise.resolve();
+        }
+        return new Promise(function(resolve){
+          image.addEventListener('load',resolve,{once:true});
+          image.addEventListener('error',resolve,{once:true});
+        }).then(function(){
+          return image.decode ? image.decode().catch(function(){}) : undefined;
+        });
+      }
+      var imageTasks = Array.prototype.map.call(document.querySelectorAll('.preview-grid img'),waitForImage);
+      var fontTask = document.fonts && document.fonts.ready ? document.fonts.ready.catch(function(){}) : Promise.resolve();
+      Promise.allSettled([waitForWindow(),fontTask].concat(imageTasks)).then(showPreview);
+      window.setTimeout(showPreview,fallbackDelay);
+    }());
+  </script>
 </body>
 </html>`;
 }

@@ -138,6 +138,12 @@ test('public webdesign preview renders only the two images for a stored mail-rea
   assert.match(response.body, /mockup-frame/);
   assert.match(response.body, /background:#121212/);
   assert.match(response.body, /background:transparent/);
+  assert.match(response.body, /class="preview-loading"/);
+  assert.match(response.body, /public-preview-loader/);
+  assert.match(response.body, /Preview laden/);
+  assert.match(response.body, /body\.preview-ready \.preview-grid\{opacity:1;transform:none\}/);
+  assert.match(response.body, /Promise\.allSettled\(\[waitForWindow\(\),fontTask\]\.concat\(imageTasks\)\)\.then\(showPreview\)/);
+  assert.match(response.body, /window\.setTimeout\(showPreview,fallbackDelay\)/);
   assert.doesNotMatch(response.body, /background:#fff/);
   assert.doesNotMatch(response.body, /concept-hero/);
   assert.doesNotMatch(response.body, /serve-creusen-profile/);
