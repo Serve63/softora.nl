@@ -175,6 +175,13 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /concept-hero/);
   assert.match(response.body, /body\{overflow-x:hidden;overflow-anchor:none\}/);
+  assert.match(response.body, /<body class="concept-loading" aria-busy="true">/);
+  assert.match(response.body, /<div class="concept-loader" role="status" aria-live="polite">/);
+  assert.match(response.body, /<div class="concept-loader-text">Design laden<\/div>/);
+  assert.match(response.body, /body\.concept-loading\{overflow:hidden\}/);
+  assert.match(response.body, /\.concept-hero,\.divider,\.about-section\{opacity:0;transition:opacity \.34s ease\}/);
+  assert.match(response.body, /body\.concept-ready \.concept-hero,body\.concept-ready \.divider,body\.concept-ready \.about-section\{opacity:1\}/);
+  assert.match(response.body, /\.concept-loader\{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:var\(--cream\);color:var\(--navy\);transition:opacity \.3s ease,visibility \.3s ease\}/);
   assert.match(response.body, /\.concept-hero\{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp\(18px,4vw,64px\);gap:44px;position:relative\}/);
   assert.match(response.body, /\.hero-heading\{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;max-width:920px\}/);
   assert.match(response.body, /\.hero-title\{font-family:Georgia,'Times New Roman',serif;font-size:clamp\(32px,4vw,44px\);font-weight:600;line-height:1\.14;color:var\(--navy\);max-width:100%;text-wrap:balance;overflow-wrap:normal;word-break:normal;hyphens:none\}/);
@@ -236,13 +243,17 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /<link rel="preload" as="image" href="\/webdesign\/customer-1\/asset\/webdesign\?w=840" fetchpriority="high">/);
   assert.match(response.body, /<link rel="preload" as="image" href="\/webdesign\/customer-1\/asset\/mockup\?w=1040">/);
   assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/webdesign\?w=840" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high">/);
-  assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/mockup\?w=1040" alt="Device mockup preview" width="1600" height="1000" loading="lazy" decoding="async">/);
+  assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/mockup\?w=1040" alt="Device mockup preview" width="1600" height="1000" loading="eager" decoding="async">/);
   assert.doesNotMatch(response.body, /piggy-webdesign\.png/);
   assert.doesNotMatch(response.body, /piggy-mockup\.jpg/);
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
   assert.match(response.body, /function fitHeroTitle\(\)/);
+  assert.match(response.body, /var minimumDelay = 1100/);
+  assert.match(response.body, /Promise\.allSettled\(\[waitForWindow\(\),fontTask\]\.concat\(imageTasks\)\)\.then\(revealConcept\)/);
+  assert.match(response.body, /document\.body\.classList\.add\('concept-ready'\)/);
+  assert.match(response.body, /document\.querySelectorAll\('\.concept-hero img\.visual'\)/);
   assert.match(response.body, /title\.scrollHeight <= lineHeight \* 2 \+ 2 && title\.scrollWidth <= title\.clientWidth \+ 1/);
 });
 
