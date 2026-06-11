@@ -1107,6 +1107,68 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
   assert.equal(messages[0].inlineImages[0].contentBase64, TINY_PNG_DATA_URL.split(',')[1]);
 });
 
+test('mailbox service keeps link-only webdesign sends free of recovered image placeholders', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [
+        {
+          uid: 55,
+          flags: ['\\Seen'],
+          internalDate: new Date('2026-06-11T06:21:00.000Z'),
+          source: {
+            date: new Date('2026-06-11T06:21:00.000Z'),
+            text: [
+              'Goedendag,',
+              '',
+              'Afgelopen week kwam ik jullie website (jagthuijs.nl) tegen.',
+              '',
+              'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+              '',
+              'Je kunt het webdesign hier bekijken 👈',
+              '',
+              'Met vriendelijke groet,',
+              'Servé Creusen',
+              '',
+              '📍 Liempde',
+            ].join('\n'),
+            html: '',
+            subject: 'Kleine vraag over jullie website',
+            from: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
+            to: { value: [{ name: 'Jaghthuijs', address: 'info@jagthuijs.nl' }] },
+            attachments: [],
+          },
+        },
+      ],
+    },
+  });
+  const requestedScopes = [];
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    getUiStateValues: async (scope) => {
+      requestedScopes.push(scope);
+      return { values: {} };
+    },
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
+
+  assert.equal(messages.length, 1);
+  assert.doesNotMatch(messages[0].body, /\[image:/i);
+  assert.doesNotMatch(messages[0].body, /korte indruk van de eerste versie/i);
+  assert.equal(messages[0].bodyImages.length, 0);
+  assert.deepEqual(requestedScopes, []);
+});
+
 test('mailbox service exposes hidden coldmail opt-out links for clickable mail previews', async () => {
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX/Verstuurd' }],

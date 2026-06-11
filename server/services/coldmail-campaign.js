@@ -2804,12 +2804,21 @@ function createColdmailCampaignService(deps = {}) {
     const selectedSenderEmail = normalizeEmailAddress(senderEmail);
     const state = await loadColdmailSendGuardState();
     const entries = state.entries;
+    const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+    const dayEntries = entries.filter((entry) =>
+      getColdmailAutopilotDateKey(new Date(parseTimestampMs(entry.at)), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey
+    );
     const nowMs = now().getTime();
-    const senderSent = entries
+    const senderRollingSent = entries
       .filter((entry) => entry.senderEmail === selectedSenderEmail)
       .reduce((sum, entry) => sum + entry.count, 0);
-    const packageSent = entries.reduce((sum, entry) => sum + entry.count, 0);
-    const personalMailboxSent = entries.reduce((sum, entry) => sum + entry.personalCount, 0);
+    const packageRollingSent = entries.reduce((sum, entry) => sum + entry.count, 0);
+    const personalMailboxRollingSent = entries.reduce((sum, entry) => sum + entry.personalCount, 0);
+    const senderDaySent = dayEntries
+      .filter((entry) => entry.senderEmail === selectedSenderEmail)
+      .reduce((sum, entry) => sum + entry.count, 0);
+    const packageDaySent = dayEntries.reduce((sum, entry) => sum + entry.count, 0);
+    const personalMailboxDaySent = dayEntries.reduce((sum, entry) => sum + entry.personalCount, 0);
     const safetyPause = entries
       .map((entry) => ({
         senderEmail: normalizeEmailAddress(entry.senderEmail),
@@ -2825,18 +2834,33 @@ function createColdmailCampaignService(deps = {}) {
     const dailySendLimit = getColdmailDailySendLimit();
     const packageDailySendLimit = getColdmailPackageDailySendLimit();
     const personalMailboxDailyLimit = getColdmailPersonalMailboxDailyLimit();
+    const senderDayRemaining = Math.max(0, dailySendLimit - senderDaySent);
+    const senderRollingRemaining = Math.max(0, dailySendLimit - senderRollingSent);
+    const packageDayRemaining = Math.max(0, packageDailySendLimit - packageDaySent);
+    const packageRollingRemaining = Math.max(0, packageDailySendLimit - packageRollingSent);
+    const personalMailboxDayRemaining = Math.max(0, personalMailboxDailyLimit - personalMailboxDaySent);
+    const personalMailboxRollingRemaining = Math.max(0, personalMailboxDailyLimit - personalMailboxRollingSent);
     return {
       entries,
       recipientEntries: state.recipientEntries || [],
-      senderSent,
-      packageSent,
-      personalMailboxSent,
+      senderSent: senderRollingSent,
+      packageSent: packageRollingSent,
+      personalMailboxSent: personalMailboxRollingSent,
+      senderDaySent,
+      packageDaySent,
+      personalMailboxDaySent,
       dailySendLimit,
       packageDailySendLimit,
       personalMailboxDailyLimit,
-      senderRemaining: Math.max(0, dailySendLimit - senderSent),
-      packageRemaining: Math.max(0, packageDailySendLimit - packageSent),
-      personalMailboxRemaining: Math.max(0, personalMailboxDailyLimit - personalMailboxSent),
+      senderRemaining: Math.min(senderDayRemaining, senderRollingRemaining),
+      packageRemaining: Math.min(packageDayRemaining, packageRollingRemaining),
+      personalMailboxRemaining: Math.min(personalMailboxDayRemaining, personalMailboxRollingRemaining),
+      senderDayRemaining,
+      senderRollingRemaining,
+      packageDayRemaining,
+      packageRollingRemaining,
+      personalMailboxDayRemaining,
+      personalMailboxRollingRemaining,
       safetyPause,
     };
   }
@@ -3471,6 +3495,18 @@ function createColdmailCampaignService(deps = {}) {
     return parts.hour * 60 + parts.minute;
   }
 
+  function getColdmailAutopilotDateKey(date, timezone) {
+    const parsed = date instanceof Date ? date : new Date(date);
+    if (!Number.isFinite(parsed.getTime())) return '';
+    const parts = getZonedColdmailAutopilotParts(parsed, timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+    if (!parts.year || !parts.month || !parts.day) return '';
+    return [
+      String(parts.year).padStart(4, '0'),
+      String(parts.month).padStart(2, '0'),
+      String(parts.day).padStart(2, '0'),
+    ].join('-');
+  }
+
   function getColdmailAutopilotSlotJitterMinutes(schedule, senderEmail, slotIndex) {
     const normalized = normalizeColdmailAutopilotSchedule(schedule);
     const max = Math.max(0, Math.min(4, normalized.minIntervalMinutes - 1));
@@ -3488,7 +3524,7 @@ function createColdmailCampaignService(deps = {}) {
     if (!isColdmailAutopilotDaySlotPacingSchedule(normalized)) return null;
     const quota = options.quota && typeof options.quota === 'object' ? options.quota : {};
     const dailyLimit = Math.max(1, Number(quota.dailySendLimit) || DEFAULT_COLDMAIL_DAILY_SEND_LIMIT);
-    const senderSent = Math.max(0, Number(quota.senderSent) || 0);
+    const senderSent = Math.max(0, Number(quota.senderDaySent ?? quota.senderSent) || 0);
     if (!lastSentAtMs || senderSent <= 0 || senderSent >= dailyLimit || dailyLimit < 2) return null;
     const windowMinutes = Math.max(
       normalized.minIntervalMinutes,
@@ -3609,6 +3645,10 @@ function createColdmailCampaignService(deps = {}) {
       }
     }
     senderOptions.sort((left, right) => {
+      const leftDaySent = Math.max(0, Number(left.quota.senderDaySent ?? left.quota.senderSent) || 0);
+      const rightDaySent = Math.max(0, Number(right.quota.senderDaySent ?? right.quota.senderSent) || 0);
+      const daySentDiff = leftDaySent - rightDaySent;
+      if (daySentDiff !== 0) return daySentDiff;
       const sentDiff = (left.quota.senderSent || 0) - (right.quota.senderSent || 0);
       if (sentDiff !== 0) return sentDiff;
       return left.index - right.index;
@@ -3635,6 +3675,9 @@ function createColdmailCampaignService(deps = {}) {
     try {
       parts = new Intl.DateTimeFormat('en-US', {
         timeZone: timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         weekday: 'short',
         hour: '2-digit',
         minute: '2-digit',
@@ -3643,6 +3686,9 @@ function createColdmailCampaignService(deps = {}) {
     } catch (_) {
       parts = new Intl.DateTimeFormat('en-US', {
         timeZone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         weekday: 'short',
         hour: '2-digit',
         minute: '2-digit',
@@ -3656,6 +3702,9 @@ function createColdmailCampaignService(deps = {}) {
     const rawHour = Number(getPart('hour'));
     return {
       weekday: getPart('weekday'),
+      year: Number(getPart('year')) || 0,
+      month: Number(getPart('month')) || 0,
+      day: Number(getPart('day')) || 0,
       hour: rawHour === 24 ? 0 : rawHour,
       minute: Number(getPart('minute')) || 0,
     };
@@ -6906,6 +6955,9 @@ function createColdmailCampaignService(deps = {}) {
         senderSentBefore: quota.senderSent,
         packageSentBefore: quota.packageSent,
         personalMailboxSentBefore: quota.personalMailboxSent,
+        senderDaySentBefore: quota.senderDaySent,
+        packageDaySentBefore: quota.packageDaySent,
+        personalMailboxDaySentBefore: quota.personalMailboxDaySent,
         senderRemainingBefore: quota.senderRemaining,
         packageRemainingBefore: quota.packageRemaining,
         personalMailboxRemainingBefore: quota.personalMailboxRemaining,
