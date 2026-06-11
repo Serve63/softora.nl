@@ -55,6 +55,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /Leg Extensions/);
   assert.match(scriptSource, /Hammer Curls/);
   assert.match(scriptSource, /Abdominal Machine/);
+  assert.match(scriptSource, /LEGACY_NOTE_TEXTS/);
+  assert.match(scriptSource, /cleanNotes/);
+  assert.match(scriptSource, /markLegacyNotes/);
   assert.match(scriptSource, /friday:\s*\[\]/);
   assert.doesNotMatch(scriptSource, /localStorage/);
   assert.match(scriptSource, /setPointerCapture/);

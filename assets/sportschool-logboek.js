@@ -53,6 +53,16 @@
     { id: 'sunday', title: 'Zondag' },
   ];
   const STORAGE_DAYS = DAYS.map((day) => day.id);
+  const LEGACY_NOTE_TEXTS = new Set([
+    'NOTITIES',
+    '3 SETS - 8 HERHALINGEN',
+    '3 SETS - 10 HERHALINGEN',
+    '3 SETS - 12 HERHALINGEN',
+    '3 SETS - 8 TOT 10 HERHALINGEN',
+    '4 SETS - 10 HERHALINGEN',
+    '4 SETS - 8 TOT 10 HERHALINGEN',
+    '3 RONDES - 45 SECONDEN',
+  ]);
 
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
@@ -70,11 +80,22 @@
   let remoteSaveTimer = null;
   let lastRemoteSnapshotJson = '';
   let logbookState = createDefaultState();
+  let cleanedLegacyNotesDuringLoad = false;
 
   addButton.disabled = true;
 
   function upper(value) {
     return String(value || '').toLocaleUpperCase('nl-NL');
+  }
+
+  function cleanNotes(value, options = {}) {
+    const text = String(value || '').trim();
+    const normalized = upper(text).replace(/\s+/g, ' ');
+    if (LEGACY_NOTE_TEXTS.has(normalized)) {
+      if (options.markLegacyNotes) cleanedLegacyNotesDuringLoad = true;
+      return '';
+    }
+    return value;
   }
 
   function currentWeekday() {
@@ -97,13 +118,14 @@
     };
   }
 
-  function normalizeExercise(day, order, exercise = {}) {
+  function normalizeExercise(day, order, exercise = {}, options = {}) {
     const fallback = defaultExerciseForDay(day, order);
     const hasTitle = Object.prototype.hasOwnProperty.call(exercise, 'title') && String(exercise.title).trim() !== '';
     const hasNotes = Object.prototype.hasOwnProperty.call(exercise, 'notes');
+    const rawNotes = hasNotes ? exercise.notes : fallback.notes;
     return {
       title: upper(hasTitle ? exercise.title : fallback.title),
-      notes: upper(hasNotes ? exercise.notes : fallback.notes),
+      notes: upper(cleanNotes(rawNotes, options)),
       sets: String(exercise.sets ?? fallback.sets ?? ''),
       reps: String(exercise.reps ?? fallback.reps ?? ''),
       kg: String(exercise.kg ?? fallback.kg ?? ''),
@@ -231,7 +253,10 @@
         nextState.days[day] = {
           orders,
           exercises: Object.fromEntries(
-            orders.map((order) => [String(order), normalizeExercise(day, order, dayState.exercises?.[String(order)])])
+            orders.map((order) => [
+              String(order),
+              normalizeExercise(day, order, dayState.exercises?.[String(order)], { markLegacyNotes: true }),
+            ])
           ),
         };
       });
@@ -352,7 +377,9 @@
         return;
       }
       lastRemoteSnapshotJson = JSON.stringify(snapshot);
+      cleanedLegacyNotesDuringLoad = false;
       applyRemoteSnapshot(snapshot);
+      if (cleanedLegacyNotesDuringLoad) scheduleRemoteSave();
     } catch (_error) {
       // Lokaal blijft de app direct werken; sync probeert later opnieuw.
     }
