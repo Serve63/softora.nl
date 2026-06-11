@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { createKnownPrettyPageSlugToFile } = require('../../server/config/page-routing');
+const { createKnownPrettyPageSlugToFile, resolveLegacyPrettyPageRedirect } = require('../../server/config/page-routing');
 
 test('sportschool logboek page is available as installable pretty page', () => {
   const pagePath = path.join(__dirname, '../../sportschool.html');
@@ -12,7 +12,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
   const prettyPages = createKnownPrettyPageSlugToFile(new Set(['sportschool.html']));
 
-  assert.equal(prettyPages.get('sportschool'), 'sportschool.html');
+  assert.equal(prettyPages.get('logboek'), 'sportschool.html');
+  assert.equal(resolveLegacyPrettyPageRedirect('sportschool'), 'logboek');
   assert.match(pageSource, /<title>Servé's Logboek<\/title>/);
   assert.match(pageSource, /apple-mobile-web-app-capable/);
   assert.match(pageSource, /apple-mobile-web-app-title" content="Servé's logboek"/);
