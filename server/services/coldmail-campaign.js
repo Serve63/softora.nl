@@ -3064,6 +3064,38 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function summarizeColdmailSenderQuota(quota = {}) {
+    return {
+      senderSent: Math.max(0, Number(quota.senderSent) || 0),
+      senderDaySent: Math.max(0, Number(quota.senderDaySent ?? quota.senderSent) || 0),
+      senderRemaining: Math.max(0, Number(quota.senderRemaining) || 0),
+      packageRemaining: Math.max(0, Number(quota.packageRemaining) || 0),
+      dailySendLimit: Math.max(0, Number(quota.dailySendLimit) || 0),
+      packageDailySendLimit: Math.max(0, Number(quota.packageDailySendLimit) || 0),
+    };
+  }
+
+  function getColdmailSenderQuotaDaySent(quota = {}) {
+    return Math.max(0, Number(quota.senderDaySent ?? quota.senderSent) || 0);
+  }
+
+  function buildColdmailSenderSkip(senderEmail, reason, extra = {}) {
+    const quotaSummary = extra.quota ? summarizeColdmailSenderQuota(extra.quota) : null;
+    const skip = {
+      senderEmail: normalizeEmailAddress(senderEmail),
+      reason,
+      ...extra,
+    };
+    if (quotaSummary) {
+      skip.quota = quotaSummary;
+      skip.senderSent = quotaSummary.senderSent;
+      skip.senderDaySent = quotaSummary.senderDaySent;
+      skip.senderRemaining = quotaSummary.senderRemaining;
+      skip.packageRemaining = quotaSummary.packageRemaining;
+    }
+    return skip;
+  }
+
   function normalizeBooleanFlag(value, fallback = false) {
     if (typeof value === 'boolean') return value;
     const text = normalizeString(value).toLowerCase();
@@ -3799,23 +3831,30 @@ function createColdmailCampaignService(deps = {}) {
     for (const [index, candidate] of candidates.entries()) {
       try {
         const senderEmail = assertSenderAllowed(candidate);
+        const quota = await getColdmailSendQuota(senderEmail);
         const senderAccount = resolveSenderSmtpAccount(senderEmail);
         if (!isSenderSmtpAccountConfigured(senderAccount)) {
-          skipped.push({
-            senderEmail,
-            reason: 'sender_smtp_not_configured',
+          skipped.push(buildColdmailSenderSkip(senderEmail, 'sender_smtp_not_configured', {
+            index,
+            quota,
             smtpDiagnostic: getSenderSmtpDiagnostic(senderEmail, senderAccount),
-          });
+          }));
           continue;
         }
-        const quota = await getColdmailSendQuota(senderEmail);
         const remaining = Math.min(quota.senderRemaining, quota.packageRemaining);
         if (quota.safetyPause) {
-          skipped.push({ senderEmail, reason: 'coldmail_safety_paused', safetyPause: quota.safetyPause });
+          skipped.push(buildColdmailSenderSkip(senderEmail, 'coldmail_safety_paused', {
+            index,
+            quota,
+            safetyPause: quota.safetyPause,
+          }));
           continue;
         }
         if (remaining <= 0) {
-          skipped.push({ senderEmail, reason: 'coldmail_daily_limit_reached', quota });
+          skipped.push(buildColdmailSenderSkip(senderEmail, 'coldmail_daily_limit_reached', {
+            index,
+            quota,
+          }));
           continue;
         }
         if (schedule.senderMinIntervalMinutes > 0) {
@@ -3833,26 +3872,52 @@ function createColdmailCampaignService(deps = {}) {
             ? daySlotReadiness.readyAtMs
             : lastSentAtMs + cooldownMinutes * 60 * 1000;
           if (lastSentAtMs && readyAtMs > currentMs && !(daySlotReadiness && daySlotReadiness.ok)) {
-            skipped.push({
-              senderEmail,
-              reason: 'sender_cooldown',
+            skipped.push(buildColdmailSenderSkip(senderEmail, 'sender_cooldown', {
+              index,
+              quota,
               readyAt: new Date(readyAtMs).toISOString(),
               cooldownMinutes,
-            });
+            }));
             continue;
           }
         }
         senderOptions.push({ senderEmail, quota, remaining, index });
       } catch (error) {
-        skipped.push({
-          senderEmail: normalizeEmailAddress(candidate),
-          reason: normalizeString(error && error.code) || 'sender_not_allowed',
+        skipped.push(buildColdmailSenderSkip(candidate, normalizeString(error && error.code) || 'sender_not_allowed', {
+          index,
+        }));
+      }
+    }
+    const smtpConfigSkips = skipped.filter((item) => item && item.reason === 'sender_smtp_not_configured');
+    if (smtpConfigSkips.length > 0) {
+      return {
+        selected: null,
+        skipped: smtpConfigSkips,
+      };
+    }
+    const daySlotPacing = isColdmailAutopilotDaySlotPacingSchedule(schedule);
+    if (daySlotPacing && senderOptions.length > 0 && skipped.length > 0) {
+      const selectableMinDaySent = senderOptions
+        .map((item) => getColdmailSenderQuotaDaySent(item.quota))
+        .reduce((lowest, value) => Math.min(lowest, value), Number.POSITIVE_INFINITY);
+      const lowerRoundSkips = skipped
+        .filter((item) => Number.isFinite(Number(item && item.senderDaySent)))
+        .filter((item) => Number(item.senderDaySent) < selectableMinDaySent)
+        .sort((left, right) => {
+          const dayDiff = Number(left.senderDaySent) - Number(right.senderDaySent);
+          if (dayDiff !== 0) return dayDiff;
+          return (Number(left.index) || 0) - (Number(right.index) || 0);
         });
+      if (lowerRoundSkips.length > 0) {
+        return {
+          selected: null,
+          skipped: lowerRoundSkips,
+        };
       }
     }
     senderOptions.sort((left, right) => {
-      const leftDaySent = Math.max(0, Number(left.quota.senderDaySent ?? left.quota.senderSent) || 0);
-      const rightDaySent = Math.max(0, Number(right.quota.senderDaySent ?? right.quota.senderSent) || 0);
+      const leftDaySent = getColdmailSenderQuotaDaySent(left.quota);
+      const rightDaySent = getColdmailSenderQuotaDaySent(right.quota);
       const daySentDiff = leftDaySent - rightDaySent;
       if (daySentDiff !== 0) return daySentDiff;
       const sentDiff = (left.quota.senderSent || 0) - (right.quota.senderSent || 0);
@@ -3977,6 +4042,10 @@ function createColdmailCampaignService(deps = {}) {
           reason: truncateText(normalizeString(item && item.reason), 120),
           readyAt: normalizeString(item && item.readyAt),
           cooldownMinutes: Math.max(0, Number(item && item.cooldownMinutes) || 0) || undefined,
+          senderSent: Math.max(0, Number(item && item.senderSent) || 0),
+          senderDaySent: Math.max(0, Number(item && item.senderDaySent) || 0),
+          senderRemaining: Math.max(0, Number(item && item.senderRemaining) || 0),
+          packageRemaining: Math.max(0, Number(item && item.packageRemaining) || 0),
           smtpDiagnostic:
             item && item.smtpDiagnostic && typeof item.smtpDiagnostic === 'object'
               ? item.smtpDiagnostic
@@ -4252,6 +4321,7 @@ function createColdmailCampaignService(deps = {}) {
           senderEmail,
           sendJitterSeconds,
           dailyQuota: sendResult.dailyQuota,
+          senderSkips: senderChoice.skipped,
           replySync: replySync ? {
             ok: replySync.ok !== false,
             skipped: Boolean(replySync.skipped),
