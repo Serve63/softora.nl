@@ -62,11 +62,16 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /bindReorder/);
   assert.match(scriptSource, /targetIndexForPointer/);
   assert.match(scriptSource, /saveOrders\(day, nextOrders, \{ silent: true \}\)/);
+  assert.match(scriptSource, /wrap\.className = `metric metric-\$\{field\}`/);
+  assert.match(scriptSource, /notes\.placeholder = ''/);
+  assert.doesNotMatch(scriptSource, /notes\.placeholder = 'NOTITIES'/);
   assert.match(scriptSource, /Verwijder/);
   assert.match(scriptSource, /IS EEN RUSTDAG/);
   assert.match(stylesSource, /\.exercise-card\s*\{[\s\S]*?padding: 8px 10px;/);
   assert.match(stylesSource, /\.exercise-list\s*\{[\s\S]*?gap: 6px;/);
-  assert.match(stylesSource, /\.metric\s*\{[\s\S]*?width: 30px;/);
+  assert.match(stylesSource, /\.metric\s*\{[\s\S]*?width: 32px;/);
+  assert.match(stylesSource, /\.metric-kg\s*\{[\s\S]*?width: 46px;/);
+  assert.match(stylesSource, /\.metric-input\s*\{[\s\S]*?width: 100%;[\s\S]*?padding: 0;/);
   assert.match(stylesSource, /\.exercise-title\s*\{[\s\S]*?font-size: 13px;/);
   assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?font-size: 11px;/);
   assert.match(stylesSource, /:focus-within/);

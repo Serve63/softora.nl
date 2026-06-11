@@ -403,7 +403,7 @@
 
   function createMetric(day, exercise, field, label, inputMode) {
     const wrap = document.createElement('label');
-    wrap.className = 'metric';
+    wrap.className = `metric metric-${field}`;
 
     const input = document.createElement('input');
     input.className = 'metric-input';
@@ -476,7 +476,7 @@
     notes.className = 'exercise-notes';
     notes.type = 'text';
     notes.value = exercise.notes;
-    notes.placeholder = 'NOTITIES';
+    notes.placeholder = '';
     notes.autocomplete = 'off';
     notes.spellcheck = false;
     notes.addEventListener('input', () => {
