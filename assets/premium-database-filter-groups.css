@@ -165,6 +165,15 @@
     padding: 8px 10px;
 }
 
+.mail-roi-card--today {
+    border-color: rgba(123, 44, 191, .48);
+    box-shadow: 0 8px 18px rgba(123, 44, 191, .055);
+}
+
+.mail-roi-card--today .mail-roi-label {
+    color: #6f3fb6;
+}
+
 .mail-roi-label {
     margin-bottom: 5px;
     color: #6b6b6b;
