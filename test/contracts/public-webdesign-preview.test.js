@@ -176,9 +176,12 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /concept-hero/);
   assert.match(response.body, /body\{overflow-x:hidden;overflow-anchor:none\}/);
   assert.match(response.body, /\.concept-hero\{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp\(18px,4vw,64px\);gap:44px;position:relative\}/);
+  assert.match(response.body, /\.hero-heading\{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;max-width:920px\}/);
+  assert.match(response.body, /\.hero-title\{font-family:Georgia,'Times New Roman',serif;font-size:clamp\(32px,4vw,44px\);font-weight:600;line-height:1\.14;color:var\(--navy\);max-width:100%;text-wrap:balance;overflow-wrap:normal;word-break:normal;hyphens:none\}/);
   assert.match(response.body, /\.mockup-stage\{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp\(0px,3vw,44px\)\}/);
   assert.match(response.body, /\.wide-stack\{width:min\(54%,780px\);display:flex;flex-direction:column;align-items:center;gap:22px\}/);
   assert.doesNotMatch(response.body, /mobile-mockup-intro/);
+  assert.match(response.body, /@media\(max-width:700px\)\{\.hero-heading\{gap:7px;max-width:calc\(100vw - 36px\)\}\.hero-title\{font-size:clamp\(24px,9\.2vw,36px\);line-height:1\.08\}\}/);
   assert.match(response.body, /@media\(max-width:900px\)\{\.concept-hero\{min-height:100svh;padding-top:34px;justify-content:flex-start\}\.mockup-stage\{flex-direction:column;padding:0;gap:22px\}\.wide-stack\{display:contents\}\.hero-heading\{order:-1;width:100%\}\.tall\{width:100%;order:0\}\.wide\{width:100%;order:1\}/);
   assert.doesNotMatch(response.body, /\.wide-stack\{order:-1\}/);
   assert.match(response.body, /<div class="wide-stack">\s*<div class="hero-heading">\s*<span class="hero-label">Webdesign presentatie<\/span>\s*<h1 class="hero-title">Piggy’s Kadoshop Hilvarenbeek<\/h1>\s*<\/div>\s*<div class="stage-card wide" data-loading="Mockup wordt geladen">/);
@@ -239,6 +242,8 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
+  assert.match(response.body, /function fitHeroTitle\(\)/);
+  assert.match(response.body, /title\.scrollHeight <= lineHeight \* 2 \+ 2 && title\.scrollWidth <= title\.clientWidth \+ 1/);
 });
 
 test('public webdesign preview concept route switches the profile by sender context', async () => {
@@ -821,6 +826,36 @@ test('public webdesign preview concept route cleans internal import ids from fal
   assert.match(response.body, /Piggy&#39;s Kadoshop/);
   assert.doesNotMatch(response.body, /Manual Import/i);
   assert.doesNotMatch(response.body, /Contact 0574/i);
+});
+
+test('public webdesign preview concept route keeps legal suffixes together and fits mobile headings', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return {
+        values: {
+          [PHOTO_KEY]: JSON.stringify({
+            'manual-import-geras-nl-contact-0101': {
+              id: 'manual-import-geras-nl-contact-0101',
+              websitePhotoUrl: 'https://cdn.softora.test/geras-webdesign.png',
+              websiteMockupUrl: 'https://cdn.softora.test/geras-mockup.jpg',
+            },
+          }),
+        },
+      };
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'geras-aannemersbedrijf-b-v' },
+    query: { cid: 'manual-import-geras-nl-contact-0101' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<h1 class="hero-title">Geras Aannemersbedrijf B\.V\.<\/h1>/);
+  assert.doesNotMatch(response.body, /Aannemersbedrijf B V/);
+  assert.match(response.body, /minSize = window\.innerWidth <= 700 \? 18 : 24/);
+  assert.match(response.body, /while\(size > minSize && !fits\(\)\)/);
 });
 
 test('public webdesign preview can read legacy chunked image data', async () => {
