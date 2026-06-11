@@ -389,6 +389,44 @@ test('premium database webdesign jobs persist status and generated photos throug
   assert.equal(getRes.body.job.status, 'done');
 });
 
+test('premium database webdesign jobs refuse queued success when persistent job storage fails', async () => {
+  let pipelineCalls = 0;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: {
+      upsertWebdesignJob: async () => ({ ok: false }),
+    },
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_persistfail123',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-persist-fail', bedrijf: 'Softora' },
+      },
+    },
+    startRes
+  );
+
+  assert.equal(startRes.statusCode, 503);
+  assert.equal(startRes.body.ok, false);
+  assert.equal(startRes.body.error, 'Webdesign-opdracht opslaan mislukt');
+  assert.equal(coordinator._jobs.has('job_persistfail123'), false);
+  assert.equal(pipelineCalls, 0);
+});
+
 test('premium database webdesign jobs store trimmed webdesign photos before mockup creation', async () => {
   const dataUrl = await createSideGutterWebdesignDataUrl();
   const uploadedPhotos = [];
