@@ -372,7 +372,9 @@ function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNorma
     slugifyWebdesignCompany(id, 'uw-bedrijf', normalizeString),
     normalizeString
   );
-  return `/webdesign/${slug}`;
+  const directIdentifier = normalizeString(id);
+  const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
+  return `/webdesign/${slug}${directQuery}`;
 }
 
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {

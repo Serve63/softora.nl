@@ -1154,7 +1154,9 @@ function createColdmailCampaignService(deps = {}) {
 
   function buildPublicWebdesignPreviewPath(row, id) {
     const slug = slugifyWebdesignCompany(getRowCompany(row), slugifyWebdesignCompany(id, 'uw-bedrijf'));
-    return `/webdesign/${slug}`;
+    const directIdentifier = normalizeString(id);
+    const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
+    return `/webdesign/${slug}${directQuery}`;
   }
 
   function buildPublicWebdesignPreviewUrl(row, id, input = {}) {
