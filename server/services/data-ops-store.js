@@ -240,9 +240,21 @@ function createSoftoraDataOpsStore(deps = {}) {
   let readFailureCooldownUntilMs = 0;
   let readFailureCooldownReason = '';
 
-  function getClient() {
+  function getClient(options = {}) {
     if (!isSupabaseConfigured()) return null;
-    return getSupabaseClient();
+    const clientOptions = {};
+    if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
+      clientOptions.timeoutMs = options.timeoutMs;
+    }
+    if (options.bypassReadFailureCooldown || options.ignoreSupabaseRestFailureCooldown) {
+      clientOptions.ignoreFailureCooldown = true;
+    }
+    if (options.suppressReadFailureCooldown || options.suppressSupabaseRestFailureCooldown) {
+      clientOptions.suppressFailureCooldown = true;
+    }
+    return Object.keys(clientOptions).length
+      ? getSupabaseClient(clientOptions)
+      : getSupabaseClient();
   }
 
   function isUnavailableError(error) {
@@ -376,7 +388,7 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   async function run(label, operation, options = {}) {
-    const client = getClient();
+    const client = getClient(options);
     if (!client) return { ok: false, unavailable: true, error: new Error('Supabase niet geconfigureerd') };
     const isReadOperation = Number(options.timeoutMs) > 0;
     if (isReadOperation && isReadFailureCooldownActive() && !options.bypassReadFailureCooldown) {
@@ -1042,13 +1054,13 @@ function createSoftoraDataOpsStore(deps = {}) {
       }
       return Array.from(rowsById.values());
     }
+    const buildQueryOptions = {
+      timeoutMs: dataOpsReadQueryTimeoutMs,
+      bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+      suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+      suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+    };
     const structuredRows = await cachedRead(cacheKey, async () => {
-      const buildQueryOptions = {
-        timeoutMs: dataOpsReadQueryTimeoutMs,
-        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
-        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
-      };
       const buildQuery = (client) => selectDesignPhotoRows(client).order('updated_at', { ascending: false });
       let result = null;
       if (identifiers.length) {
@@ -1073,7 +1085,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
     });
     if (!structuredRows) return null;
-    const client = getClient();
+    const client = getClient(buildQueryOptions);
     const rows = structuredRows
       .filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers))
       .slice(0, maxMatches);

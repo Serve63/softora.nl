@@ -310,6 +310,78 @@ test('supabase state store lets critical REST reads ignore shared cooldown and u
   assert.deepEqual(capturedTimeouts, [1000, 8000]);
 });
 
+test('supabase state store lets critical Supabase clients ignore shared cooldown and use their own timeout', async () => {
+  const capturedTimeouts = [];
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  let fetchCalls = 0;
+  const fixture = createFixture({
+    supabaseRestTimeoutMs: 5,
+    supabaseRestFailureCooldownMs: 1000,
+    fetchImpl: async (_url, options = {}) => {
+      fetchCalls += 1;
+      return new Promise((_, reject) => {
+        options.signal?.addEventListener('abort', () => {
+          const reason = options.signal?.reason;
+          if (reason instanceof Error) {
+            reject(reason);
+            return;
+          }
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      });
+    },
+  });
+
+  global.setTimeout = (callback, ms) => {
+    capturedTimeouts.push(ms);
+    queueMicrotask(callback);
+    return { ms };
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    const defaultClient = fixture.store.getSupabaseClient();
+    const defaultFetch = fixture.clientCalls[0][2].global.fetch;
+    await assert.rejects(
+      defaultFetch('https://example.supabase.co/rest/v1/runtime_state'),
+      /Supabase client timeout na 1000ms/
+    );
+    await assert.rejects(
+      defaultFetch('https://example.supabase.co/rest/v1/runtime_state'),
+      /Supabase REST tijdelijk overgeslagen/
+    );
+
+    const criticalClient = fixture.store.getSupabaseClient({
+      timeoutMs: 8000,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
+    const secondCriticalClient = fixture.store.getSupabaseClient({
+      timeoutMs: 8000,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
+    const criticalFetch = fixture.clientCalls[1][2].global.fetch;
+
+    await assert.rejects(
+      criticalFetch('https://example.supabase.co/rest/v1/runtime_state'),
+      /Supabase client timeout na 8000ms/
+    );
+    assert.notEqual(criticalClient, defaultClient);
+    assert.equal(secondCriticalClient, criticalClient);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+
+  assert.equal(fetchCalls, 2);
+  assert.equal(fixture.clientCalls.length, 2);
+  assert.deepEqual(capturedTimeouts, [1000, 8000]);
+});
+
 test('supabase state store opens REST cooldown after 5xx responses', async () => {
   let fetchCalls = 0;
   const fixture = createFixture({

@@ -1340,7 +1340,6 @@ function createMailboxService(deps = {}) {
       : `${getPublicWebdesignPreviewBaseUrl()}/${cleanUrl.replace(/^\/+/, '')}`;
     return absoluteUrl
       .replace(/\/webdesign\/([^/?#]+)(?:\/concept)?(?=([?#]|$))/i, '/webdesign/$1')
-      .replace(/\?[^#]*/g, '')
       .replace(/#.*$/g, '');
   }
 
