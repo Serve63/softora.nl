@@ -117,10 +117,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /--premium-sidebar-font-display:\s*'SoftoraSidebarOswald', 'Oswald', sans-serif;/);
   assert.match(themeSource, /\.sidebar-logo\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-display\) !important;[\s\S]*font-synthesis:\s*none !important;/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text\s*\{[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans\) !important;/);
-  assert.match(autopilotSource, /\.sidebar-link\.sidebar-link--autopilot\s*\{[\s\S]*pointer-events:\s*none !important;[\s\S]*cursor:\s*default !important;/);
-  assert.match(autopilotSource, /\.sidebar-link \.sidebar-autopilot-badge\s*\{[\s\S]*margin-left:\s*auto !important;[\s\S]*text-transform:\s*lowercase !important;/);
+  assert.match(autopilotSource, /\.sidebar-link\.sidebar-link--autopilot\s*\{[\s\S]*opacity:\s*0\.58 !important;[\s\S]*pointer-events:\s*none !important;[\s\S]*cursor:\s*default !important;/);
+  assert.match(autopilotSource, /\.sidebar-link\.sidebar-link--autopilot\.active\s*\{[\s\S]*opacity:\s*0\.62 !important;/);
+  assert.match(autopilotSource, /\.sidebar-link \.sidebar-autopilot-badge\s*\{[\s\S]*margin-left:\s*auto !important;[\s\S]*text-transform:\s*uppercase !important;/);
   assert.match(autopilotJsSource, /const AUTOPILOT_KEY = "coldmailing";/);
   assert.match(autopilotJsSource, /link\.removeAttribute\("href"\);/);
+  assert.match(autopilotJsSource, /badge\.textContent = "AUTOPILOT";/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\]\s*\{[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.2 !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-logo\s*\{[\s\S]*margin:\s*0 0 11px !important;[\s\S]*font-size:\s*25px !important;/);
   assert.match(themeSource, /\.sidebar\[data-static-sidebar="1"\] \.sidebar-link\s*\{[\s\S]*min-height:\s*0 !important;[\s\S]*font-size:\s*14px !important;[\s\S]*line-height:\s*1\.12 !important;/);
@@ -221,7 +223,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260519d'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260609a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
+  assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE/);
   assert.match(htmlPagesSource, /function isPremiumSidebarContentFrameRequest\(req\) \{/);
@@ -235,6 +238,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /premium-sidebar-stability\.js\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.css\?v=/);
   assert.match(htmlPagesSource, /premium-sidebar-autopilot\.js\?v=/);
+  assert.match(htmlPagesSource, /premium-dashboard-ai-chat-scope\.js\?v=/);
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
   assert.match(htmlPagesSource, /@view-transition\{navigation:auto;\}/);
   assert.match(htmlPagesSource, /view-transition-name:softora-premium-sidebar !important;/);
@@ -406,9 +410,9 @@ test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar
   );
   assert.match(pageSource, /<main class="main-content flynow-main">/);
   assert.match(pageSource, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
-  assert.match(pageSource, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260609a"/);
+  assert.match(pageSource, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
   assert.match(pageSource, /src="\/assets\/personnel-theme\.js\?v=20260519b" defer/);
-  assert.match(pageSource, /src="\/assets\/premium-sidebar-autopilot\.js\?v=20260609a" defer/);
+  assert.match(pageSource, /src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer/);
   assert.doesNotMatch(pageSource, /data-static-sidebar="1"/);
   assert.match(
     flynowCssSource,

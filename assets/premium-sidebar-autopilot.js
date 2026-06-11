@@ -16,7 +16,7 @@
                 const badge = document.createElement("span");
                 badge.className = BADGE_CLASS;
                 badge.setAttribute("aria-hidden", "true");
-                badge.textContent = "autopilot";
+                badge.textContent = "AUTOPILOT";
                 link.appendChild(badge);
             }
         });
