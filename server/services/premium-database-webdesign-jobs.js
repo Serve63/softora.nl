@@ -814,6 +814,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  function requiresPersistentJobStorage() {
+    return Boolean(dataOpsStore && typeof dataOpsStore.upsertWebdesignJob === 'function');
+  }
+
   async function loadPersistentJob(jobId) {
     if (!dataOpsStore || typeof dataOpsStore.getWebdesignJob !== 'function') return null;
     try {
@@ -1220,7 +1224,16 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       retry: normalizeRetryState(),
     };
     jobs.set(job.id, job);
-    await persistJob(job);
+    const persisted = await persistJob(job);
+    if (requiresPersistentJobStorage() && !persisted) {
+      jobs.delete(job.id);
+      return {
+        ok: false,
+        statusCode: 503,
+        error: 'Webdesign-opdracht opslaan mislukt',
+        detail: 'De webdesign-opdracht kon tijdelijk niet veilig worden opgeslagen. Probeer opnieuw.',
+      };
+    }
     if (!processJobsInline) {
       queueProcessing();
     }

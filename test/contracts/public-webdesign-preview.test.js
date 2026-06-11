@@ -67,6 +67,12 @@ function createResponseRecorder() {
       this.body = body;
       return body;
     },
+    redirect(code, location) {
+      this.statusCode = code;
+      this.headers.Location = location;
+      this.body = '';
+      return this;
+    },
   };
 }
 
@@ -123,7 +129,7 @@ test('public webdesign preview renders only the two images for a stored mail-rea
 
   assert.equal(requestedScope, PHOTO_SCOPE);
   assert.equal(response.statusCode, 200);
-  assert.match(response.headers['Cache-Control'], /s-maxage=900/);
+  assert.match(response.headers['Cache-Control'], /s-maxage=3600/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-webdesign\.png/);
   assert.match(response.body, /https:\/\/cdn\.softora\.test\/aagje-mockup\.jpg/);
   assert.match(response.body, /rel="preload" as="image"/);
@@ -218,11 +224,11 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /Over dit concept/);
   assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
-  assert.match(response.body, /<link rel="preload" as="image" href="\/webdesign\/customer-1\/asset\/webdesign" fetchpriority="high">/);
-  assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/webdesign" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high">/);
-  assert.match(response.body, /<img class="visual" src="\/webdesign\/customer-1\/asset\/mockup" alt="Device mockup preview" width="1600" height="1000" loading="lazy" decoding="async">/);
-  assert.doesNotMatch(response.body, /https:\/\/cdn\.softora\.test\/piggy-webdesign\.png/);
-  assert.doesNotMatch(response.body, /https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg/);
+  assert.match(response.body, /<link rel="preload" as="image" href="https:\/\/cdn\.softora\.test\/piggy-webdesign\.png" fetchpriority="high">/);
+  assert.match(response.body, /<img class="visual" src="https:\/\/cdn\.softora\.test\/piggy-webdesign\.png" alt="Volledige webdesign preview" width="900" height="1440" loading="eager" decoding="async" fetchpriority="high">/);
+  assert.match(response.body, /<img class="visual" src="https:\/\/cdn\.softora\.test\/piggy-mockup\.jpg" alt="Device mockup preview" width="1600" height="1000" loading="lazy" decoding="async">/);
+  assert.doesNotMatch(response.body, /\/webdesign\/customer-1\/asset\/webdesign/);
+  assert.doesNotMatch(response.body, /\/webdesign\/customer-1\/asset\/mockup/);
   assert.doesNotMatch(response.body, /type="file"/);
   assert.doesNotMatch(response.body, /function load/);
   assert.doesNotMatch(response.body, /background:#121212/);
@@ -268,26 +274,12 @@ test('public webdesign preview concept route switches the profile by sender cont
   assert.doesNotMatch(response.body, /Piggy’s Kadoshop/);
 });
 
-test('public webdesign preview asset route serves optimized cached webp images', async () => {
+test('public webdesign preview asset route redirects signed image URLs without server-side optimization', async () => {
   const originalFetch = global.fetch;
-  const pngBuffer = await sharp({
-    create: {
-      width: 1200,
-      height: 1800,
-      channels: 4,
-      background: { r: 28, g: 43, b: 80, alpha: 1 },
-    },
-  }).png().toBuffer();
-  let fetchedUrl = '';
-  global.fetch = async (url) => {
-    fetchedUrl = String(url);
-    return new Response(pngBuffer, {
-      status: 200,
-      headers: {
-        'content-type': 'image/png',
-        'content-length': String(pngBuffer.length),
-      },
-    });
+  let fetchCalled = false;
+  global.fetch = async () => {
+    fetchCalled = true;
+    throw new Error('signed URLs should redirect without fetching');
   };
   try {
     const service = createPublicWebdesignPreviewService({
@@ -314,21 +306,16 @@ test('public webdesign preview asset route serves optimized cached webp images',
       params: { companySlug: 'customer-1', assetType: 'webdesign' },
     }, response);
 
-    assert.equal(response.statusCode, 200);
-    assert.equal(response.headers['Content-Type'], 'image/webp');
-    assert.match(response.headers['Cache-Control'], /s-maxage=86400/);
-    assert.equal(fetchedUrl, 'https://signed.softora.test/customer-webdesign.png?token=test');
-    assert.ok(Buffer.isBuffer(response.body));
-    const metadata = await sharp(response.body).metadata();
-    assert.equal(metadata.format, 'webp');
-    assert.equal(metadata.width, 920);
+    assert.equal(response.statusCode, 302);
+    assert.equal(response.headers.Location, 'https://signed.softora.test/customer-webdesign.png?token=test');
+    assert.match(response.headers['Cache-Control'], /s-maxage=3600/);
+    assert.equal(fetchCalled, false);
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-test('public webdesign preview asset route optimizes mockups at wider display width', async () => {
-  const originalFetch = global.fetch;
+test('public webdesign preview asset route optimizes legacy data URL mockups at wider display width', async () => {
   const jpgBuffer = await sharp({
     create: {
       width: 1800,
@@ -337,45 +324,33 @@ test('public webdesign preview asset route optimizes mockups at wider display wi
       background: { r: 242, g: 237, b: 230 },
     },
   }).jpeg({ quality: 92 }).toBuffer();
-  global.fetch = async () => new Response(jpgBuffer, {
-    status: 200,
-    headers: {
-      'content-type': 'image/jpeg',
-      'content-length': String(jpgBuffer.length),
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return {
+        values: {
+          [PHOTO_KEY]: JSON.stringify({
+            'customer-1': {
+              customerId: 'customer-1',
+              id: 'customer-1',
+              fileName: 'customer-webdesign.png',
+              websitePhoto: `data:image/jpeg;base64,${jpgBuffer.toString('base64')}`,
+              websiteMockup: `data:image/jpeg;base64,${jpgBuffer.toString('base64')}`,
+            },
+          }),
+        },
+      };
     },
   });
-  try {
-    const service = createPublicWebdesignPreviewService({
-      async getUiStateValues() {
-        return { values: {} };
-      },
-      dataOpsStore: {
-        async listCustomers() {
-          return [];
-        },
-        async listDesignPhotosWithSignedUrls() {
-          return [{
-            customerId: 'customer-1',
-            fileName: 'customer-webdesign.png',
-            websitePhotoUrl: 'https://signed.softora.test/customer-webdesign.png?token=test',
-            websiteMockupUrl: 'https://signed.softora.test/customer-mockup.jpg?token=test',
-          }];
-        },
-      },
-    });
-    const response = createResponseRecorder();
+  const response = createResponseRecorder();
 
-    await service.getPreviewAssetResponse({
-      params: { companySlug: 'customer-1', assetType: 'mockup' },
-    }, response);
+  await service.getPreviewAssetResponse({
+    params: { companySlug: 'customer-1', assetType: 'mockup' },
+  }, response);
 
-    assert.equal(response.statusCode, 200);
-    assert.equal(response.headers['Content-Type'], 'image/webp');
-    const metadata = await sharp(response.body).metadata();
-    assert.equal(metadata.width, 1280);
-  } finally {
-    global.fetch = originalFetch;
-  }
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Content-Type'], 'image/webp');
+  const metadata = await sharp(response.body).metadata();
+  assert.equal(metadata.width, 1280);
 });
 
 test('public webdesign preview keeps the heavy image optimizer lazy for HTML routes', () => {
@@ -501,7 +476,7 @@ test('public webdesign preview uses outbound guards to rescue links when custome
   assert.ok(signedIdentifierReads.some((identifiers) => identifiers.includes('manual-import-idtravel-nl-0245')));
   assert.match(response.body, /<h1 class="hero-title">ID Travel B\.V\.<\/h1>/);
   assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
-  assert.match(response.body, /\/webdesign\/idtravelbv\/asset\/webdesign/);
+  assert.match(response.body, /https:\/\/signed\.softora\.test\/idtravel-webdesign\.png\?token=test/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });
 
@@ -543,7 +518,7 @@ test('public webdesign preview retries transient reads and resolves BV slug vari
   assert.equal(customerReads, 1);
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /<h1 class="hero-title">Van Gestel Steigerbouw B\.V\.<\/h1>/);
-  assert.match(response.body, /\/webdesign\/van-gestel-steigerbouw-b-v\/asset\/webdesign/);
+  assert.match(response.body, /https:\/\/signed\.softora\.test\/van-gestel-webdesign\.png\?token=test/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });
 
@@ -831,6 +806,46 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
 });
 
+test('public webdesign preview does not block first paint on slow profile enrichment', async () => {
+  let customerReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    profileContextTimeoutMs: 50,
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        customerReads += 1;
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return [{
+          id: 'manual-import-snel-nl-0001',
+          bedrijf: 'Snel Laden B.V.',
+          lastColdmailSenderEmail: 'martijn@softora.nl',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-snel-nl-0001',
+          fileName: 'snel-laden-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/snel-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/snel-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+  const startedAt = Date.now();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'snel-laden' } }, response);
+  const elapsedMs = Date.now() - startedAt;
+
+  assert.equal(response.statusCode, 200);
+  assert.ok(elapsedMs < 110, `expected slow profile context to be skipped, took ${elapsedMs}ms`);
+  assert.equal(customerReads, 1);
+  assert.match(response.body, /https:\/\/signed\.softora\.test\/snel-webdesign\.png\?token=test/);
+  assert.match(response.body, /<h1 class="hero-title">Snel Laden<\/h1>/);
+});
+
 test('public webdesign preview signs only targeted structured candidates after customer lookup', async () => {
   const signedOptions = [];
   const customerOptions = [];
@@ -948,8 +963,8 @@ test('public webdesign preview renders compact import-id photo matches when cust
 
   assert.equal(customerReads, 3);
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /\/webdesign\/cafe-schuttershof\/asset\/webdesign/);
-  assert.match(response.body, /\/webdesign\/cafe-schuttershof\/asset\/mockup/);
+  assert.match(response.body, /https:\/\/signed\.softora\.test\/cafe-schuttershof-webdesign\.png\?token=test/);
+  assert.match(response.body, /https:\/\/signed\.softora\.test\/cafe-schuttershof-mockup\.jpg\?token=test/);
   assert.match(response.body, /<h1 class="hero-title">Cafe Schuttershof<\/h1>/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
 });

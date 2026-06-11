@@ -14,9 +14,13 @@ const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 const STRUCTURED_PREVIEW_READ_ATTEMPTS = 3;
 const PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS = 2600;
+const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 900;
 const PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 5000;
 const PUBLIC_PREVIEW_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS = 45_000_000;
+const PUBLIC_PREVIEW_HTML_CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=1800';
+const PUBLIC_PREVIEW_OPTIMIZED_ASSET_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800';
+const PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=1800';
 const PUBLIC_PREVIEW_PROFILE_ROLE = 'Webdesign & Software Ontwikkeling';
 const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'serve';
 const PUBLIC_PREVIEW_PROFILES = Object.freeze({
@@ -140,7 +144,7 @@ function safeParseArray(value) {
 }
 
 function withPublicPreviewTimeout(promise, timeoutMs, label = 'public-preview-read') {
-  const ms = Math.max(500, Math.min(10000, Number(timeoutMs) || PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS));
+  const ms = Math.max(50, Math.min(10000, Number(timeoutMs) || PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS));
   let timeout = null;
   const timeoutPromise = new Promise((resolve) => {
     timeout = setTimeout(() => resolve(undefined), ms);
@@ -165,6 +169,10 @@ function clampChunkCount(value) {
 function isValidImageSource(value) {
   const source = normalizeString(value);
   return /^https?:\/\//i.test(source) || /^data:image\//i.test(source);
+}
+
+function isRemoteImageSource(value) {
+  return /^https?:\/\//i.test(normalizeString(value));
 }
 
 function normalizeProfileSignal(value) {
@@ -719,6 +727,13 @@ function buildPublicPreviewAssetPath(identifier, type) {
   return `/webdesign/${encodeURIComponent(id || 'preview')}/asset/${assetType}`;
 }
 
+function resolvePublicPreviewDisplayAssetSource(preview, type, assetIdentifier) {
+  const assetType = getPublicPreviewAssetType(type);
+  const source = assetType === 'mockup' ? preview && preview.mockupSource : preview && preview.photoSource;
+  if (isRemoteImageSource(source)) return source;
+  return buildPublicPreviewAssetPath(assetIdentifier || preview && preview.id, assetType);
+}
+
 function getPublicPreviewAssetType(value) {
   const normalized = normalizeString(value).toLowerCase();
   return normalized === 'mockup' || normalized === 'device' || normalized === 'device-mockup'
@@ -944,8 +959,9 @@ ${preconnectTags}
 }
 
 function buildConceptHtml(preview, titleFallback, assetIdentifier) {
-  const photoSource = escapeHtml(buildPublicPreviewAssetPath(assetIdentifier || titleFallback || preview.id, 'webdesign'));
-  const mockupSource = escapeHtml(buildPublicPreviewAssetPath(assetIdentifier || titleFallback || preview.id, 'mockup'));
+  const displayIdentifier = assetIdentifier || titleFallback || preview.id;
+  const photoSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'webdesign', displayIdentifier));
+  const mockupSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'mockup', displayIdentifier));
   const profile = preview.profile || resolvePublicPreviewProfile();
   const profileSource = escapeHtml(profile.photoSource);
   const profileName = escapeHtml(profile.name);
@@ -1068,6 +1084,13 @@ function buildNotFoundHtml() {
 function createPublicWebdesignPreviewService(options = {}) {
   const getUiStateValues = typeof options.getUiStateValues === 'function' ? options.getUiStateValues : async () => ({ values: {} });
   const dataOpsStore = options.dataOpsStore && typeof options.dataOpsStore === 'object' ? options.dataOpsStore : null;
+  const profileContextTimeoutMs = Math.max(
+    50,
+    Math.min(
+      PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS,
+      Number(options.profileContextTimeoutMs) || PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS
+    )
+  );
 
   async function resolveStructuredPreview(id, options = {}) {
     if (
@@ -1086,7 +1109,6 @@ function createPublicWebdesignPreviewService(options = {}) {
     }));
     const directPhotoMap = buildPhotoMapFromStructuredEntries(directPhotoEntries);
     const includeProfileContext = Boolean(options.includeProfileContext);
-    let outboundContexts = [];
     const loadOutboundContexts = async (identifiers) => {
       if (
         !includeProfileContext ||
@@ -1104,14 +1126,52 @@ function createPublicWebdesignPreviewService(options = {}) {
       );
       return Array.isArray(loaded) ? loaded : [];
     };
-    outboundContexts = await loadOutboundContexts(
-      collectPublicPreviewContextIdentifiers(id, getPreviewRecordList(directPhotoMap), [])
-    );
-    let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], outboundContexts);
-    if (preview && (!includeProfileContext || (hasExplicitPublicPreviewProfile(preview) && normalizeString(preview.title)))) {
+    const directRecords = getPreviewRecordList(directPhotoMap);
+    let preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], []);
+    if (preview && !includeProfileContext) {
       return preview;
     }
 
+    async function enrichDirectPreview() {
+      let outboundContexts = await loadOutboundContexts(
+        collectPublicPreviewContextIdentifiers(id, directRecords, [])
+      );
+      preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], outboundContexts) || preview;
+      if (preview && hasExplicitPublicPreviewProfile(preview) && normalizeString(preview.title)) {
+        return preview;
+      }
+
+      let customers = [];
+      const loadedCustomers = await retryPublicPreviewRead(() =>
+        dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS)
+      );
+      try {
+        customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
+      } catch (_error) {
+        customers = [];
+      }
+      const matchedCustomers = directRecords
+        .map((record) => findCustomerForPreviewRecord(customers, id, record))
+        .filter(Boolean);
+      outboundContexts = await loadOutboundContexts(
+        collectPublicPreviewContextIdentifiers(id, directRecords, matchedCustomers)
+      );
+      const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
+      return enrichedPreview || preview || null;
+    }
+
+    if (preview) {
+      const enrichedPreview = await withPublicPreviewTimeout(
+        enrichDirectPreview(),
+        profileContextTimeoutMs,
+        'public-preview-profile-context'
+      );
+      return enrichedPreview || preview;
+    }
+
+    let outboundContexts = await loadOutboundContexts(
+      collectPublicPreviewContextIdentifiers(id, directRecords, [])
+    );
     let customers = [];
     const loadedCustomers = await retryPublicPreviewRead(() =>
       dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS)
@@ -1120,16 +1180,6 @@ function createPublicWebdesignPreviewService(options = {}) {
       customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
     } catch (_error) {
       customers = [];
-    }
-    if (preview) {
-      const matchedCustomers = getPreviewRecordList(directPhotoMap)
-        .map((record) => findCustomerForPreviewRecord(customers, id, record))
-        .filter(Boolean);
-      outboundContexts = await loadOutboundContexts(
-        collectPublicPreviewContextIdentifiers(id, getPreviewRecordList(directPhotoMap), matchedCustomers)
-      );
-      const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
-      return enrichedPreview || preview;
     }
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
@@ -1203,7 +1253,7 @@ function createPublicWebdesignPreviewService(options = {}) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
       return res.status(404).send(buildNotFoundHtml());
     }
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', PUBLIC_PREVIEW_HTML_CACHE_CONTROL);
     return res.status(200).send(buildPreviewHtml(preview));
   }
 
@@ -1223,7 +1273,7 @@ function createPublicWebdesignPreviewService(options = {}) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
       return res.status(404).send(buildNotFoundHtml());
     }
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', PUBLIC_PREVIEW_HTML_CACHE_CONTROL);
     return res.status(200).send(buildConceptHtml(preview, routeIdentifier, assetIdentifier));
   }
 
@@ -1242,20 +1292,20 @@ function createPublicWebdesignPreviewService(options = {}) {
     }
     const assetType = getPublicPreviewAssetType(params.assetType || query.type);
     const source = assetType === 'mockup' ? preview.mockupSource : preview.photoSource;
+    if (isRemoteImageSource(source) && typeof res.redirect === 'function') {
+      res.setHeader('Cache-Control', PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL);
+      return res.redirect(302, source);
+    }
     try {
       const optimized = await optimizePublicPreviewImage(source, assetType);
       if (optimized && Buffer.isBuffer(optimized.buffer)) {
         res.setHeader('Content-Type', optimized.contentType);
-        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+        res.setHeader('Cache-Control', PUBLIC_PREVIEW_OPTIMIZED_ASSET_CACHE_CONTROL);
         res.setHeader('X-Content-Type-Options', 'nosniff');
         return res.status(200).send(optimized.buffer);
       }
     } catch (_error) {
       // If optimization fails, keep the public page usable by falling back to the original signed source.
-    }
-    if (/^https?:\/\//i.test(source) && typeof res.redirect === 'function') {
-      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=300');
-      return res.redirect(302, source);
     }
     res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
     return res.status(404).send('Preview image unavailable');
