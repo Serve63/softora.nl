@@ -57,6 +57,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /DEFAULT_DAY_EXERCISES/);
   assert.match(scriptSource, /Chest Press/);
   assert.match(scriptSource, /Leg Extensions/);
+  assert.match(scriptSource, /title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100'/);
+  assert.doesNotMatch(scriptSource, /title: 'Leg Extensions'[\s\S]*?kg: '100\/104'/);
   assert.match(scriptSource, /Hammer Curls/);
   assert.match(scriptSource, /Abdominal Machine/);
   assert.match(scriptSource, /LEGACY_NOTE_TEXTS/);

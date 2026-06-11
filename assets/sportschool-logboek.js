@@ -17,7 +17,7 @@
       { order: 6, title: 'Tricep Dip', notes: '', sets: '3', reps: '8', kg: '104' },
     ],
     tuesday: [
-      { order: 1, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100/104' },
+      { order: 1, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100' },
       { order: 2, title: 'Seated Leg Curl', notes: '', sets: '3', reps: '8', kg: '91' },
       { order: 3, title: 'Shoulder Press Machine', notes: '', sets: '3', reps: '8', kg: '50' },
       { order: 4, title: 'Lateral Shoulder Machine', notes: '', sets: '3', reps: '8', kg: '68' },
@@ -34,7 +34,7 @@
     ],
     thursday: [
       { order: 1, title: 'Seated Leg Curl', notes: '', sets: '3', reps: '8', kg: '91' },
-      { order: 2, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100/104' },
+      { order: 2, title: 'Leg Extensions', notes: '', sets: '3', reps: '8', kg: '100' },
       { order: 3, title: 'Lateral Shoulder Machine', notes: '', sets: '3', reps: '8', kg: '68' },
       { order: 4, title: 'Shoulder Press Machine', notes: '', sets: '3', reps: '8', kg: '50' },
       { order: 5, title: 'Shrugs', notes: '', sets: '3', reps: '8', kg: '36' },
