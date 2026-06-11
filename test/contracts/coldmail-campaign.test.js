@@ -847,6 +847,71 @@ test('coldmail autopilot stays idle until it is explicitly enabled', async () =>
   assert.equal(getAutopilotState().lastResult.reason, 'disabled');
 });
 
+test('coldmail autopilot status reports today sends on the Amsterdam day', async () => {
+  const { service } = createService({
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl', 'martijn@softora.nl'],
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+      },
+    },
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-04-23T21:55:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: 'yesterday@example.test',
+        },
+        {
+          at: '2026-04-23T22:05:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: 'today@example.test',
+          recipientCompany: 'Vandaag BV',
+        },
+        {
+          at: '2026-04-23T22:05:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: 'today@example.test',
+          recipientCompany: 'Vandaag BV',
+        },
+        {
+          at: '2026-04-24T09:00:00.000Z',
+          senderEmail: 'martijn@softora.nl',
+          count: 2,
+          recipientEmail: 'batch@example.test',
+        },
+      ],
+    },
+  });
+
+  const status = await service.getColdmailAutopilotStatus();
+
+  assert.equal(status.ok, true);
+  assert.equal(status.autopilot.todaySends.ok, true);
+  assert.equal(status.autopilot.todaySends.timezone, 'Europe/Amsterdam');
+  assert.equal(status.autopilot.todaySends.dateKey, '2026-04-24');
+  assert.equal(status.autopilot.todaySends.total, 3);
+  assert.equal(status.autopilot.todaySends.limit, 81);
+  assert.equal(status.autopilot.todaySends.remaining, 78);
+  assert.deepEqual(
+    status.autopilot.todaySends.senders.map((sender) => [sender.email, sender.sent, sender.remaining]),
+    [
+      ['serve@softora.nl', 1, 8],
+      ['martijn@softora.nl', 2, 7],
+    ]
+  );
+});
+
 test('coldmail autopilot does not overwrite live settings when state cannot be loaded', async () => {
   const liveState = {
     enabled: true,

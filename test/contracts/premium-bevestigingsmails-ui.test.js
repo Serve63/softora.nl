@@ -175,7 +175,7 @@ test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaa
   assert.match(pageSource, /AI is momenteel hier niet mee bezig\./);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
-  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260527a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260611a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260611a" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
   assert.match(managementSource, /Vandaag zijn er \$\{liveSentToday\} mails echt verzonden/);
@@ -731,12 +731,16 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260527a/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260611a/);
   assert.match(autopilotSource, /const BATCH_SIZE = 1;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
   assert.match(autopilotSource, /data-coldmail-autopilot-enabled/);
   assert.match(autopilotSource, /startButton\.insertAdjacentElement\("afterend", row\)/);
+  assert.match(autopilotSource, /coldmail-autopilot-today-card/);
+  assert.match(autopilotSource, /Vandaag verstuurd/);
+  assert.match(autopilotSource, /state\.todaySends/);
+  assert.match(autopilotSource, /coldmailAutopilotTodayProgress/);
   assert.match(autopilotSource, /let statusLoaded = false;/);
   assert.match(autopilotSource, /let statusUnavailable = false;/);
   assert.match(autopilotSource, /coldmail-autopilot-toggle is-loading/);

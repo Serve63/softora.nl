@@ -139,9 +139,17 @@
     const style = document.createElement("style");
     style.id = "coldmailAutopilotStyles";
     style.textContent = [
-      ".coldmail-autopilot-row{margin-top:12px;display:grid}",
+      ".coldmail-autopilot-row{margin-top:12px;display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1fr);gap:10px;align-items:stretch}",
       ".coldmail-autopilot-card{display:grid;align-items:stretch}",
       ".coldmail-autopilot-card.is-busy{opacity:.72}",
+      ".coldmail-autopilot-today-card{min-height:58px;border:1px solid rgba(123,44,191,.34);border-radius:8px;background:#fff;color:var(--dark,#1a1a2e);padding:10px 12px;display:grid;align-content:center;gap:5px;box-shadow:0 8px 20px rgba(123,44,191,.045);transition:border-color .18s ease,box-shadow .18s ease,opacity .18s ease}",
+      ".coldmail-autopilot-today-card.is-unavailable{opacity:.68;border-color:rgba(123,44,191,.2)}",
+      ".coldmail-autopilot-today-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}",
+      ".coldmail-autopilot-today-label{font-family:Oswald,sans-serif;font-size:10px;font-weight:700;letter-spacing:1.25px;text-transform:uppercase;color:rgba(123,44,191,.82);white-space:nowrap}",
+      ".coldmail-autopilot-today-value{font-family:Oswald,sans-serif;font-size:20px;font-weight:700;line-height:1;color:var(--dark,#1a1a2e);white-space:nowrap}",
+      ".coldmail-autopilot-today-note{font-size:11px;line-height:1.25;color:var(--mid,#555);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".coldmail-autopilot-today-progress{height:3px;border-radius:999px;background:rgba(123,44,191,.12);overflow:hidden}",
+      ".coldmail-autopilot-today-progress span{display:block;height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,rgba(123,44,191,.72),rgba(155,35,85,.78));transition:width .28s ease}",
       ".coldmail-autopilot-toggle{min-height:58px;width:100%;border:1px solid rgba(155,35,85,.26);border-radius:8px;background:#fff;color:var(--crimson,#9b2355);cursor:pointer;font-family:Oswald,sans-serif;font-size:14px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:11px 14px;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}",
       ".coldmail-autopilot-toggle:hover{border-color:rgba(155,35,85,.44);box-shadow:0 0 0 4px rgba(155,35,85,.08)}",
       ".coldmail-autopilot-toggle[aria-pressed=true]{background:var(--green,#16733c);border-color:var(--green,#16733c);color:#fff;box-shadow:0 10px 24px rgba(22,115,60,.18)}",
@@ -155,7 +163,7 @@
       "html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable input:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable textarea:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable select:disabled,html[data-coldmail-autopilot-enabled=true] .coldmail-autopilot-freezable button:disabled{cursor:not-allowed!important}",
       "html[data-coldmail-autopilot-enabled=true] #start-campaign-btn{opacity:.48;filter:grayscale(.2);box-shadow:none}",
       "html[data-coldmail-autopilot-enabled=true] .site-select.is-disabled .site-select-trigger{cursor:not-allowed!important;opacity:.64}",
-      "@media (max-width:760px){.coldmail-autopilot-toggle{width:100%}}",
+      "@media (max-width:760px){.coldmail-autopilot-row{grid-template-columns:1fr}.coldmail-autopilot-toggle{width:100%}.coldmail-autopilot-today-note{white-space:normal}}",
     ].join("");
     document.head.appendChild(style);
   }
@@ -169,6 +177,14 @@
     const row = document.createElement("div");
     row.className = "coldmail-autopilot-row";
     row.innerHTML = [
+      '<div class="coldmail-autopilot-today-card is-unavailable" id="coldmailAutopilotTodayCard" aria-live="polite">',
+      '<div class="coldmail-autopilot-today-top">',
+      '<span class="coldmail-autopilot-today-label">Vandaag verstuurd</span>',
+      '<strong class="coldmail-autopilot-today-value" id="coldmailAutopilotTodayValue">--</strong>',
+      "</div>",
+      '<div class="coldmail-autopilot-today-note" id="coldmailAutopilotTodayNote">Live teller laden</div>',
+      '<div class="coldmail-autopilot-today-progress" aria-hidden="true"><span id="coldmailAutopilotTodayProgress"></span></div>',
+      "</div>",
       '<div class="coldmail-autopilot-card" id="coldmailAutopilotCard">',
       '<button type="button" class="coldmail-autopilot-toggle is-loading" id="coldmailAutopilotToggle" aria-pressed="false" aria-busy="true" data-autopilot-scope="team" disabled>',
       '<span class="coldmail-autopilot-dot" aria-hidden="true"></span>',
@@ -179,6 +195,44 @@
     startButton.insertAdjacentElement("afterend", row);
     byId("coldmailAutopilotToggle").addEventListener("click", toggle);
     return true;
+  }
+
+  function formatInt(value) {
+    return new Intl.NumberFormat("nl-NL").format(Math.max(0, Number(value || 0) || 0));
+  }
+
+  function renderTodaySends() {
+    const stats = state && state.todaySends && typeof state.todaySends === "object" ? state.todaySends : null;
+    const card = byId("coldmailAutopilotTodayCard");
+    const value = byId("coldmailAutopilotTodayValue");
+    const note = byId("coldmailAutopilotTodayNote");
+    const progress = byId("coldmailAutopilotTodayProgress");
+    if (!card || !value || !note || !progress) return;
+
+    const unavailable = !statusLoaded || !stats || stats.ok === false || stats.unavailable;
+    card.classList.toggle("is-unavailable", unavailable);
+    if (unavailable) {
+      value.textContent = statusUnavailable ? "--" : "…";
+      note.textContent = statusUnavailable ? "Teller niet bereikbaar" : "Live teller laden";
+      progress.style.width = "0%";
+      card.title = "";
+      return;
+    }
+
+    const total = Math.max(0, Number(stats.total || 0) || 0);
+    const limit = Math.max(0, Number(stats.limit || 0) || 0);
+    const remaining = Math.max(0, Number(stats.remaining || Math.max(0, limit - total)) || 0);
+    const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((total / limit) * 100))) : 0;
+    value.textContent = limit > 0 ? `${formatInt(total)} / ${formatInt(limit)}` : formatInt(total);
+    note.textContent = limit > 0
+      ? `${formatInt(remaining)} over vandaag`
+      : "Vandaag live bijgewerkt";
+    progress.style.width = `${pct}%`;
+
+    const senders = Array.isArray(stats.senders) ? stats.senders : [];
+    card.title = senders.length
+      ? senders.map((sender) => `${sender.email}: ${formatInt(sender.sent)} verzonden`).join("\n")
+      : "";
   }
 
   function markFreezeTargets() {
@@ -272,6 +326,7 @@
             ? "Team autopilot aan"
             : "Team autopilot uit";
     }
+    renderTodaySends();
     setAutopilotFreeze(enabled);
     if (statusLoaded) notifyAutopilotStatus(state);
   }

@@ -3152,6 +3152,98 @@ function createColdmailCampaignService(deps = {}) {
     return skip;
   }
 
+  function buildColdmailEntryCountKey(entry) {
+    const identity = [
+      normalizeString(entry && entry.at),
+      normalizeEmailAddress(entry && entry.senderEmail),
+      normalizeEmailAddress(entry && entry.recipientEmail),
+      normalizeColdmailGuardKeyPart(entry && entry.recipientDomain),
+      normalizeColdmailGuardKeyPart(entry && entry.recipientCompanyKey),
+      normalizeColdmailGuardKeyPart(entry && entry.recipientId),
+      Math.max(0, Number(entry && entry.count) || 0),
+      Math.max(0, Number(entry && entry.personalCount) || 0),
+    ].join('|');
+    return identity;
+  }
+
+  function summarizeColdmailTodaySendStats(sendGuardState, config = {}, schedule = {}) {
+    const timezone =
+      normalizeString(schedule && (schedule.timezone || schedule.timeZone)) ||
+      DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE;
+    const todayKey = getColdmailAutopilotDateKey(now(), timezone);
+    const dailySendLimit = getColdmailDailySendLimit();
+    const packageDailySendLimit = getColdmailPackageDailySendLimit();
+    const configuredSenders = normalizeColdmailAutopilotSenderEmails(
+      config && (config.senderEmails || config.senderEmail)
+    ).filter(isColdmailAutopilotAllowedSenderEmail);
+    const senderStats = new Map();
+    configuredSenders.forEach((email) => {
+      senderStats.set(email, {
+        email,
+        sent: 0,
+        limit: dailySendLimit,
+        remaining: dailySendLimit,
+        lastSentAt: '',
+        lastRecipientEmail: '',
+        lastRecipientCompany: '',
+      });
+    });
+
+    const seen = new Set();
+    let total = 0;
+    (Array.isArray(sendGuardState && sendGuardState.entries) ? sendGuardState.entries : [])
+      .filter((entry) => entry && Math.max(0, Number(entry.count || 0) || 0) > 0)
+      .forEach((entry) => {
+        const at = normalizeString(entry.at);
+        if (!at || getColdmailAutopilotDateKey(new Date(at), timezone) !== todayKey) return;
+        const key = buildColdmailEntryCountKey(entry);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const senderEmail = normalizeEmailAddress(entry.senderEmail);
+        const count = Math.max(0, Number(entry.count || 0) || 0);
+        total += count;
+        if (!senderStats.has(senderEmail)) {
+          senderStats.set(senderEmail, {
+            email: senderEmail,
+            sent: 0,
+            limit: dailySendLimit,
+            remaining: dailySendLimit,
+            lastSentAt: '',
+            lastRecipientEmail: '',
+            lastRecipientCompany: '',
+          });
+        }
+        const stat = senderStats.get(senderEmail);
+        stat.sent += count;
+        stat.remaining = Math.max(0, dailySendLimit - stat.sent);
+        if (parseTimestampMs(at) >= parseTimestampMs(stat.lastSentAt)) {
+          stat.lastSentAt = at;
+          stat.lastRecipientEmail = normalizeEmailAddress(entry.recipientEmail);
+          stat.lastRecipientCompany = truncateText(normalizeString(entry.recipientCompany), 120);
+        }
+      });
+
+    return {
+      ok: true,
+      timezone,
+      dateKey: todayKey,
+      updatedAt: now().toISOString(),
+      total,
+      limit: packageDailySendLimit,
+      remaining: Math.max(0, packageDailySendLimit - total),
+      senders: Array.from(senderStats.values())
+        .filter((item) => item.email)
+        .sort((left, right) => {
+          const leftIndex = configuredSenders.indexOf(left.email);
+          const rightIndex = configuredSenders.indexOf(right.email);
+          if (leftIndex !== -1 || rightIndex !== -1) {
+            return (leftIndex === -1 ? 999 : leftIndex) - (rightIndex === -1 ? 999 : rightIndex);
+          }
+          return left.email.localeCompare(right.email);
+        }),
+    };
+  }
+
   function normalizeBooleanFlag(value, fallback = false) {
     if (typeof value === 'boolean') return value;
     const text = normalizeString(value).toLowerCase();
@@ -3571,7 +3663,7 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function summarizeColdmailAutopilotState(state) {
+  function summarizeColdmailAutopilotState(state, sendGuardState = null) {
     const normalized = normalizeColdmailAutopilotState(state);
     return {
       version: normalized.version,
@@ -3586,18 +3678,34 @@ function createColdmailCampaignService(deps = {}) {
       updatedAt: normalized.updatedAt,
       updatedBy: normalized.updatedBy,
       safetyLimits: getColdmailSafetyLimits(),
+      todaySends: sendGuardState
+        ? summarizeColdmailTodaySendStats(sendGuardState, normalized.config, normalized.schedule)
+        : {
+            ok: false,
+            unavailable: true,
+            timezone: normalized.schedule.timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+            dateKey: getColdmailAutopilotDateKey(now(), normalized.schedule.timezone),
+            total: 0,
+            limit: getColdmailPackageDailySendLimit(),
+            remaining: getColdmailPackageDailySendLimit(),
+            senders: [],
+          },
     };
   }
 
   async function getColdmailAutopilotStatus() {
-    const [state, liveStats] = await Promise.all([
+    const [state, liveStats, sendGuardState] = await Promise.all([
       loadColdmailAutopilotState(),
       getColdmailLiveStats(),
+      loadColdmailSendGuardState().catch((error) => {
+        logger.warn('[ColdmailAutopilot][today-sends]', error && error.message ? error.message : error);
+        return null;
+      }),
     ]);
     return {
       ok: true,
       autopilot: {
-        ...summarizeColdmailAutopilotState(state),
+        ...summarizeColdmailAutopilotState(state, sendGuardState),
         stats: liveStats.stats,
       },
       stats: liveStats.stats,
@@ -3646,9 +3754,13 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
     const saved = await saveColdmailAutopilotState(nextState, actor);
+    const sendGuardState = await loadColdmailSendGuardState().catch((error) => {
+      logger.warn('[ColdmailAutopilot][today-sends]', error && error.message ? error.message : error);
+      return null;
+    });
     return {
       ok: true,
-      autopilot: summarizeColdmailAutopilotState(saved),
+      autopilot: summarizeColdmailAutopilotState(saved, sendGuardState),
     };
   }
 
