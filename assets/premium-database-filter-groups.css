@@ -137,13 +137,16 @@
 }
 
 .mail-roi-calculator {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 5px;
+    display: inline-block;
 }
 
 .mail-roi-note {
+    grid-area: note;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 0 6px;
     color: #8a877f;
     font-size: 11px;
     font-weight: 600;
@@ -152,7 +155,11 @@
 }
 
 .mail-roi-cards {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+    grid-template-areas:
+        ". note note note"
+        "today sent deals ratio";
     align-items: stretch;
     gap: 6px;
 }
@@ -166,8 +173,21 @@
 }
 
 .mail-roi-card--today {
+    grid-area: today;
     border-color: rgba(139, 34, 82, .42);
     box-shadow: 0 8px 18px rgba(139, 34, 82, .055);
+}
+
+.mail-roi-card--sent {
+    grid-area: sent;
+}
+
+.mail-roi-card--deals {
+    grid-area: deals;
+}
+
+.mail-roi-card--ratio {
+    grid-area: ratio;
 }
 
 .mail-roi-card--today .mail-roi-label {
@@ -394,7 +414,11 @@
     }
 
     .mail-roi-cards {
-        flex-wrap: wrap;
+        grid-template-columns: repeat(2, minmax(110px, 1fr));
+        grid-template-areas:
+            "note note"
+            "today sent"
+            "deals ratio";
     }
 
 }
