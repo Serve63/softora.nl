@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
 const CUSTOMER_SCOPE = 'premium_customers_database';
@@ -18,6 +20,10 @@ const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 900;
 const PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 5000;
 const PUBLIC_PREVIEW_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS = 45_000_000;
+const PUBLIC_PREVIEW_RESOLUTION_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_PREVIEW_RESOLUTION_CACHE_MAX_ENTRIES = 500;
+const PUBLIC_PREVIEW_ASSET_CACHE_TTL_MS = 60 * 60 * 1000;
+const PUBLIC_PREVIEW_ASSET_CACHE_MAX_ENTRIES = 200;
 const PUBLIC_PREVIEW_HTML_CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=1800';
 const PUBLIC_PREVIEW_OPTIMIZED_ASSET_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800';
 const PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=1800';
@@ -38,6 +44,8 @@ const PUBLIC_PREVIEW_PROFILES = Object.freeze({
   }),
 });
 let sharpModule = null;
+const publicPreviewResolutionCache = new Map();
+const publicPreviewAssetCache = new Map();
 const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
   'serve@softora.nl': 'serve',
   'servecreusen@softora.nl': 'serve',
@@ -114,6 +122,63 @@ const {
 
 function normalizeString(value) {
   return String(value || '').trim();
+}
+
+function getPublicPreviewCacheEntry(cache, key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function setPublicPreviewCacheEntry(cache, key, value, ttlMs, maxEntries) {
+  if (!key || value === null || value === undefined) return value;
+  cache.set(key, {
+    expiresAt: Date.now() + ttlMs,
+    value,
+  });
+  while (cache.size > maxEntries) {
+    const firstKey = cache.keys().next().value;
+    if (!firstKey) break;
+    cache.delete(firstKey);
+  }
+  return value;
+}
+
+function getPublicPreviewResolutionCacheKey(id, includeProfileContext) {
+  return `${includeProfileContext ? 'profile' : 'base'}:${normalizeCustomerId(id).toLowerCase()}`;
+}
+
+function setPublicPreviewResolutionCache(id, includeProfileContext, preview) {
+  if (!preview) return preview;
+  const value = setPublicPreviewCacheEntry(
+    publicPreviewResolutionCache,
+    getPublicPreviewResolutionCacheKey(id, includeProfileContext),
+    preview,
+    PUBLIC_PREVIEW_RESOLUTION_CACHE_TTL_MS,
+    PUBLIC_PREVIEW_RESOLUTION_CACHE_MAX_ENTRIES
+  );
+  if (includeProfileContext) {
+    setPublicPreviewCacheEntry(
+      publicPreviewResolutionCache,
+      getPublicPreviewResolutionCacheKey(id, false),
+      preview,
+      PUBLIC_PREVIEW_RESOLUTION_CACHE_TTL_MS,
+      PUBLIC_PREVIEW_RESOLUTION_CACHE_MAX_ENTRIES
+    );
+  }
+  return value;
+}
+
+function getPublicPreviewSourceCacheKey(source) {
+  return crypto
+    .createHash('sha1')
+    .update(normalizeString(source))
+    .digest('hex')
+    .slice(0, 24);
 }
 
 function escapeHtml(value) {
@@ -721,17 +786,29 @@ function getSharp() {
   return sharpModule;
 }
 
-function buildPublicPreviewAssetPath(identifier, type) {
-  const id = normalizeCustomerId(identifier);
-  const assetType = normalizeString(type).toLowerCase() === 'mockup' ? 'mockup' : 'webdesign';
-  return `/webdesign/${encodeURIComponent(id || 'preview')}/asset/${assetType}`;
+function normalizePublicPreviewAssetWidth(type, value) {
+  const assetType = getPublicPreviewAssetType(type);
+  const parsed = Math.round(Number(value) || 0);
+  if (!parsed) return assetType === 'mockup' ? 1280 : 920;
+  const minWidth = assetType === 'mockup' ? 640 : 520;
+  const maxWidth = assetType === 'mockup' ? 1280 : 920;
+  const rounded = Math.round(parsed / 40) * 40;
+  return Math.max(minWidth, Math.min(maxWidth, rounded));
 }
 
-function resolvePublicPreviewDisplayAssetSource(preview, type, assetIdentifier) {
+function buildPublicPreviewAssetPath(identifier, type, width = null) {
+  const id = normalizeCustomerId(identifier);
+  const assetType = normalizeString(type).toLowerCase() === 'mockup' ? 'mockup' : 'webdesign';
+  const normalizedWidth = width ? normalizePublicPreviewAssetWidth(assetType, width) : 0;
+  const query = normalizedWidth ? `?w=${normalizedWidth}` : '';
+  return `/webdesign/${encodeURIComponent(id || 'preview')}/asset/${assetType}${query}`;
+}
+
+function resolvePublicPreviewDisplayAssetSource(preview, type, assetIdentifier, options = {}) {
   const assetType = getPublicPreviewAssetType(type);
   const source = assetType === 'mockup' ? preview && preview.mockupSource : preview && preview.photoSource;
   if (isRemoteImageSource(source)) return source;
-  return buildPublicPreviewAssetPath(assetIdentifier || preview && preview.id, assetType);
+  return buildPublicPreviewAssetPath(assetIdentifier || preview && preview.id, assetType, options.width);
 }
 
 function getPublicPreviewAssetType(value) {
@@ -779,10 +856,14 @@ async function fetchPublicPreviewImageBuffer(source) {
   }
 }
 
-async function optimizePublicPreviewImage(source, type) {
+async function optimizePublicPreviewImage(source, type, width = null) {
+  const assetType = getPublicPreviewAssetType(type);
+  const targetWidth = normalizePublicPreviewAssetWidth(assetType, width);
+  const cacheKey = `${assetType}:${targetWidth}:${getPublicPreviewSourceCacheKey(source)}`;
+  const cached = getPublicPreviewCacheEntry(publicPreviewAssetCache, cacheKey);
+  if (cached) return cached;
   const image = await fetchPublicPreviewImageBuffer(source);
   if (!image || !Buffer.isBuffer(image.buffer)) return null;
-  const targetWidth = type === 'mockup' ? 1280 : 920;
   const buffer = await getSharp()(image.buffer, { limitInputPixels: PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS })
     .rotate()
     .resize({
@@ -791,14 +872,14 @@ async function optimizePublicPreviewImage(source, type) {
       fit: 'inside',
     })
     .webp({
-      quality: type === 'mockup' ? 78 : 76,
-      effort: 4,
+      quality: assetType === 'mockup' ? 78 : 76,
+      effort: 3,
     })
     .toBuffer();
-  return {
+  return setPublicPreviewCacheEntry(publicPreviewAssetCache, cacheKey, {
     buffer,
     contentType: 'image/webp',
-  };
+  }, PUBLIC_PREVIEW_ASSET_CACHE_TTL_MS, PUBLIC_PREVIEW_ASSET_CACHE_MAX_ENTRIES);
 }
 
 function titleFromIdentifier(value) {
@@ -960,8 +1041,8 @@ ${preconnectTags}
 
 function buildConceptHtml(preview, titleFallback, assetIdentifier) {
   const displayIdentifier = assetIdentifier || titleFallback || preview.id;
-  const photoSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'webdesign', displayIdentifier));
-  const mockupSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'mockup', displayIdentifier));
+  const photoSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'webdesign', displayIdentifier, { width: 840 }));
+  const mockupSource = escapeHtml(resolvePublicPreviewDisplayAssetSource(preview, 'mockup', displayIdentifier, { width: 1040 }));
   const profile = preview.profile || resolvePublicPreviewProfile();
   const profileSource = escapeHtml(profile.photoSource);
   const profileName = escapeHtml(profile.name);
@@ -1082,6 +1163,8 @@ function buildNotFoundHtml() {
 }
 
 function createPublicWebdesignPreviewService(options = {}) {
+  publicPreviewResolutionCache.clear();
+  publicPreviewAssetCache.clear();
   const getUiStateValues = typeof options.getUiStateValues === 'function' ? options.getUiStateValues : async () => ({ values: {} });
   const dataOpsStore = options.dataOpsStore && typeof options.dataOpsStore === 'object' ? options.dataOpsStore : null;
   const profileContextTimeoutMs = Math.max(
@@ -1210,20 +1293,30 @@ function createPublicWebdesignPreviewService(options = {}) {
     const id = normalizeCustomerId(identifier);
     if (!/^[a-z0-9_-]{2,160}$/i.test(id)) return null;
     const includeProfileContext = Boolean(options.includeProfileContext);
+    const cacheKey = getPublicPreviewResolutionCacheKey(id, includeProfileContext);
+    const cachedPreview = getPublicPreviewCacheEntry(publicPreviewResolutionCache, cacheKey);
+    if (cachedPreview) return cachedPreview;
     const structuredPreview = await resolveStructuredPreview(id, { includeProfileContext });
-    if (structuredPreview) return structuredPreview;
+    if (structuredPreview) {
+      return setPublicPreviewResolutionCache(id, includeProfileContext, structuredPreview);
+    }
 
     const state = await getUiStateValues(PHOTO_SCOPE, getPublicPreviewReadOptions(PHOTO_SCOPE));
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const photoMap = safeParseObject(values[PHOTO_KEY]);
     let preview = buildPreviewFromRecord(id, values, findPhotoRecord(photoMap, id));
-    if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) return preview;
+    if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) {
+      return setPublicPreviewResolutionCache(id, includeProfileContext, preview);
+    }
     if (!preview || includeProfileContext) {
       const customerState = await getUiStateValues(CUSTOMER_SCOPE, getPublicPreviewReadOptions(CUSTOMER_SCOPE));
       const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
       preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues)) || preview;
     }
-    return preview;
+    if (preview) {
+      return setPublicPreviewResolutionCache(id, includeProfileContext, preview);
+    }
+    return null;
   }
 
   async function resolveFirstPreview(identifiers, options = {}) {
@@ -1291,13 +1384,14 @@ function createPublicWebdesignPreviewService(options = {}) {
       return res.status(404).send('Preview image unavailable');
     }
     const assetType = getPublicPreviewAssetType(params.assetType || query.type);
+    const assetWidth = normalizePublicPreviewAssetWidth(assetType, query.w || query.width);
     const source = assetType === 'mockup' ? preview.mockupSource : preview.photoSource;
     if (isRemoteImageSource(source) && typeof res.redirect === 'function') {
       res.setHeader('Cache-Control', PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL);
       return res.redirect(302, source);
     }
     try {
-      const optimized = await optimizePublicPreviewImage(source, assetType);
+      const optimized = await optimizePublicPreviewImage(source, assetType, assetWidth);
       if (optimized && Buffer.isBuffer(optimized.buffer)) {
         res.setHeader('Content-Type', optimized.contentType);
         res.setHeader('Cache-Control', PUBLIC_PREVIEW_OPTIMIZED_ASSET_CACHE_CONTROL);

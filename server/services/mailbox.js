@@ -904,10 +904,12 @@ function createMailboxService(deps = {}) {
   function buildPublicWebdesignPreviewUrl(row, id) {
     const fallbackSlug = slugifyWebdesignCompany(id, 'uw-bedrijf');
     const slug = slugifyWebdesignCompany(getCustomerCompany(row), fallbackSlug);
+    const directIdentifier = normalizeString(id);
+    const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
     try {
-      return new URL(`/webdesign/${slug}`, getPublicWebdesignPreviewBaseUrl()).toString();
+      return new URL(`/webdesign/${slug}${directQuery}`, getPublicWebdesignPreviewBaseUrl()).toString();
     } catch (_) {
-      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}`;
+      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}${directQuery}`;
     }
   }
 

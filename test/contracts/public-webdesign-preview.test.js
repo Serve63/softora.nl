@@ -353,6 +353,45 @@ test('public webdesign preview asset route optimizes legacy data URL mockups at 
   assert.equal(metadata.width, 1280);
 });
 
+test('public webdesign preview asset route serves requested smaller legacy variants', async () => {
+  const jpgBuffer = await sharp({
+    create: {
+      width: 1800,
+      height: 1100,
+      channels: 3,
+      background: { r: 242, g: 237, b: 230 },
+    },
+  }).jpeg({ quality: 92 }).toBuffer();
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return {
+        values: {
+          [PHOTO_KEY]: JSON.stringify({
+            'customer-1': {
+              customerId: 'customer-1',
+              id: 'customer-1',
+              fileName: 'customer-webdesign.png',
+              websitePhoto: `data:image/jpeg;base64,${jpgBuffer.toString('base64')}`,
+              websiteMockup: `data:image/jpeg;base64,${jpgBuffer.toString('base64')}`,
+            },
+          }),
+        },
+      };
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getPreviewAssetResponse({
+    params: { companySlug: 'customer-1', assetType: 'webdesign' },
+    query: { w: '640' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Content-Type'], 'image/webp');
+  const metadata = await sharp(response.body).metadata();
+  assert.equal(metadata.width, 640);
+});
+
 test('public webdesign preview keeps the heavy image optimizer lazy for HTML routes', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../server/services/public-webdesign-preview.js'), 'utf8');
   assert.match(source, /let sharpModule = null;/);
@@ -844,6 +883,44 @@ test('public webdesign preview does not block first paint on slow profile enrich
   assert.equal(customerReads, 1);
   assert.match(response.body, /https:\/\/signed\.softora\.test\/snel-webdesign\.png\?token=test/);
   assert.match(response.body, /<h1 class="hero-title">Snel Laden<\/h1>/);
+});
+
+test('public webdesign preview reuses resolved preview data for follow-up asset requests', async () => {
+  let signedReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        signedReads += 1;
+        return [{
+          customerId: 'customer-1',
+          bedrijf: 'Bakkerij Zon',
+          websitePhotoUrl: 'https://signed.softora.test/bakkerij-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/bakkerij-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const pageResponse = createResponseRecorder();
+  const assetResponse = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'bakkerij-zon' },
+    query: { cid: 'customer-1' },
+  }, pageResponse);
+  await service.getPreviewAssetResponse({
+    params: { companySlug: 'customer-1', assetType: 'webdesign' },
+  }, assetResponse);
+
+  assert.equal(pageResponse.statusCode, 200);
+  assert.equal(assetResponse.statusCode, 302);
+  assert.equal(assetResponse.headers.Location, 'https://signed.softora.test/bakkerij-webdesign.png?token=test');
+  assert.equal(signedReads, 1);
 });
 
 test('public webdesign preview signs only targeted structured candidates after customer lookup', async () => {
