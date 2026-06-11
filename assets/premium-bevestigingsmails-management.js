@@ -52,6 +52,12 @@
     return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
   }
 
+  function readStatsTotalSent(stats) {
+    return readStatsNumber(stats, 'systemTotalSent') ||
+      readStatsNumber(stats, 'totalSent') ||
+      readStatsNumber(stats, 'databaseTotalSent');
+  }
+
   function isAutopilotEnabled() {
     return Boolean(latestAutopilot && latestAutopilot.enabled);
   }
@@ -126,7 +132,7 @@
     const zone4 = readNumber('z4-count');
     const liveSentToday = readStatsNumber(liveStats, 'sentToday');
     const liveSentLast24h = readStatsNumber(liveStats, 'sentLast24h');
-    const liveTotal = readStatsNumber(liveStats, 'databaseTotalSent');
+    const liveTotal = readStatsTotalSent(liveStats);
     const interest = liveStats ? readStatsNumber(liveStats, 'interestedTotal') : readNumber('z5-count');
     const total = liveTotal || zone1 + zone2 + zone4 + interest;
     const conversion = liveStats

@@ -300,6 +300,79 @@ function createOutboundRecipientGuardStore(deps = {}) {
     return { ok: true, count };
   }
 
+  function mergeSentRecipientGroup(target, row = {}) {
+    [
+      'recipient_email',
+      'recipient_domain',
+      'recipient_company_key',
+      'recipient_id',
+      'recipient_company',
+      'sender_email',
+      'provider',
+      'channel',
+      'source',
+      'actor',
+      'updated_at',
+      'last_seen_at',
+      'created_at',
+    ].forEach((field) => {
+      if (!normalizeString(target[field]) && normalizeString(row[field])) target[field] = row[field];
+    });
+    return target;
+  }
+
+  async function listSentRecipientGroups(options = {}) {
+    const client = getClient();
+    if (!client) return [];
+    const maxRows = Math.max(1, Math.min(20_000, Number(options.maxRows) || 10_000));
+    let query = client
+      .from(table)
+      .select('reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,created_at,updated_at,last_seen_at')
+      .eq('status', 'sent')
+      .eq('permanent', true);
+    const provider = normalizeString(options.provider);
+    const channel = normalizeString(options.channel);
+    if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
+    if (channel && query && typeof query.eq === 'function') query = query.eq('channel', channel);
+    if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+    if (query && typeof query.limit === 'function') query = query.limit(maxRows);
+    const { data, error } = await query;
+    if (error) throw error;
+    const groups = new Map();
+    (Array.isArray(data) ? data : []).forEach((row) => {
+      const reservationId = normalizeString(row && row.reservation_id);
+      const fallbackKey = [
+        normalizeEmailAddress(row && row.recipient_email, normalizeString),
+        normalizeDomainKeyPart(row && row.recipient_domain, normalizeString),
+        normalizeCompanyKeyPart(row && row.recipient_company_key, normalizeString),
+        normalizeGuardKeyPart(row && row.recipient_id, normalizeString),
+        normalizeString(row && (row.last_seen_at || row.updated_at || row.created_at)),
+      ].join('|');
+      const groupKey = reservationId || fallbackKey;
+      if (!groupKey) return;
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          reservation_id: reservationId,
+          recipient_email: '',
+          recipient_domain: '',
+          recipient_company_key: '',
+          recipient_id: '',
+          recipient_company: '',
+          sender_email: '',
+          provider: '',
+          channel: '',
+          source: '',
+          actor: '',
+          updated_at: '',
+          last_seen_at: '',
+          created_at: '',
+        });
+      }
+      mergeSentRecipientGroup(groups.get(groupKey), row);
+    });
+    return Array.from(groups.values());
+  }
+
   async function releaseReservation(reservationId) {
     const client = getClient();
     const id = normalizeString(reservationId);
@@ -317,6 +390,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     findRecipientConflict,
     reserveRecipients,
     confirmReservation,
+    listSentRecipientGroups,
     releaseReservation,
   };
 }

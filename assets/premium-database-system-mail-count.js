@@ -7,6 +7,7 @@
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
+    let lastStatsSystemMailCount = null;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
@@ -185,6 +186,21 @@
         return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
     }
 
+    function readNonNegativeInteger(value) {
+        if (value === null || value === undefined || value === "") return null;
+        const number = Number(value);
+        return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
+    }
+
+    function readSystemMailCountFromStats(stats) {
+        const fields = ["systemTotalSent", "totalSent", "databaseTotalSent"];
+        for (let index = 0; index < fields.length; index += 1) {
+            const count = readNonNegativeInteger(stats && stats[fields[index]]);
+            if (count !== null) return count;
+        }
+        return null;
+    }
+
     function renderTodaySentCount(value, isLoading) {
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentTodayCount");
@@ -200,6 +216,26 @@
         }
         lastTodaySentCount = count;
         element.textContent = count.toLocaleString("nl-NL");
+    }
+
+    function renderSystemMailCount(value, isLoading) {
+        const rootDocument = getRootDocument();
+        const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
+        if (!element) return;
+        if (isLoading && lastRenderedMailCount === null) {
+            element.textContent = "--";
+            renderRoiCalculator(null, true);
+            return;
+        }
+        const count = value === null || value === undefined ? lastRenderedMailCount : readNonNegativeInteger(value);
+        if (count === null || count === undefined) {
+            element.textContent = "--";
+            renderRoiCalculator(null, true);
+            return;
+        }
+        lastRenderedMailCount = count;
+        element.textContent = count.toLocaleString("nl-NL");
+        renderRoiCalculator(count, false);
     }
 
     function refreshTodaySentCount() {
@@ -222,8 +258,14 @@
         }).then(function (result) {
             const payload = result.payload;
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
-            const sentToday = readPositiveInteger(payload.stats && payload.stats.sentToday);
+            const stats = payload.stats || {};
+            const sentToday = readPositiveInteger(stats.sentToday);
+            const systemMailCount = readSystemMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
+            if (systemMailCount !== null) {
+                lastStatsSystemMailCount = systemMailCount;
+                renderSystemMailCount(systemMailCount, false);
+            }
             return sentToday;
         }).catch(function (error) {
             renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
@@ -302,10 +344,7 @@
             return;
         }
         const calculatedCount = getSoftoraSystemMailSentCount(customers, options);
-        const rememberedCount = rememberRenderedMailCount(element);
-        lastRenderedMailCount = Math.max(rememberedCount || 0, calculatedCount);
-        element.textContent = lastRenderedMailCount.toLocaleString("nl-NL");
-        renderRoiCalculator(lastRenderedMailCount, false);
+        renderSystemMailCount(lastStatsSystemMailCount === null ? calculatedCount : lastStatsSystemMailCount, false);
     }
 
     window.SoftoraDatabaseSystemMailCount = {

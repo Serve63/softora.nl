@@ -3023,6 +3023,8 @@ function createColdmailCampaignService(deps = {}) {
     const last24hCutoffMs = currentMs - COLDMAIL_SEND_GUARD_WINDOW_MS;
     const currentDayKey = getColdmailAutopilotDateKey(currentNow, DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
     const perSenderToday = {};
+    const recipientCounts = {};
+    const seen = new Set();
     let sentToday = 0;
     let sentLast24h = 0;
     let personalMailboxSentToday = 0;
@@ -3032,6 +3034,9 @@ function createColdmailCampaignService(deps = {}) {
     (Array.isArray(entries) ? entries : [])
       .filter((entry) => entry && Number(entry.count || 0) > 0)
       .forEach((entry) => {
+        const key = buildColdmailEntryCountKey(entry);
+        if (seen.has(key)) return;
+        seen.add(key);
         const count = Math.max(0, Number(entry.count || 0) || 0);
         const personalCount = Math.max(0, Number(entry.personalCount || 0) || 0);
         const entryMs = parseTimestampMs(entry.at);
@@ -3042,6 +3047,16 @@ function createColdmailCampaignService(deps = {}) {
           lastSuccessfulSendAt = normalizeString(entry.at);
           lastSenderEmail = normalizeEmailAddress(entry.senderEmail);
         }
+        addColdmailRecipientCount(
+          recipientCounts,
+          buildColdmailStatsRecipientKey({
+            recipientEmail: entry.recipientEmail,
+            recipientDomain: entry.recipientDomain,
+            recipientId: entry.recipientId,
+            recipientCompanyKey: entry.recipientCompanyKey || entry.recipientCompany,
+          }),
+          count
+        );
         if (getColdmailAutopilotDateKey(new Date(entryMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) !== currentDayKey) {
           return;
         }
@@ -3058,6 +3073,8 @@ function createColdmailCampaignService(deps = {}) {
       perSenderToday,
       lastSuccessfulSendAt,
       lastSenderEmail,
+      recipientCounts,
+      unkeyedTotalSent: 0,
     };
   }
 
@@ -3066,11 +3083,22 @@ function createColdmailCampaignService(deps = {}) {
     let interestedTotal = 0;
     let activeCampaignTotal = 0;
     let lastDatabaseSentAt = '';
+    const recipientCounts = {};
+    let unkeyedTotalSent = 0;
 
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       const sentCount = getSoftoraSystemMailSentCountForRow(row);
       if (!sentCount) return;
       databaseTotalSent += sentCount;
+      const recipientKey = buildColdmailStatsRecipientKey({
+        recipientEmail: getRowEmail(row),
+        recipientDomain: getRowDomain(row),
+        recipientId: getExplicitRowId(row),
+        recipientCompanyKey: getRowCompany(row),
+      });
+      if (!addColdmailRecipientCount(recipientCounts, recipientKey, sentCount)) {
+        unkeyedTotalSent += sentCount;
+      }
       const sentAt = getColdmailSentAt(row);
       if (sentAt && (!lastDatabaseSentAt || parseTimestampMs(sentAt) > parseTimestampMs(lastDatabaseSentAt))) {
         lastDatabaseSentAt = sentAt;
@@ -3085,18 +3113,60 @@ function createColdmailCampaignService(deps = {}) {
       interestedTotal,
       activeCampaignTotal,
       lastDatabaseSentAt,
+      recipientCounts,
+      unkeyedTotalSent,
     };
   }
 
+  function summarizeColdmailCentralGuardLiveStats(groups) {
+    const recipientCounts = {};
+    (Array.isArray(groups) ? groups : []).forEach((group) => {
+      addColdmailRecipientCount(
+        recipientCounts,
+        buildColdmailStatsRecipientKey({
+          recipientEmail: group.recipient_email || group.recipientEmail,
+          recipientDomain: group.recipient_domain || group.recipientDomain,
+          recipientId: group.recipient_id || group.recipientId,
+          recipientCompanyKey: group.recipient_company_key || group.recipientCompanyKey || group.recipient_company || group.recipientCompany,
+        }),
+        1
+      );
+    });
+    return {
+      recipientCounts,
+      unkeyedTotalSent: 0,
+    };
+  }
+
+  async function loadColdmailCentralGuardStats() {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') {
+      return summarizeColdmailCentralGuardLiveStats([]);
+    }
+    try {
+      const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
+        provider: 'softora',
+        channel: 'coldmail',
+        maxRows: 20_000,
+      });
+      return summarizeColdmailCentralGuardLiveStats(groups);
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][central-guard]', error && error.message ? error.message : error);
+      return summarizeColdmailCentralGuardLiveStats([]);
+    }
+  }
+
   async function getColdmailLiveStats() {
-    const [sendGuardState, customerState] = await Promise.all([
+    const [sendGuardState, customerState, centralGuardStats] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
+      loadColdmailCentralGuardStats(),
     ]);
     const values = customerState && typeof customerState.values === 'object' ? customerState.values : {};
     const rows = parseDatabaseRows(values);
     const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
+    const centralGuardTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats);
+    const systemTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats, guardStats, databaseStats);
     const lastSuccessfulSendAt = guardStats.lastSuccessfulSendAt || databaseStats.lastDatabaseSentAt;
     const conversionRate = databaseStats.databaseTotalSent > 0
       ? Math.round((databaseStats.interestedTotal / databaseStats.databaseTotalSent) * 100)
@@ -3112,6 +3182,9 @@ function createColdmailCampaignService(deps = {}) {
         sentLast24h: guardStats.sentLast24h,
         personalMailboxSentToday: guardStats.personalMailboxSentToday,
         databaseTotalSent: databaseStats.databaseTotalSent,
+        centralGuardTotalSent,
+        systemTotalSent,
+        totalSent: systemTotalSent,
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
         conversionRate,
@@ -3166,6 +3239,41 @@ function createColdmailCampaignService(deps = {}) {
       Math.max(0, Number(entry && entry.personalCount) || 0),
     ].join('|');
     return identity;
+  }
+
+  function buildColdmailStatsRecipientKey(parts = {}) {
+    const email = normalizeEmailAddress(parts.recipientEmail || parts.email);
+    if (email) return `email:${email}`;
+    const domain = normalizeColdmailGuardKeyPart(parts.recipientDomain || parts.domain);
+    if (domain) return `domain:${domain}`;
+    const id = normalizeColdmailGuardKeyPart(parts.recipientId || parts.id);
+    if (id) return `id:${id}`;
+    const company = normalizeColdmailGuardKeyPart(parts.recipientCompanyKey || parts.company);
+    return company ? `company:${company}` : '';
+  }
+
+  function addColdmailRecipientCount(target, recipientKey, count) {
+    const safeCount = Math.max(0, Number(count) || 0);
+    if (!recipientKey || !safeCount) return 0;
+    target[recipientKey] = (target[recipientKey] || 0) + safeCount;
+    return safeCount;
+  }
+
+  function mergeColdmailRecipientCountTotals(...statsList) {
+    const keys = new Set();
+    let unkeyedTotal = 0;
+    statsList.forEach((stats) => {
+      Object.keys((stats && stats.recipientCounts) || {}).forEach((key) => keys.add(key));
+      unkeyedTotal += Math.max(0, Number(stats && stats.unkeyedTotalSent) || 0);
+    });
+    const keyedTotal = Array.from(keys).reduce((total, key) => {
+      const strongest = statsList.reduce((max, stats) => {
+        const value = Math.max(0, Number(stats && stats.recipientCounts && stats.recipientCounts[key]) || 0);
+        return Math.max(max, value);
+      }, 0);
+      return total + strongest;
+    }, 0);
+    return keyedTotal + unkeyedTotal;
   }
 
   function summarizeColdmailTodaySendStats(sendGuardState, config = {}, schedule = {}) {

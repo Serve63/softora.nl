@@ -25,7 +25,7 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /id="z4-count"/);
   assert.doesNotMatch(pageSource, /id="z5-count"/);
   assert.doesNotMatch(pageSource, /id="conv-zone-pct"/);
-  assert.match(pageSource, /assets\/premium-coldmail-live-stats\.js\?v=20260611a/);
+  assert.match(pageSource, /assets\/premium-coldmail-live-stats\.js\?v=20260611b/);
   assert.match(pageSource, /<div class="card-title">Standaard mailtekst<\/div>/);
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
@@ -48,6 +48,7 @@ test('premium bevestigingsmails live mailteller pollt echte coldmail statistieke
   const root = path.join(__dirname, '../..');
   const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
   const liveStatsSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-live-stats.js'), 'utf8');
+  const managementSource = fs.readFileSync(path.join(root, 'assets/premium-bevestigingsmails-management.js'), 'utf8');
 
   assert.match(liveStatsSource, /Vandaag verstuurd/);
   assert.match(liveStatsSource, /Laatste 24 uur/);
@@ -56,12 +57,16 @@ test('premium bevestigingsmails live mailteller pollt echte coldmail statistieke
   assert.match(liveStatsSource, /id="coldmailLiveSentLast24h"/);
   assert.match(liveStatsSource, /id="coldmailLiveSentTotal"/);
   assert.match(liveStatsSource, /function injectMarkup\(\)/);
+  assert.match(liveStatsSource, /function readTotalSent\(stats\)/);
+  assert.match(liveStatsSource, /stats\.systemTotalSent \|\| stats\.totalSent \|\| stats\.databaseTotalSent/);
   assert.match(liveStatsSource, /const STATS_URL = "\/api\/coldmailing\/stats";/);
   assert.match(liveStatsSource, /const REFRESH_MS = 15000;/);
   assert.match(liveStatsSource, /softora:coldmail-live-stats/);
   assert.match(liveStatsSource, /credentials: "same-origin"/);
   assert.match(liveStatsSource, /cache: "no-store"/);
   assert.match(liveStatsSource, /SoftoraColdmailLiveStats/);
+  assert.match(managementSource, /function readStatsTotalSent\(stats\)/);
+  assert.match(managementSource, /readStatsNumber\(stats, 'systemTotalSent'\)/);
 });
 
 test('premium bevestigingsmails blokkeert de pagina netjes tijdens coldmail verzending', () => {
@@ -176,7 +181,7 @@ test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaa
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
   assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260611a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260611a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260611b" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
   assert.match(managementSource, /Vandaag zijn er \$\{liveSentToday\} mails echt verzonden/);
   assert.match(managementSource, /window\.addEventListener\('softora-ai-management-change', updateAiColdmailingWorkspace\);/);

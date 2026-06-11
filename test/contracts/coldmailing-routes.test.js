@@ -582,6 +582,8 @@ test('coldmailing stats route exposes live send counts to authenticated staff', 
           sentToday: 3,
           sentLast24h: 4,
           databaseTotalSent: 41,
+          systemTotalSent: 44,
+          totalSent: 44,
           source: 'coldmail-send-guard-and-customer-database',
         },
       }),
@@ -596,6 +598,8 @@ test('coldmailing stats route exposes live send counts to authenticated staff', 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.stats.sentToday, 3);
   assert.equal(res.body.stats.databaseTotalSent, 41);
+  assert.equal(res.body.stats.systemTotalSent, 44);
+  assert.equal(res.body.stats.totalSent, 44);
   assert.equal(res.body.stats.source, 'coldmail-send-guard-and-customer-database');
   assert.equal(premiumAccessCalls, 1);
   assert.equal(adminAccessCalls, 0);
