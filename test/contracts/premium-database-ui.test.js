@@ -1093,7 +1093,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: center;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: inline-flex;[\s\S]*gap: 6px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-card--today\s*\{[\s\S]*border-color: rgba\(123, 44, 191, \.48\);/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-card--today\s*\{[\s\S]*border-color: rgba\(139, 34, 82, \.42\);/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-card--today \.mail-roi-label\s*\{[\s\S]*color: var\(--crimson\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-label\s*\{[\s\S]*font-family: "Oswald", sans-serif;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-step-button\s*\{[\s\S]*width: 16px;[\s\S]*height: 16px;/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{[\s\S]*align-items: center;/);

@@ -166,12 +166,12 @@
 }
 
 .mail-roi-card--today {
-    border-color: rgba(123, 44, 191, .48);
-    box-shadow: 0 8px 18px rgba(123, 44, 191, .055);
+    border-color: rgba(139, 34, 82, .42);
+    box-shadow: 0 8px 18px rgba(139, 34, 82, .055);
 }
 
 .mail-roi-card--today .mail-roi-label {
-    color: #6f3fb6;
+    color: var(--crimson);
 }
 
 .mail-roi-label {
