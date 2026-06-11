@@ -181,11 +181,17 @@ function collectTargetedDesignPhotoSearchTerms(identifiers = []) {
     const term = slugifyDesignPhotoMatchText(value);
     if (term.length >= 4 && term.length <= 90) terms.push(term);
   };
+  const addLooseTerm = (value) => {
+    const term = normalizeString(value).toLowerCase().replace(/-+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (term.length >= 4 && term.length <= 90) terms.push(term);
+  };
   (Array.isArray(identifiers) ? identifiers : []).forEach((identifier) => {
     const slug = slugifyDesignPhotoMatchText(identifier);
     const root = stripKnownDomainSuffix(slug);
     addTerm(slug);
     addTerm(root);
+    addLooseTerm(slug);
+    addLooseTerm(root);
     addTerm(compactDesignPhotoSlug(slug));
     addTerm(compactDesignPhotoSlug(root));
   });

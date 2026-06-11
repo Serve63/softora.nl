@@ -706,6 +706,88 @@ test('data ops store signs only matching design photo rows for targeted preview 
   assert.equal(entries.targetedIdentifiersApplied, true);
 });
 
+test('data ops store targets space-separated identity keys for dashed public preview slugs', async () => {
+  const matchingRow = {
+    customer_id: 'manual-import-riesenhorst-nl-0305',
+    identity_key: 'riesenschnauzer kennel de riesenhorst||0612345678',
+    storage_bucket: 'softora-design-photos',
+    storage_path: 'customers/manual-import-riesenhorst/webdesign.png',
+    mime_type: 'image/png',
+    file_name: '83cea9e83a7e3a24ac247eed45824525e84429727321c8f6230acff033215692.png',
+    legacy_meta: {
+      websitePhotoName: '83cea9e83a7e3a24ac247eed45824525e84429727321c8f6230acff033215692.png',
+      mockup: {
+        storageBucket: 'softora-design-photos',
+        storagePath: 'customers/manual-import-riesenhorst/mockup.jpg',
+        fileName: '3555bddd319a2ee38e9b9207468ea612987e3434e73a7eeea2c0b5bd1ffc7073-mockup.jpg',
+      },
+    },
+    updated_at: '2026-06-11T09:00:00.000Z',
+  };
+  const orClauses = [];
+  const signedPaths = [];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path) {
+            signedPaths.push({ bucket, path });
+            return {
+              data: { signedUrl: `https://storage.example.test/${bucket}/${path}` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      const query = {
+        orClause: '',
+        select() {
+          return this;
+        },
+        is() {
+          return this;
+        },
+        or(clause) {
+          this.orClause = clause;
+          orClauses.push(clause);
+          return this;
+        },
+        order() {
+          return this;
+        },
+        limit(limit) {
+          assert.equal(limit, 100);
+          if (!this.orClause) throw new Error('broad design photo scan should not run for dashed identity slugs');
+          const matched = this.orClause.includes('identity_key.ilike.%riesenschnauzer kennel de riesenhorst%');
+          return Promise.resolve({ data: matched ? [matchingRow] : [], error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    identifiers: ['riesenschnauzer-kennel-de-riesenhorst'],
+    expiresInSeconds: 24 * 60 * 60,
+  });
+
+  assert.ok(orClauses.some((clause) => clause.includes('identity_key.ilike.%riesenschnauzer kennel de riesenhorst%')));
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].customerId, 'manual-import-riesenhorst-nl-0305');
+  assert.deepEqual(
+    signedPaths.map((item) => item.path),
+    ['customers/manual-import-riesenhorst/webdesign.png', 'customers/manual-import-riesenhorst/mockup.jpg']
+  );
+});
+
 test('data ops store lists outbound sender guards for public preview profile fallback', async () => {
   const orClauses = [];
   const statusFilters = [];
