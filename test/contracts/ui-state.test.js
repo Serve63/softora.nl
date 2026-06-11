@@ -624,6 +624,44 @@ test('ui-state store supports a longer read timeout for heavy photo scopes', asy
   });
 });
 
+test('ui-state store allows longer critical coldmail read timeouts', async () => {
+  const { restReads, store } = createFixture({
+    uiStateReadTimeoutMs: 1,
+    uiStateReadTimeoutMsByScope: {
+      premium_coldmail_send_guard: 25000,
+    },
+    uiStateReadOptionsByScope: {
+      premium_coldmail_send_guard: {
+        preferSupabaseRestRead: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      },
+    },
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: {
+          values: {
+            [COLDMAIL_SEND_GUARD_KEY]: JSON.stringify({ entries: [] }),
+          },
+        },
+        updated_at: '2026-06-11T12:00:00.000Z',
+      },
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_coldmail_send_guard');
+
+  assert.equal(restReads[0].requestOptions.timeoutMs, 25000);
+  assert.deepEqual(state, {
+    values: {
+      [COLDMAIL_SEND_GUARD_KEY]: JSON.stringify({ entries: [] }),
+    },
+    updatedAt: '2026-06-11T12:00:00.000Z',
+    source: 'supabase',
+  });
+});
+
 test('ui-state store can isolate critical reads through REST-first scoped options', async () => {
   let clientUsed = false;
   const { restReads, store } = createFixture({
@@ -680,9 +718,9 @@ test('ui-state store can isolate critical reads through REST-first scoped option
 test('ui-seo runtime keeps coldmail state reads critical and isolated by default', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../server/services/ui-seo-runtime.js'), 'utf8');
 
-  assert.match(source, /premium_coldmail_autopilot:\s*8000/);
-  assert.match(source, /premium_coldmail_send_guard:\s*10000/);
-  assert.match(source, /premium_coldmailing_settings:\s*8000/);
+  assert.match(source, /premium_coldmail_autopilot:\s*12000/);
+  assert.match(source, /premium_coldmail_send_guard:\s*25000/);
+  assert.match(source, /premium_coldmailing_settings:\s*12000/);
   assert.match(source, /dataOpsReadQueryTimeoutMs = 6000/);
   assert.match(source, /premium_customers_database:\s*8000/);
   assert.match(source, /premium_database_photos:\s*12000/);
