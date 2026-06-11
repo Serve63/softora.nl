@@ -85,6 +85,11 @@ function createDataOpsAwareUiStateSetter(uiSeoRuntime = {}) {
     ) {
       const bridged = await dataOpsBridge.setUiStateValues(scope, values, meta);
       if (bridged) return bridged;
+      if (meta && meta.requireDataOps) {
+        const error = new Error(`DataOps-opslag voor ${scope} gaf geen bevestiging terug.`);
+        error.code = 'DATA_OPS_REQUIRED_WRITE_FAILED';
+        throw error;
+      }
     }
     return legacySetUiStateValues(scope, values, meta, ...args);
   };

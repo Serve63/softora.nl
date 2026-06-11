@@ -248,7 +248,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.equal(contactStatusClient.getColdmailSentAt({ lastColdmailSentAt: '2026-05-19T17:02:00Z' }), '2026-05-19T17:02:00Z');
 });
 
-test('premium database system mail counter excludes Instantly and counts Softora sends', () => {
+test('premium database mail counter keeps system fallback but renders webdesign outreach sends', () => {
   const node = { textContent: '' };
   const systemMailCountClient = loadDatabaseSystemMailCountClient({
     document: { getElementById: (id) => (id === 'systemMailSentCount' ? node : null) },
@@ -277,16 +277,35 @@ test('premium database system mail counter excludes Instantly and counts Softora
   ];
 
   assert.equal(systemMailCountClient.getSoftoraSystemMailSentCount(customers, helpers), 6);
-  systemMailCountClient.render(customers, helpers);
-  assert.equal(node.textContent, '6');
-  systemMailCountClient.render([], { ...helpers, dataLoading: true });
-  assert.equal(node.textContent, '6');
-  systemMailCountClient.render(customers, { ...helpers, dataLoading: true });
-  assert.equal(node.textContent, '6');
+  const webdesignHelpers = {
+    ...helpers,
+    now: () => new Date('2026-06-11T12:00:00.000+02:00'),
+  };
+  const webdesignCustomers = [
+    { bedrijf: 'Webdesign A', dom: 'https://www.web-a.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:00:00.000Z' },
+    { bedrijf: 'Webdesign A duplicate', dom: 'web-a.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T08:00:00.000Z' },
+    { bedrijf: 'Webdesign B', email: 'hello@web-b.test', outreachCampaignType: 'website-design', outreachSentAt: '2026-06-10T08:00:00.000Z' },
+    { bedrijf: 'Webdesign C', coldmailSpecialAction: 'webdesign', lastColdmailSentAt: '2026-06-11T09:00:00.000Z' },
+    { bedrijf: 'Softora testmodus', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T09:00:00.000Z' },
+    { bedrijf: 'Fresh webdesign lead', campaignType: 'webdesign' },
+  ];
+
+  const webdesignStats = systemMailCountClient.getWebdesignMailSentStats(webdesignCustomers, webdesignHelpers);
+  assert.equal(webdesignStats.total, 3);
+  assert.equal(webdesignStats.today, 2);
+  systemMailCountClient.render(webdesignCustomers, webdesignHelpers);
+  assert.equal(node.textContent, '3');
+  systemMailCountClient.render([], { ...webdesignHelpers, dataLoading: true });
+  assert.equal(node.textContent, '3');
+  systemMailCountClient.render(webdesignCustomers, { ...webdesignHelpers, dataLoading: true });
+  assert.equal(node.textContent, '3');
   node.textContent = '511';
-  systemMailCountClient.render([], { ...helpers, dataLoading: true });
+  systemMailCountClient.render([], { ...webdesignHelpers, dataLoading: true });
   assert.equal(node.textContent, '511');
-  systemMailCountClient.render([{ bedrijf: 'Older bootstrap lead', lastColdmailProvider: 'softora' }], helpers);
+  systemMailCountClient.render(
+    [{ bedrijf: 'Older bootstrap lead', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-10T07:00:00.000Z' }],
+    webdesignHelpers
+  );
   assert.equal(node.textContent, '1');
 });
 
@@ -310,14 +329,18 @@ test('premium database mail ROI calculator uses the live Softora mail count', ()
     },
   });
   const customers = [
-    { bedrijf: 'Softora lead', lastColdmailProvider: 'softora' },
-    { bedrijf: 'Gmail lead', lastColdmailProvider: 'gmail' },
-    { bedrijf: 'SMTP lead', lastColdmailSenderEmail: 'serve@softora.nl' },
-    { bedrijf: 'Message lead', coldmailSentMessageId: 'msg_1' },
-    { bedrijf: 'Two-message lead', hist: [{ label: 'Mail verstuurd' }, { type: 'gemaild', label: 'Mail verstuurd' }] },
+    { bedrijf: 'Webdesign lead 1', dom: 'lead-1.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:00:00.000Z' },
+    { bedrijf: 'Webdesign lead 2', dom: 'lead-2.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:05:00.000Z' },
+    { bedrijf: 'Webdesign lead 3', dom: 'lead-3.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:10:00.000Z' },
+    { bedrijf: 'Webdesign lead 4', dom: 'lead-4.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:15:00.000Z' },
+    { bedrijf: 'Webdesign lead 5', dom: 'lead-5.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:20:00.000Z' },
+    { bedrijf: 'Webdesign lead 6', dom: 'lead-6.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:25:00.000Z' },
   ];
 
-  systemMailCountClient.render(customers, { normalizeString: (value) => String(value || '').trim() });
+  systemMailCountClient.render(customers, {
+    normalizeString: (value) => String(value || '').trim(),
+    now: () => new Date('2026-06-11T12:00:00.000+02:00'),
+  });
 
   assert.equal(nodes.systemMailSentCount.textContent, '6');
   assert.equal(nodes.mailRoiDealsCount.textContent, '0');
@@ -347,7 +370,15 @@ test('premium database mail ROI calculator toont vandaag verstuurd live in dezel
       requestedUrls.push(url);
       return {
         ok: true,
-        json: async () => ({ ok: true, stats: { sentToday: 29, systemTotalSent: 323 } }),
+        json: async () => ({
+          ok: true,
+          stats: {
+            sentToday: 31,
+            webdesignSentToday: 26,
+            systemTotalSent: 355,
+            webdesignTotalSent: 385,
+          },
+        }),
       };
     },
     setInterval: () => 0,
@@ -356,8 +387,8 @@ test('premium database mail ROI calculator toont vandaag verstuurd live in dezel
   systemMailCountClient.render([], { dataLoading: false });
   await systemMailCountClient.refreshTodaySentCount();
 
-  assert.equal(nodes.systemMailSentTodayCount.textContent, '29');
-  assert.equal(nodes.systemMailSentCount.textContent, '323');
+  assert.equal(nodes.systemMailSentTodayCount.textContent, '26');
+  assert.equal(nodes.systemMailSentCount.textContent, '385');
   assert.equal(requestedUrls[0], '/api/coldmailing/stats');
 });
 
@@ -392,14 +423,18 @@ test('premium database mail ROI calculator persists the customer count', async (
     },
   });
   const customers = [
-    { bedrijf: 'Softora lead', lastColdmailProvider: 'softora' },
-    { bedrijf: 'Gmail lead', lastColdmailProvider: 'gmail' },
-    { bedrijf: 'SMTP lead', lastColdmailSenderEmail: 'serve@softora.nl' },
-    { bedrijf: 'Message lead', coldmailSentMessageId: 'msg_1' },
-    { bedrijf: 'Two-message lead', hist: [{ label: 'Mail verstuurd' }, { type: 'gemaild', label: 'Mail verstuurd' }] },
+    { bedrijf: 'Webdesign lead 1', dom: 'roi-1.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:00:00.000Z' },
+    { bedrijf: 'Webdesign lead 2', dom: 'roi-2.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:05:00.000Z' },
+    { bedrijf: 'Webdesign lead 3', dom: 'roi-3.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:10:00.000Z' },
+    { bedrijf: 'Webdesign lead 4', dom: 'roi-4.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:15:00.000Z' },
+    { bedrijf: 'Webdesign lead 5', dom: 'roi-5.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:20:00.000Z' },
+    { bedrijf: 'Webdesign lead 6', dom: 'roi-6.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:25:00.000Z' },
   ];
 
-  systemMailCountClient.render(customers, { normalizeString: (value) => String(value || '').trim() });
+  systemMailCountClient.render(customers, {
+    normalizeString: (value) => String(value || '').trim(),
+    now: () => new Date('2026-06-11T12:00:00.000+02:00'),
+  });
   await systemMailCountClient.loadPersistedDealCount();
 
   assert.equal(nodes.mailRoiDealsCount.textContent, '2');
@@ -750,10 +785,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /function hasSoftoraSystemMailSignal\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getCustomerSoftoraSystemMailSentCount\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getSoftoraSystemMailSentCount\(customers, helpers\)/);
+  assert.match(systemMailCountScriptSource, /function getWebdesignMailSentStats\(customers, helpers\)/);
   assert.match(systemMailCountScriptSource, /function rememberRenderedMailCount\(element\)/);
-  assert.match(systemMailCountScriptSource, /function readSystemMailCountFromStats\(stats\)/);
+  assert.match(systemMailCountScriptSource, /function readMailCountFromStats\(stats\)/);
+  assert.match(systemMailCountScriptSource, /"webdesignTotalSent"/);
   assert.match(systemMailCountScriptSource, /"systemTotalSent"/);
-  assert.match(systemMailCountScriptSource, /renderSystemMailCount\(lastStatsSystemMailCount === null \? calculatedCount : lastStatsSystemMailCount, false\)/);
+  assert.match(systemMailCountScriptSource, /renderSystemMailCount\(lastStatsMailCount === null \? calculatedStats\.total : lastStatsMailCount, false\)/);
   assert.doesNotMatch(systemMailCountScriptSource, /Math\.max\(rememberedCount \|\| 0, calculatedCount\)/);
   assert.match(systemMailCountScriptSource, /function renderRoiCalculator\(mailCount, isLoading\)/);
   assert.match(systemMailCountScriptSource, /const COLDMAIL_STATS_URL = "\/api\/coldmailing\/stats";/);
@@ -1085,7 +1122,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260611a/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260611b/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260611c/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
@@ -1246,7 +1283,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260611b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260611c"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput"/);
   assert.doesNotMatch(pageSource, /<div class="database-import-actions" id="databaseImportActions" hidden>/);

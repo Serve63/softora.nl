@@ -341,8 +341,9 @@ function createService(overrides = {}) {
     setUiStateValues: async (scope, values, meta) => {
       savedState = { scope, values, meta };
       savedStates.push(savedState);
+      let overrideSetResult;
       if (typeof overrides.onSetUiStateValues === 'function') {
-        await overrides.onSetUiStateValues({ scope, values, meta, savedStates });
+        overrideSetResult = await overrides.onSetUiStateValues({ scope, values, meta, savedStates });
       }
       if (scope === 'premium_coldmail_auto_replies') {
         replyState = JSON.parse(values.softora_coldmail_auto_replies_v1);
@@ -360,6 +361,7 @@ function createService(overrides = {}) {
         const rawRows = readChunkedStateValue(values, 'softora_customers_premium_v1');
         rows = JSON.parse(rawRows || '[]');
       }
+      if (overrideSetResult !== undefined) return overrideSetResult;
       return { ok: true };
     },
     createTransport: (config) => {
@@ -553,6 +555,9 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
         bedrijf: 'Bakkerij Zon',
         email: 'ruben@example.test',
         status: 'gemaild',
+        campaignType: 'webdesign',
+        outreachCampaignType: 'webdesign',
+        coldmailSpecialAction: 'webdesign',
         lastColdmailSenderEmail: 'serve@softora.nl',
         lastColdmailSentAt: '2026-04-24T08:00:00.000Z',
         coldmailCampaignEndsAt: '2026-04-30T08:00:00.000Z',
@@ -572,6 +577,9 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
         bedrijf: 'Instantly BV',
         email: 'instantly@example.test',
         status: 'gemaild',
+        campaignType: 'webdesign',
+        outreachCampaignType: 'webdesign',
+        coldmailSpecialAction: 'webdesign',
         lastColdmailProvider: 'instantly',
         lastColdmailSentAt: '2026-04-24T08:15:00.000Z',
       },
@@ -590,6 +598,9 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.centralGuardTotalSent, 2);
   assert.equal(result.stats.systemTotalSent, 4);
   assert.equal(result.stats.totalSent, 4);
+  assert.equal(result.stats.webdesignTotalSent, 2);
+  assert.equal(result.stats.webdesignSentToday, 2);
+  assert.equal(result.stats.webdesignDatabaseRowsTotalSent, 2);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
   assert.equal(result.stats.conversionRate, 33);
@@ -7550,6 +7561,51 @@ test('coldmail campaign pauses when customer status persistence fails after SMTP
   assert.equal(customerWrites, 4);
   const entries = getSendGuardState().entries;
   assert.equal(entries.some((entry) => entry.recipientEmail === 'info@post-smtp-customer-fail.example' && entry.count === 1), true);
+  assert.equal(entries.some((entry) => entry.count === 0 && entry.safetyPauseReason === 'post_smtp_persistence_failed'), true);
+});
+
+test('coldmail campaign treats empty customer status persistence as post-SMTP failure', async () => {
+  let customerWrites = 0;
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'post-smtp-customer-empty',
+        bedrijf: 'Post SMTP Customer Empty BV',
+        naam: 'Post SMTP Customer Empty BV',
+        email: 'info@post-smtp-customer-empty.example',
+        website: 'https://post-smtp-customer-empty.example',
+        status: 'prospect',
+        databaseStatus: 'prospect',
+        mail: true,
+      },
+    ],
+    onSetUiStateValues: async ({ scope }) => {
+      if (scope !== 'premium_customers_database') return undefined;
+      customerWrites += 1;
+      return null;
+    },
+    coldmailSafetyPauseMs: 60_000,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /Na SMTP-acceptatie kon klantstatus\/teller niet betrouwbaar worden opgeslagen/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(customerWrites, 4);
+  const entries = getSendGuardState().entries;
+  assert.equal(entries.some((entry) => entry.recipientEmail === 'info@post-smtp-customer-empty.example' && entry.count === 1), true);
   assert.equal(entries.some((entry) => entry.count === 0 && entry.safetyPauseReason === 'post_smtp_persistence_failed'), true);
 });
 

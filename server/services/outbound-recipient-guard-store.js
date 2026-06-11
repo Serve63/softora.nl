@@ -325,21 +325,40 @@ function createOutboundRecipientGuardStore(deps = {}) {
     const client = getClient();
     if (!client) return [];
     const maxRows = Math.max(1, Math.min(20_000, Number(options.maxRows) || 10_000));
-    let query = client
-      .from(table)
-      .select('reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,created_at,updated_at,last_seen_at')
-      .eq('status', 'sent')
-      .eq('permanent', true);
     const provider = normalizeString(options.provider);
     const channel = normalizeString(options.channel);
-    if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
-    if (channel && query && typeof query.eq === 'function') query = query.eq('channel', channel);
-    if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
-    if (query && typeof query.limit === 'function') query = query.limit(maxRows);
-    const { data, error } = await query;
-    if (error) throw error;
+    const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,created_at,updated_at,last_seen_at';
+    const buildQuery = () => {
+      let query = client
+        .from(table)
+        .select(selectColumns)
+        .eq('status', 'sent')
+        .eq('permanent', true);
+      if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
+      if (channel && query && typeof query.eq === 'function') query = query.eq('channel', channel);
+      if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+      return query;
+    };
+    const rows = [];
+    const pageSize = Math.min(1000, maxRows);
+    const firstQuery = buildQuery();
+    if (firstQuery && typeof firstQuery.range === 'function') {
+      for (let from = 0; from < maxRows; from += pageSize) {
+        const to = Math.min(maxRows - 1, from + pageSize - 1);
+        const { data, error } = await buildQuery().range(from, to);
+        if (error) throw error;
+        const pageRows = Array.isArray(data) ? data : [];
+        rows.push(...pageRows);
+        if (pageRows.length < pageSize) break;
+      }
+    } else {
+      const query = firstQuery && typeof firstQuery.limit === 'function' ? firstQuery.limit(maxRows) : firstQuery;
+      const { data, error } = await query;
+      if (error) throw error;
+      rows.push(...(Array.isArray(data) ? data : []));
+    }
     const groups = new Map();
-    (Array.isArray(data) ? data : []).forEach((row) => {
+    rows.slice(0, maxRows).forEach((row) => {
       const reservationId = normalizeString(row && row.reservation_id);
       const fallbackKey = [
         normalizeEmailAddress(row && row.recipient_email, normalizeString),

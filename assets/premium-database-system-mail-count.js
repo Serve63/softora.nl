@@ -7,7 +7,7 @@
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
-    let lastStatsSystemMailCount = null;
+    let lastStatsMailCount = null;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
@@ -24,9 +24,97 @@
 
     function getColdmailSentAt(customer, helpers) {
         const options = helpers || {};
-        return options.databaseContactStatus && typeof options.databaseContactStatus.getColdmailSentAt === "function"
-            ? options.databaseContactStatus.getColdmailSentAt(customer, { normalizeString: options.normalizeString })
-            : "";
+        if (options.databaseContactStatus && typeof options.databaseContactStatus.getColdmailSentAt === "function") {
+            const helperValue = options.databaseContactStatus.getColdmailSentAt(customer, { normalizeString: options.normalizeString });
+            if (helperValue) return helperValue;
+        }
+        const normalizeString = options.normalizeString || fallbackNormalizeString;
+        return normalizeString(customer && (customer.outreachSentAt || customer.outreach_sent_at || customer.lastColdmailSentAt || customer.lastMailSentAt || customer.lastMailedAt || customer.coldmailCampaignStartedAt || customer.mailCampaignStartedAt || customer.sentAt));
+    }
+
+    function normalizeWebdesignValue(value, helpers) {
+        const normalizeString = (helpers && helpers.normalizeString) || fallbackNormalizeString;
+        return normalizeString(value)
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+    }
+
+    function isWebdesignOutreachCustomer(customer, helpers) {
+        const options = helpers || {};
+        if (options.outreachController && typeof options.outreachController.isWebdesignOutreachCustomer === "function") {
+            return options.outreachController.isWebdesignOutreachCustomer(customer);
+        }
+        return Boolean(customer) && [customer.campaignType, customer.campaign_type, customer.outreachCampaignType, customer.outreach_campaign_type, customer.coldmailSpecialAction, customer.specialAction].some(function (value) {
+            const normalized = normalizeWebdesignValue(value, options);
+            return normalized === "webdesign" || normalized === "website-design" || normalized === "website" || normalized.indexOf("webdesign") !== -1;
+        });
+    }
+
+    function normalizeDomain(value, helpers) {
+        const normalizeString = (helpers && helpers.normalizeString) || fallbackNormalizeString;
+        const raw = normalizeString(value);
+        if (!raw) return "";
+        try {
+            return normalizeString(new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw).hostname).replace(/^www\./i, "").toLowerCase();
+        } catch (error) {
+            return raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/g, "").replace(/\/+$/g, "").toLowerCase();
+        }
+    }
+
+    function buildWebdesignRecipientKey(customer, helpers) {
+        const options = helpers || {};
+        const normalizeString = options.normalizeString || fallbackNormalizeString;
+        const email = normalizeString(customer && (customer.email || customer.contactEmail || customer.mail)).toLowerCase();
+        if (email) return "email:" + email;
+        const domain = normalizeDomain(customer && (customer.dom || customer.domain || customer.website || customer.websiteUrl || customer.website_url || customer.url || customer.site || customer.domein), options);
+        if (domain) return "domain:" + domain;
+        const id = normalizeWebdesignValue(customer && (customer.id || customer.customerId || customer.databaseId), options);
+        if (id) return "id:" + id;
+        const company = normalizeWebdesignValue(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam || customer.name), options);
+        return company ? "company:" + company : "";
+    }
+
+    function getAmsterdamDateKey(value) {
+        const parsed = new Date(String(value || ""));
+        if (!Number.isFinite(parsed.getTime())) return "";
+        try {
+            const parts = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Europe/Amsterdam",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }).formatToParts(parsed);
+            const get = function (type) {
+                const match = parts.find(function (part) { return part.type === type; });
+                return match ? match.value : "";
+            };
+            return get("year") + "-" + get("month") + "-" + get("day");
+        } catch (error) {
+            return parsed.toISOString().slice(0, 10);
+        }
+    }
+
+    function getWebdesignMailSentStats(customers, helpers) {
+        const options = helpers || {};
+        const nowValue = typeof options.now === "function" ? options.now() : (options.now || new Date());
+        const todayKey = getAmsterdamDateKey(nowValue);
+        const keys = new Set();
+        const todayKeys = new Set();
+        (customers || []).forEach(function (customer) {
+            const isTestCompany = typeof options.isColdmailTestCompany === "function" && options.isColdmailTestCompany(customer);
+            const sentAt = getColdmailSentAt(customer, options);
+            if (!customer || isTestCompany || !sentAt || !isWebdesignOutreachCustomer(customer, options)) return;
+            const key = buildWebdesignRecipientKey(customer, options) || "row:" + keys.size;
+            keys.add(key);
+            if (getAmsterdamDateKey(sentAt) === todayKey) todayKeys.add(key);
+        });
+        return {
+            total: keys.size,
+            today: todayKeys.size
+        };
     }
 
     function isInstantlyHistoryEntry(entry, helpers) {
@@ -192,8 +280,17 @@
         return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
     }
 
-    function readSystemMailCountFromStats(stats) {
-        const fields = ["systemTotalSent", "totalSent", "databaseTotalSent"];
+    function readMailCountFromStats(stats) {
+        const fields = ["webdesignTotalSent", "webdesignSentTotal", "webdesignDatabaseTotalSent", "systemTotalSent", "totalSent", "databaseTotalSent"];
+        for (let index = 0; index < fields.length; index += 1) {
+            const count = readNonNegativeInteger(stats && stats[fields[index]]);
+            if (count !== null) return count;
+        }
+        return null;
+    }
+
+    function readTodaySentCountFromStats(stats) {
+        const fields = ["webdesignSentToday", "sentToday"];
         for (let index = 0; index < fields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[fields[index]]);
             if (count !== null) return count;
@@ -259,11 +356,11 @@
             const payload = result.payload;
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
-            const sentToday = readPositiveInteger(stats.sentToday);
-            const systemMailCount = readSystemMailCountFromStats(stats);
+            const sentToday = readTodaySentCountFromStats(stats);
+            const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
             if (systemMailCount !== null) {
-                lastStatsSystemMailCount = systemMailCount;
+                lastStatsMailCount = systemMailCount;
                 renderSystemMailCount(systemMailCount, false);
             }
             return sentToday;
@@ -343,14 +440,16 @@
             renderRoiCalculator(null, true);
             return;
         }
-        const calculatedCount = getSoftoraSystemMailSentCount(customers, options);
-        renderSystemMailCount(lastStatsSystemMailCount === null ? calculatedCount : lastStatsSystemMailCount, false);
+        const calculatedStats = getWebdesignMailSentStats(customers, options);
+        if (lastTodaySentCount === null) renderTodaySentCount(calculatedStats.today, false);
+        renderSystemMailCount(lastStatsMailCount === null ? calculatedStats.total : lastStatsMailCount, false);
     }
 
     window.SoftoraDatabaseSystemMailCount = {
         hasSoftoraSystemMailSignal: hasSoftoraSystemMailSignal,
         getCustomerSoftoraSystemMailSentCount: getCustomerSoftoraSystemMailSentCount,
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,
+        getWebdesignMailSentStats: getWebdesignMailSentStats,
         loadPersistedDealCount: loadPersistedDealCount,
         refreshTodaySentCount: refreshTodaySentCount,
         renderRoiCalculator: renderRoiCalculator,
