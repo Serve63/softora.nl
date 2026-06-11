@@ -919,13 +919,21 @@ function titleFromIdentifier(value) {
     }
     words.push(word.length <= 2 ? word.toUpperCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`);
   });
-  return words.join(' ') || 'Webdesign Concept';
+  return normalizePublicPreviewLegalSuffix(words.join(' ')) || 'Webdesign Concept';
+}
+
+function normalizePublicPreviewLegalSuffix(value) {
+  return normalizeString(value)
+    .replace(/\bB\.?\s*V\.?$/i, 'B.V.')
+    .replace(/\bN\.?\s*V\.?$/i, 'N.V.')
+    .replace(/\bC\.?\s*V\.?$/i, 'C.V.')
+    .replace(/\bV\.?\s*O\.?\s*F\.?$/i, 'V.O.F.');
 }
 
 function cleanPublicPreviewTitle(value, fallback) {
   const title = normalizeString(value);
   if (!title || /^manual import\b/i.test(title)) return titleFromIdentifier(fallback || title);
-  return title;
+  return normalizePublicPreviewLegalSuffix(title);
 }
 
 function cleanPublicPreviewNarrativeCompanyName(value) {
@@ -1140,9 +1148,9 @@ ${preconnectTags}
     html,body{min-height:100%;background:var(--cream);color:var(--navy);font-family:Inter,Arial,sans-serif}
     body{overflow-x:hidden;overflow-anchor:none}
     .concept-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px clamp(18px,4vw,64px);gap:44px;position:relative}
-    .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+    .hero-heading{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;max-width:920px}
     .hero-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--teal);font-weight:800}
-    .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.18;color:var(--navy)}
+    .hero-title{font-family:Georgia,'Times New Roman',serif;font-size:clamp(32px,4vw,44px);font-weight:600;line-height:1.14;color:var(--navy);max-width:100%;text-wrap:balance;overflow-wrap:normal;word-break:normal;hyphens:none}
     .mockup-stage{display:flex;align-items:flex-end;justify-content:center;gap:38px;width:100%;max-width:1440px;padding:0 clamp(0px,3vw,44px)}
     .wide-stack{width:min(54%,780px);display:flex;flex-direction:column;align-items:center;gap:22px}
     .stage-card{background:rgba(255,255,255,.28);box-shadow:0 20px 60px rgba(28,43,80,.14);overflow:hidden;flex-shrink:0;position:relative}
@@ -1173,6 +1181,7 @@ ${preconnectTags}
     @media(max-width:1120px){.about-section{grid-template-columns:1fr;gap:30px;padding-top:56px}.about-profile{width:min(100%,360px);justify-self:center;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:14px}.about-photo{width:68px;flex:0 0 68px;border-radius:999px;aspect-ratio:1/1;box-shadow:0 8px 24px rgba(28,43,80,.1)}.profile-signature{margin:0;text-align:left;padding:0;border-top:0}.profile-signature span{display:block;font-size:10.5px;line-height:1.35}}
     @media(max-width:700px){.about-section{gap:28px}.about-profile{width:min(100%,320px);justify-content:flex-start}.about-photo{width:58px;flex-basis:58px}.profile-signature{display:flex;flex-direction:column;align-items:flex-start}.profile-signature span{order:-1;white-space:nowrap;font-size:clamp(8px,2.5vw,10px);letter-spacing:.7px;margin-bottom:2px}.about-text h2{font-size:clamp(13px,4.1vw,22px);text-align:center}.about-title-desktop{display:none}.about-title-mobile{display:inline}}
     @media(max-width:700px){.scroll-cue{display:none}}
+    @media(max-width:700px){.hero-heading{gap:7px;max-width:calc(100vw - 36px)}.hero-title{font-size:clamp(24px,9.2vw,36px);line-height:1.08}}
     @media(max-width:900px){.concept-hero{min-height:100svh;padding-top:34px;justify-content:flex-start}.mockup-stage{flex-direction:column;padding:0;gap:22px}.wide-stack{display:contents}.hero-heading{order:-1;width:100%}.tall{width:100%;order:0}.wide{width:100%;order:1}.divider{width:calc(100% - 36px)}}
   </style>
 </head>
@@ -1209,6 +1218,34 @@ ${preconnectTags}
       <p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
     </div>
   </section>
+  <script>
+    (function(){
+      function fitHeroTitle(){
+        var title = document.querySelector('.hero-title');
+        if(!title)return;
+        title.style.fontSize = '';
+        var minSize = window.innerWidth <= 700 ? 18 : 24;
+        var size = parseFloat(window.getComputedStyle(title).fontSize) || 36;
+        function fits(){
+          var style = window.getComputedStyle(title);
+          var lineHeight = parseFloat(style.lineHeight) || size * 1.1;
+          return title.scrollHeight <= lineHeight * 2 + 2 && title.scrollWidth <= title.clientWidth + 1;
+        }
+        while(size > minSize && !fits()){
+          size -= 1;
+          title.style.fontSize = size + 'px';
+        }
+      }
+      if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded',fitHeroTitle,{once:true});
+      }else{
+        fitHeroTitle();
+      }
+      if(document.fonts && document.fonts.ready)document.fonts.ready.then(fitHeroTitle).catch(function(){fitHeroTitle();});
+      window.addEventListener('load',fitHeroTitle,{once:true});
+      window.addEventListener('resize',fitHeroTitle);
+    }());
+  </script>
 </body>
 </html>`;
 }
