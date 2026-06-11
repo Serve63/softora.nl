@@ -1,0 +1,438 @@
+:root {
+  --softora-ink: #191827;
+  --softora-muted: #7f7d8d;
+  --softora-purple: #9b2355;
+  --softora-purple-soft: #faedf4;
+  --softora-purple-line: #f0dce6;
+  --softora-sheet: #fcf8fb;
+  --softora-white: #ffffff;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+  background: var(--softora-white);
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
+  color: var(--softora-ink);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 16px;
+  border-radius: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(155, 35, 85, 0.42);
+  outline-offset: 2px;
+}
+
+input:focus-visible {
+  outline: none;
+}
+
+.gym-app {
+  width: min(100%, 430px);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--softora-white) 0%, var(--softora-sheet) 100%);
+}
+
+.gym-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  min-height: calc(94px + var(--safe-top));
+  padding: calc(18px + var(--safe-top)) 18px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+}
+
+.gym-header-center {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.gym-header h1,
+.gym-section h2,
+.day-picker-sheet h2,
+.day-trigger,
+.icon-button,
+.exercise-title,
+.exercise-notes,
+.metric-label,
+.delete-action,
+.day-choice,
+.rest-day {
+  font-family: Oswald, Inter, sans-serif;
+  text-transform: uppercase;
+}
+
+.gym-header h1 {
+  margin: 0;
+  max-width: 300px;
+  color: var(--softora-ink);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.day-trigger {
+  appearance: none;
+  border: 0;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--softora-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.7px;
+}
+
+.gym-section {
+  padding: 24px 18px calc(28px + var(--safe-bottom));
+}
+
+.gym-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.gym-section h2 {
+  margin: 0;
+  color: var(--softora-ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  border: 1px solid var(--softora-purple-line);
+  border-radius: 13px;
+  background: var(--softora-white);
+  color: var(--softora-purple);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.icon-button:focus-visible,
+.day-choice:focus-visible {
+  border-radius: 13px;
+}
+
+.exercise-list {
+  display: grid;
+  gap: 6px;
+}
+
+.exercise-swipe {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  touch-action: pan-y;
+}
+
+.delete-action {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 108px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--softora-purple);
+  color: var(--softora-white);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.exercise-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--softora-purple-line);
+  border-radius: 12px;
+  background: var(--softora-white);
+  touch-action: pan-y;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.exercise-card.is-swiping {
+  transition: none;
+}
+
+.exercise-swipe.is-reordering {
+  z-index: 20;
+  overflow: visible;
+}
+
+.exercise-card.is-reordering {
+  border-color: rgba(155, 35, 85, 0.55);
+  box-shadow: 0 12px 28px rgba(25, 24, 39, 0.14);
+}
+
+.exercise-card:focus-within {
+  border-color: rgba(155, 35, 85, 0.48);
+  box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
+}
+
+.exercise-top {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+}
+
+.drag-handle {
+  display: grid;
+  gap: 2px;
+  width: 14px;
+  height: 28px;
+  place-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle span {
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(127, 125, 141, 0.44);
+}
+
+.drag-handle:focus-visible {
+  outline-offset: 1px;
+}
+
+.exercise-title,
+.exercise-notes,
+.metric-input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.exercise-title {
+  width: 100%;
+  min-width: 0;
+  color: var(--softora-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: 0.28px;
+}
+
+.exercise-title::placeholder,
+.exercise-notes::placeholder,
+.metric-input::placeholder {
+  color: rgba(127, 125, 141, 0.52);
+}
+
+.metric-group {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.metric {
+  display: grid;
+  justify-items: center;
+  width: 32px;
+  padding: 3px 2px 2px;
+  border: 1px solid rgba(240, 220, 230, 0.86);
+  border-radius: 8px;
+  background: rgba(252, 248, 251, 0.75);
+}
+
+.metric-kg {
+  width: 46px;
+}
+
+.metric:focus-within {
+  border-color: rgba(155, 35, 85, 0.46);
+  box-shadow: 0 0 0 3px rgba(155, 35, 85, 0.08);
+}
+
+.metric-input {
+  width: 100%;
+  min-width: 0;
+  height: 15px;
+  padding: 0;
+  color: var(--softora-ink);
+  font-family: Oswald, Inter, sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.metric-kg .metric-input {
+  font-size: 11.5px;
+}
+
+.metric-label {
+  color: rgba(127, 125, 141, 0.8);
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.exercise-notes {
+  width: 100%;
+  min-width: 0;
+  color: var(--softora-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.15px;
+}
+
+.rest-day {
+  margin: 22px 0 0;
+  color: var(--softora-muted);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-align: center;
+}
+
+.day-picker[hidden] {
+  display: none;
+}
+
+.day-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  align-items: end;
+  pointer-events: none;
+}
+
+.day-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.day-picker-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 24px, 406px);
+  margin: 0 auto max(10px, var(--safe-bottom));
+  padding: 22px 18px 26px;
+  border: 1px solid rgba(139, 34, 82, 0.12);
+  border-radius: 28px;
+  background: var(--softora-white);
+  box-shadow: 0 24px 70px rgba(25, 24, 39, 0.14);
+  pointer-events: auto;
+}
+
+.day-picker-sheet h2 {
+  margin: 0 0 16px;
+  color: var(--softora-ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.day-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.day-choice {
+  min-height: 46px;
+  border: 1px solid var(--softora-purple-line);
+  border-radius: 14px;
+  background: var(--softora-white);
+  color: var(--softora-ink);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.day-choice.is-selected {
+  border-color: var(--softora-purple);
+  background: var(--softora-purple);
+  color: var(--softora-white);
+}
+
+@media (min-width: 760px) {
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(155, 35, 85, 0.10), transparent 32%),
+      #f7f4f6;
+  }
+
+  .gym-app {
+    margin-block: 22px;
+    min-height: calc(100vh - 44px);
+    border: 1px solid var(--softora-purple-line);
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 24px 70px rgba(25, 24, 39, 0.08);
+  }
+}
