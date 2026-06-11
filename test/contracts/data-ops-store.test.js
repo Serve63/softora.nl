@@ -1199,3 +1199,91 @@ test('data ops store reuses fresh signed design photo URLs per storage path', as
   assert.equal(first[0].websitePhotoUrl, second[0].websitePhotoUrl);
   assert.equal(first[0].websiteMockupUrl, second[0].websiteMockupUrl);
 });
+
+test('data ops store passes resilient read policy into Supabase client reads and signed URLs', async () => {
+  const clientOptions = [];
+  const rows = [{
+    customer_id: 'customer-1',
+    identity_key: 'bakkerij-zon|ruben|3100000000',
+    storage_bucket: 'softora-design-photos',
+    storage_path: 'customers/customer-1/webdesign.png',
+    mime_type: 'image/png',
+    file_name: 'webdesign.png',
+    legacy_meta: {
+      mockup: {
+        storageBucket: 'softora-design-photos',
+        storagePath: 'customers/customer-1/mockup.jpg',
+        fileName: 'mockup.jpg',
+      },
+    },
+    updated_at: '2026-05-26T12:00:00.000Z',
+  }];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrls(paths, expiresInSeconds) {
+            return {
+              data: paths.map((path) => ({
+                path,
+                signedUrl: `https://storage.example.test/${bucket}/${path}?ttl=${expiresInSeconds}`,
+              })),
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    limit(limit) {
+                      assert.equal(limit, 500);
+                      return Promise.resolve({ data: rows, error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient(options) {
+      clientOptions.push(options || {});
+      return client;
+    },
+    logger: { error() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    expiresInSeconds: 600,
+    bypassReadCache: true,
+    bypassReadFailureCooldown: true,
+    suppressReadFailureCooldown: true,
+    suppressTransientReadFailureLog: true,
+  });
+
+  assert.equal(entries.length, 1);
+  assert.deepEqual(clientOptions, [
+    {
+      timeoutMs: 6000,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    },
+    {
+      timeoutMs: 6000,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    },
+  ]);
+});

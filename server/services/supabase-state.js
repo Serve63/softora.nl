@@ -18,8 +18,8 @@ function createSupabaseStateStore(deps = {}) {
     fetchImpl = globalThis.fetch,
   } = deps;
 
-  let supabaseClient = null;
-  let timedSupabaseFetch = null;
+  const supabaseClientByPolicy = new Map();
+  const timedSupabaseFetchByPolicy = new Map();
   let restFailureCooldownUntilMs = 0;
   let restFailureCooldownReason = '';
 
@@ -67,6 +67,22 @@ function createSupabaseStateStore(deps = {}) {
     return /abort|timeout|timed out|504|fetch failed|network|econnreset|etimedout|connection terminated/i.test(text);
   }
 
+  function normalizeSupabaseClientFetchOptions(options = {}) {
+    return {
+      timeoutMs: getSafeSupabaseTimeoutMs(options.timeoutMs),
+      ignoreFailureCooldown: Boolean(options.ignoreFailureCooldown),
+      suppressFailureCooldown: Boolean(options.suppressFailureCooldown),
+    };
+  }
+
+  function buildSupabaseClientPolicyKey(policy) {
+    return JSON.stringify([
+      policy.timeoutMs,
+      policy.ignoreFailureCooldown ? 1 : 0,
+      policy.suppressFailureCooldown ? 1 : 0,
+    ]);
+  }
+
   function redactSupabaseUrlForDebug(url = supabaseUrl) {
     const raw = normalizeString(url || '');
     if (!raw) return '';
@@ -86,18 +102,21 @@ function createSupabaseStateStore(deps = {}) {
     };
   }
 
-  function getTimedSupabaseFetch() {
-    if (timedSupabaseFetch) return timedSupabaseFetch;
+  function getTimedSupabaseFetch(fetchOptions = {}) {
     if (typeof fetchImpl !== 'function') return null;
+    const policy = normalizeSupabaseClientFetchOptions(fetchOptions);
+    const policyKey = buildSupabaseClientPolicyKey(policy);
+    const cachedFetch = timedSupabaseFetchByPolicy.get(policyKey);
+    if (cachedFetch) return cachedFetch;
 
-    timedSupabaseFetch = async (url, options = {}) => {
-      if (isRestFailureCooldownActive()) {
+    const timedSupabaseFetch = async (url, options = {}) => {
+      if (!policy.ignoreFailureCooldown && isRestFailureCooldownActive()) {
         const error = new Error(buildRestCooldownError());
         error.code = 'SUPABASE_REST_COOLDOWN';
         throw error;
       }
 
-      const timeoutMs = getSafeSupabaseTimeoutMs();
+      const timeoutMs = policy.timeoutMs;
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const upstreamSignal = options?.signal;
       let timeout = null;
@@ -128,12 +147,12 @@ function createSupabaseStateStore(deps = {}) {
           signal: controller ? controller.signal : upstreamSignal,
         });
         if (response && response.status >= 500) {
-          openRestFailureCooldown(`status ${response.status}`);
+          openRestFailureCooldown(`status ${response.status}`, policy);
         }
         return response;
       } catch (error) {
         if (shouldOpenRestFailureCooldownFromError(error)) {
-          openRestFailureCooldown(error?.message || error?.name || 'fetch timeout');
+          openRestFailureCooldown(error?.message || error?.name || 'fetch timeout', policy);
         }
         throw error;
       } finally {
@@ -144,6 +163,7 @@ function createSupabaseStateStore(deps = {}) {
       }
     };
 
+    timedSupabaseFetchByPolicy.set(policyKey, timedSupabaseFetch);
     return timedSupabaseFetch;
   }
 
@@ -351,17 +371,21 @@ function createSupabaseStateStore(deps = {}) {
     });
   }
 
-  function getSupabaseClient() {
+  function getSupabaseClient(options = {}) {
     if (!isSupabaseConfigured()) return null;
-    if (supabaseClient) return supabaseClient;
+    const policy = normalizeSupabaseClientFetchOptions(options);
+    const policyKey = buildSupabaseClientPolicyKey(policy);
+    const cachedClient = supabaseClientByPolicy.get(policyKey);
+    if (cachedClient) return cachedClient;
     const clientOptions = {
       auth: { persistSession: false, autoRefreshToken: false },
     };
-    const fetchWithTimeout = getTimedSupabaseFetch();
+    const fetchWithTimeout = getTimedSupabaseFetch(policy);
     if (fetchWithTimeout) {
       clientOptions.global = { fetch: fetchWithTimeout };
     }
-    supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, clientOptions);
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, clientOptions);
+    supabaseClientByPolicy.set(policyKey, supabaseClient);
     return supabaseClient;
   }
 

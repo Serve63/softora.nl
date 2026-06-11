@@ -15,7 +15,7 @@ const PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS = Object.freeze({
 const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 const STRUCTURED_PREVIEW_READ_ATTEMPTS = 3;
-const PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS = 2600;
+const PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS = 10000;
 const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 900;
 const PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 5000;
 const PUBLIC_PREVIEW_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
@@ -225,6 +225,23 @@ function withPublicPreviewTimeout(promise, timeoutMs, label = 'public-preview-re
     if (result === undefined && label) return undefined;
     return result;
   });
+}
+
+function createPublicPreviewDiagnostics() {
+  return {
+    transientReadFailure: false,
+    lastReadFailureSource: '',
+  };
+}
+
+function markPublicPreviewTransientReadFailure(diagnostics, source = 'public-preview-read') {
+  if (!diagnostics || typeof diagnostics !== 'object') return;
+  diagnostics.transientReadFailure = true;
+  diagnostics.lastReadFailureSource = normalizeString(source);
+}
+
+function hasPublicPreviewTransientReadFailure(diagnostics) {
+  return Boolean(diagnostics && diagnostics.transientReadFailure);
 }
 
 function clampChunkCount(value) {
@@ -525,7 +542,7 @@ function getPublicPreviewReadOptions(scope) {
   };
 }
 
-async function retryPublicPreviewRead(reader, attempts = STRUCTURED_PREVIEW_READ_ATTEMPTS) {
+async function retryPublicPreviewRead(reader, attempts = STRUCTURED_PREVIEW_READ_ATTEMPTS, diagnostics = null, source = 'structured-read') {
   const maxAttempts = Math.max(1, Math.min(5, Number(attempts) || 1));
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
@@ -535,8 +552,10 @@ async function retryPublicPreviewRead(reader, attempts = STRUCTURED_PREVIEW_READ
         `public-preview-read-${attempt + 1}`
       );
       if (result !== null && result !== undefined) return result;
+      markPublicPreviewTransientReadFailure(diagnostics, `${source}-${attempt + 1}`);
     } catch (_error) {
       // Public preview links are opened from email; a transient read miss should not become a broken page.
+      markPublicPreviewTransientReadFailure(diagnostics, `${source}-${attempt + 1}`);
     }
   }
   return null;
@@ -1162,6 +1181,25 @@ function buildNotFoundHtml() {
 </html>`;
 }
 
+function buildTemporarilyUnavailableHtml() {
+  return `<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="refresh" content="5">
+  <title>Preview wordt geladen | Softora</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#161616;color:#fff;font-family:Inter,Arial,sans-serif}
+    p{max-width:560px;margin:0;padding:24px;text-align:center;line-height:1.5}
+    strong{display:block;margin-bottom:8px;font-size:18px}
+  </style>
+</head>
+<body><p><strong>Preview wordt geladen.</strong>De webdesign-preview is tijdelijk nog onderweg. Deze pagina ververst automatisch.</p></body>
+</html>`;
+}
+
 function createPublicWebdesignPreviewService(options = {}) {
   publicPreviewResolutionCache.clear();
   publicPreviewAssetCache.clear();
@@ -1175,6 +1213,19 @@ function createPublicWebdesignPreviewService(options = {}) {
     )
   );
 
+  async function readUiStateScopeValues(scope, diagnostics) {
+    const state = await withPublicPreviewTimeout(
+      getUiStateValues(scope, getPublicPreviewReadOptions(scope)),
+      PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS,
+      `public-preview-ui-state-${scope}`
+    );
+    if (!state || typeof state !== 'object') {
+      markPublicPreviewTransientReadFailure(diagnostics, `ui-state-${scope}`);
+      return {};
+    }
+    return state.values && typeof state.values === 'object' ? state.values : {};
+  }
+
   async function resolveStructuredPreview(id, options = {}) {
     if (
       !dataOpsStore ||
@@ -1183,13 +1234,14 @@ function createPublicWebdesignPreviewService(options = {}) {
     ) {
       return null;
     }
+    const diagnostics = options.diagnostics || null;
 
     const directPhotoEntries = await retryPublicPreviewRead(() => dataOpsStore.listDesignPhotosWithSignedUrls({
       ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
       expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
       identifiers: [id],
       maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
-    }));
+    }), STRUCTURED_PREVIEW_READ_ATTEMPTS, diagnostics, 'design-photos-direct');
     const directPhotoMap = buildPhotoMapFromStructuredEntries(directPhotoEntries);
     const includeProfileContext = Boolean(options.includeProfileContext);
     const loadOutboundContexts = async (identifiers) => {
@@ -1200,12 +1252,15 @@ function createPublicWebdesignPreviewService(options = {}) {
       ) {
         return [];
       }
-      const loaded = await retryPublicPreviewRead(() =>
-        dataOpsStore.listOutboundRecipientGuardsForPreview({
+      const loaded = await retryPublicPreviewRead(
+        () => dataOpsStore.listOutboundRecipientGuardsForPreview({
           ...PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS,
           identifiers,
           maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
-        })
+        }),
+        STRUCTURED_PREVIEW_READ_ATTEMPTS,
+        diagnostics,
+        'outbound-context'
       );
       return Array.isArray(loaded) ? loaded : [];
     };
@@ -1225,8 +1280,11 @@ function createPublicWebdesignPreviewService(options = {}) {
       }
 
       let customers = [];
-      const loadedCustomers = await retryPublicPreviewRead(() =>
-        dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS)
+      const loadedCustomers = await retryPublicPreviewRead(
+        () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
+        STRUCTURED_PREVIEW_READ_ATTEMPTS,
+        diagnostics,
+        'customers-direct'
       );
       try {
         customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
@@ -1256,8 +1314,11 @@ function createPublicWebdesignPreviewService(options = {}) {
       collectPublicPreviewContextIdentifiers(id, directRecords, [])
     );
     let customers = [];
-    const loadedCustomers = await retryPublicPreviewRead(() =>
-      dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS)
+    const loadedCustomers = await retryPublicPreviewRead(
+      () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
+      STRUCTURED_PREVIEW_READ_ATTEMPTS,
+      diagnostics,
+      'customers-candidates'
     );
     try {
       customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
@@ -1277,7 +1338,7 @@ function createPublicWebdesignPreviewService(options = {}) {
         expiresInSeconds: STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS,
         identifiers,
         maxMatches: STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES,
-      }));
+      }), STRUCTURED_PREVIEW_READ_ATTEMPTS, diagnostics, 'design-photos-expanded');
       const photoMap = buildPhotoMapFromStructuredEntries(photoEntries);
       outboundContexts = await loadOutboundContexts(
         collectPublicPreviewContextIdentifiers(id, getPreviewRecordList(photoMap), candidates)
@@ -1296,21 +1357,20 @@ function createPublicWebdesignPreviewService(options = {}) {
     const cacheKey = getPublicPreviewResolutionCacheKey(id, includeProfileContext);
     const cachedPreview = getPublicPreviewCacheEntry(publicPreviewResolutionCache, cacheKey);
     if (cachedPreview) return cachedPreview;
-    const structuredPreview = await resolveStructuredPreview(id, { includeProfileContext });
+    const diagnostics = options.diagnostics || null;
+    const structuredPreview = await resolveStructuredPreview(id, { includeProfileContext, diagnostics });
     if (structuredPreview) {
       return setPublicPreviewResolutionCache(id, includeProfileContext, structuredPreview);
     }
 
-    const state = await getUiStateValues(PHOTO_SCOPE, getPublicPreviewReadOptions(PHOTO_SCOPE));
-    const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+    const values = await readUiStateScopeValues(PHOTO_SCOPE, diagnostics);
     const photoMap = safeParseObject(values[PHOTO_KEY]);
     let preview = buildPreviewFromRecord(id, values, findPhotoRecord(photoMap, id));
     if (preview && (!includeProfileContext || hasExplicitPublicPreviewProfile(preview))) {
       return setPublicPreviewResolutionCache(id, includeProfileContext, preview);
     }
     if (!preview || includeProfileContext) {
-      const customerState = await getUiStateValues(CUSTOMER_SCOPE, getPublicPreviewReadOptions(CUSTOMER_SCOPE));
-      const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
+      const customerValues = await readUiStateScopeValues(CUSTOMER_SCOPE, diagnostics);
       preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues)) || preview;
     }
     if (preview) {
@@ -1328,22 +1388,28 @@ function createPublicWebdesignPreviewService(options = {}) {
       seen.add(key);
       const preview = await resolvePreview(id, options);
       if (preview) return preview;
+      if (hasPublicPreviewTransientReadFailure(options.diagnostics)) return null;
     }
     return null;
   }
 
   async function getPreviewPageResponse(req, res) {
     const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+    const diagnostics = createPublicPreviewDiagnostics();
     const preview = await resolveFirstPreview([
       query.cid ||
         query.customerId ||
         query.id,
       req && req.params && (req.params.companySlug || req.params.customerId),
-    ]);
+    ], { diagnostics });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      if (hasPublicPreviewTransientReadFailure(diagnostics)) {
+        res.setHeader('Retry-After', '5');
+        return res.status(503).send(buildTemporarilyUnavailableHtml());
+      }
       return res.status(404).send(buildNotFoundHtml());
     }
     res.setHeader('Cache-Control', PUBLIC_PREVIEW_HTML_CACHE_CONTROL);
@@ -1357,14 +1423,19 @@ function createPublicWebdesignPreviewService(options = {}) {
     const routeIdentifier = params.companySlug || params.customerId;
     const queryIdentifier = query.cid || query.customerId || query.id;
     const assetIdentifier = queryIdentifier || routeIdentifier;
+    const diagnostics = createPublicPreviewDiagnostics();
     const preview = await resolveFirstPreview([
       queryIdentifier,
       routeIdentifier,
-    ], { includeProfileContext: true });
+    ], { includeProfileContext: true, diagnostics });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      if (hasPublicPreviewTransientReadFailure(diagnostics)) {
+        res.setHeader('Retry-After', '5');
+        return res.status(503).send(buildTemporarilyUnavailableHtml());
+      }
       return res.status(404).send(buildNotFoundHtml());
     }
     res.setHeader('Cache-Control', PUBLIC_PREVIEW_HTML_CACHE_CONTROL);
@@ -1376,12 +1447,17 @@ function createPublicWebdesignPreviewService(options = {}) {
     const params = req && req.params && typeof req.params === 'object' ? req.params : {};
     const routeIdentifier = params.companySlug || params.customerId;
     const queryIdentifier = query.cid || query.customerId || query.id;
+    const diagnostics = createPublicPreviewDiagnostics();
     const preview = await resolveFirstPreview([
       queryIdentifier,
       routeIdentifier,
-    ]);
+    ], { diagnostics });
     if (!preview) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      if (hasPublicPreviewTransientReadFailure(diagnostics)) {
+        res.setHeader('Retry-After', '5');
+        return res.status(503).send('Preview image temporarily unavailable');
+      }
       return res.status(404).send('Preview image unavailable');
     }
     const assetType = getPublicPreviewAssetType(params.assetType || query.type);

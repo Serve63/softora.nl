@@ -5856,7 +5856,6 @@ function createColdmailCampaignService(deps = {}) {
       : `https://www.softora.nl/${rawHref.replace(/^\/+/, '')}`;
     const href = absoluteHref
       .replace(/\/webdesign\/([^/?#]+)(?:\/concept)?(?=([?#]|$))/i, '/webdesign/$1')
-      .replace(/\?[^#]*/g, '')
       .replace(/#.*$/g, '');
     let label = rawHref.replace(/^https?:\/\/[^/]+\//i, '').replace(/^\/+/, '');
     try {

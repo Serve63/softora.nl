@@ -733,6 +733,61 @@ test('public webdesign preview does not cache unavailable preview responses', as
   assert.match(response.body, /Deze preview is niet beschikbaar/);
 });
 
+test('public webdesign preview shows a temporary loading page when structured reads fail', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return null;
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return null;
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'bakkerij-zon' },
+    query: { cid: 'customer-1' },
+  }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.equal(response.headers['Retry-After'], '5');
+  assert.match(response.body, /Preview wordt geladen/);
+  assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
+});
+
+test('public webdesign preview asset route treats transient structured read misses as temporary', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return null;
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return null;
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getPreviewAssetResponse({
+    params: { companySlug: 'bakkerij-zon', assetType: 'webdesign' },
+    query: { cid: 'customer-1' },
+  }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.equal(response.headers['Retry-After'], '5');
+  assert.equal(response.body, 'Preview image temporarily unavailable');
+});
+
 test('public webdesign preview concept route cleans internal import ids from fallback titles', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {
