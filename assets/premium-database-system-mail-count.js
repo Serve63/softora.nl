@@ -1,7 +1,12 @@
 (function () {
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
+    const COLDMAIL_STATS_URL = "/api/coldmailing/stats";
+    const TODAY_SENT_REFRESH_MS = 15000;
     let roiControlsBound = false;
+    let todaySentRefreshBound = false;
+    let todaySentRefreshPromise = null;
+    let lastTodaySentCount = null;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
@@ -70,6 +75,22 @@
 
     function getRootDocument() {
         return window.document || (typeof document === "undefined" ? null : document);
+    }
+
+    function getFetch() {
+        if (typeof window.fetch === "function") return window.fetch.bind(window);
+        if (typeof fetch === "function") return fetch;
+        return null;
+    }
+
+    function getInterval() {
+        if (typeof window.setInterval === "function") return window.setInterval.bind(window);
+        if (typeof setInterval === "function") return setInterval;
+        return null;
+    }
+
+    function addWindowListener(eventName, handler) {
+        if (typeof window.addEventListener === "function") window.addEventListener(eventName, handler);
     }
 
     function parseRenderedMailCount(value) {
@@ -159,6 +180,78 @@
         }
     }
 
+    function readPositiveInteger(value) {
+        const number = Number(value);
+        return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
+    }
+
+    function renderTodaySentCount(value, isLoading) {
+        const rootDocument = getRootDocument();
+        const element = rootDocument && rootDocument.getElementById("systemMailSentTodayCount");
+        if (!element) return;
+        if (isLoading && lastTodaySentCount === null) {
+            element.textContent = "--";
+            return;
+        }
+        const count = value === null || value === undefined ? lastTodaySentCount : readPositiveInteger(value);
+        if (count === null || count === undefined) {
+            element.textContent = "--";
+            return;
+        }
+        lastTodaySentCount = count;
+        element.textContent = count.toLocaleString("nl-NL");
+    }
+
+    function refreshTodaySentCount() {
+        const fetchImpl = getFetch();
+        if (!fetchImpl) {
+            renderTodaySentCount(lastTodaySentCount, true);
+            return Promise.resolve(lastTodaySentCount);
+        }
+        if (todaySentRefreshPromise) return todaySentRefreshPromise;
+        todaySentRefreshPromise = fetchImpl(COLDMAIL_STATS_URL, {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+            cache: "no-store"
+        }).then(function (response) {
+            return response.json().then(function (payload) {
+                return { response: response, payload: payload };
+            }).catch(function () {
+                return { response: response, payload: null };
+            });
+        }).then(function (result) {
+            const payload = result.payload;
+            if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
+            const sentToday = readPositiveInteger(payload.stats && payload.stats.sentToday);
+            renderTodaySentCount(sentToday, false);
+            return sentToday;
+        }).catch(function (error) {
+            renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
+            if (typeof console !== "undefined" && typeof console.warn === "function") console.warn("Vandaag verstuurd laden mislukt:", error && error.message ? error.message : error);
+            return lastTodaySentCount;
+        }).finally(function () {
+            todaySentRefreshPromise = null;
+        });
+        return todaySentRefreshPromise;
+    }
+
+    function bindTodaySentRefresh() {
+        renderTodaySentCount(lastTodaySentCount, true);
+        if (todaySentRefreshBound) return;
+        todaySentRefreshBound = true;
+        void refreshTodaySentCount();
+        const interval = getInterval();
+        if (interval) interval(refreshTodaySentCount, TODAY_SENT_REFRESH_MS);
+        addWindowListener("focus", refreshTodaySentCount);
+        addWindowListener("pageshow", refreshTodaySentCount);
+        const rootDocument = getRootDocument();
+        if (rootDocument && typeof rootDocument.addEventListener === "function") {
+            rootDocument.addEventListener("visibilitychange", function () {
+                if (!rootDocument.hidden) void refreshTodaySentCount();
+            });
+        }
+    }
+
     function renderRoiCalculator(mailCount, isLoading) {
         const rootDocument = getRootDocument();
         if (!rootDocument) return;
@@ -192,6 +285,7 @@
 
     function render(customers, helpers) {
         bindRoiControls();
+        bindTodaySentRefresh();
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
         if (!element) return;
@@ -219,6 +313,7 @@
         getCustomerSoftoraSystemMailSentCount: getCustomerSoftoraSystemMailSentCount,
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,
         loadPersistedDealCount: loadPersistedDealCount,
+        refreshTodaySentCount: refreshTodaySentCount,
         renderRoiCalculator: renderRoiCalculator,
         render: render
     };
