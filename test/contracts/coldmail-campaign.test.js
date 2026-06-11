@@ -1560,6 +1560,83 @@ test('coldmail autopilot day-paces each mailbox across the full 07-17 workday', 
   assert.equal(justBeforeFloorReady.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
 });
 
+test('coldmail autopilot starts a new workday slot even with rolling history from yesterday', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'servec321@gmail.com',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-10T14:19:10.000Z',
+          senderEmail: 'servec321@gmail.com',
+          count: 1,
+          personalCount: 0,
+          recipientEmail: 'old@example.test',
+          recipientDomain: 'old-example-test',
+        },
+      ],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['servec321@gmail.com'],
+        senderProfiles: {
+          'servec321@gmail.com': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: '',
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-11T05:00:00.000Z',
+    },
+    now: () => new Date('2026-06-11T05:10:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.senderEmail, 'servec321@gmail.com');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().lastResult.dailyQuota.senderDaySentBefore, 0);
+  assert.equal(getAutopilotState().lastResult.dailyQuota.senderSentBefore, 1);
+});
+
 test('coldmail autopilot staggers senders by choosing the mailbox whose cooldown is ready', async () => {
   const { service, sentMessages } = createService({
     rows: [

@@ -964,6 +964,12 @@ function createMailboxService(deps = {}) {
     return /(?:gemaakt|ontwerp|preview|eerste versie|bekijk|zichtbaar|geen webdesign willen ontvangen|\/afmelden\?t=|mocht je er niks mee willen doen)/.test(haystack);
   }
 
+  function looksLikeLinkOnlyWebdesignOutreach(parsed, text) {
+    if (!looksLikeWebdesignOutreach(parsed, text)) return false;
+    if (extractBodyImageLabels(text).length) return false;
+    return COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(`${text}\n${sanitizeMailboxDisplayText(parsed && parsed.html || '')}`);
+  }
+
   function getParsedAddressEmails(address) {
     const list = Array.isArray(address && address.value) ? address.value : Array.isArray(address) ? address : [];
     return list.map((item) => normalizeEmail(item && (item.address || item.name))).filter(isValidEmail);
@@ -1648,6 +1654,7 @@ function createMailboxService(deps = {}) {
       if (!record || !record.key) return false;
       if (Array.isArray(record.primaryBodyImages) && record.primaryBodyImages.length) return false;
       const labels = extractBodyImageLabels(record.text);
+      if (!labels.length && looksLikeLinkOnlyWebdesignOutreach(record.parsed, record.text)) return false;
       return labels.length || looksLikeWebdesignOutreach(record.parsed, record.text);
     });
     if (!candidates.length || typeof getUiStateValues !== 'function') return new Map();
@@ -1722,8 +1729,12 @@ function createMailboxService(deps = {}) {
     const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
     const optOutUrl = resolveColdmailOptOutUrl(parsed, text);
     const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
-    const storedImages = Array.isArray(options.storedImages) ? options.storedImages : [];
-    const bodyImages = mergeMailboxBodyImages(primaryBodyImages, options.storedImages, text, {
+    const storedImages = looksLikeLinkOnlyWebdesignOutreach(parsed, text)
+      ? []
+      : Array.isArray(options.storedImages)
+        ? options.storedImages
+        : [];
+    const bodyImages = mergeMailboxBodyImages(primaryBodyImages, storedImages, text, {
       allowUnmatchedFallbacks: true,
     });
     const bodyText = storedImages.length && !primaryBodyImages.length
