@@ -22,6 +22,8 @@ const TABLES = Object.freeze({
   mailboxSyncState: 'softora_mailbox_sync_state',
   outboundRecipientGuards: 'softora_outbound_recipient_guards',
 });
+const OUTBOUND_RECIPIENT_GUARD_PREVIEW_COLUMNS =
+  'guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at';
 const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
@@ -223,6 +225,14 @@ function collectOutboundRecipientGuardSearchTerms(identifiers = []) {
     addSlugTerm(domainSlugCandidate(raw));
   });
   return Array.from(new Set(terms)).slice(0, 16);
+}
+
+function collectOutboundRecipientGuardExactRecipientIds(identifiers = []) {
+  return Array.from(new Set(
+    (Array.isArray(identifiers) ? identifiers : [])
+      .map((value) => normalizeString(value).toLowerCase())
+      .filter((term) => /^[a-z0-9._-]{2,180}$/.test(term) && !term.includes('@'))
+  )).slice(0, 16);
 }
 
 function createSoftoraDataOpsStore(deps = {}) {
@@ -1336,10 +1346,11 @@ function createSoftoraDataOpsStore(deps = {}) {
         .map(normalizeString)
         .filter(Boolean)
     ));
+    const exactRecipientIds = collectOutboundRecipientGuardExactRecipientIds(identifiers);
     const searchTerms = collectOutboundRecipientGuardSearchTerms(identifiers);
-    if (!searchTerms.length) return [];
+    if (!exactRecipientIds.length && !searchTerms.length) return [];
     const maxMatches = Math.max(1, Math.min(200, Number(options.maxMatches) || 50));
-    const cacheKey = `outbound-recipient-guards-preview:${searchTerms.join('|')}:${maxMatches}`;
+    const cacheKey = `outbound-recipient-guards-preview:${exactRecipientIds.join('|')}:${searchTerms.join('|')}:${maxMatches}`;
     const rows = await cachedRead(cacheKey, async () => {
       const rowsByGuardKey = new Map();
       const buildQueryOptions = {
@@ -1348,11 +1359,41 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       };
+      const rememberRows = (rows) => {
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+          const guardKey = normalizeString(row && row.guard_key);
+          if (guardKey && !rowsByGuardKey.has(guardKey)) rowsByGuardKey.set(guardKey, row);
+        });
+      };
+      const sortedRows = () =>
+        Array.from(rowsByGuardKey.values())
+          .filter((row) => normalizeString(row && row.sender_email))
+          .sort((left, right) =>
+            Math.max(Date.parse(normalizeString(right && right.updated_at)) || 0, Date.parse(normalizeString(right && right.created_at)) || 0) -
+              Math.max(Date.parse(normalizeString(left && left.updated_at)) || 0, Date.parse(normalizeString(left && left.created_at)) || 0)
+          );
+      if (exactRecipientIds.length) {
+        const exactResult = await run('list-outbound-recipient-guards-preview-exact-recipient-id', (client) => {
+          let query = client
+            .from(TABLES.outboundRecipientGuards)
+            .select(OUTBOUND_RECIPIENT_GUARD_PREVIEW_COLUMNS)
+            .in('recipient_id', exactRecipientIds);
+          if (query && typeof query.in === 'function') query = query.in('status', ['sent', 'reserved']);
+          if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+          if (query && typeof query.limit === 'function') return query.limit(Math.max(50, maxMatches));
+          return query;
+        }, buildQueryOptions);
+        if (exactResult.ok) {
+          rememberRows(exactResult.data);
+          const exactRows = sortedRows();
+          if (exactRows.length) return exactRows.slice(0, maxMatches);
+        }
+      }
       for (const term of searchTerms) {
         const result = await run(`list-outbound-recipient-guards-preview-${term}`, (client) => {
           let query = client
             .from(TABLES.outboundRecipientGuards)
-            .select('guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at')
+            .select(OUTBOUND_RECIPIENT_GUARD_PREVIEW_COLUMNS)
             .or([
               `guard_key.ilike.%${term}%`,
               `key_value.eq.${term}`,
@@ -1367,18 +1408,9 @@ function createSoftoraDataOpsStore(deps = {}) {
           return query;
         }, buildQueryOptions);
         if (!result.ok) continue;
-        (Array.isArray(result.data) ? result.data : []).forEach((row) => {
-          const guardKey = normalizeString(row && row.guard_key);
-          if (guardKey && !rowsByGuardKey.has(guardKey)) rowsByGuardKey.set(guardKey, row);
-        });
+        rememberRows(result.data);
       }
-      return Array.from(rowsByGuardKey.values())
-        .filter((row) => normalizeString(row && row.sender_email))
-        .sort((left, right) =>
-          Math.max(Date.parse(normalizeString(right && right.updated_at)) || 0, Date.parse(normalizeString(right && right.created_at)) || 0) -
-            Math.max(Date.parse(normalizeString(left && left.updated_at)) || 0, Date.parse(normalizeString(left && left.created_at)) || 0)
-        )
-        .slice(0, maxMatches);
+      return sortedRows().slice(0, maxMatches);
     }, {
       bypassReadCache: options.bypassReadCache,
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
