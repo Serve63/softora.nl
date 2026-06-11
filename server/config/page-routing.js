@@ -11,6 +11,7 @@ const defaultLegacyPrettyPageRedirectEntries = Object.freeze([
   ['seo-crm-system', 'premium-seo-crm-system'],
   ['opdracht-preview', 'premium-opdracht-preview'],
   ['premium-maandelijkse-kosten', 'premium-vaste-lasten'],
+  ['sportschool', 'logboek'],
 ]);
 
 const legacyPrettyPageRedirects = new Map(defaultLegacyPrettyPageRedirectEntries);
@@ -41,6 +42,9 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   // Zelfde coldmailing-UI als /premium-bevestigingsmails, aparte URL voor legacy/bookmarks.
   if (map.has('premium-bevestigingsmails')) {
     map.set('premium-ai-lead-generator', map.get('premium-bevestigingsmails'));
+  }
+  if (map.has('sportschool')) {
+    map.set('logboek', map.get('sportschool'));
   }
   return map;
 }
