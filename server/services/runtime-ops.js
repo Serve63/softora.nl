@@ -5,6 +5,46 @@ const PREMIUM_WORD_HTML_KEY = 'softora_premium_word_html_v1';
 const PREMIUM_WORD_BACKUPS_KEY = 'softora_premium_word_html_backups_v1';
 const PREMIUM_WORD_BACKUP_LIMIT = 8;
 const PREMIUM_WORD_BACKUPS_MAX_LENGTH = 180000;
+const SPORTSCHOOL_LOGBOOK_SCOPE = 'sportschool_logboek';
+const SPORTSCHOOL_LOGBOOK_KEY = 'sportschool_logboek_v1';
+const SPORTSCHOOL_LOGBOOK_MAX_LENGTH = 180000;
+
+function normalizeSportschoolLogbookSnapshot(rawSnapshot) {
+  let snapshot = rawSnapshot;
+  if (typeof snapshot === 'string') {
+    try {
+      snapshot = JSON.parse(snapshot);
+    } catch (_error) {
+      return null;
+    }
+  }
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null;
+  if (!snapshot.days || typeof snapshot.days !== 'object' || Array.isArray(snapshot.days)) return null;
+
+  const serialized = JSON.stringify(snapshot);
+  if (serialized.length > SPORTSCHOOL_LOGBOOK_MAX_LENGTH) return null;
+  return serialized;
+}
+
+function extractSportschoolLogbookSnapshot(body = {}) {
+  if (Object.prototype.hasOwnProperty.call(body, 'snapshot')) return body.snapshot;
+  if (Object.prototype.hasOwnProperty.call(body, 'snapshotJson')) return body.snapshotJson;
+  if (
+    body.patch &&
+    typeof body.patch === 'object' &&
+    Object.prototype.hasOwnProperty.call(body.patch, SPORTSCHOOL_LOGBOOK_KEY)
+  ) {
+    return body.patch[SPORTSCHOOL_LOGBOOK_KEY];
+  }
+  if (
+    body.values &&
+    typeof body.values === 'object' &&
+    Object.prototype.hasOwnProperty.call(body.values, SPORTSCHOOL_LOGBOOK_KEY)
+  ) {
+    return body.values[SPORTSCHOOL_LOGBOOK_KEY];
+  }
+  return null;
+}
 
 function parsePremiumWordBackups(value) {
   let raw = value;
@@ -368,6 +408,55 @@ function createRuntimeOpsCoordinator(deps = {}) {
     });
   }
 
+  async function sendSportschoolLogbookGetResponse(_req, res) {
+    const state = await getUiStateValuesForScope(SPORTSCHOOL_LOGBOOK_SCOPE);
+    return res.status(200).json({
+      ok: true,
+      scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+      values: (state && state.values) || {},
+      source: (state && state.source) || 'supabase',
+      updatedAt: (state && state.updatedAt) || null,
+    });
+  }
+
+  async function sendSportschoolLogbookSetResponse(req, res) {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const snapshotJson = normalizeSportschoolLogbookSnapshot(
+      extractSportschoolLogbookSnapshot(body)
+    );
+
+    if (!snapshotJson) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Ongeldige sportschool logboekdata.',
+      });
+    }
+
+    const state = await setUiStateValues(
+      SPORTSCHOOL_LOGBOOK_SCOPE,
+      { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson },
+      {
+        source: normalizeString(body.source || 'sportschool-logboek'),
+        actor: normalizeString(body.actor || 'serve'),
+      }
+    );
+
+    if (!state) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon sportschool logboek niet opslaan zonder geldige Supabase-opslag.',
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+      values: state.values || { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson },
+      source: state.source || 'supabase',
+      updatedAt: state.updatedAt || null,
+    });
+  }
+
   function sendDashboardActivityCreateResponse(req, res) {
     const entry = appendDashboardActivity(
       {
@@ -390,6 +479,8 @@ function createRuntimeOpsCoordinator(deps = {}) {
     sendDashboardActivityCreateResponse,
     sendDashboardActivityResponse,
     sendSecurityAuditLogResponse,
+    sendSportschoolLogbookGetResponse,
+    sendSportschoolLogbookSetResponse,
     sendUiStateGetResponse,
     sendUiStateSetResponse,
   };

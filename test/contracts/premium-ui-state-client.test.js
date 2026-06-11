@@ -16,6 +16,9 @@ test('premium ui-state client centraliseert gedeelde read/write fallback routes'
   assert.match(source, /method: "GET", cache: "no-store"/);
   assert.match(source, /method: "POST"/);
   assert.match(source, /headers: \{ "Content-Type": "application\/json" \}/);
+  assert.match(source, /async function setUiState\(scope, body, options\)/);
+  assert.match(source, /if \(options && options\.keepalive === true\) requestOptions\.keepalive = true;/);
+  assert.match(source, /options && options\.timeoutMs/);
   assert.match(source, /var DEFAULT_TIMEOUT_MS = 5000;/);
   assert.match(source, /function fetchWithTimeout\(url, options, label, timeoutMs\) \{/);
   assert.match(source, /function shouldStopFallback\(error\) \{/);

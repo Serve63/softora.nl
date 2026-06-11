@@ -63,12 +63,12 @@
         return /reageert niet op tijd|timeout|timed out|mislukt \((?:401|403|429|5\d\d)\)/i.test(String(error && error.message || error || ""));
     }
 
-    async function requestWithFallback(urls, options, label) {
+    async function requestWithFallback(urls, options, label, timeoutMs) {
         var lastError = null;
 
         for (var index = 0; index < urls.length; index += 1) {
             try {
-                var response = await fetchWithTimeout(urls[index], options, label);
+                var response = await fetchWithTimeout(urls[index], options, label, timeoutMs);
                 if (!response.ok) {
                     var statusError = new Error(label + " mislukt (" + response.status + ")");
                     statusError.status = response.status;
@@ -92,15 +92,19 @@
         );
     }
 
-    async function setUiState(scope, body) {
+    async function setUiState(scope, body, options) {
+        var requestOptions = {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body || {})
+        };
+        if (options && options.keepalive === true) requestOptions.keepalive = true;
+
         return await requestWithFallback(
             getWriteUrls(scope),
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body || {})
-            },
-            "UI-state POST"
+            requestOptions,
+            "UI-state POST",
+            options && options.timeoutMs
         );
     }
 

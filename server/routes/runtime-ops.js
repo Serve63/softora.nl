@@ -17,6 +17,12 @@ function registerRuntimeOpsRoutes(app, deps) {
   app.post('/api/ui-state-set', async (req, res) =>
     deps.coordinator.sendUiStateSetResponse(req, res, req.query.scope)
   );
+  app.get('/api/sportschool-logboek', async (req, res) =>
+    deps.coordinator.sendSportschoolLogbookGetResponse(req, res)
+  );
+  app.post('/api/sportschool-logboek', async (req, res) =>
+    deps.coordinator.sendSportschoolLogbookSetResponse(req, res)
+  );
   app.post('/api/dashboard/activity', (req, res) =>
     deps.coordinator.sendDashboardActivityCreateResponse(req, res)
   );
