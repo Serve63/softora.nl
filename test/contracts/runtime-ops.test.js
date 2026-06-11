@@ -199,6 +199,59 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
+test('runtime ops coordinator saves data ops patches when ui-state pre-read is unavailable', async () => {
+  const bridgeWrites = [];
+  const legacyWrites = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => null,
+    setUiStateValues: async (scope, values, meta) => {
+      legacyWrites.push({ scope, values, meta });
+      return null;
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      setUiStateValues: async (scope, values, meta) => {
+        bridgeWrites.push({ scope, values, meta });
+        return {
+          values,
+          source: 'supabase:data_ops',
+          updatedAt: '2026-06-11T12:00:00.000Z',
+        };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        patch: {
+          softora_customers_premium_v1: '[{"id":"cust-2","bedrijf":"Softora"}]',
+        },
+        source: 'premium-database',
+        actor: 'Premium database',
+      },
+    },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.source, 'supabase:data_ops');
+  assert.equal(legacyWrites.length, 0);
+  assert.deepEqual(bridgeWrites[0], {
+    scope: 'premium_customers_database',
+    values: {
+      softora_customers_premium_v1: '[{"id":"cust-2","bedrijf":"Softora"}]',
+    },
+    meta: {
+      source: 'premium-database',
+      actor: 'Premium database',
+    },
+  });
+});
+
 test('runtime ops coordinator bewaart sportschool logboek snapshots zonder premium login patchpad', async () => {
   const writes = [];
   const { coordinator } = createFixture({

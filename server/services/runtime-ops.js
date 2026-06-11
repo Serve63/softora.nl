@@ -275,6 +275,17 @@ function createRuntimeOpsCoordinator(deps = {}) {
     return dataOpsUiStateBridge.setUiStateValues(scope, values, meta);
   }
 
+  function sendUiStateSetSuccessResponse(res, scope, state, fallbackValues = {}) {
+    const savedState = state && typeof state === 'object' ? state : {};
+    return res.status(200).json({
+      ok: true,
+      scope,
+      values: savedState.values || fallbackValues || {},
+      source: savedState.source || 'supabase',
+      updatedAt: savedState.updatedAt || null,
+    });
+  }
+
   async function sendUiStateGetResponse(req, res, scopeRaw) {
     const scope = normalizeUiStateScope(scopeRaw);
     if (!scope) {
@@ -349,8 +360,16 @@ function createRuntimeOpsCoordinator(deps = {}) {
       }
       valuesToSave = sanitizeUiStateValues(valuesProvided ? body.values : {});
     } else {
+      const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
       currentState = await getUiStateValuesForScope(scope);
       if (!currentState) {
+        const mirroredPatchState = await mirrorUiStateValuesToDataOps(scope, patchValues, {
+          source,
+          actor,
+        });
+        if (mirroredPatchState) {
+          return sendUiStateSetSuccessResponse(res, scope, mirroredPatchState, patchValues);
+        }
         return res.status(503).json({
           ok: false,
           error: 'Kon UI state patch niet laden zonder geldige Supabase-opslag.',
@@ -360,7 +379,6 @@ function createRuntimeOpsCoordinator(deps = {}) {
         currentState && currentState.values && typeof currentState.values === 'object'
           ? currentState.values
           : {};
-      const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
       valuesToSave = { ...currentValues, ...patchValues };
     }
 
@@ -387,25 +405,18 @@ function createRuntimeOpsCoordinator(deps = {}) {
       source,
       actor,
     });
-    if (!state) {
+    const mirroredState = await mirrorUiStateValuesToDataOps(scope, (state && state.values) || valuesToSave, {
+      source,
+      actor,
+    });
+    if (!state && !mirroredState) {
       return res.status(503).json({
         ok: false,
         error: 'Kon UI state niet opslaan zonder geldige Supabase-opslag.',
       });
     }
 
-    const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, {
-      source,
-      actor,
-    });
-
-    return res.status(200).json({
-      ok: true,
-      scope,
-      values: (mirroredState && mirroredState.values) || state.values || {},
-      source: (mirroredState && mirroredState.source) || state.source || 'supabase',
-      updatedAt: (mirroredState && mirroredState.updatedAt) || state.updatedAt || null,
-    });
+    return sendUiStateSetSuccessResponse(res, scope, mirroredState || state, valuesToSave);
   }
 
   async function sendSportschoolLogbookGetResponse(_req, res) {
