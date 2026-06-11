@@ -663,9 +663,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
   assert.match(pageSource, /function getUiStateFetchTimeoutMs\(scope\) \{/);
-  assert.match(pageSource, /normalizedScope === CUSTOMER_PHOTO_SCOPE \|\| normalizedScope === COLDMAIL_SEND_GUARD_SCOPE\) return 12000/);
+  assert.match(pageSource, /normalizedScope === CUSTOMER_PHOTO_SCOPE \|\| normalizedScope === COLDMAIL_SEND_GUARD_SCOPE \|\| normalizedScope === CUSTOMER_DB_SCOPE\) return 12000/);
   assert.match(pageSource, /const timeoutMs = getUiStateFetchTimeoutMs\(scope\);/);
   assert.match(pageSource, /fetchJsonWithTimeout\(url, \{ method: "GET", cache: "no-store" \}, timeoutMs\)/);
+  assert.match(pageSource, /function fetchUiStateSetWithFallback\(scope, body\) \{[\s\S]*const encodedScope = encodeURIComponent\(String\(scope \|\| ""\)\); const timeoutMs = getUiStateFetchTimeoutMs\(scope\);/);
+  assert.match(pageSource, /fetchJsonWithTimeout\(url, \{[\s\S]*body: JSON\.stringify\(body \|\| \{\}\)[\s\S]*\}, timeoutMs\)\.then/);
   assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 12000, "Coldmail send-guard reageert niet op tijd\."\)/);
   assert.match(pageSource, /function hasLoadedColdmailGuard\(\)/);
   assert.match(pageSource, /if \(!hasLoadedColdmailGuard\(\)\) return false;/);

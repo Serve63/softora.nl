@@ -1830,7 +1830,7 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function getUiStateFetchTimeoutMs(scope) { const normalizedScope = String(scope || ""); if (normalizedScope === CUSTOMER_PHOTO_SCOPE || normalizedScope === COLDMAIL_SEND_GUARD_SCOPE) return 12000; if (normalizedScope === CUSTOMER_DB_SCOPE) return 8000; return undefined; }
+        function getUiStateFetchTimeoutMs(scope) { const normalizedScope = String(scope || ""); if (normalizedScope === CUSTOMER_PHOTO_SCOPE || normalizedScope === COLDMAIL_SEND_GUARD_SCOPE || normalizedScope === CUSTOMER_DB_SCOPE) return 12000; return undefined; }
 
         function fetchUiStateGetWithFallback(scope) {
             const encodedScope = encodeURIComponent(String(scope || "")); const timeoutMs = getUiStateFetchTimeoutMs(scope);
@@ -1857,7 +1857,7 @@
         }
 
         function fetchUiStateSetWithFallback(scope, body) {
-            const encodedScope = encodeURIComponent(String(scope || ""));
+            const encodedScope = encodeURIComponent(String(scope || "")); const timeoutMs = getUiStateFetchTimeoutMs(scope);
             const urls = [
                 "/api/ui-state-set?scope=" + encodedScope,
                 "/api/ui-state/" + encodedScope
@@ -1870,7 +1870,7 @@
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(body || {})
-                    }).then(function (response) {
+                    }, timeoutMs).then(function (response) {
                         if (!response.ok) {
                             throw new Error("UI-state POST mislukt (" + response.status + ")");
                         }

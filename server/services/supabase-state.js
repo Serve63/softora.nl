@@ -238,18 +238,22 @@ function createSupabaseStateStore(deps = {}) {
     );
   }
 
-  async function upsertStateRowViaRest(row) {
+  async function upsertStateRowViaRest(row, requestOptions = {}) {
     const baseUrl = supabaseUrl.replace(/\/+$/, '');
     const url = `${baseUrl}/rest/v1/${encodeURIComponent(supabaseStateTable)}?on_conflict=state_key`;
 
-    return performRestRequest(url, {
-      method: 'POST',
-      headers: buildRestHeaders({
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      }),
-      body: JSON.stringify([row]),
-    });
+    return performRestRequest(
+      url,
+      {
+        method: 'POST',
+        headers: buildRestHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        }),
+        body: JSON.stringify([row]),
+      },
+      requestOptions
+    );
   }
 
   async function fetchRowByKeyViaRest(rowKey, selectColumns = 'payload,updated_at', requestOptions = {}) {
@@ -275,7 +279,7 @@ function createSupabaseStateStore(deps = {}) {
     );
   }
 
-  async function upsertRowViaRest(row) {
+  async function upsertRowViaRest(row, requestOptions = {}) {
     const stateKey = normalizeString(row?.state_key || '');
     if (!stateKey) {
       return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
@@ -284,14 +288,18 @@ function createSupabaseStateStore(deps = {}) {
     const baseUrl = supabaseUrl.replace(/\/+$/, '');
     const url = `${baseUrl}/rest/v1/${encodeURIComponent(supabaseStateTable)}?on_conflict=state_key`;
 
-    return performRestRequest(url, {
-      method: 'POST',
-      headers: buildRestHeaders({
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      }),
-      body: JSON.stringify([row]),
-    });
+    return performRestRequest(
+      url,
+      {
+        method: 'POST',
+        headers: buildRestHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        }),
+        body: JSON.stringify([row]),
+      },
+      requestOptions
+    );
   }
 
   function buildSupabaseCallUpdateStateKey(callId) {
