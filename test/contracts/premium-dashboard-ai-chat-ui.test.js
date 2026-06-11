@@ -53,9 +53,11 @@ test('premium dashboard chat blijft beperkt tot het personeel dashboard', () => 
   const dashboardPath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const databasePath = path.join(__dirname, '../../premium-database.html');
   const themePath = path.join(__dirname, '../../assets/personnel-theme.js');
+  const scopePath = path.join(__dirname, '../../assets/premium-dashboard-ai-chat-scope.js');
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
   const databaseSource = fs.readFileSync(databasePath, 'utf8');
   const themeSource = fs.readFileSync(themePath, 'utf8');
+  const scopeSource = fs.readFileSync(scopePath, 'utf8');
 
   assert.match(dashboardSource, /id="dashboardAiChat"/);
   assert.doesNotMatch(databaseSource, /id="dashboardAiChat"/);
@@ -63,6 +65,9 @@ test('premium dashboard chat blijft beperkt tot het personeel dashboard', () => 
   assert.match(themeSource, /#dashboardAiChat, \.dashboard-ai-chat/);
   assert.match(themeSource, /\/premium-personeel-dashboard/);
   assert.match(themeSource, /removeChild\(element\)/);
+  assert.match(scopeSource, /data-dashboard-ai-chat-page/);
+  assert.match(scopeSource, /new MutationObserver\(scheduleDashboardAiChatScope\)/);
+  assert.match(scopeSource, /window\.addEventListener\("pageshow", scheduleDashboardAiChatScope\);/);
 });
 
 test('premium dashboard verbergt selectors naast de datum en toont jaaromzet', () => {
