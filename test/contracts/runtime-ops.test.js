@@ -257,6 +257,62 @@ test('runtime ops coordinator bewaart sportschool logboek snapshots zonder premi
   assert.equal(JSON.parse(writes[0].values.sportschool_logboek_v1).days.tuesday.exercises['1'].kg, '100');
 });
 
+test('runtime ops coordinator schrijft sportschool logboek via data-ops brug wanneer legacy opslag ontbreekt', async () => {
+  const bridgedWrites = [];
+  const legacyWrites = [];
+  const { coordinator } = createFixture({
+    setUiStateValues: async (scope, values, meta) => {
+      legacyWrites.push({ scope, values, meta });
+      return null;
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'sportschool_logboek',
+      setUiStateValues: async (scope, values, meta) => {
+        bridgedWrites.push({ scope, values, meta });
+        return {
+          values,
+          source: 'data-ops',
+          updatedAt: '2026-06-11T16:00:00.000Z',
+        };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot: {
+          days: {
+            tuesday: {
+              orders: [1],
+              exercises: {
+                1: {
+                  title: 'Leg Extensions',
+                  sets: '3',
+                  reps: '8',
+                  kg: '100',
+                  notes: '',
+                },
+              },
+            },
+          },
+        },
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'data-ops');
+  assert.equal(bridgedWrites.length, 1);
+  assert.equal(legacyWrites.length, 0);
+  assert.equal(bridgedWrites[0].scope, 'sportschool_logboek');
+  assert.equal(JSON.parse(bridgedWrites[0].values.sportschool_logboek_v1).days.tuesday.exercises['1'].kg, '100');
+});
+
 test('runtime ops coordinator weigert kapotte sportschool logboekdata', async () => {
   const writes = [];
   const { coordinator } = createFixture({

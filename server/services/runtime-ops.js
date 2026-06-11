@@ -432,14 +432,14 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
-    const state = await setUiStateValues(
-      SPORTSCHOOL_LOGBOOK_SCOPE,
-      { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson },
-      {
-        source: normalizeString(body.source || 'sportschool-logboek'),
-        actor: normalizeString(body.actor || 'serve'),
-      }
-    );
+    const valuesToSave = { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson };
+    const meta = {
+      source: normalizeString(body.source || 'sportschool-logboek'),
+      actor: normalizeString(body.actor || 'serve'),
+    };
+    const state =
+      (await mirrorUiStateValuesToDataOps(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta)) ||
+      (await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta));
 
     if (!state) {
       return res.status(503).json({
