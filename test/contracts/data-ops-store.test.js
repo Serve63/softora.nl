@@ -900,9 +900,10 @@ test('data ops store targets space-separated identity keys for dashed public pre
   );
 });
 
-test('data ops store lists outbound sender guards for public preview profile fallback', async () => {
+test('data ops store reads exact outbound sender guards before broad public preview fallback', async () => {
   const orClauses = [];
   const statusFilters = [];
+  const recipientIdFilters = [];
   const rows = [
     {
       guard_key: 'id:manual-import-idtravel-nl-0245',
@@ -931,26 +932,27 @@ test('data ops store lists outbound sender guards for public preview profile fal
       return {
         select(selection) {
           assert.match(selection, /sender_email/);
-          return {
+          const query = {
+            in(column, values) {
+              if (column === 'recipient_id') recipientIdFilters.push(values);
+              if (column === 'status') statusFilters.push([column, values]);
+              return this;
+            },
             or(clause) {
               orClauses.push(clause);
-              return {
-                in(column, values) {
-                  statusFilters.push([column, values]);
-                  return this;
-                },
-                order(column, options) {
-                  assert.equal(column, 'updated_at');
-                  assert.equal(options.ascending, false);
-                  return this;
-                },
-                limit(limit) {
-                  assert.equal(limit, 50);
-                  return Promise.resolve({ data: rows, error: null });
-                },
-              };
+              return this;
+            },
+            order(column, options) {
+              assert.equal(column, 'updated_at');
+              assert.equal(options.ascending, false);
+              return this;
+            },
+            limit(limit) {
+              assert.equal(limit, 50);
+              return Promise.resolve({ data: rows, error: null });
             },
           };
+          return query;
         },
       };
     },
@@ -969,9 +971,77 @@ test('data ops store lists outbound sender guards for public preview profile fal
 
   assert.equal(guards.length, 1);
   assert.equal(guards[0].sender_email, 'martijn@softora.nl');
-  assert.ok(orClauses.some((clause) => clause.includes('recipient_id.eq.manual-import-idtravel-nl-0245')));
-  assert.ok(orClauses.some((clause) => clause.includes('recipient_domain.eq.idtravel-nl')));
+  assert.deepEqual(recipientIdFilters[0], ['idtravelbv', 'manual-import-idtravel-nl-0245']);
+  assert.deepEqual(orClauses, []);
   assert.deepEqual(statusFilters[0], ['status', ['sent', 'reserved']]);
+});
+
+test('data ops store falls back to broad outbound sender guard lookup when no exact recipient id exists', async () => {
+  const orClauses = [];
+  const rows = [
+    {
+      guard_key: 'domain:idtravel-nl',
+      key_type: 'domain',
+      key_value: 'idtravel-nl',
+      provider: 'softora',
+      channel: 'coldmail',
+      sender_email: 'martijn@softora.nl',
+      recipient_email: 'info@idtravel.nl',
+      recipient_domain: 'idtravel-nl',
+      recipient_company_key: 'id-travel-b-v',
+      recipient_id: 'manual-import-idtravel-nl-0245',
+      recipient_company: 'ID Travel B.V.',
+      status: 'sent',
+      source: 'softora-coldmail-pre-send',
+      actor: 'Coldmail Autopilot Cron',
+      permanent: true,
+      payload: { bedrijf: 'ID Travel B.V.' },
+      created_at: '2026-06-09T17:17:36.739273+00:00',
+      updated_at: '2026-06-09T17:17:38.634+00:00',
+    },
+  ];
+  let exactRead = true;
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_outbound_recipient_guards');
+      return {
+        select() {
+          const query = {
+            in() {
+              return this;
+            },
+            or(clause) {
+              exactRead = false;
+              orClauses.push(clause);
+              return this;
+            },
+            order() {
+              return this;
+            },
+            limit() {
+              return Promise.resolve({ data: exactRead ? [] : rows, error: null });
+            },
+          };
+          return query;
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const guards = await store.listOutboundRecipientGuardsForPreview({
+    identifiers: ['idtravelbv', 'https://www.idtravel.nl'],
+    maxMatches: 12,
+    bypassReadCache: true,
+  });
+
+  assert.equal(guards.length, 1);
+  assert.equal(guards[0].sender_email, 'martijn@softora.nl');
+  assert.ok(orClauses.some((clause) => clause.includes('recipient_domain.eq.idtravel-nl')));
 });
 
 test('data ops store matches compact manual-import design photo ids for clean public slugs', async () => {

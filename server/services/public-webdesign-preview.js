@@ -173,6 +173,17 @@ function setPublicPreviewResolutionCache(id, includeProfileContext, preview) {
   return value;
 }
 
+function setPublicPreviewBaseResolutionCache(id, preview) {
+  if (!preview || hasPendingPublicPreviewProfileContext(preview)) return preview;
+  return setPublicPreviewCacheEntry(
+    publicPreviewResolutionCache,
+    getPublicPreviewResolutionCacheKey(id, false),
+    preview,
+    PUBLIC_PREVIEW_RESOLUTION_CACHE_TTL_MS,
+    PUBLIC_PREVIEW_RESOLUTION_CACHE_MAX_ENTRIES
+  );
+}
+
 function getPublicPreviewSourceCacheKey(source) {
   return crypto
     .createHash('sha1')
@@ -345,6 +356,19 @@ function resolvePublicPreviewProfile(record = null, customer = null, outboundCon
 
 function hasExplicitPublicPreviewProfile(preview) {
   return Boolean(preview && preview.profile && preview.profile.source !== 'default');
+}
+
+function markPublicPreviewProfileContextPending(preview) {
+  return preview && typeof preview === 'object'
+    ? {
+        ...preview,
+        profileContextPending: true,
+      }
+    : preview;
+}
+
+function hasPendingPublicPreviewProfileContext(preview) {
+  return Boolean(preview && preview.profileContextPending && !hasExplicitPublicPreviewProfile(preview));
 }
 
 function readChunkedDataUrl(values, photoKey, chunkCount) {
@@ -1359,6 +1383,25 @@ function createPublicWebdesignPreviewService(options = {}) {
     return state.values && typeof state.values === 'object' ? state.values : {};
   }
 
+  async function resolveProfileContextWithTimeout(promise, fallbackPreview) {
+    let timeout = null;
+    const timeoutResult = { profileContextTimedOut: true };
+    const result = await Promise.race([
+      Promise.resolve(promise)
+        .catch(() => null)
+        .finally(() => {
+          if (timeout) clearTimeout(timeout);
+        }),
+      new Promise((resolve) => {
+        timeout = setTimeout(() => resolve(timeoutResult), profileContextTimeoutMs);
+      }),
+    ]);
+    if (result && result.profileContextTimedOut) {
+      return markPublicPreviewProfileContextPending(fallbackPreview);
+    }
+    return result || fallbackPreview;
+  }
+
   async function resolveStructuredPreview(id, options = {}) {
     if (
       !dataOpsStore ||
@@ -1435,10 +1478,9 @@ function createPublicWebdesignPreviewService(options = {}) {
     }
 
     if (preview) {
-      const enrichedPreview = await withPublicPreviewTimeout(
+      const enrichedPreview = await resolveProfileContextWithTimeout(
         enrichDirectPreview(),
-        profileContextTimeoutMs,
-        'public-preview-profile-context'
+        preview
       );
       return enrichedPreview || preview;
     }
@@ -1493,6 +1535,13 @@ function createPublicWebdesignPreviewService(options = {}) {
     const diagnostics = options.diagnostics || null;
     const structuredPreview = await resolveStructuredPreview(id, { includeProfileContext, diagnostics });
     if (structuredPreview) {
+      if (structuredPreview.profileContextPending) {
+        return structuredPreview;
+      }
+      if (includeProfileContext && !hasExplicitPublicPreviewProfile(structuredPreview)) {
+        setPublicPreviewBaseResolutionCache(id, structuredPreview);
+        return structuredPreview;
+      }
       return setPublicPreviewResolutionCache(id, includeProfileContext, structuredPreview);
     }
 
@@ -1507,6 +1556,10 @@ function createPublicWebdesignPreviewService(options = {}) {
       preview = resolvePreviewFromMaps(id, values, photoMap, parseCustomerRows(customerValues)) || preview;
     }
     if (preview) {
+      if (includeProfileContext && !hasExplicitPublicPreviewProfile(preview)) {
+        setPublicPreviewBaseResolutionCache(id, preview);
+        return preview;
+      }
       return setPublicPreviewResolutionCache(id, includeProfileContext, preview);
     }
     return null;
@@ -1571,7 +1624,17 @@ function createPublicWebdesignPreviewService(options = {}) {
       }
       return res.status(404).send(buildNotFoundHtml());
     }
-    res.setHeader('Cache-Control', PUBLIC_PREVIEW_HTML_CACHE_CONTROL);
+    if (hasPendingPublicPreviewProfileContext(preview)) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      res.setHeader('Retry-After', '2');
+      return res.status(503).send(buildTemporarilyUnavailableHtml());
+    }
+    res.setHeader(
+      'Cache-Control',
+      hasExplicitPublicPreviewProfile(preview)
+        ? PUBLIC_PREVIEW_HTML_CACHE_CONTROL
+        : 'no-store, max-age=0, must-revalidate'
+    );
     return res.status(200).send(buildConceptHtml(preview, routeIdentifier, assetIdentifier));
   }
 

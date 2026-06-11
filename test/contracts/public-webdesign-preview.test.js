@@ -1014,7 +1014,7 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
 });
 
-test('public webdesign preview does not block first paint on slow profile enrichment', async () => {
+test('public webdesign preview does not render the default Serve profile when profile enrichment times out', async () => {
   let customerReads = 0;
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
@@ -1047,11 +1047,89 @@ test('public webdesign preview does not block first paint on slow profile enrich
   await service.getConceptPageResponse({ params: { companySlug: 'snel-laden' } }, response);
   const elapsedMs = Date.now() - startedAt;
 
-  assert.equal(response.statusCode, 200);
-  assert.ok(elapsedMs < 110, `expected slow profile context to be skipped, took ${elapsedMs}ms`);
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.equal(response.headers['Retry-After'], '2');
+  assert.ok(elapsedMs < 110, `expected slow profile context to return a temporary response, took ${elapsedMs}ms`);
   assert.equal(customerReads, 1);
-  assert.match(response.body, /\/webdesign\/snel-laden\/asset\/webdesign\?w=840/);
-  assert.match(response.body, /<h1 class="hero-title">Snel Laden<\/h1>/);
+  assert.match(response.body, /Preview wordt geladen/);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+});
+
+test('public webdesign preview does not cache default Serve concept pages without sender context', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-zonder-sender-nl-0001',
+          bedrijf: 'Zonder Sender B.V.',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-zonder-sender-nl-0001',
+          fileName: 'zonder-sender-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/zonder-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/zonder-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        return [];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'zonder-sender' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.match(response.body, /<strong>Servé Creusen<\/strong>/);
+});
+
+test('public webdesign preview refuses a temporary Serve fallback when outbound guard lookup is slow', async () => {
+  const service = createPublicWebdesignPreviewService({
+    profileContextTimeoutMs: 50,
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-trage-guard-nl-0001',
+          fileName: 'trage-guard-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/trage-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/trage-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return [{
+          guard_key: 'id:manual-import-trage-guard-nl-0001',
+          sender_email: 'martijn@softora.nl',
+          recipient_id: 'manual-import-trage-guard-nl-0001',
+          recipient_company: 'Trage Guard B.V.',
+          status: 'sent',
+          updated_at: '2026-06-11T13:17:38.634+00:00',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'trage-guard' } }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.match(response.body, /Preview wordt geladen/);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
 test('public webdesign preview reuses resolved preview data for follow-up asset requests', async () => {
