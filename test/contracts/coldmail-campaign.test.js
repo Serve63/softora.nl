@@ -1752,9 +1752,154 @@ test('coldmail autopilot day-paces each mailbox across the full 07-17 workday', 
     actor: 'Coldmail Autopilot Cron',
   });
 
-  assert.equal(graceResult.reason, 'sent');
-  assert.equal(justBeforeFloorReady.sentMessages.length, 1);
-  assert.equal(justBeforeFloorReady.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
+  assert.equal(graceResult.reason, 'sender_cooldown');
+  assert.equal(justBeforeFloorReady.sentMessages.length, 0);
+
+  const safelyReady = createService({
+    ...baseSetup,
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-08T05:30:02.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+      ],
+    },
+    now: () => new Date('2026-06-08T06:30:00.000Z'),
+  });
+
+  const safelyReadyResult = await safelyReady.service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(safelyReadyResult.reason, 'sent');
+  assert.equal(safelyReady.sentMessages.length, 1);
+  assert.equal(safelyReady.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
+});
+
+test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', async () => {
+  const senderEmails = [
+    'serve@softora.nl',
+    'martijn@softora.nl',
+    'servecreusen@softora.nl',
+    'martijnvandeven@softora.nl',
+    'servec321@gmail.com',
+    'martijnven123@gmail.com',
+    'serve290@gmail.com',
+    'servecreusen7@gmail.com',
+    'contact.venvisuals@gmail.com',
+  ];
+  const rows = Array.from({ length: 90 }, (_item, index) => ({
+    id: `prospect-${String(index + 1).padStart(3, '0')}`,
+    bedrijf: `Prospect ${index + 1}`,
+    naam: `Contact ${index + 1}`,
+    email: `contact${index + 1}@prospect${index + 1}.test`,
+    status: 'prospect',
+    branche: 'Horeca & Restaurants',
+    stad: 'Oisterwijk',
+    mail: true,
+  }));
+  const previousDayEntries = senderEmails.flatMap((senderEmail, senderIndex) =>
+    Array.from({ length: 9 }, (_item, slotIndex) => ({
+      at: new Date(Date.parse('2026-06-11T05:00:00.000Z') + (slotIndex * 65 + senderIndex * 5) * 60 * 1000).toISOString(),
+      senderEmail,
+      count: 1,
+      personalCount: 0,
+      recipientKey: `email:old-${senderIndex}-${slotIndex}@example.test`,
+      recipientEmail: `old-${senderIndex}-${slotIndex}@example.test`,
+      recipientDomain: `old-${senderIndex}-${slotIndex}-example-test`,
+      recipientCompanyKey: `old-company-${senderIndex}-${slotIndex}`,
+      recipientId: `old-${senderIndex}-${slotIndex}`,
+    }))
+  );
+  let currentNow = new Date('2026-06-12T05:00:00.000Z');
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows,
+    mailboxAccountsRaw: JSON.stringify(senderEmails.map((email) => ({
+      email,
+      smtpHost: email.endsWith('@softora.nl') ? 'smtp.strato.com' : 'smtp.gmail.com',
+      smtpUser: email,
+      smtpPass: `${email}-secret`,
+    }))),
+    sendGuardState: {
+      entries: previousDayEntries,
+      recipientEntries: previousDayEntries,
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails,
+        senderProfiles: Object.fromEntries(senderEmails.map((email) => [
+          email,
+          {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        ])),
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-12T04:50:00.000Z',
+    },
+    now: () => currentNow,
+    sleep: async (ms) => {
+      currentNow = new Date(currentNow.getTime() + ms);
+    },
+  });
+
+  const workdayStartMs = Date.parse('2026-06-12T05:00:00.000Z');
+  for (let tick = 0; tick < 120; tick += 1) {
+    currentNow = new Date(workdayStartMs + tick * 5 * 60 * 1000);
+    await service.runColdmailAutopilot({
+      publicBaseUrl: 'https://www.softora.nl',
+      actor: 'Coldmail Autopilot Cron',
+    });
+  }
+
+  const sentFrom = sentMessages.map((message) => {
+    const match = String(message.from || '').match(/<([^>]+)>/);
+    return (match ? match[1] : message.from).toLowerCase();
+  });
+  const perSender = Object.fromEntries(senderEmails.map((email) => [
+    email,
+    sentFrom.filter((senderEmail) => senderEmail === email).length,
+  ]));
+  const todayEntries = getSendGuardState().entries
+    .filter((entry) => String(entry.at || '').startsWith('2026-06-12'))
+    .filter((entry) => Number(entry.count || 0) > 0);
+
+  assert.equal(sentMessages.length, 81);
+  assert.deepEqual(perSender, Object.fromEntries(senderEmails.map((email) => [email, 9])));
+  assert.equal(todayEntries.length, 81);
+
+  const latestSentAtMs = Math.max(...todayEntries.map((entry) => Date.parse(entry.at)));
+  assert.equal(latestSentAtMs < Date.parse('2026-06-12T15:00:00.000Z'), true);
+  senderEmails.forEach((senderEmail) => {
+    const senderTimes = todayEntries
+      .filter((entry) => entry.senderEmail === senderEmail)
+      .map((entry) => Date.parse(entry.at))
+      .sort((left, right) => left - right);
+    assert.equal(senderTimes.length, 9);
+    for (let index = 1; index < senderTimes.length; index += 1) {
+      assert.equal(senderTimes[index] - senderTimes[index - 1] >= 60 * 60 * 1000, true);
+    }
+  });
 });
 
 test('coldmail autopilot starts a new workday slot even with rolling history from yesterday', async () => {
@@ -1997,7 +2142,7 @@ test('coldmail autopilot does not hide an explicitly configured sender without s
   assert.equal(skip.smtpDiagnostic.resolved.configured, false);
 });
 
-test('coldmail autopilot waits instead of entering round two before a lower day-count sender clears safety limits', async () => {
+test('coldmail autopilot uses day quota instead of blocking on yesterday rolling sends', async () => {
   const martijnRollingEntries = Array.from({ length: 9 }, (_, index) => ({
     at: new Date(Date.parse('2026-06-10T14:00:00.000Z') + index * 60 * 1000).toISOString(),
     senderEmail: 'martijnven123@gmail.com',
@@ -2087,13 +2232,14 @@ test('coldmail autopilot waits instead of entering round two before a lower day-
     actor: 'Coldmail Autopilot Cron',
   });
 
-  assert.equal(result.reason, 'no_sender_capacity');
-  assert.equal(sentMessages.length, 0);
-  const [skip] = getAutopilotState().lastResult.senderSkips;
-  assert.equal(skip.senderEmail, 'martijnven123@gmail.com');
-  assert.equal(skip.reason, 'coldmail_daily_limit_reached');
-  assert.equal(skip.senderDaySent, 0);
-  assert.equal(skip.senderSent, 9);
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].from, /martijnven123@gmail\.com/);
+  const state = getAutopilotState();
+  assert.equal(state.lastResult.senderEmail, 'martijnven123@gmail.com');
+  assert.equal(state.lastResult.dailyQuota.senderDaySentBefore, 0);
+  assert.equal(state.lastResult.dailyQuota.senderSentBefore, 9);
+  assert.equal(state.lastResult.dailyQuota.senderRollingRemainingBefore, 0);
 });
 
 test('coldmail autopilot staggers senders by choosing the mailbox whose cooldown is ready', async () => {

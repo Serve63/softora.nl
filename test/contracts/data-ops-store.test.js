@@ -613,6 +613,83 @@ test('data ops store signs design photo URLs in storage batches', async () => {
   assert.equal(entries.every((entry) => entry.websiteMockupUrl.startsWith('https://')), true);
 });
 
+test('data ops store scans up to 1500 design photo rows for full coldmail stock visibility', async () => {
+  const rows = Array.from({ length: 1200 }, (_item, index) => {
+    const number = index + 1;
+    return {
+      customer_id: `customer-${number}`,
+      identity_key: `bedrijf ${number}|contact|3100000000`,
+      storage_bucket: 'softora-design-photos',
+      storage_path: `customers/customer-${number}/webdesign.png`,
+      mime_type: 'image/png',
+      file_name: `bedrijf-${number}-webdesign.png`,
+      legacy_meta: {
+        mockup: {
+          storageBucket: 'softora-design-photos',
+          storagePath: `customers/customer-${number}/mockup.jpg`,
+          fileName: `bedrijf-${number}-device-mockup-v8.jpg`,
+        },
+      },
+      updated_at: '2026-05-26T12:00:00.000Z',
+    };
+  });
+  const ranges = [];
+  const bulkBatchSizes = [];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrls(paths) {
+            bulkBatchSizes.push(paths.length);
+            return {
+              data: paths.map((path) => ({
+                path,
+                signedUrl: `https://storage.example.test/${bucket}/${path}`,
+              })),
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                order() {
+                  return {
+                    range(from, to) {
+                      ranges.push([from, to]);
+                      return Promise.resolve({ data: rows.slice(from, to + 1), error: null });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({ expiresInSeconds: 120 });
+
+  assert.equal(entries.length, 1200);
+  assert.deepEqual(ranges, [[0, 499], [500, 999], [1000, 1499]]);
+  assert.equal(bulkBatchSizes.length, 24);
+  assert.equal(bulkBatchSizes.every((size) => size === 100), true);
+  assert.equal(entries[1199].customerId, 'customer-1200');
+  assert.equal(entries[1199].websiteMockupUrl.startsWith('https://'), true);
+});
+
 test('data ops store signs only matching design photo rows for targeted preview lookups', async () => {
   const rows = [
     {

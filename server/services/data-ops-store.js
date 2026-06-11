@@ -25,7 +25,8 @@ const TABLES = Object.freeze({
 const DESIGN_PHOTO_CACHE_CONTROL_SECONDS = '31536000';
 const SIGNED_URL_CACHE_LIMIT = 1500;
 const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
-const DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT = 500;
+const DESIGN_PHOTO_SIGNED_URL_PAGE_SIZE = 500;
+const DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT = 1500;
 const DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT = 25000;
 const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
@@ -1014,7 +1015,9 @@ function createSoftoraDataOpsStore(deps = {}) {
         .map(normalizeString)
         .filter(Boolean)
     ));
-    const maxMatches = Math.max(1, Math.min(500, Number(options.maxMatches) || (identifiers.length ? 12 : 500)));
+    const maxMatchLimit = identifiers.length ? 500 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const defaultMaxMatches = identifiers.length ? 12 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const maxMatches = Math.max(1, Math.min(maxMatchLimit, Number(options.maxMatches) || defaultMaxMatches));
     const cacheKey = identifiers.length
       ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
       : `design-photos-signed:all:${maxMatches}`;
@@ -1068,16 +1071,16 @@ function createSoftoraDataOpsStore(deps = {}) {
         const targetedMatches = targetedRows.filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers));
         if (targetedMatches.length) return targetedMatches;
         result = await collectPagedRows('list-design-photos-signed-urls', buildQuery, {
-          pageSize: DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT,
+          pageSize: DESIGN_PHOTO_SIGNED_URL_PAGE_SIZE,
           maxRows: scanLimit,
           ...buildQueryOptions,
         });
       } else {
-        result = await run(
-          'list-design-photos-signed-urls',
-          (client) => buildQuery(client).limit(scanLimit),
-          buildQueryOptions
-        );
+        result = await collectPagedRows('list-design-photos-signed-urls', buildQuery, {
+          pageSize: DESIGN_PHOTO_SIGNED_URL_PAGE_SIZE,
+          maxRows: scanLimit,
+          ...buildQueryOptions,
+        });
       }
       return result.ok ? result.data || [] : null;
     }, {
