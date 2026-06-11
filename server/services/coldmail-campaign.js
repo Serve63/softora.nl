@@ -2768,11 +2768,59 @@ function createColdmailCampaignService(deps = {}) {
     return normalizeString(value) !== '';
   }
 
+  function getColdmailSendGuardSemanticSendKey(entry = {}) {
+    if (!entry || Number(entry.count || 0) <= 0) return '';
+    let identity = [
+      entry.recipientEmail,
+      entry.recipientDomain,
+      entry.recipientCompanyKey,
+      entry.recipientId,
+    ].map(normalizeString);
+    if (!identity.some(Boolean)) identity = [entry.recipientKey].map(normalizeString);
+    if (!identity.some(Boolean)) return '';
+    const parsedAt = parseTimestampMs(entry.at);
+    const atKey = parsedAt ? new Date(parsedAt).toISOString() : normalizeString(entry.at);
+    return [
+      atKey,
+      normalizeEmailAddress(entry.senderEmail),
+      Math.max(0, Number(entry.count || 0) || 0),
+      Math.max(0, Number(entry.personalCount || 0) || 0),
+      ...identity,
+    ].join('|');
+  }
+
+  function mergeColdmailSendGuardDuplicateEntry(target, source) {
+    if (!target || !source) return target || source;
+    const targetPauseMs = parseTimestampMs(target.safetyPauseUntil);
+    const sourcePauseMs = parseTimestampMs(source.safetyPauseUntil);
+    if (sourcePauseMs > targetPauseMs) {
+      target.safetyPauseUntil = source.safetyPauseUntil;
+      target.safetyPauseReason = source.safetyPauseReason;
+    } else if (!target.safetyPauseReason && source.safetyPauseReason) {
+      target.safetyPauseReason = source.safetyPauseReason;
+    }
+    [
+      'recipientKey',
+      'recipientEmail',
+      'recipientDomain',
+      'recipientCompanyKey',
+      'recipientId',
+      'recipientCompany',
+    ].forEach((field) => {
+      if (!normalizeString(target[field]) && normalizeString(source[field])) {
+        target[field] = source[field];
+      }
+    });
+    return target;
+  }
+
   function pruneColdmailSendGuardEntries(entries) {
     const cutoffMs = now().getTime() - COLDMAIL_SEND_GUARD_WINDOW_MS;
     const currentMs = now().getTime();
     const seen = new Set();
-    return (Array.isArray(entries) ? entries : [])
+    const semanticSendSeen = new Map();
+    const pruned = [];
+    (Array.isArray(entries) ? entries : [])
       .filter((entry) => entry && typeof entry === 'object')
       .map((entry) => ({
         at: normalizeString(entry.at),
@@ -2788,10 +2836,15 @@ function createColdmailCampaignService(deps = {}) {
         safetyPauseUntil: normalizeString(entry.safetyPauseUntil || entry.until),
         safetyPauseReason: truncateText(normalizeString(entry.safetyPauseReason || entry.reason), 240),
       }))
-      .filter((entry) => {
+      .forEach((entry) => {
         const sentRecently = entry.count > 0 && parseTimestampMs(entry.at) >= cutoffMs;
         const activePause = parseTimestampMs(entry.safetyPauseUntil) > currentMs;
-        if (!sentRecently && !activePause) return false;
+        if (!sentRecently && !activePause) return;
+        const semanticKey = sentRecently ? getColdmailSendGuardSemanticSendKey(entry) : '';
+        if (semanticKey && semanticSendSeen.has(semanticKey)) {
+          mergeColdmailSendGuardDuplicateEntry(pruned[semanticSendSeen.get(semanticKey)], entry);
+          return;
+        }
         const key = [
           entry.at,
           entry.senderEmail,
@@ -2805,10 +2858,12 @@ function createColdmailCampaignService(deps = {}) {
           entry.safetyPauseUntil,
           entry.safetyPauseReason,
         ].join('|');
-        if (seen.has(key)) return false;
+        if (seen.has(key)) return;
         seen.add(key);
-        return true;
+        if (semanticKey) semanticSendSeen.set(semanticKey, pruned.length);
+        pruned.push(entry);
       });
+    return pruned;
   }
 
   function pruneColdmailRecipientGuardEntries(entries) {
@@ -4030,6 +4085,20 @@ function createColdmailCampaignService(deps = {}) {
       at: normalizeString(result.at) || now().toISOString(),
       sent: Math.max(0, Number(result.sent || 0) || 0),
       failed: Math.max(0, Number(result.failed || 0) || 0),
+      failedReasons: Array.isArray(result.failedReasons)
+        ? result.failedReasons.slice(0, 8).map((item) => ({
+            reason: truncateText(normalizeString(item && item.reason), 120),
+            count: Math.max(0, Number(item && item.count) || 0),
+            sample: item && item.sample && typeof item.sample === 'object'
+              ? {
+                  bedrijf: truncateText(normalizeString(item.sample.bedrijf), 120),
+                  email: normalizeEmailAddress(item.sample.email),
+                  code: truncateText(normalizeString(item.sample.code), 120),
+                  error: truncateText(normalizeString(item.sample.error), 240),
+                }
+              : undefined,
+          })).filter((item) => item.reason && item.count > 0)
+        : summarizeColdmailFailureReasons(result.failedItems),
       invalidRecipientDomainsBlocked:
         Math.max(0, Number(result.invalidRecipientDomainsBlocked || 0) || 0) || undefined,
       senderEmail: normalizeEmailAddress(result.senderEmail),
@@ -4319,6 +4388,7 @@ function createColdmailCampaignService(deps = {}) {
           selected: sendResult.selected,
           sent: sendResult.sent,
           failed: sendResult.failed,
+          failedReasons: sendResult.failedReasons,
           senderEmail,
           sendJitterSeconds,
           dailyQuota: sendResult.dailyQuota,
@@ -4574,6 +4644,69 @@ function createColdmailCampaignService(deps = {}) {
     if (candidateFailure) return normalizeString(candidateFailure.error);
     const firstFailure = failures.find((item) => normalizeString(item && item.error));
     return firstFailure ? normalizeString(firstFailure.error) : '';
+  }
+
+  function classifyColdmailFailureReason(item = {}) {
+    const code = normalizeString(item && item.code).toLowerCase();
+    const error = normalizeString(item && item.error).toLowerCase();
+    const combined = `${code} ${error}`;
+    if (/duplicate|guard|al eerder|recently|recipient_recently_sent/.test(combined)) {
+      return 'duplicate_guard';
+    }
+    if (/geen website-design klaar|no_webdesign|website-design klaar/.test(combined)) {
+      return 'webdesign_not_ready';
+    }
+    if (/geen webdesign-foto|webdesign-foto/.test(combined)) {
+      return 'missing_webdesign_photo';
+    }
+    if (/geen device-mockup|device-mockup|mockup/.test(combined)) {
+      return 'missing_device_mockup';
+    }
+    if (/persoonlijke mailbox/.test(combined)) {
+      return 'personal_mailbox_blocked';
+    }
+    if (/invalid_email_domain|e-maildomein bestaat niet|ontvangt geen mail/.test(combined)) {
+      return 'invalid_email_domain';
+    }
+    if (/daglimiet|quota|limit/.test(combined)) {
+      return 'quota_or_day_limit';
+    }
+    if (/safety|pause|provider|smtp|blocked|spam|rate|refused|timeout/.test(combined)) {
+      return 'provider_or_safety';
+    }
+    return code || 'other';
+  }
+
+  function summarizeColdmailFailureReasons(failedItems = [], maxReasons = 8) {
+    const groups = new Map();
+    (Array.isArray(failedItems) ? failedItems : []).forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const reason = classifyColdmailFailureReason(item);
+      if (!groups.has(reason)) {
+        groups.set(reason, {
+          reason,
+          count: 0,
+          sample: null,
+        });
+      }
+      const group = groups.get(reason);
+      group.count += 1;
+      if (!group.sample) {
+        group.sample = {
+          bedrijf: truncateText(normalizeString(item.bedrijf), 120),
+          email: normalizeEmailAddress(item.email),
+          code: truncateText(normalizeString(item.code), 120),
+          error: truncateText(normalizeString(item.error), 240),
+        };
+      }
+    });
+    return [...groups.values()]
+      .sort((left, right) => {
+        const countDiff = Number(right.count) - Number(left.count);
+        if (countDiff !== 0) return countDiff;
+        return normalizeString(left.reason).localeCompare(normalizeString(right.reason));
+      })
+      .slice(0, Math.max(1, Number(maxReasons) || 8));
   }
 
   async function resolveColdmailRecipients(input = {}) {
@@ -7266,6 +7399,7 @@ function createColdmailCampaignService(deps = {}) {
       selected: selectedRows.length,
       sent: sent.length,
       failed: failed.length,
+      failedReasons: summarizeColdmailFailureReasons(failed),
       persisted: persistedSentRowIds.size,
       invalidRecipientDomainsBlocked,
       safetyLimits: getColdmailSafetyLimits(),

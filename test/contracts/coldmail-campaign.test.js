@@ -1721,6 +1721,99 @@ test('coldmail autopilot starts a new workday slot even with rolling history fro
   assert.equal(getAutopilotState().lastResult.dailyQuota.senderSentBefore, 1);
 });
 
+test('coldmail autopilot counts semantic send_guard admin copies once for quota', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailDailySendLimit: 2,
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-11T06:30:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+          recipientKey: 'email:old@old-domain.test',
+          recipientEmail: 'old@old-domain.test',
+          recipientDomain: 'old-domain-test',
+          recipientCompanyKey: 'oude-bakker',
+          recipientId: 'old-1',
+        },
+        {
+          at: '2026-06-11T06:30:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+          recipientKey: 'legacy-copy-old-1',
+          recipientEmail: 'old@old-domain.test',
+          recipientDomain: 'old-domain-test',
+          recipientCompanyKey: 'oude-bakker',
+          recipientId: 'old-1',
+          safetyPauseUntil: '',
+          safetyPauseReason: '',
+        },
+      ],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: '',
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-11T14:40:00.000Z',
+    },
+    now: () => new Date('2026-06-11T14:50:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().lastResult.dailyQuota.senderDaySentBefore, 1);
+  assert.equal(getAutopilotState().lastResult.dailyQuota.senderRemainingBefore, 1);
+});
+
 test('coldmail autopilot does not hide an explicitly configured sender without smtp', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
@@ -3720,6 +3813,105 @@ test('coldmail campaign strips legacy webdesign image placeholders before link-o
   assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/i);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(sentMessages[0].attachments, undefined);
+});
+
+test('coldmail autopilot stores a compact failure reason summary after a partial candidate scan', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'missing-photo',
+        bedrijf: 'Geen Foto BV',
+        naam: 'Ruben',
+        website: 'geenfoto.nl',
+        email: 'info@geenfoto.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'ready-photo',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Luna',
+        website: 'bakkerijzon.nl',
+        email: 'luna@bakkerijzon.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'ready-photo': {
+        id: 'ready-photo',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Kleine vraag over jullie website',
+            body: [
+              'Goedendag,',
+              '',
+              'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+              '',
+              'Je kunt het webdesign hier bekijken 👈',
+              '',
+              'Met vriendelijke groet,',
+              '{{afzender}}',
+              '',
+              '📍 {{afzenderPlaats}}',
+            ].join('\n'),
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: 'webdesign',
+        radiusKm: '',
+        webdesignImageDelivery: 'link',
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+    },
+    now: () => new Date('2026-06-11T08:20:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  const summary = getAutopilotState().lastResult.failedReasons;
+  assert.equal(Array.isArray(summary), true);
+  assert.equal(summary[0].reason, 'webdesign_not_ready');
+  assert.equal(summary[0].count, 1);
+  assert.equal(summary[0].sample.email, 'info@geenfoto.test');
 });
 
 test('coldmail autopilot lets dashboard link delivery override legacy image env', async () => {
