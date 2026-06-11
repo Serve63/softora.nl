@@ -199,6 +199,88 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
+test('runtime ops coordinator bewaart sportschool logboek snapshots zonder premium login patchpad', async () => {
+  const writes = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => null,
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return {
+        values,
+        source: 'supabase',
+        updatedAt: '2026-06-11T10:00:00.000Z',
+      };
+    },
+  });
+  const getRes = createResponseRecorder();
+  const setRes = createResponseRecorder();
+  const snapshot = {
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: {
+          1: {
+            id: 1,
+            title: 'Leg Extensions',
+            sets: '3',
+            reps: '8',
+            kg: '100',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+
+  await coordinator.sendSportschoolLogbookGetResponse({}, getRes);
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot,
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      },
+    },
+    setRes
+  );
+
+  assert.equal(getRes.statusCode, 200);
+  assert.equal(getRes.body.ok, true);
+  assert.deepEqual(getRes.body.values, {});
+  assert.equal(setRes.statusCode, 200);
+  assert.equal(setRes.body.ok, true);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].scope, 'sportschool_logboek');
+  assert.equal(writes[0].meta.source, 'sportschool-logboek');
+  assert.equal(writes[0].meta.actor, 'serve');
+  assert.equal(typeof writes[0].values.sportschool_logboek_v1, 'string');
+  assert.equal(JSON.parse(writes[0].values.sportschool_logboek_v1).days.tuesday.exercises['1'].kg, '100');
+});
+
+test('runtime ops coordinator weigert kapotte sportschool logboekdata', async () => {
+  const writes = [];
+  const { coordinator } = createFixture({
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return { values, source: 'supabase' };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot: { exercises: [] },
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.ok, false);
+  assert.equal(writes.length, 0);
+});
+
 test('runtime ops coordinator stores previous Word content as backup before overwrite', async () => {
   const writes = [];
   const { coordinator } = createFixture({

@@ -1,6 +1,7 @@
 (() => {
   const REMOTE_SCOPE = 'sportschool_logboek';
   const REMOTE_STATE_KEY = 'sportschool_logboek_v1';
+  const REMOTE_LOGBOOK_ENDPOINT = '/api/sportschool-logboek';
   const DIRECT_SUPABASE_TABLE = 'softora_sportschool_logbook';
   const DIRECT_SUPABASE_ROW_ID = 'serve_logbook';
   const REMOTE_SAVE_DELAY_MS = 450;
@@ -331,16 +332,20 @@
     const directConfig = getDirectSupabaseConfig();
     if (directConfig) return fetchDirectSupabaseState(directConfig);
 
+    const response = await fetch(REMOTE_LOGBOOK_ENDPOINT, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (response.ok) return response.json();
+    if (response.status !== 404) {
+      throw new Error(`Sportschool opslag laden mislukt (${response.status})`);
+    }
+
     if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === 'function') {
       return window.SoftoraUiStateClient.get(REMOTE_SCOPE);
     }
 
-    const response = await fetch(`/api/ui-state-get?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
-      method: 'GET',
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`Sportschool opslag laden mislukt (${response.status})`);
-    return response.json();
+    throw new Error('Sportschool opslag endpoint ontbreekt.');
   }
 
   async function saveRemoteState(snapshotJson, options = {}) {
@@ -353,18 +358,33 @@
       actor: 'serve',
     };
 
-    if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
-      return window.SoftoraUiStateClient.set(REMOTE_SCOPE, body);
+    const response = await fetch(REMOTE_LOGBOOK_ENDPOINT, {
+      method: 'POST',
+      keepalive: options.keepalive === true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        snapshot: JSON.parse(snapshotJson),
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      }),
+    });
+    if (response.ok) return response.json();
+    if (response.status !== 404) {
+      throw new Error(`Sportschool opslag opslaan mislukt (${response.status})`);
     }
 
-    const response = await fetch(`/api/ui-state-set?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
+    if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
+      return window.SoftoraUiStateClient.set(REMOTE_SCOPE, body, options);
+    }
+
+    const fallbackResponse = await fetch(`/api/ui-state-set?scope=${encodeURIComponent(REMOTE_SCOPE)}`, {
       method: 'POST',
       keepalive: options.keepalive === true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`Sportschool opslag opslaan mislukt (${response.status})`);
-    return response.json();
+    if (!fallbackResponse.ok) throw new Error(`Sportschool opslag opslaan mislukt (${fallbackResponse.status})`);
+    return fallbackResponse.json();
   }
 
   async function loadRemoteState() {

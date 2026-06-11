@@ -35,9 +35,12 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.exercise-swipe\.is-reordering/);
   assert.match(stylesSource, /\.day-picker-backdrop/);
   assert.match(scriptSource, /sportschool_logboek/);
+  assert.match(scriptSource, /REMOTE_LOGBOOK_ENDPOINT = '\/api\/sportschool-logboek'/);
   assert.match(scriptSource, /softora_sportschool_logbook/);
   assert.match(scriptSource, /SoftoraSportschoolSupabase/);
   assert.match(scriptSource, /SoftoraUiStateClient/);
+  assert.match(scriptSource, /fetch\(REMOTE_LOGBOOK_ENDPOINT/);
+  assert.match(scriptSource, /snapshot: JSON\.parse\(snapshotJson\)/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /persistRemoteSave/);
   assert.match(scriptSource, /keepalive: options\.keepalive === true/);

@@ -231,6 +231,20 @@ test('runtime ops routes keep their auth boundaries', async () => {
   }
 });
 
+test('sportschool logboek route is publiek leesbaar en schrijft alleen geldige snapshots', async () => {
+  const readResult = await getJson('/api/sportschool-logboek');
+  assert.equal(readResult.response.status, 200);
+  assert.equal(readResult.body.ok, true);
+  assert.equal(readResult.body.scope, 'sportschool_logboek');
+  assert.equal(typeof readResult.body.values, 'object');
+
+  const invalidResult = await postJson('/api/sportschool-logboek', {
+    snapshot: { exercises: [] },
+  });
+  assert.equal(invalidResult.response.status, 400);
+  assert.equal(invalidResult.body.ok, false);
+});
+
 test('active order routes keep their auth boundaries and validation contracts', async () => {
   const generateResult = await postProtectedApiExpectation(
     '/api/active-orders/generate-site',
