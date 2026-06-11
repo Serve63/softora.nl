@@ -80,21 +80,23 @@ test('premium database webdesign jobs do not break app bootstrap when sharp is u
   assert.equal(result.stdout, 'loaded');
 });
 
-test('premium database webdesign jobs keep Vercel sharp linux arm64 install explicit', () => {
+test('premium database webdesign jobs keep Vercel sharp linux installs explicit', () => {
   const repoRoot = path.join(__dirname, '../..');
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
 
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
   assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.34.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.2.4');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
+    'npm ci --include=optional && npm install --os=linux --cpu=x64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-x64@0.34.5 @img/sharp-libvips-linux-x64@1.2.4 && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
   );
   Object.values(vercelConfig.functions).forEach((functionConfig) => {
     assert.equal(
       functionConfig.includeFiles,
-      '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
+      '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
     );
   });
 });

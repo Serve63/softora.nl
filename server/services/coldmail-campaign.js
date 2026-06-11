@@ -2987,10 +2987,10 @@ function createColdmailCampaignService(deps = {}) {
     const packageDailySendLimit = getColdmailPackageDailySendLimit();
     const personalMailboxDailyLimit = getColdmailPersonalMailboxDailyLimit();
     const senderDayRemaining = Math.max(0, dailySendLimit - senderDaySent);
-    const senderRollingRemaining = Math.max(0, dailySendLimit - senderRollingSent);
     const packageDayRemaining = Math.max(0, packageDailySendLimit - packageDaySent);
-    const packageRollingRemaining = Math.max(0, packageDailySendLimit - packageRollingSent);
     const personalMailboxDayRemaining = Math.max(0, personalMailboxDailyLimit - personalMailboxDaySent);
+    const senderRollingRemaining = Math.max(0, dailySendLimit - senderRollingSent);
+    const packageRollingRemaining = Math.max(0, packageDailySendLimit - packageRollingSent);
     const personalMailboxRollingRemaining = Math.max(0, personalMailboxDailyLimit - personalMailboxRollingSent);
     return {
       entries,
@@ -3004,9 +3004,9 @@ function createColdmailCampaignService(deps = {}) {
       dailySendLimit,
       packageDailySendLimit,
       personalMailboxDailyLimit,
-      senderRemaining: Math.min(senderDayRemaining, senderRollingRemaining),
-      packageRemaining: Math.min(packageDayRemaining, packageRollingRemaining),
-      personalMailboxRemaining: Math.min(personalMailboxDayRemaining, personalMailboxRollingRemaining),
+      senderRemaining: senderDayRemaining,
+      packageRemaining: packageDayRemaining,
+      personalMailboxRemaining: personalMailboxDayRemaining,
       senderDayRemaining,
       senderRollingRemaining,
       packageDayRemaining,
@@ -4059,18 +4059,6 @@ function createColdmailCampaignService(deps = {}) {
     ].join('-');
   }
 
-  function getColdmailAutopilotSlotJitterMinutes(schedule, senderEmail, slotIndex) {
-    const normalized = normalizeColdmailAutopilotSchedule(schedule);
-    const max = Math.max(0, Math.min(4, normalized.minIntervalMinutes - 1));
-    if (!max) return 0;
-    const seed = crypto
-      .createHash('sha256')
-      .update(`${normalizeEmailAddress(senderEmail)}:${slotIndex}:autopilot-day-slot`)
-      .digest()
-      .readUInt32BE(0);
-    return seed % (max + 1);
-  }
-
   function getColdmailAutopilotDaySlotReadiness(schedule, senderEmail, lastSentAtMs, options = {}) {
     const normalized = normalizeColdmailAutopilotSchedule(schedule);
     if (!isColdmailAutopilotDaySlotPacingSchedule(normalized)) return null;
@@ -4084,35 +4072,23 @@ function createColdmailCampaignService(deps = {}) {
     );
     const senderIndex = Math.max(0, Number(options.senderIndex) || 0);
     const slotIndex = Math.min(senderSent, dailyLimit - 1);
-    const slotJitterMaxMinutes = Math.max(0, Math.min(4, normalized.minIntervalMinutes - 1));
-    const finalBufferMinutes =
-      normalized.minIntervalMinutes +
-      Math.ceil(normalized.sendJitterMaxSeconds / 60) +
-      slotJitterMaxMinutes +
-      1;
+    const finalBufferMinutes = Math.ceil(normalized.sendJitterMaxSeconds / 60) + 1;
     const firstWaveOffsetMinutes = Math.min(
       Math.max(0, windowMinutes - finalBufferMinutes),
       senderIndex * normalized.minIntervalMinutes
     );
-    const usableWindowMinutes = Math.max(
-      dailyLimit - 1,
-      windowMinutes - firstWaveOffsetMinutes - finalBufferMinutes
-    );
-    const slotSpacingMinutes = usableWindowMinutes / (dailyLimit - 1);
+    const slotSpacingMinutes = normalized.senderMinIntervalMinutes + normalized.minIntervalMinutes;
     const targetMinuteOfDay =
       normalized.startHour * 60 +
       firstWaveOffsetMinutes +
-      slotIndex * slotSpacingMinutes +
-      getColdmailAutopilotSlotJitterMinutes(normalized, senderEmail, slotIndex);
+      slotIndex * slotSpacingMinutes;
     const currentMs = now().getTime();
     const currentMinuteOfDay = getColdmailAutopilotMinuteOfDay(normalized, now());
     const targetWaitMinutes = Math.max(0, targetMinuteOfDay - currentMinuteOfDay);
     const targetReadyAtMs = currentMs + targetWaitMinutes * 60 * 1000;
-    const minimumCooldownMinutes = Math.max(
-      45,
-      normalized.senderMinIntervalMinutes - normalized.minIntervalMinutes
-    );
-    const floorReadyAtMs = lastSentAtMs + minimumCooldownMinutes * 60 * 1000;
+    const floorReadyAtMs =
+      lastSentAtMs +
+      Math.max(0, normalized.senderMinIntervalMinutes * 60 * 1000 - normalized.sendJitterMinSeconds * 1000);
     const readyAtMs = Math.max(targetReadyAtMs, floorReadyAtMs);
     if (readyAtMs <= currentMs + COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS) {
       return { ok: true, readyAtMs, cooldownMinutes: 0 };
@@ -7681,6 +7657,9 @@ function createColdmailCampaignService(deps = {}) {
         senderRemainingBefore: quota.senderRemaining,
         packageRemainingBefore: quota.packageRemaining,
         personalMailboxRemainingBefore: quota.personalMailboxRemaining,
+        senderRollingRemainingBefore: quota.senderRollingRemaining,
+        packageRollingRemainingBefore: quota.packageRollingRemaining,
+        personalMailboxRollingRemainingBefore: quota.personalMailboxRollingRemaining,
         safetyPausedUntil: safetyPause ? safetyPause.until : undefined,
       },
       safetyPaused: Boolean(safetyPause),

@@ -442,14 +442,16 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
   assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.34.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.2.4');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
+    'npm ci --include=optional && npm install --os=linux --cpu=x64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-x64@0.34.5 @img/sharp-libvips-linux-x64@1.2.4 && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
   );
   Object.values(vercelConfig.functions).forEach((functionConfig) => {
     assert.equal(
       functionConfig.includeFiles,
-      '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
+      '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}'
     );
   });
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
@@ -493,8 +495,10 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\)/);
   assert.match(safeDeploySource, /verify:critical/);
   assert.match(safeDeploySource, /restoreKnownProductionBuildSideEffects\(\);/);
-  assert.match(safeDeploySource, /installVercelSharpLinuxArm64Output\(\);/);
+  assert.match(safeDeploySource, /installVercelSharpLinuxOutput\(\);/);
   assert.match(safeDeploySource, /assertSafeProductionDeploySource\(\);\s*run\('Vercel productie-deploy'/);
+  assert.match(safeDeploySource, /@img\/sharp-linux-x64/);
+  assert.match(safeDeploySource, /@img\/sharp-libvips-linux-x64/);
   assert.match(safeDeploySource, /@img\/sharp-linux-arm64/);
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-arm64/);
   assert.match(safeDeploySource, /check:live-production-version/);

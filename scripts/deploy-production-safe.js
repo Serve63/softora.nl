@@ -15,7 +15,9 @@ const EXPECTED_VERCEL_PROJECT = Object.freeze({
 });
 const vercelProjectPath = path.join(process.cwd(), '.vercel', 'project.json');
 const vercelOutputFunctionsPath = path.join(process.cwd(), '.vercel', 'output', 'functions');
-const SHARP_LINUX_ARM64_PACKAGES = Object.freeze([
+const SHARP_LINUX_PACKAGES = Object.freeze([
+  { name: '@img/sharp-linux-x64', version: '0.34.5', tarball: 'img-sharp-linux-x64-0.34.5.tgz' },
+  { name: '@img/sharp-libvips-linux-x64', version: '1.2.4', tarball: 'img-sharp-libvips-linux-x64-1.2.4.tgz' },
   { name: '@img/sharp-linux-arm64', version: '0.34.5', tarball: 'img-sharp-linux-arm64-0.34.5.tgz' },
   { name: '@img/sharp-libvips-linux-arm64', version: '1.2.4', tarball: 'img-sharp-libvips-linux-arm64-1.2.4.tgz' },
 ]);
@@ -116,7 +118,7 @@ function listVercelFunctionDirs(rootDir) {
   return result;
 }
 
-function installVercelSharpLinuxArm64Output() {
+function installVercelSharpLinuxOutput() {
   console.log('\n[production-deploy] Linux sharp-binaries in Vercel output controleren');
   const functionDirs = listVercelFunctionDirs(vercelOutputFunctionsPath);
   if (!functionDirs.length) {
@@ -125,7 +127,7 @@ function installVercelSharpLinuxArm64Output() {
 
   const tempDir = fs.mkdtempSync(path.join(process.cwd(), '.vercel-sharp-linux-'));
   try {
-    SHARP_LINUX_ARM64_PACKAGES.forEach((pkg) => {
+    SHARP_LINUX_PACKAGES.forEach((pkg) => {
       runQuiet(`npm pack ${pkg.name}`, npmCmd, [
         'pack',
         `${pkg.name}@${pkg.version}`,
@@ -136,7 +138,7 @@ function installVercelSharpLinuxArm64Output() {
 
     let installed = 0;
     functionDirs.forEach((functionDir) => {
-      SHARP_LINUX_ARM64_PACKAGES.forEach((pkg) => {
+      SHARP_LINUX_PACKAGES.forEach((pkg) => {
         const packageDir = path.join(functionDir, 'node_modules', ...pkg.name.split('/'));
         if (fs.existsSync(path.join(packageDir, 'package.json'))) return;
         fs.mkdirSync(packageDir, { recursive: true });
@@ -170,7 +172,7 @@ run('Vercel productieomgeving ophalen', npxCmd, ['vercel', 'pull', '--yes', '--e
 assertExpectedVercelProjectLink();
 run('Vercel productie-build', npxCmd, ['vercel', 'build', '--prod']);
 restoreKnownProductionBuildSideEffects();
-installVercelSharpLinuxArm64Output();
+installVercelSharpLinuxOutput();
 assertSafeProductionDeploySource();
 run('Vercel productie-deploy', npxCmd, ['vercel', 'deploy', '--prebuilt', '--prod', '--yes']);
 run('live productieversie controleren', npmCmd, ['run', 'check:live-production-version']);
