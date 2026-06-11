@@ -56,6 +56,7 @@ const COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS = 10 * 1000;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS = [250, 1000, 2500];
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_DAILY_LIMIT_REACHED',
   'COLDMAIL_RECIPIENT_RECENTLY_SENT',
@@ -4449,6 +4450,39 @@ function createColdmailCampaignService(deps = {}) {
       : 'Coldmailing staat tijdelijk op pauze omdat de mailprovider een veiligheidsmelding gaf.';
   }
 
+  function buildColdmailPostSmtpPersistenceError(step, error) {
+    const detail = truncateText(
+      normalizeString(error && error.message ? error.message : error),
+      300
+    );
+    const wrapped = new Error(
+      `Na SMTP-acceptatie kon ${step} niet betrouwbaar worden opgeslagen.${detail ? ` Detail: ${detail}` : ''}`
+    );
+    wrapped.code = 'COLDMAIL_POST_SMTP_PERSISTENCE_FAILED';
+    wrapped.step = step;
+    wrapped.cause = error;
+    return wrapped;
+  }
+
+  async function runColdmailPostSmtpPersistenceStep(step, fn) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        if (attempt >= COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS.length) break;
+        logger.warn('[Coldmail][post-smtp-persistence-retry]', {
+          step,
+          attempt: attempt + 1,
+          error: error && error.message ? error.message : error,
+        });
+        await sleep(COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS[attempt]);
+      }
+    }
+    throw buildColdmailPostSmtpPersistenceError(step, lastError);
+  }
+
   function matchesBranch(row, branchFilter) {
     const filter = normalizeString(branchFilter).toLowerCase();
     if (!filter) return true;
@@ -7129,16 +7163,17 @@ function createColdmailCampaignService(deps = {}) {
         }
         const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
         sentItem.sentCopySaved = sentCopySaved;
-        sent.push(sentItem);
         if (!isTestRecipientRow(row, to)) {
           const recipientGuard = buildColdmailRecipientGuard(row, item.id);
-          await recordColdmailSendGuardEntry({
-            senderEmail,
-            count: 1,
-            personalCount: isPersonalMailboxDomain(to) ? 1 : 0,
-            ...recipientGuard,
-            actor,
-          });
+          await runColdmailPostSmtpPersistenceStep('oude send_guard/teller', () =>
+            recordColdmailSendGuardEntry({
+              senderEmail,
+              count: 1,
+              personalCount: isPersonalMailboxDomain(to) ? 1 : 0,
+              ...recipientGuard,
+              actor,
+            })
+          );
           const updatedRows = rows.map((currentRow, rowIndex) => {
             const rowId = getRowId(currentRow, rowIndex);
             if (rowId !== item.id) return currentRow;
@@ -7149,17 +7184,21 @@ function createColdmailCampaignService(deps = {}) {
               trackingId: sentItem.trackingId,
             });
           });
-          await setUiStateValues(
-            customerDbScope,
-            buildCustomerRowsStateValues(values, updatedRows),
-            {
-              source: 'coldmail-campaign',
-              actor,
-            }
+          await runColdmailPostSmtpPersistenceStep(
+            'klantstatus/teller',
+            () => setUiStateValues(
+              customerDbScope,
+              buildCustomerRowsStateValues(values, updatedRows),
+              {
+                source: 'coldmail-campaign',
+                actor,
+              }
+            )
           );
           rows = updatedRows;
           persistedSentRowIds.add(item.id);
         }
+        sent.push(sentItem);
       } catch (error) {
         failed.push({
           id: item.id,
@@ -7171,10 +7210,13 @@ function createColdmailCampaignService(deps = {}) {
         const errorCode = normalizeString(error && error.code);
         const guardConfirmFailed = errorCode === 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
         const guardPreflightFailed = /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED)$/i.test(errorCode);
+        const postSmtpPersistenceFailed = errorCode === 'COLDMAIL_POST_SMTP_PERSISTENCE_FAILED';
         const safetyReason = guardConfirmFailed
           ? 'central_outbound_guard_confirm_failed'
           : guardPreflightFailed
           ? 'central_outbound_guard_preflight_failed'
+          : postSmtpPersistenceFailed
+          ? 'post_smtp_persistence_failed'
           : getSmtpSafetyStopReason(error);
         if (safetyReason) {
           safetyPause = await recordColdmailSafetyPause({

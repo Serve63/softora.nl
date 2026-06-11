@@ -7168,6 +7168,97 @@ test('coldmail campaign pauses when central guard confirm updates no rows after 
   assert.equal(getSendGuardState().entries[0].safetyPauseReason, 'central_outbound_guard_confirm_failed');
 });
 
+test('coldmail campaign pauses when old send guard persistence fails after SMTP accept', async () => {
+  let sendGuardWrites = 0;
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'post-smtp-guard-fail',
+        bedrijf: 'Post SMTP Guard Fail BV',
+        naam: 'Post SMTP Guard Fail BV',
+        email: 'info@post-smtp-guard-fail.example',
+        website: 'https://post-smtp-guard-fail.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    onSetUiStateValues: async ({ scope }) => {
+      if (scope !== 'premium_coldmail_send_guard') return;
+      sendGuardWrites += 1;
+      if (sendGuardWrites <= 4) {
+        throw new Error('temporary send guard write timeout');
+      }
+    },
+    coldmailSafetyPauseMs: 60_000,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /Na SMTP-acceptatie kon oude send_guard\/teller niet betrouwbaar worden opgeslagen/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sendGuardWrites, 5);
+  assert.equal(getSendGuardState().entries.length, 1);
+  assert.equal(getSendGuardState().entries[0].count, 0);
+  assert.equal(getSendGuardState().entries[0].safetyPauseReason, 'post_smtp_persistence_failed');
+});
+
+test('coldmail campaign pauses when customer status persistence fails after SMTP accept', async () => {
+  let customerWrites = 0;
+  const { service, sentMessages, getSendGuardState } = createService({
+    rows: [
+      {
+        id: 'post-smtp-customer-fail',
+        bedrijf: 'Post SMTP Customer Fail BV',
+        naam: 'Post SMTP Customer Fail BV',
+        email: 'info@post-smtp-customer-fail.example',
+        website: 'https://post-smtp-customer-fail.example',
+        status: 'prospect',
+        databaseStatus: 'prospect',
+        mail: true,
+      },
+    ],
+    onSetUiStateValues: async ({ scope }) => {
+      if (scope !== 'premium_customers_database') return;
+      customerWrites += 1;
+      throw new Error('temporary customer database write timeout');
+    },
+    coldmailSafetyPauseMs: 60_000,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_SAFETY_PAUSED');
+      assert.match(error.message, /Na SMTP-acceptatie kon klantstatus\/teller niet betrouwbaar worden opgeslagen/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(customerWrites, 4);
+  const entries = getSendGuardState().entries;
+  assert.equal(entries.some((entry) => entry.recipientEmail === 'info@post-smtp-customer-fail.example' && entry.count === 1), true);
+  assert.equal(entries.some((entry) => entry.count === 0 && entry.safetyPauseReason === 'post_smtp_persistence_failed'), true);
+});
+
 test('coldmail campaign keeps old Instantly recipient guards permanently', async () => {
   const { service, sentMessages } = createService({
     rows: [
