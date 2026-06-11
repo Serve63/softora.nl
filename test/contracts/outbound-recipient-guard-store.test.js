@@ -158,6 +158,91 @@ test('outbound recipient guard store reports exact reserve and confirm counts', 
   assert.equal(calls.some((call) => call.type === 'confirm'), true);
 });
 
+test('outbound recipient guard store groups permanent sent guard rows by reservation', async () => {
+  const sentRows = [
+    {
+      reservation_id: 'reservation-1',
+      guard_key: 'email:fresh@example.test',
+      key_type: 'email',
+      provider: 'softora',
+      channel: 'coldmail',
+      recipient_email: 'fresh@example.test',
+      recipient_domain: 'example-test',
+      recipient_company_key: 'fresh-bv',
+      recipient_id: 'fresh-1',
+      status: 'sent',
+      permanent: true,
+      updated_at: '2026-06-08T09:00:00.000Z',
+    },
+    {
+      reservation_id: 'reservation-1',
+      guard_key: 'domain:example-test',
+      key_type: 'domain',
+      provider: 'softora',
+      channel: 'coldmail',
+      recipient_email: 'fresh@example.test',
+      recipient_domain: 'example-test',
+      recipient_company_key: 'fresh-bv',
+      recipient_id: 'fresh-1',
+      status: 'sent',
+      permanent: true,
+      updated_at: '2026-06-08T09:00:00.000Z',
+    },
+    {
+      reservation_id: 'reservation-2',
+      guard_key: 'email:second@example.test',
+      key_type: 'email',
+      provider: 'softora',
+      channel: 'coldmail',
+      recipient_email: 'second@example.test',
+      recipient_domain: 'example-test',
+      recipient_company_key: 'second-bv',
+      recipient_id: 'second-1',
+      status: 'sent',
+      permanent: true,
+      updated_at: '2026-06-08T09:30:00.000Z',
+    },
+  ];
+  const calls = [];
+  const client = {
+    from(table) {
+      return {
+        select(columns) {
+          const query = {
+            eq(column, value) {
+              calls.push({ type: 'eq', table, columns, column, value });
+              return query;
+            },
+            order(column, options) {
+              calls.push({ type: 'order', column, options });
+              return query;
+            },
+            async limit(count) {
+              calls.push({ type: 'limit', count });
+              return { data: sentRows, error: null };
+            },
+          };
+          return query;
+        },
+      };
+    },
+  };
+  const store = createStore(client);
+
+  const groups = await store.listSentRecipientGroups({
+    provider: 'softora',
+    channel: 'coldmail',
+  });
+
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].recipient_email, 'fresh@example.test');
+  assert.equal(groups[1].recipient_email, 'second@example.test');
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'status' && call.value === 'sent'), true);
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'permanent' && call.value === true), true);
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'provider' && call.value === 'softora'), true);
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'channel' && call.value === 'coldmail'), true);
+});
+
 test('outbound recipient guard store normalizes company legal suffix punctuation like coldmail', async () => {
   const { client, calls } = createMockSupabaseClient();
   const store = createStore(client);

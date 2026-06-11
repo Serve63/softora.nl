@@ -121,6 +121,11 @@ html[data-coldmail-live-stats="unavailable"] .coldmail-live-stat strong {
     return number(value).toLocaleString("nl-NL");
   }
 
+  function readTotalSent(stats) {
+    if (!stats || typeof stats !== "object") return 0;
+    return number(stats.systemTotalSent || stats.totalSent || stats.databaseTotalSent);
+  }
+
   function formatLastSentAt(value, timezone) {
     const parsed = new Date(String(value || ""));
     if (!Number.isFinite(parsed.getTime())) return "Nog geen mail";
@@ -157,7 +162,7 @@ html[data-coldmail-live-stats="unavailable"] .coldmail-live-stat strong {
     setAvailability("ready");
     setText("coldmailLiveSentToday", formatNumber(lastStats.sentToday));
     setText("coldmailLiveSentLast24h", formatNumber(lastStats.sentLast24h));
-    setText("coldmailLiveSentTotal", formatNumber(lastStats.databaseTotalSent));
+    setText("coldmailLiveSentTotal", formatNumber(readTotalSent(lastStats)));
     setText("coldmailLiveLastSentAt", formatLastSentAt(lastStats.lastSuccessfulSendAt, lastStats.timezone));
     setText("coldmailLiveLastSender", lastStats.lastSenderEmail || "Geen afzender");
     setText("coldmailLiveSentTodayNote", lastStats.dateKey || "Europe/Amsterdam");

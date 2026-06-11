@@ -513,6 +513,28 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
       ],
       recipientEntries: [],
     },
+    outboundRecipientGuardStore: {
+      listSentRecipientGroups: async () => [
+        {
+          reservation_id: 'guard-only-reservation',
+          recipient_email: 'guard-only@example.test',
+          recipient_domain: 'example.test',
+          recipient_company_key: 'guard-only-bv',
+          recipient_id: 'guard-only',
+          provider: 'softora',
+          channel: 'coldmail',
+        },
+        {
+          reservation_id: 'softora-sent-reservation',
+          recipient_email: 'ruben@example.test',
+          recipient_domain: 'example.test',
+          recipient_company_key: 'bakkerij-zon',
+          recipient_id: 'softora-sent',
+          provider: 'softora',
+          channel: 'coldmail',
+        },
+      ],
+    },
     rows: [
       {
         id: 'softora-sent',
@@ -553,6 +575,9 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.sentLast24h, 4);
   assert.equal(result.stats.personalMailboxSentToday, 2);
   assert.equal(result.stats.databaseTotalSent, 3);
+  assert.equal(result.stats.centralGuardTotalSent, 2);
+  assert.equal(result.stats.systemTotalSent, 4);
+  assert.equal(result.stats.totalSent, 4);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
   assert.equal(result.stats.conversionRate, 33);
