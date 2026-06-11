@@ -13,13 +13,18 @@ function createFixture(overrides = {}) {
   const loggerInfos = [];
   const restReads = [];
   const restWrites = [];
+  const clientOptions = [];
+  const restWriteOptions = [];
 
   const store = createUiStateStore({
     uiStateScopePrefix: 'ui_state:',
     inMemoryUiStateByScope,
     isSupabaseConfigured: () =>
       overrides.isSupabaseConfigured === undefined ? true : Boolean(overrides.isSupabaseConfigured),
-    getSupabaseClient: () => overrides.client || null,
+    getSupabaseClient: (options) => {
+      clientOptions.push(options);
+      return overrides.client || null;
+    },
     supabaseStateTable: 'app_state',
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     uiStateReadTimeoutMsByScope: overrides.uiStateReadTimeoutMsByScope,
@@ -37,8 +42,9 @@ function createFixture(overrides = {}) {
       }
       return overrides.fetchResult || { ok: true, body: null };
     },
-    upsertSupabaseRowViaRest: async (row) => {
+    upsertSupabaseRowViaRest: async (row, requestOptions) => {
       restWrites.push(row);
+      restWriteOptions.push(requestOptions);
       return overrides.upsertResult || { ok: true, body: row };
     },
     normalizeString: (value) => String(value || '').trim(),
@@ -50,11 +56,13 @@ function createFixture(overrides = {}) {
   });
 
   return {
+    clientOptions,
     inMemoryUiStateByScope,
     loggerErrors,
     loggerInfos,
     restReads,
     restWrites,
+    restWriteOptions,
     store,
   };
 }
@@ -147,7 +155,7 @@ test('ui-state store writes values through REST fallback when client upsert fail
       };
     },
   };
-  const { inMemoryUiStateByScope, restWrites, store } = createFixture({
+  const { clientOptions, inMemoryUiStateByScope, restWriteOptions, restWrites, store } = createFixture({
     client: failingClient,
   });
 
@@ -158,6 +166,16 @@ test('ui-state store writes values through REST fallback when client upsert fail
   );
 
   assert.equal(restWrites.length, 1);
+  assert.deepEqual(clientOptions[0], {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  });
+  assert.deepEqual(restWriteOptions[0], {
+    timeoutMs: 8000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  });
   assert.equal(restWrites[0].state_key, 'ui_state:dashboard');
   assert.deepEqual(restWrites[0].payload.values, {
     panel: 'overview',
@@ -722,7 +740,7 @@ test('ui-seo runtime keeps coldmail state reads critical and isolated by default
   assert.match(source, /premium_coldmail_send_guard:\s*25000/);
   assert.match(source, /premium_coldmailing_settings:\s*12000/);
   assert.match(source, /dataOpsReadQueryTimeoutMs = 6000/);
-  assert.match(source, /premium_customers_database:\s*8000/);
+  assert.match(source, /premium_customers_database:\s*12000/);
   assert.match(source, /premium_database_photos:\s*12000/);
   assert.match(source, /legacyContactMergeEnabled:\s*true/);
   assert.match(source, /legacyReadTimeoutMs:\s*2500/);

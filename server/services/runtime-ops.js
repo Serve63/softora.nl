@@ -209,7 +209,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     }
     if (scope === 'premium_database_photos') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 12000);
     if (scope === 'premium_coldmail_send_guard') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 12000);
-    if (scope === 'premium_customers_database') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 8000);
+    if (scope === 'premium_customers_database') return Math.max(Number(dataOpsUiStateReadTimeoutMs) || 0, 12000);
     return dataOpsUiStateReadTimeoutMs;
   }
 

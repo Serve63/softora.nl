@@ -29,6 +29,7 @@ const DESIGN_PHOTO_SIGNED_URL_PAGE_SIZE = 500;
 const DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT = 1500;
 const DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT = 25000;
 const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
+const DEFAULT_WRITE_QUERY_TIMEOUT_MS = 10000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
 const DEFAULT_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
 
@@ -231,6 +232,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     logger = console,
     bucketName = 'softora-design-photos',
     dataOpsReadQueryTimeoutMs = DEFAULT_READ_QUERY_TIMEOUT_MS,
+    dataOpsWriteQueryTimeoutMs = DEFAULT_WRITE_QUERY_TIMEOUT_MS,
     dataOpsReadCacheTtlMs = DEFAULT_READ_CACHE_TTL_MS,
     dataOpsReadFailureCooldownMs = DEFAULT_READ_FAILURE_COOLDOWN_MS,
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -256,6 +258,31 @@ function createSoftoraDataOpsStore(deps = {}) {
     return Object.keys(clientOptions).length
       ? getSupabaseClient(clientOptions)
       : getSupabaseClient();
+  }
+
+  function getSafeWriteQueryTimeoutMs() {
+    return Math.max(
+      1000,
+      Math.min(30000, Number(dataOpsWriteQueryTimeoutMs) || DEFAULT_WRITE_QUERY_TIMEOUT_MS)
+    );
+  }
+
+  function getWriteOperationOptions(overrides = {}) {
+    return {
+      operationType: 'write',
+      timeoutMs: getSafeWriteQueryTimeoutMs(),
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      ignoreSupabaseRestFailureCooldown: true,
+      suppressSupabaseRestFailureCooldown: true,
+      ...(overrides && typeof overrides === 'object' ? overrides : {}),
+    };
+  }
+
+  function isRunReadOperation(options = {}) {
+    if (options.operationType === 'write') return false;
+    if (options.operationType === 'read') return true;
+    return Number(options.timeoutMs) > 0;
   }
 
   function isUnavailableError(error) {
@@ -391,7 +418,7 @@ function createSoftoraDataOpsStore(deps = {}) {
   async function run(label, operation, options = {}) {
     const client = getClient(options);
     if (!client) return { ok: false, unavailable: true, error: new Error('Supabase niet geconfigureerd') };
-    const isReadOperation = Number(options.timeoutMs) > 0;
+    const isReadOperation = isRunReadOperation(options);
     if (isReadOperation && isReadFailureCooldownActive() && !options.bypassReadFailureCooldown) {
       return { ok: false, unavailable: false, error: createReadCooldownError() };
     }
@@ -653,15 +680,18 @@ function createSoftoraDataOpsStore(deps = {}) {
       .map((row) => normalizeString(row && row[idColumn]))
       .filter((id) => id && !incoming.has(id));
     if (!missing.length) return { ok: true, data: [] };
-    return run(`delete-missing-${table}`, (client) =>
-      client
-        .from(table)
-        .update({
-          deleted_at: isoNow(),
-          updated_at: isoNow(),
-          source: normalizeString(source || 'ui-state-compat').slice(0, 120),
-        })
-        .in(idColumn, missing)
+    return run(
+      `delete-missing-${table}`,
+      (client) =>
+        client
+          .from(table)
+          .update({
+            deleted_at: isoNow(),
+            updated_at: isoNow(),
+            source: normalizeString(source || 'ui-state-compat').slice(0, 120),
+          })
+          .in(idColumn, missing),
+      getWriteOperationOptions()
     );
   }
 
@@ -698,8 +728,10 @@ function createSoftoraDataOpsStore(deps = {}) {
       meta.source
     );
     if (rows.length) {
-      const upsert = await run('upsert-customers', (client) =>
-        client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' })
+      const upsert = await run(
+        'upsert-customers',
+        (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
+        getWriteOperationOptions()
       );
       if (!upsert.ok) return upsert;
     }
@@ -751,8 +783,10 @@ function createSoftoraDataOpsStore(deps = {}) {
       buildOrderRow(item, index, meta.source)
     );
     if (rows.length) {
-      const upsert = await run('upsert-active-orders', (client) =>
-        client.from(TABLES.activeOrders).upsert(rows, { onConflict: 'order_id' })
+      const upsert = await run(
+        'upsert-active-orders',
+        (client) => client.from(TABLES.activeOrders).upsert(rows, { onConflict: 'order_id' }),
+        getWriteOperationOptions()
       );
       if (!upsert.ok) return upsert;
     }
@@ -804,8 +838,10 @@ function createSoftoraDataOpsStore(deps = {}) {
       })
       .filter(Boolean);
     if (rows.length) {
-      const upsert = await run('upsert-order-runtime', (client) =>
-        client.from(TABLES.orderRuntime).upsert(rows, { onConflict: 'order_id' })
+      const upsert = await run(
+        'upsert-order-runtime',
+        (client) => client.from(TABLES.orderRuntime).upsert(rows, { onConflict: 'order_id' }),
+        getWriteOperationOptions()
       );
       if (!upsert.ok) return upsert;
     }
@@ -936,15 +972,18 @@ function createSoftoraDataOpsStore(deps = {}) {
   async function deleteDesignPhotos(customerIds, meta = {}) {
     const ids = Array.from(new Set((Array.isArray(customerIds) ? customerIds : []).map(normalizeString).filter(Boolean)));
     if (!ids.length) return { ok: true, data: [], deleted: 0 };
-    return run('delete-design-photos-explicit', (client) =>
-      client
-        .from(TABLES.designPhotos)
-        .update({
-          deleted_at: isoNow(),
-          updated_at: isoNow(),
-          source: normalizeString(meta.source || 'ui-state-compat').slice(0, 120),
-        })
-        .in('customer_id', ids)
+    return run(
+      'delete-design-photos-explicit',
+      (client) =>
+        client
+          .from(TABLES.designPhotos)
+          .update({
+            deleted_at: isoNow(),
+            updated_at: isoNow(),
+            source: normalizeString(meta.source || 'ui-state-compat').slice(0, 120),
+          })
+          .in('customer_id', ids),
+      getWriteOperationOptions()
     );
   }
 
@@ -1447,8 +1486,10 @@ function createSoftoraDataOpsStore(deps = {}) {
     if (!row.job_id || !row.owner_key) {
       return { ok: false, unavailable: false, error: new Error('Ongeldige webdesign-job') };
     }
-    return run('upsert-webdesign-job', (client) =>
-      client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' })
+    return run(
+      'upsert-webdesign-job',
+      (client) => client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' }),
+      getWriteOperationOptions()
     );
   }
 
