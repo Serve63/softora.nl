@@ -243,6 +243,65 @@ test('outbound recipient guard store groups permanent sent guard rows by reserva
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'channel' && call.value === 'coldmail'), true);
 });
 
+test('outbound recipient guard store paginates sent guard rows beyond Supabase single-page caps', async () => {
+  const sentRows = Array.from({ length: 1003 }, (_, index) => ({
+    reservation_id: `reservation-${index + 1}`,
+    guard_key: `email:lead-${index + 1}@example.test`,
+    key_type: 'email',
+    provider: 'softora',
+    channel: 'coldmail',
+    recipient_email: `lead-${index + 1}@example.test`,
+    recipient_domain: 'example-test',
+    recipient_company_key: `lead-${index + 1}`,
+    recipient_id: `lead-${index + 1}`,
+    status: 'sent',
+    permanent: true,
+    updated_at: `2026-06-08T09:${String(index % 60).padStart(2, '0')}:00.000Z`,
+  }));
+  const calls = [];
+  const client = {
+    from(table) {
+      return {
+        select(columns) {
+          const query = {
+            eq(column, value) {
+              calls.push({ type: 'eq', table, columns, column, value });
+              return query;
+            },
+            order(column, options) {
+              calls.push({ type: 'order', column, options });
+              return query;
+            },
+            async range(from, to) {
+              calls.push({ type: 'range', from, to });
+              return { data: sentRows.slice(from, to + 1), error: null };
+            },
+          };
+          return query;
+        },
+      };
+    },
+  };
+  const store = createStore(client);
+
+  const groups = await store.listSentRecipientGroups({
+    provider: 'softora',
+    channel: 'coldmail',
+    maxRows: 2000,
+  });
+
+  assert.equal(groups.length, 1003);
+  assert.equal(groups[0].recipient_email, 'lead-1@example.test');
+  assert.equal(groups[1002].recipient_email, 'lead-1003@example.test');
+  assert.deepEqual(
+    calls.filter((call) => call.type === 'range').map((call) => [call.from, call.to]),
+    [
+      [0, 999],
+      [1000, 1999],
+    ]
+  );
+});
+
 test('outbound recipient guard store normalizes company legal suffix punctuation like coldmail', async () => {
   const { client, calls } = createMockSupabaseClient();
   const store = createStore(client);

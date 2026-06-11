@@ -3080,28 +3080,48 @@ function createColdmailCampaignService(deps = {}) {
 
   function summarizeColdmailDatabaseLiveStats(rows) {
     let databaseTotalSent = 0;
+    let webdesignTotalSent = 0;
+    let webdesignSentToday = 0;
     let interestedTotal = 0;
     let activeCampaignTotal = 0;
     let lastDatabaseSentAt = '';
     const recipientCounts = {};
+    const webdesignRecipientCounts = {};
     let unkeyedTotalSent = 0;
+    let webdesignUnkeyedTotalSent = 0;
+    const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
 
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       const sentCount = getSoftoraSystemMailSentCountForRow(row);
-      if (!sentCount) return;
-      databaseTotalSent += sentCount;
       const recipientKey = buildColdmailStatsRecipientKey({
         recipientEmail: getRowEmail(row),
         recipientDomain: getRowDomain(row),
         recipientId: getExplicitRowId(row),
         recipientCompanyKey: getRowCompany(row),
       });
-      if (!addColdmailRecipientCount(recipientCounts, recipientKey, sentCount)) {
-        unkeyedTotalSent += sentCount;
+      if (sentCount) {
+        databaseTotalSent += sentCount;
+        if (!addColdmailRecipientCount(recipientCounts, recipientKey, sentCount)) {
+          unkeyedTotalSent += sentCount;
+        }
       }
       const sentAt = getColdmailSentAt(row);
       if (sentAt && (!lastDatabaseSentAt || parseTimestampMs(sentAt) > parseTimestampMs(lastDatabaseSentAt))) {
         lastDatabaseSentAt = sentAt;
+      }
+      if (!isTestRecipientRow(row, getRowEmail(row)) && isWebdesignOutreachRow(row) && sentAt) {
+        const webdesignCount = 1;
+        const sentAtMs = parseTimestampMs(sentAt);
+        webdesignTotalSent += webdesignCount;
+        if (
+          sentAtMs &&
+          getColdmailAutopilotDateKey(new Date(sentAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey
+        ) {
+          webdesignSentToday += webdesignCount;
+        }
+        if (!setColdmailRecipientCount(webdesignRecipientCounts, recipientKey, webdesignCount)) {
+          webdesignUnkeyedTotalSent += webdesignCount;
+        }
       }
       const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
       if (['interesse', 'afspraak', 'klant'].includes(status)) interestedTotal += 1;
@@ -3110,6 +3130,12 @@ function createColdmailCampaignService(deps = {}) {
 
     return {
       databaseTotalSent,
+      webdesignTotalSent: mergeColdmailRecipientCountTotals({
+        recipientCounts: webdesignRecipientCounts,
+        unkeyedTotalSent: webdesignUnkeyedTotalSent,
+      }),
+      webdesignDatabaseRowsTotalSent: webdesignTotalSent,
+      webdesignSentToday,
       interestedTotal,
       activeCampaignTotal,
       lastDatabaseSentAt,
@@ -3185,6 +3211,9 @@ function createColdmailCampaignService(deps = {}) {
         centralGuardTotalSent,
         systemTotalSent,
         totalSent: systemTotalSent,
+        webdesignTotalSent: databaseStats.webdesignTotalSent,
+        webdesignSentToday: databaseStats.webdesignSentToday,
+        webdesignDatabaseRowsTotalSent: databaseStats.webdesignDatabaseRowsTotalSent,
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
         conversionRate,
@@ -4780,6 +4809,13 @@ function createColdmailCampaignService(deps = {}) {
       }
     }
     throw buildColdmailPostSmtpPersistenceError(step, lastError);
+  }
+
+  function assertColdmailPostSmtpPersistenceResult(step, result) {
+    if (result) return result;
+    const error = new Error(`${step} gaf geen bevestiging terug.`);
+    error.code = 'COLDMAIL_POST_SMTP_PERSISTENCE_EMPTY_RESULT';
+    throw error;
   }
 
   function matchesBranch(row, branchFilter) {
@@ -7547,14 +7583,18 @@ function createColdmailCampaignService(deps = {}) {
           });
           await runColdmailPostSmtpPersistenceStep(
             'klantstatus/teller',
-            () => setUiStateValues(
-              customerDbScope,
-              buildCustomerRowsStateValues(values, updatedRows),
-              {
-                source: 'coldmail-campaign',
-                actor,
-              }
-            )
+            async () => {
+              const result = await setUiStateValues(
+                customerDbScope,
+                buildCustomerRowsStateValues(values, updatedRows),
+                {
+                  source: 'coldmail-campaign',
+                  actor,
+                  requireDataOps: true,
+                }
+              );
+              return assertColdmailPostSmtpPersistenceResult('klantstatus/teller', result);
+            }
           );
           rows = updatedRows;
           persistedSentRowIds.add(item.id);
