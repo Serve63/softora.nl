@@ -93,6 +93,41 @@ test('data ops store merges duplicate customer identities before structured upse
   assert.deepEqual(recorder.deletedIds, ['lead-1']);
 });
 
+test('data ops store saves customers with write timeout and cooldown bypass', async () => {
+  const { client, recorder } = createSupabaseClientRecorder(['lead-1']);
+  const clientOptions = [];
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: (options) => {
+      clientOptions.push(options);
+      return client;
+    },
+    dataOpsWriteQueryTimeoutMs: 12000,
+    now: () => new Date('2026-06-11T12:00:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.replaceCustomers(
+    [
+      {
+        id: 'lead-1',
+        bedrijf: 'Softora',
+        naam: 'Servé',
+        telefoon: '+31 6 12345678',
+      },
+    ],
+    { source: 'premium-database' }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(recorder.upsertRows.length, 1);
+  assert.deepEqual(clientOptions[0], {
+    timeoutMs: 12000,
+    ignoreFailureCooldown: true,
+    suppressFailureCooldown: true,
+  });
+});
+
 test('data ops store paginates customer reads beyond Supabase default page size', async () => {
   const rows = Array.from({ length: 1250 }, (_item, index) => ({
     customer_id: `lead-${index + 1}`,

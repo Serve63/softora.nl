@@ -83,7 +83,7 @@ function createUiSeoRuntime(deps = {}) {
     dataOpsReadQueryTimeoutMs = 6000,
     dataOpsUiStateReadTimeoutMs = 2500,
     dataOpsUiStateReadTimeoutMsByScope = Object.freeze({
-      premium_customers_database: 8000,
+      premium_customers_database: 12000,
       premium_database_photos: 12000,
       premium_coldmail_send_guard: 12000,
     }),

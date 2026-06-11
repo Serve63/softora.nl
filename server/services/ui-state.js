@@ -5,6 +5,7 @@ const COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH = 1000000;
 const COLDMAIL_SEND_GUARD_MAX_ENTRIES = 1000;
 const COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES = 3000;
 const DEFAULT_UI_STATE_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
+const DEFAULT_UI_STATE_WRITE_TIMEOUT_MS = 8000;
 
 function safeJsonObjectParse(value) {
   try {
@@ -69,6 +70,7 @@ function createUiStateStore(deps = {}) {
     fetchSupabaseRowByKeyViaRest = async () => ({ ok: false }),
     upsertSupabaseRowViaRest = async () => ({ ok: false }),
     uiStateReadTimeoutMs = 1500,
+    uiStateWriteTimeoutMs = DEFAULT_UI_STATE_WRITE_TIMEOUT_MS,
     uiStateReadTimeoutMsByScope = {},
     uiStateReadOptionsByScope = {},
     uiStateReadFailureCooldownMs = DEFAULT_UI_STATE_READ_FAILURE_COOLDOWN_MS,
@@ -104,6 +106,21 @@ function createUiStateStore(deps = {}) {
         ? uiStateReadTimeoutMsByScope[scope]
         : uiStateReadTimeoutMs;
     return Math.max(0, Math.min(30000, Number(scopeTimeout) || 0));
+  }
+
+  function getSafeUiStateWriteTimeoutMs() {
+    return Math.max(
+      1000,
+      Math.min(30000, Number(uiStateWriteTimeoutMs) || DEFAULT_UI_STATE_WRITE_TIMEOUT_MS)
+    );
+  }
+
+  function getUiStateWriteRequestOptions() {
+    return {
+      timeoutMs: getSafeUiStateWriteTimeoutMs(),
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    };
   }
 
   function getSafeReadFailureCooldownMs() {
@@ -438,7 +455,8 @@ function createUiStateStore(deps = {}) {
     }
 
     try {
-      const client = getSupabaseClient();
+      const writeRequestOptions = getUiStateWriteRequestOptions();
+      const client = getSupabaseClient(writeRequestOptions);
       const rowKey = getUiStateRowKey(normalizedScope);
       if (
         normalizedScope === COLDMAIL_SEND_GUARD_SCOPE &&
@@ -455,7 +473,11 @@ function createUiStateStore(deps = {}) {
             if (!error) currentRow = data || null;
           }
           if (!currentRow) {
-            const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload');
+            const fallback = await fetchSupabaseRowByKeyViaRest(
+              rowKey,
+              'payload',
+              writeRequestOptions
+            );
             if (fallback.ok) {
               currentRow = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
             }
@@ -501,7 +523,7 @@ function createUiStateStore(deps = {}) {
       }
 
       if (upsertError) {
-        const fallback = await upsertSupabaseRowViaRest(row);
+        const fallback = await upsertSupabaseRowViaRest(row, writeRequestOptions);
         if (!fallback.ok) {
           logger.error('[UI State][Supabase][SetError]', upsertError.message || upsertError);
           return null;
