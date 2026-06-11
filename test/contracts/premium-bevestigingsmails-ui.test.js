@@ -25,6 +25,7 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /id="z4-count"/);
   assert.doesNotMatch(pageSource, /id="z5-count"/);
   assert.doesNotMatch(pageSource, /id="conv-zone-pct"/);
+  assert.match(pageSource, /assets\/premium-coldmail-live-stats\.js\?v=20260611a/);
   assert.match(pageSource, /<div class="card-title">Standaard mailtekst<\/div>/);
   assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
   assert.match(pageSource, /Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
@@ -41,6 +42,26 @@ test('premium bevestigingsmails laadt geen coldmail teller per afzender', () => 
   assert.doesNotMatch(pageSource, /assets\/premium-coldmail-sender-scoreboard\.js/);
   assert.doesNotMatch(pageSource, /coldmailSenderScoreboard/);
   assert.equal(fs.existsSync(path.join(root, 'assets/premium-coldmail-sender-scoreboard.js')), false);
+});
+
+test('premium bevestigingsmails live mailteller pollt echte coldmail statistieken', () => {
+  const root = path.join(__dirname, '../..');
+  const pageSource = fs.readFileSync(path.join(root, 'premium-bevestigingsmails.html'), 'utf8');
+  const liveStatsSource = fs.readFileSync(path.join(root, 'assets/premium-coldmail-live-stats.js'), 'utf8');
+
+  assert.match(liveStatsSource, /Vandaag verstuurd/);
+  assert.match(liveStatsSource, /Laatste 24 uur/);
+  assert.match(liveStatsSource, /Totaal Softora\/Gmail/);
+  assert.match(liveStatsSource, /id="coldmailLiveSentToday"/);
+  assert.match(liveStatsSource, /id="coldmailLiveSentLast24h"/);
+  assert.match(liveStatsSource, /id="coldmailLiveSentTotal"/);
+  assert.match(liveStatsSource, /function injectMarkup\(\)/);
+  assert.match(liveStatsSource, /const STATS_URL = "\/api\/coldmailing\/stats";/);
+  assert.match(liveStatsSource, /const REFRESH_MS = 15000;/);
+  assert.match(liveStatsSource, /softora:coldmail-live-stats/);
+  assert.match(liveStatsSource, /credentials: "same-origin"/);
+  assert.match(liveStatsSource, /cache: "no-store"/);
+  assert.match(liveStatsSource, /SoftoraColdmailLiveStats/);
 });
 
 test('premium bevestigingsmails blokkeert de pagina netjes tijdens coldmail verzending', () => {
@@ -155,10 +176,12 @@ test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaa
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
   assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260527a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260423a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260611a" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
-  assert.match(managementSource, /AI is hier actief bezig met coldmailing\./);
+  assert.match(managementSource, /Vandaag zijn er \$\{liveSentToday\} mails echt verzonden/);
   assert.match(managementSource, /window\.addEventListener\('softora-ai-management-change', updateAiColdmailingWorkspace\);/);
+  assert.match(managementSource, /softora:coldmail-live-stats/);
+  assert.match(managementSource, /softora:coldmail-autopilot-status/);
 });
 
 test('premium bevestigingsmails keeps the campaign duration setting without a separate looptijd card', () => {
@@ -697,7 +720,8 @@ test('premium bevestigingsmails sends real coldmail campaigns without opening ti
   assert.match(pageSource, /if \(!payload\.sent && payload\.failed\) \{/);
   assert.match(pageSource, /assets\/premium-coldmail-send-copy\.js\?v=20260527a/);
   assert.doesNotMatch(pageSource, /function buildColdmailSendSuccessMessage\(sendResult\)/);
-  assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
+  assert.match(pageSource, /showToast\(buildColdmailSendSuccessMessage\(sendResult\)\);\s*if \(window\.SoftoraColdmailLiveStats && typeof window\.SoftoraColdmailLiveStats\.refresh === 'function'\) await window\.SoftoraColdmailLiveStats\.refresh\(\)\.catch/);
+  assert.match(pageSource, /await hydrateCampaignCompanyCountFromSupabase\(\);\s*return;/);
   assert.match(pageSource, /showScreen\('screen-campaign'\);/);
 });
 

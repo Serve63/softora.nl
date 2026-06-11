@@ -205,6 +205,50 @@ function createAutopilotRouteHarness(deps) {
   };
 }
 
+function createStatsRouteHarness(deps) {
+  let statsHandlers = null;
+  const app = {
+    get(routePath, ...handlers) {
+      if (routePath === '/api/coldmailing/stats') statsHandlers = handlers;
+    },
+    post() {},
+  };
+
+  registerColdmailingRoutes(app, deps);
+  assert.ok(Array.isArray(statsHandlers));
+
+  return async function callStats(req = {}) {
+    const res = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        return payload;
+      },
+    };
+    let index = 0;
+    const next = async () => {
+      const handler = statsHandlers[index];
+      index += 1;
+      if (!handler) return undefined;
+      let nextPromise = null;
+      const runNext = () => {
+        nextPromise = next();
+        return nextPromise;
+      };
+      await Promise.resolve(handler(req, res, runNext));
+      if (nextPromise) await nextPromise;
+      return undefined;
+    };
+    await next();
+    return res;
+  };
+}
+
 test('coldmailing campaign send rejects missing confirmation pin before agenda or mail dispatch', async () => {
   let sent = 0;
   let agendaSynced = false;
@@ -514,6 +558,45 @@ test('coldmailing autopilot status route is visible to authenticated staff witho
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.autopilot.enabled, true);
+  assert.equal(premiumAccessCalls, 1);
+  assert.equal(adminAccessCalls, 0);
+});
+
+test('coldmailing stats route exposes live send counts to authenticated staff', async () => {
+  let premiumAccessCalls = 0;
+  let adminAccessCalls = 0;
+  const callStats = createStatsRouteHarness({
+    requirePremiumApiAccess: (req, _res, next) => {
+      premiumAccessCalls += 1;
+      req.premiumAuth = { displayName: 'Martijn', role: 'medewerker' };
+      next();
+    },
+    requirePremiumAdminApiAccess: (_req, res) => {
+      adminAccessCalls += 1;
+      res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
+    },
+    coldmailCampaignService: {
+      getColdmailLiveStats: async () => ({
+        ok: true,
+        stats: {
+          sentToday: 3,
+          sentLast24h: 4,
+          databaseTotalSent: 41,
+          source: 'coldmail-send-guard-and-customer-database',
+        },
+      }),
+    },
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const res = await callStats({
+    premiumAuth: { displayName: 'Martijn', role: 'medewerker' },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.stats.sentToday, 3);
+  assert.equal(res.body.stats.databaseTotalSent, 41);
+  assert.equal(res.body.stats.source, 'coldmail-send-guard-and-customer-database');
   assert.equal(premiumAccessCalls, 1);
   assert.equal(adminAccessCalls, 0);
 });

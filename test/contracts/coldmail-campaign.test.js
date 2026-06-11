@@ -476,6 +476,90 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[1].status, 'klant');
 });
 
+test('coldmail live stats count real sends from the guard and Softora/Gmail database signals', async () => {
+  const { service } = createService({
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-04-24T07:30:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+        {
+          at: '2026-04-24T08:30:00.000Z',
+          senderEmail: 'servec321@gmail.com',
+          count: 2,
+          personalCount: 2,
+        },
+        {
+          at: '2026-04-23T13:00:00.000Z',
+          senderEmail: 'martijn@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+        {
+          at: '2026-04-22T11:00:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 9,
+          personalCount: 0,
+        },
+        {
+          at: '2026-04-24T14:00:00.000Z',
+          senderEmail: 'future@softora.nl',
+          count: 99,
+          personalCount: 99,
+        },
+      ],
+      recipientEntries: [],
+    },
+    rows: [
+      {
+        id: 'softora-sent',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'gemaild',
+        lastColdmailSenderEmail: 'serve@softora.nl',
+        lastColdmailSentAt: '2026-04-24T08:00:00.000Z',
+        coldmailCampaignEndsAt: '2026-04-30T08:00:00.000Z',
+      },
+      {
+        id: 'softora-interest',
+        bedrijf: 'Kapsalon Luna',
+        email: 'luna@example.test',
+        status: 'interesse',
+        hist: [
+          { type: 'gemaild', label: 'Mail verstuurd', actor: 'Coldmailing' },
+          { type: 'gemaild', label: 'Coldmail verzonden', actor: 'Coldmailing' },
+        ],
+      },
+      {
+        id: 'instantly-sent',
+        bedrijf: 'Instantly BV',
+        email: 'instantly@example.test',
+        status: 'gemaild',
+        lastColdmailProvider: 'instantly',
+        lastColdmailSentAt: '2026-04-24T08:15:00.000Z',
+      },
+    ],
+  });
+
+  const result = await service.getColdmailLiveStats();
+
+  assert.equal(result.ok, true);
+  assert.equal(result.stats.timezone, 'Europe/Amsterdam');
+  assert.equal(result.stats.dateKey, '2026-04-24');
+  assert.equal(result.stats.sentToday, 3);
+  assert.equal(result.stats.sentLast24h, 4);
+  assert.equal(result.stats.personalMailboxSentToday, 2);
+  assert.equal(result.stats.databaseTotalSent, 3);
+  assert.equal(result.stats.activeCampaignTotal, 1);
+  assert.equal(result.stats.interestedTotal, 1);
+  assert.equal(result.stats.conversionRate, 33);
+  assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:30:00.000Z');
+  assert.equal(result.stats.lastSenderEmail, 'servec321@gmail.com');
+});
+
 test('coldmail campaign uses standard SMTP transports with bounded timeouts', async () => {
   const { service, transportConfigs } = createService();
 

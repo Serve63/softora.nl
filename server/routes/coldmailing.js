@@ -355,6 +355,29 @@ function registerColdmailingRoutes(app, deps = {}) {
     }
   });
 
+  app.get('/api/coldmailing/stats', requirePremiumApiAccess, async (_req, res) => {
+    try {
+      if (typeof coldmailCampaignService.getColdmailLiveStats !== 'function') {
+        res.status(404).json({
+          ok: false,
+          code: 'COLDMAIL_STATS_UNAVAILABLE',
+          message: 'Coldmail statistieken zijn niet beschikbaar.',
+        });
+        return;
+      }
+      res.json(await coldmailCampaignService.getColdmailLiveStats());
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_STATS_FAILED',
+        message: truncateText(
+          normalizeString(error && error.message) || 'Coldmail statistieken konden niet worden geladen.',
+          500
+        ),
+      });
+    }
+  });
+
   app.post('/api/coldmailing/autopilot/settings', requirePremiumAdminApiAccess, async (req, res) => {
     try {
       if (typeof coldmailCampaignService.updateColdmailAutopilotSettings !== 'function') {

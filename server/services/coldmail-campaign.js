@@ -719,6 +719,78 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  function getColdmailSentAt(row) {
+    return normalizeString(
+      row &&
+        (row.lastColdmailSentAt ||
+          row.lastMailSentAt ||
+          row.outreachSentAt ||
+          row.outreach_sent_at ||
+          row.coldmailCampaignStartedAt ||
+          row.mailCampaignStartedAt ||
+          row.sentAt)
+    );
+  }
+
+  function isInstantlyHistoryEntry(entry) {
+    const provider = normalizeString(entry && (entry.provider || entry.lastColdmailProvider)).toLowerCase();
+    const text = normalizeString(
+      [
+        entry && entry.type,
+        entry && entry.status,
+        entry && entry.label,
+        entry && entry.source,
+        entry && entry.actor,
+        entry && entry.subject,
+        entry && entry.preview,
+      ].join(' ')
+    ).toLowerCase();
+    return provider === 'instantly' || text.includes('instantly');
+  }
+
+  function isSoftoraSystemMailHistoryEntry(entry) {
+    if (!entry || typeof entry !== 'object' || isInstantlyHistoryEntry(entry)) return false;
+    const text = normalizeString(
+      [
+        entry.type,
+        entry.status,
+        entry.label,
+        entry.message,
+        entry.title,
+      ].join(' ')
+    ).toLowerCase();
+    return /\b(gemaild|mail verstuurd|email sent|coldmail verzonden)\b/.test(text);
+  }
+
+  function getSoftoraSystemMailSentCountForRow(row) {
+    const email = getRowEmail(row);
+    if (!row || isTestRecipientRow(row, email) || hasActiveInstantlyColdmailOutreach(row)) return 0;
+    const provider = normalizeString(row.lastColdmailProvider).toLowerCase();
+    if (provider === 'instantly') return 0;
+    const historyCount = (Array.isArray(row.hist) ? row.hist : []).filter(isSoftoraSystemMailHistoryEntry).length;
+    if (historyCount) return historyCount;
+    if (['softora', 'gmail', 'smtp', 'strato'].includes(provider)) return 1;
+    if (
+      normalizeString(
+        row.lastColdmailSenderEmail ||
+          row.sentFromEmail ||
+          row.sent_from_email ||
+          row.outreachSentFromEmail
+      )
+    ) {
+      return 1;
+    }
+    if (getColdmailSentAt(row)) return 1;
+    return normalizeString(
+      row.coldmailSentMessageId ||
+        row.outreachMessageId ||
+        row.sentMessageId ||
+        row.messageId
+    )
+      ? 1
+      : 0;
+  }
+
   function buildCustomerRowsStateValues(values, rows) {
     return {
       ...(values && typeof values === 'object' ? values : {}),
@@ -2348,6 +2420,28 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function isRowInActiveColdmailCampaign(row) {
+    if (!row || typeof row !== 'object') return false;
+    const untilMs = Math.max(
+      parseTimestampMs(row.activeColdmailCampaignUntil),
+      parseTimestampMs(row.coldmailCampaignEndsAt),
+      parseTimestampMs(row.mailCampaignEndsAt),
+      parseTimestampMs(row.mailCampaignUntil)
+    );
+    if (untilMs > now().getTime()) return true;
+    const startedAtMs = Math.max(
+      parseTimestampMs(row.coldmailCampaignStartedAt),
+      parseTimestampMs(row.lastColdmailSentAt)
+    );
+    const durationDays = Number(row.coldmailCampaignDurationDays || row.mailCampaignDurationDays || 0);
+    return Boolean(
+      startedAtMs &&
+        Number.isFinite(durationDays) &&
+        durationDays > 0 &&
+        startedAtMs + durationDays * 24 * 60 * 60 * 1000 > now().getTime()
+    );
+  }
+
   function resolveInboundSenderEmail(parsedMail) {
     const allowed = new Set([...getAllowedSenderEmails(), ...COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS]);
     const recipients = [
@@ -2865,6 +2959,111 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function summarizeColdmailSendGuardLiveStats(entries) {
+    const currentNow = now();
+    const currentMs = currentNow.getTime();
+    const last24hCutoffMs = currentMs - COLDMAIL_SEND_GUARD_WINDOW_MS;
+    const currentDayKey = getColdmailAutopilotDateKey(currentNow, DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+    const perSenderToday = {};
+    let sentToday = 0;
+    let sentLast24h = 0;
+    let personalMailboxSentToday = 0;
+    let lastSuccessfulSendAt = '';
+    let lastSenderEmail = '';
+
+    (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry && Number(entry.count || 0) > 0)
+      .forEach((entry) => {
+        const count = Math.max(0, Number(entry.count || 0) || 0);
+        const personalCount = Math.max(0, Number(entry.personalCount || 0) || 0);
+        const entryMs = parseTimestampMs(entry.at);
+        if (!entryMs) return;
+        if (entryMs > currentMs) return;
+        if (entryMs >= last24hCutoffMs && entryMs <= currentMs) sentLast24h += count;
+        if (!lastSuccessfulSendAt || entryMs > parseTimestampMs(lastSuccessfulSendAt)) {
+          lastSuccessfulSendAt = normalizeString(entry.at);
+          lastSenderEmail = normalizeEmailAddress(entry.senderEmail);
+        }
+        if (getColdmailAutopilotDateKey(new Date(entryMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) !== currentDayKey) {
+          return;
+        }
+        const senderEmail = normalizeEmailAddress(entry.senderEmail) || 'unknown';
+        sentToday += count;
+        personalMailboxSentToday += personalCount;
+        perSenderToday[senderEmail] = (perSenderToday[senderEmail] || 0) + count;
+      });
+
+    return {
+      sentToday,
+      sentLast24h,
+      personalMailboxSentToday,
+      perSenderToday,
+      lastSuccessfulSendAt,
+      lastSenderEmail,
+    };
+  }
+
+  function summarizeColdmailDatabaseLiveStats(rows) {
+    let databaseTotalSent = 0;
+    let interestedTotal = 0;
+    let activeCampaignTotal = 0;
+    let lastDatabaseSentAt = '';
+
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const sentCount = getSoftoraSystemMailSentCountForRow(row);
+      if (!sentCount) return;
+      databaseTotalSent += sentCount;
+      const sentAt = getColdmailSentAt(row);
+      if (sentAt && (!lastDatabaseSentAt || parseTimestampMs(sentAt) > parseTimestampMs(lastDatabaseSentAt))) {
+        lastDatabaseSentAt = sentAt;
+      }
+      const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
+      if (['interesse', 'afspraak', 'klant'].includes(status)) interestedTotal += 1;
+      if (isRowInActiveColdmailCampaign(row)) activeCampaignTotal += 1;
+    });
+
+    return {
+      databaseTotalSent,
+      interestedTotal,
+      activeCampaignTotal,
+      lastDatabaseSentAt,
+    };
+  }
+
+  async function getColdmailLiveStats() {
+    const [sendGuardState, customerState] = await Promise.all([
+      loadColdmailSendGuardState(),
+      getUiStateValues(customerDbScope),
+    ]);
+    const values = customerState && typeof customerState.values === 'object' ? customerState.values : {};
+    const rows = parseDatabaseRows(values);
+    const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
+    const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
+    const lastSuccessfulSendAt = guardStats.lastSuccessfulSendAt || databaseStats.lastDatabaseSentAt;
+    const conversionRate = databaseStats.databaseTotalSent > 0
+      ? Math.round((databaseStats.interestedTotal / databaseStats.databaseTotalSent) * 100)
+      : 0;
+
+    return {
+      ok: true,
+      stats: {
+        timezone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
+        source: 'coldmail-send-guard-and-customer-database',
+        sentToday: guardStats.sentToday,
+        sentLast24h: guardStats.sentLast24h,
+        personalMailboxSentToday: guardStats.personalMailboxSentToday,
+        databaseTotalSent: databaseStats.databaseTotalSent,
+        activeCampaignTotal: databaseStats.activeCampaignTotal,
+        interestedTotal: databaseStats.interestedTotal,
+        conversionRate,
+        lastSuccessfulSendAt,
+        lastSenderEmail: guardStats.lastSenderEmail,
+        updatedAt: now().toISOString(),
+      },
+    };
+  }
+
   function normalizeBooleanFlag(value, fallback = false) {
     if (typeof value === 'boolean') return value;
     const text = normalizeString(value).toLowerCase();
@@ -3303,10 +3502,17 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function getColdmailAutopilotStatus() {
-    const state = await loadColdmailAutopilotState();
+    const [state, liveStats] = await Promise.all([
+      loadColdmailAutopilotState(),
+      getColdmailLiveStats(),
+    ]);
     return {
       ok: true,
-      autopilot: summarizeColdmailAutopilotState(state),
+      autopilot: {
+        ...summarizeColdmailAutopilotState(state),
+        stats: liveStats.stats,
+      },
+      stats: liveStats.stats,
     };
   }
 
@@ -7320,6 +7526,7 @@ function createColdmailCampaignService(deps = {}) {
     isSmtpMailConfigured,
     isLikelyValidEmail,
     getColdmailCampaignRecipients,
+    getColdmailLiveStats,
     getColdmailPreviewImage,
     getColdmailAutopilotStatus,
     getColdmailUnsubscribePreview,
