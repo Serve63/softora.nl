@@ -103,7 +103,7 @@ function createUiStateStore(deps = {}) {
       Object.prototype.hasOwnProperty.call(uiStateReadTimeoutMsByScope, scope)
         ? uiStateReadTimeoutMsByScope[scope]
         : uiStateReadTimeoutMs;
-    return Math.max(0, Math.min(10000, Number(scopeTimeout) || 0));
+    return Math.max(0, Math.min(30000, Number(scopeTimeout) || 0));
   }
 
   function getSafeReadFailureCooldownMs() {
