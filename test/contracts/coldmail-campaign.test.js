@@ -1721,6 +1721,175 @@ test('coldmail autopilot starts a new workday slot even with rolling history fro
   assert.equal(getAutopilotState().lastResult.dailyQuota.senderSentBefore, 1);
 });
 
+test('coldmail autopilot does not hide an explicitly configured sender without smtp', async () => {
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl', 'martijnven123@gmail.com'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+          'martijnven123@gmail.com': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: '',
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-11T05:00:00.000Z',
+    },
+    now: () => new Date('2026-06-11T05:10:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'no_sender_capacity');
+  assert.equal(sentMessages.length, 0);
+  const [skip] = getAutopilotState().lastResult.senderSkips;
+  assert.equal(skip.senderEmail, 'martijnven123@gmail.com');
+  assert.equal(skip.reason, 'sender_smtp_not_configured');
+  assert.equal(skip.smtpDiagnostic.resolved.configured, false);
+});
+
+test('coldmail autopilot waits instead of entering round two before a lower day-count sender clears safety limits', async () => {
+  const martijnRollingEntries = Array.from({ length: 9 }, (_, index) => ({
+    at: new Date(Date.parse('2026-06-10T14:00:00.000Z') + index * 60 * 1000).toISOString(),
+    senderEmail: 'martijnven123@gmail.com',
+    count: 1,
+    personalCount: 0,
+    recipientEmail: `old-${index}@example.test`,
+    recipientDomain: `old-${index}-example-test`,
+  }));
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+      {
+        email: 'martijnven123@gmail.com',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'martijnven123@gmail.com',
+        smtpPass: 'martijn-secret',
+      },
+    ]),
+    coldmailDailySendLimit: 9,
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-11T05:05:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+          recipientEmail: 'already-today@example.test',
+          recipientDomain: 'already-today-example-test',
+        },
+        ...martijnRollingEntries,
+      ],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl', 'martijnven123@gmail.com'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+          'martijnven123@gmail.com': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: '',
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-11T06:50:00.000Z',
+    },
+    now: () => new Date('2026-06-11T07:00:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'no_sender_capacity');
+  assert.equal(sentMessages.length, 0);
+  const [skip] = getAutopilotState().lastResult.senderSkips;
+  assert.equal(skip.senderEmail, 'martijnven123@gmail.com');
+  assert.equal(skip.reason, 'coldmail_daily_limit_reached');
+  assert.equal(skip.senderDaySent, 0);
+  assert.equal(skip.senderSent, 9);
+});
+
 test('coldmail autopilot staggers senders by choosing the mailbox whose cooldown is ready', async () => {
   const { service, sentMessages } = createService({
     rows: [
