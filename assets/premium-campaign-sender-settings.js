@@ -27,7 +27,7 @@
     "Met vriendelijke groet,",
     "{{afzender}}",
     "",
-    "📍 {{afzenderPlaats}}",
+    "📍 {{stad}}",
   ].join("\n");
   const DEFAULT_BODIES = {
     "serve@softora.nl": DEFAULT_WEBDESIGN_BODY,

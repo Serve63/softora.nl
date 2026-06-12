@@ -132,7 +132,7 @@ const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   'Met vriendelijke groet,',
   '{{afzender}}',
   '',
-  '📍 {{afzenderPlaats}}',
+  '📍 {{stad}}',
 ].join('\n');
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
@@ -229,43 +229,43 @@ const DEFAULT_COLDMAIL_SENDER_PROFILES = {
   'servecreusen@softora.nl': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijnvandeven@softora.nl': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servec321@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'martijnven123@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'serve290@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'servecreusen7@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
   'contact.venvisuals@gmail.com': {
     subject: DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT,
     body: DEFAULT_COLDMAIL_WEBDESIGN_BODY,
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}}, {{afzender}} en {{afzenderPlaats}}.",
+    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}}, {{website}} en {{afzender}}. Gebruik voor de pin de ontvangerplaats via {{stad}}.",
     toneStyle: 'Vriendelijk & professioneel',
   },
 };
@@ -5223,10 +5223,10 @@ function createColdmailCampaignService(deps = {}) {
     const senderLocation = getSenderLocationName(senderEmail);
     return normalizeString(template)
       .replace(/\{\{\s*(afzender|afzendernaam|sender|sendername)\s*\}\}/gi, senderName)
-      .replace(/\{\{\s*(afzender[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
+      .replace(/\{\{\s*(softora[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
       .replace(
-        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie)\s*\}\})/gi,
-        `$1${senderName}$2${senderLocation}`
+        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\})/gi,
+        `$1${senderName}$2{{stad}}`
       )
       .replace(/\bServe Creusen\b/g, 'Servé Creusen');
   }
@@ -5239,7 +5239,7 @@ function createColdmailCampaignService(deps = {}) {
     return applySenderVariablesToTemplate(template, options.senderEmail)
       .replace(/\{\{\s*bedrijf\s*\}\}/gi, company)
       .replace(/\{\{\s*naam\s*\}\}/gi, contact)
-      .replace(/\{\{\s*(stad|plaats|locatie)\s*\}\}/gi, city)
+      .replace(/\{\{\s*(stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\}/gi, city)
       .replace(/\{\{\s*domein\s*\}\}/gi, domain || company)
       .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
   }

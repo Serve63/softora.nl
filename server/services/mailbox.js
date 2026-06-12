@@ -880,6 +880,72 @@ function createMailboxService(deps = {}) {
     );
   }
 
+  function cleanPlaceLabel(value) {
+    const dutchProvinceSuffix =
+      '(?:N\\.?\\s?Br\\.?|N\\.?B\\.?|Noord[-\\s]?Brabant|Z\\.?H\\.?|Zuid[-\\s]?Holland|N\\.?H\\.?|Noord[-\\s]?Holland|Gld\\.?|Gelderland|Lb\\.?|Limburg|Ov\\.?|Overijssel|Dr\\.?|Drenthe|Fr\\.?|Friesland|Gr\\.?|Groningen|Fl\\.?|Flevoland|Ze\\.?|Zeeland|Ut\\.?|Utrecht)';
+    return normalizeString(value)
+      .replace(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b/g, '')
+      .replace(new RegExp(`\\s*\\(${dutchProvinceSuffix}\\)\\s*$`, 'i'), '')
+      .replace(new RegExp(`\\s+${dutchProvinceSuffix}\\s*$`, 'i'), '')
+      .replace(/\b(Nederland|The Netherlands)\b/gi, '')
+      .replace(/^[\s,.;-]+|[\s,.;-]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function looksLikeStreetAddress(value) {
+    const text = normalizeString(value).toLowerCase();
+    return /\d/.test(text) && /(straat|weg|laan|plein|pad|dijk|hof|kade|markt|singel|steeg|gracht|boulevard|baan|akker|plantsoen|park)\b/.test(text);
+  }
+
+  function extractPlaceFromAddress(value) {
+    const text = normalizeString(value)
+      .replace(/\s+/g, ' ')
+      .replace(/\s*,\s*/g, ', ')
+      .trim();
+    if (!text) return '';
+
+    const postalMatch = text.match(/\b[1-9][0-9]{3}\s?[A-Za-z]{2}\b\s+([A-Za-zÀ-ÿ'’.\- ]{2,})$/);
+    if (postalMatch) return cleanPlaceLabel(postalMatch[1]);
+
+    const parts = text.split(/[,\n;|]/).map(cleanPlaceLabel).filter(Boolean);
+    for (let index = parts.length - 1; index >= 0; index -= 1) {
+      const candidate = parts[index];
+      if (!candidate || looksLikeStreetAddress(candidate)) continue;
+      if (/^\d+$/.test(candidate)) continue;
+      return candidate;
+    }
+
+    return looksLikeStreetAddress(text) ? '' : cleanPlaceLabel(text);
+  }
+
+  function getCustomerCity(row = {}) {
+    const explicit = [
+      row.plaats,
+      row.city,
+      row.gemeente,
+      row.locality,
+      row.town,
+      row.village,
+    ]
+      .map((value) => {
+        const cleaned = cleanPlaceLabel(value);
+        if (!cleaned) return '';
+        return looksLikeStreetAddress(cleaned) ? extractPlaceFromAddress(cleaned) : cleaned;
+      })
+      .find(Boolean);
+    if (explicit) return explicit;
+
+    return [
+      row.stad,
+      row.adres,
+      row.address,
+      row.location,
+    ]
+      .map(extractPlaceFromAddress)
+      .find(Boolean) || '';
+  }
+
   function slugifyWebdesignCompany(value, fallback = 'uw-bedrijf') {
     const normalized = normalizeString(value)
       .toLowerCase()
@@ -1394,12 +1460,17 @@ function createMailboxService(deps = {}) {
     const senderLocation = getMailboxSenderLocationName(senderEmail);
     return String(text || '')
       .replace(/\{\{\s*(afzender|afzendernaam|sender|sendername)\s*\}\}/gi, senderName)
-      .replace(/\{\{\s*(afzender[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
+      .replace(/\{\{\s*(softora[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
       .replace(
-        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie)\s*\}\})/gi,
-        `$1${senderName}$2${senderLocation}`
+        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\})/gi,
+        `$1${senderName}$2{{stad}}`
       )
       .replace(/\bServe Creusen\b/g, 'Servé Creusen');
+  }
+
+  function applyMailboxRecipientLocationVariables(text, row = {}) {
+    const city = getCustomerCity(row) || 'uw regio';
+    return String(text || '').replace(/\{\{\s*(stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\}/gi, city);
   }
 
   function renderMailboxWebdesignLineHtml(line, options = {}) {
@@ -1615,15 +1686,16 @@ function createMailboxService(deps = {}) {
       const inlineImages = mailboxWebdesignImageDelivery === 'cid'
         ? await prepareMailboxInlineWebdesignImages(images, matchedId)
         : [];
-      if (!previewUrl && !inlineImages.length) return { text: normalizedText, outboundIdentity };
+      const recipientText = applyMailboxRecipientLocationVariables(normalizedText, matchedRow || {});
+      if (!previewUrl && !inlineImages.length) return { text: recipientText, outboundIdentity };
 
       return {
-        text: normalizedText,
+        text: recipientText,
         outboundIdentity,
-        html: renderMailboxWebdesignHtml(normalizedText, {
+        html: renderMailboxWebdesignHtml(recipientText, {
           webdesignPreviewUrl: previewUrl,
           inlineImages,
-          optOutUrl: extractColdmailOptOutUrlFromText(rawText) || extractColdmailOptOutUrlFromText(normalizedText),
+          optOutUrl: extractColdmailOptOutUrlFromText(rawText) || extractColdmailOptOutUrlFromText(recipientText),
         }),
         attachments: inlineImages.length ? inlineImages.map((image) => image.attachment) : undefined,
       };
@@ -1632,7 +1704,10 @@ function createMailboxService(deps = {}) {
         throw error;
       }
       logger.warn('[Mailbox][webdesign-send]', error && error.message ? error.message : error);
-      return { text: normalizedText, outboundIdentity: fallbackIdentity };
+      return {
+        text: applyMailboxRecipientLocationVariables(normalizedText),
+        outboundIdentity: fallbackIdentity,
+      };
     }
   }
 
