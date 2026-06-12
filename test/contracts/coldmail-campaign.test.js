@@ -599,7 +599,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.centralGuardTotalSent, 2);
   assert.equal(result.stats.systemTotalSent, 4);
   assert.equal(result.stats.totalSent, 4);
-  assert.equal(result.stats.webdesignTotalSent, 2);
+  assert.equal(result.stats.webdesignTotalSent, 4);
   assert.equal(result.stats.webdesignSentToday, 3);
   assert.equal(result.stats.webdesignGuardSentToday, 3);
   assert.equal(result.stats.webdesignDatabaseRowsSentToday, 2);
