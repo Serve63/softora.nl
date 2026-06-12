@@ -166,6 +166,47 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
+test('mailbox service hard-blocks manual sends to growsocialmedia.nl before SMTP', async () => {
+  const sent = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Serve',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: 'm-1', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.sendMessageResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        to: 'sales@mail.growsocialmedia.nl',
+        subject: 'Test',
+        body: 'Hallo',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.detail, /growsocialmedia\.nl/);
+  assert.equal(sent.length, 0);
+});
+
 test('mailbox service enriches normal webdesign sends with public link and inline images', async () => {
   const sent = [];
   const customerId = 'manual-import-pckbv-eu-privacy-0583';

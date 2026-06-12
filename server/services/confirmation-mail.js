@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const { findOutreachSuppressionMatch } = require('./outreach-suppression');
 
 function createConfirmationMailService(deps = {}) {
   const {
@@ -210,6 +211,19 @@ function createConfirmationMailService(deps = {}) {
     if (!isLikelyValidEmail(toEmail)) {
       const error = new Error('Vul een geldig e-mailadres in voor de ontvanger.');
       error.code = 'INVALID_RECIPIENT_EMAIL';
+      throw error;
+    }
+    const suppressionMatch = findOutreachSuppressionMatch({
+      recipientEmail: toEmail,
+      email: toEmail,
+      recipientCompany: appointment && appointment.company,
+      company: appointment && appointment.company,
+    });
+    if (suppressionMatch) {
+      const error = new Error(
+        normalizeString(suppressionMatch.message) || 'Deze ontvanger is hard geblokkeerd voor outbound mail.'
+      );
+      error.code = 'OUTREACH_SUPPRESSION_HARD_BLOCK';
       throw error;
     }
 

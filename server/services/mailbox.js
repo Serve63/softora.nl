@@ -16,6 +16,7 @@ const {
 } = require('./data-ops-serialization');
 const { fitWebdesignPreviewForEmail } = require('./coldmail-image-frame');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
+const { findOutreachSuppressionMatch } = require('./outreach-suppression');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -1875,6 +1876,15 @@ function createMailboxService(deps = {}) {
     if (!isValidEmail(to)) {
       const error = new Error('Vul een geldig e-mailadres in.');
       error.status = 400;
+      throw error;
+    }
+    const suppressionMatch = findOutreachSuppressionMatch({ recipientEmail: to, email: to });
+    if (suppressionMatch) {
+      const error = new Error(
+        normalizeString(suppressionMatch.message) || 'Deze ontvanger is hard geblokkeerd voor outbound mail.'
+      );
+      error.status = 403;
+      error.code = 'OUTREACH_SUPPRESSION_HARD_BLOCK';
       throw error;
     }
     const cleanSubject = truncateText(normalizeString(subject), 240);

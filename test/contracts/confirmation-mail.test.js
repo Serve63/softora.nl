@@ -161,6 +161,30 @@ test('confirmation mail service builds fallback draft and sends SMTP mail with r
   assert.equal(delivery.messageId, '<message-1@example.com>');
 });
 
+test('confirmation mail service hard-blocks growsocialmedia.nl before SMTP', async () => {
+  const fixture = createFixture();
+
+  await assert.rejects(
+    () =>
+      fixture.service.sendConfirmationEmailViaSmtp({
+        appointment: {
+          id: 42,
+          company: 'Grow Social Media',
+          date: '2026-04-09',
+          time: '09:30',
+        },
+        recipientEmail: 'info@growsocialmedia.nl',
+        draftText: 'Onderwerp: Intake bevestigd\n\nBedankt voor het gesprek.',
+      }),
+    (error) => {
+      assert.equal(error.code, 'OUTREACH_SUPPRESSION_HARD_BLOCK');
+      assert.match(error.message, /growsocialmedia\.nl/);
+      return true;
+    }
+  );
+  assert.equal(fixture.transportCalls.length, 0);
+});
+
 test('confirmation mail service exposes missing SMTP and IMAP env hints when config is incomplete', () => {
   const fixture = createFixture({
     smtpHost: '',
