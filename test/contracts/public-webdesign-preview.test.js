@@ -494,7 +494,9 @@ test('public webdesign preview uses a human company name in narrative copy', asy
   });
 
   assert.match(body, /<h1 class="hero-title">Autobedrijf Van Driel B\.V\.<\/h1>/);
-  assert.match(body, /<p>Ook zijn de concurrenten van Autobedrijf Van Driel in kaart gebracht\./);
+  assert.match(body, /<strong>Servé Creusen<\/strong>/);
+  assert.match(body, /serve-creusen-profile\.jpg/);
+  assert.match(body, /<p>Ook heb ik de concurrenten van Autobedrijf Van Driel in kaart gebracht\./);
   assert.doesNotMatch(body, /concurrenten van Autobedrijf Van Driel B\.V\./);
 });
 
@@ -554,6 +556,62 @@ test('public webdesign preview uses outbound send guards when customer sender fi
   assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
   assert.doesNotMatch(response.body, /Deze preview is niet beschikbaar/);
+});
+
+test('public webdesign preview renders Serve profile for Serve mailbox concept links', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'import-193-db-mohsau64-hkaino',
+          bedrijf: 'Dutna Technologies',
+          email: 'jeroen@dutna.com',
+          website: 'dutna.com',
+          lastColdmailSenderEmail: 'servec321@gmail.com',
+          sentFromEmail: 'servec321@gmail.com',
+          outreachSentFromEmail: 'servec321@gmail.com',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'import-193-db-mohsau64-hkaino',
+          identityKey: 'dutna technologies|dutna technologies|06 16 09 19 60',
+          fileName: 'dutna.com-preview.png',
+          websitePhotoUrl: 'https://signed.softora.test/dutna-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/dutna-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        return [{
+          guard_key: 'id:import-193-db-mohsau64-hkaino',
+          sender_email: 'servec321@gmail.com',
+          recipient_id: 'import-193-db-mohsau64-hkaino',
+          recipient_email: 'jeroen@dutna.com',
+          recipient_domain: 'dutna-com',
+          recipient_company_key: 'dutna-technologies',
+          recipient_company: 'Dutna Technologies',
+          status: 'sent',
+          updated_at: '2026-06-12T09:28:08.883+00:00',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'dutna-technologies' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.match(response.body, /<h1 class="hero-title">Dutna Technologies<\/h1>/);
+  assert.match(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.match(response.body, /serve-creusen-profile\.jpg/);
+  assert.match(response.body, /<h2><span class="about-title-desktop">Zó heb ik het webdesign gebouwd\.\.\.<\/span>/);
+  assert.doesNotMatch(response.body, /<strong>Softora<\/strong>/);
+  assert.doesNotMatch(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Martijn van de Ven<\/strong>/);
 });
 
 test('public webdesign preview uses outbound guards to rescue links when customer reads fail', async () => {
@@ -649,14 +707,14 @@ test('public webdesign preview retries transient reads and resolves BV slug vari
 
 test('public webdesign preview maps every known sender alias to the canonical profile', async () => {
   const cases = [
-    ['serve@softora.nl', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['servecreusen@softora.nl', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['servec321@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['serve290@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['servecreusen7@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['contact.venvisuals@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['serve@websoftora.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
-    ['servecreusen@websoftora.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['serve@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servecreusen@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servec321@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['serve290@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servecreusen7@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['contact.venvisuals@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['serve@websoftora.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['servecreusen@websoftora.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
     ['martijn@softora.nl', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
     ['martijnvandeven@softora.nl', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
     ['martijnven123@gmail.com', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
