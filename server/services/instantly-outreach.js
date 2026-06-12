@@ -2467,6 +2467,24 @@ function createInstantlyOutreachService(deps = {}) {
 
   async function addLeadsToInstantly(leads) {
     (Array.isArray(leads) ? leads : []).forEach(assertInstantlyLeadReady);
+    (Array.isArray(leads) ? leads : []).forEach((lead) => {
+      const suppressionMatch = findOutreachSuppressionMatch({
+        recipientEmail: lead && lead.email,
+        email: lead && lead.email,
+        domain: lead && lead.website,
+        website: lead && lead.website,
+        recipientCompany: lead && lead.company_name,
+        company: lead && lead.company_name,
+      });
+      if (suppressionMatch) {
+        throw createInstantlyError(
+          normalizeString(suppressionMatch.message) ||
+            'Deze ontvanger is hard geblokkeerd voor outbound mail.',
+          'OUTREACH_SUPPRESSION_HARD_BLOCK',
+          403
+        );
+      }
+    });
     const { response, data } = await fetchJsonWithTimeout(
       `${config.apiBaseUrl}/leads/add`,
       {
@@ -2794,6 +2812,22 @@ function createInstantlyOutreachService(deps = {}) {
     const cleanLeadId = normalizeString(leadId);
     if (!cleanLeadId) return null;
     assertInstantlyLeadReady(lead);
+    const suppressionMatch = findOutreachSuppressionMatch({
+      recipientEmail: lead && lead.email,
+      email: lead && lead.email,
+      domain: lead && lead.website,
+      website: lead && lead.website,
+      recipientCompany: lead && lead.company_name,
+      company: lead && lead.company_name,
+    });
+    if (suppressionMatch) {
+      throw createInstantlyError(
+        normalizeString(suppressionMatch.message) ||
+          'Deze ontvanger is hard geblokkeerd voor outbound mail.',
+        'OUTREACH_SUPPRESSION_HARD_BLOCK',
+        403
+      );
+    }
     const { response, data } = await fetchJsonWithTimeout(
       `${config.apiBaseUrl}/leads/${encodeURIComponent(cleanLeadId)}`,
       {
@@ -2833,6 +2867,7 @@ function createInstantlyOutreachService(deps = {}) {
         if (!item.leadId) return false;
         if (!hasActiveInstantlyOutreach(item.row)) return false;
         if (item.campaignId && item.campaignId !== config.defaultCampaignId) return false;
+        if (getInstantlyOutreachSuppressionMatch(item)) return false;
         return true;
       })
       .slice(0, safeLimit);

@@ -1039,6 +1039,49 @@ test('instantly sync can refresh existing lead variables without adding duplicat
   assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
 });
 
+test('instantly sync does not refresh existing growsocialmedia.nl leads', async () => {
+  const { service, fetchCalls } = createService({
+    rows: [
+      {
+        id: 'grow-social-media',
+        bedrijf: 'Grow Social Media',
+        naam: 'Grow Social Media',
+        email: 'info@growsocialmedia.nl',
+        website: 'https://growsocialmedia.nl',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        outreachStatus: 'benaderd',
+        mail: true,
+        instantlyLeadId: 'grow-lead-1',
+        instantlyCampaignId: 'campaign-1',
+        instantlyStatus: 'synced',
+        lastColdmailProvider: 'instantly',
+      },
+    ],
+    photoMap: {
+      'grow-social-media': {
+        id: 'grow-social-media',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({
+    actor: 'Test',
+    refreshExistingVariables: true,
+    refreshExistingOnly: true,
+    refreshExistingLimit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'refreshed_existing_variables');
+  assert.equal(result.refreshedExistingVariables, 0);
+  assert.equal(result.attemptedExistingVariableRefresh, 0);
+  assert.equal(fetchCalls.length, 0);
+});
+
 test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {
   const { service, fetchCalls, getRows } = createService({ syncEnabled: false });
 

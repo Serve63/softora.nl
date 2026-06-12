@@ -6673,6 +6673,7 @@ function createColdmailCampaignService(deps = {}) {
         bounceUpdated: 0,
         bounceSkipped: 0,
         providerWarnings: 0,
+        suppressed: 0,
         errors: [],
       };
       const dbState = await getUiStateValues(customerDbScope);
@@ -6864,6 +6865,34 @@ function createColdmailCampaignService(deps = {}) {
                 }
 
                 const senderEmail = resolveInboundSenderEmail(parsedMail);
+                const inboundSuppressionMatch = findOutreachSuppressionMatch({
+                  recipientEmail: from.address,
+                  email: from.address,
+                  recipientCompany: getRowCompany(match.row),
+                  company: getRowCompany(match.row),
+                  domain: getRowDomain(match.row),
+                });
+                if (inboundSuppressionMatch) {
+                  replyState.processed[processedKey] = {
+                    at: now().toISOString(),
+                    from: from.address,
+                    company: getRowCompany(match.row),
+                    subject: truncateText(normalizeString(parsedMail && parsedMail.subject), 240),
+                    suppressed: true,
+                    suppressionCode: 'OUTREACH_SUPPRESSION_HARD_BLOCK',
+                    suppressionDomain: inboundSuppressionMatch.domain,
+                    lifecycleStatus: normalizeString(classification.status),
+                    lifecycleIntent: normalizeString(classification.intent),
+                  };
+                  await saveColdmailReplyState(replyState, 'coldmail-auto-reply-suppressed');
+                  stats.suppressed += 1;
+                  const flagsSet =
+                    message.flags instanceof Set
+                      ? message.flags
+                      : new Set(Array.isArray(message.flags) ? message.flags : []);
+                  if (!flagsSet.has('\\Seen')) uidsToMarkSeen.push(message.uid);
+                  continue;
+                }
                 const aiReply = await generateColdmailAutoReplyWithOpenAi({
                   row: match.row,
                   inboundText,

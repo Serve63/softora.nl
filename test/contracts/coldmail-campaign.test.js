@@ -4643,6 +4643,76 @@ test('coldmail auto-reply answers inbound campaign replies with GPT-5.5 Pro', as
   assert.equal(Object.keys(getReplyState().processed).length, 1);
 });
 
+test('coldmail auto-reply suppresses growsocialmedia.nl replies before OpenAI and SMTP', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-grow@growsocialmedia.nl>',
+    subject: 'Re: Nieuw webdesign gemaakt!',
+    text: 'Hoi, stuur maar meer informatie.',
+    from: { value: [{ address: 'info@growsocialmedia.nl', name: 'Grow Social Media' }] },
+    to: { value: [{ address: 'serve@softora.nl', name: 'Servé Creusen' }] },
+    cc: { value: [] },
+    references: '<sent-grow@softora>',
+  };
+  let openAiCalled = false;
+  let markedSeen = false;
+  const { service, sentMessages, getReplyState } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'grow-social-media',
+        bedrijf: 'Grow Social Media',
+        naam: 'Grow Social Media',
+        email: 'info@growsocialmedia.nl',
+        website: 'https://growsocialmedia.nl',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-04-24T10:00:00.000Z',
+        mail: true,
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {
+        markedSeen = true;
+      },
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => {
+      openAiCalled = true;
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: 'gpt-5.5-pro',
+          choices: [{ message: { content: 'Hoi, leuk dat je reageert.' } }],
+        },
+      };
+    },
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+  const processed = getReplyState().processed['message:incoming-grow@growsocialmedia.nl'];
+
+  assert.equal(result.replied, 0);
+  assert.equal(result.suppressed, 1);
+  assert.equal(openAiCalled, false);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(markedSeen, true);
+  assert.equal(processed.suppressed, true);
+  assert.equal(processed.suppressionCode, 'OUTREACH_SUPPRESSION_HARD_BLOCK');
+  assert.equal(processed.suppressionDomain, 'growsocialmedia.nl');
+});
+
 test('coldmail auto-reply uses the mailbox owner identity for Martijn replies', async () => {
   const parsedInbound = {
     messageId: '<incoming-martijn@example.test>',
