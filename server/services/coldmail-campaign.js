@@ -3024,6 +3024,7 @@ function createColdmailCampaignService(deps = {}) {
     const currentDayKey = getColdmailAutopilotDateKey(currentNow, DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
     const perSenderToday = {};
     const recipientCounts = {};
+    const todayRecipientCounts = {};
     const seen = new Set();
     let sentToday = 0;
     let sentLast24h = 0;
@@ -3047,21 +3048,19 @@ function createColdmailCampaignService(deps = {}) {
           lastSuccessfulSendAt = normalizeString(entry.at);
           lastSenderEmail = normalizeEmailAddress(entry.senderEmail);
         }
-        addColdmailRecipientCount(
-          recipientCounts,
-          buildColdmailStatsRecipientKey({
-            recipientEmail: entry.recipientEmail,
-            recipientDomain: entry.recipientDomain,
-            recipientId: entry.recipientId,
-            recipientCompanyKey: entry.recipientCompanyKey || entry.recipientCompany,
-          }),
-          count
-        );
+        const recipientKey = buildColdmailStatsRecipientKey({
+          recipientEmail: entry.recipientEmail,
+          recipientDomain: entry.recipientDomain,
+          recipientId: entry.recipientId,
+          recipientCompanyKey: entry.recipientCompanyKey || entry.recipientCompany,
+        });
+        addColdmailRecipientCount(recipientCounts, recipientKey, count);
         if (getColdmailAutopilotDateKey(new Date(entryMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) !== currentDayKey) {
           return;
         }
         const senderEmail = normalizeEmailAddress(entry.senderEmail) || 'unknown';
         sentToday += count;
+        addColdmailRecipientCount(todayRecipientCounts, recipientKey, count);
         personalMailboxSentToday += personalCount;
         perSenderToday[senderEmail] = (perSenderToday[senderEmail] || 0) + count;
       });
@@ -3074,6 +3073,7 @@ function createColdmailCampaignService(deps = {}) {
       lastSuccessfulSendAt,
       lastSenderEmail,
       recipientCounts,
+      todayRecipientCounts,
       unkeyedTotalSent: 0,
     };
   }
@@ -3087,6 +3087,7 @@ function createColdmailCampaignService(deps = {}) {
     let lastDatabaseSentAt = '';
     const recipientCounts = {};
     const webdesignRecipientCounts = {};
+    const webdesignTodayRecipientCounts = {};
     let unkeyedTotalSent = 0;
     let webdesignUnkeyedTotalSent = 0;
     const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
@@ -3118,6 +3119,7 @@ function createColdmailCampaignService(deps = {}) {
           getColdmailAutopilotDateKey(new Date(sentAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey
         ) {
           webdesignSentToday += webdesignCount;
+          setColdmailRecipientCount(webdesignTodayRecipientCounts, recipientKey, webdesignCount);
         }
         if (!setColdmailRecipientCount(webdesignRecipientCounts, recipientKey, webdesignCount)) {
           webdesignUnkeyedTotalSent += webdesignCount;
@@ -3136,6 +3138,7 @@ function createColdmailCampaignService(deps = {}) {
       }),
       webdesignDatabaseRowsTotalSent: webdesignTotalSent,
       webdesignSentToday,
+      webdesignTodayRecipientCounts,
       interestedTotal,
       activeCampaignTotal,
       lastDatabaseSentAt,
@@ -3193,6 +3196,21 @@ function createColdmailCampaignService(deps = {}) {
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
     const centralGuardTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats);
     const systemTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats, guardStats, databaseStats);
+    const keyedSystemSentToday = mergeColdmailRecipientCountTotals(
+      {
+        recipientCounts: guardStats.todayRecipientCounts,
+        unkeyedTotalSent: 0,
+      },
+      {
+        recipientCounts: databaseStats.webdesignTodayRecipientCounts,
+        unkeyedTotalSent: 0,
+      }
+    );
+    const systemSentToday = Math.max(
+      guardStats.sentToday,
+      databaseStats.webdesignSentToday,
+      keyedSystemSentToday
+    );
     const lastSuccessfulSendAt = guardStats.lastSuccessfulSendAt || databaseStats.lastDatabaseSentAt;
     const conversionRate = databaseStats.databaseTotalSent > 0
       ? Math.round((databaseStats.interestedTotal / databaseStats.databaseTotalSent) * 100)
@@ -3204,7 +3222,8 @@ function createColdmailCampaignService(deps = {}) {
         timezone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
         dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
         source: 'coldmail-send-guard-and-customer-database',
-        sentToday: guardStats.sentToday,
+        sentToday: systemSentToday,
+        systemSentToday,
         sentLast24h: guardStats.sentLast24h,
         personalMailboxSentToday: guardStats.personalMailboxSentToday,
         databaseTotalSent: databaseStats.databaseTotalSent,
@@ -3212,7 +3231,9 @@ function createColdmailCampaignService(deps = {}) {
         systemTotalSent,
         totalSent: systemTotalSent,
         webdesignTotalSent: databaseStats.webdesignTotalSent,
-        webdesignSentToday: databaseStats.webdesignSentToday,
+        webdesignSentToday: systemSentToday,
+        webdesignGuardSentToday: guardStats.sentToday,
+        webdesignDatabaseRowsSentToday: databaseStats.webdesignSentToday,
         webdesignDatabaseRowsTotalSent: databaseStats.webdesignDatabaseRowsTotalSent,
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
