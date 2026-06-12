@@ -4875,6 +4875,78 @@ test('coldmail campaign preview only lists webdesign recipients with a generated
   assert.match(result.failedItems[0].error, /Nog geen website-design klaar voor Zonder Design/);
 });
 
+test('coldmail campaign accepts direct customer photos when legacy identity lacks phone', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'direct-ready',
+        bedrijf: 'Eljap BV',
+        naam: 'Eljap BV',
+        email: 'info@eljap.nl',
+        telefoon: '016 149 24 29',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'direct-ready': {
+        id: 'direct-ready',
+        identityKey: 'eljap bv|eljap bv|',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Eljap BV webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 1,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.selected, 1);
+  assert.deepEqual(
+    result.recipients.map((recipient) => recipient.id),
+    ['direct-ready']
+  );
+  assert.equal(result.failedItems.length, 0);
+});
+
+test('coldmail campaign keeps phone-less photo identities strict without a direct customer id', async () => {
+  const { service } = createService({
+    rows: [
+      {
+        id: 'fresh-row',
+        bedrijf: 'Eljap BV',
+        naam: 'Eljap BV',
+        email: 'info@eljap.nl',
+        telefoon: '016 149 24 29',
+        status: 'benaderbaar',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'old-row': {
+        id: 'old-row',
+        identityKey: 'eljap bv|eljap bv|',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Eljap BV webdesign',
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({
+    count: 1,
+    specialAction: 'webdesign',
+  });
+
+  assert.equal(result.selected, 0);
+  assert.equal(result.failedItems.length, 1);
+  assert.equal(result.failedItems[0].id, 'fresh-row');
+  assert.match(result.failedItems[0].error, /Nog geen website-design klaar voor Eljap BV/);
+});
+
 test('coldmail campaign does not treat stale row-index photos as ready webdesign', async () => {
   const { service, sentMessages } = createService({
     rows: [

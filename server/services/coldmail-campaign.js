@@ -1841,11 +1841,39 @@ function createColdmailCampaignService(deps = {}) {
     return keys;
   }
 
-  function photoRecordMatchesRowIdentity(photo, row) {
+  function splitNormalizedIdentityKey(value) {
+    const parts = normalizeString(value).split('|');
+    return {
+      company: normalizeIdentityTextPart(parts[0]),
+      contact: normalizeIdentityTextPart(parts[1]),
+      phone: normalizeIdentityPhonePart(parts.slice(2).join('|')),
+    };
+  }
+
+  function identityKeyMatchesRowIdentity(photoIdentityKey, rowIdentityKey, options = {}) {
+    if (photoIdentityKey === rowIdentityKey) return true;
+    if (!options.allowMissingStoredPhonePart) return false;
+    const photoParts = splitNormalizedIdentityKey(photoIdentityKey);
+    const rowParts = splitNormalizedIdentityKey(rowIdentityKey);
+    return Boolean(
+      photoParts.company &&
+        photoParts.contact &&
+        !photoParts.phone &&
+        rowParts.phone &&
+        photoParts.company === rowParts.company &&
+        photoParts.contact === rowParts.contact
+    );
+  }
+
+  function photoRecordMatchesRowIdentity(photo, row, options = {}) {
     const photoIdentityKeys = getPhotoIdentityKeys(photo);
     if (!photoIdentityKeys.size) return true;
     const rowIdentityKeys = buildRowIdentityKeys(row);
-    return Array.from(rowIdentityKeys).some((key) => photoIdentityKeys.has(key));
+    return Array.from(photoIdentityKeys).some((photoIdentityKey) =>
+      Array.from(rowIdentityKeys).some((rowIdentityKey) =>
+        identityKeyMatchesRowIdentity(photoIdentityKey, rowIdentityKey, options)
+      )
+    );
   }
 
   function mergeColdcallingRowsWithCustomerRows(leadRows = [], customerRows = []) {
@@ -1882,7 +1910,11 @@ function createColdmailCampaignService(deps = {}) {
     );
     for (const id of directIds) {
       const directPhoto = photos[id];
-      if (directPhoto && (photoRecordMatchesRowIdentity(directPhoto, row) || isDedicatedTestModeRow(row))) {
+      if (
+        directPhoto &&
+        (photoRecordMatchesRowIdentity(directPhoto, row, { allowMissingStoredPhonePart: true }) ||
+          isDedicatedTestModeRow(row))
+      ) {
         return directPhoto;
       }
     }
