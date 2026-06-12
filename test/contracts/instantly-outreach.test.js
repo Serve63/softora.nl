@@ -467,6 +467,67 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[1].databaseStatus, 'gemaild');
 });
 
+test('safe Instantly upload hard-blocks growsocialmedia.nl from CSV and guards', async () => {
+  const { service, fetchCalls, writes, centralGuardReservations } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'grow-social-media',
+        bedrijf: 'Grow Social Media',
+        naam: 'Grow Social Media',
+        email: 'info@growsocialmedia.nl',
+        website: 'https://growsocialmedia.nl',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-allowed',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'grow-social-media': {
+        id: 'grow-social-media',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'prospect-allowed': {
+        id: 'prospect-allowed',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.prepared, 1);
+  assert.equal(fetchCalls.length, 0);
+  assert.doesNotMatch(result.csv, /growsocialmedia\.nl/i);
+  assert.match(result.csv, /"ruben@example\.test"/);
+  assert.deepEqual(
+    result.leads.map((lead) => lead.email),
+    ['ruben@example.test']
+  );
+  assert.equal(centralGuardReservations.length, 1);
+  assert.deepEqual(
+    centralGuardReservations[0].recipients.map((recipient) => recipient.recipientEmail),
+    ['ruben@example.test']
+  );
+  assert.equal(writes.length, 2);
+});
+
 test('safe Instantly upload refuses partial batches when fewer leads are ready than requested', async () => {
   const { service, getRows, writes } = createService({
     syncEnabled: false,

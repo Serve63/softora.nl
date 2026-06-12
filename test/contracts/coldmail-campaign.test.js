@@ -5880,6 +5880,53 @@ test('coldmail campaign never sends to blocked email addresses', async () => {
   );
 });
 
+test('coldmail campaign hard-blocks growsocialmedia.nl before SMTP', async () => {
+  const { service, sentMessages, centralGuardReservations } = createService({
+    rows: [
+      {
+        id: 'grow-social-media',
+        bedrijf: 'Grow Social Media',
+        naam: 'Grow Social Media',
+        email: 'info@growsocialmedia.nl',
+        website: 'https://growsocialmedia.nl',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'allowed-1',
+        bedrijf: 'Wel Mailen BV',
+        naam: 'Servé',
+        email: 'allowed@example.test',
+        website: 'https://allowed.example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+  });
+
+  const preview = await service.getColdmailCampaignRecipients({ count: 10 });
+  assert.equal(preview.selected, 1);
+  assert.deepEqual(
+    preview.recipients.map((recipient) => recipient.email),
+    ['allowed@example.test']
+  );
+
+  const result = await service.sendColdmailCampaign({
+    count: 10,
+    subject: 'Test',
+    body: 'Hoi {{naam}}',
+    senderEmail: 'info@softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.deepEqual(
+    sentMessages.map((message) => message.to),
+    ['allowed@example.test']
+  );
+  assert.equal(centralGuardReservations.length, 1);
+  assert.equal(centralGuardReservations[0].recipients[0].recipientEmail, 'allowed@example.test');
+});
+
 test('coldmail campaign previews invalid recipient domains', async () => {
   const { service } = createService({
     rows: [

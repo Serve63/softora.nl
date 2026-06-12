@@ -17,6 +17,7 @@ const {
   fitWebdesignPreviewForEmail,
   removeDecorativeWebdesignFrameForEmail,
 } = require('./coldmail-image-frame');
+const { findOutreachSuppressionMatch } = require('./outreach-suppression');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -1313,6 +1314,34 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function getColdmailOutreachSuppressionMatch(item) {
+    const row = item && item.row ? item.row : item;
+    if (!row || typeof row !== 'object') return null;
+    const guard = buildColdmailRecipientGuard(row, item && item.id);
+    return findOutreachSuppressionMatch({
+      ...row,
+      recipientEmail: guard.recipientEmail,
+      recipientDomain: guard.recipientDomain,
+      recipientCompanyKey: guard.recipientCompanyKey,
+      recipientId: guard.recipientId,
+      recipientCompany: guard.recipientCompany,
+      company: getRowCompany(row),
+      domain: getRowDomain(row),
+      email: getRowEmail(row),
+    });
+  }
+
+  function buildColdmailOutreachSuppressionFailure(item, match) {
+    return {
+      id: item && item.id,
+      bedrijf: getRowCompany(item && item.row),
+      email: getRowEmail(item && item.row),
+      domain: match && match.domain,
+      code: 'OUTREACH_SUPPRESSION_HARD_BLOCK',
+      error: normalizeString(match && match.message) || 'Deze ontvanger is hard geblokkeerd voor outbound mail.',
+    };
+  }
+
   function isColdmailRecipientGuardFailure(item) {
     return normalizeString(item && item.code) === 'COLDMAIL_RECIPIENT_RECENTLY_SENT';
   }
@@ -1322,6 +1351,8 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
+    const suppressionMatch = getColdmailOutreachSuppressionMatch(item);
+    if (suppressionMatch) return buildColdmailOutreachSuppressionFailure(item, suppressionMatch);
     const recipientGuardMatch = getColdmailRecipientGuardMatch(item, recipientGuardEntries);
     if (recipientGuardMatch) return buildColdmailRecipientGuardFailure(item, recipientGuardMatch);
     const email = getRowEmail(item && item.row);
@@ -3793,6 +3824,14 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function reserveColdmailOutboundRecipient({ row, item, senderEmail, actor, subject, specialAction }) {
+    const suppressionMatch = getColdmailOutreachSuppressionMatch({ row, id: item && item.id });
+    if (suppressionMatch) {
+      const error = new Error(
+        normalizeString(suppressionMatch.message) || 'Deze ontvanger is hard geblokkeerd voor outbound mail.'
+      );
+      error.code = 'OUTREACH_SUPPRESSION_HARD_BLOCK';
+      throw error;
+    }
     if (!outboundRecipientGuardService || typeof outboundRecipientGuardService.reserveRecipients !== 'function') {
       const error = new Error('Centrale outbound duplicate-guard is niet beschikbaar; er wordt geen mail verstuurd.');
       error.code = 'OUTBOUND_RECIPIENT_GUARD_UNAVAILABLE';
@@ -3899,6 +3938,7 @@ function createColdmailCampaignService(deps = {}) {
     if (isDedicatedTestModeRow(row)) return false;
     const email = getRowEmail(row);
     if (!isLikelyValidEmail(email)) return false;
+    if (getColdmailOutreachSuppressionMatch({ row })) return false;
     if (isEmailBlocked(email, blockedEmailKeys)) return false;
     if (row.mail === false || row.canMail === false || row.doNotMail === true) return false;
     if (hasActiveInstantlyColdmailOutreach(row)) return false;
@@ -4025,6 +4065,11 @@ function createColdmailCampaignService(deps = {}) {
       if (mode === 'call') {
         selectedRows.push(item);
         if (selectedRows.length >= count) break;
+        continue;
+      }
+      const suppressionMatch = getColdmailOutreachSuppressionMatch(item);
+      if (suppressionMatch) {
+        failed.push(buildColdmailOutreachSuppressionFailure(item, suppressionMatch));
         continue;
       }
       const recipientGuardMatch = getColdmailRecipientGuardMatch(item, recipientGuardEntries);

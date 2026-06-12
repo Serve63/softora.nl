@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { findOutreachSuppressionMatch } = require('./outreach-suppression');
 
 const OUTBOUND_RECIPIENT_GUARDS_TABLE = 'softora_outbound_recipient_guards';
 
@@ -172,6 +173,27 @@ function createOutboundRecipientGuardService(deps = {}) {
         at,
       })
     );
+    const suppressed = items
+      .map((item) => findOutreachSuppressionMatch(item))
+      .find(Boolean);
+    if (suppressed) {
+      throw createGuardError(
+        suppressed.message || 'Deze ontvanger is hard geblokkeerd voor outbound mail.',
+        'OUTREACH_SUPPRESSION_HARD_BLOCK',
+        {
+          conflicts: [
+            {
+              guardKey: `domain:${suppressed.domain}`,
+              keyType: 'domain',
+              keyValue: suppressed.domain,
+              status: 'blocked',
+              source: 'hard-coded-outreach-suppression',
+              permanent: true,
+            },
+          ],
+        }
+      );
+    }
     if (!rows.length) {
       throw createGuardError(
         'Ontvanger mist een e-mail, domein, bedrijf en id; er wordt geen mail verstuurd.',

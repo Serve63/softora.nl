@@ -12,6 +12,7 @@ const {
   getPreviewImageCacheKey,
   rememberPreviewImage,
 } = require('./coldmail-preview-image-cache');
+const { findOutreachSuppressionMatch } = require('./outreach-suppression');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -2230,8 +2231,22 @@ function createInstantlyOutreachService(deps = {}) {
       const email = getRowEmail(row, normalizeString);
       const company = getRowCompany(row, normalizeString);
       const status = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
+      const suppressionMatch = getInstantlyOutreachSuppressionMatch({ id, index, row });
 
       if (!isLikelyValidEmail(email, normalizeString)) continue;
+      if (suppressionMatch) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          domain: suppressionMatch.domain,
+          code: 'OUTREACH_SUPPRESSION_HARD_BLOCK',
+          error:
+            normalizeString(suppressionMatch.message) ||
+            'Deze ontvanger is hard geblokkeerd voor outbound mail.',
+        });
+        continue;
+      }
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
       if (hasActiveInstantlyOutreach(row)) continue;
@@ -2890,6 +2905,25 @@ function createInstantlyOutreachService(deps = {}) {
       );
     });
     return rows.join('\n');
+  }
+
+  function getInstantlyOutreachSuppressionMatch(item) {
+    const row = item && item.row ? item.row : item;
+    if (!row || typeof row !== 'object') return null;
+    const email = getRowEmail(row, normalizeString);
+    const company = getRowCompany(row, normalizeString);
+    const domain = getRowDomain(row, normalizeString) || getEmailDomain(email);
+    return findOutreachSuppressionMatch({
+      ...row,
+      recipientEmail: email,
+      recipientDomain: normalizeColdmailGuardKeyPart(domain, normalizeString),
+      recipientCompanyKey: normalizeColdmailGuardKeyPart(company, normalizeString),
+      recipientId: normalizeColdmailGuardKeyPart(getRowId(row, item && item.index, normalizeString), normalizeString),
+      recipientCompany: company,
+      company,
+      domain,
+      email,
+    });
   }
 
   function buildPermanentInstantlyRecipientGuard(item, options = {}) {
