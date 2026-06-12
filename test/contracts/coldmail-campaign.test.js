@@ -523,9 +523,11 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
           recipient_domain: 'example.test',
           recipient_company_key: 'guard-only-bv',
           recipient_id: 'guard-only',
+          sender_email: 'serve@softora.nl',
           provider: 'softora',
           channel: 'coldmail',
           source: 'mailbox-sent-webdesign-backfill-2026-06-08',
+          updated_at: '2026-04-24T07:00:00.000Z',
         },
         {
           reservation_id: 'guard-only-customer-backfill',
@@ -533,9 +535,11 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
           recipient_domain: 'example.test',
           recipient_company_key: 'guard-only-bv',
           recipient_id: 'guard-only',
+          sender_email: 'serve@softora.nl',
           provider: 'softora',
           channel: 'coldmail',
           source: 'customer-status-backfill',
+          updated_at: '2026-04-24T07:10:00.000Z',
         },
         {
           reservation_id: 'softora-sent-reservation',
@@ -543,9 +547,11 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
           recipient_domain: 'example.test',
           recipient_company_key: 'bakkerij-zon',
           recipient_id: 'softora-sent',
+          sender_email: 'martijn@softora.nl',
           provider: 'softora',
           channel: 'coldmail',
           source: 'softora-coldmail-pre-send',
+          updated_at: '2026-04-24T08:00:00.000Z',
         },
       ],
     },
@@ -591,24 +597,30 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.ok, true);
   assert.equal(result.stats.timezone, 'Europe/Amsterdam');
   assert.equal(result.stats.dateKey, '2026-04-24');
-  assert.equal(result.stats.sentToday, 3);
-  assert.equal(result.stats.systemSentToday, 3);
+  assert.equal(result.stats.source, 'central-outbound-recipient-guard');
+  assert.equal(result.stats.reliable, true);
+  assert.equal(result.stats.sentToday, 2);
+  assert.equal(result.stats.systemSentToday, 2);
+  assert.equal(result.stats.centralGuardSentToday, 2);
   assert.equal(result.stats.sentLast24h, 4);
   assert.equal(result.stats.personalMailboxSentToday, 2);
   assert.equal(result.stats.databaseTotalSent, 3);
   assert.equal(result.stats.centralGuardTotalSent, 2);
-  assert.equal(result.stats.systemTotalSent, 4);
-  assert.equal(result.stats.totalSent, 4);
-  assert.equal(result.stats.webdesignTotalSent, 4);
-  assert.equal(result.stats.webdesignSentToday, 3);
+  assert.equal(result.stats.systemTotalSent, 2);
+  assert.equal(result.stats.totalSent, 2);
+  assert.equal(result.stats.webdesignTotalSent, 2);
+  assert.equal(result.stats.webdesignSentToday, 2);
   assert.equal(result.stats.webdesignGuardSentToday, 3);
   assert.equal(result.stats.webdesignDatabaseRowsSentToday, 2);
   assert.equal(result.stats.webdesignDatabaseRowsTotalSent, 2);
+  assert.equal(result.stats.legacySendGuardTotalSent, 4);
+  assert.equal(result.stats.legacyMergedTotalSent, 4);
+  assert.equal(result.stats.legacySystemSentToday, 3);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
   assert.equal(result.stats.conversionRate, 33);
-  assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:30:00.000Z');
-  assert.equal(result.stats.lastSenderEmail, 'servec321@gmail.com');
+  assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:00:00.000Z');
+  assert.equal(result.stats.lastSenderEmail, 'martijn@softora.nl');
 });
 
 test('coldmail campaign uses standard SMTP transports with bounded timeouts', async () => {
