@@ -290,7 +290,7 @@
     }
 
     function readTodaySentCountFromStats(stats) {
-        const fields = ["webdesignSentToday", "sentToday"];
+        const fields = ["systemSentToday", "sentToday", "webdesignSentToday"];
         for (let index = 0; index < fields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[fields[index]]);
             if (count !== null) return count;

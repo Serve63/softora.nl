@@ -374,6 +374,7 @@ test('premium database mail ROI calculator toont vandaag verstuurd live in dezel
           ok: true,
           stats: {
             sentToday: 31,
+            systemSentToday: 31,
             webdesignSentToday: 26,
             systemTotalSent: 355,
             webdesignTotalSent: 385,
@@ -387,7 +388,7 @@ test('premium database mail ROI calculator toont vandaag verstuurd live in dezel
   systemMailCountClient.render([], { dataLoading: false });
   await systemMailCountClient.refreshTodaySentCount();
 
-  assert.equal(nodes.systemMailSentTodayCount.textContent, '26');
+  assert.equal(nodes.systemMailSentTodayCount.textContent, '31');
   assert.equal(nodes.systemMailSentCount.textContent, '385');
   assert.equal(requestedUrls[0], '/api/coldmailing/stats');
 });
@@ -1128,7 +1129,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260611b/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260611c/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260612a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
@@ -1292,7 +1293,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260611c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260612a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput"/);
   assert.doesNotMatch(pageSource, /<div class="database-import-actions" id="databaseImportActions" hidden>/);

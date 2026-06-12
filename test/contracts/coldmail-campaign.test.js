@@ -592,6 +592,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.timezone, 'Europe/Amsterdam');
   assert.equal(result.stats.dateKey, '2026-04-24');
   assert.equal(result.stats.sentToday, 3);
+  assert.equal(result.stats.systemSentToday, 3);
   assert.equal(result.stats.sentLast24h, 4);
   assert.equal(result.stats.personalMailboxSentToday, 2);
   assert.equal(result.stats.databaseTotalSent, 3);
@@ -599,7 +600,9 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.systemTotalSent, 4);
   assert.equal(result.stats.totalSent, 4);
   assert.equal(result.stats.webdesignTotalSent, 2);
-  assert.equal(result.stats.webdesignSentToday, 2);
+  assert.equal(result.stats.webdesignSentToday, 3);
+  assert.equal(result.stats.webdesignGuardSentToday, 3);
+  assert.equal(result.stats.webdesignDatabaseRowsSentToday, 2);
   assert.equal(result.stats.webdesignDatabaseRowsTotalSent, 2);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
