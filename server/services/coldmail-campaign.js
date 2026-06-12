@@ -3230,7 +3230,7 @@ function createColdmailCampaignService(deps = {}) {
         centralGuardTotalSent,
         systemTotalSent,
         totalSent: systemTotalSent,
-        webdesignTotalSent: databaseStats.webdesignTotalSent,
+        webdesignTotalSent: systemTotalSent,
         webdesignSentToday: systemSentToday,
         webdesignGuardSentToday: guardStats.sentToday,
         webdesignDatabaseRowsSentToday: databaseStats.webdesignSentToday,

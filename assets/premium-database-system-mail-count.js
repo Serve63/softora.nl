@@ -281,7 +281,7 @@
     }
 
     function readMailCountFromStats(stats) {
-        const fields = ["webdesignTotalSent", "webdesignSentTotal", "webdesignDatabaseTotalSent", "systemTotalSent", "totalSent", "databaseTotalSent"];
+        const fields = ["systemTotalSent", "totalSent", "webdesignTotalSent", "webdesignSentTotal", "webdesignDatabaseTotalSent", "databaseTotalSent"];
         for (let index = 0; index < fields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[fields[index]]);
             if (count !== null) return count;
