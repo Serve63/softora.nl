@@ -3026,6 +3026,7 @@ function createColdmailCampaignService(deps = {}) {
     const recipientCounts = {};
     const todayRecipientCounts = {};
     const seen = new Set();
+    let totalSent = 0;
     let sentToday = 0;
     let sentLast24h = 0;
     let personalMailboxSentToday = 0;
@@ -3043,6 +3044,7 @@ function createColdmailCampaignService(deps = {}) {
         const entryMs = parseTimestampMs(entry.at);
         if (!entryMs) return;
         if (entryMs > currentMs) return;
+        totalSent += count;
         if (entryMs >= last24hCutoffMs && entryMs <= currentMs) sentLast24h += count;
         if (!lastSuccessfulSendAt || entryMs > parseTimestampMs(lastSuccessfulSendAt)) {
           lastSuccessfulSendAt = normalizeString(entry.at);
@@ -3067,6 +3069,7 @@ function createColdmailCampaignService(deps = {}) {
 
     return {
       sentToday,
+      totalSent,
       sentLast24h,
       personalMailboxSentToday,
       perSenderToday,
@@ -3147,29 +3150,58 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function summarizeColdmailCentralGuardLiveStats(groups) {
+  function summarizeColdmailCentralGuardLiveStats(groups, options = {}) {
     const recipientCounts = {};
+    const todayRecipientCounts = {};
+    const timezone =
+      normalizeString(options.timezone || options.timeZone) ||
+      DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE;
+    const todayKey = getColdmailAutopilotDateKey(now(), timezone);
+    let lastSentAt = '';
+    let lastSenderEmail = '';
+
     (Array.isArray(groups) ? groups : []).forEach((group) => {
-      setColdmailRecipientCount(
-        recipientCounts,
-        buildColdmailStatsRecipientKey({
-          recipientEmail: group.recipient_email || group.recipientEmail,
-          recipientDomain: group.recipient_domain || group.recipientDomain,
-          recipientId: group.recipient_id || group.recipientId,
-          recipientCompanyKey: group.recipient_company_key || group.recipientCompanyKey || group.recipient_company || group.recipientCompany,
-        }),
-        1
+      const recipientKey = buildColdmailStatsRecipientKey({
+        recipientEmail: group.recipient_email || group.recipientEmail,
+        recipientDomain: group.recipient_domain || group.recipientDomain,
+        recipientId: group.recipient_id || group.recipientId,
+        recipientCompanyKey: group.recipient_company_key || group.recipientCompanyKey || group.recipient_company || group.recipientCompany,
+      });
+      setColdmailRecipientCount(recipientCounts, recipientKey, 1);
+
+      const sentAt = normalizeString(
+        group.updated_at || group.updatedAt || group.last_seen_at || group.lastSeenAt || group.created_at || group.createdAt
       );
+      const sentAtMs = parseTimestampMs(sentAt);
+      if (sentAtMs && (!lastSentAt || sentAtMs > parseTimestampMs(lastSentAt))) {
+        lastSentAt = sentAt;
+        lastSenderEmail = normalizeEmailAddress(group.sender_email || group.senderEmail);
+      }
+      if (
+        sentAtMs &&
+        getColdmailAutopilotDateKey(new Date(sentAtMs), timezone) === todayKey
+      ) {
+        setColdmailRecipientCount(todayRecipientCounts, recipientKey, 1);
+      }
     });
+
     return {
+      available: true,
       recipientCounts,
+      todayRecipientCounts,
       unkeyedTotalSent: 0,
+      lastSentAt,
+      lastSenderEmail,
     };
   }
 
   async function loadColdmailCentralGuardStats() {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') {
-      return summarizeColdmailCentralGuardLiveStats([]);
+      return {
+        ...summarizeColdmailCentralGuardLiveStats([]),
+        available: false,
+        unavailableReason: 'central_guard_store_unavailable',
+      };
     }
     try {
       const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
@@ -3180,7 +3212,11 @@ function createColdmailCampaignService(deps = {}) {
       return summarizeColdmailCentralGuardLiveStats(groups);
     } catch (error) {
       logger.warn('[ColdmailLiveStats][central-guard]', error && error.message ? error.message : error);
-      return summarizeColdmailCentralGuardLiveStats([]);
+      return {
+        ...summarizeColdmailCentralGuardLiveStats([]),
+        available: false,
+        unavailableReason: 'central_guard_read_failed',
+      };
     }
   }
 
@@ -3194,9 +3230,19 @@ function createColdmailCampaignService(deps = {}) {
     const rows = parseDatabaseRows(values);
     const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
-    const centralGuardTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats);
-    const systemTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats, guardStats, databaseStats);
-    const keyedSystemSentToday = mergeColdmailRecipientCountTotals(
+    const centralGuardAvailable = Boolean(centralGuardStats.available);
+    const centralGuardTotalSent = centralGuardAvailable
+      ? mergeColdmailRecipientCountTotals(centralGuardStats)
+      : null;
+    const centralGuardSentToday = centralGuardAvailable
+      ? mergeColdmailRecipientCountTotals({
+          recipientCounts: centralGuardStats.todayRecipientCounts,
+          unkeyedTotalSent: 0,
+        })
+      : null;
+    const legacySendGuardTotalSent = guardStats.totalSent;
+    const legacyMergedTotalSent = mergeColdmailRecipientCountTotals(centralGuardStats, guardStats, databaseStats);
+    const legacyKeyedSystemSentToday = mergeColdmailRecipientCountTotals(
       {
         recipientCounts: guardStats.todayRecipientCounts,
         unkeyedTotalSent: 0,
@@ -3206,12 +3252,14 @@ function createColdmailCampaignService(deps = {}) {
         unkeyedTotalSent: 0,
       }
     );
-    const systemSentToday = Math.max(
+    const legacySystemSentToday = Math.max(
       guardStats.sentToday,
       databaseStats.webdesignSentToday,
-      keyedSystemSentToday
+      legacyKeyedSystemSentToday
     );
-    const lastSuccessfulSendAt = guardStats.lastSuccessfulSendAt || databaseStats.lastDatabaseSentAt;
+    const systemTotalSent = centralGuardAvailable ? centralGuardTotalSent : null;
+    const systemSentToday = centralGuardAvailable ? centralGuardSentToday : null;
+    const lastSuccessfulSendAt = centralGuardStats.lastSentAt || guardStats.lastSuccessfulSendAt || databaseStats.lastDatabaseSentAt;
     const conversionRate = databaseStats.databaseTotalSent > 0
       ? Math.round((databaseStats.interestedTotal / databaseStats.databaseTotalSent) * 100)
       : 0;
@@ -3221,9 +3269,12 @@ function createColdmailCampaignService(deps = {}) {
       stats: {
         timezone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
         dateKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
-        source: 'coldmail-send-guard-and-customer-database',
+        source: centralGuardAvailable ? 'central-outbound-recipient-guard' : 'central-outbound-recipient-guard-unavailable',
+        authoritativeSource: 'central-outbound-recipient-guard',
+        reliable: centralGuardAvailable,
         sentToday: systemSentToday,
         systemSentToday,
+        centralGuardSentToday,
         sentLast24h: guardStats.sentLast24h,
         personalMailboxSentToday: guardStats.personalMailboxSentToday,
         databaseTotalSent: databaseStats.databaseTotalSent,
@@ -3235,11 +3286,15 @@ function createColdmailCampaignService(deps = {}) {
         webdesignGuardSentToday: guardStats.sentToday,
         webdesignDatabaseRowsSentToday: databaseStats.webdesignSentToday,
         webdesignDatabaseRowsTotalSent: databaseStats.webdesignDatabaseRowsTotalSent,
+        legacySendGuardTotalSent,
+        legacyMergedTotalSent,
+        legacySystemSentToday,
+        centralGuardUnavailableReason: centralGuardStats.unavailableReason || '',
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
         conversionRate,
         lastSuccessfulSendAt,
-        lastSenderEmail: guardStats.lastSenderEmail,
+        lastSenderEmail: centralGuardStats.lastSenderEmail || guardStats.lastSenderEmail,
         updatedAt: now().toISOString(),
       },
     };

@@ -182,19 +182,6 @@
         if (typeof window.addEventListener === "function") window.addEventListener(eventName, handler);
     }
 
-    function parseRenderedMailCount(value) {
-        const normalized = fallbackNormalizeString(value).replace(/\./g, "").replace(/,/g, "");
-        const number = Number(normalized);
-        return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
-    }
-
-    function rememberRenderedMailCount(element) {
-        const renderedCount = parseRenderedMailCount(element && element.textContent);
-        if (renderedCount === null) return lastRenderedMailCount;
-        lastRenderedMailCount = Math.max(lastRenderedMailCount || 0, renderedCount);
-        return lastRenderedMailCount;
-    }
-
     function clampDealCount(value) {
         const number = Number(value);
         return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
@@ -281,7 +268,7 @@
     }
 
     function readMailCountFromStats(stats) {
-        const fields = ["systemTotalSent", "totalSent", "webdesignTotalSent", "webdesignSentTotal", "webdesignDatabaseTotalSent", "databaseTotalSent"];
+        const fields = ["systemTotalSent", "totalSent", "webdesignTotalSent", "centralGuardTotalSent"];
         for (let index = 0; index < fields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[fields[index]]);
             if (count !== null) return count;
@@ -366,6 +353,7 @@
             return sentToday;
         }).catch(function (error) {
             renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
+            renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
             if (typeof console !== "undefined" && typeof console.warn === "function") console.warn("Vandaag verstuurd laden mislukt:", error && error.message ? error.message : error);
             return lastTodaySentCount;
         }).finally(function () {
@@ -428,21 +416,7 @@
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
         if (!element) return;
-        const options = helpers || {};
-        if (options.dataLoading) {
-            const rememberedCount = rememberRenderedMailCount(element);
-            if (rememberedCount !== null) {
-                element.textContent = rememberedCount.toLocaleString("nl-NL");
-                renderRoiCalculator(rememberedCount, false);
-                return;
-            }
-            element.textContent = "--";
-            renderRoiCalculator(null, true);
-            return;
-        }
-        const calculatedStats = getWebdesignMailSentStats(customers, options);
-        if (lastTodaySentCount === null) renderTodaySentCount(calculatedStats.today, false);
-        renderSystemMailCount(lastStatsMailCount === null ? calculatedStats.total : lastStatsMailCount, false);
+        renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
     }
 
     window.SoftoraDatabaseSystemMailCount = {

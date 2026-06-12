@@ -248,7 +248,7 @@ test('premium database contact status detects sent coldmail signals', () => {
   assert.equal(contactStatusClient.getColdmailSentAt({ lastColdmailSentAt: '2026-05-19T17:02:00Z' }), '2026-05-19T17:02:00Z');
 });
 
-test('premium database mail counter keeps system fallback but renders webdesign outreach sends', () => {
+test('premium database mail counter keeps local diagnostics but does not render them as the live total', () => {
   const node = { textContent: '' };
   const systemMailCountClient = loadDatabaseSystemMailCountClient({
     document: { getElementById: (id) => (id === 'systemMailSentCount' ? node : null) },
@@ -294,23 +294,24 @@ test('premium database mail counter keeps system fallback but renders webdesign 
   assert.equal(webdesignStats.total, 3);
   assert.equal(webdesignStats.today, 2);
   systemMailCountClient.render(webdesignCustomers, webdesignHelpers);
-  assert.equal(node.textContent, '3');
+  assert.equal(node.textContent, '--');
   systemMailCountClient.render([], { ...webdesignHelpers, dataLoading: true });
-  assert.equal(node.textContent, '3');
+  assert.equal(node.textContent, '--');
   systemMailCountClient.render(webdesignCustomers, { ...webdesignHelpers, dataLoading: true });
-  assert.equal(node.textContent, '3');
+  assert.equal(node.textContent, '--');
   node.textContent = '511';
   systemMailCountClient.render([], { ...webdesignHelpers, dataLoading: true });
-  assert.equal(node.textContent, '511');
+  assert.equal(node.textContent, '--');
   systemMailCountClient.render(
     [{ bedrijf: 'Older bootstrap lead', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-10T07:00:00.000Z' }],
     webdesignHelpers
   );
-  assert.equal(node.textContent, '1');
+  assert.equal(node.textContent, '--');
 });
 
-test('premium database mail ROI calculator uses the live Softora mail count', () => {
+test('premium database mail ROI calculator uses the live Softora mail count', async () => {
   let plusHandler = null;
+  const requestedUrls = [];
   const nodes = {
     systemMailSentTodayCount: { textContent: '' },
     systemMailSentCount: { textContent: '' },
@@ -327,6 +328,22 @@ test('premium database mail ROI calculator uses the live Softora mail count', ()
         },
       }],
     },
+    fetch: async (url) => {
+      requestedUrls.push(url);
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          stats: {
+            sentToday: 6,
+            systemSentToday: 6,
+            systemTotalSent: 6,
+            centralGuardTotalSent: 6,
+          },
+        }),
+      };
+    },
+    setInterval: () => 0,
   });
   const customers = [
     { bedrijf: 'Webdesign lead 1', dom: 'lead-1.test', campaignType: 'webdesign', lastColdmailSentAt: '2026-06-11T07:00:00.000Z' },
@@ -341,8 +358,10 @@ test('premium database mail ROI calculator uses the live Softora mail count', ()
     normalizeString: (value) => String(value || '').trim(),
     now: () => new Date('2026-06-11T12:00:00.000+02:00'),
   });
+  await systemMailCountClient.refreshTodaySentCount();
 
   assert.equal(nodes.systemMailSentCount.textContent, '6');
+  assert.equal(requestedUrls[0], '/api/coldmailing/stats');
   assert.equal(nodes.mailRoiDealsCount.textContent, '0');
   assert.equal(nodes.mailRoiRatio.textContent, '—');
   plusHandler();
@@ -412,6 +431,19 @@ test('premium database mail ROI calculator persists the customer count', async (
         },
       }],
     },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        stats: {
+          sentToday: 6,
+          systemSentToday: 6,
+          systemTotalSent: 6,
+          centralGuardTotalSent: 6,
+        },
+      }),
+    }),
+    setInterval: () => 0,
     SoftoraUiStateClient: {
       get: async (scope) => {
         assert.equal(scope, 'premium_database_mail_roi');
@@ -436,6 +468,7 @@ test('premium database mail ROI calculator persists the customer count', async (
     normalizeString: (value) => String(value || '').trim(),
     now: () => new Date('2026-06-11T12:00:00.000+02:00'),
   });
+  await systemMailCountClient.refreshTodaySentCount();
   await systemMailCountClient.loadPersistedDealCount();
 
   assert.equal(nodes.mailRoiDealsCount.textContent, '2');
@@ -793,11 +826,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /function getCustomerSoftoraSystemMailSentCount\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getSoftoraSystemMailSentCount\(customers, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getWebdesignMailSentStats\(customers, helpers\)/);
-  assert.match(systemMailCountScriptSource, /function rememberRenderedMailCount\(element\)/);
+  assert.doesNotMatch(systemMailCountScriptSource, /function rememberRenderedMailCount\(element\)/);
   assert.match(systemMailCountScriptSource, /function readMailCountFromStats\(stats\)/);
-  assert.match(systemMailCountScriptSource, /"webdesignTotalSent"/);
+  assert.match(systemMailCountScriptSource, /"centralGuardTotalSent"/);
   assert.match(systemMailCountScriptSource, /"systemTotalSent"/);
-  assert.match(systemMailCountScriptSource, /renderSystemMailCount\(lastStatsMailCount === null \? calculatedStats\.total : lastStatsMailCount, false\)/);
+  assert.match(systemMailCountScriptSource, /renderSystemMailCount\(lastStatsMailCount, lastStatsMailCount === null\)/);
   assert.doesNotMatch(systemMailCountScriptSource, /Math\.max\(rememberedCount \|\| 0, calculatedCount\)/);
   assert.match(systemMailCountScriptSource, /function renderRoiCalculator\(mailCount, isLoading\)/);
   assert.match(systemMailCountScriptSource, /const COLDMAIL_STATS_URL = "\/api\/coldmailing\/stats";/);
