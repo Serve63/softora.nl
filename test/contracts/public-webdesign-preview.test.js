@@ -707,19 +707,85 @@ test('public webdesign preview uses owner fields only when no sent mailbox is kn
   assert.match(body, /martijn-van-de-ven-profile\.png/);
 });
 
-test('public webdesign preview defaults to Serve for unknown sender variables', async () => {
-  const body = await renderConceptForStructuredCustomer({
-    id: 'manual-import-unknown-sender-nl-0001',
-    bedrijf: 'Unknown Sender',
-    lastColdmailSenderEmail: 'service@example.test',
-    senderDisplayName: 'Service Team',
-    profilePhotoUrl: 'https://wrong.softora.test/profile.jpg',
+test('public webdesign preview refuses unknown sent mailbox profiles instead of defaulting to Serve', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-unknown-sender-nl-0001',
+          bedrijf: 'Unknown Sender',
+          lastColdmailSenderEmail: 'service@example.test',
+          leadOwnerKey: 'serve',
+          profilePhotoUrl: 'https://wrong.softora.test/profile.jpg',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-unknown-sender-nl-0001',
+          fileName: 'unknown-sender-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/unknown-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/unknown-mockup.jpg?token=test',
+        }];
+      },
+    },
   });
+  const response = createResponseRecorder();
 
-  assert.match(body, /<strong>Servé Creusen<\/strong>/);
-  assert.match(body, /serve-creusen-profile\.jpg/);
-  assert.doesNotMatch(body, /Service Team/);
-  assert.doesNotMatch(body, /wrong\.softora\.test/);
+  await service.getConceptPageResponse({ params: { companySlug: 'unknown-sender' } }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.match(response.body, /Preview wordt geladen/);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(response.body, /wrong\.softora\.test/);
+});
+
+test('public webdesign preview refuses unknown outbound guard sender before owner fallback', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-unknown-guard-nl-0001',
+          bedrijf: 'Unknown Guard',
+          leadOwnerKey: 'serve',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-unknown-guard-nl-0001',
+          fileName: 'unknown-guard-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/unknown-guard-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/unknown-guard-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        return [{
+          guard_key: 'id:manual-import-unknown-guard-nl-0001',
+          sender_email: 'new-martijn-mailbox@example.test',
+          recipient_id: 'manual-import-unknown-guard-nl-0001',
+          recipient_company: 'Unknown Guard',
+          status: 'sent',
+          updated_at: '2026-06-11T13:17:38.634+00:00',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'unknown-guard' } }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
+  assert.match(response.body, /Preview wordt geladen/);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
 test('public webdesign preview profile image is exported sharp enough for the cover crop', () => {

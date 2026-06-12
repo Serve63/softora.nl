@@ -334,15 +334,34 @@ function inferPublicPreviewProfileKeyFromFields(objects, fields) {
   return '';
 }
 
+function hasPublicPreviewProfileFieldSignal(objects, fields) {
+  return (Array.isArray(objects) ? objects : []).some((object) =>
+    fields.some((field) => Boolean(normalizeString(object && object[field])))
+  );
+}
+
 function inferPublicPreviewProfileKey(objects) {
-  return inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS)
-    || inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS)
+  const sentKey = inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS);
+  if (sentKey) return sentKey;
+  if (hasPublicPreviewProfileFieldSignal(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS)) {
+    return 'unresolved';
+  }
+  return inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS)
     || inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_OWNER_FIELDS);
 }
 
 function resolvePublicPreviewProfile(record = null, customer = null, outboundContext = null) {
   const objects = collectProfileObjects(outboundContext, record, customer);
   const inferredKey = inferPublicPreviewProfileKey(objects);
+  if (inferredKey === 'unresolved') {
+    return {
+      key: 'unresolved',
+      name: '',
+      role: PUBLIC_PREVIEW_PROFILE_ROLE,
+      photoSource: '',
+      source: 'unresolved',
+    };
+  }
   const key = inferredKey || PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY;
   const fallback = PUBLIC_PREVIEW_PROFILES[key] || PUBLIC_PREVIEW_PROFILES[PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY];
   return {
@@ -355,7 +374,11 @@ function resolvePublicPreviewProfile(record = null, customer = null, outboundCon
 }
 
 function hasExplicitPublicPreviewProfile(preview) {
-  return Boolean(preview && preview.profile && preview.profile.source !== 'default');
+  return Boolean(preview && preview.profile && preview.profile.source === 'explicit');
+}
+
+function hasUnresolvedPublicPreviewProfile(preview) {
+  return Boolean(preview && preview.profile && preview.profile.source === 'unresolved');
 }
 
 function markPublicPreviewProfileContextPending(preview) {
@@ -751,7 +774,7 @@ function outboundContextMatchesPreview(context, identifier, record = null, custo
 function findOutboundContextForPreview(contexts, identifier, record = null, customer = null) {
   return (Array.isArray(contexts) ? contexts : [])
     .filter((context) =>
-      inferPublicPreviewProfileKeyFromFields([context], PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS) &&
+      hasPublicPreviewProfileFieldSignal([context], PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS) &&
         outboundContextMatchesPreview(context, identifier, record, customer)
     )
     .sort((left, right) =>
@@ -1627,6 +1650,10 @@ function createPublicWebdesignPreviewService(options = {}) {
     if (hasPendingPublicPreviewProfileContext(preview)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
       res.setHeader('Retry-After', '2');
+      return res.status(503).send(buildTemporarilyUnavailableHtml());
+    }
+    if (hasUnresolvedPublicPreviewProfile(preview)) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
       return res.status(503).send(buildTemporarilyUnavailableHtml());
     }
     res.setHeader(
