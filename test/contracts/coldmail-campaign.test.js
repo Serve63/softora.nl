@@ -4258,7 +4258,7 @@ test('coldmail autopilot lets dashboard link delivery override legacy image env'
   assert.equal(sentMessages[0].attachments, undefined);
 });
 
-test('coldmail campaign replaces sender signature variables from the selected mailbox', async () => {
+test('coldmail campaign replaces sender name but keeps recipient city in the signature', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -4266,6 +4266,7 @@ test('coldmail campaign replaces sender signature variables from the selected ma
         bedrijf: 'Bakkerij Zon',
         naam: 'Ruben',
         email: 'ruben@example.test',
+        stad: 'Florijnstraat 13, 4861 BW Chaam',
         status: 'prospect',
         mail: true,
       },
@@ -4304,17 +4305,18 @@ test('coldmail campaign replaces sender signature variables from the selected ma
       'Met vriendelijke groet,',
       'Martijn van de Ven',
       '',
-      '📍 {{stad}}',
+      '📍 {{afzenderPlaats}}',
     ].join('\n'),
     senderEmail: 'serve@softora.nl',
     specialAction: 'webdesign',
   });
 
   assert.equal(result.sent, 1);
-  assert.match(sentMessages[0].text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Liempde/);
+  assert.match(sentMessages[0].text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Chaam/);
   assert.doesNotMatch(sentMessages[0].text, /Martijn van de Ven/);
+  assert.doesNotMatch(sentMessages[0].text, /📍 Liempde/);
   assert.doesNotMatch(sentMessages[0].text, /📍 Alphen/);
-  assert.doesNotMatch(sentMessages[0].text, /📍 Rotterdam/);
+  assert.doesNotMatch(sentMessages[0].text, /Florijnstraat/);
 });
 
 test('coldmail campaign refuses webdesign outreach when the device mockup is missing', async () => {
