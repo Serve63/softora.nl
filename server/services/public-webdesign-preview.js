@@ -28,13 +28,19 @@ const PUBLIC_PREVIEW_HTML_CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, s
 const PUBLIC_PREVIEW_OPTIMIZED_ASSET_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800';
 const PUBLIC_PREVIEW_REDIRECT_ASSET_CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=1800';
 const PUBLIC_PREVIEW_PROFILE_ROLE = 'Webdesign & Software Ontwikkeling';
-const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'serve';
+const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'softora';
 const PUBLIC_PREVIEW_PROFILES = Object.freeze({
-  serve: Object.freeze({
-    key: 'serve',
+  softora: Object.freeze({
+    key: 'softora',
     name: 'Softora',
     role: 'Webdesign en software',
     photoSource: '/assets/softora-strategy-meeting.jpg?v=20260612a',
+  }),
+  serve: Object.freeze({
+    key: 'serve',
+    name: 'Servé Creusen',
+    role: PUBLIC_PREVIEW_PROFILE_ROLE,
+    photoSource: '/assets/serve-creusen-profile.jpg?v=20260612a',
   }),
   martijn: Object.freeze({
     key: 'martijn',
@@ -1172,7 +1178,7 @@ function buildConceptHtml(preview, titleFallback, assetIdentifier) {
   const titleText = cleanPublicPreviewTitle(preview.title, titleFallback || preview.id);
   const title = escapeHtml(titleText);
   const narrativeCompanyName = escapeHtml(cleanPublicPreviewNarrativeCompanyName(titleText));
-  const isPersonalProfile = profile.key === 'martijn';
+  const isPersonalProfile = profile.key === 'martijn' || profile.key === 'serve';
   const aboutTitleDesktop = isPersonalProfile ? 'Zó heb ik het webdesign gebouwd...' : 'Zó is het webdesign gebouwd...';
   const aboutIntro = isPersonalProfile
     ? 'Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.'
@@ -1673,12 +1679,7 @@ function createPublicWebdesignPreviewService(options = {}) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
       return res.status(503).send(buildTemporarilyUnavailableHtml());
     }
-    res.setHeader(
-      'Cache-Control',
-      hasExplicitPublicPreviewProfile(preview)
-        ? PUBLIC_PREVIEW_HTML_CACHE_CONTROL
-        : 'no-store, max-age=0, must-revalidate'
-    );
+    res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
     return res.status(200).send(buildConceptHtml(preview, routeIdentifier, assetIdentifier));
   }
 
