@@ -19,6 +19,17 @@ function normalizeKeyPart(value) {
     .replace(/^-+|-+$/g, '');
 }
 
+function normalizeCompactKeyPart(value) {
+  return normalizeKeyPart(value).replace(/-/g, '');
+}
+
+function addKeyVariants(keys, value) {
+  const key = normalizeKeyPart(value);
+  if (key) keys.add(key);
+  const compactKey = normalizeCompactKeyPart(value);
+  if (compactKey) keys.add(compactKey);
+}
+
 function stripUrlToHost(value) {
   const raw = normalizeString(value).toLowerCase();
   if (!raw) return '';
@@ -80,17 +91,19 @@ function getCandidateDomainKeys(input = {}) {
 }
 
 function getCandidateCompanyKeys(input = {}) {
-  return new Set([
-    normalizeKeyPart(input.recipientCompanyKey),
-    normalizeKeyPart(input.companyKey),
-    normalizeKeyPart(input.recipientCompany),
-    normalizeKeyPart(input.company),
-    normalizeKeyPart(input.bedrijf),
-    normalizeKeyPart(input.organisatie),
-    normalizeKeyPart(input.organization),
-    normalizeKeyPart(input.name),
-    normalizeKeyPart(input.naam),
-  ].filter(Boolean));
+  const keys = new Set();
+  [
+    input.recipientCompanyKey,
+    input.companyKey,
+    input.recipientCompany,
+    input.company,
+    input.bedrijf,
+    input.organisatie,
+    input.organization,
+    input.name,
+    input.naam,
+  ].forEach((value) => addKeyVariants(keys, value));
+  return keys;
 }
 
 function matchesBlockedDomain(candidateDomain, blockedHost) {
@@ -107,6 +120,7 @@ function findOutreachSuppressionMatch(input = {}) {
     const blockedHost = stripUrlToHost(blockedDomain);
     const blockedDomainKey = normalizeKeyPart(blockedHost);
     const blockedCompanyKey = normalizeKeyPart(blockedHost.replace(/\.[a-z0-9.-]+$/i, ''));
+    const blockedCompanyCompactKey = normalizeCompactKeyPart(blockedCompanyKey);
     if (Array.from(domains).some((domain) => matchesBlockedDomain(domain, blockedHost))) {
       return {
         domain: blockedHost,
@@ -121,7 +135,15 @@ function findOutreachSuppressionMatch(input = {}) {
         message: `Outbound mail naar ${blockedHost} is hard geblokkeerd.`,
       };
     }
-    if (blockedCompanyKey && companyKeys.has(blockedCompanyKey)) {
+    const hasCompanyMatch = Array.from(companyKeys).some((key) => {
+      const compactKey = normalizeCompactKeyPart(key);
+      return (
+        key === blockedCompanyKey ||
+        key === blockedCompanyCompactKey ||
+        (blockedCompanyCompactKey && compactKey.includes(blockedCompanyCompactKey))
+      );
+    });
+    if (blockedCompanyKey && hasCompanyMatch) {
       return {
         domain: blockedHost,
         reason: 'hard_blocked_company',

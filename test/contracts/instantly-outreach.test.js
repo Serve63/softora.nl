@@ -1332,6 +1332,103 @@ test('instantly sync removes remote campaign leads that were already mailed outs
   assert.equal(rows[1].instantlyStatus, undefined);
 });
 
+test('instantly sync removes remote growsocialmedia.nl leads instead of backfilling them', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    rows: [
+      {
+        id: 'grow-social-media',
+        bedrijf: 'Grow Social Media B.V.',
+        email: 'owner@example.test',
+        website: 'https://growsocialmedia.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    remoteInstantlyLeads: [
+      {
+        id: 'instantly-grow-lead',
+        campaign: 'campaign-1',
+        email: 'owner@example.test',
+        company_name: 'Grow Social Media B.V.',
+        timestamp_created: '2026-05-25T08:00:00.000Z',
+        payload: {
+          softora_customer_id: 'grow-social-media',
+          softora_source: 'softora',
+          softora_status: 'prospect',
+        },
+      },
+    ],
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url === 'https://api.instantly.test/api/v2/leads' && options.method === 'DELETE') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { count: 1 },
+        };
+      }
+      throw new Error(`Unexpected Instantly call: ${options.method} ${url}`);
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'remote_instantly_reconcile');
+  assert.equal(result.removedRemoteInstantlyLeads, 1);
+  assert.equal(result.backfilledRemoteInstantlyLeads, 0);
+  assert.equal(result.instantlyDeletedCount, 1);
+  assert.equal(fetchCalls.length, 1);
+  const deleteBody = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads');
+  assert.equal(fetchCalls[0].options.method, 'DELETE');
+  assert.deepEqual(deleteBody.ids, ['instantly-grow-lead']);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].meta.source, 'instantly-remote-reconcile');
+
+  const rows = getRows();
+  assert.equal(rows[0].instantlyLeadId, '');
+  assert.equal(rows[0].instantlyStatus, '');
+  assert.equal(rows[0].instantlyRemovedLeadId, 'instantly-grow-lead');
+  assert.equal(rows[0].instantlyRemovedReason, 'outreach_suppression_hard_block');
+  assert.equal(rows[0].instantlyRemovedSuppressionDomain, 'growsocialmedia.nl');
+  assert.ok(rows[0].hist.some((item) => item.source === 'instantly-hard-block-cleanup'));
+});
+
+test('instantly sync deletes unmatched remote growsocialmedia.nl leads', async () => {
+  const { service, fetchCalls, getRows } = createService({
+    remoteInstantlyLeads: [
+      {
+        id: 'instantly-grow-unmatched',
+        campaign: 'campaign-1',
+        email: 'sales@mail.growsocialmedia.nl',
+        company_name: 'Grow Social Media',
+      },
+    ],
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url === 'https://api.instantly.test/api/v2/leads' && options.method === 'DELETE') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { count: 1 },
+        };
+      }
+      throw new Error(`Unexpected Instantly call: ${options.method} ${url}`);
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'remote_instantly_reconcile');
+  assert.equal(result.removedRemoteInstantlyLeads, 1);
+  assert.equal(result.remoteInstantlyUnmatchedCount, 0);
+  assert.equal(result.instantlyDeletedCount, 1);
+  assert.equal(fetchCalls.length, 1);
+  const deleteBody = JSON.parse(fetchCalls[0].options.body);
+  assert.deepEqual(deleteBody.ids, ['instantly-grow-unmatched']);
+  assert.equal(getRows()[0].instantlyStatus, undefined);
+});
+
 test('instantly sync backfills remote campaign leads before normal mailbox sending can select them', async () => {
   const { service, fetchCalls, getRows, writes } = createService({
     rows: [

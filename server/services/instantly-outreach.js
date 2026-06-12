@@ -2688,6 +2688,17 @@ function createInstantlyOutreachService(deps = {}) {
     return hasNonInstantlyColdmailSignal(row);
   }
 
+  function getRemoteInstantlyOutreachSuppressionMatch(remote) {
+    if (!remote || typeof remote !== 'object') return null;
+    return findOutreachSuppressionMatch({
+      recipientEmail: remote.email,
+      email: remote.email,
+      recipientDomain: getEmailDomain(remote.email),
+      recipientCompany: remote.company,
+      company: remote.company,
+    });
+  }
+
   function getRemoteInstantlyReconcilePlan(rows, remoteLeads) {
     const lookup = buildCustomerRowLookup(rows);
     const seenRemoveLeadIds = new Set();
@@ -2699,7 +2710,25 @@ function createInstantlyOutreachService(deps = {}) {
     (Array.isArray(remoteLeads) ? remoteLeads : []).forEach((rawLead) => {
       const remote = normalizeRemoteInstantlyLead(rawLead);
       if (!remote.leadId) return;
+      const remoteSuppressionMatch = getRemoteInstantlyOutreachSuppressionMatch(remote);
       const match = getLocalMatchForRemoteInstantlyLead(remote, lookup);
+      const localSuppressionMatch = match ? getInstantlyOutreachSuppressionMatch(match) : null;
+      const suppressionMatch = remoteSuppressionMatch || localSuppressionMatch;
+      if (suppressionMatch) {
+        if (!seenRemoveLeadIds.has(remote.leadId)) {
+          seenRemoveLeadIds.add(remote.leadId);
+          remove.push({
+            ...(match || {}),
+            id: match && match.id ? match.id : remote.customerId || remote.email || remote.leadId,
+            leadId: remote.leadId,
+            campaignId: remote.campaignId,
+            remote,
+            suppressionMatch,
+            suppressionCode: 'OUTREACH_SUPPRESSION_HARD_BLOCK',
+          });
+        }
+        return;
+      }
       if (!match) {
         unmatched.push(remote);
         return;
@@ -3288,19 +3317,25 @@ function createInstantlyOutreachService(deps = {}) {
     return rows.map((row, index) => {
       const item = removedByIndex.get(index);
       if (!item) return row;
+      const suppressionMatch = item && item.suppressionMatch;
+      const isSuppressed = normalizeString(item && item.suppressionCode) === 'OUTREACH_SUPPRESSION_HARD_BLOCK';
       const removedLeadId = normalizeString(item.leadId) || normalizeString(row.instantlyLeadId);
       const removedCampaignId =
         normalizeString(item.campaignId) || normalizeString(row.instantlyCampaignId) || config.defaultCampaignId;
       const historyEntry = buildHistoryEntry(
         {
           type: 'instantly_verwijderd',
-          label: 'Instantly duplicate verwijderd',
+          label: isSuppressed ? 'Instantly hard-block verwijderd' : 'Instantly duplicate verwijderd',
           actor,
-          source: 'instantly-dedupe-cleanup',
-          messageKey: `instantly-dedupe-cleanup:${removedCampaignId}:${item.id}:${removedLeadId}`,
-          subject: 'Instantly duplicate cleanup',
+          source: isSuppressed ? 'instantly-hard-block-cleanup' : 'instantly-dedupe-cleanup',
+          messageKey: `${
+            isSuppressed ? 'instantly-hard-block-cleanup' : 'instantly-dedupe-cleanup'
+          }:${removedCampaignId}:${item.id}:${removedLeadId}`,
+          subject: isSuppressed ? 'Instantly hard-block cleanup' : 'Instantly duplicate cleanup',
           preview:
-            'Lead had al Softora coldmail/open-tracking en is daarom uit Instantly verwijderd om dubbele outreach te voorkomen.',
+            isSuppressed
+              ? 'Lead is hard geblokkeerd voor outbound mail en daarom uit Instantly verwijderd.'
+              : 'Lead had al Softora coldmail/open-tracking en is daarom uit Instantly verwijderd om dubbele outreach te voorkomen.',
         },
         { normalizeString, truncateText, now: () => new Date(removedAt) }
       );
@@ -3324,7 +3359,10 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyRemovedAt: removedAt,
         instantlyRemovedLeadId: removedLeadId,
         instantlyRemovedCampaignId: removedCampaignId,
-        instantlyRemovedReason: 'prior_softora_coldmail',
+        instantlyRemovedReason: isSuppressed ? 'outreach_suppression_hard_block' : 'prior_softora_coldmail',
+        instantlyRemovedSuppressionDomain: isSuppressed
+          ? normalizeString(suppressionMatch && suppressionMatch.domain)
+          : row.instantlyRemovedSuppressionDomain,
         updatedAt: removedAt,
         hist: mergeHistory(row, historyEntry, normalizeString),
       };
