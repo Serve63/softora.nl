@@ -93,6 +93,12 @@ function getCandidateCompanyKeys(input = {}) {
   ].filter(Boolean));
 }
 
+function matchesBlockedDomain(candidateDomain, blockedHost) {
+  const domain = stripUrlToHost(candidateDomain);
+  const blocked = stripUrlToHost(blockedHost);
+  return Boolean(domain && blocked && (domain === blocked || domain.endsWith(`.${blocked}`)));
+}
+
 function findOutreachSuppressionMatch(input = {}) {
   const domains = getCandidateDomains(input);
   const domainKeys = getCandidateDomainKeys(input);
@@ -101,7 +107,7 @@ function findOutreachSuppressionMatch(input = {}) {
     const blockedHost = stripUrlToHost(blockedDomain);
     const blockedDomainKey = normalizeKeyPart(blockedHost);
     const blockedCompanyKey = normalizeKeyPart(blockedHost.replace(/\.[a-z0-9.-]+$/i, ''));
-    if (domains.has(blockedHost)) {
+    if (Array.from(domains).some((domain) => matchesBlockedDomain(domain, blockedHost))) {
       return {
         domain: blockedHost,
         reason: 'hard_blocked_domain',
