@@ -223,13 +223,13 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.match(response.body, /\.about-text p\{font-size:14px;color:var\(--muted\);line-height:1\.85;margin-bottom:12px\}/);
   assert.match(response.body, /@media\(max-width:1120px\)\{[\s\S]*\.about-profile\{width:min\(100%,360px\);justify-self:center;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:14px\}\.about-photo\{width:68px;flex:0 0 68px;border-radius:999px;aspect-ratio:1\/1;box-shadow:0 8px 24px rgba\(28,43,80,\.1\)\}\.profile-signature\{margin:0;text-align:left;padding:0;border-top:0\}/);
   assert.match(response.body, /@media\(max-width:700px\)\{\.about-section\{gap:28px\}\.about-profile\{width:min\(100%,320px\);justify-content:flex-start\}\.about-photo\{width:58px;flex-basis:58px\}\.profile-signature\{display:flex;flex-direction:column;align-items:flex-start\}\.profile-signature span\{order:-1;white-space:nowrap;font-size:clamp\(8px,2\.5vw,10px\);letter-spacing:\.7px;margin-bottom:2px\}\.about-text h2\{font-size:clamp\(13px,4\.1vw,22px\);text-align:center\}\.about-title-desktop\{display:none\}\.about-title-mobile\{display:inline\}\}/);
-  assert.match(response.body, /<div class="about-profile">\s*<div class="desktop-profile-role">Webdesign &amp; Software Ontwikkeling<\/div>\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Servé Creusen<\/strong>\s*<span>Webdesign &amp; Software Ontwikkeling<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
-  assert.match(response.body, /<h2><span class="about-title-desktop">Zó heb ik het webdesign gebouwd\.\.\.<\/span><span class="about-title-mobile">Zó is het webdesign gebouwd!<\/span><\/h2>/);
-  assert.match(response.body, /<p>Begonnen met HTML-code en een leeg scherm\. De structuur, indeling en techniek heb ik stap voor stap opgebouwd\. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers\.<\/p>/);
-  assert.match(response.body, /<p>Ook heb ik de concurrenten van Piggy’s Kadoshop Hilvarenbeek in kaart gebracht\. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten\.<\/p>/);
-  assert.match(response.body, /<p>Die inzichten heb ik meegenomen in dit ontwerp\. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt\.<\/p>/);
-  assert.match(response.body, /<p>Later heb ik AI subtiel gebruikt om de uitstraling te versterken\. AI is krachtig, maar kan kleine details missen\. Vergeef me als iets niet helemaal klopt; zoals een adres of een logo\.<\/p>/);
-  assert.match(response.body, /<p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen\. Ook voor onderhoud en doorontwikkeling denk ik graag mee\.<\/p>/);
+  assert.match(response.body, /<div class="about-profile">\s*<div class="desktop-profile-role">Webdesign en software<\/div>\s*<div class="about-photo">[\s\S]*<div class="signature profile-signature">\s*<strong>Softora<\/strong>\s*<span>Webdesign en software<\/span>\s*<\/div>\s*<\/div>\s*<div class="about-text">/);
+  assert.match(response.body, /<h2><span class="about-title-desktop">Zó is het webdesign gebouwd\.\.\.<\/span><span class="about-title-mobile">Zó is het webdesign gebouwd!<\/span><\/h2>/);
+  assert.match(response.body, /<p>We zijn begonnen met HTML-code en een leeg scherm\. De structuur, indeling en techniek zijn stap voor stap opgebouwd\. Vanuit daar is gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers\.<\/p>/);
+  assert.match(response.body, /<p>Ook zijn de concurrenten van Piggy’s Kadoshop Hilvarenbeek in kaart gebracht\. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten\.<\/p>/);
+  assert.match(response.body, /<p>Die inzichten zijn meegenomen in dit ontwerp\. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt\.<\/p>/);
+  assert.match(response.body, /<p>Later is AI subtiel gebruikt om de uitstraling te versterken\. AI is krachtig, maar kan kleine details missen\. Kleine details kunnen nog afwijken, zoals een adres of een logo\.<\/p>/);
+  assert.match(response.body, /<p>Naast webdesign bouwt Softora ook bedrijfssoftware, dashboards en klantportalen\. Ook voor onderhoud en doorontwikkeling denken we graag mee\.<\/p>/);
   assert.doesNotMatch(response.body, /concurrenten van \{\{website\}\}/);
   assert.doesNotMatch(response.body, /Hoe heb ik dit webdesign gebouwd/);
   assert.doesNotMatch(response.body, /<p>De basis heb ik zelf opgebouwd/);
@@ -238,7 +238,9 @@ test('public webdesign preview concept route renders the experimental supplied l
   assert.doesNotMatch(response.body, /<p>Dit design is tot stand gekomen/);
   assert.doesNotMatch(response.body, /<p>Kleine details kunnen nog afwijken/);
   assert.doesNotMatch(response.body, /Over dit concept/);
-  assert.match(response.body, /serve-creusen-profile\.jpg\?v=20260608e/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg\?v=20260612a/);
+  assert.doesNotMatch(response.body, /Serv[eé]\s+Creusen/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile/);
   assert.match(response.body, /Piggy’s Kadoshop Hilvarenbeek/);
   assert.match(response.body, /<link rel="preload" as="image" href="\/webdesign\/customer-1\/asset\/webdesign\?w=840" fetchpriority="high">/);
   assert.match(response.body, /<link rel="preload" as="image" href="\/webdesign\/customer-1\/asset\/mockup\?w=1040">/);
@@ -492,7 +494,7 @@ test('public webdesign preview uses a human company name in narrative copy', asy
   });
 
   assert.match(body, /<h1 class="hero-title">Autobedrijf Van Driel B\.V\.<\/h1>/);
-  assert.match(body, /<p>Ook heb ik de concurrenten van Autobedrijf Van Driel in kaart gebracht\./);
+  assert.match(body, /<p>Ook zijn de concurrenten van Autobedrijf Van Driel in kaart gebracht\./);
   assert.doesNotMatch(body, /concurrenten van Autobedrijf Van Driel B\.V\./);
 });
 
@@ -647,14 +649,14 @@ test('public webdesign preview retries transient reads and resolves BV slug vari
 
 test('public webdesign preview maps every known sender alias to the canonical profile', async () => {
   const cases = [
-    ['serve@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['servecreusen@softora.nl', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['servec321@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['serve290@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['servecreusen7@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['contact.venvisuals@gmail.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['serve@websoftora.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
-    ['servecreusen@websoftora.com', 'Servé Creusen', 'serve-creusen-profile.jpg', 'Martijn van de Ven'],
+    ['serve@softora.nl', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['servecreusen@softora.nl', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['servec321@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['serve290@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['servecreusen7@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['contact.venvisuals@gmail.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['serve@websoftora.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
+    ['servecreusen@websoftora.com', 'Softora', 'softora-strategy-meeting.jpg', 'Martijn van de Ven'],
     ['martijn@softora.nl', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
     ['martijnvandeven@softora.nl', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
     ['martijnven123@gmail.com', 'Martijn van de Ven', 'martijn-van-de-ven-profile.png', 'Servé Creusen'],
@@ -668,7 +670,7 @@ test('public webdesign preview maps every known sender alias to the canonical pr
       id: `manual-import-${senderEmail.replace(/[^a-z0-9]+/gi, '-')}`,
       bedrijf: 'Alias Test',
       lastColdmailSenderEmail: senderEmail,
-      leadOwnerKey: expectedName === 'Servé Creusen' ? 'martijn' : 'serve',
+      leadOwnerKey: expectedName === 'Softora' ? 'martijn' : 'serve',
       senderDisplayName: 'Niet tonen als variabele naam',
       senderProfilePhotoUrl: 'https://wrong.softora.test/profile.jpg',
       profilePhotoUrl: 'https://wrong.softora.test/other-profile.jpg',
@@ -1080,7 +1082,7 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
 });
 
-test('public webdesign preview does not render the default Serve profile when profile enrichment times out', async () => {
+test('public webdesign preview does not render a personal profile when profile enrichment times out', async () => {
   let customerReads = 0;
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
@@ -1123,7 +1125,7 @@ test('public webdesign preview does not render the default Serve profile when pr
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
-test('public webdesign preview does not cache default Serve concept pages without sender context', async () => {
+test('public webdesign preview keeps neutral concept pages without sender context uncached', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {
       return { values: {} };
@@ -1154,10 +1156,13 @@ test('public webdesign preview does not cache default Serve concept pages withou
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
-  assert.match(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.match(response.body, /<strong>Softora<\/strong>/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Serv[eé]\s+Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
-test('public webdesign preview refuses a temporary Serve fallback when outbound guard lookup is slow', async () => {
+test('public webdesign preview refuses a temporary personal fallback when outbound guard lookup is slow', async () => {
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
     async getUiStateValues() {

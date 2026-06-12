@@ -32,9 +32,9 @@ const PUBLIC_PREVIEW_PROFILE_DEFAULT_KEY = 'serve';
 const PUBLIC_PREVIEW_PROFILES = Object.freeze({
   serve: Object.freeze({
     key: 'serve',
-    name: 'Servé Creusen',
-    role: PUBLIC_PREVIEW_PROFILE_ROLE,
-    photoSource: '/assets/serve-creusen-profile.jpg?v=20260608e',
+    name: 'Softora',
+    role: 'Webdesign en software',
+    photoSource: '/assets/softora-strategy-meeting.jpg?v=20260612a',
   }),
   martijn: Object.freeze({
     key: 'martijn',
@@ -1172,6 +1172,23 @@ function buildConceptHtml(preview, titleFallback, assetIdentifier) {
   const titleText = cleanPublicPreviewTitle(preview.title, titleFallback || preview.id);
   const title = escapeHtml(titleText);
   const narrativeCompanyName = escapeHtml(cleanPublicPreviewNarrativeCompanyName(titleText));
+  const isPersonalProfile = profile.key === 'martijn';
+  const aboutTitleDesktop = isPersonalProfile ? 'Zó heb ik het webdesign gebouwd...' : 'Zó is het webdesign gebouwd...';
+  const aboutIntro = isPersonalProfile
+    ? 'Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.'
+    : 'We zijn begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek zijn stap voor stap opgebouwd. Vanuit daar is gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.';
+  const aboutMarket = isPersonalProfile
+    ? `Ook heb ik de concurrenten van ${narrativeCompanyName} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.`
+    : `Ook zijn de concurrenten van ${narrativeCompanyName} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.`;
+  const aboutAi = isPersonalProfile
+    ? 'Later heb ik AI subtiel gebruikt om de uitstraling te versterken. AI is krachtig, maar kan kleine details missen. Vergeef me als iets niet helemaal klopt; zoals een adres of een logo.'
+    : 'Later is AI subtiel gebruikt om de uitstraling te versterken. AI is krachtig, maar kan kleine details missen. Kleine details kunnen nog afwijken, zoals een adres of een logo.';
+  const aboutServices = isPersonalProfile
+    ? 'Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.'
+    : 'Naast webdesign bouwt Softora ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denken we graag mee.';
+  const aboutResult = isPersonalProfile
+    ? 'Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.'
+    : 'Die inzichten zijn meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.';
   const preconnectTags = Array.from(new Set([
     getUrlOrigin(preview.photoSource),
     getUrlOrigin(preview.mockupSource),
@@ -1270,12 +1287,12 @@ ${preconnectTags}
       </div>
     </div>
     <div class="about-text">
-      <h2><span class="about-title-desktop">Zó heb ik het webdesign gebouwd...</span><span class="about-title-mobile">Zó is het webdesign gebouwd!</span></h2>
-      <p>Begonnen met HTML-code en een leeg scherm. De structuur, indeling en techniek heb ik stap voor stap opgebouwd. Vanuit daar heb ik gekeken hoe de website logisch, overzichtelijk en prettig werkt voor bezoekers.</p>
-      <p>Ook heb ik de concurrenten van ${narrativeCompanyName} in kaart gebracht. Niet om te kopiëren, maar om te zien wat in deze markt sterk werkt: welke opbouw vertrouwen geeft, welke details bezoekers helpen en waar kansen liggen om het net frisser en beter neer te zetten.</p>
-      <p>Die inzichten heb ik meegenomen in dit ontwerp. Zo ontstaat een website die niet alleen mooi oogt, maar ook duidelijk, klantgericht en doordacht aanvoelt.</p>
-      <p>Later heb ik AI subtiel gebruikt om de uitstraling te versterken. AI is krachtig, maar kan kleine details missen. Vergeef me als iets niet helemaal klopt; zoals een adres of een logo.</p>
-      <p>Naast webdesign bouw ik ook bedrijfssoftware, dashboards en klantportalen. Ook voor onderhoud en doorontwikkeling denk ik graag mee.</p>
+      <h2><span class="about-title-desktop">${aboutTitleDesktop}</span><span class="about-title-mobile">Zó is het webdesign gebouwd!</span></h2>
+      <p>${aboutIntro}</p>
+      <p>${aboutMarket}</p>
+      <p>${aboutResult}</p>
+      <p>${aboutAi}</p>
+      <p>${aboutServices}</p>
     </div>
   </section>
   <script>
