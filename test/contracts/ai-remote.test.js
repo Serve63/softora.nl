@@ -238,7 +238,7 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(calls[0].options.headers['OpenAI-Project'], 'proj_softora');
   assert.match(String(calls[0].options.body || ''), /gpt-image-2/);
   assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
-  assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
+  assert.match(String(calls[0].options.body || ''), /"quality":"low"/);
   assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
   assert.equal(calls[0].timeoutMs, 540000);
   assert.equal(result.model, 'gpt-image-2');
@@ -297,7 +297,7 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
   assert.equal(result.referenceImageCount, 1);
   assert.equal(calls[0].options.body.get('model'), 'gpt-image-2');
   assert.equal(calls[0].options.body.get('size'), '2160x3840');
-  assert.equal(calls[0].options.body.get('quality'), 'high');
+  assert.equal(calls[0].options.body.get('quality'), 'low');
   assert.equal(calls[0].timeoutMs, 540000);
   assert.equal(calls[0].options.body.get('prompt'), 'Preview met 1 referentie');
   assert.equal(calls[0].options.body.getAll('image[]').length, 1);
