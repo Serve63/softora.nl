@@ -494,6 +494,7 @@ function sanitizeMailboxDisplayText(value) {
 const INDEX_STALE_MS = 2 * 60 * 1000;
 const DEFAULT_SYNC_FOLDERS = ['inbox', 'sent'];
 const DEFAULT_SYNC_LIMIT = 50;
+const CRON_SYNC_LIMIT = 100;
 
 function createMailboxService(deps = {}) {
   const {
@@ -2499,6 +2500,10 @@ function createMailboxService(deps = {}) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const folderParam = body.folder || req.query?.folder || '';
+      const defaultLimit = String(req.method || '').toUpperCase() === 'GET'
+        ? CRON_SYNC_LIMIT
+        : DEFAULT_SYNC_LIMIT;
+      const requestedLimit = body.limit || req.query?.limit || defaultLimit;
       const folders = folderParam
         ? String(folderParam)
             .split(',')
@@ -2508,7 +2513,7 @@ function createMailboxService(deps = {}) {
       const result = await syncMailbox({
         accountEmail: body.account || req.query?.account || '',
         folders,
-        limit: Number(body.limit || req.query?.limit || DEFAULT_SYNC_LIMIT) || DEFAULT_SYNC_LIMIT,
+        limit: Number(requestedLimit) || defaultLimit,
         force: Boolean(body.force || req.query?.force === '1' || req.query?.force === 'true'),
       });
       return res.status(result.ok ? 200 : 207).json(result);

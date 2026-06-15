@@ -2051,3 +2051,59 @@ test('mailbox service exposes sync response handler for cron and admin routes', 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, { ok: true, results: [] });
 });
+
+test('mailbox cron sync indexes up to 100 sent messages by default', async () => {
+  const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
+    uid: index + 1,
+    flags: ['\\Seen'],
+    internalDate: new Date(Date.UTC(2026, 5, 15, 8, index % 60, 0)),
+    source: Buffer.from(`Subject: Bericht ${index + 1}\r\nFrom: Servé <serve@softora.nl>\r\nTo: klant@example.test\r\n\r\nTest`),
+  }));
+  const client = createFakeImapClient({
+    boxes: [{ path: 'Sent', specialUse: '\\Sent' }],
+    messagesByMailbox: { Sent: sentMessages },
+  });
+  const upsertedCounts = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async () => ({
+      subject: 'Test',
+      text: 'Test',
+      from: { value: [{ address: 'serve@softora.nl', name: 'Servé' }] },
+      to: { value: [{ address: 'klant@example.test', name: 'Klant' }] },
+      date: new Date('2026-06-15T08:00:00.000Z'),
+      attachments: [],
+    }),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-1' }),
+      upsertMessages: async ({ messages }) => {
+        upsertedCounts.push(messages.length);
+        return { ok: true, upserted: messages.length };
+      },
+      finishSync: async () => ({ ok: true }),
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse(
+    { method: 'GET', query: { account: 'serve@softora.nl', folder: 'sent' }, body: {} },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.deepEqual(upsertedCounts, [100]);
+  assert.equal(response.body.results[0].synced, 100);
+});
