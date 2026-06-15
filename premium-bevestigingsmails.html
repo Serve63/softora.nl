@@ -1776,7 +1776,7 @@ function initCampaignDatabaseAutoRefresh() {
   });
   campaignDatabaseRefreshTimer = window.setInterval(() => {
     if (!document.hidden) refreshCampaignDatabaseForLatestState();
-  }, 15000);
+  }, 60000);
 }
 
 async function syncColdmailRepliesFromMailbox(options) {
@@ -1817,7 +1817,7 @@ function initColdmailReplyAutoSync() {
   });
   coldmailReplySyncTimer = window.setInterval(function () {
     if (!document.hidden) void syncColdmailRepliesFromMailbox();
-  }, 45000);
+  }, 300000);
   void syncColdmailRepliesFromMailbox({ force: true });
 }
 

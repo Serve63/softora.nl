@@ -335,7 +335,7 @@
     const response = await fetch(url, Object.assign({
       credentials: "same-origin",
       headers: { Accept: "application/json" },
-      cache: "no-store",
+      cache: options && options.method && options.method !== "GET" ? "no-store" : "default",
     }, options || {}));
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload || payload.ok === false) {
@@ -402,7 +402,7 @@
     if (isLeadGenerator() || !injectUi()) return;
     render();
     void refresh();
-    global.setInterval(refresh, 60000);
+    global.setInterval(refresh, 300000);
     global.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) void refresh();
