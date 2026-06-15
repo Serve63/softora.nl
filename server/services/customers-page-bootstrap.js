@@ -654,10 +654,20 @@ function createCustomersPageBootstrapService(deps = {}) {
     );
   }
 
-  async function buildCustomersBootstrapPayload() {
+  async function buildCustomersBootstrapPayload(options = {}) {
     const remoteState = await readBootstrapUiState(customerScope);
-    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orderState = await readBootstrapUiState(orderScope);
+    if (options.includeCustomers === false) {
+      return {
+        ok: hasLoadedUiStateValues(remoteState) || hasLoadedUiStateValues(orderState),
+        loadedAt: new Date().toISOString(),
+        source: 'deferred',
+        deferred: true,
+        customers: [],
+        activeOrdersState: buildBootstrapStateSnapshot(orderState),
+      };
+    }
+    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
     if (remoteCustomers.length) {

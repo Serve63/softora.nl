@@ -88,6 +88,40 @@ test('customers page bootstrap prefers stored customer database rows', async () 
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^2<script>/);
 });
 
+test('customers page bootstrap can defer heavy customer rows for the premium database page', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      if (scope === 'premium_customers_database') {
+        return {
+          source: 'supabase:data_ops',
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              { id: 'heavy-1', bedrijf: 'Zware database rij', status: 'prospect' },
+            ]),
+          },
+        };
+      }
+      return {
+        source: 'supabase:data_ops',
+        values: {
+          softora_custom_orders_premium_v1: JSON.stringify([]),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({ includeCustomers: false });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'deferred');
+  assert.equal(payload.deferred, true);
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(seenScopes, ['premium_customers_database', 'premium_active_orders']);
+  assert.equal(payload.activeOrdersState.source, 'supabase:data_ops');
+});
+
 test('customers page bootstrap vult dashboard actieve-opdrachten teller server-side', () => {
   const orders = JSON.stringify([
     {

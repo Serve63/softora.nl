@@ -498,7 +498,10 @@ function createAgendaRuntime(deps = {}) {
       fileName === 'premium-personeel-dashboard.html'
     ) {
       const isPremiumDashboard = fileName === 'premium-personeel-dashboard.html';
-      const dashboardPayload = await customersPageBootstrapService.buildCustomersBootstrapPayload();
+      const isPremiumDatabase = fileName === 'premium-database.html';
+      const dashboardPayload = await customersPageBootstrapService.buildCustomersBootstrapPayload({
+        includeCustomers: !isPremiumDatabase,
+      });
       const bootstrapData = {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
         scriptId: 'softoraCustomersBootstrap',
