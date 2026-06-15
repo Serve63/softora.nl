@@ -1,10 +1,32 @@
 const OPENAI_PRICING_SOURCE_URL = 'https://platform.openai.com/docs/pricing/';
 const OPENAI_USAGE_API_SOURCE = 'OpenAI Organization Usage API';
 const OPENAI_WEB_SEARCH_USD_PER_CALL = 0.01;
-const DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD = 0.165;
+const DEFAULT_GPT_IMAGE_2_LOW_1024X1536_USD = 0.005;
+const GPT_IMAGE_2_1024X1536_USD_BY_QUALITY = {
+  low: 0.005,
+  medium: 0.041,
+  high: 0.165,
+};
+const GPT_IMAGE_2_1024X1024_USD_BY_QUALITY = {
+  low: 0.006,
+  medium: 0.053,
+  high: 0.211,
+};
 
 function normalizeString(value) {
   return String(value || '').trim();
+}
+
+function normalizeOpenAiImageQuality(valueRaw, deps = {}) {
+  const env = deps.env || process.env || {};
+  const raw = normalizeString(
+    valueRaw ||
+      deps.openAiImageQuality ||
+      env.WEBSITE_PREVIEW_IMAGE_QUALITY ||
+      env.OPENAI_IMAGE_QUALITY ||
+      'low'
+  ).toLowerCase();
+  return ['low', 'medium', 'high'].includes(raw) ? raw : 'low';
 }
 
 function getOpenAiTextModelRates(modelRaw) {
@@ -31,20 +53,21 @@ function getOpenAiImageCostUsdPerImage(modelRaw, sizeRaw, deps = {}) {
 
   const model = normalizeString(modelRaw).toLowerCase();
   const size = normalizeString(sizeRaw).toLowerCase();
+  const quality = normalizeOpenAiImageQuality(deps.quality || deps.imageQuality, deps);
   const isPortraitOrLandscape = size === '1024x1536' || size === '1536x1024';
   const isSquare = size === '1024x1024';
 
   if (model.includes('gpt-image-2') || model === 'chatgpt-image-latest') {
-    if (isPortraitOrLandscape) return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
-    if (isSquare) return 0.211;
-    return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
+    if (isPortraitOrLandscape) return GPT_IMAGE_2_1024X1536_USD_BY_QUALITY[quality];
+    if (isSquare) return GPT_IMAGE_2_1024X1024_USD_BY_QUALITY[quality];
+    return GPT_IMAGE_2_1024X1536_USD_BY_QUALITY[quality];
   }
   if (model.includes('gpt-image-1.5')) return isSquare ? 0.224 : 0.176;
   if (model.includes('gpt-image-1-mini')) return isSquare ? 0.056 : 0.044;
   if (model.includes('gpt-image-1')) return isSquare ? 0.167 : 0.25;
   if (model.includes('dall-e-3')) return isPortraitOrLandscape ? 0.12 : 0.08;
   if (model.includes('dall-e-2')) return 0.02;
-  return DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD;
+  return DEFAULT_GPT_IMAGE_2_LOW_1024X1536_USD;
 }
 
 function getOpenAiWebSearchUsdPerCall(deps = {}) {
@@ -55,7 +78,9 @@ function getOpenAiWebSearchUsdPerCall(deps = {}) {
 }
 
 module.exports = {
-  DEFAULT_GPT_IMAGE_2_HIGH_1024X1536_USD,
+  DEFAULT_GPT_IMAGE_2_LOW_1024X1536_USD,
+  GPT_IMAGE_2_1024X1536_USD_BY_QUALITY,
+  GPT_IMAGE_2_1024X1024_USD_BY_QUALITY,
   OPENAI_PRICING_SOURCE_URL,
   OPENAI_USAGE_API_SOURCE,
   OPENAI_WEB_SEARCH_USD_PER_CALL,

@@ -807,7 +807,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /state\.remoteCustomersLoaded = true/);
   assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded/);
   assert.match(pageSource, /id="photoCostLabel" aria-label="Kosten voor AI-foto's"/);
-  assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.21;/);
+  assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.005;/);
   assert.match(pageSource, /<strong>€0,00<\/strong>/);
   assert.match(pageSource, /\.photo-cost-label/);
   assert.match(pageSource, /<div class="modal-bg" id="photoBatchModal" aria-hidden="true">/);

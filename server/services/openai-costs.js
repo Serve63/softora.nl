@@ -573,7 +573,10 @@ function estimateOpenAiTextUsageUsd(result = {}, deps = {}) {
 function estimateOpenAiImageUsageUsd(result = {}, deps = {}) {
   const imageCount = Math.max(0, Number(result.images || result.num_images || result.num_model_requests || 0) || 0);
   if (imageCount <= 0) return { usd: 0, imageCount: 0, requestCount: 0 };
-  const perImageUsd = getOpenAiImageCostUsdPerImage(result.model, result.size, deps);
+  const perImageUsd = getOpenAiImageCostUsdPerImage(result.model, result.size, {
+    ...deps,
+    imageQuality: result.quality || result.image_quality,
+  });
   return {
     usd: imageCount * perImageUsd,
     imageCount,
