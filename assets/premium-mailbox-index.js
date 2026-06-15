@@ -2,6 +2,8 @@
 "use strict";
 
 let syncInFlight = false;
+let lastBackgroundSyncAt = 0;
+const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -40,6 +42,9 @@ async function hydrateOutreachContexts({ getMails, setMails, renderList, getActi
 
 async function syncInBackground({ account, folder, loadMessages }) {
   if (syncInFlight) return;
+  const now = Date.now();
+  if (lastBackgroundSyncAt && now - lastBackgroundSyncAt < MIN_BACKGROUND_SYNC_INTERVAL_MS) return;
+  lastBackgroundSyncAt = now;
   syncInFlight = true;
   setStatus('Mailbox bijwerken…');
   try {

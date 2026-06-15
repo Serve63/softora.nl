@@ -59,7 +59,7 @@
   "crons": [
     {
       "path": "/api/mailbox/sync",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/coldmailing/autopilot/run",

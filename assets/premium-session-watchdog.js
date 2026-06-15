@@ -52,6 +52,7 @@
 
   async function checkSessionStillActive() {
     if (redirecting) return;
+    if (document.visibilityState === "hidden") return;
     try {
       var response = await nativeFetch("/api/auth/session", {
         method: "GET",
@@ -71,5 +72,5 @@
     if (document.visibilityState === "visible") checkSessionStillActive();
   });
   window.setTimeout(checkSessionStillActive, 1500);
-  window.setInterval(checkSessionStillActive, 60000);
+  window.setInterval(checkSessionStillActive, 300000);
 })();

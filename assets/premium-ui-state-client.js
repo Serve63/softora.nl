@@ -2,6 +2,8 @@
     "use strict";
 
     var DEFAULT_TIMEOUT_MS = 5000;
+    var GET_CACHE_TTL_MS = 15000;
+    var readCache = Object.create(null);
 
     function normalizeScope(scope) {
         return encodeURIComponent(String(scope || ""));
@@ -85,14 +87,31 @@
     }
 
     async function getUiState(scope) {
-        return await requestWithFallback(
+        var cacheKey = String(scope || "");
+        var cached = readCache[cacheKey];
+        var now = Date.now();
+        if (cached && now - cached.time < GET_CACHE_TTL_MS) {
+            return await (cached.promise || Promise.resolve(cached.data));
+        }
+        var promise = requestWithFallback(
             getReadUrls(scope),
             { method: "GET", cache: "no-store" },
             "UI-state GET"
         );
+        readCache[cacheKey] = { promise: promise, time: now };
+        try {
+            var data = await promise;
+            readCache[cacheKey] = { data: data, time: Date.now() };
+            return data;
+        } catch (error) {
+            delete readCache[cacheKey];
+            throw error;
+        }
     }
 
     async function setUiState(scope, body, options) {
+        var cacheKey = String(scope || "");
+        delete readCache[cacheKey];
         var requestOptions = {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -100,12 +119,14 @@
         };
         if (options && options.keepalive === true) requestOptions.keepalive = true;
 
-        return await requestWithFallback(
+        var data = await requestWithFallback(
             getWriteUrls(scope),
             requestOptions,
             "UI-state POST",
             options && options.timeoutMs
         );
+        delete readCache[cacheKey];
+        return data;
     }
 
     global.SoftoraUiStateClient = {

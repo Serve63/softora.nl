@@ -23,7 +23,11 @@ function createRouteHarness(deps) {
     const requestBody = { startConfirmPin: '8080', ...body };
     const res = {
       statusCode: 200,
+      headers: {},
       body: null,
+      setHeader(key, value) {
+        this.headers[key.toLowerCase()] = value;
+      },
       status(code) {
         this.statusCode = code;
         return this;
@@ -156,7 +160,11 @@ function createAutopilotRouteHarness(deps) {
   async function callHandlers(handlers, req = {}) {
     const res = {
       statusCode: 200,
+      headers: {},
       body: null,
+      setHeader(key, value) {
+        this.headers[key.toLowerCase()] = value;
+      },
       status(code) {
         this.statusCode = code;
         return this;
@@ -558,6 +566,7 @@ test('coldmailing autopilot status route is visible to authenticated staff witho
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.autopilot.enabled, true);
+  assert.equal(res.headers['cache-control'], 'private, max-age=30, stale-while-revalidate=60');
   assert.equal(premiumAccessCalls, 1);
   assert.equal(adminAccessCalls, 0);
 });
@@ -782,8 +791,10 @@ test('coldmailing autopilot route stays protected and is restored as a Vercel cr
   const routeSource = fs.readFileSync(path.join(__dirname, '../../server/routes/coldmailing.js'), 'utf8');
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../../vercel.json'), 'utf8'));
   const autopilotCron = vercelConfig.crons.find((cron) => cron.path === '/api/coldmailing/autopilot/run');
+  const mailboxCron = vercelConfig.crons.find((cron) => cron.path === '/api/mailbox/sync');
 
   assert.match(routeSource, /app\.get\('\/api\/coldmailing\/autopilot\/run', requireColdmailingCronAccess/);
   assert.match(routeSource, /runColdmailAutopilot/);
   assert.equal(autopilotCron.schedule, '*/5 * * * *');
+  assert.equal(mailboxCron.schedule, '*/15 * * * *');
 });
