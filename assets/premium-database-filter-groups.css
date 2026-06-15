@@ -156,10 +156,10 @@
 
 .mail-roi-cards {
     display: grid;
-    grid-template-columns: repeat(4, minmax(110px, 1fr));
+    grid-template-columns: repeat(5, minmax(110px, 1fr));
     grid-template-areas:
-        ". note note note"
-        "today sent deals ratio";
+        ". note note note note"
+        "autopilot today sent deals ratio";
     align-items: stretch;
     gap: 6px;
 }
@@ -178,6 +178,10 @@
     box-shadow: 0 8px 18px rgba(139, 34, 82, .055);
 }
 
+.mail-roi-card--autopilot {
+    grid-area: autopilot;
+}
+
 .mail-roi-card--sent {
     grid-area: sent;
 }
@@ -191,6 +195,10 @@
 }
 
 .mail-roi-card--today .mail-roi-label {
+    color: var(--crimson);
+}
+
+.mail-roi-card--autopilot .mail-roi-label {
     color: var(--crimson);
 }
 
@@ -216,6 +224,80 @@
 .mail-roi-value {
     color: #1a1a1a;
     font: 500 1.15rem/1 "Oswald", sans-serif;
+}
+
+.mail-roi-autopilot-toggle {
+    width: 100%;
+    min-height: 24px;
+    border: 1px solid #e0ddd8;
+    border-radius: 5px;
+    background: #f8f7f4;
+    color: #6b6b6b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font: 600 11px/1 "Oswald", sans-serif;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
+}
+
+.mail-roi-autopilot-toggle:hover:not(:disabled) {
+    border-color: rgba(139, 34, 82, .36);
+    background: rgba(139, 34, 82, .08);
+    color: var(--crimson);
+}
+
+.mail-roi-autopilot-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(139, 34, 82, .14);
+}
+
+.mail-roi-autopilot-toggle:disabled {
+    cursor: wait;
+    opacity: .62;
+}
+
+.mail-roi-autopilot-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #aaa9a3;
+    box-shadow: 0 0 0 3px rgba(170, 169, 163, .18);
+    flex: 0 0 auto;
+}
+
+.mail-roi-card--autopilot[data-autopilot-state="on"] .mail-roi-autopilot-toggle {
+    border-color: rgba(22, 115, 60, .28);
+    background: rgba(22, 115, 60, .09);
+    color: var(--green);
+}
+
+.mail-roi-card--autopilot[data-autopilot-state="on"] .mail-roi-autopilot-dot {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(22, 115, 60, .14);
+}
+
+.mail-roi-card--autopilot[data-autopilot-state="off"] .mail-roi-autopilot-toggle {
+    border-color: rgba(139, 34, 82, .2);
+    background: rgba(139, 34, 82, .06);
+    color: var(--crimson);
+}
+
+.mail-roi-card--autopilot[data-autopilot-state="off"] .mail-roi-autopilot-dot {
+    background: var(--crimson);
+    box-shadow: 0 0 0 3px rgba(139, 34, 82, .12);
+}
+
+.mail-roi-card--autopilot[data-autopilot-state="error"] .mail-roi-autopilot-toggle {
+    color: var(--red);
+}
+
+.mail-roi-card--autopilot[data-autopilot-state="error"] .mail-roi-autopilot-dot {
+    background: var(--red);
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, .12);
 }
 
 .mail-roi-stepper {
@@ -417,8 +499,9 @@
         grid-template-columns: repeat(2, minmax(110px, 1fr));
         grid-template-areas:
             "note note"
-            "today sent"
-            "deals ratio";
+            "autopilot today"
+            "sent deals"
+            "ratio ratio";
     }
 
 }
