@@ -7401,6 +7401,21 @@ function createColdmailCampaignService(deps = {}) {
       : {};
 
     if (!selectedRows.length) {
+      const preparation = shouldIncludeWebdesignPhoto
+        ? await queueWebdesignPreparationForRecipient(resolvedRecipients.webdesignPreparationCandidate)
+        : null;
+      if (preparation && preparation.queued) {
+        const error = new Error(
+          preparation.existing
+            ? `Geen mailbare webdesigns meer. Er loopt al een voorbereiding voor ${preparation.bedrijf}.`
+            : `Geen mailbare webdesigns meer. Voorbereiding gestart voor ${preparation.bedrijf}.`
+        );
+        error.code = 'WEBDESIGN_PREPARATION_QUEUED';
+        error.failedItems = failed;
+        error.invalidRecipientDomainsBlocked = invalidRecipientDomainsBlocked;
+        error.webdesignPreparation = preparation;
+        throw error;
+      }
       const firstFailure = pickFailureMessage(failed, candidateRows);
       const recipientGuardFailure = failed.length > 0 && failed.every((item) => isColdmailRecipientGuardFailure(item));
       const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');

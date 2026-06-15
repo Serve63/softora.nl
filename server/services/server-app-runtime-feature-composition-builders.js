@@ -5,7 +5,27 @@ const { createColdmailCampaignService } = require('./coldmail-campaign');
 const { createInstantlyOutreachService } = require('./instantly-outreach');
 const { createOutboundRecipientGuardStore } = require('./outbound-recipient-guard-store');
 
-const DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
+const DEFAULT_DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
+const DATA_OPS_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
+  premium_coldmail_autopilot: 12000,
+  premium_coldmail_send_guard: 25000,
+  premium_coldmailing_settings: 12000,
+  premium_customers_database: 12000,
+  premium_database_photos: 20000,
+});
+
+function getDataOpsUiStateReadTimeoutMs(scope) {
+  const configured = DATA_OPS_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE[normalizeScopeKey(scope)];
+  return Math.max(
+    1000,
+    Number(configured || DEFAULT_DATA_OPS_UI_STATE_READ_TIMEOUT_MS) ||
+      DEFAULT_DATA_OPS_UI_STATE_READ_TIMEOUT_MS
+  );
+}
+
+function normalizeScopeKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
 
 function isTransientDataOpsUiStateReadError(error) {
   const text = String(error?.message || error?.details || error?.hint || error?.code || error || '').trim();
@@ -17,17 +37,18 @@ function isTransientDataOpsUiStateReadError(error) {
 
 async function awaitDataOpsUiStateWithTimeout(promise, scope) {
   let timeoutId = null;
+  const timeoutMs = getDataOpsUiStateReadTimeoutMs(scope);
   try {
     return await Promise.race([
       Promise.resolve(promise),
       new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
           const error = new Error(
-            `DataOps UI-state read timeout na ${Math.round(DATA_OPS_UI_STATE_READ_TIMEOUT_MS / 1000)}s voor ${scope}`
+            `DataOps UI-state read timeout na ${Math.round(timeoutMs / 1000)}s voor ${scope}`
           );
           error.code = 'DATA_OPS_FEATURE_UI_STATE_TIMEOUT';
           reject(error);
-        }, DATA_OPS_UI_STATE_READ_TIMEOUT_MS);
+        }, timeoutMs);
       }),
     ]);
   } finally {
@@ -551,4 +572,5 @@ module.exports = {
   buildServerAppFeatureWiringRuntimeContext,
   createDataOpsAwareUiStateGetter,
   createDataOpsAwareUiStateSetter,
+  getDataOpsUiStateReadTimeoutMs,
 };

@@ -134,6 +134,25 @@ test('server app feature wiring uses legacy fallback when data-ops ui-state read
   assert.match(String(warnings[1]?.[0] || ''), /legacy-fallback/);
 });
 
+test('server app feature wiring gives coldmail data-ops scopes enough read time', () => {
+  assert.equal(
+    featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('premium_database_photos'),
+    20000
+  );
+  assert.equal(
+    featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('premium_coldmail_send_guard'),
+    25000
+  );
+  assert.equal(
+    featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('premium_customers_database'),
+    12000
+  );
+  assert.equal(
+    featureCompositionBuilders.getDataOpsUiStateReadTimeoutMs('lightweight_scope'),
+    2500
+  );
+});
+
 test('server app agenda bootstrap ui-state reads are timeboxed before legacy fallback', () => {
   const sourcePath = path.join(
     __dirname,

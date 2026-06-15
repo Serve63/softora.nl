@@ -4833,6 +4833,87 @@ test('coldmail campaign starts webdesign preparation for the exact next mailable
   assert.equal(preparedJobs[0].websiteUrl, 'https://zonderfoto.nl/');
 });
 
+test('coldmail campaign prepares fresh webdesign when ready stock is only duplicate-guarded', async () => {
+  const preparedJobs = [];
+  const { service, sentMessages, getSavedState } = createService({
+    rows: [
+      {
+        id: 'ready-but-sent',
+        bedrijf: 'Al Verzonden BV',
+        naam: 'Ruben',
+        email: 'info@alverzonden.nl',
+        website: 'alverzonden.nl',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'needs-fresh-design',
+        bedrijf: 'Nieuwe Voorraad BV',
+        naam: 'Ruben',
+        email: 'info@nieuwevoorraad.nl',
+        website: 'nieuwevoorraad.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'ready-but-sent': {
+        id: 'ready-but-sent',
+        identityKey: 'al verzonden bv|ruben|',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+    sendGuardState: {
+      recipientEntries: [
+        {
+          at: '2026-04-24T10:00:00.000Z',
+          recipientEmail: 'info@alverzonden.nl',
+          recipientId: 'ready-but-sent',
+          senderEmail: 'serve@softora.nl',
+        },
+      ],
+    },
+    webdesignPreparationCoordinator: {
+      startJob: async (payload) => {
+        preparedJobs.push(payload);
+        return {
+          ok: true,
+          job: {
+            id: payload.jobId,
+            status: 'queued',
+            customerId: payload.customer.id,
+          },
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Nieuwe website voor {{bedrijf}}',
+        body: 'Goedemorgen {{naam}}',
+        senderEmail: 'info@softora.nl',
+        specialAction: 'webdesign',
+      }),
+    (error) => {
+      assert.equal(error.code, 'WEBDESIGN_PREPARATION_QUEUED');
+      assert.match(error.message, /Voorbereiding gestart voor Nieuwe Voorraad BV/);
+      assert.equal(error.webdesignPreparation.customerId, 'needs-fresh-design');
+      assert.equal(error.webdesignPreparation.job.status, 'queued');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(getSavedState(), null);
+  assert.equal(preparedJobs.length, 1);
+  assert.equal(preparedJobs[0].customer.id, 'needs-fresh-design');
+  assert.equal(preparedJobs[0].websiteUrl, 'https://nieuwevoorraad.nl/');
+});
+
 test('coldmail campaign preview only lists webdesign recipients with a generated photo', async () => {
   const { service } = createService({
     rows: [
