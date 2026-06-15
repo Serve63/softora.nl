@@ -2,7 +2,7 @@
   const FOCUS_STYLE_ID = "softora-photo-batch-focus-style";
 
   function formatPhotoBatchCount(count) {
-    return Number(count || 0).toLocaleString("nl-NL") + " bedrijf" + (count === 1 ? "" : "ven");
+    return Number(count || 0).toLocaleString("nl-NL") + (count === 1 ? " bedrijf" : " bedrijven");
   }
 
   function ensureInputFocusStyles() {
@@ -22,10 +22,19 @@
     const setStatusMessage = options.setStatusMessage;
     const generate = options.generate;
     let mode = "custom";
+    let cachedTargetCount = null;
     ensureInputFocusStyles();
 
+    function getTargetCount(options) {
+      if (!options || !options.force) {
+        if (cachedTargetCount !== null) return cachedTargetCount;
+      }
+      cachedTargetCount = getTargets().length;
+      return cachedTargetCount;
+    }
+
     function updateSummary(message) {
-      const total = getTargets().length;
+      const total = getTargetCount();
       const rawLimit = Math.floor(Number(nodes.photoBatchLimitInput.value));
       const selectedCount = mode === "all"
         ? total
@@ -54,7 +63,7 @@
       closeAddActions();
       if (nodes.generatePhotosButton.disabled) return;
 
-      const total = getTargets().length;
+      const total = getTargetCount({ force: true });
       if (!total) {
         setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
         return;
@@ -69,6 +78,7 @@
     }
 
     function close() {
+      cachedTargetCount = null;
       nodes.photoBatchModal.classList.remove("on");
       nodes.photoBatchModal.setAttribute("aria-hidden", "true");
     }
@@ -78,7 +88,7 @@
     }
 
     function resolveSelection() {
-      const total = getTargets().length;
+      const total = getTargetCount();
       if (!total) {
         close();
         setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true);
