@@ -818,13 +818,39 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return Boolean(dataOpsStore && typeof dataOpsStore.upsertWebdesignJob === 'function');
   }
 
-  async function loadPersistentJob(jobId) {
-    if (!dataOpsStore || typeof dataOpsStore.getWebdesignJob !== 'function') return null;
+  function isWebdesignJobStatusUnavailableError(error) {
+    return Boolean(error && error.webdesignJobStatusUnavailable === true);
+  }
+
+  function createWebdesignJobStatusUnavailableResult() {
+    return {
+      ok: false,
+      statusCode: 503,
+      error: 'Webdesign-status tijdelijk niet bereikbaar',
+      detail: 'De webdesign-opdracht wordt nog bewaakt. De status wordt zo opnieuw opgehaald.',
+      retryable: true,
+    };
+  }
+
+  function logPersistentJobLoadError(error) {
+    const log =
+      isWebdesignJobStatusUnavailableError(error) && typeof logger.warn === 'function'
+        ? logger.warn.bind(logger)
+        : typeof logger.error === 'function'
+          ? logger.error.bind(logger)
+          : null;
+    if (log) log('[PremiumDatabaseWebdesignJobs][load]', error && error.message ? error.message : error);
+  }
+
+  async function loadPersistentJobResult(jobId) {
+    if (!dataOpsStore || typeof dataOpsStore.getWebdesignJob !== 'function') {
+      return { job: null, error: null };
+    }
     try {
-      return dataOpsStore.getWebdesignJob(jobId);
+      return { job: await dataOpsStore.getWebdesignJob(jobId), error: null };
     } catch (error) {
-      logger.error('[PremiumDatabaseWebdesignJobs][load]', error && error.message ? error.message : error);
-      return null;
+      logPersistentJobLoadError(error);
+      return { job: null, error };
     }
   }
 
@@ -1192,7 +1218,12 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     const requestedJobId = normalizeJobId(input.jobId);
     const jobId = requestedJobId || randomUUID();
-    const existingById = jobs.get(jobId) || await loadPersistentJob(jobId);
+    let existingById = jobs.get(jobId);
+    if (!existingById) {
+      const loadedById = await loadPersistentJobResult(jobId);
+      if (loadedById.error) return createWebdesignJobStatusUnavailableResult();
+      existingById = loadedById.job;
+    }
     if (existingById) {
       jobs.set(existingById.id, existingById);
       if (existingById.ownerKey !== ownerKey) {
@@ -1275,7 +1306,17 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
 
-    const job = jobs.get(jobId) || await loadPersistentJob(jobId);
+    let job = jobs.get(jobId);
+    let persistentLoadError = null;
+    if (!job) {
+      const loaded = await loadPersistentJobResult(jobId);
+      job = loaded.job;
+      persistentLoadError = loaded.error;
+    }
+    if (!job && persistentLoadError) {
+      const result = createWebdesignJobStatusUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
     if (!job) {
       return res.status(404).json({
         ok: false,

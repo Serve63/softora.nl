@@ -429,6 +429,38 @@ test('premium database webdesign jobs refuse queued success when persistent job 
   assert.equal(pipelineCalls, 0);
 });
 
+test('premium database webdesign jobs keep transient status read failures retryable', async () => {
+  const readError = new Error('Supabase status read timeout');
+  readError.webdesignJobStatusUnavailable = true;
+  readError.statusCode = 503;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: {
+      getWebdesignJob: async () => {
+        throw readError;
+      },
+    },
+  });
+
+  const statusRes = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_readretry123' },
+    },
+    statusRes
+  );
+
+  assert.equal(statusRes.statusCode, 503);
+  assert.equal(statusRes.body.ok, false);
+  assert.equal(statusRes.body.retryable, true);
+  assert.equal(statusRes.body.error, 'Webdesign-status tijdelijk niet bereikbaar');
+  assert.notEqual(statusRes.body.error, 'Job niet gevonden');
+});
+
 test('premium database webdesign jobs store trimmed webdesign photos before mockup creation', async () => {
   const dataUrl = await createSideGutterWebdesignDataUrl();
   const uploadedPhotos = [];

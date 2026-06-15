@@ -1525,6 +1525,20 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
+  function createWebdesignJobStatusReadError(result = {}) {
+    const sourceError = result.error || {};
+    const message =
+      normalizeString(sourceError.message || sourceError.details || sourceError.hint) ||
+      'Webdesign-jobstatus tijdelijk niet bereikbaar.';
+    const error = new Error(message);
+    error.code = normalizeString(sourceError.code) || 'WEBDESIGN_JOB_STATUS_UNAVAILABLE';
+    error.statusCode = 503;
+    error.webdesignJobStatusUnavailable = true;
+    error.unavailable = Boolean(result.unavailable);
+    if (sourceError && typeof sourceError === 'object') error.cause = sourceError;
+    return error;
+  }
+
   async function getWebdesignJob(jobId) {
     const result = await run('get-webdesign-job', (client) =>
       client
@@ -1533,7 +1547,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         .eq('job_id', normalizeString(jobId))
         .maybeSingle()
     );
-    if (!result.ok || !result.data) return null;
+    if (!result.ok) throw createWebdesignJobStatusReadError(result);
+    if (!result.data) return null;
     return normalizeWebdesignJobRow(result.data);
   }
 
