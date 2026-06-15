@@ -1,3 +1,5 @@
+const { createHash } = require('crypto');
+
 const {
   buildCustomerIdentityKey,
   extensionForMimeType,
@@ -11,6 +13,7 @@ const {
   getContactStatusPriority,
   normalizeContactStatus,
 } = require('./customer-lifecycle');
+const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
@@ -34,6 +37,7 @@ const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
 const DEFAULT_WRITE_QUERY_TIMEOUT_MS = 10000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
 const DEFAULT_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
+const SENT_CUSTOMER_GUARD_SOURCE = 'data-ops-customers-sent-guard';
 
 function slugifyDesignPhotoMatchText(value) {
   return normalizeString(value)
@@ -509,6 +513,211 @@ function createSoftoraDataOpsStore(deps = {}) {
     };
   }
 
+  function isOutboundSentStatus(value, payload) {
+    const normalized = normalizeContactStatus(value, payload);
+    if (normalized === 'gemaild') return true;
+    const compact = normalizeString(value).toLowerCase();
+    return ['gemaild', 'mailed', 'sent', 'email sent'].includes(compact);
+  }
+
+  function customerHistoryHasOutboundSentSignal(payload) {
+    const history = Array.isArray(payload && payload.hist) ? payload.hist : [];
+    return history.some((entry) => {
+      const text = normalizeString([
+        entry && entry.type,
+        entry && entry.label,
+        entry && entry.title,
+        entry && entry.note,
+        entry && entry.description,
+        entry && entry.source,
+      ].join(' ')).toLowerCase();
+      return /\b(gemaild|mail verstuurd|mail geopend|coldmail|cold mailing|instantly|email sent|email opened|open tracking)\b/.test(text);
+    });
+  }
+
+  function hasOutboundSentCustomerSignal(row) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const statuses = [
+      row && row.database_status,
+      row && row.lifecycle_status,
+      payload.databaseStatus,
+      payload.status,
+      payload.outreachStatus,
+      payload.contactStatus,
+    ];
+    if (statuses.some((status) => isOutboundSentStatus(status, payload))) return true;
+    const timestampFields = [
+      payload.lastColdmailSentAt,
+      payload.lastMailSentAt,
+      payload.outreachSentAt,
+      payload.outreach_sent_at,
+      payload.lastInstantlySentAt,
+      payload.instantlySentAt,
+      payload.sentAt,
+    ];
+    if (timestampFields.some((value) => normalizeString(value))) return true;
+    const messageFields = [
+      payload.coldmailSentMessageId,
+      payload.outreachMessageId,
+      payload.sentMessageId,
+      payload.messageId,
+      payload.instantlyLeadId,
+    ];
+    if (messageFields.some((value) => normalizeString(value))) return true;
+    return customerHistoryHasOutboundSentSignal(payload);
+  }
+
+  function resolveSentCustomerGuardProvider(row, meta = {}) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const text = normalizeString([
+      payload.lastColdmailProvider,
+      payload.outreachProvider,
+      payload.outboundProvider,
+      payload.provider,
+      payload.source,
+      row && row.source,
+      meta.source,
+      ...(Array.isArray(payload.hist)
+        ? payload.hist.map((entry) => [entry && entry.type, entry && entry.label, entry && entry.source].join(' '))
+        : []),
+    ].join(' ')).toLowerCase();
+    if (/\binstantly\b/.test(text)) return { provider: 'instantly', channel: 'instantly' };
+    return { provider: 'softora', channel: 'coldmail' };
+  }
+
+  function resolveSentCustomerGuardAt(row) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const candidates = [
+      payload.lastColdmailSentAt,
+      payload.lastMailSentAt,
+      payload.outreachSentAt,
+      payload.outreach_sent_at,
+      payload.lastInstantlySentAt,
+      payload.instantlySentAt,
+      payload.sentAt,
+      row && row.updated_at,
+    ];
+    const value = candidates.find((candidate) => Number.isFinite(Date.parse(normalizeString(candidate))));
+    return normalizeString(value) || isoNow();
+  }
+
+  function buildSentCustomerReservationId(row, provider, sentAt) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const basis = [
+      provider,
+      payload.coldmailSentMessageId,
+      payload.outreachMessageId,
+      payload.sentMessageId,
+      payload.messageId,
+      row && row.email,
+      row && row.website,
+      row && row.company,
+      row && row.customer_id,
+      sentAt,
+    ].map(normalizeString).filter(Boolean).join('|') || `${provider}|${normalizeString(row && row.customer_id)}`;
+    return `data-ops-sent-${createHash('sha256').update(basis).digest('hex').slice(0, 24)}`;
+  }
+
+  function buildSentOutboundGuardRowsForCustomer(row, meta = {}) {
+    if (!hasOutboundSentCustomerSignal(row)) return [];
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const at = resolveSentCustomerGuardAt(row);
+    const { provider, channel } = resolveSentCustomerGuardProvider(row, meta);
+    const reservationId = buildSentCustomerReservationId(row, provider, at);
+    const recipientCompany = normalizeString(row && row.company) ||
+      normalizeString(payload.bedrijf || payload.company || payload.companyName);
+    const identity = {
+      recipientEmail: normalizeString(row && row.email) || normalizeString(payload.email || payload.contactEmail),
+      recipientDomain:
+        normalizeString(row && row.website) ||
+        normalizeString(payload.website || payload.dom || payload.domain || payload.url),
+      recipientCompanyKey: recipientCompany,
+      recipientId: normalizeString(row && row.customer_id) || normalizeString(payload.id || payload.customerId),
+      recipientCompany,
+    };
+    const senderEmail = normalizeString(
+      payload.lastColdmailSenderEmail ||
+        payload.coldmailSenderEmail ||
+        payload.outreachSenderEmail ||
+        payload.senderEmail ||
+        payload.mailSenderEmail
+    );
+    return getIdentityKeyRows(identity, normalizeString).map((keyRow) => ({
+      guard_key: keyRow.guardKey,
+      key_type: keyRow.keyType,
+      key_value: keyRow.keyValue,
+      reservation_id: reservationId,
+      provider,
+      channel,
+      sender_email: senderEmail.slice(0, 240),
+      recipient_email: keyRow.identity.recipientEmail,
+      recipient_domain: keyRow.identity.recipientDomain,
+      recipient_company_key: keyRow.identity.recipientCompanyKey,
+      recipient_id: keyRow.identity.recipientId,
+      recipient_company: truncateText(keyRow.identity.recipientCompany, 160),
+      status: 'sent',
+      source: SENT_CUSTOMER_GUARD_SOURCE,
+      actor: truncateText(normalizeString(meta.actor || meta.source || 'data-ops'), 160),
+      permanent: true,
+      payload: {
+        customerId: normalizeString(row && row.customer_id),
+        bedrijf: recipientCompany,
+        source: normalizeString(meta.source || row && row.source || 'data-ops'),
+      },
+      expires_at: null,
+      last_seen_at: at,
+      updated_at: at,
+    }));
+  }
+
+  async function readExistingOutboundGuardKeys(guardKeys) {
+    const keys = Array.from(new Set((Array.isArray(guardKeys) ? guardKeys : []).map(normalizeString).filter(Boolean)));
+    const existing = new Set();
+    for (let index = 0; index < keys.length; index += 500) {
+      const keyChunk = keys.slice(index, index + 500);
+      const result = await run(
+        'list-existing-sent-outbound-recipient-guards',
+        (client) => client.from(TABLES.outboundRecipientGuards).select('guard_key').in('guard_key', keyChunk),
+        getWriteOperationOptions()
+      );
+      if (!result.ok) return result;
+      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+        const guardKey = normalizeString(row && row.guard_key);
+        if (guardKey) existing.add(guardKey);
+      });
+    }
+    return { ok: true, data: existing };
+  }
+
+  async function ensureSentOutboundRecipientGuards(rows, meta = {}) {
+    const guardRowsByKey = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      buildSentOutboundGuardRowsForCustomer(row, meta).forEach((guardRow) => {
+        if (!guardRowsByKey.has(guardRow.guard_key)) guardRowsByKey.set(guardRow.guard_key, guardRow);
+      });
+    });
+    if (!guardRowsByKey.size) return { ok: true, inserted: 0, expected: 0 };
+
+    const existing = await readExistingOutboundGuardKeys(Array.from(guardRowsByKey.keys()));
+    if (!existing.ok) return existing;
+    const existingKeys = existing.data instanceof Set ? existing.data : new Set();
+    const missingRows = Array.from(guardRowsByKey.values()).filter((row) => !existingKeys.has(row.guard_key));
+    if (!missingRows.length) return { ok: true, inserted: 0, expected: guardRowsByKey.size };
+
+    let inserted = 0;
+    for (let index = 0; index < missingRows.length; index += 500) {
+      const chunk = missingRows.slice(index, index + 500);
+      const result = await run(
+        'insert-sent-outbound-recipient-guards',
+        (client) => client.from(TABLES.outboundRecipientGuards).insert(chunk).select('guard_key'),
+        getWriteOperationOptions()
+      );
+      if (!result.ok) return result;
+      inserted += Array.isArray(result.data) ? result.data.length : chunk.length;
+    }
+    return { ok: true, inserted, expected: guardRowsByKey.size };
+  }
+
   function hasUsableCustomerIdentityKey(identityKey) {
     const parts = normalizeString(identityKey).split('|');
     const company = normalizeString(parts[0]);
@@ -738,6 +947,8 @@ function createSoftoraDataOpsStore(deps = {}) {
       meta.source
     );
     if (rows.length) {
+      const guardWrite = await ensureSentOutboundRecipientGuards(rows, meta);
+      if (!guardWrite.ok) return guardWrite;
       const upsert = await run(
         'upsert-customers',
         (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
