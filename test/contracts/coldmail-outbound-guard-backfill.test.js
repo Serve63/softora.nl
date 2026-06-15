@@ -599,7 +599,7 @@ test('coldmail outbound guard audit reports mailbox sent-index coverage gaps per
         status: 'ok',
         last_synced_at: '2026-06-08T14:28:13.412Z',
         last_uid: 87,
-        message_count: 50,
+        message_count: 100,
       },
       {
         account_email: 'servecreusen7@gmail.com',
