@@ -2,6 +2,8 @@
     "use strict";
 
     var DEFAULT_TIMEOUT_MS = 5000;
+    var GET_CACHE_TTL_MS = 15000;
+    var readCache = Object.create(null);
 
     function normalizeScope(scope) {
         return encodeURIComponent(String(scope || ""));
@@ -85,15 +87,32 @@
     }
 
     async function getUiState(scope) {
-        return await requestWithFallback(
+        var cacheKey = String(scope || "");
+        var cached = readCache[cacheKey];
+        var now = Date.now();
+        if (cached && now - cached.time < GET_CACHE_TTL_MS) {
+            return await (cached.promise || Promise.resolve(cached.data));
+        }
+        var promise = requestWithFallback(
             getReadUrls(scope),
             { method: "GET", cache: "no-store" },
             "UI-state GET"
         );
+        readCache[cacheKey] = { promise: promise, time: now };
+        try {
+            var data = await promise;
+            readCache[cacheKey] = { data: data, time: Date.now() };
+            return data;
+        } catch (error) {
+            delete readCache[cacheKey];
+            throw error;
+        }
     }
 
     async function setUiState(scope, body) {
-        return await requestWithFallback(
+        var cacheKey = String(scope || "");
+        delete readCache[cacheKey];
+        var data = await requestWithFallback(
             getWriteUrls(scope),
             {
                 method: "POST",
@@ -102,6 +121,8 @@
             },
             "UI-state POST"
         );
+        delete readCache[cacheKey];
+        return data;
     }
 
     global.SoftoraUiStateClient = {

@@ -7028,13 +7028,13 @@
     void pollCallUpdatesOnce();
     callUpdatePollTimer = window.setInterval(() => {
       void pollCallUpdatesOnce();
-    }, 1500);
+    }, 5000);
 
     if (!dashboardStatsPollTimer) {
       void refreshDashboardStatsFromSupabase({ silent: true });
       dashboardStatsPollTimer = window.setInterval(() => {
         void refreshDashboardStatsFromSupabase({ silent: true });
-      }, 12000);
+      }, 60000);
     }
   }
 

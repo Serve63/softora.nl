@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 function loadWatchdogSandbox(fetchImpl) {
   const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-session-watchdog.js'), 'utf8');
+  const intervals = [];
   const sandbox = {
     URL,
     URLSearchParams,
@@ -27,10 +28,14 @@ function loadWatchdogSandbox(fetchImpl) {
       fetch: fetchImpl,
       addEventListener() {},
       setTimeout() {},
-      setInterval() {},
+      setInterval(handler, ms) {
+        intervals.push(ms);
+        return intervals.length;
+      },
     },
   };
   vm.runInNewContext(source, sandbox);
+  sandbox.window.__intervals = intervals;
   return sandbox.window;
 }
 
@@ -60,4 +65,14 @@ test('premium session watchdog keeps non-api 401 responses on the current page',
   await windowRef.fetch('/private-download');
 
   assert.equal(windowRef.location.replacedWith, undefined);
+});
+
+test('premium session watchdog limits proactive session polling', () => {
+  const windowRef = loadWatchdogSandbox(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ authenticated: true }),
+  }));
+
+  assert.deepEqual(windowRef.__intervals, [300000]);
 });
