@@ -2900,7 +2900,7 @@
         async function bootstrapCustomers() {
             const hadBootstrapCustomers = state.klanten.length > 0; let loadFailed = false;
 
-            if (!hadBootstrapCustomers) { state.dataLoading = true; state.dataUnavailable = false; renderPage(); setStatusMessage("Database laden...", "info"); }
+            if (!hadBootstrapCustomers) { state.dataLoading = true; state.dataUnavailable = false; renderPage(); }
 
             try {
                 await refreshColdmailGuardState(); const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
