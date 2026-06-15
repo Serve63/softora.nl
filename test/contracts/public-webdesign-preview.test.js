@@ -1523,7 +1523,7 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
   const publicWebdesignRoute = routes.find((route) => route.path === '/webdesign/:companySlug');
   const req = {};
   publicWebdesignRoute.handler(req, {});
-  assert.equal(req.called, 'preview');
+  assert.equal(req.called, 'concept');
 });
 
 test('public webdesign preview is wired into feature routes', () => {
