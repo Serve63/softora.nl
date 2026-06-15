@@ -7,6 +7,7 @@ const { getStaticAssetCacheControl } = require('../../server/routes/public-pages
 
 const REPO_ROOT = path.join(__dirname, '../..');
 const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260606b';
+const HOME_SCREEN_ICON_HREF = '/assets/softora-touch-icon.png?v=20260615a';
 
 test('public asset cache keeps unhashed app js/css fresh even with version query strings', () => {
   assert.equal(
@@ -30,14 +31,24 @@ test('public asset cache still allows immutable caching for hashed assets and me
   );
 });
 
-test('html pages use the round Softora favicon asset sitewide', () => {
+test('html pages use the round favicon and filled home-screen icon sitewide', () => {
   const faviconPath = path.join(REPO_ROOT, 'assets/softora-favicon-round.png');
+  const homeScreenIconPath = path.join(REPO_ROOT, 'assets/softora-touch-icon.png');
   const pngSignature = fs.readFileSync(faviconPath).subarray(0, 8).toString('hex');
+  const homeScreenIcon = fs.readFileSync(homeScreenIconPath);
+  const homeScreenIconSignature = homeScreenIcon.subarray(0, 8).toString('hex');
+  const homeScreenIconWidth = homeScreenIcon.readUInt32BE(16);
+  const homeScreenIconHeight = homeScreenIcon.readUInt32BE(20);
+  const homeScreenIconColorType = homeScreenIcon.readUInt8(25);
   const htmlFiles = fs.readdirSync(REPO_ROOT).filter((name) => name.endsWith('.html'));
   const pagesWithFavicons = [];
   const oldFaviconPattern = /D80D8A58-B985-491E-A39B-27879E4C593A\.PNG\?v=20260414f/;
 
   assert.equal(pngSignature, '89504e470d0a1a0a');
+  assert.equal(homeScreenIconSignature, '89504e470d0a1a0a');
+  assert.equal(homeScreenIconWidth, 512);
+  assert.equal(homeScreenIconHeight, 512);
+  assert.equal(homeScreenIconColorType, 2, 'home-screen icon should be RGB without transparent corners');
 
   htmlFiles.forEach((fileName) => {
     const source = fs.readFileSync(path.join(REPO_ROOT, fileName), 'utf8');
@@ -51,8 +62,8 @@ test('html pages use the round Softora favicon asset sitewide', () => {
     );
     assert.match(
       source,
-      new RegExp(`<link rel="apple-touch-icon" href="${ROUND_FAVICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`),
-      `${fileName} should load the round touch icon`
+      new RegExp(`<link rel="apple-touch-icon" href="${HOME_SCREEN_ICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`),
+      `${fileName} should load the filled home-screen icon`
     );
   });
 
