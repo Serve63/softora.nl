@@ -16,6 +16,22 @@ const {
   parseUsdToEurRateResponse,
   resolveUsdToEurRateDetails,
 } = require('../../server/services/openai-costs');
+const {
+  getOpenAiImageCostUsdPerImage,
+} = require('../../server/services/openai-pricing');
+
+test('openai image pricing defaults gpt-image-2 website previews to low quality', () => {
+  const unitUsd = getOpenAiImageCostUsdPerImage('gpt-image-2', '1024x1536', { env: {} });
+
+  assert.equal(unitUsd, 0.005);
+  assert.equal(Number((59 * unitUsd).toFixed(8)), 0.295);
+  assert.equal(getOpenAiImageCostUsdPerImage('gpt-image-2', '1024x1536', {
+    env: { WEBSITE_PREVIEW_IMAGE_QUALITY: 'medium' },
+  }), 0.041);
+  assert.equal(getOpenAiImageCostUsdPerImage('gpt-image-2', '1024x1536', {
+    env: { WEBSITE_PREVIEW_IMAGE_QUALITY: 'high' },
+  }), 0.165);
+});
 
 test('openai costs service builds a current-month unix window', () => {
   const window = buildCostWindow('month', Date.UTC(2026, 3, 29, 9, 0, 0));
@@ -329,8 +345,8 @@ test('combined api costs fall back to live usage estimate when official costs la
   assert.equal(summary.exact, false);
   assert.equal(summary.estimated, true);
   assert.equal(summary.source, 'api-costs');
-  assert.equal(summary.costUsd, 0.33);
-  assert.equal(summary.costEur, 0.3);
+  assert.equal(summary.costUsd, 0.01);
+  assert.equal(summary.costEur, 0.01);
   assert.equal(summary.providers[0].source, 'openai-usage-estimate');
   assert.equal(summary.providers[0].imageCount, 2);
   assert.equal(summary.officialProvider.costUsd, 0);
@@ -391,8 +407,8 @@ test('combined api costs prefer organization-wide usage when project filter miss
                     ? []
                     : [
                         {
-                          images: 2,
-                          num_model_requests: 2,
+                          images: 20,
+                          num_model_requests: 20,
                           model: 'gpt-image-2',
                           size: '1024x1536',
                           source: 'image.generation',
@@ -421,13 +437,13 @@ test('combined api costs prefer organization-wide usage when project filter miss
 
   assert.equal(summary.exact, false);
   assert.equal(summary.estimated, true);
-  assert.equal(summary.costUsd, 0.33);
-  assert.equal(summary.costEur, 0.3);
+  assert.equal(summary.costUsd, 0.1);
+  assert.equal(summary.costEur, 0.09);
   assert.equal(summary.providers[0].source, 'openai-usage-estimate');
   assert.equal(summary.providers[0].organizationWide, true);
   assert.equal(summary.providers[0].projectFilterApplied, false);
   assert.equal(summary.usageEstimate.costUsd, 0.05);
-  assert.equal(summary.organizationUsageEstimate.costUsd, 0.33);
+  assert.equal(summary.organizationUsageEstimate.costUsd, 0.1);
   assert.ok(organizationImageCall, 'verwacht een organisatiebrede images usage-call zonder project filter');
   assert.equal(organizationImageCall.options.headers['OpenAI-Project'], undefined);
 });
