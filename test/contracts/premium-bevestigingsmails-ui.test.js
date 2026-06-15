@@ -284,7 +284,7 @@ test('premium bevestigingsmails toont bedrijfsicoon met database-aantal in Nieuw
   assert.match(pageSource, /function initCampaignDatabaseAutoRefresh\(\)/);
   assert.match(pageSource, /window\.addEventListener\('focus', refreshCampaignDatabaseForLatestState\);/);
   assert.match(pageSource, /document\.addEventListener\('visibilitychange'/);
-  assert.match(pageSource, /window\.setInterval\(\(\) => \{[\s\S]*refreshCampaignDatabaseForLatestState\(\);[\s\S]*\}, 15000\);/);
+  assert.match(pageSource, /window\.setInterval\(\(\) => \{[\s\S]*refreshCampaignDatabaseForLatestState\(\);[\s\S]*\}, 60000\);/);
   assert.doesNotMatch(pageSource, /id="campaignRecipientPreview"/);
   assert.match(pageSource, /function hydrateCampaignRecipientList\(\)/);
   assert.doesNotMatch(pageSource, /Deze pagina staat op coldcalling\. E-mailontvangers zie je bij Coldmailing\./);
