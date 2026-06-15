@@ -3,7 +3,6 @@
 
     const DEFAULT_TIMEOUT_MS = 4000;
     const unavailableMessage = "Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.";
-    const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan.";
 
     function hasChunkedStateKey(values, baseKey) {
         const stateValues = values && typeof values === "object" ? values : {};
@@ -66,7 +65,6 @@
         defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
         fetchJsonWithTimeout,
         hasChunkedStateKey,
-        staleRefreshMessage,
         shouldStopUiStateFallback,
         unavailableMessage,
         withTimeout,

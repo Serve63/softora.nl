@@ -2936,8 +2936,7 @@
                         const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true });
                         customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, customersWithFallbackMedia);
                     } catch (error) {
-                        console.error("Databasefoto's laden via Supabase mislukt:", error);
-                        setStatusMessage("Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden.", "error", true);
+                        console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error);
                     }
                     const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
                     const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
@@ -2945,10 +2944,10 @@
                     return;
                 }
             } catch (error) {
-                loadFailed = true; console.error("Klanten laden via Supabase mislukt:", error);
+                loadFailed = true; console.warn("Klanten laden via Supabase tijdelijk overgeslagen:", error);
             }
 
-            state.dataLoading = false; if (!hadBootstrapCustomers) { if (loadFailed) { state.dataUnavailable = true; renderPage(); setStatusMessage(window.SoftoraDatabaseResilience.unavailableMessage, "error"); } else { state.dataUnavailable = false; state.klanten = []; renderPage(); setStatusMessage(""); } return; } if (loadFailed) { state.dataUnavailable = false; setStatusMessage(window.SoftoraDatabaseResilience.staleRefreshMessage, "error", true); return; } state.dataUnavailable = false; setStatusMessage("");
+            state.dataLoading = false; if (!hadBootstrapCustomers) { if (loadFailed) { state.dataUnavailable = true; renderPage(); setStatusMessage(window.SoftoraDatabaseResilience.unavailableMessage, "error"); } else { state.dataUnavailable = false; state.klanten = []; renderPage(); setStatusMessage(""); } return; } if (loadFailed) { state.dataUnavailable = false; setStatusMessage(""); return; } state.dataUnavailable = false; setStatusMessage("");
         }
 
         let customerStateRefreshInFlight = false; function isDatabaseInteractionOpen() { return nodes.modalBg.classList.contains("on") || nodes.panel.classList.contains("on") || nodes.photoPreview.classList.contains("on") || (photoBatchController && typeof photoBatchController.isOpen === "function" && photoBatchController.isOpen()) || (databaseDeepSearchController && typeof databaseDeepSearchController.isOpen === "function" && databaseDeepSearchController.isOpen()); } async function refreshCustomerStateSilently() { if (customerStateRefreshInFlight || document.hidden || isDatabaseInteractionOpen()) return false; customerStateRefreshInFlight = true; try { await bootstrapCustomers(); return true; } catch (error) { console.error("Database live verversen mislukt:", error); return false; } finally { customerStateRefreshInFlight = false; } } function startCustomerStateAutoRefresh() { window.setInterval(function () { void refreshCustomerStateSilently(); }, CUSTOMER_DB_SYNC_INTERVAL_MS); window.addEventListener("focus", function () { void refreshCustomerStateSilently(); }); document.addEventListener("visibilitychange", function () { if (!document.hidden) void refreshCustomerStateSilently(); }); }
@@ -3109,7 +3108,7 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.error("Databasefoto's laden voor boot mislukt:", error); setStatusMessage("Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden.", "error", true); } } else { await bootstrapCustomers(); }
+                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { console.warn("Databasefoto's laden voor boot tijdelijk overgeslagen:", error); } } else { await bootstrapCustomers(); }
                 await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }
