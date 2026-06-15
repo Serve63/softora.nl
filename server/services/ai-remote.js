@@ -824,6 +824,18 @@ function createAiRemoteService(deps = {}) {
     return isGptImageGenerationModel(modelRaw);
   }
 
+  function resolveOpenAiWebsitePreviewImageQuality(scan = {}) {
+    const raw = normalizeString(
+      scan.imageQuality ||
+        scan.websitePreviewImageQuality ||
+        scan.previewImageQuality ||
+        env.WEBSITE_PREVIEW_IMAGE_QUALITY ||
+        env.OPENAI_IMAGE_QUALITY ||
+        'low'
+    ).toLowerCase();
+    return ['low', 'medium', 'high', 'auto'].includes(raw) ? raw : 'low';
+  }
+
   function isSupportedWebsitePreviewReferenceMimeType(mimeTypeRaw) {
     return /^image\/(?:png|jpeg|webp)$/i.test(normalizeString(mimeTypeRaw || '').split(';')[0]);
   }
@@ -964,6 +976,7 @@ function createAiRemoteService(deps = {}) {
     prompt,
     referenceImages = [],
     imageSize = '2160x3840',
+    imageQuality = 'low',
     timeoutMs = 180000,
   }) {
     if (referenceImages.length > 0 && supportsOpenAiReferenceImageEdits(imageModel)) {
@@ -971,7 +984,7 @@ function createAiRemoteService(deps = {}) {
       body.set('model', imageModel);
       body.set('prompt', prompt);
       body.set('size', imageSize);
-      body.set('quality', 'high');
+      body.set('quality', imageQuality);
       referenceImages.forEach((item) => {
         const parsed = parseImageDataUrl(item?.dataUrl || '');
         if (!parsed) return;
@@ -1000,7 +1013,7 @@ function createAiRemoteService(deps = {}) {
       model: imageModel,
       prompt,
       size: imageSize,
-      quality: 'high',
+      quality: imageQuality,
     };
     if (requiresLegacyOpenAiImageResponseFormat(imageModel)) {
       requestBody.response_format = 'b64_json';
@@ -1156,6 +1169,7 @@ function createAiRemoteService(deps = {}) {
     );
     const primaryImageSize = requestedImageSize || '2160x3840';
     const fallbackImageSize = primaryImageSize === '1024x1536' ? '' : '1024x1536';
+    const imageQuality = resolveOpenAiWebsitePreviewImageQuality(scan);
     const referenceImages = await fetchWebsitePreviewReferenceImages(scan);
     const prompt = buildWebsitePreviewPromptFromScan({
       ...scan,
@@ -1181,6 +1195,7 @@ function createAiRemoteService(deps = {}) {
           prompt,
           referenceImages,
           imageSize: attempt.imageSize,
+          imageQuality,
           timeoutMs: imageGenerationTimeoutMs,
         }));
         usedImageModel = attempt.imageModel;
