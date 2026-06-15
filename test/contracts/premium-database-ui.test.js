@@ -678,7 +678,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /function hasChunkedStateKey\(values, baseKey\) \{/);
   assert.match(pageSource, /let loadFailed = false;/);
   assert.match(pageSource, /if \(!window\.SoftoraDatabaseResilience\.hasChunkedStateKey\(remoteValues, CUSTOMER_DB_KEY\)\) throw new Error\("Geen Supabase-klantdata ontvangen\."\);/);
-  assert.match(pageSource, /loadFailed = true;[\s\S]*console\.error\("Klanten laden via Supabase mislukt:", error\);/);
+  assert.match(pageSource, /loadFailed = true;[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);/);
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{ return \(state\.activeStatus === "benaderbaar" \|\| state\.activeStatus === "beschikbaar"\) && \(state\.dataLoading \|\| state\.photoRestorePending \|\| !hasLoadedColdmailGuard\(\)\); \}/);
@@ -695,7 +695,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; state\.remoteCustomersLoaded = true; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
   assert.match(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
-  assert.match(resilienceSource, /const staleRefreshMessage = "Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\.";/);
+  assert.doesNotMatch(resilienceSource, /Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\./);
+  assert.match(pageSource, /if \(loadFailed\) \{ state\.dataUnavailable = false; setStatusMessage\(""\); return; \}/);
   assert.match(pageSource, /function getUiStateFetchTimeoutMs\(scope\) \{/);
   assert.match(pageSource, /normalizedScope === CUSTOMER_PHOTO_SCOPE \|\| normalizedScope === COLDMAIL_SEND_GUARD_SCOPE \|\| normalizedScope === CUSTOMER_DB_SCOPE\) return 12000/);
   assert.match(pageSource, /const timeoutMs = getUiStateFetchTimeoutMs\(scope\);/);
@@ -1280,7 +1281,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\);/);
   assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\)/);
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true \}\);/);
-  assert.match(pageSource, /Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden\./);
+  assert.doesNotMatch(pageSource, /Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden\./);
   assert.match(photoStorageScriptSource, /if \(loadOptions && loadOptions\.failOnError\) throw error;/);
   assert.match(pageSource, /applyCustomerList\(mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\), false\);/);
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
