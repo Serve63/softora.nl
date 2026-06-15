@@ -16,6 +16,7 @@ const WEBDESIGN_VERTICAL_GUTTER_MAX_RATIO = 0.025;
 const WEBDESIGN_GUTTER_CROP_PAD_RATIO = 0.018;
 const WEBDESIGN_GUTTER_CROP_MIN_PAD = 12;
 const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
+const WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE = 'WEBPREVIEW_SAFETY_BLOCKED';
 let cachedSharp = null;
 
 function loadSharpModule() {
@@ -748,6 +749,23 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return /abort|timeout|timed out|duurde te lang|fetch failed|terminated|econnreset|socket|netwerkfout/i.test(combined);
   }
 
+  function isOpenAiSafetyBlockedError(error) {
+    if (error && error.openAiSafetyBlocked === true) return true;
+    const detail = [
+      error && error.message,
+      error?.data?.error?.message,
+      error?.data?.error?.detail,
+      error?.data?.error?.code,
+      error?.data?.error,
+      error?.data?.detail,
+      error?.data?.safety_violations,
+      error?.data?.safetyViolations,
+    ].map(normalizeString).filter(Boolean).join(' ').toLowerCase();
+    return /safety[_ -]?violations|safety system|request was rejected|content policy|policy violation|violated policy/.test(
+      detail
+    );
+  }
+
   function createRetryablePhotoStorageError(message, cause) {
     const error = new Error(message);
     error.status = 503;
@@ -789,12 +807,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function serializeJob(job) {
     const retry = getRetryState(job);
+    const safetyBlocked = job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE;
     return {
       id: job.id,
       status: job.status,
       customerId: job.customer.id,
       company: job.customer.bedrijf,
-      error: job.error || null,
+      error: safetyBlocked ? null : job.error || null,
+      safetyBlocked,
       createdAt: job.createdAt,
       startedAt: job.startedAt || null,
       finishedAt: job.finishedAt || null,
@@ -1120,7 +1140,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         }
       }
       job.status = 'error';
-      job.error = truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
+      job.error = isOpenAiSafetyBlockedError(error)
+        ? WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE
+        : truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
       job.finishedAt = now();
       const retry = getRetryState(job);
       job.retry = {

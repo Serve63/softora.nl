@@ -821,6 +821,59 @@ test('premium database webdesign jobs keep non-retryable OpenAI errors as hard e
   assert.match(statusRes.body.job.error, /organization must be verified/i);
 });
 
+test('premium database webdesign jobs hide OpenAI safety rejection details from job status', async () => {
+  const rawSafetyMessage =
+    'OpenAI websitegenerator mislukt (400): Your request was rejected by the safety system. Include request ID req_caef77d7f5d84889803634ba4e82ac8a. safety_violations=[sexual].';
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        const error = new Error(rawSafetyMessage);
+        error.status = 400;
+        error.openAiSafetyBlocked = true;
+        error.data = {
+          error: {
+            message: rawSafetyMessage,
+          },
+        };
+        throw error;
+      },
+    },
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => ({ values: {} }),
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_safetyhide123',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-safety-hidden', bedrijf: 'Softora Safety' },
+      },
+    },
+    createResponseRecorder()
+  );
+
+  const statusRes = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'job_safetyhide123' },
+    },
+    statusRes
+  );
+
+  assert.equal(statusRes.statusCode, 200);
+  assert.equal(statusRes.body.job.status, 'error');
+  assert.equal(statusRes.body.job.error, null);
+  assert.equal(statusRes.body.job.safetyBlocked, true);
+  assert.doesNotMatch(JSON.stringify(statusRes.body), /request ID|safety_violations|sexual|help\.openai\.com/i);
+});
+
 test('premium database webdesign inline processing runs at most one OpenAI image job at once', async () => {
   let active = 0;
   let maxActive = 0;

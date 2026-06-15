@@ -59,6 +59,44 @@ function createAiToolsCoordinator(deps = {}) {
     logger = console,
   } = deps;
 
+  const WEBSITE_PREVIEW_SAFETY_DETAIL =
+    'Deze websitepreview is door de AI-veiligheidscheck overgeslagen. Probeer opnieuw met een andere website of input.';
+
+  function collectErrorText(value, out = []) {
+    if (value === null || value === undefined) return out;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      out.push(String(value));
+      return out;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((entry) => collectErrorText(entry, out));
+      return out;
+    }
+    if (typeof value === 'object') {
+      [
+        'message',
+        'detail',
+        'error',
+        'code',
+        'type',
+        'param',
+        'safety_violations',
+        'safetyViolations',
+        'violations',
+      ].forEach((key) => collectErrorText(value[key], out));
+    }
+    return out;
+  }
+
+  function isOpenAiSafetyBlockedError(error) {
+    if (error && error.openAiSafetyBlocked === true) return true;
+    const haystack = collectErrorText(error).map(normalizeString).join(' ').toLowerCase();
+    if (!haystack) return false;
+    return /safety[_ -]?violations|safety system|request was rejected|content policy|policy violation|violated policy/.test(
+      haystack
+    );
+  }
+
   function shouldUseDatabasePreviewFallback(body = {}) {
     return normalizeString(body.source).toLowerCase() === 'premium-database'
       && normalizeString(body.action).toLowerCase() === 'webdesign';
@@ -181,6 +219,7 @@ function createAiToolsCoordinator(deps = {}) {
     } catch (error) {
       const status = Number(error?.status) || 500;
       const safeStatus = status >= 400 && status < 600 ? status : 500;
+      const safetyBlocked = isOpenAiSafetyBlockedError(error);
       const baseDetail = normalizeString(error?.message || 'Onbekende fout');
       const upstreamDetail = truncateText(
         normalizeString(
@@ -199,18 +238,21 @@ function createAiToolsCoordinator(deps = {}) {
         500
       );
       const safeUpstreamDetail =
-        upstreamDetail && !detail.includes(upstreamDetail) ? upstreamDetail : null;
+        !safetyBlocked && upstreamDetail && !detail.includes(upstreamDetail) ? upstreamDetail : null;
 
       return res.status(safeStatus).json({
         ok: false,
         error:
-          safeStatus === 503
+          safetyBlocked
+            ? 'Websitegenerator overgeslagen'
+            : safeStatus === 503
             ? 'Websitegenerator AI niet beschikbaar'
             : 'Websitegenerator genereren mislukt',
-        detail,
+        detail: safetyBlocked ? WEBSITE_PREVIEW_SAFETY_DETAIL : detail,
         openAiEnabled: Boolean(getOpenAiApiKey()),
         imageModel: openAiImageModel,
         upstreamDetail: safeUpstreamDetail,
+        safetyBlocked,
       });
     }
   }

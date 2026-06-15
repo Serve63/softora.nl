@@ -953,7 +953,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260615a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
   assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
@@ -1166,7 +1166,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260615a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260605a/);
@@ -2062,6 +2062,71 @@ test('premium database webdesign action keeps generation errors visible until th
   assert.ok(errorMessage);
   assert.equal(errorMessage.message, 'Webdesign maken duurde te lang. Probeer opnieuw.');
   assert.equal(errorMessage.autoClear, undefined);
+});
+
+test('premium database webdesign action hides safety-blocked job errors from the banner', async () => {
+  const messages = [];
+  const chargeLabels = [];
+  const document = {
+    getElementById: () => null,
+    createElement: () => ({ ...createClassListNode(), style: {} }),
+    querySelectorAll: () => chargeLabels,
+    head: { appendChild() {} },
+    body: {
+      appendChild(node) {
+        node.parentNode = {
+          removeChild(child) {
+            const index = chargeLabels.indexOf(child);
+            if (index >= 0) chargeLabels.splice(index, 1);
+            child.parentNode = null;
+          },
+        };
+        chargeLabels.push(node);
+      },
+    },
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    document,
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        job: {
+          id: 'job-safety-blocked-1',
+          customerId: 'customer-1',
+          status: 'error',
+          error: null,
+          safetyBlocked: true,
+        },
+      }),
+    }),
+  });
+  const controller = webdesignActionClient.createController({
+    state: {
+      klanten: [{
+        id: 'customer-1',
+        bedrijf: 'Softora Testmodus',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        websitePhoto: '',
+      }],
+    },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage(message, tone, autoClear) {
+      messages.push({ message, tone, autoClear });
+    },
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  await controller.generateForCustomer('customer-1');
+
+  assert.deepEqual(messages.filter((item) => item.tone === 'error'), []);
+  assert.doesNotMatch(JSON.stringify(messages), /request ID|safety_violations|sexual|help\.openai\.com/i);
 });
 
 test('premium database webdesign action retries temporary status failures without a red error', async () => {
