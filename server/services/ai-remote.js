@@ -87,6 +87,59 @@ function createAiRemoteService(deps = {}) {
     websiteGenerationStrictHtml = false,
   } = deps;
 
+  const OPENAI_WEBSITE_PREVIEW_SAFETY_DETAIL =
+    'Deze websitepreview is door de AI-veiligheidscheck overgeslagen. Probeer opnieuw met een andere website of input.';
+
+  function collectOpenAiErrorText(value, out = []) {
+    if (value === null || value === undefined) return out;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      out.push(String(value));
+      return out;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((entry) => collectOpenAiErrorText(entry, out));
+      return out;
+    }
+    if (typeof value === 'object') {
+      [
+        'message',
+        'detail',
+        'error',
+        'code',
+        'type',
+        'param',
+        'safety_violations',
+        'safetyViolations',
+        'violations',
+      ].forEach((key) => collectOpenAiErrorText(value[key], out));
+    }
+    return out;
+  }
+
+  function isOpenAiSafetyRejectionData(data, upstreamDetail) {
+    const haystack = collectOpenAiErrorText(data, [upstreamDetail]).map(normalizeString).join(' ').toLowerCase();
+    if (!haystack) return false;
+    return /safety[_ -]?violations|safety system|request was rejected|content policy|policy violation|violated policy/.test(
+      haystack
+    );
+  }
+
+  function buildOpenAiWebsitePreviewSafetyError(response, data, model) {
+    const err = new Error(OPENAI_WEBSITE_PREVIEW_SAFETY_DETAIL);
+    err.status = response.status;
+    err.data = {
+      error: {
+        code: 'openai_safety_rejected',
+      },
+    };
+    err.model = model;
+    err.openAiSafetyBlocked = true;
+    err.userSafeDetail = OPENAI_WEBSITE_PREVIEW_SAFETY_DETAIL;
+    err.upstreamStatus = response.status;
+    err.upstreamErrorCode = normalizeString(data?.error?.code || data?.code || '');
+    return err;
+  }
+
   function parseHtmlTagAttributes(tagRaw) {
     const tag = String(tagRaw || '');
     const attrs = {};
@@ -1225,6 +1278,9 @@ function createAiRemoteService(deps = {}) {
         normalizeString(data?.error?.message || data?.error?.detail || data?.error || data?.message || ''),
         500
       );
+      if (isOpenAiSafetyRejectionData(data, upstreamDetail)) {
+        throw buildOpenAiWebsitePreviewSafetyError(response, data, usedImageModel);
+      }
       const err = new Error(
         upstreamDetail
           ? `OpenAI websitegenerator mislukt (${response.status}): ${upstreamDetail}`

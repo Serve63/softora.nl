@@ -198,6 +198,40 @@ test('ai tools coordinator wraps website preview failures in a stable error payl
   assert.equal(res.body.upstreamDetail, null);
 });
 
+test('ai tools coordinator hides raw OpenAI safety rejection details', async () => {
+  const rawSafetyMessage =
+    'OpenAI websitegenerator mislukt (400): Your request was rejected by the safety system. Include request ID req_caef77d7f5d84889803634ba4e82ac8a. safety_violations=[sexual].';
+  const { coordinator } = createFixture({
+    generateWebsitePreviewImageWithAi: async () => {
+      const error = new Error(rawSafetyMessage);
+      error.status = 400;
+      error.openAiSafetyBlocked = true;
+      error.data = {
+        error: {
+          message: rawSafetyMessage,
+        },
+      };
+      throw error;
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendWebsitePreviewGenerateResponse(
+    {
+      body: { url: 'https://softora.nl' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'Websitegenerator overgeslagen');
+  assert.equal(res.body.safetyBlocked, true);
+  assert.match(res.body.detail, /AI-veiligheidscheck/);
+  assert.equal(res.body.upstreamDetail, null);
+  assert.doesNotMatch(JSON.stringify(res.body), /request ID|safety_violations|sexual|help\.openai\.com/i);
+});
+
 test('ai tools coordinator lets premium database previews generate with gpt-image-2 when scanning fails', async () => {
   const generatedScans = [];
   const { coordinator } = createFixture({

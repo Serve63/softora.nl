@@ -453,6 +453,35 @@ test('ai remote service includes OpenAI upstream detail in image generation erro
   );
 });
 
+test('ai remote service sanitizes OpenAI safety rejection details for image generation', async () => {
+  const rawSafetyMessage =
+    'Your request was rejected by the safety system. If you believe this is an error, contact us at help.openai.com and include the request ID req_caef77d7f5d84889803634ba4e82ac8a. safety_violations=[sexual].';
+  const { service } = createService({
+    fetchJsonWithTimeout: async () => ({
+      response: { ok: false, status: 400 },
+      data: {
+        error: {
+          message: rawSafetyMessage,
+        },
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () => service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' }),
+    (error) => {
+      assert.equal(error.status, 400);
+      assert.equal(error.model, 'gpt-image-2');
+      assert.equal(error.openAiSafetyBlocked, true);
+      assert.match(String(error.message || ''), /AI-veiligheidscheck/);
+      assert.doesNotMatch(String(error.message || ''), /request ID|safety_violations|sexual|help\.openai\.com/i);
+      assert.doesNotMatch(JSON.stringify(error.data || {}), /request ID|safety_violations|sexual|help\.openai\.com/i);
+      assert.equal(error?.data?.error?.code, 'openai_safety_rejected');
+      return true;
+    }
+  );
+});
+
 test('ai remote service marks OpenAI image rate limits as retryable with retry timing', async () => {
   const { service } = createService({
     fetchJsonWithTimeout: async () => ({
