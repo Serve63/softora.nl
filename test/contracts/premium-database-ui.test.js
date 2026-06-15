@@ -229,7 +229,7 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -821,7 +821,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.photo-batch-option\.is-active/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
-  assert.match(pageSource, /function renderPhotoCostLabel\(customers, pending\)/);
+  assert.match(pageSource, /function renderPhotoCostLabel\(customers, pending, eligibleCountOverride\)/);
   assert.match(systemMailCountScriptSource, /function hasSoftoraSystemMailSignal\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getCustomerSoftoraSystemMailSentCount\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getSoftoraSystemMailSentCount\(customers, helpers\)/);
@@ -925,7 +925,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*if \(state\.activeStatus === "benaderbaar"\) return getMailReadyCustomers\(customers\); if \(state\.activeStatus === "beschikbaar"\) return getAvailableColdmailCandidates\(customers\); return customers \|\| \[\];/);
   assert.match(pageSource, /const baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\)/);
   assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
-  assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered, mailReadyPending\);/);
+  assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered, mailReadyPending, eligiblePhotoCount\);/);
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), photoHeaderCount = mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = photoHeaderCount === null \? "\(--\)" : "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /logDatabaseMediaDebug\("render-table", \{ activeStatus: state\.activeStatus, databaseCount: state\.klanten\.length, filteredCount: visibleCustomers\.length, renderedCount: filtered\.length, photoHeaderCount: photoHeaderCount/);
@@ -960,7 +960,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.isMailReady;/);
   assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
   assert.match(pageSource, /function getPhotoHeaderCount\(customers, showPhotoColumn\)/);
-  assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*getMailReadyCustomers\(customers\)\.length/);
+  assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*const count = \(customers \|\| \[\]\)\.length/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto's nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
   assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null;/);
@@ -1240,7 +1240,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
-  assert.match(pageSource, /renderPage: renderPage/);
+  assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
@@ -1252,12 +1252,24 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
   assert.match(webdesignActionScriptSource, /function resolveJobPollDelay\(job\)/);
   assert.match(webdesignActionScriptSource, /schedulePoll\(jobId, resolveJobPollDelay\(job\)\);/);
+  assert.match(webdesignActionScriptSource, /const FINISHED_PHOTO_REFRESH_DELAY_MS = 900;/);
+  assert.match(webdesignActionScriptSource, /const AUTO_MOCKUP_IDLE_DELAY_MS = 350;/);
+  assert.match(webdesignActionScriptSource, /function queueFinishedPhotoRefresh\(customerId\)/);
+  assert.match(webdesignActionScriptSource, /setPendingJob\(pendingJob, \{ deferRender: true \}\); schedulePoll\(pendingJob\.jobId, \(restoredCount % 80\) \* BATCH_POLL_STAGGER_MS\);/);
+  assert.match(webdesignActionScriptSource, /if \(restoredCount && typeof renderPage === "function"\) renderPage\(\);/);
+  assert.doesNotMatch(webdesignActionScriptSource, /await refreshFinishedPhotos\(job\.customerId\)/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.doesNotMatch(webdesignActionScriptSource, /sessionStorage/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignMockup\.createController\(\{/);
   assert.match(pageSource, /ensureMockupForCustomer: function \(customerId, ensureOptions\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
+  assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false \};/);
+  assert.match(pageSource, /function getCustomerSearchHaystack\(customer\)/);
+  assert.match(pageSource, /databaseRenderRuntime\.activeAssetCache = new WeakMap\(\);/);
+  assert.match(pageSource, /function scheduleRenderPage\(\)/);
+  assert.match(pageSource, /renderPage: scheduleRenderPage/);
+  assert.doesNotMatch(pageSource, /await webdesignMockupController\.ensureForCustomer\(context\.customerId\)/);
   assert.match(pageSource, /const initialBootstrapCustomers = resolveBootstrapCustomers\(\), databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
   assert.match(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 1000\)/);
@@ -1604,7 +1616,18 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
 });
 
 test('premium database webdesign action keeps loaded photo slots stable across re-renders', () => {
-  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  const timers = [];
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+  });
   const customer = {
     id: 'customer-1',
     websitePhoto: 'https://assets.softora.test/customer-1.png',
@@ -1688,7 +1711,18 @@ test('premium database webdesign action renders stored inline photos as ready wi
 });
 
 test('premium database webdesign action queues missing mockup repairs outside render', async () => {
-  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  const timers = [];
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+  });
   const ensured = [];
   const customer = {
     id: 'customer-1',
@@ -1731,7 +1765,9 @@ test('premium database webdesign action queues missing mockup repairs outside re
 
   assert.equal(controller.queueVisibleMissingMockupRepairs([customer], 4), 1);
   assert.equal(controller.queueVisibleMissingMockupRepairs([customer], 4), 0);
-  await Promise.resolve();
+  const mockupTimer = timers.find((timer) => Number(timer.delay) >= 300);
+  assert.ok(mockupTimer, 'missing mockup repair should be delayed off the render path');
+  mockupTimer.callback();
   await Promise.resolve();
 
   assert.equal(ensured.length, 1);
@@ -1894,6 +1930,56 @@ test('premium database webdesign action starts large batches without per-row ren
   assert.ok(maxActiveRequests <= 4, `expected <=4 active requests, saw ${maxActiveRequests}`);
   assert.ok(renderCount <= 8, `expected batched renders, saw ${renderCount}`);
   assert.ok(timers.length <= 1, `expected one shared poll pump timer, saw ${timers.length}`);
+});
+
+test('premium database webdesign action restores large running job lists without render storms', async () => {
+  const timers = [];
+  let renderCount = 0;
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async (url) => {
+      if (String(url || '') === '/api/premium-database/webdesign-photo-jobs') {
+        return {
+          ok: true,
+          json: async () => ({
+            jobs: Array.from({ length: 1200 }, (_, index) => ({
+              id: `restored-job-${index}`,
+              customerId: `customer-${index}`,
+              status: index % 2 ? 'queued' : 'running',
+              createdAt: Date.now() - index,
+            })),
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({ job: { id: 'ignored', status: 'running' } }) };
+    },
+  });
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() { renderCount += 1; },
+    refreshPhotos: async () => {},
+  });
+
+  await controller.resumePendingJobs();
+
+  assert.equal(renderCount, 1);
+  assert.ok(timers.some((timer) => Number(timer.delay) === 0), 'restored jobs should still start polling quickly');
+  assert.ok(timers.some((timer) => Number(timer.delay) > 0 && Number(timer.delay) < 15000), 'restored jobs should stagger status polling');
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {
@@ -2128,6 +2214,10 @@ test('premium database webdesign action silently drops restored jobs that disapp
 
   pollTimer.callback();
   await new Promise((resolve) => setImmediate(resolve));
+  const refreshTimer = timers.find((timer) => Number(timer.delay) >= 800 && Number(timer.delay) < 1200);
+  assert.ok(refreshTimer, 'finished restored job should batch photo refresh off the poll path');
+  refreshTimer.callback();
+  await new Promise((resolve) => setImmediate(resolve));
 
   assert.deepEqual(messages.filter((item) => item.tone === 'error'), []);
   assert.equal(refreshed.length, 1);
@@ -2357,7 +2447,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /<button class="load-more-btn" id="loadMoreButton" type="button">Laad meer<\/button>/);
   assert.match(pageSource, /databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\)/);
   assert.match(pageSource, /nodes\.count\.textContent[\s\S]*visibleCustomers\.length\.toLocaleString\("nl-NL"\) \+ " resultaten"/);
-  assert.match(pageSource, /nodes\.loadMoreButton\.addEventListener\("click", function \(\) \{ state\.visibleLimit = databaseTableHelpers\.getNextVisibleLimit\(state\.visibleLimit, TABLE_PAGE_SIZE\); renderPage\(\); \}\);/);
+  assert.match(pageSource, /nodes\.loadMoreButton\.addEventListener\("click", function \(\) \{ state\.visibleLimit = databaseTableHelpers\.getNextVisibleLimit\(state\.visibleLimit, TABLE_PAGE_SIZE\); scheduleRenderPage\(\); \}\);/);
   assert.match(pageSource, /function setStatus\(status, button\) \{\s*if \(button && button\.disabled\) return;/);
   assert.match(pageSource, /if \(statusButton && !statusButton\.disabled\)/);
   assert.match(webdesignActionSource, /function hasInstantlyOutreachSignal\(customer\)/);
@@ -2397,7 +2487,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
   assert.match(pageSource, /showOutreachActionColumn \? outreachController\.renderActions\(customer, \{ hideMailButton: state\.activeStatus === "instantly" \}\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showOutreachActionColumn \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
-  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
+  assert.match(pageSource, /\(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(7\), table\.outreach-action-mode tbody td:nth-child\(7\) \{ width: 24%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(9\), table\.outreach-action-mode tbody td:nth-child\(9\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
@@ -3759,7 +3849,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : sortCustomers\(customers\);/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);

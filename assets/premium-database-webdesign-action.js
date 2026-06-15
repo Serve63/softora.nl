@@ -11,6 +11,8 @@
     const BATCH_PROGRESS_INTERVAL_MS = 700;
     const BATCH_POLL_STAGGER_MS = 180;
     const BATCH_YIELD_INTERVAL = 40;
+    const FINISHED_PHOTO_REFRESH_DELAY_MS = 900;
+    const AUTO_MOCKUP_IDLE_DELAY_MS = 350;
     const PHOTO_LOAD_FALLBACK_MS = 20000;
     const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
@@ -69,9 +71,9 @@
         let photoHydrationQueued = false;
         let autoMockupScheduled = false;
         let autoMockupRunning = false;
-        let pollPumpTimer = null;
-        let pollPumpDueAt = 0;
-        let activePollRequests = 0;
+        let pollPumpTimer = null, pollPumpDueAt = 0, activePollRequests = 0;
+        let finishedPhotoRefreshTimer = null, finishedPhotoRefreshRunning = false, finishedPhotoRefreshPromise = null, resolveFinishedPhotoRefresh = null;
+        const finishedPhotoRefreshIds = new Set();
         ensureStyles();
 
         function getSharedLoadedPhotoKeys() {
@@ -300,15 +302,10 @@
         function scheduleAutoMockupQueue() {
             if (autoMockupScheduled) return;
             autoMockupScheduled = true;
-            const run = function () {
-                autoMockupScheduled = false;
-                processAutoMockupQueue();
-            };
-            if (typeof global.queueMicrotask === "function") {
-                global.queueMicrotask(run);
-                return;
-            }
-            Promise.resolve().then(run);
+            const run = function () { autoMockupScheduled = false; processAutoMockupQueue(); };
+            if (typeof global.setTimeout === "function") global.setTimeout(run, AUTO_MOCKUP_IDLE_DELAY_MS);
+            else if (typeof global.queueMicrotask === "function") global.queueMicrotask(run);
+            else Promise.resolve().then(run);
         }
 
         function scheduleMissingMockupPair(customerId) {
@@ -453,13 +450,20 @@
             };
         }
 
-        async function refreshFinishedPhotos(customerId) {
-            if (typeof refreshPhotos === "function") {
-                await refreshPhotos({ customerId: customerId });
-            } else if (typeof renderPage === "function") {
-                renderPage();
-            }
-            if (customerId) await ensureMockupForCustomer(customerId);
+        function queueFinishedPhotoRefresh(customerId) {
+            const id = normalizeString(customerId); if (id) finishedPhotoRefreshIds.add(id);
+            if (!finishedPhotoRefreshPromise) finishedPhotoRefreshPromise = new Promise(function (resolve) { resolveFinishedPhotoRefresh = resolve; });
+            if (!finishedPhotoRefreshTimer && typeof global.setTimeout === "function") finishedPhotoRefreshTimer = global.setTimeout(flushFinishedPhotoRefresh, FINISHED_PHOTO_REFRESH_DELAY_MS);
+            else if (!finishedPhotoRefreshTimer) void flushFinishedPhotoRefresh();
+            return finishedPhotoRefreshPromise;
+        }
+
+        async function flushFinishedPhotoRefresh() {
+            if (finishedPhotoRefreshRunning) return finishedPhotoRefreshPromise;
+            finishedPhotoRefreshRunning = true; if (finishedPhotoRefreshTimer && typeof global.clearTimeout === "function") global.clearTimeout(finishedPhotoRefreshTimer); finishedPhotoRefreshTimer = null;
+            const customerIds = Array.from(finishedPhotoRefreshIds); finishedPhotoRefreshIds.clear();
+            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); }
+            finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh(""); }
         }
 
         function clearPollTimer(jobId) {
@@ -508,7 +512,7 @@
         async function finishPendingJob(job, message) {
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
-            await refreshFinishedPhotos(job.customerId);
+            queueFinishedPhotoRefresh(job.customerId);
             if (message) setStatusMessage(message, "error");
             if (typeof renderPage === "function") renderPage();
         }
@@ -575,18 +579,14 @@
                 });
                 const jobs = Array.isArray(payload && payload.jobs) ? payload.jobs : [];
                 if (!response.ok) return;
+                let restoredCount = 0;
                 jobs.forEach(function (job) {
                     if (!job || (job.status !== "queued" && job.status !== "running")) return;
-                    const pendingJob = {
-                        customerId: normalizeString(job.customerId),
-                        jobId: normalizeString(job.id),
-                        startedAt: Math.max(0, Number(job.createdAt) || now()),
-                        restored: true
-                    };
+                    const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
                     if (!pendingJob.customerId || !pendingJob.jobId) return;
-                    setPendingJob(pendingJob);
-                    schedulePoll(pendingJob.jobId, 0);
+                    setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
                 });
+                if (restoredCount && typeof renderPage === "function") renderPage();
             } catch (error) {
                 /* The next page load or poll will pick up running server jobs again. */
             }
