@@ -793,7 +793,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     category: 'CRM',
     intent: 'Uitleg',
     publishedAt: '2026-05-27',
-    updatedAt: '2026-05-27',
+    updatedAt: '2026-06-15',
     readTime: '5 min',
     summary:
       'Een CRM systeem geeft overzicht over leads, klanten, afspraken, offertes en opvolging, zodat kansen minder snel blijven liggen.',
@@ -819,11 +819,28 @@ const SEO_CONTENT_ITEMS = Object.freeze([
           'Softora kijkt dan eerst naar de kernflow: van nieuwe lead naar duidelijke actie. Pas daarna bouwen we extra schermen of automatisering.',
         ]),
       }),
+      Object.freeze({
+        heading: 'Let op pipeline en datakwaliteit',
+        paragraphs: Object.freeze([
+          'Een CRM werkt pas goed als de sales pipeline en de data-afspraken helder zijn. De pipeline laat zien in welke fase een lead zit, terwijl datakwaliteit bepaalt of notities, statussen en taken betrouwbaar blijven.',
+          'Voor MKB-teams is dit vaak belangrijker dan een lange lijst functies. Een compact CRM met duidelijke fases, verplichte kernvelden en automatische opvolgtaken geeft sneller rust dan een groot systeem waar niemand consequent in werkt.',
+        ]),
+      }),
     ]),
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({
+        label: 'Wat is CRM datakwaliteit?',
+        href: '/kennisbank/wat-is-crm-datakwaliteit',
+        availableFrom: '2026-06-05',
+      }),
+      Object.freeze({
+        label: 'Wat is een sales pipeline?',
+        href: '/kennisbank/wat-is-een-sales-pipeline-crm',
+        availableFrom: '2026-06-12',
+      }),
     ]),
   }),
   Object.freeze({
@@ -1420,7 +1437,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     category: 'CRM',
     intent: 'Uitleg',
     publishedAt: '2026-06-05',
-    updatedAt: '2026-06-05',
+    updatedAt: '2026-06-15',
     image: Object.freeze({
       src: '/assets/seo-content/crm-datakwaliteit-klantopvolging-softora.jpg',
       alt: 'Twee medewerkers bespreken CRM datakwaliteit en klantopvolging met dashboard en procesnotities.',
@@ -1445,6 +1462,13 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         ]),
       }),
       Object.freeze({
+        heading: 'Signalen dat CRM-data opvolging remt',
+        paragraphs: Object.freeze([
+          'Je merkt slechte datakwaliteit vaak aan praktische signalen: dubbele contacten, lege telefoonnummers, oude leadstatussen, taken zonder eigenaar of offertes die nergens aan gekoppeld zijn.',
+          'Ook rapportages worden dan minder bruikbaar. Als niet duidelijk is welke leads nieuw, gekwalificeerd, ingepland of in voorstel zitten, kan een team moeilijk prioriteit geven aan de beste commerciële kansen.',
+        ]),
+      }),
+      Object.freeze({
         heading: 'Hoe automatisering kan helpen',
         paragraphs: Object.freeze([
           'Automatisering kan dubbele invoer beperken, ontbrekende velden signaleren en samenvattingen klaarzetten na formulieren, telefoongesprekken of chats. Dat maakt het makkelijker om CRM-data actueel te houden.',
@@ -1456,6 +1480,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
+      Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
       Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
     ]),
@@ -1669,7 +1694,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     category: 'CRM',
     intent: 'Uitleg',
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-06-15',
     image: Object.freeze({
       src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
       alt: 'CRM-dashboard met sales pipeline, leadfases en opvolgtaken voor overzichtelijke commerciële opvolging.',
@@ -1691,6 +1716,13 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         paragraphs: Object.freeze([
           'Een pipeline werkt alleen wanneer iedereen dezelfde betekenis geeft aan een fase. Als “opvolgen” voor de ene medewerker iets anders betekent dan voor de andere, wordt rapportage onbetrouwbaar.',
           'Daarom begint een goed CRM niet met zoveel mogelijk velden, maar met heldere statusovergangen. Welke informatie is nodig om naar de volgende fase te gaan en wie beslist dat?',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Praktische fases voor MKB leadopvolging',
+        paragraphs: Object.freeze([
+          'Voor veel MKB-bedrijven is een compacte pipeline genoeg: nieuwe lead, te kwalificeren, afspraak gepland, voorstel verstuurd, opvolgen, gewonnen of verloren. Belangrijk is dat elke fase een duidelijke volgende actie heeft.',
+          'Zo voorkom je dat een CRM alleen een adressenboek wordt. De pipeline laat dagelijks zien welke kansen aandacht vragen, welke offertes wachten en waar een taak of reminder nodig is.',
         ]),
       }),
       Object.freeze({
