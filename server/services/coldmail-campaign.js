@@ -58,6 +58,8 @@ const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS = [250, 1000, 2500];
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
+  'COLDMAIL_AUTOPILOT_DISABLED',
+  'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
   'COLDMAIL_DAILY_LIMIT_REACHED',
   'COLDMAIL_RECIPIENT_RECENTLY_SENT',
   'COLDMAIL_SAFETY_PAUSED',
@@ -4547,6 +4549,22 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  async function assertColdmailAutopilotStillEnabledBeforeSend() {
+    const latestStateRecord = await loadColdmailAutopilotStateRecord().catch(() => null);
+    if (!latestStateRecord || !latestStateRecord.hasValue) {
+      const error = new Error(
+        'Autopilot-state kon vlak voor verzenden niet veilig uit Supabase worden geladen. Er is niets verzonden.'
+      );
+      error.code = 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE';
+      throw error;
+    }
+    if (!latestStateRecord.state.enabled) {
+      const error = new Error('Coldmail autopilot staat uit. Er is niets verzonden.');
+      error.code = 'COLDMAIL_AUTOPILOT_DISABLED';
+      throw error;
+    }
+  }
+
   async function runColdmailAutopilot(input = {}) {
     const actor = truncateText(normalizeString(input.actor), 120) || 'Coldmail Autopilot';
     const stateRecord = await loadColdmailAutopilotStateRecord();
@@ -4717,6 +4735,7 @@ function createColdmailCampaignService(deps = {}) {
         testMode: false,
         publicBaseUrl: input.publicBaseUrl,
         actor,
+        beforeSendGuard: assertColdmailAutopilotStillEnabledBeforeSend,
       });
       return finishColdmailAutopilotRun(
         state,
@@ -4745,8 +4764,16 @@ function createColdmailCampaignService(deps = {}) {
       );
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED';
+      if (code === 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE') {
+        return compactColdmailAutopilotResult(buildColdmailAutopilotSkipResult(
+          'state_unavailable',
+          normalizeString(error && error.message) ||
+            'Autopilot-state kon vlak voor verzenden niet veilig worden geladen. Er is niets verzonden.'
+        ));
+      }
       const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
       const shouldKeepPreviousStartTime =
+        code === 'COLDMAIL_AUTOPILOT_DISABLED' ||
         code === 'NO_VALID_RECIPIENT_DOMAINS' ||
         code === 'NO_WEBDESIGN_PHOTOS' ||
         code === 'WEBDESIGN_PREPARATION_QUEUED';
@@ -4760,7 +4787,7 @@ function createColdmailCampaignService(deps = {}) {
         {
           ok: knownSkip,
           skipped: knownSkip,
-          reason: code.toLowerCase(),
+          reason: code === 'COLDMAIL_AUTOPILOT_DISABLED' ? 'disabled' : code.toLowerCase(),
           message: truncateText(
             normalizeString(error && error.message) || 'Coldmail autopilot kon niet veilig draaien.',
             500
@@ -4780,6 +4807,11 @@ function createColdmailCampaignService(deps = {}) {
         actor
       );
     }
+  }
+
+  async function runColdmailBeforeSendGuard(input = {}, context = {}) {
+    if (typeof input.beforeSendGuard !== 'function') return;
+    await input.beforeSendGuard(context);
   }
 
   async function recordColdmailSendGuardEntry({
@@ -7442,6 +7474,17 @@ function createColdmailCampaignService(deps = {}) {
     for (const [index, item] of selectedRows.entries()) {
       const row = item.row;
       const to = getRowEmail(row);
+      if (!testMode) {
+        await runColdmailBeforeSendGuard(input, {
+          actor,
+          index,
+          selected: selectedRows.length,
+          senderEmail,
+          to,
+          item,
+          row,
+        });
+      }
       if (!testMode && index > 0) {
         const delayMs = isPersonalMailboxDomain(to)
           ? Math.max(getColdmailSendDelayMs(), getColdmailPersonalMailboxSendDelayMs())
@@ -7623,6 +7666,17 @@ function createColdmailCampaignService(deps = {}) {
         if (shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'link') {
           assertColdmailLinkOnlyMailIsImageFree(mail);
         }
+        if (!testMode) {
+          await runColdmailBeforeSendGuard(input, {
+            actor,
+            index,
+            selected: selectedRows.length,
+            senderEmail,
+            to,
+            item,
+            row,
+          });
+        }
         const outboundReservation = !isTestRecipientRow(row, to)
           ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor)
           : null;
@@ -7742,6 +7796,11 @@ function createColdmailCampaignService(deps = {}) {
       const outboundGuardFailure = failed.every((item) =>
         /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED|CONFIRM_FAILED)$/i.test(normalizeString(item && item.code))
       );
+      const autopilotGuardFailure = failed.every((item) =>
+        ['COLDMAIL_AUTOPILOT_DISABLED', 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE'].includes(
+          normalizeString(item && item.code)
+        )
+      );
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
@@ -7752,6 +7811,8 @@ function createColdmailCampaignService(deps = {}) {
           ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
           : outboundGuardFailure
           ? 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE'
+          : autopilotGuardFailure
+          ? normalizeString(failed[0] && failed[0].code) || 'COLDMAIL_AUTOPILOT_DISABLED'
           : webdesignAssetFailure
           ? 'NO_WEBDESIGN_PHOTOS'
           : 'SMTP_SEND_FAILED';
