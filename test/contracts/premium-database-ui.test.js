@@ -1887,6 +1887,102 @@ test('premium database webdesign action keeps generation errors visible until th
   assert.equal(errorMessage.autoClear, undefined);
 });
 
+test('premium database webdesign action retries temporary status failures without a red error', async () => {
+  const messages = [];
+  const timers = [];
+  const chargeLabels = [];
+  const document = {
+    getElementById: () => null,
+    createElement: () => ({ ...createClassListNode(), style: {} }),
+    querySelectorAll: () => chargeLabels,
+    head: { appendChild() {} },
+    body: {
+      appendChild(node) {
+        node.parentNode = {
+          removeChild(child) {
+            const index = chargeLabels.indexOf(child);
+            if (index >= 0) chargeLabels.splice(index, 1);
+            child.parentNode = null;
+          },
+        };
+        chargeLabels.push(node);
+      },
+    },
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    document,
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async (url, options) => {
+      const target = String(url || '');
+      if (target === '/api/premium-database/webdesign-photo-jobs' && options && options.method === 'POST') {
+        return {
+          ok: true,
+          status: 202,
+          json: async () => ({
+            job: {
+              id: 'job-status-retry-1',
+              customerId: 'customer-1',
+              status: 'queued',
+            },
+          }),
+        };
+      }
+      if (target === '/api/premium-database/webdesign-photo-jobs/job-status-retry-1') {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({
+            ok: false,
+            retryable: true,
+            error: 'Webdesign-status tijdelijk niet bereikbaar',
+          }),
+        };
+      }
+      return { ok: false, status: 500, json: async () => ({}) };
+    },
+  });
+  const controller = webdesignActionClient.createController({
+    state: {
+      klanten: [{
+        id: 'customer-1',
+        bedrijf: 'Softora Testmodus',
+        website: 'softora.nl',
+        dom: 'softora.nl',
+        websitePhoto: '',
+      }],
+    },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage(message, tone, autoClear) {
+      messages.push({ message, tone, autoClear });
+    },
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  await controller.generateForCustomer('customer-1');
+  const pollTimer = timers.find((timer) => Number(timer.delay) === 0);
+  assert.ok(pollTimer, 'queued webdesign job should schedule an immediate status poll');
+
+  pollTimer.callback();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(messages.filter((item) => item.tone === 'error'), []);
+  assert.ok(timers.some((timer) => Number(timer.delay) >= 4000), 'temporary status failure should schedule a retry');
+});
+
 test('premium database webdesign action silently drops restored jobs that disappeared server-side', async () => {
   const messages = [];
   const timers = [];
