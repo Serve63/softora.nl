@@ -2292,6 +2292,210 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Wat is een CRM integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
     ]),
   }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'crm-taken-reminders-automatiseren-mkb',
+    title: 'CRM taken en reminders automatiseren in het MKB',
+    description:
+      'Hoe MKB-teams CRM-taken, reminders en opvolgmomenten slimmer kunnen automatiseren zonder grip op klantrelaties te verliezen.',
+    category: 'CRM automatisering',
+    intent: 'Koopintentie',
+    publishedAt: '2026-06-30',
+    updatedAt: '2026-06-30',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-datakwaliteit-klantopvolging-softora.jpg',
+      alt: 'CRM-overzicht met taken, reminders en klantopvolging voor een MKB-team dat minder handwerk wil.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'CRM automatisering wordt waardevol wanneer taken, reminders en statussen het team helpen om leads op tijd en met context op te volgen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Opvolging valt vaak tussen systemen en mensen',
+        paragraphs: Object.freeze([
+          'Veel MKB-bedrijven leggen klantgegevens wel ergens vast, maar opvolging blijft afhankelijk van geheugen, losse agenda-afspraken of inboxnotities. Daardoor ontstaat niet altijd een groot dataprobleem, maar wel een praktisch ritmeprobleem: wie moet wanneer iets doen?',
+          'CRM-taken en reminders lossen dat pas op wanneer ze dicht bij het echte proces zitten. Een reminder moet niet zomaar een melding zijn, maar gekoppeld zijn aan leadstatus, laatste contactmoment, offertefase en eigenaar.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Automatiseer de voorbereiding, niet de relatie',
+        paragraphs: Object.freeze([
+          'Goede CRM automatisering neemt niet de hele klantrelatie over. De winst zit vooral in voorbereiden: taak aanmaken, samenvatting tonen, ontbrekende informatie signaleren en het juiste moment zichtbaar maken.',
+          'Een medewerker blijft bepalen wat de beste vervolgstap is. Dat houdt opvolging persoonlijk en voorkomt dat klanten generieke berichten krijgen die niet passen bij het gesprek.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Begin met drie duidelijke taakmomenten',
+        paragraphs: Object.freeze([
+          'Een sterke eerste versie hoeft niet groot te zijn. Kies bijvoorbeeld taken na een nieuwe aanvraag, reminders na een verstuurde offerte en een signaal wanneer een klant al te lang geen update heeft gehad.',
+          'Vanuit die basis kan Softora CRM, website, mailbox en eventueel AI automatisering koppelen. Zo ontstaat een systeem waarin opvolging consistenter wordt, zonder dat het team elke stap handmatig hoeft te bewaken.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
+      Object.freeze({
+        label: 'Wat is lead scoring?',
+        href: '/kennisbank/wat-is-lead-scoring',
+        availableFrom: '2026-07-01',
+      }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-lead-scoring',
+    title: 'Wat is lead scoring?',
+    description:
+      'Een heldere uitleg van lead scoring: hoe je leads beoordeelt op fit, timing en intentie zonder blind op automatische scores te varen.',
+    category: 'CRM',
+    intent: 'Uitleg',
+    publishedAt: '2026-07-01',
+    updatedAt: '2026-07-01',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
+      alt: 'CRM-dashboard met lead scoring, prioriteit en opvolgstatussen voor betere commerciële keuzes.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Lead scoring helpt teams bepalen welke aanvragen eerst aandacht verdienen, zolang de score uitlegbaar blijft en niet de enige beslisser wordt.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele betekenis',
+        paragraphs: Object.freeze([
+          'Lead scoring is het geven van een prioriteit aan leads op basis van signalen. Denk aan dienstinteresse, budgetindicatie, timing, bedrijfsprofiel, bronpagina, ingevulde gegevens en eerdere contactmomenten.',
+          'Het doel is niet om mensen als nummers te behandelen. Het doel is om sneller te zien welke aanvraag waarschijnlijk meer context, snelheid of persoonlijke aandacht nodig heeft.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke signalen vaak meetellen',
+        paragraphs: Object.freeze([
+          'Een praktische score kijkt naar fit en intentie. Fit gaat over de vraag of de klant past bij je dienstverlening. Intentie gaat over gedrag: welke pagina is bezocht, welke vraag is gesteld en hoe concreet is de behoefte?',
+          'AI kan helpen om tekst uit formulieren, chatgesprekken of belnotities samen te vatten. De score moet daarna altijd uitlegbaar blijven, zodat een medewerker kan zien waarom een lead hoger of lager staat.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer lead scoring zinvol wordt',
+        paragraphs: Object.freeze([
+          'Lead scoring wordt vooral nuttig wanneer er genoeg aanvragen zijn om prioriteit te moeten kiezen. Bij weinig volume is een duidelijke pipeline vaak belangrijker dan een uitgebreide score.',
+          'Voor Softora-projecten is de beste start meestal compact: score op dienst, urgentie, volledigheid en opvolgstatus. Daarna kun je koppelen met CRM-taken, reminders en dashboards.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'Wat is leadkwalificatie?', href: '/kennisbank/wat-is-leadkwalificatie' }),
+      Object.freeze({ label: 'CRM taken automatiseren', href: '/blog/crm-taken-reminders-automatiseren-mkb' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'ai-telefonie-menselijke-overdracht',
+    title: 'AI telefonie met menselijke overdracht goed inrichten',
+    description:
+      'Waar MKB-bedrijven op moeten letten wanneer AI telefonie bereikbaarheidsvragen opvangt, maar complexe gesprekken veilig overdraagt.',
+    category: 'AI telefonie',
+    intent: 'Koopintentie',
+    publishedAt: '2026-07-02',
+    updatedAt: '2026-07-02',
+    image: Object.freeze({
+      src: '/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg',
+      alt: 'Team met headset en laptop richt AI telefonie in met duidelijke menselijke overdracht bij klantvragen.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'AI telefonie werkt sterker wanneer duidelijk is welke gesprekken zelfstandig voorbereid worden en wanneer een mens moet overnemen.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Bereikbaarheid mag niet voelen als een muur',
+        paragraphs: Object.freeze([
+          'AI telefonie kan helpen om vragen sneller op te vangen, afspraken voor te bereiden en basisinformatie te verzamelen. Maar voor klanten moet altijd duidelijk blijven dat ingewikkelde of gevoelige vragen niet vastlopen in een systeem.',
+          'Daarom is menselijke overdracht geen bijzaak. Het is juist een belangrijk ontwerpprincipe: wanneer is doorverbinden nodig, welke context gaat mee en wie is verantwoordelijk voor de opvolging?',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Leg grenzen vooraf vast',
+        paragraphs: Object.freeze([
+          'Een goede voiceflow heeft concrete grenzen. Denk aan nieuwe aanvraag, afspraakverzoek, veelgestelde vraag, bestaande klant, klacht, spoed of onduidelijke intentie. Per type gesprek bepaal je wat AI mag voorbereiden en wanneer het team moet meekijken.',
+          'Die grenzen maken AI telefonie betrouwbaarder. De AI hoeft niet alles zelfstandig op te lossen, maar moet wel netjes samenvatten en de juiste vervolgstap klaarzetten.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Koppel overdracht aan CRM of taak',
+        paragraphs: Object.freeze([
+          'Een overdracht is pas bruikbaar wanneer de medewerker context krijgt. Naam, bedrijf, vraag, samenvatting, urgentie en voorgestelde actie horen daarom in CRM, mailbox of taakoverzicht terecht te komen.',
+          'Softora bouwt AI telefonie daarom als onderdeel van klantcontact en opvolging. De telefoonflow vangt de eerste laag op, CRM bewaart de status en het team houdt controle over het gesprek.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
+      Object.freeze({ label: 'Voicesoftware op maat', href: '/voicesoftware-op-maat' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({
+        label: 'Wat is chatbot overdracht?',
+        href: '/kennisbank/wat-is-chatbot-overdracht',
+        availableFrom: '2026-07-03',
+      }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'kennisbank',
+    slug: 'wat-is-chatbot-overdracht',
+    title: 'Wat is chatbot overdracht?',
+    description:
+      'Een praktische uitleg van chatbot overdracht: wanneer een gesprek naar een medewerker gaat en welke context mee moet naar CRM of WhatsApp.',
+    category: 'Chatbots',
+    intent: 'Uitleg',
+    publishedAt: '2026-07-03',
+    updatedAt: '2026-07-03',
+    image: Object.freeze({
+      src: '/assets/seo-content/chatbot-menselijke-overdracht-klantcontact-softora.jpg',
+      alt: 'Chatbotgesprek wordt met samenvatting en context overgedragen aan een medewerker voor opvolging.',
+      width: 1600,
+      height: 1000,
+    }),
+    summary:
+      'Chatbot overdracht betekent dat een gesprek op het juiste moment met context naar een medewerker of opvolgsysteem gaat.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'De simpele definitie',
+        paragraphs: Object.freeze([
+          'Chatbot overdracht is het moment waarop een chatbot een gesprek niet verder zelfstandig afhandelt, maar doorzet naar een medewerker, WhatsApp-route, mailbox, CRM-taak of ander opvolgsysteem.',
+          'Dat moment is belangrijk omdat klanten vaak eerst snelle hulp willen, maar bij specifieke vragen vertrouwen nodig hebben. Een goede overdracht voorkomt dat iemand opnieuw hetzelfde verhaal moet vertellen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Welke context mee moet',
+        paragraphs: Object.freeze([
+          'Minimaal wil je naam, contactgegevens, vraag, onderwerp, bronpagina, samenvatting en voorgestelde vervolgstap bewaren. Bij commerciële gesprekken kunnen dienstinteresse, timing en urgentie ook nuttig zijn.',
+          'De chatbot hoeft niet alles perfect te beoordelen. Hij moet vooral helder maken wat bekend is, wat nog onzeker is en waarom menselijke opvolging logisch is.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Wanneer overdracht nodig is',
+        paragraphs: Object.freeze([
+          'Overdracht is nodig bij complexe vragen, duidelijke koopintentie, bestaande klantproblemen, privacygevoelige informatie of situaties waarin de chatbot geen betrouwbaar antwoord kan geven.',
+          'Voor Softora is chatbot overdracht onderdeel van de totale leadflow. De chatbot helpt aan de voorkant, CRM of WhatsApp houdt de vervolgstap vast en het team blijft eigenaar van relatie en inhoud.',
+        ]),
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
+      Object.freeze({ label: 'Chatbot en CRM koppelen', href: '/blog/chatbot-crm-koppeling-leads-opvolgen' }),
+      Object.freeze({ label: 'AI telefonie overdracht', href: '/blog/ai-telefonie-menselijke-overdracht' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    ]),
+  }),
 ]);
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {

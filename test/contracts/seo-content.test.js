@@ -345,6 +345,79 @@ test('seo content verbergt vierde-batch links naar steunpagina’s tot die live 
   assert.match(afterCrmIntegration, /href="\/kennisbank\/wat-is-een-crm-integratie"/);
 });
 
+test('seo content houdt de vijfde wekelijkse batch uit public routes en sitemap tot publicatie', () => {
+  const beforeFifthBatch = new Date('2026-06-29T12:00:00.000Z');
+  const firstFifthBatchDay = new Date('2026-06-30T12:00:00.000Z');
+  const afterFifthBatch = new Date('2026-07-03T12:00:00.000Z');
+  const fifthBatchPaths = [
+    '/branches/adviesbureaus',
+    '/blog/crm-taken-reminders-automatiseren-mkb',
+    '/kennisbank/wat-is-lead-scoring',
+    '/blog/ai-telefonie-menselijke-overdracht',
+    '/kennisbank/wat-is-chatbot-overdracht',
+  ];
+  const newSupportPaths = fifthBatchPaths.slice(1);
+
+  const earlyPaths = getSeoContentPublicPaths({ now: beforeFifthBatch });
+  const earlySitemap = getSeoContentSitemapEntries({ now: beforeFifthBatch });
+  assert.ok(earlyPaths.includes('/branches/adviesbureaus'));
+  assert.ok(earlySitemap.some((entry) => entry.path === '/branches/adviesbureaus'));
+  for (const pathName of newSupportPaths) {
+    assert.ok(!earlyPaths.includes(pathName), `${pathName} mag voor publicatiedatum niet publiek zijn.`);
+    assert.ok(!earlySitemap.some((entry) => entry.path === pathName), `${pathName} mag voor publicatiedatum niet in sitemap staan.`);
+  }
+
+  assert.ok(
+    getSeoContentPublicPaths({ now: firstFifthBatchDay }).includes(
+      '/blog/crm-taken-reminders-automatiseren-mkb'
+    )
+  );
+  assert.ok(
+    getSeoContentSitemapEntries({ now: firstFifthBatchDay }).some(
+      (entry) => entry.path === '/blog/crm-taken-reminders-automatiseren-mkb'
+    )
+  );
+
+  const livePaths = getSeoContentPublicPaths({ now: afterFifthBatch });
+  const liveSitemap = getSeoContentSitemapEntries({ now: afterFifthBatch });
+  for (const pathName of fifthBatchPaths) {
+    assert.ok(livePaths.includes(pathName), `${pathName} moet op of na publicatiedatum publiek zijn.`);
+    assert.ok(liveSitemap.some((entry) => entry.path === pathName), `${pathName} moet op of na publicatiedatum in sitemap staan.`);
+  }
+});
+
+test('seo content verbergt vijfde-batch links naar steunpagina’s tot die live zijn', () => {
+  const beforeLeadScoring = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-taken-reminders-automatiseren-mkb', {
+      now: new Date('2026-06-30T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const afterLeadScoring = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-taken-reminders-automatiseren-mkb', {
+      now: new Date('2026-07-01T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const beforeChatbotTransfer = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonie-menselijke-overdracht', {
+      now: new Date('2026-07-02T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  const afterChatbotTransfer = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'ai-telefonie-menselijke-overdracht', {
+      now: new Date('2026-07-03T12:00:00.000Z'),
+    }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+
+  assert.doesNotMatch(beforeLeadScoring, /href="\/kennisbank\/wat-is-lead-scoring"/);
+  assert.match(afterLeadScoring, /href="\/kennisbank\/wat-is-lead-scoring"/);
+  assert.doesNotMatch(beforeChatbotTransfer, /href="\/kennisbank\/wat-is-chatbot-overdracht"/);
+  assert.match(afterChatbotTransfer, /href="\/kennisbank\/wat-is-chatbot-overdracht"/);
+});
+
 test('seo content renders the existing blog visual language with real links', () => {
   const html = buildSeoContentIndexHtml('blog', {
     siteOrigin: 'https://www.softora.nl',
