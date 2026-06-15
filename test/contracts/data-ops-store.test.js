@@ -44,6 +44,89 @@ function createSupabaseClientRecorder(currentCustomerIds = []) {
   return { client, recorder };
 }
 
+function createSupabaseCustomerGuardRecorder(options = {}) {
+  const currentCustomerIds = Array.isArray(options.currentCustomerIds) ? options.currentCustomerIds : [];
+  const existingGuardKeys = new Set(Array.isArray(options.existingGuardKeys) ? options.existingGuardKeys : []);
+  const recorder = {
+    upsertRows: [],
+    deletedIds: [],
+    insertedGuardRows: [],
+    events: [],
+  };
+  const client = {
+    from(table) {
+      if (table === 'softora_outbound_recipient_guards') {
+        return {
+          select(column) {
+            return {
+              in(_column, keys) {
+                const idColumn = String(column || 'guard_key');
+                return Promise.resolve({
+                  data: (Array.isArray(keys) ? keys : [])
+                    .filter((key) => existingGuardKeys.has(key))
+                    .map((key) => ({ [idColumn]: key })),
+                  error: null,
+                });
+              },
+            };
+          },
+          insert(rows) {
+            return {
+              select(column) {
+                recorder.events.push('insert-guards');
+                if (options.insertGuardError) {
+                  return Promise.resolve({ data: null, error: options.insertGuardError });
+                }
+                const inserted = Array.isArray(rows) ? rows : [rows];
+                recorder.insertedGuardRows.push(...inserted);
+                inserted.forEach((row) => existingGuardKeys.add(row.guard_key));
+                const idColumn = String(column || 'guard_key');
+                return Promise.resolve({
+                  data: inserted.map((row) => ({ [idColumn]: row.guard_key })),
+                  error: null,
+                });
+              },
+            };
+          },
+        };
+      }
+      return {
+        upsert(rows) {
+          if (table === 'softora_customers') {
+            recorder.events.push('upsert-customers');
+            recorder.upsertRows = rows;
+          }
+          return Promise.resolve({ data: rows, error: null });
+        },
+        select(column) {
+          return {
+            is() {
+              return {
+                limit() {
+                  const idColumn = String(column || 'customer_id');
+                  return Promise.resolve({
+                    data: currentCustomerIds.map((id) => ({ [idColumn]: id })),
+                    error: null,
+                  });
+                },
+              };
+            },
+          };
+        },
+        update() {
+          return {
+            in(_column, ids) {
+              recorder.deletedIds = ids;
+              return Promise.resolve({ data: [], error: null });
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client, recorder };
+}
+
 test('data ops store merges duplicate customer identities before structured upsert', async () => {
   const { client, recorder } = createSupabaseClientRecorder(['lead-1', 'lead-2']);
   const store = createSoftoraDataOpsStore({
@@ -91,6 +174,85 @@ test('data ops store merges duplicate customer identities before structured upse
     ['klant', 'import']
   );
   assert.deepEqual(recorder.deletedIds, ['lead-1']);
+});
+
+test('data ops store writes outbound guards before saving sent customers', async () => {
+  const { client, recorder } = createSupabaseCustomerGuardRecorder({
+    currentCustomerIds: ['lead-1'],
+  });
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-15T19:00:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.replaceCustomers(
+    [
+      {
+        id: 'lead-1',
+        bedrijf: 'B&B Bij ons in Chaam',
+        email: 'info@bij-ons-in-chaam.nl',
+        website: 'https://bij-ons-in-chaam.nl',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-06-15T10:15:00.000Z',
+        coldmailSentMessageId: 'smtp-message-1',
+        lastColdmailSenderEmail: 'serve@softora.nl',
+        hist: [{ type: 'gemaild', label: 'Mail verstuurd', date: '2026-06-15' }],
+      },
+    ],
+    { source: 'premium-database', actor: 'Servé' }
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(recorder.events, ['insert-guards', 'upsert-customers']);
+  assert.equal(recorder.upsertRows.length, 1);
+  assert.deepEqual(
+    recorder.insertedGuardRows.map((row) => row.guard_key).sort(),
+    [
+      'company:b-b-bij-ons-in-chaam',
+      'domain:bij-ons-in-chaam-nl',
+      'email:info@bij-ons-in-chaam.nl',
+      'id:lead-1',
+    ]
+  );
+  assert.equal(recorder.insertedGuardRows.every((row) => row.status === 'sent'), true);
+  assert.equal(recorder.insertedGuardRows.every((row) => row.permanent === true), true);
+  assert.equal(recorder.insertedGuardRows.every((row) => row.provider === 'softora'), true);
+  assert.equal(recorder.insertedGuardRows.every((row) => row.channel === 'coldmail'), true);
+});
+
+test('data ops store refuses to save sent customers when outbound guards fail', async () => {
+  const { client, recorder } = createSupabaseCustomerGuardRecorder({
+    currentCustomerIds: ['lead-1'],
+    insertGuardError: new Error('guard insert unavailable'),
+  });
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-15T19:00:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.replaceCustomers(
+    [
+      {
+        id: 'lead-1',
+        bedrijf: 'B&B Bij ons in Chaam',
+        email: 'info@bij-ons-in-chaam.nl',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        lastColdmailSentAt: '2026-06-15T10:15:00.000Z',
+      },
+    ],
+    { source: 'premium-database' }
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(result.error.message, /guard insert unavailable/);
+  assert.deepEqual(recorder.events, ['insert-guards']);
+  assert.equal(recorder.upsertRows.length, 0);
 });
 
 test('data ops store saves customers with write timeout and cooldown bypass', async () => {
