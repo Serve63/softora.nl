@@ -694,7 +694,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /Beschikbare data laden\.\.\./);
   assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{ nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">Database laden\.\.\.<\/div><\/td><\/tr>";/);
   assert.match(pageSource, /state\.dataUnavailable = true; renderPage\(\); setStatusMessage\(""\);/);
-  assert.match(pageSource, /state\.dataLoading = true;[\s\S]*renderPage\(\);[\s\S]*setStatusMessage\("Database laden\.\.\.", "info"\);/);
+  assert.match(pageSource, /state\.dataLoading = true; state\.dataUnavailable = false; renderPage\(\);/);
+  assert.doesNotMatch(pageSource, /setStatusMessage\("Database laden\.\.\.", "info"\);/);
   assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
