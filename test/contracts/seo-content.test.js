@@ -155,6 +155,34 @@ test('seo content linkt op publicatiedatum niet naar future-dated content', () =
   assert.deepEqual(brokenLinks, []);
 });
 
+test('CRM kennisbankcluster ondersteunt sales pipeline en datakwaliteit richting de money page', () => {
+  const now = new Date('2026-06-15T12:00:00.000Z');
+  const pages = [
+    getSeoContentItem('kennisbank', 'wat-is-een-crm-systeem', { now }),
+    getSeoContentItem('kennisbank', 'wat-is-crm-datakwaliteit', { now }),
+    getSeoContentItem('kennisbank', 'wat-is-een-sales-pipeline-crm', { now }),
+  ].map((item) => ({
+    path: getSeoContentPathForItem(item),
+    html: buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' }),
+  }));
+
+  for (const page of pages) {
+    assert.match(page.html, /href="\/crm-systeem-op-maat"/, `${page.path} moet de CRM money page ondersteunen.`);
+  }
+
+  const crmSystem = pages.find((page) => page.path === '/kennisbank/wat-is-een-crm-systeem').html;
+  const dataQuality = pages.find((page) => page.path === '/kennisbank/wat-is-crm-datakwaliteit').html;
+  const salesPipeline = pages.find((page) => page.path === '/kennisbank/wat-is-een-sales-pipeline-crm').html;
+
+  assert.match(crmSystem, /Let op pipeline en datakwaliteit/);
+  assert.match(crmSystem, /href="\/kennisbank\/wat-is-crm-datakwaliteit"/);
+  assert.match(crmSystem, /href="\/kennisbank\/wat-is-een-sales-pipeline-crm"/);
+  assert.match(dataQuality, /Signalen dat CRM-data opvolging remt/);
+  assert.match(dataQuality, /href="\/kennisbank\/wat-is-een-sales-pipeline-crm"/);
+  assert.match(salesPipeline, /Praktische fases voor MKB leadopvolging/);
+  assert.match(salesPipeline, /nieuwe lead, te kwalificeren, afspraak gepland, voorstel verstuurd/);
+});
+
 test('seo content toont datumgebonden related links pas wanneer de steunpagina live is', () => {
   const beforeLeadQualification = buildSeoContentArticleHtml(
     getSeoContentItem('blog', 'ai-automatisering-leadkwalificatie-mkb', {
