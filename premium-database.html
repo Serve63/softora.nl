@@ -2174,7 +2174,7 @@
         function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
         function isColdmailReadyWebdesignLead(customer) { return buildCustomerWebdesignAssetState(customer).isMailReady; }
         function isAvailableColdmailCandidate(customer) { return isColdmailBaseLeadEligible(customer) && !hasUsedColdCalling(customer) && !hasUsedColdMailing(customer) && !outreachController.hasInstantlyOutreachSignal(customer) && !isColdmailReadyWebdesignLead(customer); } function getAvailableColdmailCandidates(customers) { return (customers || []).filter(isAvailableColdmailCandidate); } function getMailReadyCustomers(customers) { return (customers || []).filter(isColdmailReadyWebdesignLead); }
-        function getVisibleTableCustomers(customers) { if (state.activeStatus === "benaderbaar") return getMailReadyCustomers(customers); if (state.activeStatus === "beschikbaar") return getAvailableColdmailCandidates(customers); return customers || []; }
+        function getVisibleTableCustomers(customers) { if (state.activeStatus === "benaderbaar") return getMailReadyCustomers(customers); if (state.activeStatus === "beschikbaar") return getAvailableColdmailCandidates(customers); return customers || []; } function getEmptyTableMessage() { if (!state.klanten.length) return "Nog geen bedrijven geladen."; if (state.activeStatus === "benaderbaar") return "Geen mailklare bedrijven."; if (state.activeStatus === "beschikbaar") return "Geen beschikbare bedrijven."; if (state.activeStatus === "benaderd") return "Geen benaderde bedrijven."; if (state.activeStatus === "instantly") return "Geen Instantly-bedrijven."; return "Geen bedrijven in deze filter."; }
         function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = (customers || []).length; state.lastMailReadyHeaderCount = count; return count; } const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
         function isWebdesignPhotoEligible(customer) { return buildCustomerWebdesignAssetState(customer).canGeneratePhoto; }
         function getAvailablePreparationStatus(customer) {
@@ -2212,7 +2212,7 @@
             const showOutreachActionColumn = state.activeStatus === "benaderd" || state.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn;
             const mailReadyPending = isMailReadyCalculationPending(), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state.klanten.length;
 
-            nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
+            nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar.";
             window.SoftoraDatabaseSystemMailCount.render(state.klanten, { dataLoading: state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || state.photoRestoreFailed, normalizeString: normalizeString, isColdmailTestCompany: isColdmailTestCompany, outreachController: outreachController, databaseContactStatus: databaseContactStatus });
             if (blockForMailReadyPending) { nodes.count.textContent = "-- resultaten"; document.getElementById("databaseTable").classList.toggle("outreach-action-mode", false); document.getElementById("statusHeader").hidden = false; document.getElementById("outreachActionHeader").hidden = true; document.getElementById("photoHeader").hidden = false; document.getElementById("daysHeader").hidden = true; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel([], true); document.getElementById("photoHeaderCount").textContent = "(--)"; updateLoadMoreControl(0, 0); nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; return; }
             const baseFiltered = getSortedCustomers(getFilteredCustomers()), visibleCustomers = getVisibleTableCustomers(baseFiltered), filtered = databaseTableHelpers.getVisibleRows(visibleCustomers, state.visibleLimit, TABLE_PAGE_SIZE);
@@ -2223,7 +2223,7 @@
 
             updateLoadMoreControl(visibleCustomers.length, filtered.length);
             if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">Database laden...</div></td></tr>"; updateLoadMoreControl(0, 0); return; } if (!visibleCustomers.length) {
-                nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + getEmptyTableMessage() + "</div></td></tr>";
                 updateLoadMoreControl(0, 0);
                 return;
             }
