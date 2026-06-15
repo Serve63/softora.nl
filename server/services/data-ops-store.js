@@ -1787,7 +1787,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         .eq('owner_key', normalizeString(ownerKey))
         .in('status', ['queued', 'running'])
         .order('created_at', { ascending: true })
-        .limit(100)
+        .limit(5000)
     );
     if (!result.ok) return null;
     return (result.data || []).map(normalizeWebdesignJobRow);

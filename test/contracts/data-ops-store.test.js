@@ -1,7 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { createSoftoraDataOpsStore } = require('../../server/services/data-ops-store');
+
+test('data ops store restores large premium database webdesign job queues', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../server/services/data-ops-store.js'), 'utf8');
+
+  assert.match(
+    source,
+    /async function listVisibleWebdesignJobs\(ownerKey\)[\s\S]*\.in\('status', \['queued', 'running'\]\)[\s\S]*\.limit\(5000\)/
+  );
+});
 
 function createSupabaseClientRecorder(currentCustomerIds = []) {
   const recorder = {

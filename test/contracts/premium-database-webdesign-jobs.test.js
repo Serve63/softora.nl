@@ -562,6 +562,45 @@ test('premium database webdesign jobs list running jobs for the current user', a
   assert.equal(res.body.jobs[0].customerId, 'customer-list');
 });
 
+test('premium database webdesign jobs keep thousands of queued jobs visible', async () => {
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+  });
+
+  for (let index = 0; index < 1200; index += 1) {
+    const res = createResponseRecorder();
+    await coordinator.startJobResponse(
+      {
+        premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+        body: {
+          jobId: `job_bulk_${String(index).padStart(5, '0')}_123`,
+          websiteUrl: `https://bedrijf-${index}.test`,
+          customer: { id: `customer-bulk-${index}`, bedrijf: `Bedrijf ${index}` },
+        },
+      },
+      res
+    );
+    assert.equal(res.statusCode, 202);
+  }
+
+  const listRes = createResponseRecorder();
+  await coordinator.listJobsResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+    },
+    listRes
+  );
+
+  assert.equal(coordinator._jobs.size, 1200);
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.body.jobs.length, 1200);
+  assert.equal(listRes.body.jobs[0].customerId, 'customer-bulk-0');
+  assert.equal(listRes.body.jobs[1199].customerId, 'customer-bulk-1199');
+});
+
 test('premium database webdesign jobs requeue retryable OpenAI rate limits and resume after the wait', async () => {
   let nowMs = 1760000000000;
   let pipelineCalls = 0;
