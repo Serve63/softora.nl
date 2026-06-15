@@ -877,6 +877,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.company-edit:hover \{[\s\S]*color: var\(--crimson\);/);
   assert.match(pageSource, /\.photo-remove/);
   assert.match(pageSource, /\.photo-remove \{[\s\S]*position: absolute;[\s\S]*right: 2px;/);
+  assert.match(pageSource, /\.toast\s*\{[\s\S]*background: #111;[\s\S]*color: #fff;[\s\S]*font-weight: 700;[\s\S]*max-width: min\(340px, calc\(100vw - 48px\)\);/);
+  const toastCssBlock = pageSource.match(/\.toast\s*\{[\s\S]*?\}/)[0];
+  assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
   assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
   const topRightHtml = pageSource.slice(
