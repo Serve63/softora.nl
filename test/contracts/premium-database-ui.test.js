@@ -943,7 +943,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260615a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
   assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
@@ -1040,7 +1040,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const LOADING_ICON = "<span class=\\"photo-generate-spinner\\"/);
   assert.match(webdesignActionScriptSource, /const PHOTO_READY_SELECTOR = ".photo-drop\[data-has-photo=\\"true\\"\], .photo-drop--mockup\[data-has-photo=\\"true\\"\]";/);
   assert.match(webdesignActionScriptSource, /const pendingIds = new Set\(\);/);
-  assert.match(webdesignActionScriptSource, /const pollTimers = new Map\(\);/);
+  assert.match(webdesignActionScriptSource, /const pollQueue = new Map\(\);/);
+  assert.match(webdesignActionScriptSource, /const activePollJobIds = new Set\(\);/);
+  assert.match(webdesignActionScriptSource, /const MAX_ACTIVE_POLL_REQUESTS = 3;/);
+  assert.match(webdesignActionScriptSource, /function runPollPump\(\)/);
   assert.match(webdesignActionScriptSource, /const loadedPhotoKeys = getSharedLoadedPhotoKeys\(\);/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";/);
   assert.match(webdesignActionScriptSource, /const PHOTO_LOAD_CACHE_LIMIT = 2500;/);
@@ -1077,9 +1080,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const isRestoring = !hasPhoto && !isPending && Boolean\(isRestoringPhotos\(customer\)\);/);
   assert.match(webdesignActionScriptSource, /const canGenerate = !hasPhoto && !isLoading && Boolean\(resolveCustomerWebsiteUrl\(customer\)\);/);
   assert.match(webdesignActionScriptSource, /const isPending = pendingIds\.has\(customer\.id\);/);
-  assert.match(webdesignActionScriptSource, /if \(pendingIds\.has\(target\.id\)\) \{/);
-  assert.match(webdesignActionScriptSource, /if \(isRestoringPhotos\(target\)\) \{/);
-  assert.match(webdesignActionScriptSource, /schedulePoll\(job\.id, 0\);/);
+  assert.match(webdesignActionScriptSource, /if \(pendingIds\.has\(target\.id\) \|\| isRestoringPhotos\(target\)\) \{/);
+  assert.match(webdesignActionScriptSource, /schedulePoll\(job\.id, pollDelay\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /Er wordt al een webdesign gemaakt/);
   assert.match(webdesignActionScriptSource, /photo-drop" \+ \(isLoading \? " is-generating" : ""\) \+ \(isRestoring \? " is-restoring" : ""\)/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-remove\\"/);
@@ -1154,7 +1156,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260429b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260529d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260615a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260605a/);
@@ -1219,16 +1221,22 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(photoBatchScriptSource, /void generate\(selection\.limit, \{ silentProgress: true \}\);/);
   assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
   assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);
+  assert.match(pageSource, /function formatBatchProgressMessage\(progress\)/);
+  assert.match(pageSource, /webdesignActionController\.generateBatchForCustomers\(targets, \{/);
+  assert.match(webdesignActionScriptSource, /async function generateBatchForCustomers\(customers, batchOptions\)/);
+  assert.match(webdesignActionScriptSource, /const BATCH_START_CONCURRENCY = 4;/);
+  assert.match(webdesignActionScriptSource, /const BATCH_RENDER_INTERVAL = 20;/);
+  assert.match(webdesignActionScriptSource, /const BATCH_POLL_STAGGER_MS = 180;/);
   assert.match(pageSource, /return isWebdesignPhotoEligible\(customer\);/);
   assert.doesNotMatch(pageSource, /Promise\.allSettled\(targets\.map\(function \(target\) \{/);
-  assert.match(pageSource, /for \(const target of targets\) \{/);
-  assert.match(pageSource, /await webdesignActionController\.generateForCustomer\(target\.id\);/);
+  assert.doesNotMatch(pageSource, /for \(const target of targets\) \{/);
+  assert.doesNotMatch(pageSource, /await webdesignActionController\.generateForCustomer\(target\.id\);/);
   assert.doesNotMatch(pageSource, /return webdesignActionController\.generateForCustomer\(target\.id\);/);
   assert.doesNotMatch(pageSource, /Webdesign maken voor " \+ target\.bedrijf/);
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
   assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
   assert.doesNotMatch(pageSource, /onlyCustomerIds: \[target\.id\]/);
-  assert.match(pageSource, /setStatusMessage\(""\);[\s\S]*for \(const target of targets\)/);
+  assert.match(pageSource, /setStatusMessage\("Webdesign-batch wordt voorbereid\.\.\.", "info"\);[\s\S]*generateBatchForCustomers\(targets/);
   assert.doesNotMatch(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
@@ -1819,6 +1827,73 @@ test('premium database webdesign action keeps loaded photo memory for large data
 
   assert.match(controller.render(customers[0]), /data-photo-loaded="true"/);
   assert.match(controller.render(customers[799]), /data-photo-loaded="true"/);
+});
+
+test('premium database webdesign action starts large batches without per-row render or request storms', async () => {
+  let activeRequests = 0;
+  let maxActiveRequests = 0;
+  let fetchCalls = 0;
+  let renderCount = 0;
+  const timers = [];
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    requestAnimationFrame: (callback) => callback(),
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async (_url, options) => {
+      activeRequests += 1;
+      maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+      fetchCalls += 1;
+      await new Promise((resolve) => setImmediate(resolve));
+      activeRequests -= 1;
+      const body = JSON.parse(options.body);
+      return {
+        ok: true,
+        status: 202,
+        json: async () => ({
+          job: {
+            id: body.jobId,
+            customerId: body.customer.id,
+            status: 'queued',
+          },
+        }),
+      };
+    },
+  });
+  const customers = Array.from({ length: 120 }, (_, index) => ({
+    id: `customer-${index}`,
+    bedrijf: `Bedrijf ${index}`,
+    website: `https://bedrijf-${index}.test`,
+    dom: `bedrijf-${index}.test`,
+    websitePhoto: '',
+  }));
+  const controller = webdesignActionClient.createController({
+    state: { klanten: customers },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: (customer) => customer.website,
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() { renderCount += 1; },
+    refreshPhotos: async () => {},
+  });
+
+  const result = await controller.generateBatchForCustomers(customers);
+
+  assert.equal(result.started, 120);
+  assert.equal(result.failed, 0);
+  assert.equal(fetchCalls, 120);
+  assert.ok(maxActiveRequests <= 4, `expected <=4 active requests, saw ${maxActiveRequests}`);
+  assert.ok(renderCount <= 8, `expected batched renders, saw ${renderCount}`);
+  assert.ok(timers.length <= 1, `expected one shared poll pump timer, saw ${timers.length}`);
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {

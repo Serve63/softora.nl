@@ -5,6 +5,12 @@
     const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
     const PENDING_TTL_MS = 6 * 60 * 60 * 1000;
     const POLL_INTERVAL_MS = 2200;
+    const MAX_ACTIVE_POLL_REQUESTS = 3;
+    const BATCH_START_CONCURRENCY = 4;
+    const BATCH_RENDER_INTERVAL = 20;
+    const BATCH_PROGRESS_INTERVAL_MS = 700;
+    const BATCH_POLL_STAGGER_MS = 180;
+    const BATCH_YIELD_INTERVAL = 40;
     const PHOTO_LOAD_FALLBACK_MS = 20000;
     const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
@@ -50,7 +56,8 @@
         const costEur = Math.max(0, Number(options.costEur) || 0);
         const pendingIds = new Set();
         const pendingJobs = new Map();
-        const pollTimers = new Map();
+        const pollQueue = new Map();
+        const activePollJobIds = new Set();
         const loadedPhotoKeys = getSharedLoadedPhotoKeys();
         const failedPhotoKeys = new Set();
         const failedPhotoKeyTimes = new Map();
@@ -62,6 +69,9 @@
         let photoHydrationQueued = false;
         let autoMockupScheduled = false;
         let autoMockupRunning = false;
+        let pollPumpTimer = null;
+        let pollPumpDueAt = 0;
+        let activePollRequests = 0;
         ensureStyles();
 
         function getSharedLoadedPhotoKeys() {
@@ -422,10 +432,10 @@
             pendingIds.delete(customerId);
         }
 
-        function setPendingJob(job) {
+        function setPendingJob(job, updateOptions) {
             pendingIds.add(job.customerId);
             upsertPendingJob(job);
-            if (typeof renderPage === "function") renderPage();
+            if (!(updateOptions && updateOptions.deferRender) && typeof renderPage === "function") renderPage();
         }
 
         function buildJobPayload(target, jobId) {
@@ -453,18 +463,38 @@
         }
 
         function clearPollTimer(jobId) {
-            const timer = pollTimers.get(jobId);
-            if (timer) global.clearTimeout(timer);
-            pollTimers.delete(jobId);
+            pollQueue.delete(jobId);
+            if (pollQueue.size || !pollPumpTimer || typeof global.clearTimeout !== "function") return;
+            global.clearTimeout(pollPumpTimer); pollPumpTimer = null; pollPumpDueAt = 0;
         }
-
+        function getNextPollDueAt() { let dueAt = Infinity; pollQueue.forEach(function (value) { dueAt = Math.min(dueAt, Number(value) || 0); }); return Number.isFinite(dueAt) ? dueAt : 0; }
+        function schedulePollPump() {
+            if (!pollQueue.size || activePollRequests >= MAX_ACTIVE_POLL_REQUESTS || typeof global.setTimeout !== "function") return;
+            const dueAt = getNextPollDueAt();
+            if (!dueAt || (pollPumpTimer && pollPumpDueAt && pollPumpDueAt <= dueAt)) return;
+            if (pollPumpTimer && typeof global.clearTimeout === "function") global.clearTimeout(pollPumpTimer);
+            pollPumpDueAt = dueAt; pollPumpTimer = global.setTimeout(function () { pollPumpTimer = null; pollPumpDueAt = 0; runPollPump(); }, Math.max(0, dueAt - now()));
+        }
+        function runPollPump() {
+            if (!pollQueue.size) return;
+            const currentTime = now();
+            let started = 0;
+            Array.from(pollQueue.entries()).filter(function (entry) { return Number(entry[1]) <= currentTime; }).sort(function (left, right) { return Number(left[1]) - Number(right[1]); }).some(function (entry) {
+                const jobId = entry[0];
+                if (activePollRequests >= MAX_ACTIVE_POLL_REQUESTS) return true;
+                if (!jobId) return false;
+                if (activePollJobIds.has(jobId)) { pollQueue.set(jobId, currentTime + 250); return false; }
+                pollQueue.delete(jobId); activePollRequests += 1; activePollJobIds.add(jobId); started += 1;
+                Promise.resolve(pollJob(jobId)).catch(function () {}).finally(function () { activePollRequests = Math.max(0, activePollRequests - 1); activePollJobIds.delete(jobId); schedulePollPump(); });
+                return false;
+            });
+            if (pollQueue.size && (started || activePollRequests < MAX_ACTIVE_POLL_REQUESTS)) schedulePollPump();
+        }
         function schedulePoll(jobId, delay) {
-            if (!jobId || pollTimers.has(jobId)) return;
-            const timer = global.setTimeout(function () {
-                pollTimers.delete(jobId);
-                void pollJob(jobId);
-            }, Math.max(0, Number(delay) || 0));
-            pollTimers.set(jobId, timer);
+            if (!jobId) return;
+            const dueAt = now() + Math.max(0, Number(delay) || 0), queuedAt = pollQueue.get(jobId);
+            if (queuedAt && queuedAt <= dueAt) return;
+            pollQueue.set(jobId, dueAt); schedulePollPump();
         }
 
         function resolveJobPollDelay(job) {
@@ -663,27 +693,40 @@
             return "<div class=\"photo-cell\"><div class=\"photo-drop" + (isLoading ? " is-generating" : "") + (isRestoring ? " is-restoring" : "") + "\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" data-photo-key=\"" + escapeHtml(photoLoadKey) + "\" data-photo-loaded=\"" + (photoLoaded || photoFailed ? "true" : "false") + "\" data-photo-error=\"" + (photoFailed ? "true" : "false") + "\" data-can-generate=\"" + (canGenerate ? "true" : "false") + "\" aria-label=\"" + ariaLabel + "\" title=\"" + escapeHtml(title) + "\">" + inner + remove + "</div>" + mockupSlot + (global.SoftoraDatabaseWebdesignPreview && typeof global.SoftoraDatabaseWebdesignPreview.renderLink === "function" ? global.SoftoraDatabaseWebdesignPreview.renderLink(customer, { escapeHtml: escapeHtml, show: hasPhoto && hasMockup && !photoFailed && !mockupFailed }) : "") + "</div>";
         }
 
-        async function generateForCustomer(customerId) {
-            const target = getCustomerById(customerId);
-            if (!target) return;
+        function waitForBatchYield() { return new Promise(function (resolve) { if (typeof global.requestAnimationFrame === "function") global.requestAnimationFrame(function () { resolve(); }); else global.setTimeout(resolve, 0); }); }
+        function clearPendingStart(target, jobId, startOptions, message) {
+            const quiet = Boolean(startOptions && startOptions.quiet);
+            const deferRender = Boolean(startOptions && startOptions.deferRender);
+            clearPollTimer(jobId);
+            removePendingJob(target.id);
+            if (!deferRender && typeof renderPage === "function") renderPage();
+            if (!quiet && message) setStatusMessage(message, "error");
+            return { started: false, failed: true, error: message || "" };
+        }
+
+        async function startJobForTarget(target, startOptions) {
+            const quiet = Boolean(startOptions && startOptions.quiet);
+            const deferRender = Boolean(startOptions && startOptions.deferRender);
+            const pollDelay = Math.max(0, Number(startOptions && startOptions.pollDelay) || 0);
+            if (!target) return { started: false, skipped: true };
             if (isValidWebsitePhotoDataUrl(target.websitePhoto)) {
-                openWebsitePhotoPreview(customerId);
-                return;
+                if (!quiet) openWebsitePhotoPreview(target.id);
+                return { started: false, skipped: true };
             }
-            if (pendingIds.has(target.id)) {
-                return;
-            }
-            if (isRestoringPhotos(target)) {
-                return;
+            if (pendingIds.has(target.id) || isRestoringPhotos(target)) {
+                return { started: false, skipped: true };
             }
             if (!isWebdesignPhotoEligible(target)) {
-                setStatusMessage("Geen geldige website gevonden voor " + target.bedrijf + ".", "error");
-                return;
+                const message = "Geen geldige website gevonden voor " + target.bedrijf + ".";
+                if (!quiet) setStatusMessage(message, "error");
+                return { started: false, failed: true, error: message };
             }
-            setStatusMessage("");
-            showChargeLabel();
+            if (!quiet) {
+                setStatusMessage("");
+                showChargeLabel();
+            }
             const jobId = createJobId();
-            setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() });
+            setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() }, { deferRender: deferRender });
             try {
                 const response = await fetch(JOB_ENDPOINT, {
                     method: "POST",
@@ -701,23 +744,56 @@
                 }
                 if (job.id !== jobId) {
                     clearPollTimer(jobId);
-                    setPendingJob({ customerId: target.id, jobId: job.id, startedAt: now() });
+                    setPendingJob({ customerId: target.id, jobId: job.id, startedAt: now() }, { deferRender: deferRender });
                 }
                 if (job.status === "done") {
                     await finishPendingJob({ customerId: target.id, jobId: job.id }, "");
-                    return;
+                    return { started: true, done: true, jobId: job.id };
                 }
                 if (job.status === "error") {
-                    await finishPendingJob({ customerId: target.id, jobId: job.id }, normalizeString(job.error) || "Webdesign maken is mislukt.");
-                    return;
+                    const errorMessage = normalizeString(job.error) || "Webdesign maken is mislukt.";
+                    if (quiet) return clearPendingStart(target, job.id, startOptions, errorMessage);
+                    await finishPendingJob({ customerId: target.id, jobId: job.id }, errorMessage);
+                    return { started: false, failed: true, error: errorMessage };
                 }
-                schedulePoll(job.id, 0);
+                schedulePoll(job.id, pollDelay);
+                return { started: true, jobId: job.id };
             } catch (error) {
-                await finishPendingJob({ customerId: target.id, jobId: jobId }, normalizeString(error && error.message) || "Webdesign starten is mislukt.");
+                return clearPendingStart(target, jobId, startOptions, normalizeString(error && error.message) || "Webdesign starten is mislukt.");
             }
         }
 
+        async function generateForCustomer(customerId) { await startJobForTarget(getCustomerById(customerId), { quiet: false, deferRender: false, pollDelay: 0 }); }
+
+        async function generateBatchForCustomers(customers, batchOptions) {
+            const targets = (Array.isArray(customers) ? customers : []).filter(Boolean), total = targets.length;
+            const onProgress = batchOptions && typeof batchOptions.onProgress === "function" ? batchOptions.onProgress : null;
+            let cursor = 0, completed = 0, started = 0, failed = 0, lastRenderedCompleted = 0, lastProgressAt = 0;
+            function reportProgress(force) {
+                const currentTime = now();
+                if (onProgress && (force || currentTime - lastProgressAt >= BATCH_PROGRESS_INTERVAL_MS)) { lastProgressAt = currentTime; onProgress({ total: total, completed: completed, started: started, failed: failed }); }
+                if (typeof renderPage === "function" && (force || completed - lastRenderedCompleted >= BATCH_RENDER_INTERVAL)) { lastRenderedCompleted = completed; renderPage(); }
+            }
+            async function worker(workerIndex) {
+                while (cursor < total) {
+                    const index = cursor, target = targets[index]; cursor += 1;
+                    const result = await startJobForTarget(target, { quiet: true, deferRender: true, pollDelay: ((index + workerIndex) % 80) * BATCH_POLL_STAGGER_MS });
+                    if (result && result.started) started += 1;
+                    else if (result && result.failed) failed += 1;
+                    completed += 1; reportProgress(false);
+                    if (completed % BATCH_YIELD_INTERVAL === 0) await waitForBatchYield();
+                }
+            }
+            if (!total) return { total: 0, completed: 0, started: 0, failed: 0 };
+            reportProgress(true);
+            const workerCount = Math.min(BATCH_START_CONCURRENCY, total);
+            await Promise.all(Array.from({ length: workerCount }, function (_, index) { return worker(index); }));
+            reportProgress(true);
+            return { total: total, completed: completed, started: started, failed: failed };
+        }
+
         return {
+            generateBatchForCustomers: generateBatchForCustomers,
             generateForCustomer: generateForCustomer,
             hydratePhotoDrops: hydratePhotoDrops,
             isMockupFailed: isMockupFailed,
