@@ -1867,22 +1867,34 @@ function createSoftoraDataOpsStore(deps = {}) {
 
   function normalizeWebdesignTableStatus(value, fallback = 'queued') {
     const normalized = normalizeString(value || fallback).toLowerCase();
+    return ['queued', 'running', 'done', 'error'].includes(normalized) ? normalized : fallback;
+  }
+
+  function normalizeWebdesignBatchStatus(value, fallback = 'queued') {
+    const normalized = normalizeString(value || fallback).toLowerCase();
     return ['queued', 'running', 'done', 'error', 'cancelled'].includes(normalized) ? normalized : fallback;
+  }
+
+  function getWebdesignBatchTableStatus(status) {
+    const normalized = normalizeWebdesignBatchStatus(status, 'queued');
+    return normalized === 'cancelled' ? 'error' : normalized;
   }
 
   function buildWebdesignBatchRow(batch = {}) {
     const id = normalizeString(batch.id);
+    const status = normalizeWebdesignBatchStatus(batch.status, 'queued');
     return {
       job_id: id,
       owner_key: normalizeString(batch.ownerKey),
       customer_id: WEBDESIGN_BATCH_CUSTOMER_ID,
       website_url: `https://softora.local/webdesign-bulk/${encodeURIComponent(id || 'batch')}`,
-      status: normalizeWebdesignTableStatus(batch.status, 'queued'),
+      status: getWebdesignBatchTableStatus(status),
       error: normalizeString(batch.error || '').slice(0, 1000) || null,
       payload: {
         kind: WEBDESIGN_BATCH_KIND,
         batch: {
           id,
+          status,
           total: Math.max(0, Math.floor(Number(batch.total || 0) || 0)),
           expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
           uploadedTargets: Math.max(0, Math.floor(Number(batch.uploadedTargets || 0) || 0)),
@@ -1903,7 +1915,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     return {
       id: normalizeString(row.job_id || batch.id),
       ownerKey: normalizeString(row.owner_key),
-      status: normalizeWebdesignTableStatus(row.status, 'queued'),
+      status: normalizeWebdesignBatchStatus(batch.status || row.status, 'queued'),
       error: normalizeString(row.error || ''),
       total: Math.max(0, Math.floor(Number(batch.total || 0) || 0)),
       expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
@@ -2096,7 +2108,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
         .eq('owner_key', normalizeString(ownerKey))
         .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
-        .in('status', ['queued', 'running', 'done', 'error', 'cancelled'])
+        .in('status', ['queued', 'running', 'done', 'error'])
         .order('created_at', { ascending: false })
         .limit(5)
     );

@@ -18,8 +18,44 @@ test('data ops store restores large premium database webdesign job queues', () =
   );
   assert.match(
     source,
-    /async function listVisibleWebdesignBatches\(ownerKey\)[\s\S]*\.in\('status', \['queued', 'running', 'done', 'error', 'cancelled'\]\)/
+    /async function listVisibleWebdesignBatches\(ownerKey\)[\s\S]*\.in\('status', \['queued', 'running', 'done', 'error'\]\)/
   );
+  assert.match(source, /function getWebdesignBatchTableStatus\(status\)[\s\S]*return normalized === 'cancelled' \? 'error' : normalized;/);
+  assert.match(source, /status,\s*total: Math\.max/);
+});
+
+test('data ops store saves cancelled webdesign batches with a table-compatible status', async () => {
+  const upsertRows = [];
+  const client = {
+    from(table) {
+      return {
+        upsert(row) {
+          upsertRows.push({ table, row });
+          return Promise.resolve({ data: row, error: null });
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const result = await store.upsertWebdesignBatch({
+    id: 'webdesign_batch_cancelled',
+    ownerKey: 'owner',
+    status: 'cancelled',
+    total: 10,
+    summary: { total: 10, done: 3, cancelled: 7 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(upsertRows.length, 1);
+  assert.equal(upsertRows[0].table, 'softora_webdesign_jobs');
+  assert.equal(upsertRows[0].row.status, 'error');
+  assert.equal(upsertRows[0].row.payload.batch.status, 'cancelled');
+  assert.equal(upsertRows[0].row.payload.batch.summary.cancelled, 7);
 });
 
 function createSupabaseClientRecorder(currentCustomerIds = []) {
