@@ -187,6 +187,22 @@ test('data ops store merges duplicate customer identities before structured upse
   assert.deepEqual(recorder.deletedIds, ['lead-1']);
 });
 
+test('data ops store can soft-delete explicit customer ids without replacing the full customer list', async () => {
+  const { client, recorder } = createSupabaseClientRecorder();
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-16T12:58:00.000Z'),
+    logger: { error: () => {} },
+  });
+
+  const result = await store.deleteCustomers(['lead-413'], { source: 'premium-database-delete-lead' });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(recorder.deletedIds, ['lead-413']);
+  assert.deepEqual(recorder.upsertRows, []);
+});
+
 test('data ops store writes outbound guards before saving sent customers', async () => {
   const { client, recorder } = createSupabaseCustomerGuardRecorder({
     currentCustomerIds: ['lead-1'],
