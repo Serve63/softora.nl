@@ -118,8 +118,8 @@ test('customers page bootstrap can defer heavy customer rows for the premium dat
   assert.equal(payload.source, 'deferred');
   assert.equal(payload.deferred, true);
   assert.deepEqual(payload.customers, []);
-  assert.deepEqual(seenScopes, ['premium_customers_database', 'premium_active_orders']);
-  assert.equal(payload.activeOrdersState.source, 'supabase:data_ops');
+  assert.deepEqual(seenScopes, []);
+  assert.equal(payload.activeOrdersState.source, '');
 });
 
 test('customers page bootstrap vult dashboard actieve-opdrachten teller server-side', () => {

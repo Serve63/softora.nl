@@ -1488,7 +1488,7 @@
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-distance.js?v=20260616a"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260616a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -1532,7 +1532,7 @@
             sortAsc: true,
             openId: null,
             modalEditId: null,
-            photoTargetId: null, photoRestorePending: true, photoRestoreFailed: false, dataLoading: true, dataUnavailable: false, remoteCustomersLoaded: false,
+            photoTargetId: null, photoRestorePending: true, photoRestoreFailed: false, dataLoading: true, dataUnavailable: false, remoteCustomersLoaded: false, mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false,
             visibleLimit: TABLE_PAGE_SIZE,
             lastMailReadyHeaderCount: null,
             lastPhotoHeaderCount: null,
@@ -1994,6 +1994,7 @@
                 return !isDerivedOrderPlaceholderCustomer(customer);
             });
         }
+        async function loadMailReadySnapshot() { return window.SoftoraDatabaseMailReadySnapshot.load({ databaseHadBootstrapCustomers: databaseHadBootstrapCustomers, state: state, normalizeCustomer: normalizeCustomer, applyCustomerList: applyCustomerList, fetchJsonWithTimeout: window.SoftoraDatabaseResilience.fetchJsonWithTimeout, logger: console }); }
         function customerListsDiffer(nextCustomers) { return state.klanten !== nextCustomers; }
         function applyCustomerList(nextCustomers, forceRender) { const changed = Boolean(forceRender) || customerListsDiffer(nextCustomers); logDatabaseMediaDebug("apply-customer-list", { currentCount: state.klanten.length, nextCount: (nextCustomers || []).length, forceRender: Boolean(forceRender), changed: changed }); databaseRenderRuntime.searchHaystackCache = new WeakMap(); state.klanten = nextCustomers; if (changed) renderPage(); }
 
@@ -2155,18 +2156,16 @@
         }
         function isValidWebsitePhotoUrl(value) { const raw = normalizeString(value); if (!/^https:\/\//i.test(raw)) return false; try { const parsed = new URL(raw); return parsed.protocol === "https:" && Boolean(parsed.hostname); } catch (error) { return false; } }
         function isValidWebsitePhotoSource(value) { return isValidWebsitePhotoDataUrl(value) || isValidWebsitePhotoUrl(value); }
-        function shouldShowWebsitePhoto(customer) {
-            return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
-        }
+        function shouldShowWebsitePhoto(customer) { return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant"; }
         function isLikelyColdmailAddress(value) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeString(value)); }
-        function isColdmailBaseLeadEligible(customer) { if (!hasLoadedColdmailGuard()) return false; if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; if (hasColdmailSendGuardSignal(customer)) return false; if (hasUsedColdMailing(customer)) return false; return true; }
+        function isColdmailBaseLeadEligible(customer) { if (window.SoftoraDatabaseMailReadySnapshot.isSnapshotMailReadyCustomer(customer) && !state.remoteCustomersLoaded) return true; if (!hasLoadedColdmailGuard()) return false; if (!customer || isColdmailTestCompany(customer)) return false; const status = normalizeDatabaseStatus(customer.status || customer.databaseStatus, customer); if (["gemaild", "interesse", "afspraak", "klant", "afgehaakt", "geblokkeerd", "buiten"].indexOf(status) !== -1) return false; if (!isLikelyColdmailAddress(customer.email)) return false; if (customer.mail === false || customer.canMail === false || customer.doNotMail === true) return false; if (outreachController.hasInstantlyOutreachSignal(customer)) return false; if (hasColdmailSendGuardSignal(customer)) return false; if (hasUsedColdMailing(customer)) return false; return true; }
         function buildCustomerWebdesignAssetState(customer) { const cache = databaseRenderRuntime.activeAssetCache; const build = function () { return window.SoftoraDatabaseWebdesignAssetState.buildWebdesignAssetState(customer, { shouldShowWebsitePhoto: shouldShowWebsitePhoto, isValidWebsitePhotoSource: isValidWebsitePhotoSource, resolveCustomerWebsiteUrl: resolveCustomerWebsiteUrl, isMailLeadEligible: isColdmailBaseLeadEligible, isMockupPending: function (customerId) { return webdesignMockupController.isPending(customerId); }, isMockupFailed: function (customerId) { return webdesignActionController.isMockupFailed(customerId); } }, state); }; if (!cache || !customer || typeof customer !== "object") return build(); const cached = cache.get(customer); if (cached) return cached; const next = build(); cache.set(customer, next); return next; }
         function hasApprovedWebdesignMockup(customer) { return buildCustomerWebdesignAssetState(customer).mockupApproved; }
         function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
         function isColdmailReadyWebdesignLead(customer) { return buildCustomerWebdesignAssetState(customer).isMailReady; }
         function isAvailableColdmailCandidate(customer) { return isColdmailBaseLeadEligible(customer) && !hasUsedColdCalling(customer) && !hasUsedColdMailing(customer) && !outreachController.hasInstantlyOutreachSignal(customer) && !isColdmailReadyWebdesignLead(customer); } function getAvailableColdmailCandidates(customers) { return (customers || []).filter(isAvailableColdmailCandidate); } function getMailReadyCustomers(customers) { return (customers || []).filter(isColdmailReadyWebdesignLead); }
         function getVisibleTableCustomers(customers) { return customers || []; } function getEmptyTableMessage() { if (!state.klanten.length) return "Nog geen bedrijven geladen."; if (state.activeStatus === "benaderbaar") return "Geen mailklare bedrijven."; if (state.activeStatus === "beschikbaar") return "Geen beschikbare bedrijven."; if (state.activeStatus === "benaderd") return "Geen benaderde bedrijven."; if (state.activeStatus === "instantly") return "Geen Instantly-bedrijven."; return "Geen bedrijven in deze filter."; }
-        function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = (customers || []).length; state.lastMailReadyHeaderCount = count; return count; } const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
+        function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = window.SoftoraDatabaseMailReadySnapshot.getDisplayCount(state, (customers || []).length); state.lastMailReadyHeaderCount = count; return count; } const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
         function isWebdesignPhotoEligible(customer) { return buildCustomerWebdesignAssetState(customer).canGeneratePhoto; }
         function getAvailablePreparationStatus(customer) {
             const assetState = buildCustomerWebdesignAssetState(customer);
@@ -2177,14 +2176,9 @@
 
         function buildDatabaseMediaDebugItems(customers) { return (customers || []).slice(0, 30).map(function (customer) { const assetState = buildCustomerWebdesignAssetState(customer); return { id: customer.id, status: customer.status, bedrijf: customer.bedrijf, hasPhoto: assetState.hasPhoto, hasMockup: assetState.hasMockup, mockupApproved: assetState.mockupApproved, mockupState: assetState.mockupState, isMailReady: assetState.isMailReady, canGeneratePhoto: assetState.canGeneratePhoto, canRepairMockup: assetState.canRepairMockup }; }); }
 
-        function formatEuroCost(value) {
-            return "€" + Number(value || 0).toLocaleString("nl-NL", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
+        function formatEuroCost(value) { return "€" + Number(value || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-        function isMailReadyCalculationPending() { return (state.activeStatus === "benaderbaar" || state.activeStatus === "beschikbaar") && (state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || state.photoRestoreFailed || !hasLoadedColdmailGuard()); }
+        function isMailReadyCalculationPending() { return (state.activeStatus === "benaderbaar" || state.activeStatus === "beschikbaar") && (state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || !hasLoadedColdmailGuard()); }
         function renderPhotoCostLabel(customers, pending, eligibleCountOverride) { const showPhotoBatchControl = state.activeStatus === "beschikbaar"; if (nodes.resultCountStack) nodes.resultCountStack.hidden = !showPhotoBatchControl; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
             if (pending) { nodes.photoCostLabel.innerHTML = "<strong>--</strong>"; nodes.photoCostLabel.title = "Beschikbare data wordt nog geladen."; return; }
             const eligibleCount = Number.isFinite(Number(eligibleCountOverride)) ? Math.max(0, Number(eligibleCountOverride)) : (customers || []).filter(isWebdesignPhotoEligible).length, totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
@@ -2193,9 +2187,7 @@
         function resetVisibleLimit() { state.visibleLimit = TABLE_PAGE_SIZE; }
         function updateLoadMoreControl(totalCount, renderedCount) { if (!nodes.loadMoreWrap) return; const loadState = databaseTableHelpers.getLoadMoreState(totalCount, renderedCount); nodes.loadMoreWrap.hidden = !loadState.hasMore; if (nodes.loadMoreSummary) nodes.loadMoreSummary.textContent = loadState.summary; }
 
-        function renderWebsitePhotoDrop(customer) {
-            return webdesignActionController.render(customer);
-        }
+        function renderWebsitePhotoDrop(customer) { return webdesignActionController.render(customer); }
 
         function renderTable() {
             const previousAssetCache = databaseRenderRuntime.activeAssetCache; databaseRenderRuntime.activeAssetCache = new WeakMap();
@@ -2208,7 +2200,8 @@
             if (blockForMailReadyPending) { nodes.count.textContent = "-- resultaten"; document.getElementById("databaseTable").classList.toggle("outreach-action-mode", false); document.getElementById("statusHeader").hidden = false; document.getElementById("outreachActionHeader").hidden = true; document.getElementById("photoHeader").hidden = false; document.getElementById("daysHeader").hidden = true; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel([], true); document.getElementById("photoHeaderCount").textContent = "(--)"; updateLoadMoreControl(0, 0); nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; return; }
             const filtered = databaseTableHelpers.getVisibleRows(visibleCustomers, state.visibleLimit, TABLE_PAGE_SIZE);
             const photoHeaderCount = getPhotoHeaderCount(visibleCustomers, showPhotoColumn);
-            nodes.count.textContent = blockForMailReadyPending || (state.dataLoading && !state.klanten.length) || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : visibleCustomers.length.toLocaleString("nl-NL") + " resultaten";
+            const visibleResultCount = window.SoftoraDatabaseMailReadySnapshot.getDisplayCount(state, visibleCustomers.length);
+            nodes.count.textContent = blockForMailReadyPending || (state.dataLoading && !state.klanten.length) || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : visibleResultCount.toLocaleString("nl-NL") + " resultaten";
             document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; const eligiblePhotoCount = state.activeStatus === "beschikbaar" && !blockForMailReadyPending ? visibleCustomers.filter(isWebdesignPhotoEligible).length : undefined; renderPhotoCostLabel(baseFiltered, blockForMailReadyPending, eligiblePhotoCount); document.getElementById("photoHeaderCount").textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: visibleCustomers.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), photoRestoreFailed: Boolean(state.photoRestoreFailed), items: buildDatabaseMediaDebugItems(filtered) });
 
@@ -2893,13 +2886,18 @@
             if (!hadBootstrapCustomers) { state.dataLoading = true; state.dataUnavailable = false; renderPage(); }
 
             try {
-                await refreshColdmailGuardState(); const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
+                const guardPromise = refreshColdmailGuardState();
+                const remoteStatePromise = fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
+                const orderStatePromise = fetchUiStateGetWithFallback(ORDER_SCOPE).then(function (orderState) { return { orderState: orderState }; }, function (error) { return { error: error }; });
+                await guardPromise; const remoteState = await remoteStatePromise;
                 const remoteValues = remoteState && remoteState.values && typeof remoteState.values === "object" ? remoteState.values : {}; if (!window.SoftoraDatabaseResilience.hasChunkedStateKey(remoteValues, CUSTOMER_DB_KEY)) throw new Error("Geen Supabase-klantdata ontvangen."); const remoteCustomersRaw = window.SoftoraDatabaseImport.readChunkedStateValue(remoteValues, CUSTOMER_DB_KEY), remoteCustomers = parseCustomers(remoteCustomersRaw); if (!remoteCustomers.length) throw new Error("Geen bruikbare Supabase-klantdata ontvangen.");
 
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
                     try {
-                        const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
+                        const orderResult = await orderStatePromise;
+                        if (orderResult && orderResult.error) throw orderResult.error;
+                        const orderState = orderResult && orderResult.orderState;
                         const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
                         state.orders = Array.isArray(orders) ? orders : [];
                         enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, orders);
@@ -2916,7 +2914,7 @@
                         state.photoRestoreFailed = true; console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error);
                     }
                     const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
-                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
+                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; state.mailReadySnapshotLoaded = false; state.mailReadySnapshotTotal = null; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     if (coldmailGuardLoadError && !coldmailGuardReady) setStatusMessage("Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd.", "error", true); else if (!coldmailGuardLoadError) setStatusMessage("");
                     return;
                 }
@@ -3070,7 +3068,7 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { state.photoRestoreFailed = true; console.warn("Databasefoto's laden voor boot tijdelijk overgeslagen:", error); } } else { await bootstrapCustomers(); }
+                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { state.photoRestoreFailed = true; console.warn("Databasefoto's laden voor boot tijdelijk overgeslagen:", error); } } else { await loadMailReadySnapshot(); await bootstrapCustomers(); }
                 await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestoreFailed = true; state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }

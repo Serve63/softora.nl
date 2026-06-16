@@ -655,18 +655,19 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   async function buildCustomersBootstrapPayload(options = {}) {
-    const remoteState = await readBootstrapUiState(customerScope);
-    const orderState = await readBootstrapUiState(orderScope);
     if (options.includeCustomers === false) {
       return {
-        ok: hasLoadedUiStateValues(remoteState) || hasLoadedUiStateValues(orderState),
+        ok: true,
         loadedAt: new Date().toISOString(),
         source: 'deferred',
         deferred: true,
         customers: [],
-        activeOrdersState: buildBootstrapStateSnapshot(orderState),
+        activeOrdersState: buildBootstrapStateSnapshot(null),
       };
     }
+
+    const remoteState = await readBootstrapUiState(customerScope);
+    const orderState = await readBootstrapUiState(orderScope);
     const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
