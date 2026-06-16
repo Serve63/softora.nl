@@ -138,6 +138,66 @@ function createSupabaseCustomerGuardRecorder(options = {}) {
   return { client, recorder };
 }
 
+test('data ops store chunks outbound recipient guard key lookups conservatively', async () => {
+  const chunkSizes = [];
+  const statusFilters = [];
+  const existingGuardKeys = new Set(['guard-3', 'guard-101', 'guard-240']);
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_outbound_recipient_guards');
+      return {
+        select(column) {
+          assert.equal(column, 'guard_key');
+          return {
+            in(filterColumn, values) {
+              if (filterColumn === 'guard_key') {
+                chunkSizes.push(values.length);
+                return {
+                  in(statusColumn, statuses) {
+                    assert.equal(statusColumn, 'status');
+                    statusFilters.push(statuses);
+                    return {
+                      limit(limit) {
+                        assert.equal(limit, values.length);
+                        return Promise.resolve({
+                          data: values
+                            .filter((key) => existingGuardKeys.has(key))
+                            .map((key) => ({ guard_key: key })),
+                          error: null,
+                        });
+                      },
+                    };
+                  },
+                };
+              }
+              throw new Error(`Onverwachte filterkolom: ${filterColumn}`);
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const keys = Array.from({ length: 241 }, (_item, index) => `guard-${index}`);
+  const found = await store.listOutboundRecipientGuardKeys(keys, {
+    bypassReadCache: true,
+    suppressTransientReadFailureLog: true,
+  });
+
+  assert.deepEqual(chunkSizes, [100, 100, 41]);
+  assert.deepEqual(statusFilters, [
+    ['sent', 'reserved'],
+    ['sent', 'reserved'],
+    ['sent', 'reserved'],
+  ]);
+  assert.deepEqual(found, ['guard-3', 'guard-101', 'guard-240']);
+});
+
 test('data ops store merges duplicate customer identities before structured upsert', async () => {
   const { client, recorder } = createSupabaseClientRecorder(['lead-1', 'lead-2']);
   const store = createSoftoraDataOpsStore({
