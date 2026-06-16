@@ -90,6 +90,7 @@ test('app middleware skips Supabase hydration for isolated API requests', async 
     '/api/health/baseline',
     '/api/mailbox/sync',
     '/api/coldmailing/autopilot/run',
+    '/api/premium-database/webdesign-photo-batches/run',
   ]) {
     await new Promise((resolve) => {
       middleware({ method: 'POST', path: requestPath }, {}, () => {
@@ -99,7 +100,7 @@ test('app middleware skips Supabase hydration for isolated API requests', async 
     });
   }
 
-  assert.equal(nextCalls, 5);
+  assert.equal(nextCalls, 6);
   assert.equal(hydrateCalls, 0);
 });
 

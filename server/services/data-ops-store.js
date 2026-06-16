@@ -2102,6 +2102,21 @@ function createSoftoraDataOpsStore(deps = {}) {
     return (result.data || []).map(normalizeWebdesignBatchRow);
   }
 
+  async function listRunnableWebdesignBatches(limit = 5) {
+    const safeLimit = Math.max(1, Math.min(20, Number(limit) || 5));
+    const result = await run('list-runnable-webdesign-batches', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
+        .eq('status', 'running')
+        .order('updated_at', { ascending: true })
+        .limit(safeLimit)
+    );
+    if (!result.ok) return null;
+    return (result.data || []).map(normalizeWebdesignBatchRow);
+  }
+
   async function listVisibleWebdesignJobs(ownerKey) {
     const result = await run('list-webdesign-jobs', (client) =>
       client
@@ -2121,6 +2136,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     getDataOpsCounts,
     getWebdesignBatch,
     getWebdesignJob,
+    listRunnableWebdesignBatches,
     deleteDesignPhotos,
     listCustomerSnapshotRows,
     listDesignPhotoAssetFlags,

@@ -30,6 +30,7 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/healthz',
       '/api/mailbox/sync',
       '/api/coldmailing/autopilot/run',
+      '/api/premium-database/webdesign-photo-batches/run',
     ],
     skipSupabaseHydrateUiStateScopes = [
       'premium_monthly_costs',
@@ -297,6 +298,7 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/mailbox/send',
       '/api/mailbox/sync',
       '/api/coldmailing/autopilot/run',
+      '/api/premium-database/webdesign-photo-batches/run',
       '/api/coldmailing/autopilot/settings',
       '/api/coldmailing/campaigns/send',
       '/api/coldmailing/outreach/status',

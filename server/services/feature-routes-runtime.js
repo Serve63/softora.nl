@@ -116,6 +116,8 @@ function registerFeatureRoutes(app, deps = {}) {
   registerWebsitePreviewBatchRoutes(app, { coordinator: websitePreviewBatchCoordinator });
   registerPremiumDatabaseWebdesignJobRoutes(app, {
     coordinator: premiumDatabaseWebdesignJobsCoordinator,
+    cronSecret: mailboxCronSecret,
+    requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
   });
   registerPublicWebdesignPreviewRoutes(app, {
     coordinator: publicWebdesignPreviewCoordinator,

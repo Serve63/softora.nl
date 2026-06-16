@@ -12,6 +12,10 @@ test('data ops store restores large premium database webdesign job queues', () =
     source,
     /async function listVisibleWebdesignJobs\(ownerKey\)[\s\S]*\.in\('status', \['queued', 'running'\]\)[\s\S]*\.limit\(5000\)/
   );
+  assert.match(
+    source,
+    /async function listRunnableWebdesignBatches\(limit = 5\)[\s\S]*\.eq\('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID\)[\s\S]*\.eq\('status', 'running'\)[\s\S]*\.order\('updated_at', \{ ascending: true \}\)[\s\S]*\.limit\(safeLimit\)/
+  );
 });
 
 function createSupabaseClientRecorder(currentCustomerIds = []) {

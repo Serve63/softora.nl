@@ -313,6 +313,9 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/coldmailing/autopilot/run' && method === 'GET') {
         return true;
       }
+      if (requestPath === '/api/premium-database/webdesign-photo-batches/run' && method === 'GET') {
+        return true;
+      }
       if (
         requestPath === '/api/twilio/voice' &&
         (method === 'GET' || method === 'POST')
