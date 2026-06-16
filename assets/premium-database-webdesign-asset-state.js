@@ -33,8 +33,10 @@
         const isMockupFailed = typeof options.isMockupFailed === "function" ? options.isMockupFailed : function () { return false; };
         const id = normalizeString(customer && customer.id);
         const visible = Boolean(customer) && shouldShowWebsitePhoto(customer);
-        const hasPhoto = visible && isValidWebsitePhotoSource(customer && customer.websitePhoto);
-        const hasMockup = visible && isValidWebsitePhotoSource(customer && customer.websiteMockup);
+        const snapshotPhotoReady = Boolean(customer && (customer.websitePhotoAssetReady === true || customer.hasPhoto === true));
+        const snapshotMockupReady = Boolean(customer && (customer.websiteMockupAssetReady === true || customer.hasMockup === true));
+        const hasPhoto = visible && (isValidWebsitePhotoSource(customer && customer.websitePhoto) || snapshotPhotoReady);
+        const hasMockup = visible && (isValidWebsitePhotoSource(customer && customer.websiteMockup) || snapshotMockupReady);
         const mockupApproved = hasMockup;
         const mockupPending = Boolean(id) && (Boolean(isMockupPending(id)) || Boolean(runtime.pendingMockupIds && runtime.pendingMockupIds.has && runtime.pendingMockupIds.has(id)));
         const mockupFailed = Boolean(id) && (Boolean(isMockupFailed(id)) || Boolean(runtime.failedMockupIds && runtime.failedMockupIds.has && runtime.failedMockupIds.has(id)));

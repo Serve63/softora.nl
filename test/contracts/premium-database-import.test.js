@@ -1395,10 +1395,14 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /createPremiumDatabaseImportCoordinator\(\{[\s\S]*getUiStateValues: deps\.getUiStateValues/);
   assert.match(featureRoutesSource, /setUiStateValues: deps\.setUiStateValues/);
   assert.match(featureRoutesSource, /dataOpsStore: deps\.dataOpsStore/);
+  assert.match(featureRoutesSource, /createPremiumDatabaseMailReadySnapshotService\(\{[\s\S]*dataOpsStore: deps\.dataOpsStore/);
+  assert.match(featureRoutesSource, /getUiStateValues: deps\.getUiStateValues/);
+  assert.match(featureRoutesSource, /mailReadySnapshotService: premiumDatabaseMailReadySnapshotService/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/delete-lead'/);
+  assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
 });

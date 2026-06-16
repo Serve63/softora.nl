@@ -30,6 +30,9 @@ const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
 const {
+  createPremiumDatabaseMailReadySnapshotService,
+} = require('./premium-database-mail-ready-snapshot');
+const {
   createPublicWebdesignPreviewService,
 } = require('./public-webdesign-preview');
 const { createPremiumRouteRuntime } = require('./premium-route-runtime');
@@ -66,6 +69,10 @@ function registerFeatureRoutes(app, deps = {}) {
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
     dataOpsStore: deps.dataOpsStore,
+  });
+  const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
+    dataOpsStore: deps.dataOpsStore,
+    getUiStateValues: deps.getUiStateValues,
   });
   const publicWebdesignPreviewCoordinator = createPublicWebdesignPreviewService({
     getUiStateValues: deps.getUiStateValues,
@@ -129,6 +136,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,
+    mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
   });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,

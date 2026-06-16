@@ -949,6 +949,27 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
+  async function listCustomerSnapshotRows(options = {}) {
+    return cachedRead('customers-snapshot', async () => {
+      const result = await collectPagedRows('list-customers-snapshot', (client) =>
+        client
+          .from(TABLES.customers)
+          .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at')
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false }),
+      {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
+      return result.ok ? result.data || [] : null;
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
   async function replaceCustomers(customers, meta = {}) {
     const rows = dedupeCustomerRowsForReplace(
       (Array.isArray(customers) ? customers : []).map((item, index) =>
@@ -1583,6 +1604,78 @@ function createSoftoraDataOpsStore(deps = {}) {
     return entries;
   }
 
+  async function listDesignPhotoAssetFlags(options = {}) {
+    return cachedRead('design-photo-asset-flags', async () => {
+      const result = await collectPagedRows('list-design-photo-asset-flags', (client) =>
+        client
+          .from(TABLES.designPhotos)
+          .select('customer_id,identity_key,storage_path,legacy_meta,updated_at')
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false }),
+      {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
+      if (!result.ok) return null;
+      return (result.data || []).map((row) => {
+        const legacyMeta = row && row.legacy_meta && typeof row.legacy_meta === 'object'
+          ? row.legacy_meta
+          : {};
+        const mockupMeta = legacyMeta.mockup && typeof legacyMeta.mockup === 'object'
+          ? legacyMeta.mockup
+          : {};
+        return {
+          customerId: normalizeString(row && row.customer_id),
+          identityKey: normalizeString(row && row.identity_key),
+          hasPhoto: Boolean(normalizeString(row && row.storage_path)),
+          hasMockup: Boolean(
+            normalizeString(mockupMeta.storagePath) ||
+              normalizeString(legacyMeta.websiteMockupStoragePath) ||
+              normalizeString(legacyMeta.websiteMockupPath)
+          ),
+          updatedAt: normalizeString(row && row.updated_at),
+        };
+      });
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
+  async function listOutboundRecipientGuardKeys(guardKeys, options = {}) {
+    const keys = Array.from(new Set(
+      (Array.isArray(guardKeys) ? guardKeys : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    ));
+    if (!keys.length) return [];
+    const found = new Set();
+    for (let index = 0; index < keys.length; index += 500) {
+      const keyChunk = keys.slice(index, index + 500);
+      const result = await run('list-outbound-recipient-guard-keys', (client) =>
+        client
+          .from(TABLES.outboundRecipientGuards)
+          .select('guard_key')
+          .in('guard_key', keyChunk)
+          .in('status', ['sent', 'reserved'])
+          .limit(keyChunk.length),
+      {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
+      if (!result.ok) return null;
+      (result.data || []).forEach((row) => {
+        const key = normalizeString(row && row.guard_key);
+        if (key) found.add(key);
+      });
+    }
+    return Array.from(found);
+  }
+
   async function listOutboundRecipientGuardsForPreview(options = {}) {
     const identifiers = Array.from(new Set(
       (Array.isArray(options.identifiers) ? options.identifiers : [])
@@ -2028,10 +2121,13 @@ function createSoftoraDataOpsStore(deps = {}) {
     getWebdesignBatch,
     getWebdesignJob,
     deleteDesignPhotos,
+    listCustomerSnapshotRows,
+    listDesignPhotoAssetFlags,
     listActiveOrders,
     listCustomers,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
+    listOutboundRecipientGuardKeys,
     listOutboundRecipientGuardsForPreview,
     listVisibleWebdesignBatches,
     listVisibleWebdesignJobs,
