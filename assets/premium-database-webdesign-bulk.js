@@ -7,6 +7,7 @@
     const WORKER_KICK_INTERVAL_MS = 8000;
     const BULK_UPLOAD_CHUNK_SIZE = 100;
     const RESTORE_DONE_BATCH_WINDOW_MS = 15 * 60 * 1000;
+    const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
     const STYLE_ID = "softora-database-webdesign-bulk-style";
 
     function fallbackNormalize(value) { return String(value || "").trim(); }
@@ -41,7 +42,7 @@
         const refreshPhotos = typeof options.refreshPhotos === "function" ? options.refreshPhotos : null;
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
-        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false;
+        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false, restoreRetryTimer = null, restoreRetryAttempt = 0, restoreInFlight = false;
         ensureStyles();
 
         function ensureStatusNode() {
@@ -200,6 +201,23 @@
             }, delayMs);
         }
 
+        function clearRestoreRetry() {
+            if (restoreRetryTimer && typeof global.clearTimeout === "function") global.clearTimeout(restoreRetryTimer);
+            restoreRetryTimer = null;
+            restoreRetryAttempt = 0;
+        }
+
+        function scheduleRestoreRetry() {
+            if (activeBatchId || restoreRetryTimer || typeof global.setTimeout !== "function") return;
+            const delay = RESTORE_RETRY_DELAYS_MS[restoreRetryAttempt];
+            if (!Number.isFinite(Number(delay))) return;
+            restoreRetryAttempt += 1;
+            restoreRetryTimer = global.setTimeout(function () {
+                restoreRetryTimer = null;
+                void loadLatestBatch({ retry: true });
+            }, delay);
+        }
+
         function kickServerWorker() {
             if (typeof fetch !== "function" || workerKickInFlight) return;
             const currentTime = Date.now();
@@ -224,6 +242,7 @@
             if (!batch || !batch.id) return;
             const status = normalizeString(batch.status).toLowerCase();
             activeBatchId = batch.id;
+            clearRestoreRetry();
             renderStatus(batch, phase);
             queuePhotoRefresh(batch);
             if (isTerminalBatchStatus(status)) {
@@ -308,18 +327,30 @@
         }
 
         async function loadLatestBatch() {
+            if (restoreInFlight) return null;
+            restoreInFlight = true;
             try {
                 const response = await fetch(BATCH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
                 const payload = await readJson(response);
                 const batches = Array.isArray(payload && payload.batches) ? payload.batches : [];
-                if (!response.ok || !batches.length) return;
+                if (!response.ok) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
+                if (!batches.length) {
+                    scheduleRestoreRetry();
+                    return null;
+                }
                 const batch = pickRestorableBatch(batches);
-                if (!batch || !batch.id) return;
+                if (!batch || !batch.id) {
+                    scheduleRestoreRetry();
+                    return null;
+                }
                 latestMade = Math.max(0, Number(batch.made || batch.done) || 0);
                 handleBatch(batch, batch.status === "queued" ? "uploading" : "running", { immediate: true });
                 return batch;
             } catch (error) {
-                /* A later page load or status poll can pick up the persistent batch again. */
+                scheduleRestoreRetry();
+                return null;
+            } finally {
+                restoreInFlight = false;
             }
         }
 

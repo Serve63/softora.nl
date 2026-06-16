@@ -1535,7 +1535,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(webdesignBulkScriptSource, /ACTIVE_JOB_PUMP_LIMIT/);
   assert.match(webdesignBulkScriptSource, /async function startBulkBatchForCustomers\(customers\)/);
   assert.match(webdesignBulkScriptSource, /RESTORE_DONE_BATCH_WINDOW_MS = 15 \* 60 \* 1000/);
+  assert.match(webdesignBulkScriptSource, /RESTORE_RETRY_DELAYS_MS = \[2000, 6000, 15000, 30000\]/);
   assert.match(webdesignBulkScriptSource, /function pickRestorableBatch\(batches\)/);
+  assert.match(webdesignBulkScriptSource, /function scheduleRestoreRetry\(\)/);
+  assert.match(webdesignBulkScriptSource, /if \(!response\.ok\) throw new Error/);
   assert.match(webdesignBulkScriptSource, /function kickServerWorker\(\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_UPLOAD_CHUNK_SIZE = 100;/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-title\\">Webdesigns/);
@@ -1569,7 +1572,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616g/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616h/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
   assert.match(webdesignBulkScriptSource, /const WORKER_KICK_INTERVAL_MS = 8000;/);
@@ -2500,6 +2503,104 @@ test('premium database webdesign bulk restores the progress bar from the running
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/webdesign_batch_live/cancel'));
   assert.match(statusNode.innerHTML, /2\.062 geannuleerd/);
   assert.match(statusNode.innerHTML, /webdesign-bulk-cancel[\s\S]*hidden/);
+});
+
+test('premium database webdesign bulk retries restore after a temporary batch list failure', async () => {
+  const nodes = new Map();
+  const createNode = () => ({
+    id: '',
+    className: '',
+    hidden: false,
+    innerHTML: '',
+    textContent: '',
+    style: {},
+    parentNode: null,
+  });
+  const document = {
+    getElementById: (id) => nodes.get(id) || null,
+    createElement: () => createNode(),
+    head: {
+      appendChild(node) {
+        nodes.set(node.id, node);
+      },
+    },
+    body: {
+      appendChild(node) {
+        node.parentNode = this;
+        nodes.set(node.id, node);
+      },
+    },
+  };
+  const timers = [];
+  const requests = [];
+  let batchListCalls = 0;
+  const webdesignBulkClient = loadDatabaseWebdesignBulkClient({
+    document,
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async (url, options = {}) => {
+      requests.push(String(url));
+      if (String(url || '') === '/api/premium-database/webdesign-photo-batches/run') {
+        assert.equal(options.method, 'POST');
+        return { ok: true, status: 200, json: async () => ({ ok: true, batchCount: 1 }) };
+      }
+      if (String(url || '') === '/api/premium-database/webdesign-photo-batches') {
+        batchListCalls += 1;
+        if (batchListCalls === 1) {
+          return { ok: false, status: 503, json: async () => ({ error: 'Supabase tijdelijk niet bereikbaar' }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            batches: [
+              {
+                id: 'webdesign_batch_restore_retry',
+                status: 'running',
+                total: 2562,
+                made: 959,
+                done: 959,
+                active: 2,
+                activeJobIds: ['job_restore_retry_1'],
+                createdAt: Date.now(),
+              },
+            ],
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({}) };
+    },
+  });
+  const controller = webdesignBulkClient.createController({
+    normalizeString: (value) => String(value || '').trim(),
+    escapeHtml: (value) => String(value),
+    refreshPhotos: async () => {},
+    renderPage() {},
+    refreshDelayMs: 900,
+  });
+
+  const first = await controller.loadLatestBatch();
+  assert.equal(first, null);
+  assert.equal(batchListCalls, 1);
+  assert.ok(timers.some((timer) => Number(timer.delay) === 2000), 'temporary restore failure should schedule a retry');
+
+  const retryTimer = timers.find((timer) => Number(timer.delay) === 2000);
+  retryTimer.callback();
+  for (let index = 0; index < 8; index += 1) await Promise.resolve();
+
+  const statusNode = nodes.get('webdesignBulkStatus');
+  assert.equal(batchListCalls, 2);
+  assert.equal(statusNode.hidden, false);
+  assert.match(statusNode.innerHTML, /959 \/ 2\.562/);
+  assert.match(statusNode.innerHTML, /1\.603 resterend/);
+  assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/run'));
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {
