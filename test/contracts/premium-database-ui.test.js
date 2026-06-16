@@ -212,6 +212,26 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /sortKey: "manual"/);
 });
 
+test('premium database has a right-side company search that scans the full database', () => {
+  const pagePath = path.join(__dirname, '../../premium-database.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /<div class="top-right">[\s\S]*<div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<div class="add-actions" id="addActions">/
+  );
+  assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
+  assert.match(pageSource, /if \(!query && state\.activeStatus !== "benaderbaar" && !outreachController\.matchesStatusFilter/);
+  assert.match(
+    pageSource,
+    /function getVisibleTableCustomers\(customers\) \{ return state\.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch\(\) \? getMailReadyCustomers\(customers\) : \(customers \|\| \[\]\); \}/
+  );
+  assert.match(
+    pageSource,
+    /nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch\(\) \? "Mailklaar" : "Foto's";/
+  );
+});
+
 test('premium database contact status detects sent coldmail signals', () => {
   const contactStatusClient = loadDatabaseContactStatusClient();
 
@@ -501,7 +521,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, />Uploaden</);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
-  assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
+  assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
   assert.doesNotMatch(pageSource, /id="f-branche"/);
   assert.doesNotMatch(pageSource, /id="m-branche"/);
   assert.doesNotMatch(pageSource, /id="m-responsible"/);
@@ -539,9 +559,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
-  assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return state\.activeStatus === "benaderbaar" \? getMailReadyCustomers\(customers\) : \(customers \|\| \[\]\);/);
+  assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return state\.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch\(\) \? getMailReadyCustomers\(customers\) : \(customers \|\| \[\]\);/);
   assert.match(pageSource, /const baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), filtered = getVisibleTableCustomers\(baseFiltered\)/);
-  assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
+  assert.match(pageSource, /document\.getElementById\("latestActionHeader"\)\.textContent = showOutreachActionColumn \? "Acties" : "Laatste actie"; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch\(\) \? "Mailklaar" : "Foto's";/);
   assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered\);/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(filtered, showPhotoColumn\);/);
   assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);

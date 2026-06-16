@@ -1397,6 +1397,7 @@
                             <div class="page-sub" id="top-sub"></div>
                         </div>
                         <div class="top-right">
+                            <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="q" placeholder="Zoek bedrijf in database…"></div>
                             <div class="add-actions" id="addActions">
                                 <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
                                     Acties
@@ -1413,10 +1414,6 @@
                     <div class="status-banner" id="statusBanner" aria-live="polite"></div>
 
                     <div class="filter-bar">
-                        <div class="search">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
-                        </div>
                         <div class="status-filter">
                             <button class="sf-btn act" data-s="benaderbaar" type="button">Beschikbaar</button><button class="sf-btn" data-s="alle" type="button">Alles</button><button class="sf-btn" data-s="klant" type="button">Klant</button><button class="sf-btn" data-s="benaderd" type="button">Benaderd</button><button class="sf-btn" data-s="instantly" type="button">Instantly</button><button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
                         </div>
@@ -2198,7 +2195,7 @@
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
             return state.klanten.filter(function (customer) {
-                if (state.activeStatus !== "benaderbaar" && !outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing)) return false;
+                if (!query && state.activeStatus !== "benaderbaar" && !outreachController.matchesStatusFilter(customer, state.activeStatus, hasUsedColdCalling, hasUsedColdMailing)) return false;
                 if (!query) return true;
 
                 const haystack = [
@@ -2218,6 +2215,7 @@
                 return haystack.indexOf(query) !== -1;
             });
         }
+        function hasActiveDatabaseSearch() { return Boolean(normalizeSearchValue(state.query)); }
         function getSortedCustomers(customers) {
             return (state.activeStatus === "benaderd" || state.activeStatus === "instantly") ? outreachController.sortByRecentOutreach(customers, parseDateValue, normalizeSearchValue) : sortCustomers(customers);
         }
@@ -2296,8 +2294,8 @@
         function hasCompleteWebdesignAssets(customer) { return buildCustomerWebdesignAssetState(customer).hasCompleteAssets; }
         function isColdmailReadyWebdesignLead(customer) { return buildCustomerWebdesignAssetState(customer).isMailReady; }
         function getMailReadyCustomers(customers) { return (customers || []).filter(isColdmailReadyWebdesignLead); }
-        function getVisibleTableCustomers(customers) { return state.activeStatus === "benaderbaar" ? getMailReadyCustomers(customers) : (customers || []); }
-        function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar") { const count = getMailReadyCustomers(customers).length; state.lastMailReadyHeaderCount = count; return count; } const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
+        function getVisibleTableCustomers(customers) { return state.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch() ? getMailReadyCustomers(customers) : (customers || []); }
+        function getPhotoHeaderCount(customers, showPhotoColumn) { if (!showPhotoColumn) return 0; if (state.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch()) { const count = getMailReadyCustomers(customers).length; state.lastMailReadyHeaderCount = count; return count; } const photoCount = (customers || []).filter(function (customer) { return buildCustomerWebdesignAssetState(customer).hasPhoto; }).length; state.lastPhotoHeaderCount = photoCount; return photoCount; }
         function isWebdesignPhotoEligible(customer) { return buildCustomerWebdesignAssetState(customer).canGeneratePhoto; }
 
         function buildDatabaseMediaDebugItems(customers) { return (customers || []).slice(0, 30).map(function (customer) { const assetState = buildCustomerWebdesignAssetState(customer); return { id: customer.id, status: customer.status, bedrijf: customer.bedrijf, hasPhoto: assetState.hasPhoto, hasMockup: assetState.hasMockup, mockupApproved: assetState.mockupApproved, mockupState: assetState.mockupState, isMailReady: assetState.isMailReady, canGeneratePhoto: assetState.canGeneratePhoto, canRepairMockup: assetState.canRepairMockup }; }); }
@@ -2326,7 +2324,7 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben<br>of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = state.dataLoading || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : filtered.length.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered); document.getElementById("photoHeaderCount").textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("latestActionHeader").textContent = showOutreachActionColumn ? "Acties" : "Laatste actie"; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch() ? "Mailklaar" : "Foto's"; renderPhotoCostLabel(baseFiltered); document.getElementById("photoHeaderCount").textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: baseFiltered.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), items: buildDatabaseMediaDebugItems(filtered) });
 
             if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"" + (showOutreachActionColumn ? 8 : 9) + "\"><div class=\"tbl-empty\">" + escapeHtml(state.dataLoading ? "Database laden..." : window.SoftoraDatabaseResilience.unavailableMessage) + "</div></td></tr>"; return; } if (!filtered.length) {
