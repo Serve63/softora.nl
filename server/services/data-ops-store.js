@@ -404,7 +404,17 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   function forgetReads(...cacheKeys) {
-    cacheKeys.forEach((cacheKey) => readCache.delete(cacheKey));
+    cacheKeys.forEach((cacheKey) => {
+      const key = normalizeString(cacheKey);
+      if (key.endsWith('*')) {
+        const prefix = key.slice(0, -1);
+        Array.from(readCache.keys()).forEach((cachedKey) => {
+          if (normalizeString(cachedKey).startsWith(prefix)) readCache.delete(cachedKey);
+        });
+        return;
+      }
+      readCache.delete(key);
+    });
   }
 
   async function cachedRead(cacheKey, loader, options = {}) {
@@ -965,6 +975,26 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
+  async function deleteCustomers(customerIds, meta = {}) {
+    const ids = Array.from(new Set((Array.isArray(customerIds) ? customerIds : []).map(normalizeString).filter(Boolean)));
+    if (!ids.length) return { ok: true, data: [], deleted: 0 };
+    const result = await run(
+      'delete-customers-explicit',
+      (client) =>
+        client
+          .from(TABLES.customers)
+          .update({
+            deleted_at: isoNow(),
+            updated_at: isoNow(),
+            source: normalizeString(meta.source || 'ui-state-compat').slice(0, 120),
+          })
+          .in('customer_id', ids),
+      getWriteOperationOptions()
+    );
+    if (result.ok) forgetReads('customers');
+    return result;
+  }
+
   function buildOrderRow(raw, index, source) {
     const payload = raw && typeof raw === 'object' ? { ...raw } : {};
     const id = normalizeString(payload.id || payload.orderId) || `order_${index + 1}`;
@@ -1193,7 +1223,7 @@ function createSoftoraDataOpsStore(deps = {}) {
   async function deleteDesignPhotos(customerIds, meta = {}) {
     const ids = Array.from(new Set((Array.isArray(customerIds) ? customerIds : []).map(normalizeString).filter(Boolean)));
     if (!ids.length) return { ok: true, data: [], deleted: 0 };
-    return run(
+    const result = await run(
       'delete-design-photos-explicit',
       (client) =>
         client
@@ -1206,6 +1236,8 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('customer_id', ids),
       getWriteOperationOptions()
     );
+    if (result.ok) forgetReads('design-photos', 'design-photos-signed:*');
+    return result;
   }
 
   async function listDesignPhotosWithDataUrls() {
@@ -1805,6 +1837,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listOutboundRecipientGuardsForPreview,
     listVisibleWebdesignJobs,
     listOrderRuntime,
+    deleteCustomers,
     getReadFailureCooldownStatus,
     replaceActiveOrders,
     replaceCustomers,

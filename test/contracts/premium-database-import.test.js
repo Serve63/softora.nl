@@ -69,6 +69,21 @@ function createStoredZip(files) {
   return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
+function createMockResponse() {
+  return {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+}
+
 function escapeXml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -341,6 +356,56 @@ test('premium database import sync route returns fetched spreadsheet rows', asyn
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.ok, true);
   assert.equal(response.body.rows[1][0], 'Augustijn Auto Expertise');
+});
+
+test('premium database delete lead route removes one customer through data ops without reposting the full list', async () => {
+  const calls = [];
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    dataOpsStore: {
+      deleteCustomers: async (customerIds, meta) => {
+        calls.push({ type: 'customers', customerIds, meta });
+        return { ok: true };
+      },
+      deleteDesignPhotos: async (customerIds, meta) => {
+        calls.push({ type: 'photos', customerIds, meta });
+        return { ok: true };
+      },
+    },
+  });
+  const response = createMockResponse();
+
+  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-413' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { ok: true, customerId: 'customer-413', deleted: true });
+  assert.deepEqual(calls, [
+    {
+      type: 'customers',
+      customerIds: ['customer-413'],
+      meta: { source: 'premium-database-delete-lead', actor: 'Premium database' },
+    },
+    {
+      type: 'photos',
+      customerIds: ['customer-413'],
+      meta: { source: 'premium-database-delete-lead', actor: 'Premium database' },
+    },
+  ]);
+});
+
+test('premium database delete lead route fails closed without a customer id or data ops delete storage', async () => {
+  const coordinator = createPremiumDatabaseImportCoordinator();
+  const missingIdResponse = createMockResponse();
+  const missingStoreResponse = createMockResponse();
+
+  await coordinator.sendDeleteLeadResponse({ body: {} }, missingIdResponse);
+  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-1' } }, missingStoreResponse);
+
+  assert.equal(missingIdResponse.statusCode, 400);
+  assert.equal(missingIdResponse.body.ok, false);
+  assert.equal(missingIdResponse.body.code, 'CUSTOMER_ID_REQUIRED');
+  assert.equal(missingStoreResponse.statusCode, 503);
+  assert.equal(missingStoreResponse.body.ok, false);
+  assert.equal(missingStoreResponse.body.code, 'CUSTOMER_DELETE_STORAGE_UNAVAILABLE');
 });
 
 test('premium database real businesses maps Google Places rows and discovers public email', async () => {
@@ -1329,9 +1394,11 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /registerPremiumDatabaseImportRoutes\(app/);
   assert.match(featureRoutesSource, /createPremiumDatabaseImportCoordinator\(\{[\s\S]*getUiStateValues: deps\.getUiStateValues/);
   assert.match(featureRoutesSource, /setUiStateValues: deps\.setUiStateValues/);
+  assert.match(featureRoutesSource, /dataOpsStore: deps\.dataOpsStore/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
+  assert.match(routeSource, /app\.post\('\/api\/premium-database\/delete-lead'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
 });

@@ -140,6 +140,20 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   return sandbox.window.SoftoraDatabaseWebdesignAction;
 }
 
+function loadDatabaseLeadDeleteClient(options = {}) {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-lead-delete.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const document = options.document || {
+    getElementById: () => null,
+    createElement: () => ({ id: '', textContent: '' }),
+    head: { appendChild() {} },
+    addEventListener() {},
+  };
+  const sandbox = { window: { document } };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseLeadDelete;
+}
+
 function loadDatabaseOutreachClient(options = {}) {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -1222,12 +1236,18 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /class=\\"lead-delete-icon\\"/);
   assert.match(leadDeleteScriptSource, /\.lead-delete-button\{flex:0 0 18px;width:18px;height:34px;/);
   assert.match(leadDeleteScriptSource, /async function removeCustomerLead\(customerId\)/);
+  assert.match(leadDeleteScriptSource, /const deleteCustomerLead = typeof options\.deleteCustomerLead === "function" \? options\.deleteCustomerLead : null;/);
+  assert.match(leadDeleteScriptSource, /if \(deleteCustomerLead\) \{/);
+  assert.match(leadDeleteScriptSource, /const result = await deleteCustomerLead\(normalizedId\);/);
   assert.match(leadDeleteScriptSource, /persistCustomerPhotos\(state\.klanten, \{ removeCustomerIds: \[normalizedId\] \}\)/);
   assert.match(leadDeleteScriptSource, /global\[ACTION_PROPERTY\] = removeCustomerLead;/);
   assert.match(leadDeleteScriptSource, /target\.closest\("\.lead-delete-button"\)/);
   assert.match(leadDeleteScriptSource, /action\(button\.getAttribute\("data-delete-lead-id"\)\)/);
-  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260616a/);
-  assert.match(pageSource, /SoftoraDatabaseLeadDelete\.createController\(\{ state, persistCustomerList, persistCustomerPhotos, sortCustomers, closePanel, closeModal, setStatusMessage, renderPage: scheduleRenderPage, toast \}\)/);
+  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260616b/);
+  assert.match(pageSource, /function deleteCustomerLead\(customerId\)/);
+  assert.match(pageSource, /\/api\/premium-database\/delete-lead/);
+  assert.match(pageSource, /JSON\.stringify\(\{ customerId: normalizeString\(customerId\) \}\)/);
+  assert.match(pageSource, /SoftoraDatabaseLeadDelete\.createController\(\{ state, deleteCustomerLead, persistCustomerList, persistCustomerPhotos, sortCustomers, closePanel, closeModal, setStatusMessage, renderPage: scheduleRenderPage, toast \}\)/);
   assert.match(webdesignActionScriptSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId, kind\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
@@ -1864,6 +1884,47 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.match(html, /class="lead-delete-button"/);
   assert.match(html, /data-delete-lead-id="customer-1"/);
   assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
+});
+
+test('premium database lead delete uses the small server delete route instead of reposting all customers', async () => {
+  const deleteClient = loadDatabaseLeadDeleteClient();
+  const calls = [];
+  const state = {
+    klanten: [{ id: 'lead-413', bedrijf: 'Payload BV' }, { id: 'lead-414', bedrijf: 'Blijft BV' }],
+    openId: 'lead-413',
+  };
+
+  const controller = deleteClient.createController({
+    state,
+    deleteCustomerLead: async (customerId) => {
+      calls.push(['server-delete', customerId]);
+      return { ok: true };
+    },
+    persistCustomerList: async () => {
+      calls.push(['full-list-post']);
+      return { ok: true };
+    },
+    persistCustomerPhotos: async () => {
+      calls.push(['photo-map-post']);
+      return { ok: true };
+    },
+    sortCustomers: (customers) => customers,
+    closePanel: () => calls.push(['close-panel']),
+    closeModal: () => {},
+    setStatusMessage: () => {},
+    renderPage: () => calls.push(['render']),
+    toast: () => calls.push(['toast']),
+  });
+
+  await controller.removeCustomerLead('lead-413');
+
+  assert.deepEqual(state.klanten.map((customer) => customer.id), ['lead-414']);
+  assert.deepEqual(calls, [
+    ['close-panel'],
+    ['render'],
+    ['server-delete', 'lead-413'],
+    ['toast'],
+  ]);
 });
 
 test('premium database webdesign action queues missing mockup repairs outside render', async () => {

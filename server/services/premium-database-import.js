@@ -2002,6 +2002,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     env = process.env,
     getUiStateValues,
     setUiStateValues,
+    dataOpsStore = null,
   } = deps;
 
   function sendImportResponse(req, res) {
@@ -2118,12 +2119,60 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     }
   }
 
+  async function sendDeleteLeadResponse(req, res) {
+    const customerId = normalizeString(req && req.body && req.body.customerId);
+    if (!customerId) {
+      return res.status(400).json({
+        ok: false,
+        code: 'CUSTOMER_ID_REQUIRED',
+        error: 'Klant-id ontbreekt.',
+      });
+    }
+    if (!dataOpsStore || typeof dataOpsStore.deleteCustomers !== 'function') {
+      return res.status(503).json({
+        ok: false,
+        code: 'CUSTOMER_DELETE_STORAGE_UNAVAILABLE',
+        error: 'Klant verwijderen is tijdelijk niet beschikbaar.',
+      });
+    }
+
+    const meta = {
+      source: 'premium-database-delete-lead',
+      actor: 'Premium database',
+    };
+    const deleted = await dataOpsStore.deleteCustomers([customerId], meta);
+    if (!deleted || !deleted.ok) {
+      return res.status(503).json({
+        ok: false,
+        code: 'CUSTOMER_DELETE_FAILED',
+        error: truncateText(normalizeString(deleted && deleted.error && deleted.error.message) || 'Lead verwijderen mislukt.', 500),
+      });
+    }
+    if (typeof dataOpsStore.deleteDesignPhotos === 'function') {
+      const photosDeleted = await dataOpsStore.deleteDesignPhotos([customerId], meta);
+      if (!photosDeleted || !photosDeleted.ok) {
+        return res.status(503).json({
+          ok: false,
+          code: 'CUSTOMER_PHOTO_DELETE_FAILED',
+          error: truncateText(normalizeString(photosDeleted && photosDeleted.error && photosDeleted.error.message) || 'Lead verwijderd, maar foto-opslag opruimen mislukte.', 500),
+        });
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      customerId,
+      deleted: true,
+    });
+  }
+
   return {
     sendSyncResponse,
     sendImportResponse,
     sendRealBusinessesResponse,
     sendDeepSearchEstimateResponse,
     sendDeepSearchBusinessesResponse,
+    sendDeleteLeadResponse,
   };
 }
 

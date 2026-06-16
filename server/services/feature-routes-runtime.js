@@ -65,6 +65,7 @@ function registerFeatureRoutes(app, deps = {}) {
   const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
+    dataOpsStore: deps.dataOpsStore,
   });
   const publicWebdesignPreviewCoordinator = createPublicWebdesignPreviewService({
     getUiStateValues: deps.getUiStateValues,

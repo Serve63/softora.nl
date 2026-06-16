@@ -23,6 +23,7 @@
 
     function createController(options) {
         const state = options.state;
+        const deleteCustomerLead = typeof options.deleteCustomerLead === "function" ? options.deleteCustomerLead : null;
         const persistCustomerList = options.persistCustomerList;
         const persistCustomerPhotos = typeof options.persistCustomerPhotos === "function" ? options.persistCustomerPhotos : async function () { return { ok: true }; };
         const sortCustomers = typeof options.sortCustomers === "function" ? options.sortCustomers : function (customers) { return (customers || []).slice(); };
@@ -44,7 +45,7 @@
                 return normalizeString(item && item.id) === normalizedId;
             });
             if (!existing) return;
-            if (typeof persistCustomerList !== "function") {
+            if (!deleteCustomerLead && typeof persistCustomerList !== "function") {
                 setStatusMessage("Lead verwijderen is tijdelijk niet beschikbaar.", "error");
                 return;
             }
@@ -57,6 +58,23 @@
             if (state.openId === normalizedId) closePanel();
             if (state.modalEditId === normalizedId) closeModal();
             renderPage();
+
+            if (deleteCustomerLead) {
+                try {
+                    const result = await deleteCustomerLead(normalizedId);
+                    if (!result || !result.ok) throw result && result.error;
+                    removingIds.delete(normalizedId);
+                    toast("Lead verwijderd");
+                    setStatusMessage("Lead verwijderd.", "success", true);
+                    return;
+                } catch (error) {
+                    state.klanten = previousCustomers;
+                    renderPage();
+                    setStatusMessage("Lead verwijderen mislukt: " + getErrorMessage(error), "error");
+                    removingIds.delete(normalizedId);
+                    return;
+                }
+            }
 
             try {
                 const result = await persistCustomerList(state.klanten);
