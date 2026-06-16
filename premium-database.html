@@ -334,51 +334,32 @@
             color: #fff;
         }
 
-        .f-count {
-            font-size: 12px;
-            color: var(--light);
-            margin-left: auto;
-        }
-
-        .result-count-stack { margin-left: 0; align-self: flex-end; margin-bottom: 0; min-width: 158px; max-width: 100%; display: inline-flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 7px; padding: 11px 15px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: 0 10px 24px rgba(26, 26, 46, .06); color: var(--light); }
-
-        .result-count-action-row { display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 24px; }
-
-        .result-count-stack .f-count { margin-left: 0; width: 100%; text-align: left; font-size: 16px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
-
-        .photo-cost-label { display: inline-flex; align-items: center; font-size: 15px; line-height: 1; color: var(--light); text-align: left; max-width: 150px; }
-
-        .photo-cost-label strong {
-            color: var(--crimson);
-            font-weight: 800;
-        }
-
-        .result-count-icon {
-            width: 22px;
-            height: 22px;
-            color: var(--crimson);
-            filter: drop-shadow(0 5px 12px rgba(139, 34, 82, 0.28));
-        }
-
-        .result-count-button {
-            display: inline-flex; align-items: center; justify-content: center; border: 0;
-            flex: 0 0 24px;
-            width: 24px;
-            height: 24px;
+        .photo-header-results-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 100%;
+            min-width: 94px;
+            border: 0;
             padding: 0;
             background: transparent;
-            color: var(--crimson);
+            color: var(--light);
+            font: inherit;
+            font-size: 10px;
+            letter-spacing: .2px;
+            line-height: 1.15;
+            text-transform: none;
+            white-space: nowrap;
             cursor: pointer;
-            line-height: 0;
-            transition: transform .15s ease, filter .15s ease;
+            transition: color .15s ease, transform .15s ease;
         }
 
-        .result-count-button:hover {
-            transform: translateY(-1px) scale(1.05);
-            filter: drop-shadow(0 8px 18px rgba(139, 34, 82, 0.34));
+        .photo-header-results-button:hover {
+            color: var(--crimson);
+            transform: translateY(-1px);
         }
 
-        .result-count-button:disabled {
+        .photo-header-results-button:disabled {
             cursor: wait;
             opacity: .58;
             transform: none;
@@ -426,7 +407,7 @@
         thead th:nth-child(5), tbody td:nth-child(5) { width: 14.285%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; }
         thead th:nth-child(6), tbody td:nth-child(6) { width: 14.285%; }
         table:not(.outreach-action-mode) thead th:nth-child(7), table:not(.outreach-action-mode) tbody td:nth-child(7), table:not(.outreach-action-mode) thead th:nth-child(9), table:not(.outreach-action-mode) tbody td:nth-child(9) { display: none; } table.outreach-action-mode thead th:nth-child(6), table.outreach-action-mode tbody td:nth-child(6) { display: none; } table.outreach-action-mode thead th:nth-child(8), table.outreach-action-mode tbody td:nth-child(8) { display: none; } table.outreach-action-mode thead th:nth-child(7), table.outreach-action-mode tbody td:nth-child(7) { width: 24%; text-align: center; } table.outreach-action-mode thead th:nth-child(9), table.outreach-action-mode tbody td:nth-child(9) { width: 5%; min-width: 56px; text-align: center; }
-        thead th:nth-child(8), tbody td:nth-child(8) { width: 14.285%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(9), tbody td:nth-child(9) { width: 5%; text-align: center; }
+        thead th:nth-child(8), tbody td:nth-child(8) { width: 14.285%; min-width: 118px; text-align: center; padding-left: 7px; padding-right: 7px; } #photoHeader { overflow: visible; text-overflow: clip; white-space: nowrap; } #photoHeader .photo-header-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 94px; max-width: 100%; letter-spacing: .75px; } #photoHeader .photo-header-title[hidden], #photoHeader .photo-header-results-button[hidden] { display: none; } #photoHeaderCount { flex: 0 0 auto; } thead th:nth-child(9), tbody td:nth-child(9) { width: 5%; text-align: center; }
 
         thead th:hover {
             color: var(--dark);
@@ -1229,11 +1210,6 @@
                 justify-content: flex-start;
             }
 
-            .f-count {
-                margin-left: 0;
-                width: 100%;
-            }
-
             .table-card {
                 overflow-x: auto;
             }
@@ -1341,7 +1317,7 @@
                     <div class="filter-bar">
                         <div class="status-filter">
                             <div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters"><span class="status-filter-label">Algemeen</span><span class="status-filter-pills"><button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters"><span class="status-filter-label">Coldmailing</span><span class="status-filter-pills"><button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar</button></span></div><span class="status-filter-divider" aria-hidden="true"></span><div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true"><span class="status-filter-label"><span class="status-filter-lock" aria-hidden="true"><svg class="status-filter-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span>Coldcalling</span><span class="status-filter-pills"><button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse</button><button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor</button><button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik</button></span></div>
-                        </div><div class="filter-search"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="q" placeholder="Zoek bedrijf in database…"></div></div><div class="result-count-stack" aria-label="Aantal resultaten" hidden><div class="result-count-action-row"><button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto"><svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z"/></svg></button><div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's"><strong>€0,00</strong></div></div><div class="f-count" id="f-count"></div></div>
+                        </div><div class="filter-search"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="q" placeholder="Zoek bedrijf in database…"></div></div>
                     </div>
 
                     <div class="tbl-wrap">
@@ -1356,7 +1332,7 @@
                                         <th data-sort-key="dom">Website</th>
                                         <th data-sort-key="status" id="statusHeader">Status</th>
                                         <th id="outreachActionHeader" hidden>Acties</th>
-                                        <th id="photoHeader"><span class="photo-header-title"><span id="photoHeaderLabel">Foto's</span> <span id="photoHeaderCount">(0)</span></span></th><th id="daysHeader" hidden>Dagen</th>
+                                        <th id="photoHeader"><span class="photo-header-title" id="photoHeaderTitle"><span id="photoHeaderLabel">Foto's</span> <span id="photoHeaderCount">(0)</span></span><button class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">0 resultaten</span></button></th><th id="daysHeader" hidden>Dagen</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody"></tbody>
@@ -1544,15 +1520,14 @@
             topSub: document.getElementById("top-sub"),
             statusBanner: document.getElementById("statusBanner"),
             query: document.getElementById("q"),
-            count: document.getElementById("f-count"),
+            count: document.getElementById("photoHeaderResultsLabel"),
             tbody: document.getElementById("tbody"),
             statusButtons: Array.from(document.querySelectorAll(".sf-btn")),
             sortButtons: Array.from(document.querySelectorAll("[data-sort-key]")),
             addActions: document.getElementById("addActions"),
             addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
-            photoCostLabel: document.getElementById("photoCostLabel"),
-            generatePhotosButton: document.getElementById("generatePhotosButton"), resultCountStack: document.querySelector(".result-count-stack"), photoHeaderLabel: document.getElementById("photoHeaderLabel"),
+            generatePhotosButton: document.getElementById("generatePhotosButton"), photoHeaderTitle: document.getElementById("photoHeaderTitle"), photoHeaderLabel: document.getElementById("photoHeaderLabel"), photoHeaderCount: document.getElementById("photoHeaderCount"),
             loadMoreWrap: document.getElementById("loadMoreWrap"), loadMoreButton: document.getElementById("loadMoreButton"), loadMoreSummary: document.getElementById("loadMoreSummary"),
             deepSearchButton: document.getElementById("deepSearchButton"), manualAddButton: document.getElementById("manualAddButton"),
             photoFileInput: document.getElementById("photoFileInput"),
@@ -2179,10 +2154,12 @@
         function formatEuroCost(value) { return "€" + Number(value || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
         function isMailReadyCalculationPending() { return (state.activeStatus === "benaderbaar" || state.activeStatus === "beschikbaar") && (state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || !hasLoadedColdmailGuard()); }
-        function renderPhotoCostLabel(customers, pending, eligibleCountOverride) { const showPhotoBatchControl = state.activeStatus === "beschikbaar"; if (nodes.resultCountStack) nodes.resultCountStack.hidden = !showPhotoBatchControl; nodes.photoCostLabel.hidden = !showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl;
-            if (pending) { nodes.photoCostLabel.innerHTML = "<strong>--</strong>"; nodes.photoCostLabel.title = "Beschikbare data wordt nog geladen."; return; }
+        function renderPhotoBatchHeader(customers, pending, eligibleCountOverride, resultText) { const showPhotoBatchControl = state.activeStatus === "beschikbaar"; if (nodes.photoHeaderTitle) nodes.photoHeaderTitle.hidden = showPhotoBatchControl; nodes.generatePhotosButton.hidden = !showPhotoBatchControl; if (!showPhotoBatchControl) return;
+            const displayText = resultText || "-- resultaten"; nodes.count.textContent = displayText; if (pending) { nodes.generatePhotosButton.disabled = true; nodes.generatePhotosButton.title = "Beschikbare data wordt nog geladen."; nodes.generatePhotosButton.setAttribute("aria-label", "Beschikbare resultaten laden"); return; }
+            if (nodes.generatePhotosButton.dataset.generating !== "true") nodes.generatePhotosButton.disabled = false;
             const eligibleCount = Number.isFinite(Number(eligibleCountOverride)) ? Math.max(0, Number(eligibleCountOverride)) : (customers || []).filter(isWebdesignPhotoEligible).length, totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
-            nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>"; nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. AI-foto kost " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + " per stuk.";
+            nodes.generatePhotosButton.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. Totale kosten: " + formatEuroCost(totalCost) + ".";
+            nodes.generatePhotosButton.setAttribute("aria-label", displayText + " - webdesigns maken");
         }
         function resetVisibleLimit() { state.visibleLimit = TABLE_PAGE_SIZE; }
         function updateLoadMoreControl(totalCount, renderedCount) { if (!nodes.loadMoreWrap) return; const loadState = databaseTableHelpers.getLoadMoreState(totalCount, renderedCount); nodes.loadMoreWrap.hidden = !loadState.hasMore; if (nodes.loadMoreSummary) nodes.loadMoreSummary.textContent = loadState.summary; }
@@ -2197,12 +2174,12 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar.";
             window.SoftoraDatabaseSystemMailCount.render(state.klanten, { dataLoading: state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || state.photoRestoreFailed, normalizeString: normalizeString, isColdmailTestCompany: isColdmailTestCompany, outreachController: outreachController, databaseContactStatus: databaseContactStatus });
-            if (blockForMailReadyPending) { nodes.count.textContent = "-- resultaten"; document.getElementById("databaseTable").classList.toggle("outreach-action-mode", false); document.getElementById("statusHeader").hidden = false; document.getElementById("outreachActionHeader").hidden = true; document.getElementById("photoHeader").hidden = false; document.getElementById("daysHeader").hidden = true; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoCostLabel([], true); document.getElementById("photoHeaderCount").textContent = "(--)"; updateLoadMoreControl(0, 0); nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; return; }
+            if (blockForMailReadyPending) { const resultCountText = "-- resultaten"; document.getElementById("databaseTable").classList.toggle("outreach-action-mode", false); document.getElementById("statusHeader").hidden = false; document.getElementById("outreachActionHeader").hidden = true; document.getElementById("photoHeader").hidden = false; document.getElementById("daysHeader").hidden = true; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoBatchHeader([], true, undefined, resultCountText); nodes.photoHeaderCount.textContent = "(--)"; updateLoadMoreControl(0, 0); nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; return; }
             const filtered = databaseTableHelpers.getVisibleRows(visibleCustomers, state.visibleLimit, TABLE_PAGE_SIZE);
             const photoHeaderCount = getPhotoHeaderCount(visibleCustomers, showPhotoColumn);
             const visibleResultCount = window.SoftoraDatabaseMailReadySnapshot.getDisplayCount(state, visibleCustomers.length);
-            nodes.count.textContent = blockForMailReadyPending || (state.dataLoading && !state.klanten.length) || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : visibleResultCount.toLocaleString("nl-NL") + " resultaten";
-            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; const eligiblePhotoCount = state.activeStatus === "beschikbaar" && !blockForMailReadyPending ? visibleCustomers.filter(isWebdesignPhotoEligible).length : undefined; renderPhotoCostLabel(baseFiltered, blockForMailReadyPending, eligiblePhotoCount); document.getElementById("photoHeaderCount").textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
+            const resultCountText = blockForMailReadyPending || (state.dataLoading && !state.klanten.length) || (state.dataUnavailable && !state.klanten.length) ? "-- resultaten" : visibleResultCount.toLocaleString("nl-NL") + " resultaten";
+            document.getElementById("databaseTable").classList.toggle("outreach-action-mode", showOutreachActionColumn); document.getElementById("statusHeader").hidden = showOutreachActionColumn; document.getElementById("outreachActionHeader").hidden = !showOutreachActionColumn; document.getElementById("photoHeader").hidden = !showPhotoColumn; document.getElementById("daysHeader").hidden = !showOutreachActionColumn; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; const eligiblePhotoCount = state.activeStatus === "beschikbaar" && !blockForMailReadyPending ? visibleCustomers.filter(isWebdesignPhotoEligible).length : undefined; renderPhotoBatchHeader(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText); nodes.photoHeaderCount.textContent = "(" + photoHeaderCount.toLocaleString("nl-NL") + ")";
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: visibleCustomers.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), photoRestoreFailed: Boolean(state.photoRestoreFailed), items: buildDatabaseMediaDebugItems(filtered) });
 
             updateLoadMoreControl(visibleCustomers.length, filtered.length);
@@ -2560,7 +2537,7 @@
         }
 
         async function generateWebdesignPhotos(limit, options) {
-            const progressSilent = Boolean(options && options.silentProgress); closeAddActions(); nodes.generatePhotosButton.disabled = true;
+            const progressSilent = Boolean(options && options.silentProgress); closeAddActions(); nodes.generatePhotosButton.dataset.generating = "true"; nodes.generatePhotosButton.disabled = true;
             const targets = Array.isArray(limit) ? limit : getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) { if (!progressSilent) setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true); return; }
@@ -2569,7 +2546,7 @@
                 if (!progressSilent) toast("Webdesign-bulk gestart");
             } catch (error) {
                 setStatusMessage(String(error && error.message || "Webdesign-bulk starten is mislukt."), "error");
-            } finally { nodes.generatePhotosButton.disabled = false; }
+            } finally { delete nodes.generatePhotosButton.dataset.generating; nodes.generatePhotosButton.disabled = false; }
         }
 
         function resetModal() {

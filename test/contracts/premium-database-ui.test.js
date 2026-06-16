@@ -285,14 +285,15 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /sortKey: "manual"/);
 });
 
-test('premium database has a compact company search beside the result count', () => {
+test('premium database has a compact company search without the old result count card', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(
     pageSource,
-    /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><\/div><div class="result-count-stack" aria-label="Aantal resultaten" hidden>/
+    /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><\/div>\s*<\/div>/
   );
+  assert.doesNotMatch(pageSource, /result-count-stack/);
   assert.doesNotMatch(pageSource, /database-search-row/);
   assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
   assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.activeStatus === "benaderbaar"[\s\S]*isColdmailReadyWebdesignLead\(customer\)[\s\S]*state\.activeStatus === "beschikbaar"[\s\S]*isAvailableColdmailCandidate\(customer\)/);
@@ -887,8 +888,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">" \+ \(state\.activeStatus === "beschikbaar" \? "Beschikbare data laden\.\.\." : "Mailklare data laden\.\.\."\)/);
   assert.doesNotMatch(pageSource, /mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount/);
   assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);/);
-  assert.match(pageSource, /nodes\.count\.textContent = blockForMailReadyPending \|\| \(state\.dataLoading && !state\.klanten\.length\) \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten"/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(--\)";/);
+  assert.match(pageSource, /const resultCountText = blockForMailReadyPending \|\| \(state\.dataLoading && !state\.klanten\.length\) \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten" : visibleResultCount\.toLocaleString\("nl-NL"\) \+ " resultaten";/);
+  assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
   assert.match(pageSource, /Mailklare data laden\.\.\./);
   assert.match(pageSource, /Beschikbare data laden\.\.\./);
   assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{ nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">Database laden\.\.\.<\/div><\/td><\/tr>";/);
@@ -990,7 +991,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.toast\s*\{[\s\S]*background: #111;[\s\S]*color: #fff;[\s\S]*font-weight: 700;[\s\S]*max-width: min\(340px, calc\(100vw - 48px\)\);/);
   const toastCssBlock = pageSource.match(/\.toast\s*\{[\s\S]*?\}/)[0];
   assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
-  assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
+  assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">0 resultaten<\/span><\/button>/);
   assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
   assert.match(pageSource, /<div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
   const topRightHtml = pageSource.slice(
@@ -998,8 +999,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
     pageSource.indexOf('<div class="status-banner"')
   );
   assert.doesNotMatch(topRightHtml, /<div class="top-right"><div class="search">/);
-  assert.doesNotMatch(topRightHtml, /class="result-count-stack"/);
-  assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
+  assert.doesNotMatch(pageSource, /class="result-count-stack"/);
+  assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<\/div><\/div>\s*<\/div>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
@@ -1007,14 +1008,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
-  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*min-width: 158px;[\s\S]*max-width: 100%;/);
-  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*display: inline-flex;[\s\S]*flex-direction: column;[\s\S]*gap: 7px;/);
-  assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*border: 1px solid var\(--border\);[\s\S]*background: var\(--card\);/);
-  assert.match(pageSource, /\.result-count-action-row\s*\{[\s\S]*display: inline-flex;[\s\S]*justify-content: flex-start;[\s\S]*gap: 8px;/);
-  assert.match(pageSource, /\.result-count-stack \.f-count\s*\{[\s\S]*margin-left: 0;[\s\S]*text-align: left;[\s\S]*font-size: 16px;/);
-  assert.match(pageSource, /<div class="result-count-action-row"><button class="result-count-button" id="generatePhotosButton"/);
-  assert.match(pageSource, /\.photo-cost-label\s*\{[\s\S]*display: inline-flex;[\s\S]*font-size: 15px;[\s\S]*line-height: 1;/);
-  assert.match(pageSource, /\.result-count-button\s*\{[\s\S]*display: inline-flex;[\s\S]*justify-content: center;[\s\S]*width: 24px;[\s\S]*height: 24px;/);
+  assert.match(pageSource, /\.photo-header-results-button\s*\{[\s\S]*display: inline-flex;[\s\S]*min-width: 94px;[\s\S]*text-transform: none;/);
+  assert.match(pageSource, /\.photo-header-results-button:hover\s*\{[\s\S]*color: var\(--crimson\);/);
+  assert.match(pageSource, /#photoHeader \.photo-header-title\[hidden\], #photoHeader \.photo-header-results-button\[hidden\] \{ display: none; \}/);
+  assert.doesNotMatch(pageSource, /result-count-button|result-count-icon|photo-cost-label/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"/);
   assert.match(pageSource, /class="mail-roi-label">Vandaag verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot"/);
@@ -1036,10 +1033,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /remoteCustomersLoaded: false/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true/);
   assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded \|\| state\.photoRestorePending \|\| state\.photoRestoreFailed/);
-  assert.match(pageSource, /id="photoCostLabel" aria-label="Kosten voor AI-foto's"/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.005;/);
-  assert.match(pageSource, /<strong>€0,00<\/strong>/);
-  assert.match(pageSource, /\.photo-cost-label/);
+  assert.match(pageSource, /id="photoHeaderResultsLabel">0 resultaten<\/span>/);
   assert.match(pageSource, /<div class="modal-bg" id="photoBatchModal" aria-hidden="true">/);
   assert.match(pageSource, /id="photoBatchTitle">Webdesigns maken<\/div>/);
   assert.match(pageSource, /data-photo-batch-mode="all"/);
@@ -1051,7 +1046,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.photo-batch-option\.is-active/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
-  assert.match(pageSource, /function renderPhotoCostLabel\(customers, pending, eligibleCountOverride\)/);
+  assert.match(pageSource, /function renderPhotoBatchHeader\(customers, pending, eligibleCountOverride, resultText\)/);
   assert.match(systemMailCountScriptSource, /function hasSoftoraSystemMailSignal\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getCustomerSoftoraSystemMailSentCount\(customer, helpers\)/);
   assert.match(systemMailCountScriptSource, /function getSoftoraSystemMailSentCount\(customers, helpers\)/);
@@ -1079,18 +1074,17 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(autopilotToggleScriptSource, /body: JSON\.stringify\(\{ enabled: nextEnabled \}\)/);
   assert.doesNotMatch(autopilotToggleScriptSource, /senderProfiles|senderEmails|subject|schedule|buildAutopilotConfig/);
   assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded \|\| state\.photoRestorePending \|\| state\.photoRestoreFailed/);
-  assert.match(pageSource, /SoftoraDatabaseSystemMailCount\.render\(state\.klanten,[\s\S]*nodes\.count\.textContent/);
+  assert.match(pageSource, /const resultCountText = blockForMailReadyPending \|\| \(state\.dataLoading && !state\.klanten\.length\) \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten" : visibleResultCount\.toLocaleString\("nl-NL"\) \+ " resultaten";/);
   assert.match(pageSource, /const showPhotoBatchControl = state\.activeStatus === "beschikbaar";/);
-  assert.match(pageSource, /nodes\.resultCountStack\.hidden = !showPhotoBatchControl;/);
-  assert.match(pageSource, /nodes\.photoCostLabel\.hidden = !showPhotoBatchControl;/);
+  assert.match(pageSource, /nodes\.photoHeaderTitle\.hidden = showPhotoBatchControl;/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
   assert.match(pageSource, /eligibleCount \* WEBSITE_PHOTO_COST_EUR/);
-  assert.match(pageSource, /nodes\.photoCostLabel\.innerHTML = "<strong>" \+ formatEuroCost\(totalCost\) \+ "<\/strong>";/);
-  assert.match(pageSource, /AI-foto kost " \+ formatEuroCost\(WEBSITE_PHOTO_COST_EUR\) \+ " per stuk/);
+  assert.match(pageSource, /nodes\.count\.textContent = displayText;/);
+  assert.match(pageSource, /Totale kosten: " \+ formatEuroCost\(totalCost\) \+ "\."/);
   assert.doesNotMatch(pageSource, /URL-scan kost €0,00/);
   assert.match(pageSource, /id="generatePhotosButton"/);
-  assert.match(pageSource, /<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
-  assert.match(pageSource, /class="result-count-icon"/);
+  assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton"/);
+  assert.doesNotMatch(pageSource, /class="result-count-icon"/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
   assert.doesNotMatch(pageSource, /AI-database/i);
   assert.doesNotMatch(pageSource, /ai-database-badge/);
@@ -1144,7 +1138,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.doesNotMatch(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /<th id="outreachActionHeader" hidden>Acties<\/th>/);
-  assert.match(pageSource, /<th id="photoHeader"><span class="photo-header-title"><span id="photoHeaderLabel">Foto's<\/span> <span id="photoHeaderCount">\(0\)<\/span><\/span><\/th>/);
+  assert.match(pageSource, /<th id="photoHeader"><span class="photo-header-title" id="photoHeaderTitle"><span id="photoHeaderLabel">Foto's<\/span> <span id="photoHeaderCount">\(0\)<\/span><\/span><button class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">0 resultaten<\/span><\/button><\/th>/);
   assert.match(pageSource, /<th id="daysHeader" hidden>Dagen<\/th>/);
   assert.doesNotMatch(pageSource, /id="myMailsFilterButton"/);
   assert.doesNotMatch(pageSource, /Enkel mijn mails tonen/);
@@ -1164,11 +1158,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
   assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
-  assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount\);/);
+  assert.match(pageSource, /renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(--\)";/);
-  assert.match(pageSource, /document\.getElementById\("photoHeaderCount"\)\.textContent = "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);
+  assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
+  assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(" \+ photoHeaderCount\.toLocaleString\("nl-NL"\) \+ "\)";/);
   assert.match(pageSource, /logDatabaseMediaDebug\("render-table", \{ activeStatus: state\.activeStatus, databaseCount: state\.klanten\.length, filteredCount: visibleCustomers\.length, renderedCount: filtered\.length, photoHeaderCount: photoHeaderCount/);
   assert.match(pageSource, /<td colspan=\\"7\\">/);
   assert.match(pageSource, /nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">" \+ getEmptyTableMessage\(\) \+ "<\/div><\/td><\/tr>";/);
@@ -2856,7 +2850,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /visibleLimit: TABLE_PAGE_SIZE/);
   assert.match(pageSource, /<button class="load-more-btn" id="loadMoreButton" type="button">Laad meer<\/button>/);
   assert.match(pageSource, /databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\)/);
-  assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);[\s\S]*nodes\.count\.textContent[\s\S]*visibleResultCount\.toLocaleString\("nl-NL"\) \+ " resultaten"/);
+  assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);[\s\S]*renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.match(pageSource, /nodes\.loadMoreButton\.addEventListener\("click", function \(\) \{ state\.visibleLimit = databaseTableHelpers\.getNextVisibleLimit\(state\.visibleLimit, TABLE_PAGE_SIZE\); scheduleRenderPage\(\); \}\);/);
   assert.match(pageSource, /function setStatus\(status, button\) \{\s*if \(button && button\.disabled\) return;/);
   assert.match(pageSource, /if \(statusButton && !statusButton\.disabled\)/);
