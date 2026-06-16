@@ -807,7 +807,14 @@ test('premium database webdesign bulk cancel reports storage cause when saving f
     ...baseStore,
     async upsertWebdesignBatch(batch) {
       if (batch && batch.status === 'cancelled') {
-        return { ok: false, error: 'supabase write refused' };
+        return {
+          ok: false,
+          error: {
+            code: '23514',
+            message: 'new row violates softora_webdesign_jobs_status_check',
+            details: 'Failing row contains status cancelled.',
+          },
+        };
       }
       return baseStore.upsertWebdesignBatch(batch);
     },
@@ -853,9 +860,10 @@ test('premium database webdesign bulk cancel reports storage cause when saving f
 
   assert.equal(cancelRes.statusCode, 503);
   assert.equal(cancelRes.body.ok, false);
-  assert.match(cancelRes.body.detail, /Oorzaak: batch-annulering opslaan - supabase write refused/);
+  assert.match(cancelRes.body.detail, /Oorzaak: batch-annulering opslaan - new row violates softora_webdesign_jobs_status_check/);
+  assert.doesNotMatch(cancelRes.body.detail, /\[object Object\]/);
   assert.equal(cancelRes.body.action, 'batch-annulering opslaan');
-  assert.equal(cancelRes.body.cause, 'supabase write refused');
+  assert.equal(cancelRes.body.cause, 'new row violates softora_webdesign_jobs_status_check');
 });
 
 test('premium database webdesign bulk status returns active jobs without blocking on image generation', async () => {

@@ -1469,12 +1469,39 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     );
   }
 
+  function extractBatchStorageCause(value, depth = 0) {
+    if (!value || depth > 5) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      const direct = normalizeString(value);
+      return direct === '[object Object]' ? '' : direct;
+    }
+    if (value instanceof Error) {
+      const direct = normalizeString(value.message);
+      if (direct && direct !== '[object Object]') return direct;
+      return extractBatchStorageCause(value.cause, depth + 1);
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => extractBatchStorageCause(item, depth + 1)).filter(Boolean).join('; ');
+    }
+    if (typeof value === 'object') {
+      const source = value;
+      const keys = ['message', 'detail', 'details', 'error_description', 'error', 'hint', 'code', 'statusText', 'cause', 'result'];
+      for (const key of keys) {
+        const nested = extractBatchStorageCause(source[key], depth + 1);
+        if (nested) return nested;
+      }
+      try {
+        const json = JSON.stringify(source);
+        return json && json !== '{}' ? json : '';
+      } catch (_error) {
+        return '';
+      }
+    }
+    return '';
+  }
+
   function getBatchStorageCause(error) {
-    if (!error) return '';
-    if (typeof error === 'string') return truncateText(normalizeString(error), 240);
-    const source = error && typeof error === 'object' ? error : {};
-    const message = normalizeString(source.message || source.detail || source.details || source.error || source.hint || source.code || source.statusText || error);
-    return truncateText(message, 240);
+    return truncateText(extractBatchStorageCause(error), 240);
   }
 
   function createBatchStorageUnavailableResult(action, error) {
@@ -1494,7 +1521,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function createPersistFailure(action, result) {
     const message = getBatchStorageCause(result) || `${action} mislukt`;
-    return { ok: false, action, error: new Error(message), result };
+    const error = new Error(message);
+    if (result && typeof result === 'object') error.cause = result;
+    return { ok: false, action, error, result, cause: message };
   }
 
   async function persistBatch(batch, action = 'batch opslaan') {
