@@ -18,7 +18,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".webdesign-bulk-status{display:block;margin:14px 0 18px;padding:13px 16px;border:1px solid rgba(74,144,226,.24);border-radius:8px;background:#f7fbff;color:#2368ad;font-family:Inter,sans-serif;line-height:1.35}.webdesign-bulk-status[hidden]{display:none}.webdesign-bulk-status strong{font-weight:900;color:#1d5f9f}.webdesign-bulk-status small{display:block;margin-top:3px;color:#5c7f9f;font-size:12px;font-weight:700}.webdesign-bulk-bar{display:block;height:7px;margin-top:10px;border-radius:999px;background:rgba(74,144,226,.14);overflow:hidden}.webdesign-bulk-bar span{display:block;height:100%;width:0;border-radius:inherit;background:#4a90e2;transition:width .24s ease}";
+        style.textContent = ".webdesign-bulk-status{font-family:Inter,sans-serif;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:14px;max-width:700px;margin:0 48px 18px;color:#71717a;line-height:1.2}.webdesign-bulk-status[hidden]{display:none}.webdesign-bulk-title{font-size:13px;font-weight:500;color:#71717a;white-space:nowrap}.webdesign-bulk-num{font-size:13px;font-weight:600;color:#18181b;white-space:nowrap}.webdesign-bulk-track{flex:1;height:6px;border-radius:99px;background:#f4f4f5;overflow:hidden;min-width:84px}.webdesign-bulk-fill{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8B2252,#c4547a);width:0;transition:width 1.2s cubic-bezier(.22,1,.36,1)}.webdesign-bulk-rest{font-size:11px;color:#a1a1aa;white-space:nowrap}@media(max-width:860px){.webdesign-bulk-status{margin-left:20px;margin-right:20px;max-width:none;flex-wrap:wrap}.webdesign-bulk-track{flex-basis:100%;order:4}}";
         global.document.head.appendChild(style);
     }
 
@@ -46,22 +46,14 @@
             return node;
         }
 
-        function getStatusLine(batch, phase) {
+        function getStatusLine(batch) {
             const total = Math.max(0, Number(batch && batch.total) || 0);
             const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
-            const failed = Math.max(0, Number(batch && batch.failed) || 0);
-            const queued = Math.max(0, Number(batch && batch.queued) || 0);
-            const running = Math.max(0, Number(batch && batch.running) || 0);
-            const pending = Math.max(0, Number(batch && batch.pending) || 0);
-            const uploaded = Math.max(0, Number(batch && batch.uploadedTargets) || 0);
-            const parts = [];
-            if (phase === "uploading") parts.push(formatNumber(uploaded) + "/" + formatNumber(total) + " klaargezet");
-            if (running) parts.push(formatNumber(running) + " bezig");
-            if (queued) parts.push(formatNumber(queued) + " in wachtrij");
-            if (pending) parts.push(formatNumber(pending) + " wachten");
-            if (failed) parts.push(formatNumber(failed) + " mislukt");
-            if (!parts.length && batch && batch.status === "done") parts.push("volledig afgerond");
-            return { title: "Webdesigns gemaakt: " + formatNumber(made) + "/" + formatNumber(total), detail: parts.join(", ") };
+            const remaining = Math.max(0, total - made);
+            return {
+                num: formatNumber(made) + " / " + formatNumber(total),
+                rest: formatNumber(remaining) + " resterend"
+            };
         }
 
         function renderStatus(batch, phase) {
@@ -70,9 +62,10 @@
             const total = Math.max(0, Number(batch.total) || 0);
             const made = Math.max(0, Number(batch.made || batch.done) || 0);
             const pct = total ? Math.max(0, Math.min(100, Math.round((made / total) * 100))) : 0;
-            const line = getStatusLine(batch, phase);
+            const visiblePct = total ? Math.max(pct, 0.12) : 0;
+            const line = getStatusLine(batch);
             node.hidden = false;
-            node.innerHTML = "<strong>" + escapeHtml(line.title) + "</strong>" + (line.detail ? "<small>" + escapeHtml(line.detail) + "</small>" : "") + "<span class=\"webdesign-bulk-bar\" aria-hidden=\"true\"><span style=\"width:" + pct + "%\"></span></span>";
+            node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span>";
         }
 
         function queuePhotoRefresh(batch) {
