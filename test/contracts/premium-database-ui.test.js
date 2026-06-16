@@ -1366,6 +1366,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(statusFilterCssBlock, /rgba\(139, 34, 82/);
   assert.doesNotMatch(statusFilterCssBlock, /margin-left: auto;/);
   assert.match(filterGroupsCssSource, /\.filter-metrics\s*\{[\s\S]*margin-left: 0;[\s\S]*gap: 24px;/);
+  assert.match(filterGroupsCssSource, /\.database-search-row\s*\{[\s\S]*padding: 28px clamp\(20px, 2\.35vw, 48px\) 8px;[\s\S]*justify-content: flex-end;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-block;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: center;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: center;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(5, minmax\(110px, 1fr\)\);[\s\S]*"\. \. note note note"[\s\S]*"autopilot today sent deals ratio";[\s\S]*gap: 6px;/);

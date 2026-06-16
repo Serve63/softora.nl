@@ -139,7 +139,7 @@
 }
 
 .database-search-row {
-    padding: 0 clamp(20px, 2.35vw, 48px) 18px;
+    padding: 28px clamp(20px, 2.35vw, 48px) 8px;
     display: flex;
     justify-content: flex-end;
 }
