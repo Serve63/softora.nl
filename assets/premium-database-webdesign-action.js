@@ -599,9 +599,9 @@
 
         function resumePendingJobs() {
             const firstLoad = loadRunningJobs();
-            resumeBulkBatch();
+            void resumeBulkBatch();
             global.setTimeout(function () { void loadRunningJobs(); }, 2000);
-            global.setTimeout(resumeBulkBatch, 2500);
+            global.setTimeout(resumeBulkBatch, 2500); global.setTimeout(resumeBulkBatch, 7000); global.setTimeout(resumeBulkBatch, 15000);
             return firstLoad;
         }
 
