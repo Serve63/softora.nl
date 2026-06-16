@@ -152,6 +152,7 @@ function createPremiumAuthStateManager(options = {}) {
       firstName: '',
       lastName: '',
       avatarDataUrl: '',
+      tokenFallback: true,
     };
   }
 
@@ -347,6 +348,7 @@ function createPremiumApiAccessGuard(options = {}) {
     getRequestPathname = () => '/',
     getRequestOriginFromHeaders = () => '',
     clearPremiumSessionCookie = () => {},
+    normalizeString = (value) => String(value || '').trim(),
   } = options;
 
   async function requirePremiumApiAccess(req, res, next) {
@@ -402,7 +404,60 @@ function createPremiumApiAccessGuard(options = {}) {
     });
   }
 
-  function requirePremiumAdminApiAccess(req, res, next) {
+  function getUserAgent(req) {
+    return typeof req?.get === 'function' ? req.get('user-agent') : '';
+  }
+
+  function getNormalizedAdminRequestPath(req) {
+    return normalizeRequestPathname(getRequestPathname(req) || '/');
+  }
+
+  function isAutopilotAdminFallbackRequest(req) {
+    const method = normalizeString(req?.method || '').toUpperCase();
+    return method === 'POST' && getNormalizedAdminRequestPath(req) === '/api/coldmailing/autopilot/settings';
+  }
+
+  function isTrustedAdminTokenFallback(authState) {
+    return Boolean(
+      authState &&
+        authState.configured &&
+        authState.authenticated &&
+        authState.isAdmin &&
+        authState.tokenFallback &&
+        authState.token &&
+        authState.userId &&
+        authState.email &&
+        !authState.expired &&
+        !authState.revoked
+    );
+  }
+
+  async function refreshAdminAuthState(req) {
+    try {
+      return await getResolvedPremiumAuthState(req, {
+        allowAnonymousWithoutHydration: false,
+        allowTokenFallbackWithoutHydration: false,
+      });
+    } catch (error) {
+      appendSecurityAuditEvent(
+        {
+          type: 'admin_reconfirm_failed',
+          severity: 'warning',
+          success: false,
+          email: req?.premiumAuth?.email || '',
+          ip: getClientIpFromRequest(req),
+          path: getRequestPathname(req),
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: getUserAgent(req),
+          detail: `Adminstatus kon niet opnieuw worden bevestigd: ${normalizeString(error?.message || error)}`,
+        },
+        'security_admin_reconfirm_failed'
+      );
+      return null;
+    }
+  }
+
+  async function requirePremiumAdminApiAccess(req, res, next) {
     const authState = req.premiumAuth || null;
     if (!authState || !authState.authenticated) {
       return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
@@ -410,10 +465,42 @@ function createPremiumApiAccessGuard(options = {}) {
     if (!authState.isAdmin) {
       return res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
     }
-    if (!authState.user) {
-      return res.status(403).json({ ok: false, error: 'Adminstatus kon niet veilig worden bevestigd.' });
+    if (authState.user) {
+      return next();
     }
-    return next();
+
+    const refreshedAuthState = await refreshAdminAuthState(req);
+    if (refreshedAuthState?.authenticated && refreshedAuthState?.isAdmin && refreshedAuthState?.user) {
+      req.premiumAuth = refreshedAuthState;
+      return next();
+    }
+
+    if (refreshedAuthState?.expired || refreshedAuthState?.revoked) {
+      clearPremiumSessionCookie(req, res);
+      return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+    }
+
+    const fallbackAuthState = refreshedAuthState?.authenticated ? refreshedAuthState : authState;
+    if (isAutopilotAdminFallbackRequest(req) && isTrustedAdminTokenFallback(fallbackAuthState)) {
+      req.premiumAuth = fallbackAuthState;
+      appendSecurityAuditEvent(
+        {
+          type: 'admin_token_fallback_allowed',
+          severity: 'info',
+          success: true,
+          email: fallbackAuthState.email || '',
+          ip: getClientIpFromRequest(req),
+          path: getRequestPathname(req),
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: getUserAgent(req),
+          detail: 'Autopilot admin-actie toegestaan op basis van een geldige gesigneerde Full Access-sessie.',
+        },
+        'security_admin_token_fallback_allowed'
+      );
+      return next();
+    }
+
+    return res.status(403).json({ ok: false, error: 'Adminstatus kon niet veilig worden bevestigd.' });
   }
 
   return {

@@ -174,12 +174,12 @@ test('premium api guard clears expired or revoked sessions before returning 401'
   assert.equal(cleared.length, 1);
 });
 
-test('premium admin api guard enforces login and admin role', () => {
+test('premium admin api guard enforces login and admin role', async () => {
   const guard = createPremiumApiAccessGuard();
 
   const unauthenticatedRes = createResponseRecorder();
   let unauthenticatedNext = false;
-  guard.requirePremiumAdminApiAccess({}, unauthenticatedRes, () => {
+  await guard.requirePremiumAdminApiAccess({}, unauthenticatedRes, () => {
     unauthenticatedNext = true;
   });
   assert.equal(unauthenticatedNext, false);
@@ -187,7 +187,7 @@ test('premium admin api guard enforces login and admin role', () => {
 
   const nonAdminRes = createResponseRecorder();
   let nonAdminNext = false;
-  guard.requirePremiumAdminApiAccess(
+  await guard.requirePremiumAdminApiAccess(
     { premiumAuth: { authenticated: true, isAdmin: false } },
     nonAdminRes,
     () => {
@@ -199,7 +199,7 @@ test('premium admin api guard enforces login and admin role', () => {
 
   const adminRes = createResponseRecorder();
   let adminNext = false;
-  guard.requirePremiumAdminApiAccess(
+  await guard.requirePremiumAdminApiAccess(
     { premiumAuth: { authenticated: true, isAdmin: true, user: { id: 'usr_admin' } } },
     adminRes,
     () => {
@@ -211,7 +211,7 @@ test('premium admin api guard enforces login and admin role', () => {
 
   const unverifiedAdminRes = createResponseRecorder();
   let unverifiedAdminNext = false;
-  guard.requirePremiumAdminApiAccess(
+  await guard.requirePremiumAdminApiAccess(
     { premiumAuth: { authenticated: true, isAdmin: true, user: null } },
     unverifiedAdminRes,
     () => {
@@ -221,4 +221,151 @@ test('premium admin api guard enforces login and admin role', () => {
   assert.equal(unverifiedAdminNext, false);
   assert.equal(unverifiedAdminRes.statusCode, 403);
   assert.equal(unverifiedAdminRes.body.error, 'Adminstatus kon niet veilig worden bevestigd.');
+});
+
+test('premium admin api guard re-confirms token fallback admin through hydrated user when available', async () => {
+  const hydratedUser = { id: 'usr_admin', email: 'serve@softora.nl', role: 'admin' };
+  const resolverCalls = [];
+  const guard = createPremiumApiAccessGuard({
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      return {
+        configured: true,
+        authenticated: true,
+        isAdmin: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_admin',
+        user: hydratedUser,
+      };
+    },
+  });
+
+  const req = {
+    method: 'POST',
+    originalUrl: '/api/coldmailing/autopilot/settings',
+    premiumAuth: {
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      user: null,
+    },
+    get: () => 'agent',
+  };
+  const res = createResponseRecorder();
+  let nextCalled = false;
+
+  await guard.requirePremiumAdminApiAccess(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.statusCode, null);
+  assert.equal(req.premiumAuth.user, hydratedUser);
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: false,
+      allowTokenFallbackWithoutHydration: false,
+    },
+  ]);
+});
+
+test('premium admin api guard allows signed admin token fallback for autopilot settings when hydration stays unavailable', async () => {
+  const events = [];
+  const guard = createPremiumApiAccessGuard({
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    }),
+    appendSecurityAuditEvent: (payload, reason) => events.push({ payload, reason }),
+    getClientIpFromRequest: () => '203.0.113.10',
+    getRequestPathname: () => '/api/coldmailing/autopilot/settings',
+    getRequestOriginFromHeaders: () => 'https://www.softora.nl',
+  });
+
+  const req = {
+    method: 'POST',
+    originalUrl: '/api/coldmailing/autopilot/settings',
+    premiumAuth: {
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    },
+    get: () => 'agent',
+  };
+  const res = createResponseRecorder();
+  let nextCalled = false;
+
+  await guard.requirePremiumAdminApiAccess(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.statusCode, null);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].reason, 'security_admin_token_fallback_allowed');
+  assert.equal(events[0].payload.type, 'admin_token_fallback_allowed');
+});
+
+test('premium admin api guard keeps token fallback blocked for unrelated admin routes', async () => {
+  const guard = createPremiumApiAccessGuard({
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    }),
+    getRequestPathname: () => '/api/premium-users',
+  });
+
+  const req = {
+    method: 'POST',
+    originalUrl: '/api/premium-users',
+    premiumAuth: {
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired: false,
+      revoked: false,
+      user: null,
+    },
+  };
+  const res = createResponseRecorder();
+  let nextCalled = false;
+
+  await guard.requirePremiumAdminApiAccess(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, false);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error, 'Adminstatus kon niet veilig worden bevestigd.');
 });
