@@ -15,11 +15,11 @@ function createService(overrides = {}) {
     },
     async listDesignPhotoAssetFlags() {
       calls.push('photo-flags');
-      return overrides.photoFlags || [];
+      return Object.prototype.hasOwnProperty.call(overrides, 'photoFlags') ? overrides.photoFlags : [];
     },
     async listOutboundRecipientGuardKeys(keys) {
       calls.push(['guard-keys', keys.slice()]);
-      return overrides.centralGuardKeys || [];
+      return Object.prototype.hasOwnProperty.call(overrides, 'centralGuardKeys') ? overrides.centralGuardKeys : [];
     },
     async listDesignPhotosWithSignedUrls() {
       throw new Error('signed URLs mogen niet in de snapshotroute worden gemaakt');
@@ -158,9 +158,47 @@ test('premium database mail-ready snapshot fails closed when legacy send guard c
     legacyGuardError: new Error('legacy guard unavailable'),
   });
 
-  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+  await assert.rejects(
+    () => service.buildMailReadySnapshot({ limit: 10 }),
+    /Mailklare snapshot kon verzendbeveiliging niet laden/
+  );
+});
 
-  assert.equal(payload.ok, true);
-  assert.equal(payload.total, 0);
-  assert.deepEqual(payload.customers, []);
+test('premium database mail-ready snapshot refuses fake empty totals when photo flags cannot be read', async () => {
+  const customers = [{
+    customer_id: 'ready-1',
+    company: 'Ready One',
+    email: 'info@ready-one.nl',
+    website: 'ready-one.nl',
+    database_status: 'prospect',
+  }];
+  const { service } = createService({
+    customers,
+    photoFlags: null,
+  });
+
+  await assert.rejects(
+    () => service.buildMailReadySnapshot({ limit: 10 }),
+    /Mailklare snapshot kon foto- en mockupdata niet laden/
+  );
+});
+
+test('premium database mail-ready snapshot refuses fake empty totals when central guards cannot be read', async () => {
+  const customers = [{
+    customer_id: 'ready-1',
+    company: 'Ready One',
+    email: 'info@ready-one.nl',
+    website: 'ready-one.nl',
+    database_status: 'prospect',
+  }];
+  const { service } = createService({
+    customers,
+    photoFlags: [{ customerId: 'ready-1', hasPhoto: true, hasMockup: true }],
+    centralGuardKeys: null,
+  });
+
+  await assert.rejects(
+    () => service.buildMailReadySnapshot({ limit: 10 }),
+    /Mailklare snapshot kon verzendbeveiliging niet laden/
+  );
 });
