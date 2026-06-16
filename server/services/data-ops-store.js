@@ -1718,6 +1718,10 @@ function createSoftoraDataOpsStore(deps = {}) {
     const payload = {
       customer: job.customer && typeof job.customer === 'object' ? job.customer : {},
     };
+    if (job.batchId) payload.batchId = normalizeString(job.batchId).slice(0, 120);
+    if (Number.isFinite(Number(job.batchTargetIndex))) {
+      payload.batchTargetIndex = Math.max(0, Math.floor(Number(job.batchTargetIndex)));
+    }
     if (retry.attempts || retry.nextAttemptAt || retry.lastRetryAt || retry.lastRetryReason) {
       payload.retry = retry;
     }
@@ -1753,7 +1757,132 @@ function createSoftoraDataOpsStore(deps = {}) {
       startedAt: toMsFromIso(row.started_at),
       finishedAt: toMsFromIso(row.finished_at),
       retry: normalizeWebdesignJobRetryPayload(payload.retry),
+      batchId: normalizeString(payload.batchId || ''),
+      batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))
+        ? Math.max(0, Math.floor(Number(payload.batchTargetIndex)))
+        : null,
     };
+  }
+
+  const WEBDESIGN_BATCH_KIND = 'bulk_webdesign_batch';
+  const WEBDESIGN_BATCH_CHUNK_KIND = 'bulk_webdesign_chunk';
+  const WEBDESIGN_BATCH_CUSTOMER_ID = '__bulk_batch__';
+  const WEBDESIGN_BATCH_CHUNK_CUSTOMER_PREFIX = '__bulk_chunk__:';
+
+  function normalizeWebdesignTableStatus(value, fallback = 'queued') {
+    const normalized = normalizeString(value || fallback).toLowerCase();
+    return ['queued', 'running', 'done', 'error'].includes(normalized) ? normalized : fallback;
+  }
+
+  function buildWebdesignBatchRow(batch = {}) {
+    const id = normalizeString(batch.id);
+    return {
+      job_id: id,
+      owner_key: normalizeString(batch.ownerKey),
+      customer_id: WEBDESIGN_BATCH_CUSTOMER_ID,
+      website_url: `https://softora.local/webdesign-bulk/${encodeURIComponent(id || 'batch')}`,
+      status: normalizeWebdesignTableStatus(batch.status, 'queued'),
+      error: normalizeString(batch.error || '').slice(0, 1000) || null,
+      payload: {
+        kind: WEBDESIGN_BATCH_KIND,
+        batch: {
+          id,
+          total: Math.max(0, Math.floor(Number(batch.total || 0) || 0)),
+          expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
+          uploadedTargets: Math.max(0, Math.floor(Number(batch.uploadedTargets || 0) || 0)),
+          summary: batch.summary && typeof batch.summary === 'object' ? batch.summary : {},
+          lastError: normalizeString(batch.lastError || '').slice(0, 500),
+        },
+      },
+      created_at: toIsoFromMaybeMs(batch.createdAt) || isoNow(),
+      started_at: toIsoFromMaybeMs(batch.startedAt),
+      finished_at: toIsoFromMaybeMs(batch.finishedAt),
+      updated_at: isoNow(),
+    };
+  }
+
+  function normalizeWebdesignBatchRow(row = {}) {
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const batch = payload.batch && typeof payload.batch === 'object' ? payload.batch : {};
+    return {
+      id: normalizeString(row.job_id || batch.id),
+      ownerKey: normalizeString(row.owner_key),
+      status: normalizeWebdesignTableStatus(row.status, 'queued'),
+      error: normalizeString(row.error || ''),
+      total: Math.max(0, Math.floor(Number(batch.total || 0) || 0)),
+      expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
+      uploadedTargets: Math.max(0, Math.floor(Number(batch.uploadedTargets || 0) || 0)),
+      summary: batch.summary && typeof batch.summary === 'object' ? batch.summary : {},
+      lastError: normalizeString(batch.lastError || ''),
+      createdAt: toMsFromIso(row.created_at) || Date.now(),
+      startedAt: toMsFromIso(row.started_at),
+      finishedAt: toMsFromIso(row.finished_at),
+    };
+  }
+
+  function buildWebdesignBatchChunkCustomerId(batchId) {
+    return `${WEBDESIGN_BATCH_CHUNK_CUSTOMER_PREFIX}${normalizeString(batchId).slice(0, 140)}`;
+  }
+
+  function normalizeWebdesignBatchTargets(targets) {
+    return (Array.isArray(targets) ? targets : [])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        index: Math.max(0, Math.floor(Number(item.index || 0) || 0)),
+        status: normalizeString(item.status || 'pending').toLowerCase() || 'pending',
+        jobId: normalizeString(item.jobId || '').slice(0, 160),
+        error: normalizeString(item.error || '').slice(0, 500),
+        attempts: Math.max(0, Math.floor(Number(item.attempts || 0) || 0)),
+        nextAttemptAt: Math.max(0, Number(item.nextAttemptAt || 0) || 0) || null,
+        updatedAt: Math.max(0, Number(item.updatedAt || 0) || 0) || null,
+        finishedAt: Math.max(0, Number(item.finishedAt || 0) || 0) || null,
+        websiteUrl: normalizeString(item.websiteUrl || '').slice(0, 500),
+        customer: item.customer && typeof item.customer === 'object' ? item.customer : {},
+      }));
+  }
+
+  function buildWebdesignBatchChunkRow(chunk = {}) {
+    const batchId = normalizeString(chunk.batchId);
+    const index = Math.max(0, Math.floor(Number(chunk.index || 0) || 0));
+    const id = normalizeString(chunk.id || `${batchId}_chunk_${String(index).padStart(5, '0')}`);
+    return {
+      job_id: id,
+      owner_key: normalizeString(chunk.ownerKey),
+      customer_id: buildWebdesignBatchChunkCustomerId(batchId),
+      website_url: `https://softora.local/webdesign-bulk/${encodeURIComponent(batchId || 'batch')}/chunks/${index}`,
+      status: normalizeWebdesignTableStatus(chunk.status, 'queued'),
+      error: normalizeString(chunk.error || '').slice(0, 1000) || null,
+      payload: {
+        kind: WEBDESIGN_BATCH_CHUNK_KIND,
+        batchId,
+        index,
+        targets: normalizeWebdesignBatchTargets(chunk.targets),
+      },
+      created_at: toIsoFromMaybeMs(chunk.createdAt) || isoNow(),
+      started_at: null,
+      finished_at: toIsoFromMaybeMs(chunk.finishedAt),
+      updated_at: isoNow(),
+    };
+  }
+
+  function normalizeWebdesignBatchChunkRow(row = {}) {
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    return {
+      id: normalizeString(row.job_id),
+      ownerKey: normalizeString(row.owner_key),
+      batchId: normalizeString(payload.batchId || ''),
+      index: Math.max(0, Math.floor(Number(payload.index || 0) || 0)),
+      status: normalizeWebdesignTableStatus(row.status, 'queued'),
+      error: normalizeString(row.error || ''),
+      targets: normalizeWebdesignBatchTargets(payload.targets),
+      createdAt: toMsFromIso(row.created_at) || Date.now(),
+      finishedAt: toMsFromIso(row.finished_at),
+    };
+  }
+
+  function isRegularWebdesignJobRow(row = {}) {
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    return payload.kind !== WEBDESIGN_BATCH_KIND && payload.kind !== WEBDESIGN_BATCH_CHUNK_KIND;
   }
 
   async function upsertWebdesignJob(job) {
@@ -1763,6 +1892,30 @@ function createSoftoraDataOpsStore(deps = {}) {
     }
     return run(
       'upsert-webdesign-job',
+      (client) => client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' }),
+      getWriteOperationOptions()
+    );
+  }
+
+  async function upsertWebdesignBatch(batch) {
+    const row = buildWebdesignBatchRow(batch);
+    if (!row.job_id || !row.owner_key) {
+      return { ok: false, unavailable: false, error: new Error('Ongeldige webdesign-batch') };
+    }
+    return run(
+      'upsert-webdesign-batch',
+      (client) => client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' }),
+      getWriteOperationOptions()
+    );
+  }
+
+  async function upsertWebdesignBatchChunk(chunk) {
+    const row = buildWebdesignBatchChunkRow(chunk);
+    if (!row.job_id || !row.owner_key || !row.payload.batchId) {
+      return { ok: false, unavailable: false, error: new Error('Ongeldige webdesign-batchchunk') };
+    }
+    return run(
+      'upsert-webdesign-batch-chunk',
       (client) => client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' }),
       getWriteOperationOptions()
     );
@@ -1791,8 +1944,37 @@ function createSoftoraDataOpsStore(deps = {}) {
         .maybeSingle()
     );
     if (!result.ok) throw createWebdesignJobStatusReadError(result);
-    if (!result.data) return null;
+    if (!result.data || !isRegularWebdesignJobRow(result.data)) return null;
     return normalizeWebdesignJobRow(result.data);
+  }
+
+  async function getWebdesignBatch(ownerKey, batchId) {
+    const result = await run('get-webdesign-batch', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('job_id', normalizeString(batchId))
+        .eq('owner_key', normalizeString(ownerKey))
+        .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
+        .maybeSingle()
+    );
+    if (!result.ok) throw createWebdesignJobStatusReadError(result);
+    if (!result.data) return null;
+    return normalizeWebdesignBatchRow(result.data);
+  }
+
+  async function listWebdesignBatchChunks(ownerKey, batchId) {
+    const result = await run('list-webdesign-batch-chunks', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('owner_key', normalizeString(ownerKey))
+        .eq('customer_id', buildWebdesignBatchChunkCustomerId(batchId))
+        .order('created_at', { ascending: true })
+        .limit(10000)
+    );
+    if (!result.ok) throw createWebdesignJobStatusReadError(result);
+    return (result.data || []).map(normalizeWebdesignBatchChunkRow).sort((left, right) => left.index - right.index);
   }
 
   async function findRunningWebdesignJob(ownerKey, customerId) {
@@ -1807,8 +1989,23 @@ function createSoftoraDataOpsStore(deps = {}) {
         .limit(1)
         .maybeSingle()
     );
-    if (!result.ok || !result.data) return null;
+    if (!result.ok || !result.data || !isRegularWebdesignJobRow(result.data)) return null;
     return normalizeWebdesignJobRow(result.data);
+  }
+
+  async function listVisibleWebdesignBatches(ownerKey) {
+    const result = await run('list-webdesign-batches', (client) =>
+      client
+        .from(TABLES.webdesignJobs)
+        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
+        .eq('owner_key', normalizeString(ownerKey))
+        .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
+        .in('status', ['queued', 'running', 'done', 'error'])
+        .order('created_at', { ascending: false })
+        .limit(5)
+    );
+    if (!result.ok) return null;
+    return (result.data || []).map(normalizeWebdesignBatchRow);
   }
 
   async function listVisibleWebdesignJobs(ownerKey) {
@@ -1822,12 +2019,13 @@ function createSoftoraDataOpsStore(deps = {}) {
         .limit(5000)
     );
     if (!result.ok) return null;
-    return (result.data || []).map(normalizeWebdesignJobRow);
+    return (result.data || []).filter(isRegularWebdesignJobRow).map(normalizeWebdesignJobRow);
   }
 
   return {
     findRunningWebdesignJob,
     getDataOpsCounts,
+    getWebdesignBatch,
     getWebdesignJob,
     deleteDesignPhotos,
     listActiveOrders,
@@ -1835,7 +2033,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
     listOutboundRecipientGuardsForPreview,
+    listVisibleWebdesignBatches,
     listVisibleWebdesignJobs,
+    listWebdesignBatchChunks,
     listOrderRuntime,
     deleteCustomers,
     getReadFailureCooldownStatus,
@@ -1845,6 +2045,8 @@ function createSoftoraDataOpsStore(deps = {}) {
     replaceOrderRuntime,
     uploadDesignPhoto,
     upsertDesignPhotos,
+    upsertWebdesignBatch,
+    upsertWebdesignBatchChunk,
     upsertWebdesignJob,
   };
 }
