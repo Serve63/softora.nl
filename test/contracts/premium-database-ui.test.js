@@ -149,6 +149,32 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   return sandbox.window.SoftoraDatabaseWebdesignAction;
 }
 
+function loadDatabaseWebdesignBulkClient(options = {}) {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-bulk.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const document = options.document || {
+    getElementById: () => null,
+    createElement: () => ({ id: '', className: '', hidden: false, innerHTML: '', textContent: '' }),
+    head: { appendChild() {} },
+    body: { appendChild() {} },
+  };
+  const windowObject = {
+    document,
+    localStorage: options.localStorage,
+    setTimeout: options.setTimeout || setTimeout,
+    clearTimeout: options.clearTimeout || clearTimeout,
+    fetch: options.fetch || (async () => ({ ok: true, status: 200, json: async () => ({ batches: [] }) })),
+  };
+  const sandbox = {
+    window: windowObject,
+    fetch: windowObject.fetch,
+    setTimeout: windowObject.setTimeout,
+    clearTimeout: windowObject.clearTimeout,
+  };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseWebdesignBulk;
+}
+
 function loadDatabaseLeadDeleteClient(options = {}) {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-lead-delete.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -1188,7 +1214,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
   assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
@@ -1418,7 +1444,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1501,6 +1527,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /SoftoraDatabaseWebdesignBulk/);
   assert.match(webdesignBulkScriptSource, /const BATCH_ENDPOINT = "\/api\/premium-database\/webdesign-photo-batches";/);
   assert.match(webdesignBulkScriptSource, /async function startBulkBatchForCustomers\(customers\)/);
+  assert.match(webdesignBulkScriptSource, /RESTORE_DONE_BATCH_WINDOW_MS = 15 \* 60 \* 1000/);
+  assert.match(webdesignBulkScriptSource, /function pickRestorableBatch\(batches\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_UPLOAD_CHUNK_SIZE = 100;/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-title\\">Webdesigns/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-num\\"/);
@@ -1528,14 +1556,15 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);
   assert.doesNotMatch(webdesignActionScriptSource, /setStatusMessage\(message, "error", true\)/);
   assert.doesNotMatch(webdesignActionScriptSource, /Geen geldige website gevonden voor " \+ target\.bedrijf \+ "\.", "error", true/);
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
+  assert.match(webdesignActionScriptSource, /global\.setTimeout\(resumeBulkBatch, 2500\); global\.setTimeout\(resumeBulkBatch, 7000\); global\.setTimeout\(resumeBulkBatch, 15000\);/);
   assert.match(webdesignActionScriptSource, /return firstLoad;/);
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
   assert.match(webdesignActionScriptSource, /function resolveJobPollDelay\(job\)/);
@@ -2327,6 +2356,86 @@ test('premium database webdesign action restores large running job lists without
   assert.equal(renderCount, 1);
   assert.ok(timers.some((timer) => Number(timer.delay) === 0), 'restored jobs should still start polling quickly');
   assert.ok(timers.some((timer) => Number(timer.delay) > 0 && Number(timer.delay) < 15000), 'restored jobs should stagger status polling');
+});
+
+test('premium database webdesign bulk restores the progress bar from the running server batch list', async () => {
+  const nodes = new Map();
+  const createNode = () => ({
+    id: '',
+    className: '',
+    hidden: false,
+    innerHTML: '',
+    textContent: '',
+    style: {},
+    parentNode: null,
+  });
+  const document = {
+    getElementById: (id) => nodes.get(id) || null,
+    createElement: () => createNode(),
+    head: {
+      appendChild(node) {
+        nodes.set(node.id, node);
+      },
+    },
+    body: {
+      appendChild(node) {
+        node.parentNode = this;
+        nodes.set(node.id, node);
+      },
+    },
+  };
+  const timers = [];
+  const requests = [];
+  const webdesignBulkClient = loadDatabaseWebdesignBulkClient({
+    document,
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async (url) => {
+      requests.push(String(url));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          batches: [
+            {
+              id: 'webdesign_batch_live',
+              status: 'running',
+              total: 2562,
+              made: 500,
+              done: 500,
+              createdAt: Date.now(),
+            },
+          ],
+        }),
+      };
+    },
+  });
+  const controller = webdesignBulkClient.createController({
+    normalizeString: (value) => String(value || '').trim(),
+    escapeHtml: (value) => String(value),
+    refreshPhotos: async () => {},
+    renderPage() {},
+    refreshDelayMs: 900,
+  });
+
+  const batch = await controller.loadLatestBatch();
+
+  const statusNode = nodes.get('webdesignBulkStatus');
+  assert.equal(batch.id, 'webdesign_batch_live');
+  assert.equal(statusNode.hidden, false);
+  assert.match(statusNode.innerHTML, /class="webdesign-bulk-title">Webdesigns/);
+  assert.match(statusNode.innerHTML, /500 \/ 2\.562/);
+  assert.match(statusNode.innerHTML, /2\.062 resterend/);
+  assert.match(statusNode.innerHTML, /class="webdesign-bulk-fill" style="width:20%"/);
+  assert.equal(requests[0], '/api/premium-database/webdesign-photo-batches');
+  assert.ok(timers.some((timer) => Number(timer.delay) === 0), 'restored bulk batch should poll immediately');
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {

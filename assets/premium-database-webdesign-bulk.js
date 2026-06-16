@@ -4,6 +4,7 @@
     const BATCH_ENDPOINT = "/api/premium-database/webdesign-photo-batches";
     const BULK_POLL_INTERVAL_MS = 2600;
     const BULK_UPLOAD_CHUNK_SIZE = 100;
+    const RESTORE_DONE_BATCH_WINDOW_MS = 15 * 60 * 1000;
     const STYLE_ID = "softora-database-webdesign-bulk-style";
 
     function fallbackNormalize(value) { return String(value || "").trim(); }
@@ -13,6 +14,11 @@
         });
     }
     function formatNumber(value) { return Math.max(0, Number(value) || 0).toLocaleString("nl-NL"); }
+    function isActiveBatchStatus(status) {
+        const value = fallbackNormalize(status).toLowerCase();
+        return value === "queued" || value === "running";
+    }
+    function getBatchSortTime(batch) { return Math.max(0, Number(batch && (batch.finishedAt || batch.startedAt || batch.createdAt)) || 0); }
 
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
@@ -82,24 +88,31 @@
         }
 
         function schedulePoll(delay) {
-            if (!activeBatchId || pollTimer || typeof global.setTimeout !== "function") return;
+            const delayMs = Math.max(0, Number(delay) || 0);
+            if (!activeBatchId || typeof global.setTimeout !== "function") return;
+            if (pollTimer) {
+                if (delayMs > 0) return;
+                if (typeof global.clearTimeout === "function") global.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
             pollTimer = global.setTimeout(function () {
                 pollTimer = null;
                 void pollBatch(activeBatchId);
-            }, Math.max(0, Number(delay) || 0));
+            }, delayMs);
         }
 
-        function handleBatch(batch, phase) {
+        function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
+            const status = normalizeString(batch.status).toLowerCase();
             activeBatchId = batch.id;
             renderStatus(batch, phase);
             queuePhotoRefresh(batch);
-            if (batch.status === "done" || batch.status === "error") {
+            if (status === "done" || status === "error") {
                 if (pollTimer && typeof global.clearTimeout === "function") global.clearTimeout(pollTimer);
                 pollTimer = null;
                 return;
             }
-            schedulePoll(BULK_POLL_INTERVAL_MS);
+            schedulePoll(options && options.immediate ? 0 : BULK_POLL_INTERVAL_MS);
         }
 
         async function readJson(response) { return response.json().catch(function () { return {}; }); }
@@ -110,6 +123,10 @@
             try {
                 const response = await fetch(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
                 const payload = await readJson(response);
+                if (response.status === 404) {
+                    if (id === activeBatchId) activeBatchId = "";
+                    return;
+                }
                 if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
                 handleBatch(payload.batch, "running");
             } catch (error) {
@@ -156,9 +173,17 @@
                 handleBatch(latest, "uploading");
             }
             latest = await postJsonWithRetry(BATCH_ENDPOINT + "/" + encodeURIComponent(batchId) + "/commit", { total: total, expectedChunks: expectedChunks });
-            handleBatch(latest, "running");
-            schedulePoll(0);
+            handleBatch(latest, "running", { immediate: true });
             return latest;
+        }
+
+        function pickRestorableBatch(batches) {
+            const sorted = (Array.isArray(batches) ? batches : []).filter(Boolean).sort(function (left, right) { return getBatchSortTime(right) - getBatchSortTime(left); });
+            return sorted.find(function (item) { return item && item.id && isActiveBatchStatus(item.status); }) || sorted.find(function (item) {
+                const status = normalizeString(item && item.status).toLowerCase();
+                const sortTime = getBatchSortTime(item);
+                return item && item.id && (status === "done" || status === "error") && sortTime && Date.now() - sortTime <= RESTORE_DONE_BATCH_WINDOW_MS;
+            }) || null;
         }
 
         async function loadLatestBatch() {
@@ -167,12 +192,11 @@
                 const payload = await readJson(response);
                 const batches = Array.isArray(payload && payload.batches) ? payload.batches : [];
                 if (!response.ok || !batches.length) return;
-                const batch = batches.find(function (item) { return item && (item.status === "running" || item.status === "queued"); }) || batches[0];
+                const batch = pickRestorableBatch(batches);
                 if (!batch || !batch.id) return;
-                activeBatchId = batch.id;
                 latestMade = Math.max(0, Number(batch.made || batch.done) || 0);
-                renderStatus(batch, batch.status === "queued" ? "uploading" : "running");
-                if (batch.status === "running" || batch.status === "queued") schedulePoll(0);
+                handleBatch(batch, batch.status === "queued" ? "uploading" : "running", { immediate: true });
+                return batch;
             } catch (error) {
                 /* A later page load or status poll can pick up the persistent batch again. */
             }
