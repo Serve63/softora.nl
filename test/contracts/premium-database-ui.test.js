@@ -265,8 +265,8 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
     sorted.map((customer) => customer.bedrijf),
     ['Oisterwijk Winkel', 'Alphen Service', 'Chaam Garage', 'Roosendaal Zaak', 'Onbekend Ver Weg']
   );
-  assert.match(pageSource, /assets\/premium-database-target-coords\.js\?v=20260522a/);
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
+  assert.match(pageSource, /targetCoords: "assets\/premium-database-target-coords\.js\?v=20260616a"/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260616a/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
@@ -856,12 +856,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const availableImportScriptPath = path.join(__dirname, '../../assets/premium-database-available-import.js');
   const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
   const webdesignAssetStateScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
+  const coldmailGuardScriptPath = path.join(__dirname, '../../assets/premium-database-coldmail-guard.js');
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const webdesignPreviewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
   const leadDeleteScriptPath = path.join(__dirname, '../../assets/premium-database-lead-delete.js');
   const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
+  const deepSearchLoaderScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search-loader.js');
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const contactStatusScriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
   const filterGroupsCssPath = path.join(__dirname, '../../assets/premium-database-filter-groups.css');
@@ -873,12 +875,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const availableImportScriptSource = fs.readFileSync(availableImportScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
   const webdesignAssetStateScriptSource = fs.readFileSync(webdesignAssetStateScriptPath, 'utf8');
+  const coldmailGuardScriptSource = fs.readFileSync(coldmailGuardScriptPath, 'utf8');
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const webdesignPreviewScriptSource = fs.readFileSync(webdesignPreviewScriptPath, 'utf8');
   const leadDeleteScriptSource = fs.readFileSync(leadDeleteScriptPath, 'utf8');
   const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
   const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
+  const deepSearchLoaderScriptSource = fs.readFileSync(deepSearchLoaderScriptPath, 'utf8');
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
   const contactStatusScriptSource = fs.readFileSync(contactStatusScriptPath, 'utf8');
   const filterGroupsCssSource = fs.readFileSync(filterGroupsCssPath, 'utf8');
@@ -1456,11 +1460,17 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignMockup\.createController\(\{/);
   assert.match(pageSource, /ensureMockupForCustomer: function \(customerId, ensureOptions\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
-  assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false \};/);
+  assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null \};/);
   assert.match(pageSource, /function getCustomerSearchHaystack\(customer\)/);
   assert.match(pageSource, /databaseRenderRuntime\.activeAssetCache = new WeakMap\(\);/);
   assert.match(pageSource, /function scheduleRenderPage\(\)/);
+  assert.match(pageSource, /function scheduleSearchRender\(\)/);
+  assert.match(pageSource, /window\.setTimeout\(function \(\) \{[\s\S]*resetVisibleLimit\(\);[\s\S]*scheduleRenderPage\(\);[\s\S]*\}, 90\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
+  assert.match(coldmailGuardScriptSource, /function createGuardIndex\(entries\)/);
+  assert.match(coldmailGuardScriptSource, /function guardIndexMatchesCustomer\(index, guard\)/);
+  assert.match(coldmailGuardScriptSource, /entryIndex = createGuardIndex\(entries\);/);
+  assert.doesNotMatch(coldmailGuardScriptSource, /return entries\.some\(function \(entry\)/);
   assert.doesNotMatch(pageSource, /await webdesignMockupController\.ensureForCustomer\(context\.customerId\)/);
   assert.match(pageSource, /const initialBootstrapCustomers = resolveBootstrapCustomers\(\), databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
   assert.match(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
@@ -1512,7 +1522,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /deepSearchButton: document\.getElementById\("deepSearchButton"\), manualAddButton: document\.getElementById\("manualAddButton"\),/);
   assert.match(pageSource, /if \(!nodes\.addActions \|\| !nodes\.addButton\) return;/);
   assert.match(pageSource, /nodes\.modalCompany\.focus\(\);/);
-  assert.match(pageSource, /if \(nodes\.addActionsMenu\) nodes\.addActionsMenu\.addEventListener\("click", function \(event\) \{ const actionButton = event\.target\.closest\("\.add-actions-item"\); if \(!actionButton\) return; closeAddActions\(\); if \(actionButton === nodes\.manualAddButton\) \{ openModal\(\); return; \} if \(actionButton === nodes\.deepSearchButton\) databaseDeepSearchController\.open\(\); \}\);/);
+  assert.match(pageSource, /if \(nodes\.addActionsMenu\) nodes\.addActionsMenu\.addEventListener\("click", function \(event\) \{ const actionButton = event\.target\.closest\("\.add-actions-item"\); if \(!actionButton\) return; closeAddActions\(\); if \(actionButton === nodes\.manualAddButton\) \{ openModal\(\); return; \} if \(actionButton === nodes\.deepSearchButton\) void databaseDeepSearchController\.open\(\); \}\);/);
   assert.match(pageSource, /website: normalizeString\(nodes\.modalDomain\.value\) \|\| dom,/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
   assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
@@ -1541,7 +1551,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260612b"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260616a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
+  assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
+  assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
+  assert.match(deepSearchLoaderScriptSource, /function createController\(options\)/);
+  assert.match(deepSearchLoaderScriptSource, /function loadScriptOnce\(src\)/);
+  assert.match(deepSearchLoaderScriptSource, /loadScriptOnce\(scriptUrls\.deepSearchHelpers\)/);
+  assert.match(deepSearchLoaderScriptSource, /loadScriptOnce\(scriptUrls\.targetCoords\)/);
+  assert.match(deepSearchLoaderScriptSource, /loadScriptOnce\(scriptUrls\.deepSearch\)/);
+  assert.match(deepSearchLoaderScriptSource, /global\.SoftoraDatabaseDeepSearchLoader =/);
   assert.doesNotMatch(pageSource, /<input type="file" id="importFileInput"/);
   assert.doesNotMatch(pageSource, /<div class="database-import-actions" id="databaseImportActions" hidden>/);
   assert.doesNotMatch(pageSource, /<div class="database-import-drop-overlay" id="databaseImportDropOverlay" hidden aria-hidden="true">/);
@@ -1610,10 +1627,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /nodes\.addSyncButton\.addEventListener\("click"/);
   assert.doesNotMatch(pageSource, /addRealBusinessesButton: document\.getElementById\("addRealBusinessesButton"\)/);
   assert.match(pageSource, /realBusinessButton: null/);
-  assert.match(pageSource, /const databaseDeepSearchController = window\.SoftoraDatabaseDeepSearch\.createController\(\{/);
+  assert.match(pageSource, /const databaseDeepSearchController = window\.SoftoraDatabaseDeepSearchLoader\.createController\(\{/);
   assert.match(pageSource, /stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY/);
   assert.match(pageSource, /importRows: importCustomersFromRows/);
-  assert.match(pageSource, /databaseDeepSearchController\.bind\(\);/);
+  assert.match(deepSearchLoaderScriptSource, /controller\.bind\(\);/);
   assert.match(pageSource, /if \(nodes\.addActionsMenu\) nodes\.addActionsMenu\.addEventListener\("click"/);
   assert.match(pageSource, /databaseDeepSearchController\.open\(\);/);
   assert.match(deepSearchScriptSource, /function parseTargetLines\(raw\)/);
@@ -4148,8 +4165,8 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   const targetCoordsSource = fs.readFileSync(targetCoordsPath, 'utf8');
   const sorterSource = fs.readFileSync(sorterPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-database-target-coords\.js\?v=20260522a/);
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260522b/);
+  assert.match(pageSource, /targetCoords: "assets\/premium-database-target-coords\.js\?v=20260616a"/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260616a/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return \(state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly"\) \? outreachController\.sortByRecentOutreach\(customers, parseDateValue, normalizeSearchValue\) : \(customers \|\| \[\]\);/);
@@ -4162,8 +4179,11 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Oisterwijk'
   assert.match(sorterSource, /function resolveExternalCustomerCoords\(customer, text\)/);
   assert.match(sorterSource, /function resolveExternalTargetCoords\(parts\)/);
   assert.match(sorterSource, /source\.resolveTextCoords\(text, \{ province: province, municipality: municipality \}\)/);
+  assert.match(sorterSource, /const customerDistanceCache = new Map\(\);/);
+  assert.match(sorterSource, /const targetDistanceCache = new Map\(\);/);
   assert.match(targetCoordsSource, /function resolveTextCoords\(value, hints\)/);
   assert.match(targetCoordsSource, /placeEntries\.sort\(function \(left, right\)/);
+  assert.match(targetCoordsSource, /placePattern: buildNormalizedPhrasePattern\(place\)/);
   assert.match(sorterSource, /function compareCustomerSortEntries\(left, right\)/);
   assert.match(sorterSource, /\.map\(function \(customer, index\) \{/);
   assert.match(sorterSource, /\.sort\(compareCustomerSortEntries\)/);

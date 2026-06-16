@@ -71,7 +71,15 @@
       exact[province + "|" + municipality + "|" + place] = coords;
       addUnique(byProvincePlace, province + "|" + place, coords);
       addUnique(byPlace, place, coords);
-      placeEntries.push({ province: province, municipality: municipality, place: place, coords: coords });
+      placeEntries.push({
+        province: province,
+        municipality: municipality,
+        place: place,
+        coords: coords,
+        provincePattern: buildNormalizedPhrasePattern(province),
+        municipalityPattern: buildNormalizedPhrasePattern(municipality),
+        placePattern: buildNormalizedPhrasePattern(place)
+      });
     });
     placeEntries.sort(function (left, right) {
       return right.place.length - left.place.length;
@@ -84,12 +92,19 @@
     return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
+  function buildNormalizedPhrasePattern(value) {
+    const phrase = normalizeText(value);
+    if (!phrase) return null;
+    return new RegExp("(^|\\s)" + escapeRegExp(phrase).replace(/\s+/g, "\\s+") + "(\\s|$)");
+  }
+
+  function matchesNormalizedPhrase(normalizedText, pattern) {
+    return Boolean(normalizedText && pattern && pattern.test(normalizedText));
+  }
+
   function hasNormalizedPhrase(text, phrase) {
     const normalizedText = normalizeText(text);
-    const normalizedPhrase = normalizeText(phrase);
-    if (!normalizedText || !normalizedPhrase) return false;
-    const pattern = new RegExp("(^|\\s)" + escapeRegExp(normalizedPhrase).replace(/\s+/g, "\\s+") + "(\\s|$)");
-    return pattern.test(normalizedText);
+    return matchesNormalizedPhrase(normalizedText, buildNormalizedPhrasePattern(phrase));
   }
 
   function getTargetCoords(target) {
@@ -114,7 +129,7 @@
 
     for (let index = 0; index < maps.placeEntries.length; index += 1) {
       const entry = maps.placeEntries[index];
-      if (!hasNormalizedPhrase(text, entry.place)) continue;
+      if (!matchesNormalizedPhrase(text, entry.placePattern)) continue;
       if (province && entry.province !== province) continue;
       if (municipality && entry.municipality !== municipality) continue;
       if (province || municipality) return entry.coords;
@@ -122,15 +137,15 @@
 
     for (let index = 0; index < maps.placeEntries.length; index += 1) {
       const entry = maps.placeEntries[index];
-      if (!hasNormalizedPhrase(text, entry.place)) continue;
-      if (hasNormalizedPhrase(text, entry.province) || hasNormalizedPhrase(text, entry.municipality)) {
+      if (!matchesNormalizedPhrase(text, entry.placePattern)) continue;
+      if (matchesNormalizedPhrase(text, entry.provincePattern) || matchesNormalizedPhrase(text, entry.municipalityPattern)) {
         return entry.coords;
       }
     }
 
     for (let index = 0; index < maps.placeEntries.length; index += 1) {
       const entry = maps.placeEntries[index];
-      if (!hasNormalizedPhrase(text, entry.place)) continue;
+      if (!matchesNormalizedPhrase(text, entry.placePattern)) continue;
       const uniqueCoords = maps.byPlace[entry.place];
       if (uniqueCoords) return uniqueCoords;
     }

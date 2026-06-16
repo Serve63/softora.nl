@@ -153,6 +153,9 @@
   const PLACE_KEYS_BY_LENGTH = Object.keys(PLACE_COORDS).sort(function (left, right) {
     return right.length - left.length;
   });
+  const DISTANCE_CACHE_LIMIT = 12000;
+  const customerDistanceCache = new Map();
+  const targetDistanceCache = new Map();
 
   function normalizeText(value) {
     return String(value || "")
@@ -167,6 +170,16 @@
 
   function getCompanyName(customer) {
     return normalizeText(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam || customer.name));
+  }
+
+  function rememberCachedValue(cache, key, value) {
+    if (!key) return value;
+    if (cache.size >= DISTANCE_CACHE_LIMIT) {
+      const firstKey = cache.keys().next().value;
+      if (firstKey !== undefined) cache.delete(firstKey);
+    }
+    cache.set(key, value);
+    return value;
   }
 
   function haversineKm(left, right) {
@@ -242,11 +255,32 @@
     return resolvePostalCoords(text) || resolvePlaceCoords(text) || resolveExternalCustomerCoords(customer, text);
   }
 
+  function buildCustomerDistanceCacheKey(customer) {
+    if (!customer || typeof customer !== "object") return "";
+    const text = [
+      customer.stad,
+      customer.plaats,
+      customer.city,
+      customer.gemeente,
+      customer.adres,
+      customer.address,
+      customer.location,
+    ].filter(Boolean).join(" ");
+    return [
+      normalizeText(text),
+      normalizeText(firstCustomerValue(customer, ["provincie", "province", "regio", "region"])),
+      normalizeText(firstCustomerValue(customer, ["gemeente", "municipality"])),
+      normalizeText(firstCustomerValue(customer, ["plaats", "woonplaats", "city", "stad"]))
+    ].join("|");
+  }
+
   function getDistanceKm(customer) {
     const existing = Number(customer && (customer.distanceKm || customer.afstandKm));
     if (Number.isFinite(existing) && existing >= 0) return existing;
+    const cacheKey = buildCustomerDistanceCacheKey(customer);
+    if (cacheKey && customerDistanceCache.has(cacheKey)) return customerDistanceCache.get(cacheKey);
     const coords = resolveCustomerCoords(customer);
-    return coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity;
+    return rememberCachedValue(customerDistanceCache, cacheKey, coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity);
   }
 
   function compareCustomersByDistance(left, right) {
@@ -320,8 +354,10 @@
   }
 
   function getTargetDistanceKm(label) {
+    const cacheKey = normalizeText(label);
+    if (cacheKey && targetDistanceCache.has(cacheKey)) return targetDistanceCache.get(cacheKey);
     const coords = resolveTargetCoords(label);
-    return coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity;
+    return rememberCachedValue(targetDistanceCache, cacheKey, coords ? haversineKm(OISTERWIJK_COORDS, coords) : Infinity);
   }
 
   function compareTargetLabelsByDistance(left, right) {

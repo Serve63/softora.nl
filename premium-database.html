@@ -1494,7 +1494,8 @@
     <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606d"></script><script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-database-system-mail-count.js?v=20260612b"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260616a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260605a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
-    <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
+    <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
+    <script src="assets/premium-database-distance.js?v=20260616a"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -1511,6 +1512,7 @@
         const CUSTOMER_PHOTO_DATA_PREFIX = "softora_database_photo_data_v1_";
         const CUSTOMER_PHOTO_CHUNK_SIZE = 180000;
         const WEBSITE_PHOTO_COST_EUR = 0.005; const TABLE_PAGE_SIZE = 25;
+        const DATABASE_LAZY_SCRIPT_URLS = { deepSearchHelpers: "assets/premium-database-deep-search-helpers.js?v=20260521b", targetCoords: "assets/premium-database-target-coords.js?v=20260616a", deepSearch: "assets/premium-database-deep-search.js?v=20260521d" };
         const COLDMAIL_TEST_COMPANIES = ["mcv e-commerce", "softora testmodus"];
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
@@ -1544,7 +1546,7 @@
             lastPhotoHeaderCount: null,
             messageTimer: null
         };
-        const databaseRenderRuntime = { searchHaystackCache: new WeakMap(), activeAssetCache: null, scheduledRender: false };
+        const databaseRenderRuntime = { searchHaystackCache: new WeakMap(), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null };
 
         const nodes = {
             topSub: document.getElementById("top-sub"),
@@ -2260,6 +2262,7 @@
 
         function renderPage() { renderTable(); }
         function scheduleRenderPage() { if (databaseRenderRuntime.scheduledRender) return; databaseRenderRuntime.scheduledRender = true; const frame = typeof window.requestAnimationFrame === "function" ? window.requestAnimationFrame : function (callback) { window.setTimeout(callback, 0); }; frame(function () { databaseRenderRuntime.scheduledRender = false; renderPage(); }); }
+        function scheduleSearchRender() { if (databaseRenderRuntime.searchRenderTimer) window.clearTimeout(databaseRenderRuntime.searchRenderTimer); databaseRenderRuntime.searchRenderTimer = window.setTimeout(function () { databaseRenderRuntime.searchRenderTimer = null; resetVisibleLimit(); scheduleRenderPage(); }, 90); }
 
         function setStatus(status, button) { if (button && button.disabled) return;
             state.activeStatus = status;
@@ -2958,25 +2961,10 @@
             realBusinessButton: null
         });
         const availableImportController = window.SoftoraDatabaseAvailableImport.createController({ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage }); availableImportController.bind();
-        const databaseDeepSearchController = window.SoftoraDatabaseDeepSearch.createController({
-            nodes: nodes,
-            getUiState: fetchUiStateGetWithFallback,
-            setUiState: fetchUiStateSetWithFallback,
-            scope: CUSTOMER_DB_SCOPE,
-            stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY,
-            importRows: importCustomersFromRows,
-            recordApiCost: recordApiCostEvent,
-            getCustomers: function () {
-                return state.klanten;
-            },
-            setStatusMessage: setStatusMessage,
-            toast: toast
-        });
-
+        const databaseDeepSearchController = window.SoftoraDatabaseDeepSearchLoader.createController({ scriptUrls: DATABASE_LAZY_SCRIPT_URLS, nodes: nodes, getUiState: fetchUiStateGetWithFallback, setUiState: fetchUiStateSetWithFallback, scope: CUSTOMER_DB_SCOPE, stateKey: CUSTOMER_DB_DEEP_SEARCH_KEY, importRows: importCustomersFromRows, recordApiCost: recordApiCostEvent, getCustomers: function () { return state.klanten; }, setStatusMessage: setStatusMessage, toast: toast });
         if (nodes.query) nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
-            resetVisibleLimit();
-            scheduleRenderPage();
+            scheduleSearchRender();
         });
 
         nodes.statusButtons.forEach(function (button) { button.addEventListener("click", function () { setStatus(button.dataset.s || "alle", button); }); });
@@ -3059,8 +3047,8 @@
         nodes.generatePhotosButton.addEventListener("click", function () {
             photoBatchController.open();
         });
-        photoBatchController.bind(); databaseDeepSearchController.bind(); startCustomerStateAutoRefresh();
-        if (nodes.addActionsMenu) nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) databaseDeepSearchController.open(); });
+        photoBatchController.bind(); startCustomerStateAutoRefresh();
+        if (nodes.addActionsMenu) nodes.addActionsMenu.addEventListener("click", function (event) { const actionButton = event.target.closest(".add-actions-item"); if (!actionButton) return; closeAddActions(); if (actionButton === nodes.manualAddButton) { openModal(); return; } if (actionButton === nodes.deepSearchButton) void databaseDeepSearchController.open(); });
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
         nodes.modalBg.addEventListener("click", function (event) {

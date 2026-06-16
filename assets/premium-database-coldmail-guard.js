@@ -121,27 +121,55 @@
         return false;
     }
 
+    function createGuardIndex(entries) {
+        const index = {
+            recipientKeys: new Set(),
+            recipientEmails: new Set(),
+            recipientDomains: new Set(),
+            recipientIds: new Set()
+        };
+        (Array.isArray(entries) ? entries : []).forEach(function (entry) {
+            if (!entry) return;
+            if (entry.recipientKey) index.recipientKeys.add(entry.recipientKey);
+            if (entry.recipientEmail) index.recipientEmails.add(entry.recipientEmail);
+            if (entry.recipientDomain) index.recipientDomains.add(entry.recipientDomain);
+            if (entry.recipientId) index.recipientIds.add(entry.recipientId);
+        });
+        return index;
+    }
+
+    function guardIndexMatchesCustomer(index, guard) {
+        if (!index || !guard) return false;
+        if (guard.recipientKey && index.recipientKeys.has(guard.recipientKey)) return true;
+        if (guard.recipientEmail && index.recipientEmails.has(guard.recipientEmail)) return true;
+        if (guard.recipientId && index.recipientIds.has(guard.recipientId)) return true;
+        return (guard.recipientDomains || []).some(function (domain) {
+            return index.recipientDomains.has(domain);
+        });
+    }
+
     function createController(options) {
         const getUiState = options && options.getUiState;
         const scope = normalizeString(options && options.scope);
         const key = normalizeString(options && options.key);
         let entries = [];
+        let entryIndex = createGuardIndex(entries);
 
         async function load() {
             if (typeof getUiState !== "function" || !scope || !key) {
                 entries = [];
+                entryIndex = createGuardIndex(entries);
                 return entries;
             }
             const state = await getUiState(scope);
             entries = readGuardEntries(state && state.values, key);
+            entryIndex = createGuardIndex(entries);
             return entries;
         }
 
         function hasGuard(customer) {
             const guard = buildCustomerRecipientGuard(customer);
-            return entries.some(function (entry) {
-                return entryMatchesCustomer(entry, guard);
-            });
+            return guardIndexMatchesCustomer(entryIndex, guard);
         }
 
         return {
@@ -155,6 +183,8 @@
     global.SoftoraDatabaseColdmailGuard = {
         buildCustomerRecipientGuard: buildCustomerRecipientGuard,
         createController: createController,
+        createGuardIndex: createGuardIndex,
+        guardIndexMatchesCustomer: guardIndexMatchesCustomer,
         readGuardEntries: readGuardEntries
     };
 })(window);
