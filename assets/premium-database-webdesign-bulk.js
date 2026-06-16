@@ -20,13 +20,17 @@
         const value = fallbackNormalize(status).toLowerCase();
         return value === "queued" || value === "running";
     }
+    function isTerminalBatchStatus(status) {
+        const value = fallbackNormalize(status).toLowerCase();
+        return value === "done" || value === "error" || value === "cancelled";
+    }
     function getBatchSortTime(batch) { return Math.max(0, Number(batch && (batch.finishedAt || batch.startedAt || batch.createdAt)) || 0); }
 
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".webdesign-bulk-status{font-family:Inter,sans-serif;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:14px;max-width:700px;margin:0 48px 18px;color:#71717a;line-height:1.2}.webdesign-bulk-status[hidden]{display:none}.webdesign-bulk-title{font-size:13px;font-weight:500;color:#71717a;white-space:nowrap}.webdesign-bulk-num{font-size:13px;font-weight:600;color:#18181b;white-space:nowrap}.webdesign-bulk-track{flex:1;height:6px;border-radius:99px;background:#f4f4f5;overflow:hidden;min-width:84px}.webdesign-bulk-fill{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8B2252,#c4547a);width:0;transition:width 1.2s cubic-bezier(.22,1,.36,1)}.webdesign-bulk-rest{font-size:11px;color:#a1a1aa;white-space:nowrap}@media(max-width:860px){.webdesign-bulk-status{margin-left:20px;margin-right:20px;max-width:none;flex-wrap:wrap}.webdesign-bulk-track{flex-basis:100%;order:4}}";
+        style.textContent = ".webdesign-bulk-status{font-family:Inter,sans-serif;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:14px;max-width:760px;margin:0 48px 18px;color:#71717a;line-height:1.2}.webdesign-bulk-status[hidden]{display:none}.webdesign-bulk-title{font-size:13px;font-weight:500;color:#71717a;white-space:nowrap}.webdesign-bulk-num{font-size:13px;font-weight:600;color:#18181b;white-space:nowrap}.webdesign-bulk-track{flex:1;height:6px;border-radius:99px;background:#f4f4f5;overflow:hidden;min-width:84px}.webdesign-bulk-fill{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8B2252,#c4547a);width:0;transition:width 1.2s cubic-bezier(.22,1,.36,1)}.webdesign-bulk-rest{font-size:11px;color:#a1a1aa;white-space:nowrap}.webdesign-bulk-cancel{width:26px;height:26px;border:1px solid #ead5df;background:#fff7fb;color:#8B2252;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;line-height:1;cursor:pointer;transition:background .2s ease,border-color .2s ease,color .2s ease,transform .2s ease}.webdesign-bulk-cancel:hover{background:#8B2252;border-color:#8B2252;color:#fff;transform:translateY(-1px)}.webdesign-bulk-cancel:disabled{opacity:.45;cursor:default;transform:none}.webdesign-bulk-cancel[hidden]{display:none}@media(max-width:860px){.webdesign-bulk-status{margin-left:20px;margin-right:20px;max-width:none;flex-wrap:wrap}.webdesign-bulk-track{flex-basis:100%;order:4}.webdesign-bulk-cancel{margin-left:auto}}";
         global.document.head.appendChild(style);
     }
 
@@ -37,7 +41,7 @@
         const refreshPhotos = typeof options.refreshPhotos === "function" ? options.refreshPhotos : null;
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
-        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0;
+        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false;
         ensureStyles();
 
         function ensureStatusNode() {
@@ -57,12 +61,16 @@
         function ensureStatusParts(node) {
             if (!node) return null;
             if (!node.__softoraBulkParts) {
-                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\"></span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\"></span></span><span class=\"webdesign-bulk-rest\"></span>";
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\"></span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\"></span></span><span class=\"webdesign-bulk-rest\"></span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Rest annuleren\">&times;</button>";
                 node.__softoraBulkParts = {
                     num: node.querySelector ? node.querySelector(".webdesign-bulk-num") : null,
                     fill: node.querySelector ? node.querySelector(".webdesign-bulk-fill") : null,
-                    rest: node.querySelector ? node.querySelector(".webdesign-bulk-rest") : null
+                    rest: node.querySelector ? node.querySelector(".webdesign-bulk-rest") : null,
+                    cancel: node.querySelector ? node.querySelector(".webdesign-bulk-cancel") : null
                 };
+                if (node.__softoraBulkParts.cancel && typeof node.__softoraBulkParts.cancel.addEventListener === "function") {
+                    node.__softoraBulkParts.cancel.addEventListener("click", function () { void confirmAndCancelBatch(); });
+                }
             }
             return node.__softoraBulkParts;
         }
@@ -70,10 +78,13 @@
         function getStatusLine(batch) {
             const total = Math.max(0, Number(batch && batch.total) || 0);
             const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
-            const remaining = Math.max(0, total - made);
+            const failed = Math.max(0, Number(batch && batch.failed) || 0);
+            const cancelled = Math.max(0, Number(batch && batch.cancelled) || 0);
+            const remaining = Math.max(0, total - made - failed - cancelled);
+            const status = fallbackNormalize(batch && batch.status).toLowerCase();
             return {
                 num: formatNumber(made) + " / " + formatNumber(total),
-                rest: formatNumber(remaining) + " resterend"
+                rest: status === "cancelled" ? formatNumber(cancelled || Math.max(0, total - made - failed)) + " geannuleerd" : formatNumber(remaining) + " resterend"
             };
         }
 
@@ -86,13 +97,18 @@
             const visiblePct = total ? Math.max(pct, 0.12) : 0;
             const line = getStatusLine(batch);
             const parts = ensureStatusParts(node);
+            const status = fallbackNormalize(batch && batch.status).toLowerCase();
             node.hidden = false;
             if (!parts || !parts.num || !parts.fill || !parts.rest) {
-                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span>";
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Rest annuleren\"" + (isTerminalBatchStatus(status) ? " hidden" : "") + ">&times;</button>";
                 return;
             }
             if (parts && parts.num) parts.num.textContent = line.num;
             if (parts && parts.rest) parts.rest.textContent = line.rest;
+            if (parts && parts.cancel) {
+                parts.cancel.hidden = isTerminalBatchStatus(status);
+                parts.cancel.disabled = cancelInFlight;
+            }
             if (parts && parts.fill) {
                 const nextWidth = visiblePct + "%";
                 if (!parts.fill.style.width) {
@@ -105,6 +121,55 @@
                 } else {
                     parts.fill.style.width = nextWidth;
                 }
+            }
+        }
+
+        async function confirmCancelBatch() {
+            const message = "Weet je zeker dat je de resterende webdesigns wilt annuleren? Gemaakte webdesigns blijven staan.";
+            if (global.SoftoraDialogs && typeof global.SoftoraDialogs.confirm === "function") {
+                return global.SoftoraDialogs.confirm(message, {
+                    title: "Bulk annuleren",
+                    confirmText: "Rest annuleren",
+                    cancelText: "Terug"
+                });
+            }
+            return typeof global.confirm === "function" ? global.confirm(message) : false;
+        }
+
+        async function cancelActiveBatch() {
+            const id = normalizeString(activeBatchId);
+            if (!id || cancelInFlight || typeof fetch !== "function") return null;
+            cancelInFlight = true;
+            const node = ensureStatusNode();
+            const parts = node ? ensureStatusParts(node) : null;
+            if (parts && parts.cancel) parts.cancel.disabled = true;
+            try {
+                const response = await fetch(BATCH_ENDPOINT + "/" + encodeURIComponent(id) + "/cancel", {
+                    method: "POST",
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify({})
+                });
+                const payload = await readJson(response);
+                if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk annuleren is mislukt.");
+                handleBatch(payload.batch, "cancelled");
+                return payload.batch;
+            } finally {
+                cancelInFlight = false;
+                if (parts && parts.cancel) parts.cancel.disabled = false;
+            }
+        }
+
+        async function confirmAndCancelBatch() {
+            if (!(await confirmCancelBatch())) return null;
+            try {
+                return await cancelActiveBatch();
+            } catch (error) {
+                const message = error && error.message ? error.message : "Webdesign-bulk annuleren is mislukt.";
+                if (global.SoftoraDialogs && typeof global.SoftoraDialogs.alert === "function") await global.SoftoraDialogs.alert(message, { title: "Annuleren mislukt" });
+                else if (typeof global.alert === "function") global.alert(message);
+                return null;
             }
         }
 
@@ -161,9 +226,10 @@
             activeBatchId = batch.id;
             renderStatus(batch, phase);
             queuePhotoRefresh(batch);
-            if (status === "done" || status === "error") {
+            if (isTerminalBatchStatus(status)) {
                 if (pollTimer && typeof global.clearTimeout === "function") global.clearTimeout(pollTimer);
                 pollTimer = null;
+                activeBatchId = "";
                 return;
             }
             kickServerWorker();
@@ -237,7 +303,7 @@
             return sorted.find(function (item) { return item && item.id && isActiveBatchStatus(item.status); }) || sorted.find(function (item) {
                 const status = normalizeString(item && item.status).toLowerCase();
                 const sortTime = getBatchSortTime(item);
-                return item && item.id && (status === "done" || status === "error") && sortTime && Date.now() - sortTime <= RESTORE_DONE_BATCH_WINDOW_MS;
+                return item && item.id && (status === "done" || status === "error" || status === "cancelled") && sortTime && Date.now() - sortTime <= RESTORE_DONE_BATCH_WINDOW_MS;
             }) || null;
         }
 
@@ -257,7 +323,7 @@
             }
         }
 
-        return { loadLatestBatch: loadLatestBatch, startBulkBatchForCustomers: startBulkBatchForCustomers };
+        return { cancelActiveBatch: cancelActiveBatch, loadLatestBatch: loadLatestBatch, startBulkBatchForCustomers: startBulkBatchForCustomers };
     }
 
     global.SoftoraDatabaseWebdesignBulk = { createController: createController };

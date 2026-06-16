@@ -53,6 +53,9 @@ function registerPremiumDatabaseWebdesignJobRoutes(app, deps = {}) {
   app.post('/api/premium-database/webdesign-photo-batches/:batchId/commit', (req, res) =>
     coordinator.commitBatchResponse(req, res)
   );
+  app.post('/api/premium-database/webdesign-photo-batches/:batchId/cancel', requirePremiumApiAccess, (req, res) =>
+    coordinator.cancelBatchResponse(req, res)
+  );
   app.get('/api/premium-database/webdesign-photo-batches/:batchId', (req, res) =>
     coordinator.getBatchResponse(req, res)
   );

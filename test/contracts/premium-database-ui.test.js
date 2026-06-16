@@ -1543,6 +1543,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-track\\"/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-fill\\"/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-rest\\"/);
+  assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-cancel\\"/);
+  assert.match(webdesignBulkScriptSource, /title=\\"Rest annuleren\\"/);
+  assert.match(webdesignBulkScriptSource, /SoftoraDialogs\.confirm/);
+  assert.match(webdesignBulkScriptSource, /BATCH_ENDPOINT \+ "\/" \+ encodeURIComponent\(id\) \+ "\/cancel"/);
+  assert.match(webdesignBulkScriptSource, /cancelActiveBatch: cancelActiveBatch/);
   assert.match(webdesignBulkScriptSource, /linear-gradient\(90deg,#8B2252,#c4547a\)/);
   assert.doesNotMatch(webdesignBulkScriptSource, /bezig/);
   assert.match(webdesignActionScriptSource, /const BATCH_START_CONCURRENCY = 4;/);
@@ -1564,7 +1569,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616f/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616g/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
   assert.match(webdesignBulkScriptSource, /const WORKER_KICK_INTERVAL_MS = 8000;/);
@@ -2417,6 +2422,27 @@ test('premium database webdesign bulk restores the progress bar from the running
           json: async () => ({ ok: true, batchCount: 1, processedJobs: 3 }),
         };
       }
+      if (String(url || '') === '/api/premium-database/webdesign-photo-batches/webdesign_batch_live/cancel') {
+        assert.equal(options.method, 'POST');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            cancelled: true,
+            batch: {
+              id: 'webdesign_batch_live',
+              status: 'cancelled',
+              total: 2562,
+              made: 500,
+              done: 500,
+              cancelled: 2062,
+              remaining: 0,
+              finishedAt: Date.now(),
+            },
+          }),
+        };
+      }
       if (String(url || '').includes('/webdesign-photo-jobs/')) {
         return {
           ok: true,
@@ -2468,6 +2494,12 @@ test('premium database webdesign bulk restores the progress bar from the running
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/run'));
   assert.equal(requests.some((url) => String(url).includes('/webdesign-photo-jobs/job_live_')), false);
   assert.ok(timers.some((timer) => Number(timer.delay) === 0), 'restored bulk batch should poll immediately');
+
+  const cancelled = await controller.cancelActiveBatch();
+  assert.equal(cancelled.status, 'cancelled');
+  assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/webdesign_batch_live/cancel'));
+  assert.match(statusNode.innerHTML, /2\.062 geannuleerd/);
+  assert.match(statusNode.innerHTML, /webdesign-bulk-cancel[\s\S]*hidden/);
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {
