@@ -11,6 +11,9 @@
     var forePick = document.getElementById("wordForeColor");
     var hilitePick = document.getElementById("wordHiliteColor");
     var saveTimer = 0;
+    var reconnectTimer = 0;
+    var reconnectDelayMs = 1600;
+    var reconnectRunning = false;
     var remoteLoadComplete = false;
     var remoteLoadFailed = false;
     var isDirty = false;
@@ -233,6 +236,10 @@
         return sanitizeWordHtml(html).replace(/\s+/g, " ").trim();
     }
 
+    function getCurrentEditorHtml() {
+        return sanitizeWordHtml(editor.innerHTML);
+    }
+
     function mergeLocalDraftIntoBackups(backups) {
         var safeBackups = Array.isArray(backups) ? backups.slice() : [];
         var localDraftBackup = buildLocalDraftBackup();
@@ -266,6 +273,70 @@
         );
         if (restoredLocalDraft) editor.innerHTML = sanitizeWordHtml(localDraft.html);
         setWordStatus(getLoadFailureMessage(error, restoredLocalDraft), "warning");
+    }
+
+    function resetReconnectDelay() {
+        reconnectDelayMs = 1600;
+    }
+
+    function scheduleReconnect() {
+        if (reconnectTimer) return;
+        reconnectTimer = window.setTimeout(function () {
+            reconnectTimer = 0;
+            void retryOnlineConnection();
+        }, reconnectDelayMs);
+        reconnectDelayMs = Math.min(reconnectDelayMs * 2, 12000);
+    }
+
+    async function retryOnlineConnection() {
+        if (reconnectRunning) return;
+        reconnectRunning = true;
+        try {
+            var state = await getUiStateClient().get(REMOTE_SCOPE);
+            var remoteHtml = sanitizeWordHtml(String(state && state.values && state.values[REMOTE_KEY] || ""));
+            var localDraft = readLocalDraft();
+            var localHtml = localDraft && localDraft.html ? sanitizeWordHtml(localDraft.html) : "";
+            var currentHtml = getCurrentEditorHtml();
+            var hasUnsavedLocalText = Boolean(
+                isDirty ||
+                (localHtml && currentHtml && getSanitizedCompareHtml(currentHtml) !== getSanitizedCompareHtml(remoteHtml))
+            );
+
+            editor.setAttribute("contenteditable", "true");
+            refreshBackupsFromState(state);
+            remoteLoadComplete = true;
+            remoteLoadFailed = false;
+            resetReconnectDelay();
+
+            if (hasUnsavedLocalText) {
+                editor.innerHTML = currentHtml;
+                isDirty = true;
+                setWordStatus("Online opslag hersteld. Je tekst wordt nu opgeslagen.", "warning");
+                await save();
+                return;
+            }
+
+            if (remoteHtml) {
+                editor.innerHTML = remoteHtml;
+                clearLocalDraft();
+                isDirty = false;
+            } else if (localHtml) {
+                editor.innerHTML = localHtml;
+                isDirty = true;
+                setWordStatus("Online opslag hersteld. Lokale hersteltekst wordt nu opgeslagen.", "warning");
+                await save();
+                return;
+            }
+
+            setWordStatus("", "");
+        } catch (error) {
+            remoteLoadComplete = false;
+            remoteLoadFailed = true;
+            scheduleReconnect();
+            console.error("Word-document opnieuw verbinden mislukt:", error);
+        } finally {
+            reconnectRunning = false;
+        }
     }
 
     async function restoreLatestBackup() {
@@ -353,6 +424,7 @@
             wordBackups = [];
             updateRestoreBackupButton();
             enableLocalFallback(error);
+            scheduleReconnect();
             console.error("Word-document laden mislukt:", error);
         }
     }
@@ -377,9 +449,10 @@
             remoteLoadFailed = true;
             persistLocalDraft();
             setWordStatus(
-                "Online opslaan lukt nu niet. Je tekst blijft in dit tabblad staan; vernieuw of log opnieuw in om te synchroniseren.",
+                "Online opslaan lukt nu niet. Je tekst blijft in dit tabblad staan; we proberen automatisch opnieuw te verbinden.",
                 "warning"
             );
+            scheduleReconnect();
             console.error("Word-document opslaan mislukt:", error);
         }
     }
@@ -387,7 +460,10 @@
     function queueSave() {
         isDirty = true;
         persistLocalDraft();
-        if (!remoteLoadComplete || remoteLoadFailed) return;
+        if (!remoteLoadComplete || remoteLoadFailed) {
+            scheduleReconnect();
+            return;
+        }
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(function () {
             void save();

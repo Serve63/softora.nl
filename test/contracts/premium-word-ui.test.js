@@ -18,7 +18,7 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(pageSource, /id="wordRestoreBackup"/);
   assert.match(pageSource, /id="wordStatus"/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260605a/);
-  assert.match(pageSource, /assets\/premium-word\.js\?v=20260609a/);
+  assert.match(pageSource, /assets\/premium-word\.js\?v=20260616a/);
   assert.doesNotMatch(pageSource, /REMOTE_SCOPE|softora_premium_word_html_v1|fetchUiStateGet|editor\.innerHTML/);
   assert.match(scriptSource, /REMOTE_SCOPE = "premium_word"/);
   assert.match(scriptSource, /BACKUP_KEY = "softora_premium_word_html_backups_v1"/);
@@ -32,6 +32,8 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(scriptSource, /function restoreLatestBackup\(\)/);
   assert.match(scriptSource, /refreshBackupsFromState\(state\)/);
   assert.match(scriptSource, /function enableLocalFallback\(error\)/);
+  assert.match(scriptSource, /function scheduleReconnect\(\)/);
+  assert.match(scriptSource, /function retryOnlineConnection\(\)/);
   assert.match(scriptSource, /function persistLocalDraft\(\)/);
   assert.match(scriptSource, /function setWordStatus\(message, type\)/);
   assert.match(scriptSource, /function closestElement\(target, selector\)/);
@@ -49,7 +51,10 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(scriptSource, /if \(!remoteLoadComplete \|\| remoteLoadFailed \|\| !isDirty\) return;/);
   assert.doesNotMatch(scriptSource, /editor\.setAttribute\("contenteditable", "false"\)/);
   assert.match(scriptSource, /editor\.setAttribute\("contenteditable", "true"\)/);
-  assert.match(scriptSource, /persistLocalDraft\(\);[\s\S]*if \(!remoteLoadComplete \|\| remoteLoadFailed\) return;/);
+  assert.match(scriptSource, /persistLocalDraft\(\);[\s\S]*if \(!remoteLoadComplete \|\| remoteLoadFailed\) \{[\s\S]*scheduleReconnect\(\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(scriptSource, /scheduleReconnect\(\);[\s\S]*Word-document laden mislukt/);
+  assert.match(scriptSource, /scheduleReconnect\(\);[\s\S]*Word-document opslaan mislukt/);
+  assert.match(scriptSource, /Online opslag hersteld\. Je tekst wordt nu opgeslagen\./);
   assert.match(scriptSource, /if \(isDirty\) void save\(\);/);
   assert.match(pageSource, /\.word-page\s*\{/);
   assert.match(pageSource, /\.word-ribbon\s*\{/);
