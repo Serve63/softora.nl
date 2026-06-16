@@ -1547,6 +1547,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function serializeBatch(batch, chunks) {
     const summary = summarizeBatchChunks(batch, chunks);
+    const activeJobIds = collectActiveBatchJobIds(chunks);
     return {
       id: batch.id,
       status: batch.status,
@@ -1564,11 +1565,31 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       completed: summary.completed,
       remaining: summary.remaining,
       nextAttemptAt: summary.nextAttemptAt,
+      activeJobIds,
+      activeJobCount: activeJobIds.length,
       lastError: truncateText(normalizeString(batch.lastError || batch.error || ''), 500),
       createdAt: batch.createdAt || null,
       startedAt: batch.startedAt || null,
       finishedAt: batch.finishedAt || null,
     };
+  }
+
+  function collectActiveBatchJobIds(chunks) {
+    const ids = [];
+    const seen = new Set();
+    for (const chunk of Array.isArray(chunks) ? chunks : []) {
+      for (const target of Array.isArray(chunk && chunk.targets) ? chunk.targets : []) {
+        const status = normalizeString(target && target.status).toLowerCase();
+        const jobId = normalizeJobId(target && target.jobId);
+        if ((status !== 'queued' && status !== 'running') || !jobId || seen.has(jobId)) continue;
+        const nextAttemptAt = Math.max(0, Number(target && target.nextAttemptAt) || 0);
+        if (status === 'queued' && nextAttemptAt && nextAttemptAt > now()) continue;
+        seen.add(jobId);
+        ids.push(jobId);
+        if (ids.length >= BULK_ACTIVE_JOB_LIMIT) return ids;
+      }
+    }
+    return ids;
   }
 
   function markTarget(target, status, patch = {}) {
@@ -1587,7 +1608,6 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function reconcileBatchJobs(chunks) {
     const changed = new Set();
-    let reconciled = 0;
     for (const chunk of chunks) {
       for (const target of chunk.targets || []) {
         const status = normalizeString(target.status).toLowerCase();
@@ -1604,10 +1624,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           continue;
         }
         jobs.set(job.id, job);
-        if (processJobsInline && (job.status === 'queued' || job.status === 'running') && reconciled < BULK_RECONCILE_LIMIT) {
-          await processJobForStatusRequest(job);
-          reconciled += 1;
-        } else if (!processJobsInline && job.status === 'queued') {
+        if (!processJobsInline && job.status === 'queued') {
           queueProcessing();
         }
         if (job.status === 'done') {
