@@ -768,6 +768,8 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /notifyAutopilotStatus\(state\)/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/status/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/settings/);
+  assert.match(autopilotSource, /"X-Softora-Requested-With": "premium"/);
+  assert.match(autopilotSource, /Object\.assign\(\{\s*Accept: "application\/json"/);
   assert.match(autopilotSource, /const senderEmails = getSenderEmails\(\)/);
   assert.match(autopilotSource, /senderProfiles: buildSenderProfiles\(payload, senderEmails\)/);
   assert.match(autopilotSource, /function getStoredSenderProfiles\(\)/);

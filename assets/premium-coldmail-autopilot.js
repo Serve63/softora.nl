@@ -332,11 +332,15 @@
   }
 
   async function json(url, options) {
-    const response = await fetch(url, Object.assign({
+    const requestOptions = options || {};
+    const response = await fetch(url, Object.assign({}, requestOptions, {
       credentials: "same-origin",
-      headers: { Accept: "application/json" },
-      cache: options && options.method && options.method !== "GET" ? "no-store" : "default",
-    }, options || {}));
+      headers: Object.assign({
+        Accept: "application/json",
+        "X-Softora-Requested-With": "premium",
+      }, requestOptions.headers || {}),
+      cache: requestOptions.method && requestOptions.method !== "GET" ? "no-store" : "default",
+    }));
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload || payload.ok === false) {
       throw new Error(payload && (payload.message || payload.error) || "Autopilot verzoek mislukt.");
