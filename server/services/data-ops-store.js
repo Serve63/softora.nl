@@ -33,6 +33,7 @@ const SIGNED_URL_CACHE_MIN_FRESH_MS = 60 * 1000;
 const DESIGN_PHOTO_SIGNED_URL_PAGE_SIZE = 500;
 const DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT = 1500;
 const DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT = 25000;
+const OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE = 100;
 const DEFAULT_READ_QUERY_TIMEOUT_MS = 6000;
 const DEFAULT_WRITE_QUERY_TIMEOUT_MS = 10000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
@@ -683,8 +684,8 @@ function createSoftoraDataOpsStore(deps = {}) {
   async function readExistingOutboundGuardKeys(guardKeys) {
     const keys = Array.from(new Set((Array.isArray(guardKeys) ? guardKeys : []).map(normalizeString).filter(Boolean)));
     const existing = new Set();
-    for (let index = 0; index < keys.length; index += 500) {
-      const keyChunk = keys.slice(index, index + 500);
+    for (let index = 0; index < keys.length; index += OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE) {
+      const keyChunk = keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE);
       const result = await run(
         'list-existing-sent-outbound-recipient-guards',
         (client) => client.from(TABLES.outboundRecipientGuards).select('guard_key').in('guard_key', keyChunk),
@@ -1652,8 +1653,8 @@ function createSoftoraDataOpsStore(deps = {}) {
     ));
     if (!keys.length) return [];
     const found = new Set();
-    for (let index = 0; index < keys.length; index += 500) {
-      const keyChunk = keys.slice(index, index + 500);
+    for (let index = 0; index < keys.length; index += OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE) {
+      const keyChunk = keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE);
       const result = await run('list-outbound-recipient-guard-keys', (client) =>
         client
           .from(TABLES.outboundRecipientGuards)
