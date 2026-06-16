@@ -1530,9 +1530,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /async function generateBatchForCustomers\(customers, batchOptions\)/);
   assert.match(webdesignActionScriptSource, /SoftoraDatabaseWebdesignBulk/);
   assert.match(webdesignBulkScriptSource, /const BATCH_ENDPOINT = "\/api\/premium-database\/webdesign-photo-batches";/);
+  assert.match(webdesignBulkScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
+  assert.match(webdesignBulkScriptSource, /const ACTIVE_JOB_PUMP_LIMIT = 3;/);
   assert.match(webdesignBulkScriptSource, /async function startBulkBatchForCustomers\(customers\)/);
   assert.match(webdesignBulkScriptSource, /RESTORE_DONE_BATCH_WINDOW_MS = 15 \* 60 \* 1000/);
   assert.match(webdesignBulkScriptSource, /function pickRestorableBatch\(batches\)/);
+  assert.match(webdesignBulkScriptSource, /function pumpBatchJobs\(batch\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_UPLOAD_CHUNK_SIZE = 100;/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-title\\">Webdesigns/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-num\\"/);
@@ -1540,7 +1543,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-fill\\"/);
   assert.match(webdesignBulkScriptSource, /class=\\"webdesign-bulk-rest\\"/);
   assert.match(webdesignBulkScriptSource, /linear-gradient\(90deg,#8B2252,#c4547a\)/);
-  assert.match(webdesignBulkScriptSource, /formatNumber\(remaining\) \+ " resterend"/);
+  assert.match(webdesignBulkScriptSource, /formatNumber\(active\) \+ " bezig · " : ""/);
   assert.match(webdesignActionScriptSource, /const BATCH_START_CONCURRENCY = 4;/);
   assert.match(webdesignActionScriptSource, /const BATCH_RENDER_INTERVAL = 20;/);
   assert.match(webdesignActionScriptSource, /const BATCH_POLL_STAGGER_MS = 180;/);
@@ -1560,7 +1563,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
@@ -2403,6 +2406,13 @@ test('premium database webdesign bulk restores the progress bar from the running
     },
     fetch: async (url) => {
       requests.push(String(url));
+      if (String(url || '').includes('/webdesign-photo-jobs/')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ job: { id: String(url).split('/').pop(), status: 'done' } }),
+        };
+      }
       return {
         ok: true,
         status: 200,
@@ -2414,6 +2424,8 @@ test('premium database webdesign bulk restores the progress bar from the running
               total: 2562,
               made: 500,
               done: 500,
+              active: 2,
+              activeJobIds: ['job_live_1', 'job_live_2'],
               createdAt: Date.now(),
             },
           ],
@@ -2430,15 +2442,19 @@ test('premium database webdesign bulk restores the progress bar from the running
   });
 
   const batch = await controller.loadLatestBatch();
+  await Promise.resolve();
+  await Promise.resolve();
 
   const statusNode = nodes.get('webdesignBulkStatus');
   assert.equal(batch.id, 'webdesign_batch_live');
   assert.equal(statusNode.hidden, false);
   assert.match(statusNode.innerHTML, /class="webdesign-bulk-title">Webdesigns/);
   assert.match(statusNode.innerHTML, /500 \/ 2\.562/);
-  assert.match(statusNode.innerHTML, /2\.062 resterend/);
+  assert.match(statusNode.innerHTML, /2 bezig · 2\.062 resterend/);
   assert.match(statusNode.innerHTML, /class="webdesign-bulk-fill" style="width:20%"/);
   assert.equal(requests[0], '/api/premium-database/webdesign-photo-batches');
+  assert.ok(requests.includes('/api/premium-database/webdesign-photo-jobs/job_live_1'));
+  assert.ok(requests.includes('/api/premium-database/webdesign-photo-jobs/job_live_2'));
   assert.ok(timers.some((timer) => Number(timer.delay) === 0), 'restored bulk batch should poll immediately');
 });
 

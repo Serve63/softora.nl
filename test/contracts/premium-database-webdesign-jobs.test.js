@@ -526,10 +526,16 @@ test('premium database webdesign bulk batches process targets through a persiste
   assert.equal(commitRes.statusCode, 202);
   assert.equal(commitRes.body.batch.total, 5);
   assert.ok(commitRes.body.batch.queued <= 2);
+  assert.ok(commitRes.body.batch.activeJobIds.length <= 2);
   assert.equal(pipelineCalls.length, 0);
 
   let latest = commitRes.body.batch;
   for (let attempt = 0; attempt < 20 && latest.status !== 'done'; attempt += 1) {
+    for (const jobId of latest.activeJobIds || []) {
+      const jobRes = createResponseRecorder();
+      await coordinator.getJobResponse({ premiumAuth: auth, params: { jobId } }, jobRes);
+      assert.equal(jobRes.statusCode, 200);
+    }
     const statusRes = createResponseRecorder();
     await coordinator.getBatchResponse({ premiumAuth: auth, params: { batchId } }, statusRes);
     assert.equal(statusRes.statusCode, 200);
@@ -540,6 +546,56 @@ test('premium database webdesign bulk batches process targets through a persiste
   assert.equal(latest.made, 5);
   assert.equal(latest.failed, 0);
   assert.equal(pipelineCalls.length, 5);
+});
+
+test('premium database webdesign bulk status returns active jobs without blocking on image generation', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let pipelineCalls = 0;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    bulkActiveJobLimit: 2,
+    bulkStartLimit: 2,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 2 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  const chunkRes = createResponseRecorder();
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        targets: [
+          { websiteUrl: 'https://bedrijf-1.test', customer: { id: 'customer-1', bedrijf: 'Bedrijf 1' } },
+          { websiteUrl: 'https://bedrijf-2.test', customer: { id: 'customer-2', bedrijf: 'Bedrijf 2' } },
+        ],
+      },
+    },
+    chunkRes
+  );
+  const commitRes = createResponseRecorder();
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 2, expectedChunks: 1 } }, commitRes);
+
+  const statusRes = createResponseRecorder();
+  await coordinator.getBatchResponse({ premiumAuth: auth, params: { batchId } }, statusRes);
+
+  assert.equal(statusRes.statusCode, 200);
+  assert.equal(statusRes.body.batch.made, 0);
+  assert.equal(statusRes.body.batch.active, 2);
+  assert.equal(statusRes.body.batch.activeJobIds.length, 2);
+  assert.equal(pipelineCalls, 0);
 });
 
 test('premium database webdesign jobs refuse queued success when persistent job storage fails', async () => {

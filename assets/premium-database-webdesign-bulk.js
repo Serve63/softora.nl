@@ -2,6 +2,8 @@
     "use strict";
 
     const BATCH_ENDPOINT = "/api/premium-database/webdesign-photo-batches";
+    const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
+    const ACTIVE_JOB_PUMP_LIMIT = 3;
     const BULK_POLL_INTERVAL_MS = 2600;
     const BULK_UPLOAD_CHUNK_SIZE = 100;
     const RESTORE_DONE_BATCH_WINDOW_MS = 15 * 60 * 1000;
@@ -35,7 +37,8 @@
         const refreshPhotos = typeof options.refreshPhotos === "function" ? options.refreshPhotos : null;
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
-        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false;
+        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, activeJobPumpCount = 0;
+        const activeJobPumpIds = new Set();
         ensureStyles();
 
         function ensureStatusNode() {
@@ -55,10 +58,11 @@
         function getStatusLine(batch) {
             const total = Math.max(0, Number(batch && batch.total) || 0);
             const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
+            const active = Math.max(0, Number(batch && batch.active) || 0, Array.isArray(batch && batch.activeJobIds) ? batch.activeJobIds.length : 0);
             const remaining = Math.max(0, total - made);
             return {
                 num: formatNumber(made) + " / " + formatNumber(total),
-                rest: formatNumber(remaining) + " resterend"
+                rest: (active ? formatNumber(active) + " bezig · " : "") + formatNumber(remaining) + " resterend"
             };
         }
 
@@ -101,6 +105,28 @@
             }, delayMs);
         }
 
+        function getBatchActiveJobIds(batch) {
+            return (Array.isArray(batch && batch.activeJobIds) ? batch.activeJobIds : []).map(normalizeString).filter(Boolean);
+        }
+
+        function pumpBatchJobs(batch) {
+            if (typeof fetch !== "function") return;
+            getBatchActiveJobIds(batch).some(function (jobId) {
+                if (activeJobPumpCount >= ACTIVE_JOB_PUMP_LIMIT) return true;
+                if (activeJobPumpIds.has(jobId)) return false;
+                activeJobPumpIds.add(jobId);
+                activeJobPumpCount += 1;
+                fetch(JOB_ENDPOINT + "/" + encodeURIComponent(jobId), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
+                    .catch(function () {})
+                    .finally(function () {
+                        activeJobPumpIds.delete(jobId);
+                        activeJobPumpCount = Math.max(0, activeJobPumpCount - 1);
+                        schedulePoll(0);
+                    });
+                return false;
+            });
+        }
+
         function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
             const status = normalizeString(batch.status).toLowerCase();
@@ -112,6 +138,7 @@
                 pollTimer = null;
                 return;
             }
+            pumpBatchJobs(batch);
             schedulePoll(options && options.immediate ? 0 : BULK_POLL_INTERVAL_MS);
         }
 
