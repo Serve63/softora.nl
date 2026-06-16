@@ -859,6 +859,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const photoBatchScriptPath = path.join(__dirname, '../../assets/premium-database-photo-batch.js');
   const webdesignAssetStateScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
   const coldmailGuardScriptPath = path.join(__dirname, '../../assets/premium-database-coldmail-guard.js');
+  const webdesignBulkScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-bulk.js');
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const webdesignPreviewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
   const leadDeleteScriptPath = path.join(__dirname, '../../assets/premium-database-lead-delete.js');
@@ -878,6 +879,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
   const webdesignAssetStateScriptSource = fs.readFileSync(webdesignAssetStateScriptPath, 'utf8');
   const coldmailGuardScriptSource = fs.readFileSync(coldmailGuardScriptPath, 'utf8');
+  const webdesignBulkScriptSource = fs.readFileSync(webdesignBulkScriptPath, 'utf8');
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const webdesignPreviewScriptSource = fs.readFileSync(webdesignPreviewScriptPath, 'utf8');
   const leadDeleteScriptSource = fs.readFileSync(leadDeleteScriptPath, 'utf8');
@@ -1118,7 +1120,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
   assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
@@ -1348,7 +1350,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1425,9 +1427,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(photoBatchScriptSource, /void generate\(selection\.limit, \{ silentProgress: true \}\);/);
   assert.match(pageSource, /function generateWebdesignPhotos\(limit, options\)/);
   assert.match(pageSource, /const progressSilent = Boolean\(options && options\.silentProgress\);/);
-  assert.match(pageSource, /function formatBatchProgressMessage\(progress\)/);
-  assert.match(pageSource, /webdesignActionController\.generateBatchForCustomers\(targets, \{/);
+  assert.doesNotMatch(pageSource, /function formatBatchProgressMessage\(progress\)/);
+  assert.match(pageSource, /webdesignActionController\.startBulkBatchForCustomers\(targets\)/);
   assert.match(webdesignActionScriptSource, /async function generateBatchForCustomers\(customers, batchOptions\)/);
+  assert.match(webdesignActionScriptSource, /SoftoraDatabaseWebdesignBulk/);
+  assert.match(webdesignBulkScriptSource, /const BATCH_ENDPOINT = "\/api\/premium-database\/webdesign-photo-batches";/);
+  assert.match(webdesignBulkScriptSource, /async function startBulkBatchForCustomers\(customers\)/);
+  assert.match(webdesignBulkScriptSource, /const BULK_UPLOAD_CHUNK_SIZE = 100;/);
+  assert.match(webdesignBulkScriptSource, /Webdesigns gemaakt: /);
   assert.match(webdesignActionScriptSource, /const BATCH_START_CONCURRENCY = 4;/);
   assert.match(webdesignActionScriptSource, /const BATCH_RENDER_INTERVAL = 20;/);
   assert.match(webdesignActionScriptSource, /const BATCH_POLL_STAGGER_MS = 180;/);
@@ -1440,12 +1447,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /AI-foto maken voor " \+ target\.bedrijf/);
   assert.match(pageSource, /const photoResult = await persistCustomerPhotos\(state\.klanten, \{ onlyCustomerIds: \[customerId\] \}\);/);
   assert.doesNotMatch(pageSource, /onlyCustomerIds: \[target\.id\]/);
-  assert.match(pageSource, /setStatusMessage\("Webdesign-batch wordt voorbereid\.\.\.", "info"\);[\s\S]*generateBatchForCustomers\(targets/);
+  assert.match(pageSource, /setStatusMessage\("Webdesign-bulk wordt klaargezet\.\.\.", "info"\);[\s\S]*startBulkBatchForCustomers\(targets\)/);
   assert.doesNotMatch(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.addEventListener\("click"/);
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616b/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);

@@ -12,6 +12,9 @@ const {
   isSuspectWebdesignMockupRenderer,
   trimUniformWebdesignSideGuttersDataUrl,
 } = require('../../server/services/premium-database-webdesign-jobs');
+const {
+  registerPremiumDatabaseWebdesignJobRoutes,
+} = require('../../server/routes/premium-database-webdesign-jobs');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -101,6 +104,26 @@ test('premium database webdesign jobs keep Vercel sharp linux installs explicit'
   });
 });
 
+test('premium database webdesign job routes expose persistent bulk endpoints', () => {
+  const routes = [];
+  const app = {
+    post(pathname) { routes.push(['POST', pathname]); },
+    get(pathname) { routes.push(['GET', pathname]); },
+  };
+  registerPremiumDatabaseWebdesignJobRoutes(app, { coordinator: {} });
+
+  assert.deepEqual(routes, [
+    ['POST', '/api/premium-database/webdesign-photo-jobs'],
+    ['GET', '/api/premium-database/webdesign-photo-jobs'],
+    ['GET', '/api/premium-database/webdesign-photo-jobs/:jobId'],
+    ['POST', '/api/premium-database/webdesign-photo-batches'],
+    ['GET', '/api/premium-database/webdesign-photo-batches'],
+    ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/chunks'],
+    ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/commit'],
+    ['GET', '/api/premium-database/webdesign-photo-batches/:batchId'],
+  ]);
+});
+
 test('premium database server mockup renderer matches the browser layout without fragile text labels', async () => {
   const spec = getDeviceMockupRendererSpec();
   const laptop = spec.devices.find((device) => device.id === 'laptop');
@@ -183,6 +206,68 @@ async function waitForJobDone(coordinator, jobId) {
     await wait(20);
   }
   return coordinator._jobs.get(jobId);
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function createInMemoryWebdesignBatchStore() {
+  const jobs = new Map();
+  const batches = new Map();
+  const chunks = new Map();
+  function clone(value) {
+    return value ? cloneJson(value) : value;
+  }
+  return {
+    jobs,
+    batches,
+    chunks,
+    async upsertWebdesignJob(job) {
+      jobs.set(job.id, clone(job));
+      return { ok: true };
+    },
+    async getWebdesignJob(jobId) {
+      return clone(jobs.get(jobId) || null);
+    },
+    async findRunningWebdesignJob(ownerKey, customerId) {
+      for (const job of jobs.values()) {
+        if (job.ownerKey === ownerKey && job.customer?.id === customerId && ['queued', 'running'].includes(job.status)) {
+          return clone(job);
+        }
+      }
+      return null;
+    },
+    async listVisibleWebdesignJobs(ownerKey) {
+      return Array.from(jobs.values())
+        .filter((job) => job.ownerKey === ownerKey && ['queued', 'running'].includes(job.status))
+        .map(clone);
+    },
+    async upsertWebdesignBatch(batch) {
+      batches.set(batch.id, clone(batch));
+      return { ok: true };
+    },
+    async getWebdesignBatch(ownerKey, batchId) {
+      const batch = batches.get(batchId);
+      return batch && batch.ownerKey === ownerKey ? clone(batch) : null;
+    },
+    async listVisibleWebdesignBatches(ownerKey) {
+      return Array.from(batches.values()).filter((batch) => batch.ownerKey === ownerKey).map(clone);
+    },
+    async upsertWebdesignBatchChunk(chunk) {
+      chunks.set(chunk.id, clone(chunk));
+      return { ok: true };
+    },
+    async listWebdesignBatchChunks(ownerKey, batchId) {
+      return Array.from(chunks.values())
+        .filter((chunk) => chunk.ownerKey === ownerKey && chunk.batchId === batchId)
+        .sort((left, right) => left.index - right.index)
+        .map(clone);
+    },
+    async uploadDesignPhoto(entry, meta) {
+      return { ok: true, entry, meta };
+    },
+  };
 }
 
 test('premium database webdesign jobs generate and persist a customer photo in the background', async () => {
@@ -389,6 +474,72 @@ test('premium database webdesign jobs persist status and generated photos throug
 
   assert.equal(getRes.statusCode, 200);
   assert.equal(getRes.body.job.status, 'done');
+});
+
+test('premium database webdesign bulk batches process targets through a persistent small queue', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  const pipelineCalls = [];
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    bulkActiveJobLimit: 2,
+    bulkStartLimit: 2,
+    bulkReconcileLimit: 1,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async (url, options) => {
+        pipelineCalls.push({ url, company: options.body.company });
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: `${options.body.company}-preview.png` } };
+      },
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 5 } }, startRes);
+  assert.equal(startRes.statusCode, 202);
+  const batchId = startRes.body.batch.id;
+
+  const chunkRes = createResponseRecorder();
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        offset: 0,
+        targets: Array.from({ length: 5 }, (_, index) => ({
+          websiteUrl: `https://bedrijf-${index}.test`,
+          customer: { id: `customer-${index}`, bedrijf: `Bedrijf ${index}`, dom: `bedrijf-${index}.test` },
+        })),
+      },
+    },
+    chunkRes
+  );
+  assert.equal(chunkRes.statusCode, 202);
+  assert.equal(chunkRes.body.batch.uploadedTargets, 5);
+
+  const commitRes = createResponseRecorder();
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 5, expectedChunks: 1 } }, commitRes);
+  assert.equal(commitRes.statusCode, 202);
+  assert.equal(commitRes.body.batch.total, 5);
+  assert.ok(commitRes.body.batch.queued <= 2);
+  assert.equal(pipelineCalls.length, 0);
+
+  let latest = commitRes.body.batch;
+  for (let attempt = 0; attempt < 20 && latest.status !== 'done'; attempt += 1) {
+    const statusRes = createResponseRecorder();
+    await coordinator.getBatchResponse({ premiumAuth: auth, params: { batchId } }, statusRes);
+    assert.equal(statusRes.statusCode, 200);
+    latest = statusRes.body.batch;
+  }
+
+  assert.equal(latest.status, 'done');
+  assert.equal(latest.made, 5);
+  assert.equal(latest.failed, 0);
+  assert.equal(pipelineCalls.length, 5);
 });
 
 test('premium database webdesign jobs refuse queued success when persistent job storage fails', async () => {

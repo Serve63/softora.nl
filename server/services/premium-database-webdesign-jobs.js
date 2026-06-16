@@ -520,6 +520,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     jobProcessTimeoutMs = 10 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
     webdesignJobConcurrency = process.env.PREMIUM_WEBDESIGN_JOB_CONCURRENCY,
+    bulkChunkTargetLimit = process.env.PREMIUM_WEBDESIGN_BULK_CHUNK_TARGET_LIMIT,
+    bulkActiveJobLimit = process.env.PREMIUM_WEBDESIGN_BULK_ACTIVE_LIMIT,
+    bulkStartLimit = process.env.PREMIUM_WEBDESIGN_BULK_START_LIMIT,
+    bulkReconcileLimit = process.env.PREMIUM_WEBDESIGN_BULK_RECONCILE_LIMIT,
     loadSharpImpl = loadSharpModule,
     now = () => Date.now(),
     random = Math.random,
@@ -534,6 +538,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const RETRY_DELAY_MIN_MS = 5000;
   const RETRY_DELAY_MAX_MS = 60000;
   const PROCESSING_CONCURRENCY = Math.max(1, Math.min(4, Math.floor(Number(webdesignJobConcurrency) || 2)));
+  const BULK_CHUNK_TARGET_LIMIT = Math.max(1, Math.min(250, Math.floor(Number(bulkChunkTargetLimit) || 100)));
+  const BULK_ACTIVE_JOB_LIMIT = Math.max(1, Math.min(24, Math.floor(Number(bulkActiveJobLimit) || 6)));
+  const BULK_START_LIMIT = Math.max(1, Math.min(8, Math.floor(Number(bulkStartLimit) || 3)));
+  const BULK_RECONCILE_LIMIT = Math.max(1, Math.min(12, Math.floor(Number(bulkReconcileLimit) || 4)));
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
@@ -1282,6 +1290,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       startedAt: null,
       finishedAt: null,
       retry: normalizeRetryState(),
+      batchId: normalizeJobId(input.batchId),
+      batchTargetIndex: Number.isFinite(Number(input.batchTargetIndex))
+        ? Math.max(0, Math.floor(Number(input.batchTargetIndex)))
+        : null,
     };
     jobs.set(job.id, job);
     const persisted = await persistJob(job);
@@ -1388,9 +1400,453 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     });
   }
 
+  function createBatchId() {
+    return `webdesign_batch_${randomUUID().replace(/-/g, '')}`;
+  }
+
+  function requiresPersistentBatchStorage() {
+    return Boolean(
+      dataOpsStore &&
+        typeof dataOpsStore.upsertWebdesignBatch === 'function' &&
+        typeof dataOpsStore.upsertWebdesignBatchChunk === 'function' &&
+        typeof dataOpsStore.getWebdesignBatch === 'function' &&
+        typeof dataOpsStore.listWebdesignBatchChunks === 'function'
+    );
+  }
+
+  function createBatchStorageUnavailableResult() {
+    return {
+      ok: false,
+      statusCode: 503,
+      error: 'Webdesign-bulk tijdelijk niet bereikbaar',
+      detail: 'De bulk-wachtrij kon niet veilig worden opgeslagen of gelezen. Probeer opnieuw.',
+      retryable: true,
+    };
+  }
+
+  async function persistBatch(batch) {
+    if (!requiresPersistentBatchStorage()) return null;
+    try {
+      const saved = await dataOpsStore.upsertWebdesignBatch(batch);
+      return saved && saved.ok ? saved : null;
+    } catch (error) {
+      logger.error('[PremiumDatabaseWebdesignJobs][batch-persist]', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
+  async function persistBatchChunk(chunk) {
+    if (!requiresPersistentBatchStorage()) return null;
+    try {
+      const saved = await dataOpsStore.upsertWebdesignBatchChunk(chunk);
+      return saved && saved.ok ? saved : null;
+    } catch (error) {
+      logger.error('[PremiumDatabaseWebdesignJobs][batch-chunk-persist]', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
+  async function loadBatch(ownerKey, batchId) {
+    if (!requiresPersistentBatchStorage()) return { batch: null, error: new Error('Batch-opslag ontbreekt') };
+    try {
+      return { batch: await dataOpsStore.getWebdesignBatch(ownerKey, batchId), error: null };
+    } catch (error) {
+      logPersistentJobLoadError(error);
+      return { batch: null, error };
+    }
+  }
+
+  async function loadBatchChunks(ownerKey, batchId) {
+    if (!requiresPersistentBatchStorage()) return { chunks: [], error: new Error('Batch-opslag ontbreekt') };
+    try {
+      return { chunks: await dataOpsStore.listWebdesignBatchChunks(ownerKey, batchId), error: null };
+    } catch (error) {
+      logPersistentJobLoadError(error);
+      return { chunks: [], error };
+    }
+  }
+
+  function normalizeBatchTarget(raw = {}, index = 0) {
+    const customer = normalizeCustomer(raw.customer || raw);
+    const websiteUrl = normalizeWebsiteUrl(raw.websiteUrl || customer.website || customer.dom);
+    return {
+      index: Math.max(0, Math.floor(Number(raw.index || index) || 0)),
+      status: websiteUrl && customer.id && customer.bedrijf ? normalizeString(raw.status || 'pending').toLowerCase() || 'pending' : 'error',
+      jobId: truncateText(normalizeString(raw.jobId || ''), 160),
+      error: websiteUrl && customer.id && customer.bedrijf ? truncateText(normalizeString(raw.error || ''), 500) : 'Ongeldige webdesign-target.',
+      attempts: Math.max(0, Math.floor(Number(raw.attempts || 0) || 0)),
+      nextAttemptAt: Math.max(0, Number(raw.nextAttemptAt || 0) || 0) || null,
+      updatedAt: Math.max(0, Number(raw.updatedAt || 0) || 0) || now(),
+      finishedAt: Math.max(0, Number(raw.finishedAt || 0) || 0) || null,
+      websiteUrl,
+      customer,
+    };
+  }
+
+  function summarizeBatchChunks(batch, chunks) {
+    if ((!Array.isArray(chunks) || !chunks.length) && batch && batch.summary && typeof batch.summary === 'object') {
+      const stored = batch.summary;
+      const done = Math.max(0, Math.floor(Number(stored.done || stored.made || 0) || 0));
+      const failed = Math.max(0, Math.floor(Number(stored.failed || 0) || 0));
+      const pending = Math.max(0, Math.floor(Number(stored.pending || 0) || 0));
+      const queued = Math.max(0, Math.floor(Number(stored.queued || 0) || 0));
+      const running = Math.max(0, Math.floor(Number(stored.running || 0) || 0));
+      const total = Math.max(0, Math.floor(Number(batch.total || stored.total || 0) || 0));
+      return {
+        total,
+        uploadedTargets: Math.max(0, Math.floor(Number(batch.uploadedTargets || stored.uploadedTargets || 0) || 0)),
+        pending,
+        queued,
+        running,
+        done,
+        failed,
+        completed: done + failed,
+        remaining: Math.max(0, total - done - failed),
+        active: queued + running,
+        chunks: Math.max(0, Math.floor(Number(stored.chunks || 0) || 0)),
+        nextAttemptAt: Math.max(0, Number(stored.nextAttemptAt || 0) || 0) || null,
+        made: done,
+      };
+    }
+    const summary = {
+      total: Math.max(0, Math.floor(Number(batch && batch.total) || 0)),
+      uploadedTargets: 0,
+      pending: 0,
+      queued: 0,
+      running: 0,
+      done: 0,
+      failed: 0,
+      completed: 0,
+      remaining: 0,
+      active: 0,
+      chunks: Array.isArray(chunks) ? chunks.length : 0,
+      nextAttemptAt: null,
+    };
+    (Array.isArray(chunks) ? chunks : []).forEach((chunk) => {
+      (Array.isArray(chunk.targets) ? chunk.targets : []).forEach((target) => {
+        summary.uploadedTargets += 1;
+        const status = normalizeString(target && target.status).toLowerCase();
+        if (status === 'done') summary.done += 1;
+        else if (status === 'error') summary.failed += 1;
+        else if (status === 'running') summary.running += 1;
+        else if (status === 'queued') summary.queued += 1;
+        else summary.pending += 1;
+        const nextAttemptAt = Math.max(0, Number(target && target.nextAttemptAt) || 0);
+        if (nextAttemptAt && (!summary.nextAttemptAt || nextAttemptAt < summary.nextAttemptAt)) {
+          summary.nextAttemptAt = nextAttemptAt;
+        }
+      });
+    });
+    if (!summary.total) summary.total = summary.uploadedTargets;
+    summary.active = summary.queued + summary.running;
+    summary.completed = summary.done + summary.failed;
+    summary.remaining = Math.max(0, summary.total - summary.completed);
+    summary.made = summary.done;
+    return summary;
+  }
+
+  function serializeBatch(batch, chunks) {
+    const summary = summarizeBatchChunks(batch, chunks);
+    return {
+      id: batch.id,
+      status: batch.status,
+      total: summary.total,
+      uploadedTargets: summary.uploadedTargets,
+      expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
+      chunks: summary.chunks,
+      made: summary.made,
+      done: summary.done,
+      failed: summary.failed,
+      pending: summary.pending,
+      queued: summary.queued,
+      running: summary.running,
+      active: summary.active,
+      completed: summary.completed,
+      remaining: summary.remaining,
+      nextAttemptAt: summary.nextAttemptAt,
+      lastError: truncateText(normalizeString(batch.lastError || batch.error || ''), 500),
+      createdAt: batch.createdAt || null,
+      startedAt: batch.startedAt || null,
+      finishedAt: batch.finishedAt || null,
+    };
+  }
+
+  function markTarget(target, status, patch = {}) {
+    Object.assign(target, patch, {
+      status,
+      updatedAt: now(),
+    });
+    if (status === 'done' || status === 'error') target.finishedAt = now();
+  }
+
+  function isRetryableStartFailure(result) {
+    const statusCode = Number(result && result.statusCode) || 0;
+    if (result && result.retryable === true) return true;
+    return statusCode === 408 || statusCode === 429 || statusCode === 502 || statusCode === 503 || statusCode === 504 || statusCode >= 500;
+  }
+
+  async function reconcileBatchJobs(chunks) {
+    const changed = new Set();
+    let reconciled = 0;
+    for (const chunk of chunks) {
+      for (const target of chunk.targets || []) {
+        const status = normalizeString(target.status).toLowerCase();
+        if ((status !== 'queued' && status !== 'running') || !target.jobId) continue;
+        let job = jobs.get(target.jobId);
+        if (!job) {
+          const loaded = await loadPersistentJobResult(target.jobId);
+          if (loaded.error) continue;
+          job = loaded.job;
+        }
+        if (!job) {
+          markTarget(target, 'pending', { jobId: '', error: '' });
+          changed.add(chunk.index);
+          continue;
+        }
+        jobs.set(job.id, job);
+        if (processJobsInline && (job.status === 'queued' || job.status === 'running') && reconciled < BULK_RECONCILE_LIMIT) {
+          await processJobForStatusRequest(job);
+          reconciled += 1;
+        } else if (!processJobsInline && job.status === 'queued') {
+          queueProcessing();
+        }
+        if (job.status === 'done') {
+          markTarget(target, 'done', { error: '' });
+          changed.add(chunk.index);
+        } else if (job.status === 'error') {
+          markTarget(target, 'error', {
+            error: job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE ? 'OpenAI safety block' : truncateText(job.error || 'Webdesign maken is mislukt.', 500),
+          });
+          changed.add(chunk.index);
+        } else if (target.status !== job.status) {
+          markTarget(target, job.status === 'running' ? 'running' : 'queued');
+          changed.add(chunk.index);
+        }
+      }
+    }
+    return changed;
+  }
+
+  async function startPendingBatchTargets(batch, chunks) {
+    const changed = new Set();
+    let summary = summarizeBatchChunks(batch, chunks);
+    let started = 0;
+    let attempted = 0;
+    for (const chunk of chunks) {
+      for (const target of chunk.targets || []) {
+        if (summary.active >= BULK_ACTIVE_JOB_LIMIT || attempted >= BULK_START_LIMIT) return changed;
+        if (normalizeString(target.status).toLowerCase() !== 'pending') continue;
+        if (target.nextAttemptAt && target.nextAttemptAt > now()) continue;
+        attempted += 1;
+        const result = await startJob({
+          ownerKey: batch.ownerKey,
+          customer: target.customer,
+          websiteUrl: target.websiteUrl,
+          batchId: batch.id,
+          batchTargetIndex: target.index,
+        });
+        if (result.ok && result.job && result.job.id) {
+          const job = result.job;
+          if (job.status === 'done') markTarget(target, 'done', { jobId: job.id, error: '' });
+          else if (job.status === 'error') markTarget(target, 'error', { jobId: job.id, error: job.error || 'Webdesign maken is mislukt.' });
+          else {
+            markTarget(target, job.status === 'running' ? 'running' : 'queued', { jobId: job.id, error: '' });
+            summary.active += 1;
+          }
+          started += 1;
+          changed.add(chunk.index);
+          continue;
+        }
+        const message = truncateText(normalizeString(result.detail || result.error || 'Webdesign starten is tijdelijk mislukt.'), 500);
+        if (isRetryableStartFailure(result)) {
+          const attempts = Math.max(0, Number(target.attempts) || 0) + 1;
+          target.attempts = attempts;
+          target.nextAttemptAt = now() + Math.min(RETRY_DELAY_MAX_MS, RETRY_DELAY_MIN_MS * Math.max(1, attempts));
+          target.error = message;
+          target.updatedAt = now();
+          batch.lastError = message;
+          changed.add(chunk.index);
+          continue;
+        }
+        markTarget(target, 'error', { error: message });
+        batch.lastError = message;
+        changed.add(chunk.index);
+      }
+    }
+    return changed;
+  }
+
+  async function persistChangedBatchChunks(chunks, changedIndexes) {
+    for (const chunk of chunks) {
+      if (!changedIndexes.has(chunk.index)) continue;
+      await persistBatchChunk(chunk);
+    }
+  }
+
+  async function driveBatch(batch, chunks) {
+    const changed = new Set();
+    if (batch.status === 'running') {
+      const reconciled = await reconcileBatchJobs(chunks);
+      reconciled.forEach((index) => changed.add(index));
+      const started = await startPendingBatchTargets(batch, chunks);
+      started.forEach((index) => changed.add(index));
+      await persistChangedBatchChunks(chunks, changed);
+      const summary = summarizeBatchChunks(batch, chunks);
+      batch.summary = summary;
+      batch.uploadedTargets = summary.uploadedTargets;
+      if (summary.total > 0 && summary.completed >= summary.total && summary.pending === 0 && summary.active === 0) {
+        batch.status = 'done';
+        batch.finishedAt = now();
+      }
+      await persistBatch(batch);
+    }
+    return { batch, chunks };
+  }
+
+  async function startBatchResponse(req, res) {
+    const ownerKey = ownerKeyFromReq(req);
+    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
+    if (!requiresPersistentBatchStorage()) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const batch = {
+      id: createBatchId(),
+      ownerKey,
+      status: 'queued',
+      total: Math.max(0, Math.floor(Number(body.total || 0) || 0)),
+      expectedChunks: 0,
+      uploadedTargets: 0,
+      createdAt: now(),
+      startedAt: null,
+      finishedAt: null,
+      summary: {},
+      lastError: '',
+    };
+    const saved = await persistBatch(batch);
+    if (!saved) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    return res.status(202).json({ ok: true, batch: serializeBatch(batch, []) });
+  }
+
+  async function appendBatchChunkResponse(req, res) {
+    const ownerKey = ownerKeyFromReq(req);
+    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
+    const batchId = normalizeJobId(req.params && req.params.batchId);
+    if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
+    const loaded = await loadBatch(ownerKey, batchId);
+    if (loaded.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
+    if (loaded.batch.status === 'done') return res.status(409).json({ ok: false, error: 'Batch is al klaar' });
+
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const rawTargets = Array.isArray(body.targets) ? body.targets.slice(0, BULK_CHUNK_TARGET_LIMIT) : [];
+    const index = Math.max(0, Math.floor(Number(body.index || 0) || 0));
+    const offset = Math.max(0, Math.floor(Number(body.offset || index * BULK_CHUNK_TARGET_LIMIT) || 0));
+    const chunk = {
+      id: `${batchId}_chunk_${String(index).padStart(5, '0')}`,
+      ownerKey,
+      batchId,
+      index,
+      status: 'queued',
+      targets: rawTargets.map((target, targetIndex) => normalizeBatchTarget({ ...target, index: offset + targetIndex }, offset + targetIndex)),
+      createdAt: now(),
+    };
+    const saved = await persistBatchChunk(chunk);
+    if (!saved) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    const chunksResult = await loadBatchChunks(ownerKey, batchId);
+    const chunks = chunksResult.chunks || [chunk];
+    const summary = summarizeBatchChunks(loaded.batch, chunks);
+    loaded.batch.uploadedTargets = summary.uploadedTargets;
+    loaded.batch.expectedChunks = Math.max(loaded.batch.expectedChunks || 0, index + 1);
+    loaded.batch.summary = summary;
+    await persistBatch(loaded.batch);
+    return res.status(202).json({ ok: true, batch: serializeBatch(loaded.batch, chunks) });
+  }
+
+  async function commitBatchResponse(req, res) {
+    const ownerKey = ownerKeyFromReq(req);
+    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
+    const batchId = normalizeJobId(req.params && req.params.batchId);
+    if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
+    const loaded = await loadBatch(ownerKey, batchId);
+    if (loaded.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
+    const chunksResult = await loadBatchChunks(ownerKey, batchId);
+    if (chunksResult.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    const chunks = chunksResult.chunks || [];
+    const summary = summarizeBatchChunks(loaded.batch, chunks);
+    if (!summary.uploadedTargets) return res.status(400).json({ ok: false, error: 'Batch heeft nog geen targets' });
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    loaded.batch.status = 'running';
+    loaded.batch.total = Math.max(summary.uploadedTargets, Math.floor(Number(body.total || loaded.batch.total || 0) || 0));
+    loaded.batch.expectedChunks = Math.max(chunks.length, Math.floor(Number(body.expectedChunks || loaded.batch.expectedChunks || 0) || 0));
+    loaded.batch.uploadedTargets = summary.uploadedTargets;
+    loaded.batch.startedAt = loaded.batch.startedAt || now();
+    loaded.batch.summary = summary;
+    await persistBatch(loaded.batch);
+    const driven = await driveBatch(loaded.batch, chunks);
+    return res.status(202).json({ ok: true, batch: serializeBatch(driven.batch, driven.chunks) });
+  }
+
+  async function getBatchResponse(req, res) {
+    const ownerKey = ownerKeyFromReq(req);
+    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
+    const batchId = normalizeJobId(req.params && req.params.batchId);
+    if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
+    const loaded = await loadBatch(ownerKey, batchId);
+    if (loaded.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
+    const chunksResult = await loadBatchChunks(ownerKey, batchId);
+    if (chunksResult.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    const driven = await driveBatch(loaded.batch, chunksResult.chunks || []);
+    return res.status(200).json({ ok: true, batch: serializeBatch(driven.batch, driven.chunks) });
+  }
+
+  async function listBatchesResponse(req, res) {
+    const ownerKey = ownerKeyFromReq(req);
+    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
+    if (!dataOpsStore || typeof dataOpsStore.listVisibleWebdesignBatches !== 'function') {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    const batches = await dataOpsStore.listVisibleWebdesignBatches(ownerKey);
+    if (!Array.isArray(batches)) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    return res.status(200).json({ ok: true, batches: batches.map((batch) => serializeBatch(batch, [])) });
+  }
+
   return {
+    appendBatchChunkResponse,
+    commitBatchResponse,
+    getBatchResponse,
     getJobResponse,
+    listBatchesResponse,
     listJobsResponse,
+    startBatchResponse,
     startJob,
     startJobResponse,
     _jobs: jobs,

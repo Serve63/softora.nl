@@ -1490,7 +1490,7 @@
         </div>
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260616a"></script>
-    <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-action.js?v=20260616a"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script><script src="assets/premium-database-lead-delete.js?v=20260616b"></script>
+    <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260616a"></script><script src="assets/premium-database-webdesign-action.js?v=20260616b"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script><script src="assets/premium-database-lead-delete.js?v=20260616b"></script>
     <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606d"></script><script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-database-system-mail-count.js?v=20260612b"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260616a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260616b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
@@ -2574,18 +2574,18 @@
             return targets;
         }
 
-        function formatBatchProgressMessage(progress) { const total = Number(progress && progress.total) || 0, completed = Number(progress && progress.completed) || 0, started = Number(progress && progress.started) || 0, failed = Number(progress && progress.failed) || 0; return "Webdesigns starten: " + completed.toLocaleString("nl-NL") + "/" + total.toLocaleString("nl-NL") + " verwerkt, " + started.toLocaleString("nl-NL") + " in wachtrij" + (failed ? ", " + failed.toLocaleString("nl-NL") + " niet gestart" : "") + "."; }
-
         async function generateWebdesignPhotos(limit, options) {
             const progressSilent = Boolean(options && options.silentProgress); closeAddActions(); nodes.generatePhotosButton.disabled = true;
             const targets = Array.isArray(limit) ? limit : getWebdesignPhotoTargets(limit);
             try {
                 if (!targets.length) { if (!progressSilent) setStatusMessage("Geen bedrijven zonder foto met een geldige website gevonden.", "info", true); return; }
-                setStatusMessage("Webdesign-batch wordt voorbereid...", "info");
-                const result = await webdesignActionController.generateBatchForCustomers(targets, { onProgress: function (progress) { setStatusMessage(formatBatchProgressMessage(progress), "info"); } });
-                const finalMessage = result.started.toLocaleString("nl-NL") + " webdesign" + (result.started === 1 ? "" : "s") + " in de wachtrij" + (result.failed ? ", " + result.failed.toLocaleString("nl-NL") + " niet gestart" : "") + ". De pagina blijft de status rustig bijwerken.";
-                setStatusMessage(finalMessage, result.failed ? "error" : "success", true);
-                if (!progressSilent) toast(result.started + " webdesign" + (result.started === 1 ? "" : "s") + " in de wachtrij" + (result.failed ? ", " + result.failed + " niet gestart" : ""));
+                setStatusMessage("Webdesign-bulk wordt klaargezet...", "info");
+                const batch = await webdesignActionController.startBulkBatchForCustomers(targets);
+                const total = Number(batch && batch.total) || targets.length, made = Number(batch && (batch.made || batch.done)) || 0;
+                setStatusMessage("Webdesigns gemaakt: " + made.toLocaleString("nl-NL") + "/" + total.toLocaleString("nl-NL") + ". De bulk blijft rustig doorlopen.", "info");
+                if (!progressSilent) toast("Webdesign-bulk gestart");
+            } catch (error) {
+                setStatusMessage(String(error && error.message || "Webdesign-bulk starten is mislukt."), "error");
             } finally { nodes.generatePhotosButton.disabled = false; }
         }
 
