@@ -57,7 +57,7 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260518b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260616a"><\/script>/);
   assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(
     combinedSource,
@@ -116,7 +116,7 @@ test('premium terugkerende kosten verbergt coldcalling en api kosten uit de stan
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260518b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260616a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260521d" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
@@ -153,7 +153,8 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(combinedSource, /function applyMonthlyCostsStageBooting\(isBooting\) \{[\s\S]*getElementById\('monthly-costs-boot-shell'\)/);
   assert.match(combinedSource, /function setMonthlyCostsStageBooting\(isBooting\) \{[\s\S]*MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS - elapsedMs/);
   assert.match(combinedSource, /if \(!monthlyCostsBootstrapDone\) \{\s*setTotalsLoading\(\);/);
-  assert.match(combinedSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
+  assert.match(combinedSource, /values: \{\s*\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
+  assert.match(combinedSource, /replace: true,/);
   assert.match(combinedSource, /await ensureMonthlyCostEntriesLoaded\(\);/);
   assert.match(combinedSource, /const refreshTasks = \[\];/);
   assert.doesNotMatch(combinedSource, /refreshTasks\.push\(window\.refreshMonthlyColdcallingCosts\(\)\);/);
