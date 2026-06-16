@@ -125,6 +125,15 @@
             }
         }
 
+        function hideStatus() {
+            if (pollTimer && typeof global.clearTimeout === "function") global.clearTimeout(pollTimer);
+            pollTimer = null;
+            activeBatchId = "";
+            clearRestoreRetry();
+            const node = global.document && global.document.getElementById ? global.document.getElementById("webdesignBulkStatus") : null;
+            if (node) node.hidden = true;
+        }
+
         async function confirmCancelBatch() {
             const message = "Weet je zeker dat je de resterende webdesigns wilt annuleren? Gemaakte webdesigns blijven staan.";
             if (global.SoftoraDialogs && typeof global.SoftoraDialogs.confirm === "function") {
@@ -241,6 +250,11 @@
         function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
             const status = normalizeString(batch.status).toLowerCase();
+            if (status === "cancelled") {
+                queuePhotoRefresh(batch);
+                hideStatus();
+                return;
+            }
             activeBatchId = batch.id;
             clearRestoreRetry();
             renderStatus(batch, phase);
@@ -322,7 +336,7 @@
             return sorted.find(function (item) { return item && item.id && isActiveBatchStatus(item.status); }) || sorted.find(function (item) {
                 const status = normalizeString(item && item.status).toLowerCase();
                 const sortTime = getBatchSortTime(item);
-                return item && item.id && (status === "done" || status === "error" || status === "cancelled") && sortTime && Date.now() - sortTime <= RESTORE_DONE_BATCH_WINDOW_MS;
+                return item && item.id && (status === "done" || status === "error") && sortTime && Date.now() - sortTime <= RESTORE_DONE_BATCH_WINDOW_MS;
             }) || null;
         }
 
@@ -340,7 +354,7 @@
                 }
                 const batch = pickRestorableBatch(batches);
                 if (!batch || !batch.id) {
-                    scheduleRestoreRetry();
+                    hideStatus();
                     return null;
                 }
                 latestMade = Math.max(0, Number(batch.made || batch.done) || 0);

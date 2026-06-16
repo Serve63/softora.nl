@@ -1551,6 +1551,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignBulkScriptSource, /RESTORE_DONE_BATCH_WINDOW_MS = 15 \* 60 \* 1000/);
   assert.match(webdesignBulkScriptSource, /RESTORE_RETRY_DELAYS_MS = \[2000, 6000, 15000, 30000\]/);
   assert.match(webdesignBulkScriptSource, /function pickRestorableBatch\(batches\)/);
+  assert.match(webdesignBulkScriptSource, /function hideStatus\(\)/);
+  assert.match(webdesignBulkScriptSource, /if \(status === "cancelled"\) \{[\s\S]*hideStatus\(\);[\s\S]*return;[\s\S]*\}/);
+  assert.doesNotMatch(webdesignBulkScriptSource, /status === "done" \|\| status === "error" \|\| status === "cancelled"/);
   assert.match(webdesignBulkScriptSource, /function scheduleRestoreRetry\(\)/);
   assert.match(webdesignBulkScriptSource, /if \(!response\.ok\) throw new Error/);
   assert.match(webdesignBulkScriptSource, /function kickServerWorker\(\)/);
@@ -1588,7 +1591,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260617a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260617b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
   assert.match(webdesignBulkScriptSource, /const WORKER_KICK_INTERVAL_MS = 8000;/);
@@ -2517,8 +2520,8 @@ test('premium database webdesign bulk restores the progress bar from the running
   const cancelled = await controller.cancelActiveBatch();
   assert.equal(cancelled.status, 'cancelled');
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/webdesign_batch_live/cancel'));
-  assert.match(statusNode.innerHTML, /2\.062 geannuleerd/);
-  assert.match(statusNode.innerHTML, /webdesign-bulk-cancel[\s\S]*hidden/);
+  assert.equal(statusNode.hidden, true);
+  assert.doesNotMatch(statusNode.innerHTML, /geannuleerd/);
 });
 
 test('premium database webdesign bulk retries restore after a temporary batch list failure', async () => {
