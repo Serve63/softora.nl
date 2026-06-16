@@ -3886,6 +3886,26 @@ function createColdmailCampaignService(deps = {}) {
     return record.state;
   }
 
+  function hasColdmailAutopilotTrustedToggleMarker(state = {}) {
+    return Boolean(parseTimestampMs(state.updatedAt) && normalizeString(state.updatedBy));
+  }
+
+  function isColdmailAutopilotTrustedDisabledState(state = {}) {
+    const normalized = normalizeColdmailAutopilotState(state);
+    if (normalized.enabled !== false) return false;
+    if (parseTimestampMs(normalized.emergencyStoppedAt) && normalizeString(normalized.emergencyStopReason)) {
+      return true;
+    }
+    return hasColdmailAutopilotTrustedToggleMarker(normalized);
+  }
+
+  function buildColdmailAutopilotUntrustedDisabledResult() {
+    return buildColdmailAutopilotSkipResult(
+      'state_unavailable',
+      'Autopilot-state is onbetrouwbaar: er staat enabled=false zonder geldige knop-actie. Er is niets verzonden en niets overschreven.'
+    );
+  }
+
   async function saveColdmailAutopilotState(state, actor = 'coldmail-autopilot') {
     const normalized = normalizeColdmailAutopilotState(state);
     await setUiStateValues(
@@ -3969,16 +3989,28 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function updateColdmailAutopilotSettings(input = {}, actor = 'Coldmail Autopilot') {
-    const state = await loadColdmailAutopilotState();
+    const stateRecord = await loadColdmailAutopilotStateRecord();
+    const state = stateRecord.state;
     const rawConfig = input && input.config && typeof input.config === 'object' ? input.config : {};
     const rawSchedule = input && input.schedule && typeof input.schedule === 'object' ? input.schedule : {};
+    const hasExplicitEnabled = Object.prototype.hasOwnProperty.call(input, 'enabled');
+    if (!stateRecord.hasValue && !hasExplicitEnabled) {
+      const error = new Error('Autopilot-state kon niet veilig worden geladen. Gebruik de knop om hem expliciet aan of uit te zetten.');
+      error.code = 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE';
+      throw error;
+    }
+    if (stateRecord.hasValue && !state.enabled && !isColdmailAutopilotTrustedDisabledState(state) && !hasExplicitEnabled) {
+      const error = new Error('Autopilot-state is onbetrouwbaar. Gebruik de knop om hem expliciet aan of uit te zetten.');
+      error.code = 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE';
+      throw error;
+    }
     const fallbackConfig = await loadColdmailAutopilotSenderSettingsConfig().catch(() => state.config);
     const nextSenderEmails = Object.prototype.hasOwnProperty.call(rawConfig, 'senderEmails')
       ? rawConfig.senderEmails
       : Object.prototype.hasOwnProperty.call(rawConfig, 'senderEmail')
         ? rawConfig.senderEmail
         : state.config.senderEmails;
-    const requestedEnabled = Object.prototype.hasOwnProperty.call(input, 'enabled')
+    const requestedEnabled = hasExplicitEnabled
       ? normalizeBooleanFlag(input.enabled, state.enabled)
       : state.enabled;
     const candidateConfig = normalizeColdmailAutopilotConfig({
@@ -4500,6 +4532,7 @@ function createColdmailCampaignService(deps = {}) {
     const preserveDisabledState =
       latestState &&
       latestState.enabled === false &&
+      isColdmailAutopilotTrustedDisabledState(latestState) &&
       state &&
       state.enabled !== false;
     const baseState = preserveDisabledState
@@ -4559,6 +4592,13 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     if (!latestStateRecord.state.enabled) {
+      if (!isColdmailAutopilotTrustedDisabledState(latestStateRecord.state)) {
+        const error = new Error(
+          'Autopilot-state is onbetrouwbaar: er staat enabled=false zonder geldige knop-actie. Er is niets verzonden.'
+        );
+        error.code = 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE';
+        throw error;
+      }
       const error = new Error('Coldmail autopilot staat uit. Er is niets verzonden.');
       error.code = 'COLDMAIL_AUTOPILOT_DISABLED';
       throw error;
@@ -4578,6 +4618,9 @@ function createColdmailCampaignService(deps = {}) {
     }
 
     if (!state.enabled) {
+      if (!isColdmailAutopilotTrustedDisabledState(state)) {
+        return compactColdmailAutopilotResult(buildColdmailAutopilotUntrustedDisabledResult());
+      }
       return finishColdmailAutopilotRun(
         state,
         buildColdmailAutopilotSkipResult('disabled', 'Coldmail autopilot staat uit.'),

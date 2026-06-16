@@ -896,7 +896,7 @@ test('coldmail open tracking ignores tokens from before a metrics reset', async 
 });
 
 test('coldmail autopilot stays idle until it is explicitly enabled', async () => {
-  const { service, sentMessages, getAutopilotState } = createService();
+  const { service, sentMessages, getSavedStates } = createService();
 
   const result = await service.runColdmailAutopilot({
     publicBaseUrl: 'https://www.softora.nl',
@@ -905,9 +905,10 @@ test('coldmail autopilot stays idle until it is explicitly enabled', async () =>
 
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
-  assert.equal(result.reason, 'disabled');
+  assert.equal(result.reason, 'state_unavailable');
+  assert.match(result.message, /enabled=false zonder geldige knop-actie/i);
   assert.equal(sentMessages.length, 0);
-  assert.equal(getAutopilotState().lastResult.reason, 'disabled');
+  assert.equal(getSavedStates().some((entry) => entry.scope === 'premium_coldmail_autopilot'), false);
 });
 
 test('coldmail autopilot status reports today sends on the Amsterdam day', async () => {
@@ -1097,6 +1098,50 @@ test('coldmail autopilot does not overwrite live settings when state cannot be l
   assert.equal(result.reason, 'state_unavailable');
   assert.equal(sentMessages.length, 0);
   assert.equal(getAutopilotState().enabled, true);
+  assert.equal(getSavedStates().some((entry) => entry.scope === 'premium_coldmail_autopilot'), false);
+});
+
+test('coldmail autopilot does not treat an untrusted empty disabled state as a button off', async () => {
+  const untrustedDisabledState = {
+    enabled: false,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 7,
+      endHour: 17,
+      minIntervalMinutes: 5,
+      senderMinIntervalMinutes: 60,
+      senderMaxIntervalMinutes: 74,
+      sendJitterMinSeconds: 45,
+      sendJitterMaxSeconds: 240,
+    },
+    updatedAt: '',
+    updatedBy: '',
+  };
+  const { service, sentMessages, getSavedStates } = createService({
+    autopilotState: untrustedDisabledState,
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'state_unavailable');
+  assert.match(result.message, /enabled=false zonder geldige knop-actie/i);
+  assert.equal(sentMessages.length, 0);
   assert.equal(getSavedStates().some((entry) => entry.scope === 'premium_coldmail_autopilot'), false);
 });
 
@@ -3357,7 +3402,7 @@ test('coldmail autopilot keeps an emergency disabled state when a running batch 
   assert.equal(getAutopilotState().emergencyStopReason, 'Noodstop tijdens actieve run.');
 });
 
-test('coldmail autopilot does not let an empty disabled state wipe sender config after a run', async () => {
+test('coldmail autopilot does not let an empty disabled state overrule the enabled button after a run', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
       {
@@ -3437,7 +3482,7 @@ test('coldmail autopilot does not let an empty disabled state wipe sender config
   const state = getAutopilotState();
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.equal(state.enabled, false);
+  assert.equal(state.enabled, true);
   assert.deepEqual(state.config.senderEmails, ['serve@softora.nl']);
   assert.equal(state.config.senderProfiles['serve@softora.nl'].subject, 'Korte vraag voor {{bedrijf}}');
   assert.equal(state.schedule.endHour, 18);
@@ -3445,6 +3490,61 @@ test('coldmail autopilot does not let an empty disabled state wipe sender config
   assert.equal(state.schedule.senderMaxIntervalMinutes, 82);
   assert.equal(state.schedule.sendJitterMinSeconds, 45);
   assert.equal(state.schedule.sendJitterMaxSeconds, 240);
+});
+
+test('coldmail autopilot button can recover an untrusted disabled state by explicitly enabling it', async () => {
+  const { service, getAutopilotState } = createService({
+    autopilotState: {
+      enabled: false,
+      config: {
+        count: 1,
+        senderEmails: [],
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+      },
+      updatedAt: '',
+      updatedBy: '',
+    },
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+  });
+
+  await service.updateColdmailAutopilotSettings({
+    enabled: true,
+    config: {
+      senderEmails: ['serve@softora.nl'],
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 7,
+      endHour: 17,
+      minIntervalMinutes: 5,
+      senderMinIntervalMinutes: 60,
+      senderMaxIntervalMinutes: 74,
+      sendJitterMinSeconds: 45,
+      sendJitterMaxSeconds: 240,
+    },
+  }, 'serve@softora.nl');
+
+  const state = getAutopilotState();
+  assert.equal(state.enabled, true);
+  assert.equal(state.updatedBy, 'serve@softora.nl');
+  assert.ok(state.updatedAt);
+  assert.deepEqual(state.config.senderEmails, ['serve@softora.nl']);
+  assert.equal(state.schedule.senderMaxIntervalMinutes, 74);
 });
 
 test('coldmail autopilot does not treat a full agenda as a mail safety stop', async () => {
