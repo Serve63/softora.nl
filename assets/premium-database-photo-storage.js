@@ -69,8 +69,13 @@
             const stateValues = values && typeof values === "object" ? values : {};
             const count = clampCount(chunkCount, 0);
             const chunks = [];
+            let missingChunk = false;
             if (count) {
-                for (let index = 0; index < count; index += 1) chunks.push(normalizeString(stateValues[photoKey + "_" + index]));
+                for (let index = 0; index < count; index += 1) {
+                    const chunk = stateValues[photoKey + "_" + index];
+                    if (typeof chunk !== "string") missingChunk = true;
+                    chunks.push(normalizeString(chunk));
+                }
             } else {
                 for (let index = 0; index < 80; index += 1) {
                     const value = stateValues[photoKey + "_" + index];
@@ -79,7 +84,8 @@
                 }
             }
             const dataUrl = chunks.join("");
-            return isValidWebsitePhotoDataUrl(dataUrl) ? { dataUrl: dataUrl, chunkCount: chunks.length } : null;
+            if (!count && !chunks.length) return null;
+            return isValidWebsitePhotoDataUrl(dataUrl) ? { dataUrl: dataUrl, chunkCount: chunks.length } : { dataUrl: "", chunkCount: chunks.length, incomplete: missingChunk || Boolean(count && !chunks.length) };
         }
 
         function stripPhotoMeta(item) {
@@ -102,7 +108,7 @@
             };
         }
 
-        function parsePhotoMap(raw, values, customers) {
+        function parsePhotoMapDetailed(raw, values, customers) {
             let parsed = {};
             try {
                 const value = JSON.parse(String(raw || "{}"));
@@ -112,19 +118,26 @@
             }
 
             const result = {};
+            let incompleteCount = 0;
+            let referencedMediaCount = 0;
             Object.keys(parsed).forEach(function (photoId) {
                 const meta = stripPhotoMeta({ ...parsed[photoId], id: parsed[photoId].id || photoId });
                 if (!meta.id || !meta.photoKey) return;
+                referencedMediaCount += 1;
                 const chunked = readChunkedData(values, meta.photoKey, meta.chunkCount);
                 const mockupChunked = meta.mockupPhotoKey ? readChunkedData(values, meta.mockupPhotoKey, meta.mockupChunkCount) : null;
-                const mockupSource = mockupChunked ? mockupChunked.dataUrl : (isValidWebsitePhotoSource(meta.websiteMockupUrl) ? meta.websiteMockupUrl : "");
-                if (chunked) {
+                if (chunked && chunked.incomplete) incompleteCount += 1;
+                if (mockupChunked && mockupChunked.incomplete) incompleteCount += 1;
+                const mockupSource = mockupChunked && mockupChunked.dataUrl ? mockupChunked.dataUrl : (isValidWebsitePhotoSource(meta.websiteMockupUrl) ? meta.websiteMockupUrl : "");
+                if (chunked && chunked.dataUrl) {
                     result[meta.id] = { ...meta, chunkCount: chunked.chunkCount, websitePhoto: chunked.dataUrl, websiteMockup: mockupSource, websiteMockupName: meta.websiteMockupName || "Device mockup" };
                     return;
                 }
                 if (isValidWebsitePhotoSource(meta.websitePhotoUrl)) {
                     result[meta.id] = { ...meta, websitePhoto: meta.websitePhotoUrl, websiteMockup: mockupSource, websiteMockupName: meta.websiteMockupName || "Device mockup" };
+                    return;
                 }
+                incompleteCount += 1;
             });
 
             (Array.isArray(customers) ? customers : []).forEach(function (customer, index) {
@@ -132,7 +145,7 @@
                 if (!normalized.id || result[normalized.id] || !shouldShowWebsitePhoto(normalized)) return;
                 const photoKey = buildDataKey(normalized.id);
                 const chunked = readChunkedData(values, photoKey, 0);
-                if (!chunked) return;
+                if (!chunked || !chunked.dataUrl) return;
                 result[normalized.id] = {
                     id: normalized.id,
                     identityKey: buildCustomerIdentityKey(normalized),
@@ -149,7 +162,20 @@
                     websitePhoto: chunked.dataUrl
                 };
             });
-            return result;
+            return {
+                photoMap: result,
+                incompleteCount: incompleteCount,
+                referencedMediaCount: referencedMediaCount
+            };
+        }
+
+        function parsePhotoMap(raw, values, customers) {
+            return parsePhotoMapDetailed(raw, values, customers).photoMap;
+        }
+
+        function hasStateKey(values, stateKey) {
+            const stateValues = values && typeof values === "object" ? values : {};
+            return Object.prototype.hasOwnProperty.call(stateValues, normalizeString(stateKey));
         }
 
         function buildCurrentStorage(customers, onlyCustomerIds) {
@@ -256,7 +282,15 @@
             cachedLoadKey = loadKey;
             cachedLoadPromise = getUiState(scope).then(function (state) {
                 const values = state && state.values && typeof state.values === "object" ? state.values : {};
-                return parsePhotoMap(values[key], values, customers);
+                const parsed = parsePhotoMapDetailed(values[key], values, customers);
+                const hasPhotoState = hasStateKey(values, key);
+                if (loadOptions && loadOptions.requireStateKey && !hasPhotoState && !Object.keys(parsed.photoMap).length) {
+                    throw new Error("Databasefoto's niet volledig ontvangen.");
+                }
+                if (loadOptions && loadOptions.failOnIncomplete && parsed.referencedMediaCount > 0 && !Object.keys(parsed.photoMap).length && parsed.incompleteCount > 0) {
+                    throw new Error("Databasefoto's tijdelijk incompleet ontvangen.");
+                }
+                return parsed.photoMap;
             }).catch(function (error) {
                 console.error("Databasefoto's laden via Supabase mislukt:", error);
                 clearLoadCache();

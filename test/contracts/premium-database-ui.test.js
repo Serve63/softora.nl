@@ -1350,7 +1350,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260605a/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
@@ -1484,9 +1484,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
   assert.match(webdesignActionScriptSource, /markPhotoKeyLoaded\(loadKey\)/);
   assert.match(pageSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length\) \{/);
-  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\);/);
-  assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\)/);
-  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true \}\);/);
+  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
+  assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\)/);
+  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
   assert.match(pageSource, /state\.photoRestoreFailed = true; console\.warn\("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error\);/);
   assert.match(pageSource, /state\.photoRestoreFailed = true; console\.warn\("Databasefoto's laden voor boot tijdelijk overgeslagen:", error\);/);
   assert.doesNotMatch(pageSource, /Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden\./);
@@ -1494,7 +1494,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /applyCustomerList\(mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\), false\);/);
   assert.match(pageSource, /else \{\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
-  assert.match(pageSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length\) \{ await refreshColdmailGuardState\(\); try \{ const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true \}\);/);
+  assert.match(pageSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length\) \{ await refreshColdmailGuardState\(\); try \{ const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);[\s\S]*state\.photoRestorePending = false;[\s\S]*renderPage\(\);[\s\S]*releaseDatabaseBootShell\(\);/);
   assert.doesNotMatch(pageSource, /void webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\), 12\)\.catch/);
   assert.doesNotMatch(pageSource, /window\.setTimeout\(function \(\) \{ resolve\(false\); \}, 850\);/);
@@ -3313,6 +3313,64 @@ test('premium database photo storage can fail closed when boot needs reliable ph
   await assert.rejects(
     controller.load([{ id: 'customer1' }], { force: true, failOnError: true }),
     /photo read timeout/
+  );
+});
+
+test('premium database photo storage fails closed when the boot photo state is missing', async () => {
+  const photoStorageClient = loadDatabasePhotoStorageClient();
+  const controller = photoStorageClient.createController({
+    getUiState: async () => ({ values: {} }),
+    setUiState: async () => ({ ok: true }),
+    normalizeCustomer: (customer) => customer,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    buildCustomerIdentityKey: (customer) => 'identity:' + customer.id,
+    formatDateForStorage: () => '2026-04-28',
+    scope: 'premium_database_photos',
+    key: 'photos',
+    dataPrefix: 'photo_',
+    chunkSize: 180000,
+  });
+
+  const fallback = await controller.load([{ id: 'customer1' }], { force: true });
+  assert.equal(Object.keys(fallback).length, 0);
+  await assert.rejects(
+    controller.load([{ id: 'customer1' }], { force: true, failOnError: true, requireStateKey: true }),
+    /Databasefoto's niet volledig ontvangen/
+  );
+});
+
+test('premium database photo storage fails closed when referenced boot chunks are incomplete', async () => {
+  const photoStorageClient = loadDatabasePhotoStorageClient();
+  const controller = photoStorageClient.createController({
+    getUiState: async () => ({
+      values: {
+        photos: JSON.stringify({
+          customer1: {
+            id: 'customer1',
+            photoKey: 'photo_customer1',
+            chunkCount: 1,
+          },
+        }),
+      },
+    }),
+    setUiState: async () => ({ ok: true }),
+    normalizeCustomer: (customer) => customer,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    buildCustomerIdentityKey: (customer) => 'identity:' + customer.id,
+    formatDateForStorage: () => '2026-04-28',
+    scope: 'premium_database_photos',
+    key: 'photos',
+    dataPrefix: 'photo_',
+    chunkSize: 180000,
+  });
+
+  const fallback = await controller.load([{ id: 'customer1' }], { force: true });
+  assert.equal(Object.keys(fallback).length, 0);
+  await assert.rejects(
+    controller.load([{ id: 'customer1' }], { force: true, failOnError: true, failOnIncomplete: true }),
+    /Databasefoto's tijdelijk incompleet ontvangen/
   );
 });
 

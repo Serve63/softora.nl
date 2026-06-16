@@ -1494,7 +1494,7 @@
     <script src="assets/premium-database-photo-batch.js?v=20260616a"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-action.js?v=20260616a"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script><script src="assets/premium-database-lead-delete.js?v=20260616b"></script>
     <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-available-import.js?v=20260606d"></script><script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-database-system-mail-count.js?v=20260612b"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260616a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
-    <script src="assets/premium-database-photo-storage.js?v=20260605a"></script>
+    <script src="assets/premium-database-photo-storage.js?v=20260616b"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-distance.js?v=20260616a"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
@@ -2922,7 +2922,7 @@
                     const customersWithFallbackMedia = mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten);
                     let customersWithPhotos = customersWithFallbackMedia;
                     try {
-                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true });
+                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true });
                         customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, customersWithFallbackMedia);
                     } catch (error) {
                         state.photoRestoreFailed = true; console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error);
@@ -3082,7 +3082,7 @@
 
         void (async function () {
             try {
-                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { state.photoRestoreFailed = true; console.warn("Databasefoto's laden voor boot tijdelijk overgeslagen:", error); } } else { await bootstrapCustomers(); }
+                state.photoRestorePending = true; if (databaseHadBootstrapCustomers && state.klanten.length) { await refreshColdmailGuardState(); try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true }); applyCustomerList(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), false); } catch (error) { state.photoRestoreFailed = true; console.warn("Databasefoto's laden voor boot tijdelijk overgeslagen:", error); } } else { await bootstrapCustomers(); }
                 await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); state.photoRestorePending = false; renderPage(); releaseDatabaseBootShell(); void webdesignActionController.resumePendingJobs().catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
                 void databaseImportController.startAutoSync();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestoreFailed = true; state.photoRestorePending = false; renderPage(); } finally { releaseDatabaseBootShell(); }
