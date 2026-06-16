@@ -314,11 +314,14 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
 test('premium database has a compact company search without the old result count card', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const filterBarCssBlock = pageSource.match(/\.filter-bar\s*\{[\s\S]*?\}/)[0];
 
   assert.match(
     pageSource,
     /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><\/div>\s*<\/div>/
   );
+  assert.match(filterBarCssBlock, /align-items: center;/);
+  assert.doesNotMatch(filterBarCssBlock, /align-items: flex-end;/);
   assert.doesNotMatch(pageSource, /result-count-stack/);
   assert.doesNotMatch(pageSource, /database-search-row/);
   assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
@@ -1041,7 +1044,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
-  assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
+  assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: center;/);
+  assert.doesNotMatch(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
   assert.match(pageSource, /\.photo-header-results-button\s*\{[\s\S]*display: inline-flex;[\s\S]*min-width: 94px;[\s\S]*text-transform: none;/);
   assert.match(pageSource, /\.photo-header-results-button:hover\s*\{[\s\S]*color: var\(--crimson\);/);
   assert.match(pageSource, /#photoHeader \.photo-header-title\[hidden\], #photoHeader \.photo-header-results-button\[hidden\] \{ display: none; \}/);
