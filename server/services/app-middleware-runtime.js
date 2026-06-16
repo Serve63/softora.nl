@@ -31,6 +31,9 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/mailbox/sync',
       '/api/coldmailing/autopilot/run',
     ],
+    skipSupabaseHydrateUiStateScopes = [
+      'premium_monthly_costs',
+    ],
   } = deps;
 
   const safeSupabaseHydrateMiddlewareWaitMs = Math.max(
@@ -48,6 +51,11 @@ function applyAppMiddleware(app, deps = {}) {
   )
     .map((item) => String(item || '').trim())
     .filter(Boolean);
+  const normalizedSkipSupabaseHydrateUiStateScopes = new Set(
+    (Array.isArray(skipSupabaseHydrateUiStateScopes) ? skipSupabaseHydrateUiStateScopes : [])
+      .map((item) => String(item || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
 
   function isReadOnlyRequestMethod(method) {
     const normalizedMethod = String(method || 'GET').trim().toUpperCase();
@@ -63,6 +71,33 @@ function applyAppMiddleware(app, deps = {}) {
   function skipsSupabaseHydration(pathname) {
     const requestPath = String(pathname || '');
     return normalizedSkipSupabaseHydrateApiPrefixes.some((prefix) => requestPath.startsWith(prefix));
+  }
+
+  function normalizeHydrationUiStateScope(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+      return decodeURIComponent(raw).trim().toLowerCase();
+    } catch (_) {
+      return raw.toLowerCase();
+    }
+  }
+
+  function resolveUiStateHydrationScope(req, pathname) {
+    const requestPath = String(pathname || '');
+    if (requestPath === '/api/ui-state-set') {
+      return normalizeHydrationUiStateScope(req && req.query && req.query.scope);
+    }
+    const routePrefix = '/api/ui-state/';
+    if (requestPath.startsWith(routePrefix)) {
+      return normalizeHydrationUiStateScope(requestPath.slice(routePrefix.length).split('/')[0]);
+    }
+    return '';
+  }
+
+  function skipsUiStateScopeHydration(req, pathname) {
+    const scope = resolveUiStateHydrationScope(req, pathname);
+    return Boolean(scope && normalizedSkipSupabaseHydrateUiStateScopes.has(scope));
   }
 
   app.disable('x-powered-by');
@@ -338,6 +373,7 @@ function applyAppMiddleware(app, deps = {}) {
     if (!isSupabaseConfigured()) return next();
     if (!requestPath.startsWith('/api/')) return next();
     if (skipsSupabaseHydration(requestPath)) return next();
+    if (skipsUiStateScopeHydration(req, requestPath)) return next();
     const strictHydration = requiresStrictSupabaseHydration(requestPath, req.method);
 
     if (!strictHydration) {

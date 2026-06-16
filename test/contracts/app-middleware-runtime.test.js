@@ -188,6 +188,41 @@ test('app middleware blocks state-changing critical API requests when Supabase h
   assert.match(res.body.error, /Supabase-opslag/i);
 });
 
+test('app middleware skips strict hydration for monthly costs ui-state writes', async () => {
+  const app = createAppRecorder();
+  let hydrateCalls = 0;
+  let nextCalls = 0;
+
+  applyAppMiddleware(
+    app,
+    createDeps({
+      supabaseHydrateMiddlewareWaitMs: 5,
+      ensureRuntimeStateHydratedFromSupabase: async () => {
+        hydrateCalls += 1;
+        return false;
+      },
+    })
+  );
+
+  const middleware = getLastMiddleware(app);
+  const requests = [
+    { method: 'POST', path: '/api/ui-state-set', query: { scope: 'premium_monthly_costs' } },
+    { method: 'POST', path: '/api/ui-state/premium_monthly_costs', query: {} },
+  ];
+
+  for (const req of requests) {
+    await new Promise((resolve) => {
+      middleware(req, {}, () => {
+        nextCalls += 1;
+        resolve();
+      });
+    });
+  }
+
+  assert.equal(nextCalls, 2);
+  assert.equal(hydrateCalls, 0);
+});
+
 test('app middleware skips Supabase hydration for non-api requests', async () => {
   const app = createAppRecorder();
   let hydrateCalls = 0;
