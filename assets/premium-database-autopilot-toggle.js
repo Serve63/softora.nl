@@ -102,12 +102,17 @@
     async function requestJson(url, options) {
         const fetchImpl = getFetch();
         if (!fetchImpl) throw new Error("Autopilotverzoek kan niet worden uitgevoerd.");
-        const requestOptions = Object.assign({
+        const requestOptions = options || {};
+        const headers = Object.assign({
+            Accept: "application/json",
+            "X-Softora-Requested-With": "premium",
+        }, requestOptions.headers || {});
+        const requestOptionsWithDefaults = Object.assign({}, requestOptions, {
             credentials: "same-origin",
-            headers: { Accept: "application/json" },
+            headers: headers,
             cache: "no-store",
-        }, options || {});
-        const response = await fetchImpl(url, requestOptions);
+        });
+        const response = await fetchImpl(url, requestOptionsWithDefaults);
         const payload = await response.json().catch(function () { return null; });
         if (!response.ok || !payload || payload.ok === false) {
             throw new Error(payload && (payload.message || payload.error) || "Autopilotverzoek mislukt.");

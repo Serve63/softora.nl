@@ -546,6 +546,7 @@ test('premium database autopilot toggle switches the real coldmail autopilot sta
     assert.equal(request.options.method, 'POST');
     assert.equal(request.options.credentials, 'same-origin');
     assert.equal(request.options.cache, 'no-store');
+    assert.equal(request.options.headers['X-Softora-Requested-With'], 'premium');
     assert.equal(request.options.headers['Content-Type'], 'application/json');
   });
 });
