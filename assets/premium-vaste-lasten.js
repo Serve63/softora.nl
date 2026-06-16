@@ -490,11 +490,12 @@ async function persistMonthlyCostEntries(actor = 'browser') {
       highlighted: false,
     }));
   const result = await fetchUiStateSetWithFallback(MONTHLY_COSTS_REMOTE_SCOPE, {
-    patch: {
+    values: {
       [MONTHLY_COSTS_REMOTE_KEY]: JSON.stringify(editableItems),
       updated_at: new Date().toISOString(),
       updated_by: normalizeString(actor || 'browser'),
     },
+    replace: true,
     source: 'premium-vaste-lasten',
     actor: normalizeString(actor || 'browser'),
   });
