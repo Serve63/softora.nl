@@ -276,14 +276,15 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /sortKey: "manual"/);
 });
 
-test('premium database has a company search below metrics that stays inside the active filter', () => {
+test('premium database has a compact company search beside the result count', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(
     pageSource,
-    /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">[\s\S]*<\/div>\s*<\/div>\s*<\/div>\s*<div class="database-search-row"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/
+    /<div class="filter-bar">\s*<div class="status-filter">[\s\S]*<\/div><div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><\/div><div class="result-count-stack" aria-label="Aantal resultaten" hidden>/
   );
+  assert.doesNotMatch(pageSource, /database-search-row/);
   assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
   assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.activeStatus === "benaderbaar"[\s\S]*isColdmailReadyWebdesignLead\(customer\)[\s\S]*state\.activeStatus === "beschikbaar"[\s\S]*isAvailableColdmailCandidate\(customer\)/);
   assert.match(pageSource, /if \(!matchesActiveDatabaseFilter\(customer\)\) return false;/);
@@ -924,14 +925,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
   assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
-  assert.match(pageSource, /<div class="database-search-row"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
+  assert.match(pageSource, /<div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
   const topRightHtml = pageSource.slice(
     pageSource.indexOf('<div class="top-right">'),
     pageSource.indexOf('<div class="status-banner"')
   );
   assert.doesNotMatch(topRightHtml, /<div class="top-right"><div class="search">/);
   assert.doesNotMatch(topRightHtml, /class="result-count-stack"/);
-  assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
+  assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
@@ -1354,7 +1355,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260616b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260616c/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260612b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260616a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -1366,7 +1367,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(statusFilterCssBlock, /rgba\(139, 34, 82/);
   assert.doesNotMatch(statusFilterCssBlock, /margin-left: auto;/);
   assert.match(filterGroupsCssSource, /\.filter-metrics\s*\{[\s\S]*margin-left: 0;[\s\S]*gap: 24px;/);
-  assert.match(filterGroupsCssSource, /\.database-search-row\s*\{[\s\S]*padding: 28px clamp\(20px, 2\.35vw, 48px\) 8px;[\s\S]*justify-content: flex-end;/);
+  assert.match(filterGroupsCssSource, /\.filter-search\s*\{[\s\S]*margin-left: auto;[\s\S]*width: min\(340px, 25vw\);[\s\S]*min-width: 260px;/);
+  assert.match(filterGroupsCssSource, /\.filter-search \.search\s*\{[\s\S]*width: 100%;/);
+  assert.doesNotMatch(filterGroupsCssSource, /database-search-row/);
   assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-block;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: center;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: center;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(5, minmax\(110px, 1fr\)\);[\s\S]*"\. \. note note note"[\s\S]*"autopilot today sent deals ratio";[\s\S]*gap: 6px;/);
