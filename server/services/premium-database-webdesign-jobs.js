@@ -519,6 +519,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     photoDataPrefix = 'softora_database_photo_data_v1_',
     jobProcessTimeoutMs = 10 * 60 * 1000,
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
+    webdesignJobConcurrency = process.env.PREMIUM_WEBDESIGN_JOB_CONCURRENCY,
     loadSharpImpl = loadSharpModule,
     now = () => Date.now(),
     random = Math.random,
@@ -532,10 +533,11 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const MAX_RETRY_ATTEMPTS = 6;
   const RETRY_DELAY_MIN_MS = 5000;
   const RETRY_DELAY_MAX_MS = 60000;
+  const PROCESSING_CONCURRENCY = Math.max(1, Math.min(4, Math.floor(Number(webdesignJobConcurrency) || 2)));
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
-  let processing = false;
+  let activeProcessingCount = 0;
   let processingWakeTimer = null;
   let processingWakeAt = 0;
   const inlineProcessingJobIds = new Set();
@@ -1165,7 +1167,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function processJobForStatusRequest(job) {
     if (!processJobsInline || !job) return job;
     const shouldProcess = (job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job);
-    if (!shouldProcess || processing || inlineProcessingJobIds.has(job.id)) return job;
+    if (!shouldProcess || activeProcessingCount >= PROCESSING_CONCURRENCY || inlineProcessingJobIds.has(job.id)) return job;
 
     if (job.status === 'running') {
       job.status = 'queued';
@@ -1176,33 +1178,38 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       await persistJob(job);
     }
 
-    processing = true;
+    activeProcessingCount += 1;
     inlineProcessingJobIds.add(job.id);
     try {
       return await settleJob(job);
     } finally {
       inlineProcessingJobIds.delete(job.id);
-      processing = false;
+      activeProcessingCount = Math.max(0, activeProcessingCount - 1);
     }
   }
 
   function queueProcessing() {
-    if (processing) return;
-    const next = Array.from(jobs.values()).find(isJobReadyToProcess);
-    if (!next) {
+    if (activeProcessingCount >= PROCESSING_CONCURRENCY) return;
+    let started = false;
+    while (activeProcessingCount < PROCESSING_CONCURRENCY) {
+      const next = Array.from(jobs.values()).find((job) => isJobReadyToProcess(job) && !inlineProcessingJobIds.has(job.id));
+      if (!next) break;
+      started = true;
+      activeProcessingCount += 1;
+      inlineProcessingJobIds.add(next.id);
+      setImmediate(() => {
+        settleJob(next)
+          .finally(() => {
+            inlineProcessingJobIds.delete(next.id);
+            activeProcessingCount = Math.max(0, activeProcessingCount - 1);
+            queueProcessing();
+          });
+      });
+    }
+    if (!started) {
       const nextRetryAt = getSoonestQueuedRetryAt();
       if (nextRetryAt) scheduleProcessingWake(nextRetryAt - now());
-      return;
     }
-
-    processing = true;
-    setImmediate(() => {
-      settleJob(next)
-        .finally(() => {
-          processing = false;
-          queueProcessing();
-        });
-    });
   }
 
   async function startJob(input = {}) {

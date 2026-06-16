@@ -874,7 +874,7 @@ test('premium database webdesign jobs hide OpenAI safety rejection details from 
   assert.doesNotMatch(JSON.stringify(statusRes.body), /request ID|safety_violations|sexual|help\.openai\.com/i);
 });
 
-test('premium database webdesign inline processing runs at most one OpenAI image job at once', async () => {
+test('premium database webdesign inline processing keeps AI image jobs in a small bounded pool', async () => {
   let active = 0;
   let maxActive = 0;
   let pipelineCalls = 0;
@@ -935,10 +935,10 @@ test('premium database webdesign inline processing runs at most one OpenAI image
     ),
   ]);
 
-  assert.equal(maxActive, 1);
-  assert.equal(pipelineCalls, 1);
+  assert.ok(maxActive <= 2, `expected <=2 active jobs, saw ${maxActive}`);
+  assert.equal(pipelineCalls, 2);
   assert.equal(firstPoll.body.job.status, 'done');
-  assert.equal(secondPoll.body.job.status, 'queued');
+  assert.equal(secondPoll.body.job.status, 'done');
 
   const finalPoll = createResponseRecorder();
   await coordinator.getJobResponse(
