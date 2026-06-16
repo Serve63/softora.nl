@@ -1508,7 +1508,7 @@
             sortAsc: true,
             openId: null,
             modalEditId: null,
-            photoTargetId: null, photoRestorePending: true, photoRestoreFailed: false, dataLoading: true, dataUnavailable: false, remoteCustomersLoaded: false, mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false,
+            photoTargetId: null, photoRestorePending: true, photoRestoreFailed: false, dataLoading: true, dataUnavailable: false, remoteCustomersLoaded: false, mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false, mailReadySnapshotCustomers: [],
             visibleLimit: TABLE_PAGE_SIZE,
             lastMailReadyHeaderCount: null,
             lastPhotoHeaderCount: null,
@@ -2890,7 +2890,7 @@
                     } catch (error) {
                         state.photoRestoreFailed = true; console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error);
                     }
-                    const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
+                    customersWithPhotos = window.SoftoraDatabaseMailReadySnapshot.mergeAssetFlags(customersWithPhotos, state.mailReadySnapshotCustomers); const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
                     const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; state.mailReadySnapshotLoaded = false; state.mailReadySnapshotTotal = null; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     if (coldmailGuardLoadError && !coldmailGuardReady) setStatusMessage("Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd.", "error", true); else if (!coldmailGuardLoadError) setStatusMessage("");
                     return;

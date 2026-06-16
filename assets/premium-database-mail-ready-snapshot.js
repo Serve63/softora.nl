@@ -19,6 +19,46 @@
         });
     }
 
+    function normalizeMatchValue(value) {
+        return String(value || "").trim().toLowerCase();
+    }
+
+    function getMatchKeys(customer) {
+        const rawWebsite = normalizeMatchValue(customer && (customer.website || customer.dom)).replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+        return [
+            normalizeMatchValue(customer && customer.id),
+            normalizeMatchValue(customer && customer.email),
+            rawWebsite,
+            normalizeMatchValue(customer && customer.bedrijf)
+        ].filter(Boolean);
+    }
+
+    function buildSnapshotMap(snapshotCustomers) {
+        const map = new Map();
+        (Array.isArray(snapshotCustomers) ? snapshotCustomers : []).forEach(function (customer) {
+            if (!isSnapshotMailReadyCustomer(customer)) return;
+            getMatchKeys(customer).forEach(function (key) {
+                if (!map.has(key)) map.set(key, customer);
+            });
+        });
+        return map;
+    }
+
+    function mergeAssetFlags(customers, snapshotCustomers) {
+        const snapshotMap = buildSnapshotMap(snapshotCustomers);
+        if (!snapshotMap.size) return customers || [];
+        return (customers || []).map(function (customer) {
+            const match = getMatchKeys(customer).map(function (key) { return snapshotMap.get(key); }).find(Boolean);
+            if (!match) return customer;
+            return Object.assign({}, customer, {
+                hasPhoto: true,
+                hasMockup: true,
+                websitePhotoAssetReady: true,
+                websiteMockupAssetReady: true
+            });
+        });
+    }
+
     function getDisplayCount(state, currentCount) {
         const count = Math.max(0, Number(currentCount) || 0);
         if (!state || !state.mailReadySnapshotLoaded || state.remoteCustomersLoaded || state.activeStatus !== "benaderbaar" || !Number.isFinite(Number(state.mailReadySnapshotTotal))) return count;
@@ -39,6 +79,7 @@
             const snapshotCustomers = rows.map(function (row, index) { return normalizeSnapshotCustomer(row, index, config.normalizeCustomer); }).filter(function (customer) { return customer && customer.id; });
             if (!snapshotCustomers.length) return false;
             state.mailReadySnapshotLoaded = true; state.mailReadySnapshotFailed = false; state.mailReadySnapshotTotal = Math.max(snapshotCustomers.length, Number(payload.total) || 0); state.dataUnavailable = false;
+            state.mailReadySnapshotCustomers = snapshotCustomers;
             if (typeof config.applyCustomerList === "function") config.applyCustomerList(snapshotCustomers, true);
             return true;
         } catch (error) {
@@ -49,5 +90,5 @@
         }
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, normalizeCustomer: normalizeSnapshotCustomer, getDisplayCount: getDisplayCount, load: load };
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, normalizeCustomer: normalizeSnapshotCustomer, mergeAssetFlags: mergeAssetFlags, getDisplayCount: getDisplayCount, load: load };
 })(window);

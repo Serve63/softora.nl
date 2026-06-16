@@ -773,7 +773,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
 
 test('mail-ready snapshot client loads compact rows before full database restore', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('snapshot should not warn'); } } });
-  const state = { mailReadySnapshotLoaded: false, mailReadySnapshotFailed: false, mailReadySnapshotTotal: null, dataUnavailable: true, remoteCustomersLoaded: false, activeStatus: 'benaderbaar' };
+  const state = { mailReadySnapshotLoaded: false, mailReadySnapshotFailed: false, mailReadySnapshotTotal: null, mailReadySnapshotCustomers: [], dataUnavailable: true, remoteCustomersLoaded: false, activeStatus: 'benaderbaar' };
   const applied = [];
   let requestArgs = null;
 
@@ -796,6 +796,7 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(state.mailReadySnapshotLoaded, true);
   assert.equal(state.mailReadySnapshotFailed, false);
   assert.equal(state.mailReadySnapshotTotal, 437);
+  assert.equal(state.mailReadySnapshotCustomers.length, 1);
   assert.equal(state.dataUnavailable, false);
   assert.equal(applied.length, 1);
   assert.equal(applied[0].forceRender, true);
@@ -803,6 +804,10 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(applied[0].customers[0].websiteMockupAssetReady, true);
   assert.equal(client.isSnapshotMailReadyCustomer(applied[0].customers[0]), true);
   assert.equal(client.getDisplayCount(state, applied[0].customers.length), 437);
+
+  const merged = client.mergeAssetFlags([{ id: 'customer-1', bedrijf: 'Demo BV', email: 'info@demo.nl', website: 'https://demo.nl' }], state.mailReadySnapshotCustomers);
+  assert.equal(merged[0].websitePhotoAssetReady, true);
+  assert.equal(merged[0].websiteMockupAssetReady, true);
 });
 
 test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
@@ -877,12 +882,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /loadFailed = true;[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);/);
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
-  assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false,/);
+  assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260616a/);
   assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /fetchJsonWithTimeout\(ENDPOINT \+ "\?limit=50&offset=0", \{ method: "GET", cache: "no-store" \}, 2500\)/);
   assert.match(snapshotSource, /global\.SoftoraDatabaseMailReadySnapshot =/);
+  assert.match(snapshotSource, /state\.mailReadySnapshotCustomers = snapshotCustomers;/);
+  assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers\)/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{ return \(state\.activeStatus === "benaderbaar" \|\| state\.activeStatus === "beschikbaar"\) && \(state\.dataLoading \|\| !state\.remoteCustomersLoaded \|\| state\.photoRestorePending \|\| !hasLoadedColdmailGuard\(\)\); \}/);
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">" \+ \(state\.activeStatus === "beschikbaar" \? "Beschikbare data laden\.\.\." : "Mailklare data laden\.\.\."\)/);
@@ -899,6 +906,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
+  assert.match(pageSource, /customersWithPhotos = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(customersWithPhotos, state\.mailReadySnapshotCustomers\);/);
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; state\.remoteCustomersLoaded = true; state\.mailReadySnapshotLoaded = false; state\.mailReadySnapshotTotal = null; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
   assert.doesNotMatch(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(pageSource, /if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
