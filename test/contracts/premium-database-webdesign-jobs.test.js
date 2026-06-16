@@ -801,6 +801,63 @@ test('premium database webdesign bulk cancel stops the remaining server batch wo
   assert.equal(pipelineCalls.length, 1);
 });
 
+test('premium database webdesign bulk cancel reports storage cause when saving fails', async () => {
+  const baseStore = createInMemoryWebdesignBatchStore();
+  const store = {
+    ...baseStore,
+    async upsertWebdesignBatch(batch) {
+      if (batch && batch.status === 'cancelled') {
+        return { ok: false, error: 'supabase write refused' };
+      }
+      return baseStore.upsertWebdesignBatch(batch);
+    },
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => ({ image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } }),
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 1 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        targets: [{
+          websiteUrl: 'https://cancel-fail.test',
+          customer: { id: 'cancel-fail', bedrijf: 'Cancel Fail', dom: 'cancel-fail.test' },
+        }],
+      },
+    },
+    createResponseRecorder()
+  );
+
+  const storedBatch = store.batches.get(batchId);
+  storedBatch.status = 'running';
+  storedBatch.total = 1;
+  storedBatch.uploadedTargets = 1;
+  storedBatch.summary = { total: 1, uploadedTargets: 1, pending: 1, queued: 0, running: 0, done: 0, failed: 0, cancelled: 0 };
+
+  const cancelRes = createResponseRecorder();
+  await coordinator.cancelBatchResponse({ premiumAuth: auth, params: { batchId } }, cancelRes);
+
+  assert.equal(cancelRes.statusCode, 503);
+  assert.equal(cancelRes.body.ok, false);
+  assert.match(cancelRes.body.detail, /Oorzaak: batch-annulering opslaan - supabase write refused/);
+  assert.equal(cancelRes.body.action, 'batch-annulering opslaan');
+  assert.equal(cancelRes.body.cause, 'supabase write refused');
+});
+
 test('premium database webdesign bulk status returns active jobs without blocking on image generation', async () => {
   const store = createInMemoryWebdesignBatchStore();
   let pipelineCalls = 0;

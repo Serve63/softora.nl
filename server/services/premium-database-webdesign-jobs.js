@@ -1469,35 +1469,59 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     );
   }
 
-  function createBatchStorageUnavailableResult() {
+  function getBatchStorageCause(error) {
+    if (!error) return '';
+    if (typeof error === 'string') return truncateText(normalizeString(error), 240);
+    const source = error && typeof error === 'object' ? error : {};
+    const message = normalizeString(source.message || source.detail || source.details || source.error || source.hint || source.code || source.statusText || error);
+    return truncateText(message, 240);
+  }
+
+  function createBatchStorageUnavailableResult(action, error) {
+    const actionText = truncateText(normalizeString(action), 120);
+    const cause = getBatchStorageCause(error);
+    const suffix = [actionText, cause].filter(Boolean).join(' - ') || 'onbekende opslagfout';
     return {
       ok: false,
       statusCode: 503,
       error: 'Webdesign-bulk tijdelijk niet bereikbaar',
-      detail: 'De bulk-wachtrij kon niet veilig worden opgeslagen of gelezen. Probeer opnieuw.',
+      detail: `De bulk-wachtrij kon niet veilig worden opgeslagen of gelezen. Oorzaak: ${suffix}.`,
+      action: actionText,
+      cause,
       retryable: true,
     };
   }
 
-  async function persistBatch(batch) {
-    if (!requiresPersistentBatchStorage()) return null;
+  function createPersistFailure(action, result) {
+    const message = getBatchStorageCause(result) || `${action} mislukt`;
+    return { ok: false, action, error: new Error(message), result };
+  }
+
+  async function persistBatch(batch, action = 'batch opslaan') {
+    if (!requiresPersistentBatchStorage()) return { ok: false, action, error: new Error('Batch-opslag ontbreekt') };
     try {
       const saved = await dataOpsStore.upsertWebdesignBatch(batch);
-      return saved && saved.ok ? saved : null;
+      if (saved && saved.ok) return saved;
+      const failure = createPersistFailure(action, saved);
+      logger.error('[PremiumDatabaseWebdesignJobs][batch-persist-result]', failure.error.message);
+      return failure;
     } catch (error) {
       logger.error('[PremiumDatabaseWebdesignJobs][batch-persist]', error && error.message ? error.message : error);
-      return null;
+      return { ok: false, action, error };
     }
   }
 
-  async function persistBatchChunk(chunk) {
-    if (!requiresPersistentBatchStorage()) return null;
+  async function persistBatchChunk(chunk, action = 'batch-blok opslaan') {
+    if (!requiresPersistentBatchStorage()) return { ok: false, action, error: new Error('Batch-opslag ontbreekt') };
     try {
       const saved = await dataOpsStore.upsertWebdesignBatchChunk(chunk);
-      return saved && saved.ok ? saved : null;
+      if (saved && saved.ok) return saved;
+      const failure = createPersistFailure(action, saved);
+      logger.error('[PremiumDatabaseWebdesignJobs][batch-chunk-persist-result]', failure.error.message);
+      return failure;
     } catch (error) {
       logger.error('[PremiumDatabaseWebdesignJobs][batch-chunk-persist]', error && error.message ? error.message : error);
-      return null;
+      return { ok: false, action, error };
     }
   }
 
@@ -1788,8 +1812,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function persistChangedBatchChunks(chunks, changedIndexes) {
     for (const chunk of chunks) {
       if (!changedIndexes.has(chunk.index)) continue;
-      await persistBatchChunk(chunk);
+      const saved = await persistBatchChunk(chunk, `batch-blok ${chunk.index} opslaan`);
+      if (!saved || saved.ok !== true) return saved;
     }
+    return { ok: true };
   }
 
   async function runLimited(items, limit, worker) {
@@ -1857,7 +1883,17 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       }
     });
 
-    await persistChangedBatchChunks(chunks, changed);
+    const chunksSaved = await persistChangedBatchChunks(chunks, changed);
+    if (!chunksSaved || chunksSaved.ok !== true) {
+      return {
+        loadedJobs,
+        missingJobs,
+        processedJobs,
+        completedTargets,
+        changedChunks: changed.size,
+        storageError: chunksSaved,
+      };
+    }
     const summary = summarizeBatchChunks(batch, chunks);
     batch.summary = summary;
     batch.uploadedTargets = summary.uploadedTargets;
@@ -1865,7 +1901,18 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       batch.status = 'done';
       batch.finishedAt = now();
     }
-    await persistBatch(batch);
+    const batchSaved = await persistBatch(batch, 'batch-worker samenvatting opslaan');
+    if (!batchSaved || batchSaved.ok !== true) {
+      return {
+        loadedJobs,
+        missingJobs,
+        processedJobs,
+        completedTargets,
+        changedChunks: changed.size,
+        summary,
+        storageError: batchSaved,
+      };
+    }
 
     return {
       loadedJobs,
@@ -1884,7 +1931,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       reconciled.forEach((index) => changed.add(index));
       const started = await startPendingBatchTargets(batch, chunks);
       started.forEach((index) => changed.add(index));
-      await persistChangedBatchChunks(chunks, changed);
+      const chunksSaved = await persistChangedBatchChunks(chunks, changed);
+      if (!chunksSaved || chunksSaved.ok !== true) return { batch, chunks, storageError: chunksSaved };
       const summary = summarizeBatchChunks(batch, chunks);
       batch.summary = summary;
       batch.uploadedTargets = summary.uploadedTargets;
@@ -1892,7 +1940,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         batch.status = 'done';
         batch.finishedAt = now();
       }
-      await persistBatch(batch);
+      const batchSaved = await persistBatch(batch, 'batch-status opslaan');
+      if (!batchSaved || batchSaved.ok !== true) return { batch, chunks, storageError: batchSaved };
     }
     return { batch, chunks };
   }
@@ -1939,14 +1988,29 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         changed.add(chunk.index);
       }
     }
-    await persistChangedBatchChunks(chunks, changed);
+    const chunksSaved = await persistChangedBatchChunks(chunks, changed);
+    if (!chunksSaved || chunksSaved.ok !== true) {
+      return {
+        ok: false,
+        action: chunksSaved && chunksSaved.action,
+        error: chunksSaved && chunksSaved.error,
+      };
+    }
     const summary = summarizeBatchChunks(batch, chunks);
     batch.status = 'cancelled';
     batch.finishedAt = batch.finishedAt || now();
     batch.summary = summary;
     batch.uploadedTargets = summary.uploadedTargets;
-    await persistBatch(batch);
+    const batchSaved = await persistBatch(batch, 'batch-annulering opslaan');
+    if (!batchSaved || batchSaved.ok !== true) {
+      return {
+        ok: false,
+        action: batchSaved && batchSaved.action,
+        error: batchSaved && batchSaved.error,
+      };
+    }
     return {
+      ok: true,
       batch,
       chunks,
       cancelledTargets,
@@ -1963,12 +2027,17 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function runBatchWorker(options = {}) {
     pruneJobs();
     if (!requiresPersistentBatchStorage()) {
-      return createBatchStorageUnavailableResult();
+      return createBatchStorageUnavailableResult('batch-opslag controleren');
     }
     const batchLimit = Math.max(1, Math.min(BULK_WORKER_BATCH_LIMIT, Math.floor(Number(options.batchLimit) || BULK_WORKER_BATCH_LIMIT)));
-    const runnableBatches = await listRunnableBatches(batchLimit);
+    let runnableBatches;
+    try {
+      runnableBatches = await listRunnableBatches(batchLimit);
+    } catch (error) {
+      return createBatchStorageUnavailableResult('runnable batches lezen', error);
+    }
     if (!Array.isArray(runnableBatches)) {
-      return createBatchStorageUnavailableResult();
+      return createBatchStorageUnavailableResult('runnable batches lezen', new Error('Geen batchlijst ontvangen'));
     }
 
     const result = {
@@ -1988,8 +2057,26 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       const chunksResult = await loadBatchChunks(batch.ownerKey, batch.id);
       if (chunksResult.error) continue;
       const drivenBefore = await driveBatch(batch, chunksResult.chunks || []);
+      if (drivenBefore.storageError) {
+        return createBatchStorageUnavailableResult(
+          drivenBefore.storageError.action || 'batch-status opslaan',
+          drivenBefore.storageError.error
+        );
+      }
       const workerResult = await processBatchJobsForWorker(drivenBefore.batch, drivenBefore.chunks, options);
+      if (workerResult.storageError) {
+        return createBatchStorageUnavailableResult(
+          workerResult.storageError.action || 'batch-worker opslaan',
+          workerResult.storageError.error
+        );
+      }
       const drivenAfter = await driveBatch(drivenBefore.batch, drivenBefore.chunks);
+      if (drivenAfter.storageError) {
+        return createBatchStorageUnavailableResult(
+          drivenAfter.storageError.action || 'batch-status opslaan',
+          drivenAfter.storageError.error
+        );
+      }
       const serialized = serializeBatch(drivenAfter.batch, drivenAfter.chunks);
       result.batchCount += 1;
       result.processedJobs += workerResult.processedJobs;
@@ -2020,13 +2107,13 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
     const loaded = await loadBatch(ownerKey, batchId);
     if (loaded.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch lezen', loaded.error);
       return res.status(result.statusCode).json(result);
     }
     if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
     const chunksResult = await loadBatchChunks(ownerKey, batchId);
     if (chunksResult.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch-blokken lezen', chunksResult.error);
       return res.status(result.statusCode).json(result);
     }
     const chunks = chunksResult.chunks || [];
@@ -2040,6 +2127,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       });
     }
     const cancelled = await cancelBatch(loaded.batch, chunks);
+    if (!cancelled || cancelled.ok !== true) {
+      const result = createBatchStorageUnavailableResult(cancelled && cancelled.action ? cancelled.action : 'batch annuleren', cancelled && cancelled.error);
+      return res.status(result.statusCode).json(result);
+    }
     return res.status(200).json({
       ok: true,
       cancelled: true,
@@ -2053,7 +2144,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const ownerKey = ownerKeyFromReq(req);
     if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
     if (!requiresPersistentBatchStorage()) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch-opslag controleren');
       return res.status(result.statusCode).json(result);
     }
     const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -2070,9 +2161,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       summary: {},
       lastError: '',
     };
-    const saved = await persistBatch(batch);
-    if (!saved) {
-      const result = createBatchStorageUnavailableResult();
+    const saved = await persistBatch(batch, 'batch starten opslaan');
+    if (!saved || saved.ok !== true) {
+      const result = createBatchStorageUnavailableResult(saved && saved.action ? saved.action : 'batch starten opslaan', saved && saved.error);
       return res.status(result.statusCode).json(result);
     }
     return res.status(202).json({ ok: true, batch: serializeBatch(batch, []) });
@@ -2085,7 +2176,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
     const loaded = await loadBatch(ownerKey, batchId);
     if (loaded.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch lezen', loaded.error);
       return res.status(result.statusCode).json(result);
     }
     if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
@@ -2104,18 +2195,26 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       targets: rawTargets.map((target, targetIndex) => normalizeBatchTarget({ ...target, index: offset + targetIndex }, offset + targetIndex)),
       createdAt: now(),
     };
-    const saved = await persistBatchChunk(chunk);
-    if (!saved) {
-      const result = createBatchStorageUnavailableResult();
+    const saved = await persistBatchChunk(chunk, `batch-blok ${index} opslaan`);
+    if (!saved || saved.ok !== true) {
+      const result = createBatchStorageUnavailableResult(saved && saved.action ? saved.action : 'batch-blok opslaan', saved && saved.error);
       return res.status(result.statusCode).json(result);
     }
     const chunksResult = await loadBatchChunks(ownerKey, batchId);
+    if (chunksResult.error) {
+      const result = createBatchStorageUnavailableResult('batch-blokken na upload lezen', chunksResult.error);
+      return res.status(result.statusCode).json(result);
+    }
     const chunks = chunksResult.chunks || [chunk];
     const summary = summarizeBatchChunks(loaded.batch, chunks);
     loaded.batch.uploadedTargets = summary.uploadedTargets;
     loaded.batch.expectedChunks = Math.max(loaded.batch.expectedChunks || 0, index + 1);
     loaded.batch.summary = summary;
-    await persistBatch(loaded.batch);
+    const batchSaved = await persistBatch(loaded.batch, 'batch-upload samenvatting opslaan');
+    if (!batchSaved || batchSaved.ok !== true) {
+      const result = createBatchStorageUnavailableResult(batchSaved && batchSaved.action ? batchSaved.action : 'batch-upload samenvatting opslaan', batchSaved && batchSaved.error);
+      return res.status(result.statusCode).json(result);
+    }
     return res.status(202).json({ ok: true, batch: serializeBatch(loaded.batch, chunks) });
   }
 
@@ -2126,14 +2225,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
     const loaded = await loadBatch(ownerKey, batchId);
     if (loaded.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch lezen', loaded.error);
       return res.status(result.statusCode).json(result);
     }
     if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
     if (isBatchTerminalStatus(loaded.batch.status)) return res.status(409).json({ ok: false, error: 'Batch is al klaar' });
     const chunksResult = await loadBatchChunks(ownerKey, batchId);
     if (chunksResult.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch-blokken lezen', chunksResult.error);
       return res.status(result.statusCode).json(result);
     }
     const chunks = chunksResult.chunks || [];
@@ -2146,8 +2245,16 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     loaded.batch.uploadedTargets = summary.uploadedTargets;
     loaded.batch.startedAt = loaded.batch.startedAt || now();
     loaded.batch.summary = summary;
-    await persistBatch(loaded.batch);
+    const batchSaved = await persistBatch(loaded.batch, 'batch starten afronden');
+    if (!batchSaved || batchSaved.ok !== true) {
+      const result = createBatchStorageUnavailableResult(batchSaved && batchSaved.action ? batchSaved.action : 'batch starten afronden', batchSaved && batchSaved.error);
+      return res.status(result.statusCode).json(result);
+    }
     const driven = await driveBatch(loaded.batch, chunks);
+    if (driven.storageError) {
+      const result = createBatchStorageUnavailableResult(driven.storageError.action || 'batch-status opslaan', driven.storageError.error);
+      return res.status(result.statusCode).json(result);
+    }
     return res.status(202).json({ ok: true, batch: serializeBatch(driven.batch, driven.chunks) });
   }
 
@@ -2158,16 +2265,20 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
     const loaded = await loadBatch(ownerKey, batchId);
     if (loaded.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch lezen', loaded.error);
       return res.status(result.statusCode).json(result);
     }
     if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
     const chunksResult = await loadBatchChunks(ownerKey, batchId);
     if (chunksResult.error) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('batch-blokken lezen', chunksResult.error);
       return res.status(result.statusCode).json(result);
     }
     const driven = await driveBatch(loaded.batch, chunksResult.chunks || []);
+    if (driven.storageError) {
+      const result = createBatchStorageUnavailableResult(driven.storageError.action || 'batch-status opslaan', driven.storageError.error);
+      return res.status(result.statusCode).json(result);
+    }
     return res.status(200).json({ ok: true, batch: serializeBatch(driven.batch, driven.chunks) });
   }
 
@@ -2175,12 +2286,18 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const ownerKey = ownerKeyFromReq(req);
     if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
     if (!dataOpsStore || typeof dataOpsStore.listVisibleWebdesignBatches !== 'function') {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('zichtbare batches lezen');
       return res.status(result.statusCode).json(result);
     }
-    const batches = await dataOpsStore.listVisibleWebdesignBatches(ownerKey);
+    let batches;
+    try {
+      batches = await dataOpsStore.listVisibleWebdesignBatches(ownerKey);
+    } catch (error) {
+      const result = createBatchStorageUnavailableResult('zichtbare batches lezen', error);
+      return res.status(result.statusCode).json(result);
+    }
     if (!Array.isArray(batches)) {
-      const result = createBatchStorageUnavailableResult();
+      const result = createBatchStorageUnavailableResult('zichtbare batches lezen', new Error('Geen batchlijst ontvangen'));
       return res.status(result.statusCode).json(result);
     }
     return res.status(200).json({ ok: true, batches: batches.map((batch) => serializeBatch(batch, [])) });

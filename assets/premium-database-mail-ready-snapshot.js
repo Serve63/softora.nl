@@ -2,6 +2,12 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
+    const PAGE_LIMIT = 100;
+    const MAX_SNAPSHOT_ROWS = 3000;
+    const FIRST_PAGE_TIMEOUT_MS = 2500;
+    const NEXT_PAGE_TIMEOUT_MS = 4500;
+    const PAGE_CONCURRENCY = 3;
+    const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
 
     function isSnapshotMailReadyCustomer(customer) {
         return Boolean(customer && customer.mailReadySnapshot === true && customer.mailReady === true);
@@ -61,29 +67,118 @@
 
     function getDisplayCount(state, currentCount) {
         const count = Math.max(0, Number(currentCount) || 0);
-        if (!state || !state.mailReadySnapshotLoaded || state.remoteCustomersLoaded || state.activeStatus !== "benaderbaar" || !Number.isFinite(Number(state.mailReadySnapshotTotal))) return count;
+        if (state && String(state.query || "").trim()) return count;
+        if (!state || !state.mailReadySnapshotLoaded || state.activeStatus !== "benaderbaar" || !Number.isFinite(Number(state.mailReadySnapshotTotal))) return count;
         return Math.max(count, Number(state.mailReadySnapshotTotal));
+    }
+
+    function clearRetry(state) {
+        if (!state) return;
+        if (state.mailReadySnapshotRetryTimer && typeof global.clearTimeout === "function") {
+            global.clearTimeout(state.mailReadySnapshotRetryTimer);
+        }
+        state.mailReadySnapshotRetryTimer = null;
+        state.mailReadySnapshotRetryAttempt = 0;
+    }
+
+    function scheduleRetry(config) {
+        const state = config && config.state;
+        if (!state || state.mailReadySnapshotRetryTimer || typeof global.setTimeout !== "function") return;
+        const attempt = Math.max(0, Number(state.mailReadySnapshotRetryAttempt) || 0);
+        const delay = RESTORE_RETRY_DELAYS_MS[attempt];
+        if (!Number.isFinite(Number(delay))) return;
+        state.mailReadySnapshotPending = true;
+        state.mailReadySnapshotRetryAttempt = attempt + 1;
+        state.mailReadySnapshotRetryTimer = global.setTimeout(function () {
+            state.mailReadySnapshotRetryTimer = null;
+            void load(Object.assign({}, config, { retry: true }));
+        }, delay);
+    }
+
+    function buildEndpoint(limit, offset) {
+        return ENDPOINT + "?limit=" + encodeURIComponent(limit) + "&offset=" + encodeURIComponent(offset);
+    }
+
+    async function fetchSnapshotPage(config, limit, offset, timeoutMs) {
+        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "no-store" }, timeoutMs);
+        if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
+        const payload = await response.json().catch(function () { return {}; });
+        if (!payload || payload.ok !== true) throw new Error(String(payload && (payload.detail || payload.error) || "Mailklare snapshot gaf geen geldige data terug."));
+        const rows = Array.isArray(payload.customers) ? payload.customers : [];
+        const total = Math.max(rows.length + offset, Number(payload.total) || 0);
+        return { payload: payload, rows: rows, total: total };
+    }
+
+    function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
+        return (Array.isArray(rows) ? rows : []).map(function (row, index) {
+            return normalizeSnapshotCustomer(row, offset + index, normalizeCustomer);
+        }).filter(function (customer) { return customer && customer.id; });
+    }
+
+    function publishSnapshot(config, snapshotCustomers, total, pending) {
+        const state = config.state;
+        state.mailReadySnapshotLoaded = true;
+        state.mailReadySnapshotFailed = false;
+        state.mailReadySnapshotPending = Boolean(pending);
+        state.mailReadySnapshotTotal = Math.max(snapshotCustomers.length, Number(total) || 0);
+        state.mailReadySnapshotCustomers = snapshotCustomers;
+        state.dataUnavailable = false;
+        clearRetry(state);
+        if (typeof config.applyCustomerList === "function") {
+            const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
+            const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(isSnapshotMailReadyCustomer);
+            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers) : snapshotCustomers, true);
+        }
+    }
+
+    async function fetchRemainingPages(config, total, firstRows) {
+        const maxRows = Math.min(MAX_SNAPSHOT_ROWS, Math.max(0, Number(total) || 0));
+        const offsets = [];
+        for (let offset = PAGE_LIMIT; offset < maxRows; offset += PAGE_LIMIT) offsets.push(offset);
+        const pages = [];
+        let cursor = 0;
+        async function worker() {
+            while (cursor < offsets.length) {
+                const offset = offsets[cursor];
+                cursor += 1;
+                const page = await fetchSnapshotPage(config, PAGE_LIMIT, offset, NEXT_PAGE_TIMEOUT_MS);
+                pages.push({ offset: offset, rows: page.rows });
+            }
+        }
+        await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+        return firstRows.concat(pages.sort(function (left, right) { return left.offset - right.offset; }).flatMap(function (page) { return page.rows; }));
     }
 
     async function load(options) {
         const config = options || {}, state = config.state;
-        if (config.databaseHadBootstrapCustomers || !state) return false;
+        if (!state) return false;
         const fetchJsonWithTimeout = config.fetchJsonWithTimeout || (global.SoftoraDatabaseResilience && global.SoftoraDatabaseResilience.fetchJsonWithTimeout);
         if (typeof fetchJsonWithTimeout !== "function") return false;
+        config.fetchJsonWithTimeout = fetchJsonWithTimeout;
+        state.mailReadySnapshotPending = true;
         try {
-            const response = await fetchJsonWithTimeout(ENDPOINT + "?limit=50&offset=0", { method: "GET", cache: "no-store" }, 2500);
-            if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
-            const payload = await response.json().catch(function () { return {}; });
-            const rows = Array.isArray(payload && payload.customers) ? payload.customers : [];
-            if (!payload || payload.ok !== true || !rows.length) return false;
-            const snapshotCustomers = rows.map(function (row, index) { return normalizeSnapshotCustomer(row, index, config.normalizeCustomer); }).filter(function (customer) { return customer && customer.id; });
-            if (!snapshotCustomers.length) return false;
-            state.mailReadySnapshotLoaded = true; state.mailReadySnapshotFailed = false; state.mailReadySnapshotTotal = Math.max(snapshotCustomers.length, Number(payload.total) || 0); state.dataUnavailable = false;
-            state.mailReadySnapshotCustomers = snapshotCustomers;
-            if (typeof config.applyCustomerList === "function") config.applyCustomerList(snapshotCustomers, true);
+            const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
+            let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
+            publishSnapshot(config, snapshotCustomers, firstPage.total, firstPage.total > snapshotCustomers.length);
+            if (firstPage.total > snapshotCustomers.length && snapshotCustomers.length < MAX_SNAPSHOT_ROWS) {
+                try {
+                    const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
+                    snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
+                    publishSnapshot(config, snapshotCustomers, firstPage.total, false);
+                } catch (error) {
+                    state.mailReadySnapshotFailed = true;
+                    state.mailReadySnapshotPending = true;
+                    scheduleRetry(config);
+                    const logger = config.logger || global.console;
+                    if (logger && typeof logger.warn === "function") logger.warn("Mailklare snapshot vervolgpaginering tijdelijk overgeslagen:", error);
+                }
+            } else {
+                state.mailReadySnapshotPending = false;
+            }
             return true;
         } catch (error) {
             state.mailReadySnapshotFailed = true;
+            scheduleRetry(config);
             const logger = config.logger || global.console;
             if (logger && typeof logger.warn === "function") logger.warn("Mailklare snapshot tijdelijk overgeslagen:", error);
             return false;

@@ -376,11 +376,18 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   async function readCentralGuardKeys(keys) {
     if (!dataOpsStore || typeof dataOpsStore.listOutboundRecipientGuardKeys !== 'function') return new Set();
-    const rows = await dataOpsStore.listOutboundRecipientGuardKeys(keys, {
-      suppressTransientReadFailureLog: true,
-    });
-    if (!rows) return new Set(keys);
-    return new Set(rows);
+    try {
+      const rows = await dataOpsStore.listOutboundRecipientGuardKeys(keys, {
+        suppressTransientReadFailureLog: true,
+      });
+      if (!Array.isArray(rows)) return null;
+      return new Set(rows);
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[PremiumDatabaseMailReadySnapshot][central-guard]', error?.message || error);
+      }
+      return null;
+    }
   }
 
   async function buildMailReadySnapshot(options = {}) {
@@ -398,7 +405,10 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const photosStartMs = Date.now();
     const photoRows = await readPhotoFlags();
     const photosMs = Date.now() - photosStartMs;
-    const photoMaps = buildPhotoFlagMaps(photoRows || []);
+    if (!Array.isArray(photoRows)) {
+      throw createUnavailableError('Mailklare snapshot kon foto- en mockupdata niet laden.');
+    }
+    const photoMaps = buildPhotoFlagMaps(photoRows);
 
     const computeStartMs = Date.now();
     const basicCandidates = customerRows
@@ -413,8 +423,11 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       readLegacyColdmailGuardKeys(getUiStateValues, logger),
     ]);
     const guardsMs = Date.now() - guardsStartMs;
+    if (centralGuardKeys === null || legacyGuardKeys === null) {
+      throw createUnavailableError('Mailklare snapshot kon verzendbeveiliging niet laden.');
+    }
 
-    const blockedGuardKeys = legacyGuardKeys === null ? new Set(guardKeys) : new Set([...centralGuardKeys, ...legacyGuardKeys]);
+    const blockedGuardKeys = new Set([...centralGuardKeys, ...legacyGuardKeys]);
     const finalComputeStartMs = Date.now();
     const mailReadyRows = basicCandidates
       .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)))
@@ -457,6 +470,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         ok: false,
         source: SNAPSHOT_SOURCE,
         error: truncateText(error && error.message ? error.message : 'Mailklare snapshot kon niet laden.', 240),
+        detail: truncateText(error && error.message ? error.message : 'Mailklare snapshot kon niet laden.', 240),
       });
     }
   }

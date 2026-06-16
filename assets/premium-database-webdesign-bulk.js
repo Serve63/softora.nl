@@ -62,7 +62,7 @@
         function ensureStatusParts(node) {
             if (!node) return null;
             if (!node.__softoraBulkParts) {
-                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\"></span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\"></span></span><span class=\"webdesign-bulk-rest\"></span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Rest annuleren\">&times;</button>";
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\"></span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\"></span></span><span class=\"webdesign-bulk-rest\"></span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Annuleren\">&times;</button>";
                 node.__softoraBulkParts = {
                     num: node.querySelector ? node.querySelector(".webdesign-bulk-num") : null,
                     fill: node.querySelector ? node.querySelector(".webdesign-bulk-fill") : null,
@@ -101,7 +101,7 @@
             const status = fallbackNormalize(batch && batch.status).toLowerCase();
             node.hidden = false;
             if (!parts || !parts.num || !parts.fill || !parts.rest) {
-                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Rest annuleren\"" + (isTerminalBatchStatus(status) ? " hidden" : "") + ">&times;</button>";
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Annuleren\"" + (isTerminalBatchStatus(status) ? " hidden" : "") + ">&times;</button>";
                 return;
             }
             if (parts && parts.num) parts.num.textContent = line.num;
@@ -130,7 +130,7 @@
             if (global.SoftoraDialogs && typeof global.SoftoraDialogs.confirm === "function") {
                 return global.SoftoraDialogs.confirm(message, {
                     title: "Bulk annuleren",
-                    confirmText: "Rest annuleren",
+                    confirmText: "Annuleren",
                     cancelText: "Terug"
                 });
             }
