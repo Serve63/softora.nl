@@ -548,6 +548,54 @@ test('premium database webdesign bulk batches process targets through a persiste
   assert.equal(pipelineCalls.length, 5);
 });
 
+test('premium database webdesign bulk starts a larger default active window for faster generation', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let pipelineCalls = 0;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 20 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  const chunkRes = createResponseRecorder();
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        offset: 0,
+        targets: Array.from({ length: 20 }, (_, index) => ({
+          websiteUrl: `https://bedrijf-fast-${index}.test`,
+          customer: { id: `customer-fast-${index}`, bedrijf: `Bedrijf Fast ${index}`, dom: `bedrijf-fast-${index}.test` },
+        })),
+      },
+    },
+    chunkRes
+  );
+
+  const commitRes = createResponseRecorder();
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 20, expectedChunks: 1 } }, commitRes);
+
+  assert.equal(commitRes.statusCode, 202);
+  assert.equal(commitRes.body.batch.active, 16);
+  assert.equal(commitRes.body.batch.queued, 16);
+  assert.equal(commitRes.body.batch.activeJobIds.length, 16);
+  assert.equal(pipelineCalls, 0);
+});
+
 test('premium database webdesign bulk status returns active jobs without blocking on image generation', async () => {
   const store = createInMemoryWebdesignBatchStore();
   let pipelineCalls = 0;

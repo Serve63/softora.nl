@@ -1531,7 +1531,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /SoftoraDatabaseWebdesignBulk/);
   assert.match(webdesignBulkScriptSource, /const BATCH_ENDPOINT = "\/api\/premium-database\/webdesign-photo-batches";/);
   assert.match(webdesignBulkScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(webdesignBulkScriptSource, /const ACTIVE_JOB_PUMP_LIMIT = 3;/);
+  assert.match(webdesignBulkScriptSource, /const ACTIVE_JOB_PUMP_LIMIT = 12;/);
   assert.match(webdesignBulkScriptSource, /async function startBulkBatchForCustomers\(customers\)/);
   assert.match(webdesignBulkScriptSource, /RESTORE_DONE_BATCH_WINDOW_MS = 15 \* 60 \* 1000/);
   assert.match(webdesignBulkScriptSource, /function pickRestorableBatch\(batches\)/);
@@ -1563,8 +1563,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260616e/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
+  assert.match(webdesignBulkScriptSource, /const ACTIVE_JOB_PUMP_LIMIT = 12;/);
+  assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1600;/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);
