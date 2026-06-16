@@ -34,6 +34,20 @@ function createResponseRecorder() {
   };
 }
 
+async function callRouteHandlers(handlers, req = {}) {
+  const res = createResponseRecorder();
+  let index = 0;
+  async function next() {
+    const handler = handlers[index];
+    index += 1;
+    if (typeof handler === 'function') {
+      await handler(req, res, next);
+    }
+  }
+  await next();
+  return res;
+}
+
 function wait(ms = 0) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -118,10 +132,56 @@ test('premium database webdesign job routes expose persistent bulk endpoints', (
     ['GET', '/api/premium-database/webdesign-photo-jobs/:jobId'],
     ['POST', '/api/premium-database/webdesign-photo-batches'],
     ['GET', '/api/premium-database/webdesign-photo-batches'],
+    ['POST', '/api/premium-database/webdesign-photo-batches/run'],
+    ['GET', '/api/premium-database/webdesign-photo-batches/run'],
     ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/chunks'],
     ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/commit'],
     ['GET', '/api/premium-database/webdesign-photo-batches/:batchId'],
   ]);
+});
+
+test('premium database webdesign bulk runner cron route requires CRON_SECRET bearer access', async () => {
+  let cronRunHandlers = null;
+  let adminRunHandlers = null;
+  let workerCalls = 0;
+  const app = {
+    post(pathname, ...handlers) {
+      if (pathname === '/api/premium-database/webdesign-photo-batches/run') adminRunHandlers = handlers;
+    },
+    get(pathname, ...handlers) {
+      if (pathname === '/api/premium-database/webdesign-photo-batches/run') cronRunHandlers = handlers;
+    },
+  };
+  registerPremiumDatabaseWebdesignJobRoutes(app, {
+    cronSecret: 'cron-secret',
+    requirePremiumApiAccess: (_req, _res, next) => next(),
+    coordinator: {
+      runBatchWorkerResponse: async (_req, res) => {
+        workerCalls += 1;
+        return res.status(200).json({ ok: true });
+      },
+    },
+  });
+
+  const denied = await callRouteHandlers(cronRunHandlers, { headers: { authorization: 'Bearer wrong' } });
+  assert.equal(denied.statusCode, 401);
+  assert.equal(denied.body.code, 'WEBDESIGN_BULK_CRON_UNAUTHORIZED');
+  assert.equal(workerCalls, 0);
+
+  const allowed = await callRouteHandlers(cronRunHandlers, { headers: { authorization: 'Bearer cron-secret' } });
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(workerCalls, 1);
+
+  const admin = await callRouteHandlers(adminRunHandlers, { headers: {}, body: {} });
+  assert.equal(admin.statusCode, 200);
+  assert.equal(workerCalls, 2);
+});
+
+test('premium database webdesign bulk runner is registered as a Vercel cron', () => {
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../../vercel.json'), 'utf8'));
+  const workerCron = vercelConfig.crons.find((cron) => cron.path === '/api/premium-database/webdesign-photo-batches/run');
+
+  assert.equal(workerCron.schedule, '* * * * *');
 });
 
 test('premium database server mockup renderer matches the browser layout without fragile text labels', async () => {
@@ -253,6 +313,13 @@ function createInMemoryWebdesignBatchStore() {
     },
     async listVisibleWebdesignBatches(ownerKey) {
       return Array.from(batches.values()).filter((batch) => batch.ownerKey === ownerKey).map(clone);
+    },
+    async listRunnableWebdesignBatches(limit = 5) {
+      return Array.from(batches.values())
+        .filter((batch) => batch.status === 'running')
+        .sort((left, right) => (left.updatedAt || left.createdAt || 0) - (right.updatedAt || right.createdAt || 0))
+        .slice(0, limit)
+        .map(clone);
     },
     async upsertWebdesignBatchChunk(chunk) {
       chunks.set(chunk.id, clone(chunk));
@@ -567,7 +634,7 @@ test('premium database webdesign bulk starts a larger default active window for 
   const auth = { email: 'owner@softora.nl', userId: 'owner' };
 
   const startRes = createResponseRecorder();
-  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 20 } }, startRes);
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 50 } }, startRes);
   const batchId = startRes.body.batch.id;
   const chunkRes = createResponseRecorder();
   await coordinator.appendBatchChunkResponse(
@@ -577,7 +644,7 @@ test('premium database webdesign bulk starts a larger default active window for 
       body: {
         index: 0,
         offset: 0,
-        targets: Array.from({ length: 20 }, (_, index) => ({
+        targets: Array.from({ length: 50 }, (_, index) => ({
           websiteUrl: `https://bedrijf-fast-${index}.test`,
           customer: { id: `customer-fast-${index}`, bedrijf: `Bedrijf Fast ${index}`, dom: `bedrijf-fast-${index}.test` },
         })),
@@ -587,13 +654,61 @@ test('premium database webdesign bulk starts a larger default active window for 
   );
 
   const commitRes = createResponseRecorder();
-  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 20, expectedChunks: 1 } }, commitRes);
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 50, expectedChunks: 1 } }, commitRes);
 
   assert.equal(commitRes.statusCode, 202);
-  assert.equal(commitRes.body.batch.active, 16);
-  assert.equal(commitRes.body.batch.queued, 16);
-  assert.equal(commitRes.body.batch.activeJobIds.length, 16);
+  assert.equal(commitRes.body.batch.active, 36);
+  assert.equal(commitRes.body.batch.queued, 36);
+  assert.equal(commitRes.body.batch.activeJobIds.length, 36);
   assert.equal(pipelineCalls, 0);
+});
+
+test('premium database webdesign bulk server worker processes batches without browser job polling', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  const pipelineCalls = [];
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async (url, options) => {
+        pipelineCalls.push({ url, company: options.body.company });
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: `${options.body.company}-preview.png` } };
+      },
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 4 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        targets: Array.from({ length: 4 }, (_, index) => ({
+          websiteUrl: `https://server-worker-${index}.test`,
+          customer: { id: `server-worker-${index}`, bedrijf: `Server Worker ${index}`, dom: `server-worker-${index}.test` },
+        })),
+      },
+    },
+    createResponseRecorder()
+  );
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 4, expectedChunks: 1 } }, createResponseRecorder());
+
+  const run = await coordinator.runBatchWorker({ batchLimit: 1, jobLimit: 4, concurrency: 2 });
+
+  assert.equal(run.ok, true);
+  assert.equal(run.batchCount, 1);
+  assert.equal(run.processedJobs, 4);
+  assert.equal(pipelineCalls.length, 4);
+  assert.equal(run.batches[0].status, 'done');
+  assert.equal(run.batches[0].made, 4);
+  assert.equal(run.batches[0].remaining, 0);
 });
 
 test('premium database webdesign bulk status returns active jobs without blocking on image generation', async () => {

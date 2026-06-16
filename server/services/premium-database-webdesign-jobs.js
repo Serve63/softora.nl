@@ -524,6 +524,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     bulkActiveJobLimit = process.env.PREMIUM_WEBDESIGN_BULK_ACTIVE_LIMIT,
     bulkStartLimit = process.env.PREMIUM_WEBDESIGN_BULK_START_LIMIT,
     bulkReconcileLimit = process.env.PREMIUM_WEBDESIGN_BULK_RECONCILE_LIMIT,
+    bulkWorkerBatchLimit = process.env.PREMIUM_WEBDESIGN_BULK_WORKER_BATCH_LIMIT,
+    bulkWorkerJobLimit = process.env.PREMIUM_WEBDESIGN_BULK_WORKER_JOB_LIMIT,
+    bulkWorkerConcurrency = process.env.PREMIUM_WEBDESIGN_BULK_WORKER_CONCURRENCY,
     loadSharpImpl = loadSharpModule,
     now = () => Date.now(),
     random = Math.random,
@@ -537,11 +540,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   const MAX_RETRY_ATTEMPTS = 6;
   const RETRY_DELAY_MIN_MS = 5000;
   const RETRY_DELAY_MAX_MS = 60000;
-  const PROCESSING_CONCURRENCY = Math.max(1, Math.min(8, Math.floor(Number(webdesignJobConcurrency) || 4)));
+  const PROCESSING_CONCURRENCY = Math.max(1, Math.min(10, Math.floor(Number(webdesignJobConcurrency) || 6)));
   const BULK_CHUNK_TARGET_LIMIT = Math.max(1, Math.min(250, Math.floor(Number(bulkChunkTargetLimit) || 100)));
-  const BULK_ACTIVE_JOB_LIMIT = Math.max(1, Math.min(48, Math.floor(Number(bulkActiveJobLimit) || 16)));
-  const BULK_START_LIMIT = Math.max(1, Math.min(32, Math.floor(Number(bulkStartLimit) || 16)));
+  const BULK_ACTIVE_JOB_LIMIT = Math.max(1, Math.min(64, Math.floor(Number(bulkActiveJobLimit) || 36)));
+  const BULK_START_LIMIT = Math.max(1, Math.min(48, Math.floor(Number(bulkStartLimit) || 36)));
   const BULK_RECONCILE_LIMIT = Math.max(1, Math.min(12, Math.floor(Number(bulkReconcileLimit) || 4)));
+  const BULK_WORKER_BATCH_LIMIT = Math.max(1, Math.min(8, Math.floor(Number(bulkWorkerBatchLimit) || 4)));
+  const BULK_WORKER_JOB_LIMIT = Math.max(1, Math.min(24, Math.floor(Number(bulkWorkerJobLimit) || 18)));
+  const BULK_WORKER_CONCURRENCY = Math.max(1, Math.min(PROCESSING_CONCURRENCY, Math.floor(Number(bulkWorkerConcurrency) || 6)));
   const CHUNK_SIZE = 180000;
   const MAX_STORAGE_CHUNKS = 80;
   const DATABASE_PHOTO_IMAGE_SIZE = '1024x1536';
@@ -1196,6 +1202,30 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  async function processJobForWorker(job) {
+    if (!job) return job;
+    const shouldProcess = (job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job);
+    if (!shouldProcess || activeProcessingCount >= PROCESSING_CONCURRENCY || inlineProcessingJobIds.has(job.id)) return job;
+
+    if (job.status === 'running') {
+      job.status = 'queued';
+      job.error = null;
+      job.startedAt = null;
+      job.finishedAt = null;
+      clearRetryState(job);
+      await persistJob(job);
+    }
+
+    activeProcessingCount += 1;
+    inlineProcessingJobIds.add(job.id);
+    try {
+      return await settleJob(job);
+    } finally {
+      inlineProcessingJobIds.delete(job.id);
+      activeProcessingCount = Math.max(0, activeProcessingCount - 1);
+    }
+  }
+
   function queueProcessing() {
     if (activeProcessingCount >= PROCESSING_CONCURRENCY) return;
     let started = false;
@@ -1592,6 +1622,28 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return ids;
   }
 
+  function applyJobResultToBatchTarget(target, job) {
+    if (!target || !job) return false;
+    const beforeStatus = normalizeString(target.status).toLowerCase();
+    const beforeError = normalizeString(target.error || '');
+    if (job.status === 'done') {
+      markTarget(target, 'done', { error: '' });
+    } else if (job.status === 'error') {
+      markTarget(target, 'error', {
+        error: job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE ? 'OpenAI safety block' : truncateText(job.error || 'Webdesign maken is mislukt.', 500),
+      });
+    } else if (job.status === 'running') {
+      markTarget(target, 'running', { error: '' });
+    } else {
+      const retry = getRetryState(job);
+      markTarget(target, 'queued', {
+        error: '',
+        nextAttemptAt: retry.nextAttemptAt || null,
+      });
+    }
+    return beforeStatus !== normalizeString(target.status).toLowerCase() || beforeError !== normalizeString(target.error || '');
+  }
+
   function markTarget(target, status, patch = {}) {
     Object.assign(target, patch, {
       status,
@@ -1700,6 +1752,91 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  async function runLimited(items, limit, worker) {
+    const safeLimit = Math.max(1, Number(limit) || 1);
+    let cursor = 0;
+    const results = [];
+    const runners = Array.from({ length: Math.min(safeLimit, items.length) }, async () => {
+      while (cursor < items.length) {
+        const item = items[cursor];
+        cursor += 1;
+        results.push(await worker(item));
+      }
+    });
+    await Promise.all(runners);
+    return results;
+  }
+
+  async function processBatchJobsForWorker(batch, chunks, options = {}) {
+    const changed = new Set();
+    const jobLimit = Math.max(1, Math.min(BULK_WORKER_JOB_LIMIT, Math.floor(Number(options.jobLimit) || BULK_WORKER_JOB_LIMIT)));
+    const concurrency = Math.max(1, Math.min(BULK_WORKER_CONCURRENCY, Math.floor(Number(options.concurrency) || BULK_WORKER_CONCURRENCY)));
+    const candidates = [];
+    let loadedJobs = 0;
+    let missingJobs = 0;
+    let completedTargets = 0;
+
+    for (const chunk of Array.isArray(chunks) ? chunks : []) {
+      for (const target of Array.isArray(chunk.targets) ? chunk.targets : []) {
+        if (candidates.length >= jobLimit) break;
+        const status = normalizeString(target.status).toLowerCase();
+        const jobId = normalizeJobId(target.jobId);
+        if ((status !== 'queued' && status !== 'running') || !jobId) continue;
+        let job = jobs.get(jobId);
+        if (!job) {
+          const loaded = await loadPersistentJobResult(jobId);
+          if (loaded.error) continue;
+          job = loaded.job;
+        }
+        if (!job) {
+          markTarget(target, 'pending', { jobId: '', error: '' });
+          missingJobs += 1;
+          changed.add(chunk.index);
+          continue;
+        }
+        jobs.set(job.id, job);
+        loadedJobs += 1;
+        if (applyJobResultToBatchTarget(target, job)) changed.add(chunk.index);
+        if (job.status === 'done' || job.status === 'error') {
+          completedTargets += 1;
+          continue;
+        }
+        if ((job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job)) {
+          candidates.push({ chunk, target, job });
+        }
+      }
+      if (candidates.length >= jobLimit) break;
+    }
+
+    let processedJobs = 0;
+    await runLimited(candidates, concurrency, async ({ chunk, target, job }) => {
+      const result = await processJobForWorker(job);
+      if (result && (result.status === 'done' || result.status === 'error' || result.status === 'queued' || result.status === 'running')) {
+        processedJobs += result.status === 'done' || result.status === 'error' || result.status === 'queued' ? 1 : 0;
+        if (applyJobResultToBatchTarget(target, result)) changed.add(chunk.index);
+      }
+    });
+
+    await persistChangedBatchChunks(chunks, changed);
+    const summary = summarizeBatchChunks(batch, chunks);
+    batch.summary = summary;
+    batch.uploadedTargets = summary.uploadedTargets;
+    if (batch.status === 'running' && summary.total > 0 && summary.completed >= summary.total && summary.pending === 0 && summary.active === 0) {
+      batch.status = 'done';
+      batch.finishedAt = now();
+    }
+    await persistBatch(batch);
+
+    return {
+      loadedJobs,
+      missingJobs,
+      processedJobs,
+      completedTargets,
+      changedChunks: changed.size,
+      summary,
+    };
+  }
+
   async function driveBatch(batch, chunks) {
     const changed = new Set();
     if (batch.status === 'running') {
@@ -1718,6 +1855,64 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       await persistBatch(batch);
     }
     return { batch, chunks };
+  }
+
+  async function listRunnableBatches(limit) {
+    if (!dataOpsStore || typeof dataOpsStore.listRunnableWebdesignBatches !== 'function') return null;
+    return dataOpsStore.listRunnableWebdesignBatches(limit);
+  }
+
+  async function runBatchWorker(options = {}) {
+    pruneJobs();
+    if (!requiresPersistentBatchStorage()) {
+      return createBatchStorageUnavailableResult();
+    }
+    const batchLimit = Math.max(1, Math.min(BULK_WORKER_BATCH_LIMIT, Math.floor(Number(options.batchLimit) || BULK_WORKER_BATCH_LIMIT)));
+    const runnableBatches = await listRunnableBatches(batchLimit);
+    if (!Array.isArray(runnableBatches)) {
+      return createBatchStorageUnavailableResult();
+    }
+
+    const result = {
+      ok: true,
+      statusCode: 200,
+      batchCount: 0,
+      processedJobs: 0,
+      loadedJobs: 0,
+      missingJobs: 0,
+      completedTargets: 0,
+      changedChunks: 0,
+      batches: [],
+    };
+
+    for (const batch of runnableBatches) {
+      if (!batch || !batch.id || !batch.ownerKey) continue;
+      const chunksResult = await loadBatchChunks(batch.ownerKey, batch.id);
+      if (chunksResult.error) continue;
+      const drivenBefore = await driveBatch(batch, chunksResult.chunks || []);
+      const workerResult = await processBatchJobsForWorker(drivenBefore.batch, drivenBefore.chunks, options);
+      const drivenAfter = await driveBatch(drivenBefore.batch, drivenBefore.chunks);
+      const serialized = serializeBatch(drivenAfter.batch, drivenAfter.chunks);
+      result.batchCount += 1;
+      result.processedJobs += workerResult.processedJobs;
+      result.loadedJobs += workerResult.loadedJobs;
+      result.missingJobs += workerResult.missingJobs;
+      result.completedTargets += workerResult.completedTargets;
+      result.changedChunks += workerResult.changedChunks;
+      result.batches.push(serialized);
+    }
+
+    return result;
+  }
+
+  async function runBatchWorkerResponse(req, res) {
+    const result = await runBatchWorker({
+      batchLimit: req.query?.batchLimit || req.body?.batchLimit,
+      jobLimit: req.query?.jobLimit || req.body?.jobLimit,
+      concurrency: req.query?.concurrency || req.body?.concurrency,
+    });
+    const statusCode = Math.max(100, Math.min(599, Number(result.statusCode) || (result.ok ? 200 : 500)));
+    return res.status(statusCode).json(result);
   }
 
   async function startBatchResponse(req, res) {
@@ -1863,6 +2058,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     getJobResponse,
     listBatchesResponse,
     listJobsResponse,
+    runBatchWorker,
+    runBatchWorkerResponse,
     startBatchResponse,
     startJob,
     startJobResponse,

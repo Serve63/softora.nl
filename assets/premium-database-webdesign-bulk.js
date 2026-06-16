@@ -2,9 +2,9 @@
     "use strict";
 
     const BATCH_ENDPOINT = "/api/premium-database/webdesign-photo-batches";
-    const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
-    const ACTIVE_JOB_PUMP_LIMIT = 12;
-    const BULK_POLL_INTERVAL_MS = 1600;
+    const RUN_ENDPOINT = "/api/premium-database/webdesign-photo-batches/run";
+    const BULK_POLL_INTERVAL_MS = 1200;
+    const WORKER_KICK_INTERVAL_MS = 8000;
     const BULK_UPLOAD_CHUNK_SIZE = 100;
     const RESTORE_DONE_BATCH_WINDOW_MS = 15 * 60 * 1000;
     const STYLE_ID = "softora-database-webdesign-bulk-style";
@@ -37,8 +37,7 @@
         const refreshPhotos = typeof options.refreshPhotos === "function" ? options.refreshPhotos : null;
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
-        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, activeJobPumpCount = 0;
-        const activeJobPumpIds = new Set();
+        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0;
         ensureStyles();
 
         function ensureStatusNode() {
@@ -55,14 +54,26 @@
             return node;
         }
 
+        function ensureStatusParts(node) {
+            if (!node) return null;
+            if (!node.__softoraBulkParts) {
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\"></span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\"></span></span><span class=\"webdesign-bulk-rest\"></span>";
+                node.__softoraBulkParts = {
+                    num: node.querySelector ? node.querySelector(".webdesign-bulk-num") : null,
+                    fill: node.querySelector ? node.querySelector(".webdesign-bulk-fill") : null,
+                    rest: node.querySelector ? node.querySelector(".webdesign-bulk-rest") : null
+                };
+            }
+            return node.__softoraBulkParts;
+        }
+
         function getStatusLine(batch) {
             const total = Math.max(0, Number(batch && batch.total) || 0);
             const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
-            const active = Math.max(0, Number(batch && batch.active) || 0, Array.isArray(batch && batch.activeJobIds) ? batch.activeJobIds.length : 0);
             const remaining = Math.max(0, total - made);
             return {
                 num: formatNumber(made) + " / " + formatNumber(total),
-                rest: (active ? formatNumber(active) + " bezig · " : "") + formatNumber(remaining) + " resterend"
+                rest: formatNumber(remaining) + " resterend"
             };
         }
 
@@ -74,8 +85,27 @@
             const pct = total ? Math.max(0, Math.min(100, Math.round((made / total) * 100))) : 0;
             const visiblePct = total ? Math.max(pct, 0.12) : 0;
             const line = getStatusLine(batch);
+            const parts = ensureStatusParts(node);
             node.hidden = false;
-            node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span>";
+            if (!parts || !parts.num || !parts.fill || !parts.rest) {
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span>";
+                return;
+            }
+            if (parts && parts.num) parts.num.textContent = line.num;
+            if (parts && parts.rest) parts.rest.textContent = line.rest;
+            if (parts && parts.fill) {
+                const nextWidth = visiblePct + "%";
+                if (!parts.fill.style.width) {
+                    parts.fill.style.width = "0%";
+                    if (typeof global.requestAnimationFrame === "function") {
+                        global.requestAnimationFrame(function () { parts.fill.style.width = nextWidth; });
+                    } else {
+                        parts.fill.style.width = nextWidth;
+                    }
+                } else {
+                    parts.fill.style.width = nextWidth;
+                }
+            }
         }
 
         function queuePhotoRefresh(batch) {
@@ -105,26 +135,24 @@
             }, delayMs);
         }
 
-        function getBatchActiveJobIds(batch) {
-            return (Array.isArray(batch && batch.activeJobIds) ? batch.activeJobIds : []).map(normalizeString).filter(Boolean);
-        }
-
-        function pumpBatchJobs(batch) {
-            if (typeof fetch !== "function") return;
-            getBatchActiveJobIds(batch).some(function (jobId) {
-                if (activeJobPumpCount >= ACTIVE_JOB_PUMP_LIMIT) return true;
-                if (activeJobPumpIds.has(jobId)) return false;
-                activeJobPumpIds.add(jobId);
-                activeJobPumpCount += 1;
-                fetch(JOB_ENDPOINT + "/" + encodeURIComponent(jobId), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
-                    .catch(function () {})
-                    .finally(function () {
-                        activeJobPumpIds.delete(jobId);
-                        activeJobPumpCount = Math.max(0, activeJobPumpCount - 1);
-                        schedulePoll(0);
-                    });
-                return false;
-            });
+        function kickServerWorker() {
+            if (typeof fetch !== "function" || workerKickInFlight) return;
+            const currentTime = Date.now();
+            if (lastWorkerKickAt && currentTime - lastWorkerKickAt < WORKER_KICK_INTERVAL_MS) return;
+            lastWorkerKickAt = currentTime;
+            workerKickInFlight = true;
+            fetch(RUN_ENDPOINT, {
+                method: "POST",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ batchLimit: 1 })
+            })
+                .catch(function () {})
+                .finally(function () {
+                    workerKickInFlight = false;
+                    schedulePoll(0);
+                });
         }
 
         function handleBatch(batch, phase, options) {
@@ -138,7 +166,7 @@
                 pollTimer = null;
                 return;
             }
-            pumpBatchJobs(batch);
+            kickServerWorker();
             schedulePoll(options && options.immediate ? 0 : BULK_POLL_INTERVAL_MS);
         }
 
