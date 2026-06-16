@@ -236,6 +236,53 @@ test('request security context allows same-origin fetch metadata when origin hea
   assert.equal(decision.reason, 'fetch_metadata_same_origin_allowed');
 });
 
+test('request security context allows trusted premium JSON ajax when browser origin metadata is absent', () => {
+  const context = createRequestSecurityContext({
+    enforceSameOriginRequests: true,
+    getEffectivePublicBaseUrl: () => 'https://app.softora.nl',
+  });
+
+  const req = createRequest({
+    method: 'POST',
+    headers: {
+      host: 'app.softora.nl',
+      'x-forwarded-proto': 'https',
+      'content-type': 'application/json',
+      'content-length': '2',
+      'x-softora-requested-with': 'premium',
+    },
+    originalUrl: '/api/coldmailing/autopilot/settings',
+  });
+
+  const decision = context.getStateChangingApiProtectionDecision(req);
+  assert.equal(decision.allowed, true);
+  assert.equal(decision.reason, 'trusted_ajax_header_allowed');
+});
+
+test('request security context does not let trusted ajax header override a foreign origin', () => {
+  const context = createRequestSecurityContext({
+    enforceSameOriginRequests: true,
+    getEffectivePublicBaseUrl: () => 'https://app.softora.nl',
+  });
+
+  const req = createRequest({
+    method: 'POST',
+    headers: {
+      origin: 'https://evil.example',
+      host: 'app.softora.nl',
+      'x-forwarded-proto': 'https',
+      'content-type': 'application/json',
+      'content-length': '2',
+      'x-softora-requested-with': 'premium',
+    },
+    originalUrl: '/api/coldmailing/autopilot/settings',
+  });
+
+  const decision = context.getStateChangingApiProtectionDecision(req);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, 'csrf_origin_blocked');
+});
+
 test('request security context enforces premium admin ip allowlist', () => {
   const context = createRequestSecurityContext({
     premiumAdminAllowedIpSet: new Set(['203.0.113.10']),

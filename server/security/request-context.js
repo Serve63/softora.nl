@@ -24,6 +24,8 @@ const BLOCKED_STATE_CHANGING_CONTENT_TYPES = new Set([
   'multipart/form-data',
   'text/plain',
 ]);
+const TRUSTED_STATE_CHANGING_AJAX_HEADER = 'x-softora-requested-with';
+const TRUSTED_STATE_CHANGING_AJAX_VALUE = 'premium';
 
 function normalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
@@ -142,6 +144,11 @@ function requestMayCarryBody(req) {
   return false;
 }
 
+function hasTrustedStateChangingAjaxHeader(req) {
+  return normalizeString(req?.get?.(TRUSTED_STATE_CHANGING_AJAX_HEADER) || '').toLowerCase() ===
+    TRUSTED_STATE_CHANGING_AJAX_VALUE;
+}
+
 function createRequestSecurityContext(options = {}) {
   const {
     enforceSameOriginRequests = true,
@@ -225,6 +232,14 @@ function createRequestSecurityContext(options = {}) {
         reason: allowed ? 'same_origin_allowed' : 'csrf_origin_blocked',
         detail: allowed ? '' : 'State-changing API request geweigerd door same-origin bescherming.',
         publicMessage: allowed ? '' : 'Verzoek geweigerd door same-origin beveiliging.',
+      };
+    }
+
+    if (hasTrustedStateChangingAjaxHeader(req) && isJsonLikeContentType(contentType)) {
+      return {
+        allowed: true,
+        reason: 'trusted_ajax_header_allowed',
+        detail: '',
       };
     }
 
