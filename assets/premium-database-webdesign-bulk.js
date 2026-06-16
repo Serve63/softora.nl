@@ -3,8 +3,8 @@
 
     const BATCH_ENDPOINT = "/api/premium-database/webdesign-photo-batches";
     const JOB_ENDPOINT = "/api/premium-database/webdesign-photo-jobs";
-    const ACTIVE_JOB_PUMP_LIMIT = 3;
-    const BULK_POLL_INTERVAL_MS = 2600;
+    const ACTIVE_JOB_PUMP_LIMIT = 12;
+    const BULK_POLL_INTERVAL_MS = 1600;
     const BULK_UPLOAD_CHUNK_SIZE = 100;
     const RESTORE_DONE_BATCH_WINDOW_MS = 15 * 60 * 1000;
     const STYLE_ID = "softora-database-webdesign-bulk-style";
