@@ -823,6 +823,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const webdesignAssetStateScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const webdesignPreviewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
+  const leadDeleteScriptPath = path.join(__dirname, '../../assets/premium-database-lead-delete.js');
   const apiCostLedgerScriptPath = path.join(__dirname, '../../assets/softora-api-cost-ledger.js');
   const photoStorageScriptPath = path.join(__dirname, '../../assets/premium-database-photo-storage.js');
   const webdesignMockupScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-mockup.js');
@@ -839,6 +840,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const webdesignAssetStateScriptSource = fs.readFileSync(webdesignAssetStateScriptPath, 'utf8');
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const webdesignPreviewScriptSource = fs.readFileSync(webdesignPreviewScriptPath, 'utf8');
+  const leadDeleteScriptSource = fs.readFileSync(leadDeleteScriptPath, 'utf8');
   const apiCostLedgerScriptSource = fs.readFileSync(apiCostLedgerScriptPath, 'utf8');
   const photoStorageScriptSource = fs.readFileSync(photoStorageScriptPath, 'utf8');
   const webdesignMockupScriptSource = fs.readFileSync(webdesignMockupScriptPath, 'utf8');
@@ -1189,7 +1191,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
   assert.match(webdesignActionScriptSource, /photo-drop-image\{width:100%;height:100%;object-fit:cover;display:block;opacity:0;/);
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
-  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:98px;min-width:98px\}/);
+  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:120px;min-width:120px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
   assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\/" \+ escapeHtml\(slug\) \+ "\\"/);
   assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
@@ -1215,6 +1217,17 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /photo-drop" \+ \(isLoading \? " is-generating" : ""\) \+ \(isRestoring \? " is-restoring" : ""\)/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-remove\\"/);
   assert.match(webdesignActionScriptSource, /data-remove-photo-id=\\"/);
+  assert.match(webdesignActionScriptSource, /class=\\"lead-delete-button\\"/);
+  assert.match(webdesignActionScriptSource, /data-delete-lead-id=\\"/);
+  assert.match(webdesignActionScriptSource, /class=\\"lead-delete-icon\\"/);
+  assert.match(leadDeleteScriptSource, /\.lead-delete-button\{flex:0 0 18px;width:18px;height:34px;/);
+  assert.match(leadDeleteScriptSource, /async function removeCustomerLead\(customerId\)/);
+  assert.match(leadDeleteScriptSource, /persistCustomerPhotos\(state\.klanten, \{ removeCustomerIds: \[normalizedId\] \}\)/);
+  assert.match(leadDeleteScriptSource, /global\[ACTION_PROPERTY\] = removeCustomerLead;/);
+  assert.match(leadDeleteScriptSource, /target\.closest\("\.lead-delete-button"\)/);
+  assert.match(leadDeleteScriptSource, /action\(button\.getAttribute\("data-delete-lead-id"\)\)/);
+  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260616a/);
+  assert.match(pageSource, /SoftoraDatabaseLeadDelete\.createController\(\{ state, persistCustomerList, persistCustomerPhotos, sortCustomers, closePanel, closeModal, setStatusMessage, renderPage: scheduleRenderPage, toast \}\)/);
   assert.match(webdesignActionScriptSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId, kind\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
@@ -1848,6 +1861,9 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-public-preview-id="customer-1"/);
   assert.match(html, /aria-label="Open openbare previewpagina"/);
+  assert.match(html, /class="lead-delete-button"/);
+  assert.match(html, /data-delete-lead-id="customer-1"/);
+  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
 });
 
 test('premium database webdesign action queues missing mockup repairs outside render', async () => {
