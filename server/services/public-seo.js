@@ -85,9 +85,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'crm-systeem-op-maat.html',
     path: '/crm-systeem-op-maat',
-    title: 'CRM op maat laten maken voor MKB',
+    title: 'CRM systeem op maat laten maken voor MKB',
     description:
-      'Laat een CRM op maat maken voor leadpipeline, klantbeheer, crm offerte systeem, klantportaal, dashboards, reminders en AI-opvolging.',
+      'Laat een CRM systeem op maat maken voor leadpipeline, klantbeheer, offerteflow, klantportaal, dashboards, reminders en AI-opvolging.',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [
@@ -98,6 +98,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/kennisbank/wat-is-bedrijfssoftware-op-maat',
       '/kennisbank/wat-is-een-crm-systeem',
       '/blog/crm-systeem-op-maat-spreadsheets-vervangen',
+      '/kennisbank/wat-is-een-sales-pipeline-crm',
+      '/kennisbank/wat-is-crm-datakwaliteit',
+      '/vergelijkingen/crm-op-maat-vs-standaard-crm',
       '/blog/ai-automatisering-mkb-waar-beginnen',
     ],
   },

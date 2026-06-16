@@ -139,13 +139,13 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   const source = readPage('crm-systeem-op-maat.html');
   const entry = getRegistryEntry('crm-systeem-op-maat.html');
 
-  assert.match(source, /<title>CRM op maat laten maken voor MKB \| Softora<\/title>/);
-  assert.match(source, /<meta name="description" content="Laat een CRM op maat maken voor leadpipeline/);
+  assert.match(source, /<title>CRM systeem op maat laten maken voor MKB \| Softora<\/title>/);
+  assert.match(source, /<meta name="description" content="Laat een CRM systeem op maat maken voor leadpipeline/);
   assert.match(source, /<meta name="robots" content="index, follow">/);
   assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(source, /<h1>CRM op maat voor leads, offertes en klantportaal<\/h1>/);
+  assert.match(source, /<h1>CRM systeem op maat voor leadpipeline en offerteflow<\/h1>/);
   assert.match(source, /Leadpipeline/);
   assert.match(source, /Klantbeheer/);
   assert.match(source, /CRM offerte systeem/);
@@ -163,13 +163,15 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.match(source, /href="\/chatbot-laten-maken"/);
   assert.match(source, /href="\/voicesoftware-op-maat"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
-  assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-een-sales-pipeline-crm"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-crm-datakwaliteit"/);
+  assert.match(source, /href="\/vergelijkingen\/crm-op-maat-vs-standaard-crm"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'CRM op maat laten maken voor MKB');
-  assert.match(entry.description, /leadpipeline, klantbeheer, crm offerte systeem/);
+  assert.equal(entry.title, 'CRM systeem op maat laten maken voor MKB');
+  assert.match(entry.description, /leadpipeline, klantbeheer, offerteflow/);
   assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
@@ -186,7 +188,7 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.deepEqual(
     faq.mainEntity.map((question) => question.name),
     [
-      'Wanneer kies je voor een CRM op maat in plaats van standaard CRM?',
+      'Wanneer kies je voor een CRM systeem op maat in plaats van standaard CRM?',
       'Welke CRM modules kan Softora bouwen?',
       'Moet alles meteen in een CRM op maat?',
     ]

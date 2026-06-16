@@ -456,7 +456,14 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
   const pages = [
     {
       fileName: 'crm-systeem-op-maat.html',
-      terms: ['crm op maat', 'crm offerte systeem', 'klantportaal', 'dashboard laten ontwikkelen'],
+      terms: [
+        'crm systeem op maat',
+        'crm op maat',
+        'crm offerte systeem',
+        'klantportaal',
+        'dashboard laten ontwikkelen',
+        'sales pipeline',
+      ],
     },
     {
       fileName: 'premium-bedrijfssoftware.html',
