@@ -276,24 +276,25 @@ test('premium database page keeps customers fixed from Oisterwijk nearby to far 
   assert.doesNotMatch(pageSource, /sortKey: "manual"/);
 });
 
-test('premium database has a right-side company search that scans the full database', () => {
+test('premium database has a company search below metrics that stays inside the active filter', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(
     pageSource,
-    /<div class="top-right"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><div class="filter-metrics" aria-label="Database statistieken">/
+    /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">[\s\S]*<\/div>\s*<\/div>\s*<\/div>\s*<div class="database-search-row"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/
   );
   assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
-  assert.match(pageSource, /if \(!query\) \{[\s\S]*state\.activeStatus === "beschikbaar" && !isAvailableColdmailCandidate\(customer\)[\s\S]*return true;/);
+  assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.activeStatus === "benaderbaar"[\s\S]*isColdmailReadyWebdesignLead\(customer\)[\s\S]*state\.activeStatus === "beschikbaar"[\s\S]*isAvailableColdmailCandidate\(customer\)/);
+  assert.match(pageSource, /if \(!matchesActiveDatabaseFilter\(customer\)\) return false;/);
   assert.match(pageSource, /return getCustomerSearchHaystack\(customer\)\.indexOf\(query\) !== -1;/);
   assert.match(
     pageSource,
-    /function getVisibleTableCustomers\(customers\) \{ if \(!hasActiveDatabaseSearch\(\)\) \{ if \(state\.activeStatus === "benaderbaar"\) return getMailReadyCustomers\(customers\); if \(state\.activeStatus === "beschikbaar"\) return getAvailableColdmailCandidates\(customers\); \} return customers \|\| \[\]; \}/
+    /function getVisibleTableCustomers\(customers\) \{ return customers \|\| \[\]; \}/
   );
   assert.match(
     pageSource,
-    /nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch\(\) \? "Mailklaar" : "Foto's";/
+    /nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/
   );
 });
 
@@ -922,18 +923,20 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const toastCssBlock = pageSource.match(/\.toast\s*\{[\s\S]*?\}/)[0];
   assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
-  assert.match(pageSource, /<div class="top-right"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">[\s\S]*<\/div><div class="filter-metrics" aria-label="Database statistieken">/);
+  assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
+  assert.match(pageSource, /<div class="database-search-row"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
   const topRightHtml = pageSource.slice(
     pageSource.indexOf('<div class="top-right">'),
     pageSource.indexOf('<div class="status-banner"')
   );
+  assert.doesNotMatch(topRightHtml, /<div class="top-right"><div class="search">/);
   assert.doesNotMatch(topRightHtml, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="result-count-stack" aria-label="Aantal resultaten" hidden>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
-  assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 3\.000 mails\.<\/div>/);
+  assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
-  assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 3\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
+  assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: flex-end;/);
   assert.match(pageSource, /\.result-count-stack\s*\{[\s\S]*align-self: flex-end;[\s\S]*width: max-content;[\s\S]*max-width: 100%;/);
@@ -1085,12 +1088,13 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function isAvailableColdmailCandidate\(customer\) \{\s*return isColdmailBaseLeadEligible\(customer\) && !hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\) && !outreachController\.hasInstantlyOutreachSignal\(customer\) && !isColdmailReadyWebdesignLead\(customer\);/);
   assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailCandidate\);/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
-  assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*if \(!hasActiveDatabaseSearch\(\)\) \{ if \(state\.activeStatus === "benaderbaar"\) return getMailReadyCustomers\(customers\); if \(state\.activeStatus === "beschikbaar"\) return getAvailableColdmailCandidates\(customers\); \} return customers \|\| \[\];/);
+  assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.activeStatus === "benaderbaar"[\s\S]*isColdmailReadyWebdesignLead\(customer\)[\s\S]*state\.activeStatus === "beschikbaar"[\s\S]*isAvailableColdmailCandidate\(customer\)/);
+  assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return customers \|\| \[\];/);
   assert.match(pageSource, /function getEmptyTableMessage\(\) \{[\s\S]*Geen mailklare bedrijven\.[\s\S]*Geen beschikbare bedrijven\.[\s\S]*Geen bedrijven in deze filter\./);
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
-  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" && !hasActiveDatabaseSearch\(\) \? "Mailklaar" : "Foto's";/);
+  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
   assert.match(pageSource, /renderPhotoCostLabel\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
@@ -1350,7 +1354,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260616a/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260612b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260616a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -1364,7 +1368,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.filter-metrics\s*\{[\s\S]*margin-left: 0;[\s\S]*gap: 24px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-block;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: center;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: center;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(5, minmax\(110px, 1fr\)\);[\s\S]*"\. note note note note"[\s\S]*"autopilot today sent deals ratio";[\s\S]*gap: 6px;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(5, minmax\(110px, 1fr\)\);[\s\S]*"\. \. note note note"[\s\S]*"autopilot today sent deals ratio";[\s\S]*gap: 6px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--autopilot\s*\{[\s\S]*grid-area: autopilot;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--today\s*\{[\s\S]*grid-area: today;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);/);
@@ -2750,11 +2754,11 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
   assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /data-s="beschikbaar" type="button">Beschikbaar<\/button>/);
-  assert.match(pageSource, /state\.activeStatus === "beschikbaar" && !isAvailableColdmailCandidate\(customer\)/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailCandidate\(customer\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
-  assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\) && !matchesColdcallingStatusFilter\(customer, state\.activeStatus\)\) return false;/);
-  assert.match(pageSource, /state\.activeStatus !== "benaderbaar" && state\.activeStatus !== "beschikbaar" && !isColdcallingStatusFilter\(state\.activeStatus\) && !outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\)/);
+  assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\)\) return matchesColdcallingStatusFilter\(customer, state\.activeStatus\);/);
+  assert.match(pageSource, /return outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\);/);
   assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260605a/);
   assert.match(pageSource, /function hasUsedColdCalling\(customer\) \{ return databaseTableHelpers\.hasUsedColdCalling\(customer, getTableHelperOptions\(\)\); \}/);
   assert.match(pageSource, /function matchesColdcallingStatusFilter\(customer, activeStatus\) \{ return databaseTableHelpers\.matchesColdcallingStatusFilter\(customer, activeStatus, getTableHelperOptions\(\)\); \}/);
