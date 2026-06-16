@@ -136,6 +136,7 @@ test('premium database webdesign job routes expose persistent bulk endpoints', (
     ['GET', '/api/premium-database/webdesign-photo-batches/run'],
     ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/chunks'],
     ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/commit'],
+    ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/cancel'],
     ['GET', '/api/premium-database/webdesign-photo-batches/:batchId'],
   ]);
 });
@@ -175,6 +176,36 @@ test('premium database webdesign bulk runner cron route requires CRON_SECRET bea
   const admin = await callRouteHandlers(adminRunHandlers, { headers: {}, body: {} });
   assert.equal(admin.statusCode, 200);
   assert.equal(workerCalls, 2);
+});
+
+test('premium database webdesign bulk cancel route requires premium access', async () => {
+  let cancelHandlers = null;
+  let accessCalls = 0;
+  let cancelCalls = 0;
+  const app = {
+    post(pathname, ...handlers) {
+      if (pathname === '/api/premium-database/webdesign-photo-batches/:batchId/cancel') cancelHandlers = handlers;
+    },
+    get() {},
+  };
+  registerPremiumDatabaseWebdesignJobRoutes(app, {
+    requirePremiumApiAccess: (_req, _res, next) => {
+      accessCalls += 1;
+      return next();
+    },
+    coordinator: {
+      cancelBatchResponse: async (_req, res) => {
+        cancelCalls += 1;
+        return res.status(200).json({ ok: true });
+      },
+    },
+  });
+
+  const res = await callRouteHandlers(cancelHandlers, { headers: {}, body: {}, params: { batchId: 'webdesign_batch_123' } });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(accessCalls, 1);
+  assert.equal(cancelCalls, 1);
 });
 
 test('premium database webdesign bulk runner is registered as a Vercel cron', () => {
@@ -709,6 +740,65 @@ test('premium database webdesign bulk server worker processes batches without br
   assert.equal(run.batches[0].status, 'done');
   assert.equal(run.batches[0].made, 4);
   assert.equal(run.batches[0].remaining, 0);
+});
+
+test('premium database webdesign bulk cancel stops the remaining server batch work', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  const pipelineCalls = [];
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    bulkActiveJobLimit: 2,
+    bulkStartLimit: 2,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async (url, options) => {
+        pipelineCalls.push({ url, company: options.body.company });
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: `${options.body.company}-preview.png` } };
+      },
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 4 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        targets: Array.from({ length: 4 }, (_, index) => ({
+          websiteUrl: `https://cancel-${index}.test`,
+          customer: { id: `cancel-${index}`, bedrijf: `Cancel ${index}`, dom: `cancel-${index}.test` },
+        })),
+      },
+    },
+    createResponseRecorder()
+  );
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 4, expectedChunks: 1 } }, createResponseRecorder());
+
+  const firstRun = await coordinator.runBatchWorker({ batchLimit: 1, jobLimit: 1, concurrency: 1 });
+  assert.equal(firstRun.processedJobs, 1);
+  assert.equal(pipelineCalls.length, 1);
+
+  const cancelRes = createResponseRecorder();
+  await coordinator.cancelBatchResponse({ premiumAuth: auth, params: { batchId } }, cancelRes);
+
+  assert.equal(cancelRes.statusCode, 200);
+  assert.equal(cancelRes.body.cancelled, true);
+  assert.equal(cancelRes.body.cancelledTargets, 3);
+  assert.equal(cancelRes.body.batch.status, 'cancelled');
+  assert.equal(cancelRes.body.batch.made, 1);
+  assert.equal(cancelRes.body.batch.cancelled, 3);
+  assert.equal(cancelRes.body.batch.remaining, 0);
+
+  const secondRun = await coordinator.runBatchWorker({ batchLimit: 1, jobLimit: 4, concurrency: 2 });
+  assert.equal(secondRun.batchCount, 0);
+  assert.equal(pipelineCalls.length, 1);
 });
 
 test('premium database webdesign bulk status returns active jobs without blocking on image generation', async () => {

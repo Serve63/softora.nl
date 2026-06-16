@@ -17,6 +17,7 @@ const WEBDESIGN_GUTTER_CROP_PAD_RATIO = 0.018;
 const WEBDESIGN_GUTTER_CROP_MIN_PAD = 12;
 const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
 const WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE = 'WEBPREVIEW_SAFETY_BLOCKED';
+const WEBDESIGN_JOB_CANCELLED_ERROR = 'Geannuleerd door gebruiker.';
 let cachedSharp = null;
 
 function loadSharpModule() {
@@ -790,6 +791,12 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return error;
   }
 
+  function createCancelledWebdesignJobError() {
+    const error = new Error(WEBDESIGN_JOB_CANCELLED_ERROR);
+    error.webdesignJobCancelled = true;
+    return error;
+  }
+
   function isJobReadyToProcess(job) {
     if (!job || job.status !== 'queued') return false;
     const retry = getRetryState(job);
@@ -1077,6 +1084,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function processJob(job) {
+    if (job && job.cancelled === true) throw createCancelledWebdesignJobError();
     job.status = 'running';
     job.startedAt = now();
     await persistJob(job);
@@ -1097,6 +1105,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         domain: job.customer.dom,
       },
     });
+
+    if (job.cancelled === true || (job.status === 'error' && job.error === WEBDESIGN_JOB_CANCELLED_ERROR)) {
+      throw createCancelledWebdesignJobError();
+    }
 
     await persistGeneratedPhoto(job, payload && payload.image);
   }
@@ -1131,6 +1143,19 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       clearRetryState(job);
       await persistJob(job);
     } catch (error) {
+      if (error && error.webdesignJobCancelled === true) {
+        job.status = 'error';
+        job.error = WEBDESIGN_JOB_CANCELLED_ERROR;
+        job.cancelled = true;
+        job.finishedAt = now();
+        const retry = getRetryState(job);
+        job.retry = {
+          ...retry,
+          nextAttemptAt: null,
+        };
+        await persistJob(job);
+        return job;
+      }
       if (isRetryableWebdesignError(error)) {
         const retry = getRetryState(job);
         const failedAttemptCount = retry.attempts + 1;
@@ -1513,6 +1538,16 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     };
   }
 
+  function isBatchTerminalStatus(status) {
+    const value = normalizeString(status).toLowerCase();
+    return value === 'done' || value === 'error' || value === 'cancelled';
+  }
+
+  function isTargetTerminalStatus(status) {
+    const value = normalizeString(status).toLowerCase();
+    return value === 'done' || value === 'error' || value === 'cancelled';
+  }
+
   function summarizeBatchChunks(batch, chunks) {
     if ((!Array.isArray(chunks) || !chunks.length) && batch && batch.summary && typeof batch.summary === 'object') {
       const stored = batch.summary;
@@ -1521,6 +1556,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       const pending = Math.max(0, Math.floor(Number(stored.pending || 0) || 0));
       const queued = Math.max(0, Math.floor(Number(stored.queued || 0) || 0));
       const running = Math.max(0, Math.floor(Number(stored.running || 0) || 0));
+      const cancelled = Math.max(0, Math.floor(Number(stored.cancelled || 0) || 0));
       const total = Math.max(0, Math.floor(Number(batch.total || stored.total || 0) || 0));
       return {
         total,
@@ -1530,8 +1566,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         running,
         done,
         failed,
-        completed: done + failed,
-        remaining: Math.max(0, total - done - failed),
+        cancelled,
+        completed: done + failed + cancelled,
+        remaining: Math.max(0, total - done - failed - cancelled),
         active: queued + running,
         chunks: Math.max(0, Math.floor(Number(stored.chunks || 0) || 0)),
         nextAttemptAt: Math.max(0, Number(stored.nextAttemptAt || 0) || 0) || null,
@@ -1546,6 +1583,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       running: 0,
       done: 0,
       failed: 0,
+      cancelled: 0,
       completed: 0,
       remaining: 0,
       active: 0,
@@ -1558,6 +1596,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         const status = normalizeString(target && target.status).toLowerCase();
         if (status === 'done') summary.done += 1;
         else if (status === 'error') summary.failed += 1;
+        else if (status === 'cancelled') summary.cancelled += 1;
         else if (status === 'running') summary.running += 1;
         else if (status === 'queued') summary.queued += 1;
         else summary.pending += 1;
@@ -1569,7 +1608,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     });
     if (!summary.total) summary.total = summary.uploadedTargets;
     summary.active = summary.queued + summary.running;
-    summary.completed = summary.done + summary.failed;
+    summary.completed = summary.done + summary.failed + summary.cancelled;
     summary.remaining = Math.max(0, summary.total - summary.completed);
     summary.made = summary.done;
     return summary;
@@ -1588,6 +1627,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       made: summary.made,
       done: summary.done,
       failed: summary.failed,
+      cancelled: summary.cancelled,
       pending: summary.pending,
       queued: summary.queued,
       running: summary.running,
@@ -1649,7 +1689,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       status,
       updatedAt: now(),
     });
-    if (status === 'done' || status === 'error') target.finishedAt = now();
+    if (isTargetTerminalStatus(status)) target.finishedAt = now();
   }
 
   function isRetryableStartFailure(result) {
@@ -1857,6 +1897,64 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return { batch, chunks };
   }
 
+  async function cancelActiveTargetJob(target) {
+    const jobId = normalizeJobId(target && target.jobId);
+    if (!jobId) return false;
+    let job = jobs.get(jobId);
+    if (!job) {
+      const loaded = await loadPersistentJobResult(jobId);
+      if (!loaded.error && loaded.job) job = loaded.job;
+    }
+    if (!job || (job.status !== 'queued' && job.status !== 'running')) return false;
+    job.cancelled = true;
+    job.status = 'error';
+    job.error = WEBDESIGN_JOB_CANCELLED_ERROR;
+    job.finishedAt = now();
+    const retry = getRetryState(job);
+    job.retry = {
+      ...retry,
+      nextAttemptAt: null,
+    };
+    jobs.set(job.id, job);
+    await persistJob(job);
+    return true;
+  }
+
+  async function cancelBatch(batch, chunks) {
+    const changed = new Set();
+    let cancelledTargets = 0;
+    let cancelledJobs = 0;
+    for (const chunk of Array.isArray(chunks) ? chunks : []) {
+      for (const target of Array.isArray(chunk.targets) ? chunk.targets : []) {
+        const status = normalizeString(target && target.status).toLowerCase();
+        if (isTargetTerminalStatus(status)) continue;
+        if ((status === 'queued' || status === 'running') && target.jobId) {
+          if (await cancelActiveTargetJob(target)) cancelledJobs += 1;
+        }
+        markTarget(target, 'cancelled', {
+          error: WEBDESIGN_JOB_CANCELLED_ERROR,
+          nextAttemptAt: null,
+        });
+        cancelledTargets += 1;
+        changed.add(chunk.index);
+      }
+    }
+    await persistChangedBatchChunks(chunks, changed);
+    const summary = summarizeBatchChunks(batch, chunks);
+    batch.status = 'cancelled';
+    batch.finishedAt = batch.finishedAt || now();
+    batch.summary = summary;
+    batch.uploadedTargets = summary.uploadedTargets;
+    await persistBatch(batch);
+    return {
+      batch,
+      chunks,
+      cancelledTargets,
+      cancelledJobs,
+      summary,
+    };
+  }
+
   async function listRunnableBatches(limit) {
     if (!dataOpsStore || typeof dataOpsStore.listRunnableWebdesignBatches !== 'function') return null;
     return dataOpsStore.listRunnableWebdesignBatches(limit);
@@ -1915,6 +2013,42 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return res.status(statusCode).json(result);
   }
 
+  async function cancelBatchResponse(req, res) {
+    const ownerKey = ownerKeyFromReq(req);
+    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
+    const batchId = normalizeJobId(req.params && req.params.batchId);
+    if (!batchId) return res.status(400).json({ ok: false, error: 'Batch ontbreekt' });
+    const loaded = await loadBatch(ownerKey, batchId);
+    if (loaded.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
+    const chunksResult = await loadBatchChunks(ownerKey, batchId);
+    if (chunksResult.error) {
+      const result = createBatchStorageUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+    const chunks = chunksResult.chunks || [];
+    if (isBatchTerminalStatus(loaded.batch.status)) {
+      return res.status(200).json({
+        ok: true,
+        cancelled: loaded.batch.status === 'cancelled',
+        cancelledTargets: 0,
+        cancelledJobs: 0,
+        batch: serializeBatch(loaded.batch, chunks),
+      });
+    }
+    const cancelled = await cancelBatch(loaded.batch, chunks);
+    return res.status(200).json({
+      ok: true,
+      cancelled: true,
+      cancelledTargets: cancelled.cancelledTargets,
+      cancelledJobs: cancelled.cancelledJobs,
+      batch: serializeBatch(cancelled.batch, cancelled.chunks),
+    });
+  }
+
   async function startBatchResponse(req, res) {
     const ownerKey = ownerKeyFromReq(req);
     if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
@@ -1955,7 +2089,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       return res.status(result.statusCode).json(result);
     }
     if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
-    if (loaded.batch.status === 'done') return res.status(409).json({ ok: false, error: 'Batch is al klaar' });
+    if (isBatchTerminalStatus(loaded.batch.status)) return res.status(409).json({ ok: false, error: 'Batch is al klaar' });
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const rawTargets = Array.isArray(body.targets) ? body.targets.slice(0, BULK_CHUNK_TARGET_LIMIT) : [];
@@ -1996,6 +2130,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       return res.status(result.statusCode).json(result);
     }
     if (!loaded.batch) return res.status(404).json({ ok: false, error: 'Batch niet gevonden' });
+    if (isBatchTerminalStatus(loaded.batch.status)) return res.status(409).json({ ok: false, error: 'Batch is al klaar' });
     const chunksResult = await loadBatchChunks(ownerKey, batchId);
     if (chunksResult.error) {
       const result = createBatchStorageUnavailableResult();
@@ -2053,6 +2188,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   return {
     appendBatchChunkResponse,
+    cancelBatchResponse,
     commitBatchResponse,
     getBatchResponse,
     getJobResponse,
