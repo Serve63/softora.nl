@@ -162,7 +162,7 @@
     display: grid;
     grid-template-columns: repeat(6, minmax(110px, 1fr));
     grid-template-areas:
-        ". . note note note note"
+        ". . . note note note"
         "autopilot today bounces sent deals ratio";
     align-items: stretch;
     gap: 6px;
@@ -516,10 +516,11 @@
     .mail-roi-cards {
         grid-template-columns: repeat(2, minmax(110px, 1fr));
         grid-template-areas:
-            "note note"
             "autopilot today"
-            "bounces sent"
-            "deals ratio";
+            "bounces ."
+            "note note"
+            "sent deals"
+            "ratio ratio";
     }
 
 }
