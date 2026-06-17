@@ -119,14 +119,6 @@ test('server app runtime bootstrap flattens env config without changing values',
       requireWebdesignAssets: true,
       defaultSenderEmail: 'serve@softora.nl',
     },
-    emailVerification: {
-      enabled: true,
-      provider: 'zerobounce',
-      zeroBounceApiKey: 'zb-key',
-      zeroBounceApiBaseUrl: 'https://api-eu.zerobounce.test/v2',
-      requireGreenForOutbound: true,
-      timeoutMs: 22000,
-    },
     securityContactEmail: 'security@test.invalid',
     demoConfirmationTaskEnabled: true,
   });
@@ -158,12 +150,6 @@ test('server app runtime bootstrap flattens env config without changing values',
   assert.equal(envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT, true);
   assert.equal(envConfig.INSTANTLY_REQUIRE_WEBDESIGN_ASSETS, true);
   assert.equal(envConfig.INSTANTLY_DEFAULT_SENDER_EMAIL, 'serve@softora.nl');
-  assert.equal(envConfig.EMAIL_VERIFICATION_ENABLED, true);
-  assert.equal(envConfig.EMAIL_VERIFICATION_PROVIDER, 'zerobounce');
-  assert.equal(envConfig.ZEROBOUNCE_API_KEY, 'zb-key');
-  assert.equal(envConfig.ZEROBOUNCE_API_BASE_URL, 'https://api-eu.zerobounce.test/v2');
-  assert.equal(envConfig.EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND, true);
-  assert.equal(envConfig.EMAIL_VERIFICATION_TIMEOUT_MS, 22000);
   assert.equal(envConfig.MAIL_IMAP_MAILBOX, 'INBOX');
   assert.equal(envConfig.SECURITY_CONTACT_EMAIL, 'security@test.invalid');
 });

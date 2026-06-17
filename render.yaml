@@ -167,18 +167,6 @@ services:
         value: true
       - key: INSTANTLY_DEFAULT_SENDER_EMAIL
         value: serve@softora.nl
-      - key: EMAIL_VERIFICATION_ENABLED
-        value: true
-      - key: EMAIL_VERIFICATION_PROVIDER
-        value: softora
-      - key: ZEROBOUNCE_API_KEY
-        sync: false
-      - key: ZEROBOUNCE_API_BASE_URL
-        value: https://api-eu.zerobounce.net/v2
-      - key: EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND
-        value: true
-      - key: EMAIL_VERIFICATION_TIMEOUT_MS
-        value: 15000
       - key: GOOGLE_CALENDAR_SYNC_ENABLED
         value: false
       - key: GOOGLE_CALENDAR_CLIENT_EMAIL

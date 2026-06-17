@@ -12,9 +12,6 @@ const {
   getPreviewImageCacheKey,
   rememberPreviewImage,
 } = require('./coldmail-preview-image-cache');
-const {
-  getEmailVerificationBlockReason,
-} = require('./premium-database-email-verification');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -1834,10 +1831,6 @@ function normalizeInstantlyConfig(config = {}) {
     verifyLeadsOnImport: readBool(config.verifyLeadsOnImport, false),
     blockPersonalMailboxDomains: readBool(config.blockPersonalMailboxDomains, true),
     requireWebdesignAssets: readBool(config.requireWebdesignAssets, true),
-    emailVerificationRequireGreenForOutbound: readBool(
-      config.emailVerificationRequireGreenForOutbound,
-      false
-    ),
     prewarmPublicImageUrls: readBool(config.prewarmPublicImageUrls, true),
     publicBaseUrl: normalizePublicBaseUrl(config.publicBaseUrl) || DEFAULT_PUBLIC_BASE_URL,
     previewImageBaseUrl:
@@ -2399,19 +2392,6 @@ function createInstantlyOutreachService(deps = {}) {
       const status = normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect';
 
       if (!isLikelyValidEmail(email, normalizeString)) continue;
-      const emailVerificationBlockReason = getEmailVerificationBlockReason(row, {
-        requireGreen: config.emailVerificationRequireGreenForOutbound,
-      });
-      if (emailVerificationBlockReason) {
-        failed.push({
-          id,
-          bedrijf: company,
-          email,
-          code: 'EMAIL_VERIFICATION_BLOCKED',
-          error: emailVerificationBlockReason,
-        });
-        continue;
-      }
       if (row.mail === false || row.canMail === false || row.doNotMail === true) continue;
       if (EXCLUDED_DATABASE_STATUSES.has(status)) continue;
       if (hasActiveInstantlyOutreach(row)) continue;
@@ -4238,7 +4218,6 @@ function createInstantlyOutreachService(deps = {}) {
       verifyLeadsOnImport: config.verifyLeadsOnImport,
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
       requireWebdesignAssets: config.requireWebdesignAssets,
-      emailVerificationRequireGreenForOutbound: config.emailVerificationRequireGreenForOutbound,
       prewarmPublicImageUrls: config.prewarmPublicImageUrls,
       defaultSenderEmail: config.defaultSenderEmail,
       marksSyncedLeadsAsApproached: true,
