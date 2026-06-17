@@ -234,6 +234,10 @@ function createService(overrides = {}) {
       outboundGuardCalls.push({ type: 'confirm', reservationId, options });
       return { ok: true, count: 4 };
     },
+    releaseReservation: async (reservationId) => {
+      outboundGuardCalls.push({ type: 'release', reservationId });
+      return { ok: true };
+    },
   };
   const service = createColdmailCampaignService({
     env: overrides.env || {},
@@ -7992,6 +7996,57 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
   const customerWriteIndex = calls.findIndex((call) => call.type === 'state:premium_customers_database');
   assert.ok(sendGuardWriteIndex > confirmIndex);
   assert.ok(customerWriteIndex > confirmIndex);
+});
+
+test('coldmail campaign releases the central reservation when SMTP fails before accept', async () => {
+  const calls = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'smtp-fail-row',
+        bedrijf: 'SMTP Fail BV',
+        naam: 'SMTP Fail BV',
+        email: 'info@smtp-fail.example',
+        website: 'https://smtp-fail.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ type: 'reserve', items, options });
+        return { ok: true, reservationId: 'reservation-smtp-fails', count: items.length * 4, expectedCount: items.length * 4 };
+      },
+      confirmReservation: async (reservationId, options) => {
+        calls.push({ type: 'confirm', reservationId, options });
+        return { ok: true, count: 4 };
+      },
+      releaseReservation: async (reservationId) => {
+        calls.push({ type: 'release', reservationId });
+        return { ok: true };
+      },
+    },
+    sendMailError: '535 Authentication failed',
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Kleine vraag over jullie website',
+        body: 'Goedendag {{naam}}',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'SMTP_SEND_FAILED');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.deepEqual(calls.map((call) => call.type), ['reserve', 'release']);
+  assert.equal(calls[1].reservationId, 'reservation-smtp-fails');
 });
 
 test('coldmail campaign pauses immediately when central guard confirm fails after SMTP accept', async () => {
