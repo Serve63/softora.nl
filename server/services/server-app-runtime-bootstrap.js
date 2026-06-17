@@ -9,6 +9,7 @@ const { createRuntimeMemoryState } = require('./runtime-memory');
 function buildServerAppEnvConfig(runtimeEnv) {
   const googleCalendar = runtimeEnv.googleCalendar || {};
   const instantly = runtimeEnv.instantly || {};
+  const emailVerification = runtimeEnv.emailVerification || {};
   return {
     PORT: runtimeEnv.app.port,
     IS_PRODUCTION: runtimeEnv.app.isProduction,
@@ -108,6 +109,12 @@ function buildServerAppEnvConfig(runtimeEnv) {
     INSTANTLY_VERIFY_LEADS_ON_IMPORT: Boolean(instantly.verifyLeadsOnImport),
     INSTANTLY_REQUIRE_WEBDESIGN_ASSETS: instantly.requireWebdesignAssets !== false,
     INSTANTLY_DEFAULT_SENDER_EMAIL: instantly.defaultSenderEmail || 'serve@softora.nl',
+    EMAIL_VERIFICATION_ENABLED: emailVerification.enabled !== false,
+    EMAIL_VERIFICATION_PROVIDER: emailVerification.provider || 'zerobounce',
+    ZEROBOUNCE_API_KEY: emailVerification.zeroBounceApiKey || '',
+    ZEROBOUNCE_API_BASE_URL: emailVerification.zeroBounceApiBaseUrl || 'https://api-eu.zerobounce.net/v2',
+    EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND: Boolean(emailVerification.requireGreenForOutbound),
+    EMAIL_VERIFICATION_TIMEOUT_MS: emailVerification.timeoutMs || 15000,
     GOOGLE_CALENDAR_SYNC_ENABLED: Boolean(googleCalendar.enabled),
     GOOGLE_CALENDAR_CLIENT_EMAIL: googleCalendar.clientEmail || '',
     GOOGLE_CALENDAR_PRIVATE_KEY: googleCalendar.privateKey || '',

@@ -389,6 +389,7 @@ function createService(overrides = {}) {
       };
     },
     mailboxAccountsRaw: overrides.mailboxAccountsRaw || '',
+    emailVerificationRequireGreenForOutbound: Boolean(overrides.emailVerificationRequireGreenForOutbound),
     createImapClient:
       overrides.createImapClient ||
       (() => ({
@@ -8958,6 +8959,42 @@ test('coldmail campaign skips recipients whose domain does not receive mail', as
   assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
   assert.equal(savedRows[0].hist[0].source, 'coldmail-invalid-email-domain');
   assert.equal(savedRows[1].status, 'gemaild');
+});
+
+test('coldmail campaign blocks risky verified emails when green verification is required', async () => {
+  const { service, sentMessages } = createService({
+    emailVerificationRequireGreenForOutbound: true,
+    rows: [
+      {
+        id: 'risky-email',
+        bedrijf: 'Risky BV',
+        naam: 'Info',
+        email: 'info@risky.test',
+        status: 'benaderbaar',
+        mail: true,
+        emailVerificationVerdict: 'orange',
+        emailVerificationReason: 'Role-based adres; niet automatisch in bulk mailen.',
+      },
+    ],
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendColdmailCampaign({
+        count: 1,
+        subject: 'Test',
+        body: 'Test',
+        senderEmail: 'info@softora.nl',
+      }),
+    (error) => {
+      assert.equal(error.code, 'NO_VALID_RECIPIENT_DOMAINS');
+      assert.match(error.message, /Role-based/);
+      assert.equal(error.failedItems[0].code, 'EMAIL_VERIFICATION_BLOCKED');
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
 });
 
 test('coldmail campaign skips rows that are already active in Instantly', async () => {
