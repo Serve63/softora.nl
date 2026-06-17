@@ -160,10 +160,10 @@
 
 .mail-roi-cards {
     display: grid;
-    grid-template-columns: repeat(5, minmax(110px, 1fr));
+    grid-template-columns: repeat(6, minmax(110px, 1fr));
     grid-template-areas:
-        ". . note note note"
-        "autopilot today sent deals ratio";
+        ". . note note note note"
+        "autopilot today bounces sent deals ratio";
     align-items: stretch;
     gap: 6px;
 }
@@ -182,6 +182,11 @@
     box-shadow: 0 8px 18px rgba(139, 34, 82, .055);
 }
 
+.mail-roi-card--bounces {
+    grid-area: bounces;
+    border-color: rgba(139, 34, 82, .28);
+}
+
 .mail-roi-card--autopilot {
     grid-area: autopilot;
 }
@@ -198,7 +203,8 @@
     grid-area: ratio;
 }
 
-.mail-roi-card--today .mail-roi-label {
+.mail-roi-card--today .mail-roi-label,
+.mail-roi-card--bounces .mail-roi-label {
     color: var(--crimson);
 }
 
@@ -510,8 +516,8 @@
         grid-template-areas:
             "note note"
             "autopilot today"
-            "sent deals"
-            "ratio ratio";
+            "bounces sent"
+            "deals ratio";
     }
 
 }

@@ -39,6 +39,7 @@ const DEFAULT_WRITE_QUERY_TIMEOUT_MS = 10000;
 const DEFAULT_READ_CACHE_TTL_MS = 60 * 1000;
 const DEFAULT_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
 const SENT_CUSTOMER_GUARD_SOURCE = 'data-ops-customers-sent-guard';
+const UNSAFE_CUSTOMER_REPLACE_ERROR_CODE = 'DATA_OPS_UNSAFE_CUSTOMER_REPLACE';
 
 function slugifyDesignPhotoMatchText(value) {
   return normalizeString(value)
@@ -925,6 +926,68 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
+  function isCustomerMissingDeleteAllowed(meta = {}) {
+    return (
+      meta.replaceMissing === true ||
+      meta.fullReplace === true ||
+      meta.allowMissingDelete === true ||
+      meta.allowMassCustomerDelete === true
+    );
+  }
+
+  function createUnsafeCustomerReplaceError(details = {}) {
+    const error = new Error(
+      `Klantopslag geblokkeerd: ${details.missingCount || 0} bestaande klanten zouden worden verborgen door een niet-expliciete vervanging.`
+    );
+    error.code = UNSAFE_CUSTOMER_REPLACE_ERROR_CODE;
+    error.details = details;
+    return error;
+  }
+
+  async function planCustomerMissingDeletes(incomingIds, meta = {}) {
+    const current = await collectPagedRows('list-softora_customers-ids', (client) =>
+      client.from(TABLES.customers).select('customer_id').is('deleted_at', null)
+    );
+    if (!current.ok) return current;
+    const incoming = new Set(incomingIds.map(normalizeString).filter(Boolean));
+    const missing = (current.data || [])
+      .map((row) => normalizeString(row && row.customer_id))
+      .filter((id) => id && !incoming.has(id));
+    if (!missing.length) return { ok: true, data: [] };
+    if (isCustomerMissingDeleteAllowed(meta)) return { ok: true, data: missing };
+
+    const details = {
+      source: normalizeString(meta.source || 'ui-state-compat').slice(0, 120),
+      incomingCount: incoming.size,
+      currentCount: (current.data || []).length,
+      missingCount: missing.length,
+      sampleMissingIds: missing.slice(0, 8),
+    };
+    const error = createUnsafeCustomerReplaceError(details);
+    if (typeof logger.warn === 'function') {
+      logger.warn('[DataOps][unsafe-customer-replace-blocked]', error.message, details);
+    }
+    return { ok: false, blocked: true, error, ...details };
+  }
+
+  async function deleteMissingCustomerIds(customerIds, source) {
+    const ids = Array.from(new Set((Array.isArray(customerIds) ? customerIds : []).map(normalizeString).filter(Boolean)));
+    if (!ids.length) return { ok: true, data: [] };
+    return run(
+      'delete-missing-softora_customers',
+      (client) =>
+        client
+          .from(TABLES.customers)
+          .update({
+            deleted_at: isoNow(),
+            updated_at: isoNow(),
+            source: normalizeString(source || 'ui-state-compat').slice(0, 120),
+          })
+          .in('customer_id', ids),
+      getWriteOperationOptions()
+    );
+  }
+
   async function listCustomers(options = {}) {
     return cachedRead('customers', async () => {
       const result = await collectPagedRows('list-customers', (client) =>
@@ -978,6 +1041,11 @@ function createSoftoraDataOpsStore(deps = {}) {
       ),
       meta.source
     );
+    const missingDeletePlan = await planCustomerMissingDeletes(
+      rows.map((row) => row.customer_id),
+      meta
+    );
+    if (!missingDeletePlan.ok) return missingDeletePlan;
     if (rows.length) {
       const guardWrite = await ensureSentOutboundRecipientGuards(rows, meta);
       if (!guardWrite.ok) return guardWrite;
@@ -989,12 +1057,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       if (!upsert.ok) return upsert;
     }
     forgetReads('customers');
-    return markMissingDeleted(
-      TABLES.customers,
-      'customer_id',
-      rows.map((row) => row.customer_id),
-      meta.source
-    );
+    return deleteMissingCustomerIds(missingDeletePlan.data, meta.source);
   }
 
   async function upsertCustomers(customers, meta = {}) {

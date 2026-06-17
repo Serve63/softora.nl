@@ -427,6 +427,10 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     if (!canHandleScope(scope)) return null;
     const stateValues = values && typeof values === 'object' ? values : {};
     const sourceMeta = { source: normalizeString(meta.source || 'ui-state-compat') };
+    if (meta.replaceMissing === true) sourceMeta.replaceMissing = true;
+    if (meta.fullReplace === true) sourceMeta.fullReplace = true;
+    if (meta.allowMissingDelete === true) sourceMeta.allowMissingDelete = true;
+    if (meta.allowMassCustomerDelete === true) sourceMeta.allowMassCustomerDelete = true;
 
     try {
       if (scope === SCOPES.customers && hasKey(stateValues, KEYS.customers)) {
