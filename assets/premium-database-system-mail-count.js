@@ -7,6 +7,7 @@
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
+    let lastTodayBouncesCount = null;
     let lastStatsMailCount = null;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
@@ -285,6 +286,18 @@
         return null;
     }
 
+    function readTodayBouncesCountFromStats(stats) {
+        const directFields = ["bouncesToday", "todayBounces"];
+        for (let index = 0; index < directFields.length; index += 1) {
+            const count = readNonNegativeInteger(stats && stats[directFields[index]]);
+            if (count !== null) return count;
+        }
+        const groupedStats = stats && stats.todayBounceStats && typeof stats.todayBounceStats === "object"
+            ? stats.todayBounceStats
+            : null;
+        return readNonNegativeInteger(groupedStats && groupedStats.total);
+    }
+
     function renderTodaySentCount(value, isLoading) {
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentTodayCount");
@@ -299,6 +312,23 @@
             return;
         }
         lastTodaySentCount = count;
+        element.textContent = count.toLocaleString("nl-NL");
+    }
+
+    function renderTodayBouncesCount(value, isLoading) {
+        const rootDocument = getRootDocument();
+        const element = rootDocument && rootDocument.getElementById("systemMailBouncesTodayCount");
+        if (!element) return;
+        if (isLoading && lastTodayBouncesCount === null) {
+            element.textContent = "--";
+            return;
+        }
+        const count = value === null || value === undefined ? lastTodayBouncesCount : readNonNegativeInteger(value);
+        if (count === null || count === undefined) {
+            element.textContent = "--";
+            return;
+        }
+        lastTodayBouncesCount = count;
         element.textContent = count.toLocaleString("nl-NL");
     }
 
@@ -344,8 +374,10 @@
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
             const sentToday = readTodaySentCountFromStats(stats);
+            const bouncesToday = readTodayBouncesCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
+            renderTodayBouncesCount(bouncesToday, false);
             if (systemMailCount !== null) {
                 lastStatsMailCount = systemMailCount;
                 renderSystemMailCount(systemMailCount, false);
@@ -353,6 +385,7 @@
             return sentToday;
         }).catch(function (error) {
             renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
+            renderTodayBouncesCount(lastTodayBouncesCount, lastTodayBouncesCount === null);
             renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
             if (typeof console !== "undefined" && typeof console.warn === "function") console.warn("Vandaag verstuurd laden mislukt:", error && error.message ? error.message : error);
             return lastTodaySentCount;
@@ -364,6 +397,7 @@
 
     function bindTodaySentRefresh() {
         renderTodaySentCount(lastTodaySentCount, true);
+        renderTodayBouncesCount(lastTodayBouncesCount, true);
         if (todaySentRefreshBound) return;
         todaySentRefreshBound = true;
         void refreshTodaySentCount();

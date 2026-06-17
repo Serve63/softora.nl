@@ -3132,6 +3132,12 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function normalizeColdmailLiveBounceType(value) {
+    const normalized = normalizeString(value).toLowerCase();
+    if (normalized === 'hard' || normalized === 'soft' || normalized === 'instantly') return normalized;
+    return 'unknown';
+  }
+
   function summarizeColdmailDatabaseLiveStats(rows) {
     let databaseTotalSent = 0;
     let webdesignTotalSent = 0;
@@ -3139,14 +3145,23 @@ function createColdmailCampaignService(deps = {}) {
     let interestedTotal = 0;
     let activeCampaignTotal = 0;
     let lastDatabaseSentAt = '';
+    let bouncesToday = 0;
     const recipientCounts = {};
     const webdesignRecipientCounts = {};
     const webdesignTodayRecipientCounts = {};
+    const bounceTodayRecipientKeys = new Set();
+    const bounceTypesToday = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
+    const bounceItemsToday = [];
     let unkeyedTotalSent = 0;
     let webdesignUnkeyedTotalSent = 0;
     const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
 
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
+    (Array.isArray(rows) ? rows : []).forEach((row, index) => {
       const sentCount = getSoftoraSystemMailSentCountForRow(row);
       const recipientKey = buildColdmailStatsRecipientKey({
         recipientEmail: getRowEmail(row),
@@ -3182,6 +3197,28 @@ function createColdmailCampaignService(deps = {}) {
       const status = normalizeDatabaseStatus(row.databaseStatus || row.status, row);
       if (['interesse', 'afspraak', 'klant'].includes(status)) interestedTotal += 1;
       if (isRowInActiveColdmailCampaign(row)) activeCampaignTotal += 1;
+
+      const bounceAt = normalizeString(row && (row.coldmailBounceAt || row.lastColdmailBounceAt || row.bouncedAt));
+      const bounceAtMs = parseTimestampMs(bounceAt);
+      if (
+        bounceAtMs &&
+        !isTestRecipientRow(row, getRowEmail(row)) &&
+        getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey
+      ) {
+        const bounceKey = recipientKey || `row:${index}`;
+        if (!bounceTodayRecipientKeys.has(bounceKey)) {
+          bounceTodayRecipientKeys.add(bounceKey);
+          const bounceType = normalizeColdmailLiveBounceType(row && row.coldmailBounceType);
+          bouncesToday += 1;
+          bounceTypesToday[bounceType] = (bounceTypesToday[bounceType] || 0) + 1;
+          bounceItemsToday.push({
+            company: truncateText(getRowCompany(row), 120),
+            email: getRowEmail(row),
+            type: bounceType,
+            at: bounceAt,
+          });
+        }
+      }
     });
 
     return {
@@ -3196,6 +3233,11 @@ function createColdmailCampaignService(deps = {}) {
       interestedTotal,
       activeCampaignTotal,
       lastDatabaseSentAt,
+      bouncesToday,
+      bounceTypesToday,
+      bounceItemsToday: bounceItemsToday
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
       recipientCounts,
       unkeyedTotalSent,
     };
@@ -3343,6 +3385,10 @@ function createColdmailCampaignService(deps = {}) {
         centralGuardUnavailableReason: centralGuardStats.unavailableReason || '',
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
+        bouncesToday: databaseStats.bouncesToday,
+        todayBounces: databaseStats.bouncesToday,
+        bounceTypesToday: databaseStats.bounceTypesToday,
+        bounceItemsToday: databaseStats.bounceItemsToday,
         conversionRate,
         lastSuccessfulSendAt,
         lastSenderEmail: centralGuardStats.lastSenderEmail || guardStats.lastSenderEmail,
