@@ -2052,7 +2052,7 @@ test('mailbox service exposes sync response handler for cron and admin routes', 
   assert.deepEqual(response.body, { ok: true, results: [] });
 });
 
-test('mailbox cron sync indexes up to 100 sent messages by default', async () => {
+test('mailbox cron sync indexes a lightweight sent batch by default', async () => {
   const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
     uid: index + 1,
     flags: ['\\Seen'],
@@ -2104,6 +2104,6 @@ test('mailbox cron sync indexes up to 100 sent messages by default', async () =>
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.ok, true);
-  assert.deepEqual(upsertedCounts, [100]);
-  assert.equal(response.body.results[0].synced, 100);
+  assert.deepEqual(upsertedCounts, [30]);
+  assert.equal(response.body.results[0].synced, 30);
 });

@@ -1156,10 +1156,23 @@ function summarizeMailboxCoverage(messages = [], syncStates = []) {
       .sort();
     const sentSync = syncByAccountFolder.get(`${account}|sent`) || null;
     const sentSyncCount = Number(sentSync && sentSync.message_count) || 0;
+    const sentSyncStatus = normalizeString(sentSync && sentSync.status);
+    const sentSyncLockExpiresAt = normalizeString(sentSync && sentSync.lock_expires_at);
+    const sentSyncLockExpiresMs = Date.parse(sentSyncLockExpiresAt);
+    const sentSyncLockExpired =
+      Number.isFinite(sentSyncLockExpiresMs) && sentSyncLockExpiresMs <= Date.now();
     const warnings = [];
-    if (!sentRows.length) warnings.push('sent_index_empty');
+    const notes = [];
+    if (!sentRows.length) notes.push('sent_index_empty_monitoring_only');
     if (!sentSync) warnings.push('sent_sync_state_missing');
-    if (sentSyncCount >= MAILBOX_SYNC_LIMIT_HINT) warnings.push('sent_sync_limit_reached');
+    if (sentSyncStatus === 'error') warnings.push('sent_sync_error');
+    if (sentSyncStatus === 'syncing' && sentSyncLockExpiresAt && !sentSyncLockExpired) {
+      notes.push('sent_sync_active_lock_monitoring_only');
+    }
+    if (sentSyncStatus === 'syncing' && sentSyncLockExpired) {
+      notes.push('sent_sync_stale_lock_monitoring_only');
+    }
+    if (sentSyncCount >= MAILBOX_SYNC_LIMIT_HINT) notes.push('sent_sync_limit_reached_monitoring_only');
     return {
       accountEmail: account,
       totalIndexedRows: rows.length,
@@ -1167,17 +1180,23 @@ function summarizeMailboxCoverage(messages = [], syncStates = []) {
       inboxIndexedRows: inboxRows.length,
       sentFirstAt: sentDates[0] || '',
       sentLastAt: sentDates[sentDates.length - 1] || '',
-      sentSyncStatus: normalizeString(sentSync && sentSync.status),
+      sentSyncStatus,
       sentSyncLastSyncedAt: normalizeString(sentSync && sentSync.last_synced_at),
       sentSyncMessageCount: sentSyncCount,
       sentSyncLastUid: Number(sentSync && sentSync.last_uid) || 0,
+      sentSyncLockExpiresAt,
       warnings,
+      notes,
     };
   });
 }
 
 function summarizeCoverageWarnings(mailboxCoverage = []) {
   return mailboxCoverage.filter((item) => Array.isArray(item.warnings) && item.warnings.length);
+}
+
+function summarizeCoverageNotes(mailboxCoverage = []) {
+  return mailboxCoverage.filter((item) => Array.isArray(item.notes) && item.notes.length);
 }
 
 function buildReport({
@@ -1233,10 +1252,33 @@ function buildReport({
     legacyCombinedSoftoraDuplicateCompanies: legacyEvents.length ? legacyCombinedDuplicateCompanies : [],
   });
   const mailboxCoverageWarnings = summarizeCoverageWarnings(mailboxCoverage);
+  const mailboxCoverageNotes = summarizeCoverageNotes(mailboxCoverage);
+  const blockingProblems = [];
+  if (missing.length) {
+    blockingProblems.push({
+      code: 'missing_central_outbound_guard',
+      count: missing.length,
+    });
+  }
+  const historicalWarnings = [];
+  if (postPauseEvents.length) {
+    historicalWarnings.push({
+      code: 'historical_post_pause_initial_sends',
+      count: postPauseEvents.length,
+    });
+  }
+  if (consolidatedDuplicateRiskEmails.length) {
+    historicalWarnings.push({
+      code: 'historical_duplicate_contact_risks',
+      count: consolidatedDuplicateRiskEmails.length,
+    });
+  }
   return {
-    ok: missing.length === 0 && postPauseEvents.length === 0,
+    ok: blockingProblems.length === 0,
     mode: options.apply ? 'apply' : 'check',
     generatedAt: new Date().toISOString(),
+    blockingProblems,
+    historicalWarnings,
     summary: {
       outboundEvidenceEvents: events.length,
       eventSourceCounts,
@@ -1265,8 +1307,20 @@ function buildReport({
       legacyCombinedSoftoraDuplicateDomains: legacyCombinedDuplicateDomains.length,
       legacyCombinedSoftoraDuplicateCompanies: legacyCombinedDuplicateCompanies.length,
       mailboxCoverageWarnings: mailboxCoverageWarnings.length,
-      mailboxSentIndexEmpty: mailboxCoverage.filter((item) => Array.isArray(item.warnings) && item.warnings.includes('sent_index_empty')).length,
-      mailboxSentSyncLimitReached: mailboxCoverage.filter((item) => Array.isArray(item.warnings) && item.warnings.includes('sent_sync_limit_reached')).length,
+      mailboxCoverageNotes: mailboxCoverageNotes.length,
+      mailboxSentIndexEmpty: mailboxCoverage.filter(
+        (item) =>
+          (Array.isArray(item.warnings) && item.warnings.includes('sent_index_empty')) ||
+          (Array.isArray(item.notes) && item.notes.includes('sent_index_empty_monitoring_only'))
+      ).length,
+      mailboxSentIndexEmptyMonitoringOnly: mailboxCoverage.filter((item) => Array.isArray(item.notes) && item.notes.includes('sent_index_empty_monitoring_only')).length,
+      mailboxSentSyncLimitReached: mailboxCoverage.filter(
+        (item) =>
+          (Array.isArray(item.warnings) && item.warnings.includes('sent_sync_limit_reached')) ||
+          (Array.isArray(item.notes) && item.notes.includes('sent_sync_limit_reached_monitoring_only'))
+      ).length,
+      mailboxSentSyncLimitReachedMonitoringOnly: mailboxCoverage.filter((item) => Array.isArray(item.notes) && item.notes.includes('sent_sync_limit_reached_monitoring_only')).length,
+      mailboxSentSyncStaleLockMonitoringOnly: mailboxCoverage.filter((item) => Array.isArray(item.notes) && item.notes.includes('sent_sync_stale_lock_monitoring_only')).length,
     },
     missingRecipients: missingEmails,
     missingSamples: missing.slice(0, options.sample || 15).map((item) => ({
@@ -1301,6 +1355,7 @@ function buildReport({
     legacyCombinedSoftoraDuplicateCompanies: legacyCombinedDuplicateCompanies,
     mailboxCoverage,
     mailboxCoverageWarnings,
+    mailboxCoverageNotes,
   };
 }
 
@@ -1337,9 +1392,12 @@ function printHuman(report) {
   console.log(`- Geconsolideerde dubbelcontact-risico e-mails: ${report.summary.consolidatedDuplicateRiskEmails}`);
   console.log(`- Legacy customer-send events: ${report.summary.legacyCustomerSentEvents}`);
   console.log(`- Legacy-gecombineerde Softora-dubbel ontvangers: ${report.summary.legacyCombinedSoftoraDuplicateRecipients}`);
+  console.log(`- Audit-blockers: ${report.blockingProblems.length}`);
+  console.log(`- Historische audit-waarschuwingen: ${report.historicalWarnings.length}`);
   console.log(`- Mailbox coverage waarschuwingen: ${report.summary.mailboxCoverageWarnings}`);
-  console.log(`- Mailbox sent-index leeg: ${report.summary.mailboxSentIndexEmpty}`);
-  console.log(`- Mailbox sent-sync limiet geraakt: ${report.summary.mailboxSentSyncLimitReached}`);
+  console.log(`- Mailbox coverage monitor-notes: ${report.summary.mailboxCoverageNotes}`);
+  console.log(`- Mailbox sent-index leeg (monitoring-only): ${report.summary.mailboxSentIndexEmptyMonitoringOnly}`);
+  console.log(`- Mailbox sent-sync limiet geraakt (monitoring-only): ${report.summary.mailboxSentSyncLimitReachedMonitoringOnly}`);
   if (report.mailboxCoverageWarnings.length) {
     console.log('\nMailbox coverage waarschuwingen:');
     console.table(
@@ -1349,6 +1407,18 @@ function printHuman(report) {
         syncStatus: item.sentSyncStatus,
         syncCount: item.sentSyncMessageCount,
         waarschuwingen: item.warnings.join(', '),
+      }))
+    );
+  }
+  if (report.mailboxCoverageNotes.length) {
+    console.log('\nMailbox coverage monitor-notes:');
+    console.table(
+      report.mailboxCoverageNotes.map((item) => ({
+        mailbox: item.accountEmail,
+        sentRows: item.sentIndexedRows,
+        syncStatus: item.sentSyncStatus,
+        syncCount: item.sentSyncMessageCount,
+        notes: item.notes.join(', '),
       }))
     );
   }
@@ -1438,7 +1508,7 @@ function parseStateJson(values, key, fallback) {
 }
 
 async function pauseAutopilotForMissingGuard(client, stateTable, report) {
-  if (!report.summary.missingGuardKeys && !report.summary.postPauseInitialSends) return false;
+  if (!report.summary.missingGuardKeys) return false;
   const now = new Date();
   const until = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
 
@@ -1454,7 +1524,6 @@ async function pauseAutopilotForMissingGuard(client, stateTable, report) {
     safetyPauseUntil: until,
     safetyPauseReason: MONITOR_PAUSE_REASON,
     missingGuardKeys: report.summary.missingGuardKeys,
-    postPauseInitialSends: report.summary.postPauseInitialSends,
   });
   await writeUiState(
     client,
@@ -1512,7 +1581,7 @@ async function loadLiveData(client, stateTable, options = {}) {
     fetchAll(
       client,
       'softora_mailbox_sync_state',
-      'account_email,folder,status,last_synced_at,last_uid,message_count,last_error',
+      'account_email,folder,status,last_synced_at,last_uid,message_count,last_error,lock_expires_at',
       (query) => query.in('account_email', SENDERS).order('account_email', { ascending: true })
     ),
   ]);
