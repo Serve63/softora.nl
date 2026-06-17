@@ -1497,7 +1497,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: flex-start;[\s\S]*padding: 0;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: left;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(6, minmax\(110px, 1fr\)\);[\s\S]*"\. \. note note note note"[\s\S]*"autopilot today bounces sent deals ratio";[\s\S]*gap: 6px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-card--autopilot\s*\{[\s\S]*grid-area: autopilot;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-card--autopilot\s*\{[\s\S]*grid-area: autopilot;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);[\s\S]*box-shadow: 0 8px 18px rgba\(139, 34, 82, \.055\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--today\s*\{[\s\S]*grid-area: today;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--bounces\s*\{[\s\S]*grid-area: bounces;[\s\S]*border-color: rgba\(139, 34, 82, \.28\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--sent\s*\{[\s\S]*grid-area: sent;/);
