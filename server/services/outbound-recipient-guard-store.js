@@ -400,7 +400,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
       .from(table)
       .delete()
       .eq('reservation_id', id)
-      .eq('permanent', false);
+      .eq('status', 'reserved');
     if (error) throw error;
     return { ok: true };
   }

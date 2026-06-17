@@ -26,16 +26,23 @@ function createMockSupabaseClient({ conflictKeys = [], conflictAfterInsert = fal
     from(table) {
       return {
         delete() {
-          return {
+          const filters = [];
+          const query = {
             eq(column, value) {
-              return {
-                async lt(otherColumn, otherValue) {
-                  calls.push({ type: 'delete', table, column, value, otherColumn, otherValue });
-                  return { error: null };
-                },
-              };
+              filters.push({ column, value });
+              return query;
+            },
+            async lt(column, value) {
+              filters.push({ column, value, operator: 'lt' });
+              calls.push({ type: 'delete', table, filters: filters.slice() });
+              return { error: null };
+            },
+            then(resolve, reject) {
+              calls.push({ type: 'delete', table, filters: filters.slice() });
+              return Promise.resolve({ error: null }).then(resolve, reject);
             },
           };
+          return query;
         },
         select(columns) {
           return {
@@ -368,4 +375,19 @@ test('outbound recipient guard store marks confirm empty when no reservation row
   assert.equal(confirmation.ok, false);
   assert.equal(confirmation.reason, 'reservation_not_found');
   assert.equal(confirmation.count, 0);
+});
+
+test('outbound recipient guard store releases reserved rows without touching sent guards', async () => {
+  const { client, calls } = createMockSupabaseClient();
+  const store = createStore(client);
+
+  const result = await store.releaseReservation('reservation-to-release');
+
+  assert.equal(result.ok, true);
+  const release = calls.find((call) => call.type === 'delete' && call.filters.some((filter) => filter.column === 'reservation_id'));
+  assert.ok(release);
+  assert.deepEqual(release.filters, [
+    { column: 'reservation_id', value: 'reservation-to-release' },
+    { column: 'status', value: 'reserved' },
+  ]);
 });

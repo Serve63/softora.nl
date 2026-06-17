@@ -1563,6 +1563,22 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  async function releaseSupabaseOutboundRecipientReservation(reservation, context = {}) {
+    const reservationId = normalizeString(reservation && reservation.reservationId);
+    if (!reservationId || !outboundRecipientGuardStore || typeof outboundRecipientGuardStore.releaseReservation !== 'function') {
+      return;
+    }
+    try {
+      await outboundRecipientGuardStore.releaseReservation(reservationId);
+    } catch (error) {
+      logger.warn('[OutboundRecipientGuard][coldmail-release]', {
+        reservationId,
+        recipientEmail: normalizeEmailAddress(context && context.to),
+        error: error && error.message ? error.message : error,
+      });
+    }
+  }
+
   function hasPriorOutboundMailSignal(row) {
     if (!row || typeof row !== 'object') return false;
     if (normalizeContactStatus(row.outreachStatus, row) === 'gemaild') return true;
@@ -7965,15 +7981,23 @@ function createColdmailCampaignService(deps = {}) {
           failed.push(outboundReservation.conflict);
           continue;
         }
-        const info = await transporter.sendMail(mail);
-        const accepted = Array.isArray(info && info.accepted)
-          ? info.accepted.map(normalizeEmailAddress).filter(Boolean)
-          : [];
-        const rejected = Array.isArray(info && info.rejected)
-          ? info.rejected.map(normalizeEmailAddress).filter(Boolean)
-          : [];
-        if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
-          throw new Error('SMTP accepteerde de ontvanger niet.');
+        let info;
+        let accepted = [];
+        let rejected = [];
+        try {
+          info = await transporter.sendMail(mail);
+          accepted = Array.isArray(info && info.accepted)
+            ? info.accepted.map(normalizeEmailAddress).filter(Boolean)
+            : [];
+          rejected = Array.isArray(info && info.rejected)
+            ? info.rejected.map(normalizeEmailAddress).filter(Boolean)
+            : [];
+          if (rejected.includes(normalizeEmailAddress(to)) || (Array.isArray(info && info.accepted) && !accepted.length)) {
+            throw new Error('SMTP accepteerde de ontvanger niet.');
+          }
+        } catch (error) {
+          await releaseSupabaseOutboundRecipientReservation(outboundReservation, { to });
+          throw error;
         }
         const sentItem = {
           id: item.id,
