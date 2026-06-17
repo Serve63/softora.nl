@@ -451,7 +451,7 @@
         }
 
         let bulkController = null;
-        function getBulkController(){const factory=global.SoftoraDatabaseWebdesignBulk&&global.SoftoraDatabaseWebdesignBulk.createController;if(typeof factory!=="function")return null;if(!bulkController)bulkController=factory({normalizeString:normalizeString,escapeHtml:escapeHtml,buildJobPayload:buildJobPayload,refreshPhotos:refreshPhotos,renderPage:renderPage,refreshDelayMs:FINISHED_PHOTO_REFRESH_DELAY_MS});return bulkController;}
+        function getBulkController(){const factory=global.SoftoraDatabaseWebdesignBulk&&global.SoftoraDatabaseWebdesignBulk.createController;if(typeof factory!=="function")return null;if(!bulkController)bulkController=factory({normalizeString:normalizeString,escapeHtml:escapeHtml,buildJobPayload:buildJobPayload,refreshPhotos:refreshPhotos,renderPage:renderPage,onCancel:function(result){const ids=new Set((Array.isArray(result&&result.cancelledJobIds)?result.cancelledJobIds:[]).map(normalizeString).filter(Boolean));let cleared=0;readPendingJobs().forEach(function(job){const shouldClear=ids.size?ids.has(normalizeString(job.jobId)):isRestoredPendingJob(job);if(!shouldClear)return;clearPollTimer(job.jobId);removePendingJob(job.customerId);cleared+=1;});if(cleared&&typeof renderPage==="function")renderPage();},refreshDelayMs:FINISHED_PHOTO_REFRESH_DELAY_MS});return bulkController;}
         async function startBulkBatchForCustomers(customers){const controller=getBulkController();if(!controller)throw new Error("Webdesign-bulk script is niet geladen.");return controller.startBulkBatchForCustomers(customers);}
         function resumeBulkBatch(){const controller=getBulkController();if(controller&&typeof controller.loadLatestBatch==="function")void controller.loadLatestBatch();}
 

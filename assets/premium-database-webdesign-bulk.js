@@ -41,6 +41,7 @@
         const buildJobPayload = typeof options.buildJobPayload === "function" ? options.buildJobPayload : null;
         const refreshPhotos = typeof options.refreshPhotos === "function" ? options.refreshPhotos : null;
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : null;
+        const onCancel = typeof options.onCancel === "function" ? options.onCancel : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
         let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false, restoreRetryTimer = null, restoreRetryAttempt = 0, restoreInFlight = false;
         ensureStyles();
@@ -164,6 +165,10 @@
                 const payload = await readJson(response);
                 if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk annuleren is mislukt.");
                 handleBatch(payload.batch, "cancelled");
+                if (onCancel) {
+                    try { onCancel({ batch: payload.batch, cancelledJobIds: Array.isArray(payload.cancelledJobIds) ? payload.cancelledJobIds : [], payload: payload }); }
+                    catch (error) {}
+                }
                 return payload.batch;
             } finally {
                 cancelInFlight = false;

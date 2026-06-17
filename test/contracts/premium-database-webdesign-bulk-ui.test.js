@@ -87,6 +87,7 @@ function createHarness(fetchImpl) {
 
 test('webdesign bulk cancel hides the status bar after the server confirms cancellation', async () => {
   const fetchCalls = [];
+  const cancelCallbacks = [];
   const { context, document } = createHarness(async (url, options = {}) => {
     fetchCalls.push({ url, method: options.method || 'GET' });
     if (String(url).endsWith('/run')) return { ok: true, json: async () => ({ ok: true }) };
@@ -95,6 +96,7 @@ test('webdesign bulk cancel hides the status bar after the server confirms cance
         ok: true,
         json: async () => ({
           batch: { id: 'batch-1', status: 'cancelled', total: 10, made: 0, done: 0, cancelled: 10 },
+          cancelledJobIds: ['job-cancelled-1'],
         }),
       };
     }
@@ -105,7 +107,11 @@ test('webdesign bulk cancel hides the status bar after the server confirms cance
       }),
     };
   });
-  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({
+    onCancel(result) {
+      cancelCallbacks.push(result);
+    },
+  });
 
   await controller.loadLatestBatch();
   assert.equal(document.getElementById('webdesignBulkStatus').hidden, false);
@@ -113,6 +119,7 @@ test('webdesign bulk cancel hides the status bar after the server confirms cance
   await controller.cancelActiveBatch();
 
   assert.equal(document.getElementById('webdesignBulkStatus').hidden, true);
+  assert.deepEqual(cancelCallbacks.map((result) => result.cancelledJobIds), [['job-cancelled-1']]);
   assert.equal(fetchCalls.some((call) => String(call.url).endsWith('/batch-1/cancel')), true);
 });
 

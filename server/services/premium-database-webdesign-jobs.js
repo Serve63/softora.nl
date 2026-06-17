@@ -913,6 +913,34 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return null;
   }
 
+  async function cancelActiveJobRecord(job) {
+    if (!job || (job.status !== 'queued' && job.status !== 'running')) return '';
+    job.cancelled = true;
+    job.status = 'error';
+    job.error = WEBDESIGN_JOB_CANCELLED_ERROR;
+    job.finishedAt = now();
+    const retry = getRetryState(job);
+    job.retry = {
+      ...retry,
+      nextAttemptAt: null,
+    };
+    jobs.set(job.id, job);
+    await persistJob(job);
+    return job.id;
+  }
+
+  async function isJobFromCancelledBatch(job) {
+    const batchId = normalizeJobId(job && job.batchId);
+    const ownerKey = normalizeString(job && job.ownerKey);
+    if (!batchId || !ownerKey || !dataOpsStore || typeof dataOpsStore.getWebdesignBatch !== 'function') return false;
+    try {
+      const batch = await dataOpsStore.getWebdesignBatch(ownerKey, batchId);
+      return normalizeString(batch && batch.status).toLowerCase() === 'cancelled';
+    } catch (error) {
+      return false;
+    }
+  }
+
   async function getVisibleJobsForOwner(ownerKey) {
     const byId = new Map();
     if (dataOpsStore && typeof dataOpsStore.listVisibleWebdesignJobs === 'function') {
@@ -928,7 +956,15 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       .filter((job) => job.ownerKey === ownerKey)
       .filter((job) => job.status === 'queued' || job.status === 'running')
       .forEach((job) => byId.set(job.id, job));
-    return Array.from(byId.values()).sort((left, right) => left.createdAt - right.createdAt);
+    const visible = [];
+    for (const job of Array.from(byId.values()).sort((left, right) => left.createdAt - right.createdAt)) {
+      if (await isJobFromCancelledBatch(job)) {
+        await cancelActiveJobRecord(job);
+        continue;
+      }
+      visible.push(job);
+    }
+    return visible;
   }
 
   async function persistGeneratedPhoto(job, image) {
@@ -1977,37 +2013,62 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function cancelActiveTargetJob(target) {
     const jobId = normalizeJobId(target && target.jobId);
-    if (!jobId) return false;
+    if (!jobId) return '';
     let job = jobs.get(jobId);
     if (!job) {
       const loaded = await loadPersistentJobResult(jobId);
       if (!loaded.error && loaded.job) job = loaded.job;
     }
-    if (!job || (job.status !== 'queued' && job.status !== 'running')) return false;
-    job.cancelled = true;
-    job.status = 'error';
-    job.error = WEBDESIGN_JOB_CANCELLED_ERROR;
-    job.finishedAt = now();
-    const retry = getRetryState(job);
-    job.retry = {
-      ...retry,
-      nextAttemptAt: null,
-    };
-    jobs.set(job.id, job);
-    await persistJob(job);
-    return true;
+    return cancelActiveJobRecord(job);
+  }
+
+  async function cancelActiveJobsForBatch(batch, seenJobIds) {
+    const ownerKey = normalizeString(batch && batch.ownerKey);
+    const batchId = normalizeJobId(batch && batch.id);
+    if (!ownerKey || !batchId) return [];
+    const candidates = new Map();
+    Array.from(jobs.values())
+      .filter((job) => job && job.ownerKey === ownerKey && normalizeJobId(job.batchId) === batchId)
+      .filter((job) => job.status === 'queued' || job.status === 'running')
+      .forEach((job) => candidates.set(job.id, job));
+    if (dataOpsStore && typeof dataOpsStore.listVisibleWebdesignJobs === 'function') {
+      const persistentJobs = await dataOpsStore.listVisibleWebdesignJobs(ownerKey);
+      (Array.isArray(persistentJobs) ? persistentJobs : [])
+        .filter((job) => job && normalizeJobId(job.batchId) === batchId)
+        .filter((job) => job.status === 'queued' || job.status === 'running')
+        .forEach((job) => {
+          jobs.set(job.id, job);
+          candidates.set(job.id, job);
+        });
+    }
+    const cancelledJobIds = [];
+    for (const job of candidates.values()) {
+      if (!job || seenJobIds.has(job.id)) continue;
+      const cancelledJobId = await cancelActiveJobRecord(job);
+      if (cancelledJobId) {
+        cancelledJobIds.push(cancelledJobId);
+      }
+    }
+    return cancelledJobIds;
   }
 
   async function cancelBatch(batch, chunks) {
     const changed = new Set();
     let cancelledTargets = 0;
-    let cancelledJobs = 0;
+    const cancelledJobIds = [];
+    const seenCancelledJobIds = new Set();
+    function rememberCancelledJob(jobId) {
+      const normalized = normalizeJobId(jobId);
+      if (!normalized || seenCancelledJobIds.has(normalized)) return;
+      seenCancelledJobIds.add(normalized);
+      cancelledJobIds.push(normalized);
+    }
     for (const chunk of Array.isArray(chunks) ? chunks : []) {
       for (const target of Array.isArray(chunk.targets) ? chunk.targets : []) {
         const status = normalizeString(target && target.status).toLowerCase();
         if (isTargetTerminalStatus(status)) continue;
         if ((status === 'queued' || status === 'running') && target.jobId) {
-          if (await cancelActiveTargetJob(target)) cancelledJobs += 1;
+          rememberCancelledJob(await cancelActiveTargetJob(target));
         }
         markTarget(target, 'cancelled', {
           error: WEBDESIGN_JOB_CANCELLED_ERROR,
@@ -2017,6 +2078,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         changed.add(chunk.index);
       }
     }
+    (await cancelActiveJobsForBatch(batch, seenCancelledJobIds)).forEach(rememberCancelledJob);
     const chunksSaved = await persistChangedBatchChunks(chunks, changed);
     if (!chunksSaved || chunksSaved.ok !== true) {
       return {
@@ -2043,7 +2105,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       batch,
       chunks,
       cancelledTargets,
-      cancelledJobs,
+      cancelledJobs: cancelledJobIds.length,
+      cancelledJobIds,
       summary,
     };
   }
@@ -2152,6 +2215,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         cancelled: loaded.batch.status === 'cancelled',
         cancelledTargets: 0,
         cancelledJobs: 0,
+        cancelledJobIds: [],
         batch: serializeBatch(loaded.batch, chunks),
       });
     }
@@ -2165,6 +2229,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       cancelled: true,
       cancelledTargets: cancelled.cancelledTargets,
       cancelledJobs: cancelled.cancelledJobs,
+      cancelledJobIds: cancelled.cancelledJobIds || [],
       batch: serializeBatch(cancelled.batch, cancelled.chunks),
     });
   }
