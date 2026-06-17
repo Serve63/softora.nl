@@ -17,6 +17,10 @@ function createStore(overrides = {}) {
       calls.push({ type: 'customers', customers, meta });
       return { ok: true };
     }),
+    upsertCustomers: overrides.upsertCustomers || (async (customers, meta) => {
+      calls.push({ type: 'customers-upsert', customers, meta });
+      return { ok: true };
+    }),
     listActiveOrders: overrides.listActiveOrders || (async () => []),
     replaceActiveOrders: overrides.replaceActiveOrders || (async (orders, meta) => {
       calls.push({ type: 'orders', orders, meta });
@@ -200,6 +204,22 @@ test('data ops ui-state bridge dual-writes customer and active order values', as
   assert.equal(store.calls[1].orders[0].title, 'Website');
   assert.equal(store.calls[2].type, 'runtime');
   assert.equal(store.calls[2].runtime['7'].statusKey, 'running');
+});
+
+test('data ops ui-state bridge can partial-upsert customer patches without full replace', async () => {
+  const store = createStore();
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+
+  await bridge.setUiStateValues(
+    SCOPES.customers,
+    buildChunkedStatePatch(KEYS.customers, JSON.stringify([{ id: 'cust-1', bedrijf: 'Softora' }])),
+    { source: 'coldmail-campaign', upsertOnly: true }
+  );
+
+  assert.equal(store.calls.length, 1);
+  assert.equal(store.calls[0].type, 'customers-upsert');
+  assert.equal(store.calls[0].customers[0].id, 'cust-1');
+  assert.deepEqual(store.calls[0].meta, { source: 'coldmail-campaign' });
 });
 
 test('data ops ui-state bridge stores photo chunks as structured photo entries', async () => {

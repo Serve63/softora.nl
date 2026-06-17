@@ -431,7 +431,11 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     try {
       if (scope === SCOPES.customers && hasKey(stateValues, KEYS.customers)) {
         const customers = safeParseJsonArray(readChunkedStateValue(stateValues, KEYS.customers));
-        const saved = await store.replaceCustomers(customers, sourceMeta);
+        const upsertOnly = meta.upsertOnly === true || meta.partial === true || meta.replaceMissing === false;
+        const saveCustomers = upsertOnly && typeof store.upsertCustomers === 'function'
+          ? store.upsertCustomers
+          : store.replaceCustomers;
+        const saved = await saveCustomers(customers, sourceMeta);
         return saved.ok ? buildState(scope, stateValues) : null;
       }
       if (scope === SCOPES.activeOrders) {
