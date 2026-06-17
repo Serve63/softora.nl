@@ -68,6 +68,20 @@ function loadDatabaseColdmailGuardClient() {
   return sandbox.window.SoftoraDatabaseColdmailGuard;
 }
 
+function loadDatabaseEmailVerificationClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-email-verification.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = {
+    window: {
+      document: null,
+      setTimeout,
+      clearTimeout,
+    },
+  };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraDatabaseEmailVerification;
+}
+
 function loadDatabaseWebdesignActionClient(options = {}) {
   const previewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
@@ -338,6 +352,28 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.equal(missingPhoto.isMailReady, false);
 });
 
+test('premium database email verification client renders badges and blocks risky verified rows', () => {
+  const verificationClient = loadDatabaseEmailVerificationClient();
+
+  assert.equal(verificationClient.isOutboundAllowed({ emailVerificationVerdict: 'green' }), true);
+  assert.equal(verificationClient.isOutboundAllowed({ emailVerificationVerdict: 'orange' }), false);
+  assert.equal(verificationClient.isOutboundAllowed({ emailVerificationVerdict: 'red' }), false);
+  assert.equal(verificationClient.isOutboundAllowed({}, { requireGreen: true }), false);
+  assert.match(
+    verificationClient.renderEmailCell('info@example.nl', {
+      emailVerificationVerdict: 'orange',
+      emailVerificationReason: 'Role-based adres',
+    }),
+    /email-verification-badge is-orange/
+  );
+  assert.match(
+    verificationClient.renderEmailCell('bad@example.nl', {
+      emailVerificationVerdict: 'red',
+    }),
+    /Blokkeren/
+  );
+});
+
 test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -541,7 +577,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const websiteValue = normalizeString\(customer\.website \|\| customer\.dom\) \|\| "—";/);
   assert.match(pageSource, /class=\\"website-link\\"/);
   assert.match(pageSource, /target=\\"_blank\\" rel=\\"noopener\\"/);
-  assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
+  assert.match(pageSource, /SoftoraDatabaseEmailVerification\.renderEmailCell\(customer && customer\.email, customer\)/);
+  assert.match(pageSource, /assets\/premium-database-email-verification\.js\?v=20260617a/);
+  assert.match(pageSource, /id="emailVerificationButton"/);
+  assert.match(pageSource, /SoftoraDatabaseEmailVerification\.isOutboundAllowed\(customer, \{ requireGreen: false \}\)/);
+  assert.match(pageSource, /emailVerificationVerdict: normalizeString\(raw && raw\.emailVerificationVerdict\)/);
   assert.match(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
   assert.match(pageSource, /formatPhoneNumber\(raw && \(raw\.tel \|\| raw\.telefoon \|\| raw\.contactPhone\)\)/);
   assert.match(pageSource, /tel: normalizeString\(nodes\.modalPhone\.value\) \|\| "—",/);
@@ -794,6 +834,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
+  assert.match(pageSource, /assets\/premium-database-email-verification\.js\?v=20260617a/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-exact-upload/);
   assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = '\/api\/outreach\/provider-upload'/);
   assert.doesNotMatch(instantlySyncScriptSource, /SYNC_ENDPOINT = '\/api\/outreach\/provider-sync'/);

@@ -13,7 +13,10 @@ test('premium runtime polling stays cost-aware for coldmail and confirmation das
     'utf8'
   );
 
-  assert.match(autopilotSource, /cache: options && options\.method && options\.method !== "GET" \? "no-store" : "default"/);
+  assert.match(
+    autopilotSource,
+    /cache: (?:options && options|requestOptions)\.method && (?:options|requestOptions)\.method !== "GET" \? "no-store" : "default"/
+  );
   assert.match(autopilotSource, /global\.setInterval\(refresh, 300000\);/);
   assert.doesNotMatch(autopilotSource, /global\.setInterval\(refresh, 60000\);/);
   assert.match(confirmationPageSource, /campaignDatabaseRefreshTimer = window\.setInterval\(\(\) => \{[\s\S]*\}, 60000\);/);

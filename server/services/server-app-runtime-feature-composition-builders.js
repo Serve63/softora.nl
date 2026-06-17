@@ -4,6 +4,9 @@ const {
 const { createColdmailCampaignService } = require('./coldmail-campaign');
 const { createInstantlyOutreachService } = require('./instantly-outreach');
 const { createOutboundRecipientGuardService } = require('./outbound-recipient-guard');
+const {
+  createPremiumDatabaseEmailVerificationService,
+} = require('./premium-database-email-verification');
 
 const DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
 
@@ -375,6 +378,8 @@ function buildServerAppFeatureWiringRuntimeContext({
             env.COLDMAIL_AUTOREPLY_OPENAI_MODEL || env.COLDMAIL_AUTOREPLY_MODEL || envConfig.OPENAI_MODEL || 'gpt-5.5-pro'
           ),
           coldmailAutoReplyEnabled: /^true$/i.test(shared.normalizeString(env.COLDMAIL_AUTOREPLY_ENABLED || '')),
+          emailVerificationRequireGreenForOutbound:
+            envConfig.EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND,
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
           outboundRecipientGuardService,
@@ -415,6 +420,8 @@ function buildServerAppFeatureWiringRuntimeContext({
             batchSize: envConfig.INSTANTLY_SYNC_BATCH_SIZE,
             dailyCap: envConfig.INSTANTLY_DAILY_CAP,
             verifyLeadsOnImport: envConfig.INSTANTLY_VERIFY_LEADS_ON_IMPORT,
+            emailVerificationRequireGreenForOutbound:
+              envConfig.EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND,
             blockPersonalMailboxDomains: envConfig.COLDMAIL_BLOCK_PERSONAL_MAILBOX_DOMAINS,
             requireWebdesignAssets: envConfig.INSTANTLY_REQUIRE_WEBDESIGN_ASSETS,
             publicBaseUrl: envConfig.PUBLIC_BASE_URL,
@@ -444,6 +451,23 @@ function buildServerAppFeatureWiringRuntimeContext({
       },
       websiteLinkCoordinator: uiSeoRuntime.websiteLinkCoordinator,
       websitePreviewLibraryCoordinator: uiSeoRuntime.websitePreviewLibraryCoordinator,
+      premiumDatabaseEmailVerificationCoordinator: createPremiumDatabaseEmailVerificationService({
+        emailVerificationConfig: {
+          enabled: envConfig.EMAIL_VERIFICATION_ENABLED,
+          provider: envConfig.EMAIL_VERIFICATION_PROVIDER,
+          zeroBounceApiKey: envConfig.ZEROBOUNCE_API_KEY,
+          zeroBounceApiBaseUrl: envConfig.ZEROBOUNCE_API_BASE_URL,
+          requireGreenForOutbound: envConfig.EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND,
+          timeoutMs: envConfig.EMAIL_VERIFICATION_TIMEOUT_MS,
+        },
+        getUiStateValues: dataOpsAwareUiStateGetter,
+        setUiStateValues: dataOpsAwareUiStateSetter,
+        fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
+        customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
+        customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
+        normalizeString: shared.normalizeString,
+        truncateText: shared.truncateText,
+      }),
       mailbox: {
         logger: console,
         normalizeString: shared.normalizeString,

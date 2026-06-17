@@ -13,6 +13,9 @@ const {
   rememberPreviewImage,
 } = require('./coldmail-preview-image-cache');
 const { findOutreachSuppressionMatch } = require('./outreach-suppression');
+const {
+  getEmailVerificationBlockReason,
+} = require('./premium-database-email-verification');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -1827,6 +1830,10 @@ function normalizeInstantlyConfig(config = {}) {
     verifyLeadsOnImport: readBool(config.verifyLeadsOnImport, false),
     blockPersonalMailboxDomains: readBool(config.blockPersonalMailboxDomains, true),
     requireWebdesignAssets: readBool(config.requireWebdesignAssets, true),
+    emailVerificationRequireGreenForOutbound: readBool(
+      config.emailVerificationRequireGreenForOutbound,
+      false
+    ),
     prewarmPublicImageUrls: readBool(config.prewarmPublicImageUrls, true),
     publicBaseUrl: normalizePublicBaseUrl(config.publicBaseUrl) || DEFAULT_PUBLIC_BASE_URL,
     previewImageBaseUrl:
@@ -2234,6 +2241,19 @@ function createInstantlyOutreachService(deps = {}) {
       const suppressionMatch = getInstantlyOutreachSuppressionMatch({ id, index, row });
 
       if (!isLikelyValidEmail(email, normalizeString)) continue;
+      const emailVerificationBlockReason = getEmailVerificationBlockReason(row, {
+        requireGreen: config.emailVerificationRequireGreenForOutbound,
+      });
+      if (emailVerificationBlockReason) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          code: 'EMAIL_VERIFICATION_BLOCKED',
+          error: emailVerificationBlockReason,
+        });
+        continue;
+      }
       if (suppressionMatch) {
         failed.push({
           id,
@@ -4152,6 +4172,7 @@ function createInstantlyOutreachService(deps = {}) {
       verifyLeadsOnImport: config.verifyLeadsOnImport,
       blockPersonalMailboxDomains: config.blockPersonalMailboxDomains,
       requireWebdesignAssets: config.requireWebdesignAssets,
+      emailVerificationRequireGreenForOutbound: config.emailVerificationRequireGreenForOutbound,
       prewarmPublicImageUrls: config.prewarmPublicImageUrls,
       defaultSenderEmail: config.defaultSenderEmail,
       marksSyncedLeadsAsApproached: true,

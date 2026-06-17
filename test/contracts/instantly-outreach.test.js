@@ -171,6 +171,7 @@ function createService(overrides = {}) {
         overrides.requireWebdesignAssets === undefined
           ? true
           : overrides.requireWebdesignAssets,
+      emailVerificationRequireGreenForOutbound: Boolean(overrides.emailVerificationRequireGreenForOutbound),
       prewarmPublicImageUrls:
         overrides.prewarmPublicImageUrls === undefined
           ? true
@@ -676,6 +677,48 @@ test('safe Instantly upload skips leads that are already protected by recipient 
   assert.equal(result.prepared, 0);
   assert.equal(result.failed.length, 1);
   assert.match(result.failed[0].error, /permanente duplicate-guard/);
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].instantlyStatus, undefined);
+});
+
+test('safe Instantly upload blocks risky verified email rows when green verification is required', async () => {
+  const { service, getRows, writes } = createService({
+    syncEnabled: false,
+    emailVerificationRequireGreenForOutbound: true,
+    rows: [
+      {
+        id: 'risky-1',
+        bedrijf: 'Risky BV',
+        email: 'info@risky.test',
+        website: 'https://risky.test',
+        status: 'prospect',
+        mail: true,
+        emailVerificationVerdict: 'orange',
+        emailVerificationReason: 'Role-based adres; niet automatisch in bulk mailen.',
+      },
+    ],
+    photoMap: {
+      'risky-1': {
+        id: 'risky-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    limit: 1,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'no_eligible_leads');
+  assert.equal(result.prepared, 0);
+  assert.equal(result.failed.length, 1);
+  assert.equal(result.failed[0].code, 'EMAIL_VERIFICATION_BLOCKED');
+  assert.match(result.failed[0].error, /Role-based/);
   assert.equal(writes.length, 0);
   assert.equal(getRows()[0].instantlyStatus, undefined);
 });

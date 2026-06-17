@@ -87,6 +87,12 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
     INSTANTLY_VERIFY_LEADS_ON_IMPORT: 'true',
     INSTANTLY_REQUIRE_WEBDESIGN_ASSETS: 'true',
     INSTANTLY_DEFAULT_SENDER_EMAIL: ' Serve@Softora.NL ',
+    EMAIL_VERIFICATION_ENABLED: 'true',
+    EMAIL_VERIFICATION_PROVIDER: ' zerobounce ',
+    ZEROBOUNCE_API_KEY: ' zb-key ',
+    ZEROBOUNCE_API_BASE_URL: ' https://api-eu.zerobounce.test/v2 ',
+    EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND: 'true',
+    EMAIL_VERIFICATION_TIMEOUT_MS: '22000',
   });
 
   assert.equal(runtimeEnv.instantly.enabled, true);
@@ -102,6 +108,12 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   assert.equal(runtimeEnv.instantly.verifyLeadsOnImport, true);
   assert.equal(runtimeEnv.instantly.requireWebdesignAssets, true);
   assert.equal(runtimeEnv.instantly.defaultSenderEmail, 'serve@softora.nl');
+  assert.equal(runtimeEnv.emailVerification.enabled, true);
+  assert.equal(runtimeEnv.emailVerification.provider, 'zerobounce');
+  assert.equal(runtimeEnv.emailVerification.zeroBounceApiKey, 'zb-key');
+  assert.equal(runtimeEnv.emailVerification.zeroBounceApiBaseUrl, 'https://api-eu.zerobounce.test/v2');
+  assert.equal(runtimeEnv.emailVerification.requireGreenForOutbound, true);
+  assert.equal(runtimeEnv.emailVerification.timeoutMs, 22000);
 });
 
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
