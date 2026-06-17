@@ -98,12 +98,12 @@ function createDataOpsAwareUiStateSetter(uiSeoRuntime = {}) {
 
   return async (scope, values, meta = {}, ...args) => {
     const dataOpsBridge = uiSeoRuntime.dataOpsUiStateBridge;
-    if (
+    const dataOpsCanHandle =
       dataOpsBridge &&
       typeof dataOpsBridge.canHandleScope === 'function' &&
       dataOpsBridge.canHandleScope(scope) &&
-      typeof dataOpsBridge.setUiStateValues === 'function'
-    ) {
+      typeof dataOpsBridge.setUiStateValues === 'function';
+    if (dataOpsCanHandle) {
       const bridged = await dataOpsBridge.setUiStateValues(scope, values, meta);
       if (bridged) return bridged;
       if (meta && meta.requireDataOps) {
@@ -111,6 +111,7 @@ function createDataOpsAwareUiStateSetter(uiSeoRuntime = {}) {
         error.code = 'DATA_OPS_REQUIRED_WRITE_FAILED';
         throw error;
       }
+      return null;
     }
     return legacySetUiStateValues(scope, values, meta, ...args);
   };
