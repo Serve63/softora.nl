@@ -2,6 +2,7 @@ const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_UI_STATE_VALUE_MAX_LENGTH = 200000;
 const COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH = 1000000;
+const JSON_UI_STATE_VALUE_MAX_LENGTH = 1000000;
 const COLDMAIL_SEND_GUARD_MAX_ENTRIES = 1000;
 const COLDMAIL_SEND_GUARD_MAX_RECIPIENT_ENTRIES = 3000;
 const DEFAULT_UI_STATE_READ_FAILURE_COOLDOWN_MS = 60 * 1000;
@@ -13,6 +14,26 @@ function safeJsonObjectParse(value) {
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch (_error) {
     return {};
+  }
+}
+
+function isLikelyJsonStateKey(key) {
+  return /^softora_[a-z0-9_]+_v[0-9]+$/i.test(String(key || ''));
+}
+
+function looksLikeJsonValue(value) {
+  const text = String(value || '').trim();
+  return text.startsWith('{') || text.startsWith('[');
+}
+
+function parseJsonValue(value) {
+  try {
+    return { ok: true, value: JSON.parse(String(value || '')) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : String(error || 'JSON parse failed'),
+    };
   }
 }
 
@@ -207,6 +228,7 @@ function createUiStateStore(deps = {}) {
 
   function getUiStateValueMaxLength(key) {
     if (key === COLDMAIL_SEND_GUARD_KEY) return COLDMAIL_SEND_GUARD_VALUE_MAX_LENGTH;
+    if (isLikelyJsonStateKey(key)) return JSON_UI_STATE_VALUE_MAX_LENGTH;
     return DEFAULT_UI_STATE_VALUE_MAX_LENGTH;
   }
 
@@ -221,9 +243,31 @@ function createUiStateStore(deps = {}) {
         out[key] = '';
         continue;
       }
-      out[key] = truncateText(String(rawValue), getUiStateValueMaxLength(key));
+      const value = String(rawValue);
+      if (isLikelyJsonStateKey(key) && looksLikeJsonValue(value)) {
+        out[key] = value;
+        continue;
+      }
+      out[key] = truncateText(value, getUiStateValueMaxLength(key));
     }
     return out;
+  }
+
+  function getInvalidJsonStateValueErrors(values) {
+    const errors = [];
+    if (!values || typeof values !== 'object' || Array.isArray(values)) return errors;
+    Object.entries(values).forEach(([key, value]) => {
+      if (!isLikelyJsonStateKey(key) || !looksLikeJsonValue(value)) return;
+      const text = String(value || '');
+      const maxLength = getUiStateValueMaxLength(key);
+      if (text.length > maxLength) {
+        errors.push(`${key} is ${text.length} tekens; limiet is ${maxLength}`);
+        return;
+      }
+      const parsed = parseJsonValue(text);
+      if (!parsed.ok) errors.push(`${key} bevat ongeldige JSON: ${parsed.error}`);
+    });
+    return errors;
   }
 
   function buildInMemoryState(scope) {
@@ -448,6 +492,15 @@ function createUiStateStore(deps = {}) {
     if (!normalizedScope) return null;
 
     const sanitizedValues = sanitizeUiStateValues(values);
+    const invalidJsonStateValueErrors = getInvalidJsonStateValueErrors(sanitizedValues);
+    if (invalidJsonStateValueErrors.length) {
+      logger.error(
+        '[UI State][JsonIntegrity][SetRejected]',
+        normalizedScope,
+        invalidJsonStateValueErrors.join('; ')
+      );
+      return null;
+    }
     const updatedAt = new Date().toISOString();
 
     if (!isSupabaseConfigured()) {

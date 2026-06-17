@@ -6,6 +6,7 @@ const path = require('node:path');
 const { createUiStateStore } = require('../../server/services/ui-state');
 
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
+const COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
 
 function createFixture(overrides = {}) {
   const inMemoryUiStateByScope = new Map();
@@ -102,6 +103,81 @@ test('ui-state store keeps large coldmail send guard values intact while sanitiz
 
   assert.equal(sanitized[COLDMAIL_SEND_GUARD_KEY].length, largeGuard.length);
   assert.equal(sanitized.default_limit.length, 200000);
+});
+
+test('ui-state store never truncates JSON state values into invalid JSON', () => {
+  const { store } = createFixture({ isSupabaseConfigured: false });
+  const largeAutopilot = JSON.stringify({
+    enabled: true,
+    config: {
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag',
+          body: 'x'.repeat(210000),
+        },
+      },
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      startHour: 7,
+      endHour: 17,
+    },
+  });
+
+  assert.ok(largeAutopilot.length > 200000);
+  const sanitized = store.sanitizeUiStateValues({
+    [COLDMAIL_AUTOPILOT_KEY]: largeAutopilot,
+    default_limit: 'x'.repeat(250000),
+  });
+
+  assert.equal(sanitized[COLDMAIL_AUTOPILOT_KEY], largeAutopilot);
+  assert.equal(JSON.parse(sanitized[COLDMAIL_AUTOPILOT_KEY]).enabled, true);
+  assert.equal(sanitized.default_limit.length, 200000);
+});
+
+test('ui-state store refuses to persist broken JSON state values', async () => {
+  const { loggerErrors, restWrites, store } = createFixture({
+    client: null,
+  });
+
+  const result = await store.setUiStateValues('premium_coldmail_autopilot', {
+    [COLDMAIL_AUTOPILOT_KEY]: '{"enabled":true,"config":{"senderEmails":["serve@softora.nl"]',
+  }, {
+    source: 'contract-test',
+    actor: 'contract-test',
+  });
+
+  assert.equal(result, null);
+  assert.equal(restWrites.length, 0);
+  assert.equal(loggerErrors.length, 1);
+  assert.match(String(loggerErrors[0].join(' ')), /JsonIntegrity/);
+  assert.match(String(loggerErrors[0].join(' ')), /ongeldige JSON/);
+});
+
+test('ui-state store refuses oversized JSON state values instead of clipping them', async () => {
+  const { loggerErrors, restWrites, store } = createFixture({
+    client: null,
+  });
+  const oversized = JSON.stringify({
+    enabled: true,
+    config: {
+      senderEmails: ['serve@softora.nl'],
+      body: 'x'.repeat(1000000),
+    },
+  });
+
+  assert.ok(oversized.length > 1000000);
+  const result = await store.setUiStateValues('premium_coldmail_autopilot', {
+    [COLDMAIL_AUTOPILOT_KEY]: oversized,
+  }, {
+    source: 'contract-test',
+    actor: 'contract-test',
+  });
+
+  assert.equal(result, null);
+  assert.equal(restWrites.length, 0);
+  assert.match(String(loggerErrors[0].join(' ')), /limiet is 1000000/);
 });
 
 test('ui-state store reads values through REST fallback when client is unavailable', async () => {
