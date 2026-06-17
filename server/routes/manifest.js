@@ -25,6 +25,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/premium-ai-lead-generator', marker: 'Cold Mailing', allowLoginFallback: true },
   { path: '/premium-coldmailing-lead', marker: 'Softora | Coldmailing Lead - Premium', allowLoginFallback: true },
   { path: '/premium-actieve-opdrachten', marker: 'Softora | Actieve Opdrachten — Premium', allowLoginFallback: true },
+  { path: '/kvk-database', marker: 'Softora | KVK Database', allowLoginFallback: true },
 ]);
 
 const contractTargets = Object.freeze([
