@@ -17,9 +17,6 @@ const {
   fitWebdesignPreviewForEmail,
   removeDecorativeWebdesignFrameForEmail,
 } = require('./coldmail-image-frame');
-const {
-  getEmailVerificationBlockReason,
-} = require('./premium-database-email-verification');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -396,7 +393,6 @@ function createColdmailCampaignService(deps = {}) {
     openAiApiBaseUrl = 'https://api.openai.com/v1',
     coldmailAutoReplyModel = 'gpt-5.5-pro',
     coldmailAutoReplyEnabled = false,
-    emailVerificationRequireGreenForOutbound = false,
     logger = console,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
@@ -1614,18 +1610,6 @@ function createColdmailCampaignService(deps = {}) {
   async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
     const duplicateBlock = await getColdmailOutboundDuplicateBlock(item, recipientGuardEntries);
     if (duplicateBlock) return duplicateBlock;
-    const verificationBlockReason = getEmailVerificationBlockReason(item && item.row, {
-      requireGreen: emailVerificationRequireGreenForOutbound === true,
-    });
-    if (verificationBlockReason) {
-      return {
-        id: item && item.id,
-        bedrijf: getRowCompany(item && item.row),
-        email: getRowEmail(item && item.row),
-        code: 'EMAIL_VERIFICATION_BLOCKED',
-        error: verificationBlockReason,
-      };
-    }
     const email = getRowEmail(item && item.row);
     if (!isTestRecipientRow(item && item.row, email) && shouldBlockPersonalMailboxDomains() && isPersonalMailboxDomain(email)) {
       return {
@@ -5473,19 +5457,6 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       const email = getRowEmail(item.row);
-      const verificationBlockReason = getEmailVerificationBlockReason(item.row, {
-        requireGreen: emailVerificationRequireGreenForOutbound === true,
-      });
-      if (verificationBlockReason) {
-        failed.push({
-          id: item.id,
-          bedrijf: getRowCompany(item.row),
-          email,
-          code: 'EMAIL_VERIFICATION_BLOCKED',
-          error: verificationBlockReason,
-        });
-        continue;
-      }
       if (!isTestRecipientRow(item.row, email) && shouldBlockPersonalMailboxDomains() && isPersonalMailboxDomain(email)) {
         failed.push({
           id: item.id,
