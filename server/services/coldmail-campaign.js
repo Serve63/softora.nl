@@ -56,6 +56,7 @@ const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 74;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS = 45;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS = 240;
 const COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS = 10 * 1000;
+const COLDMAIL_AUTOPILOT_STATE_VALUE_SOFT_LIMIT = 160_000;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -3361,6 +3362,56 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function summarizeColdmailAutopilotDailyQuota(quota = {}) {
+    if (!quota || typeof quota !== 'object') return undefined;
+    const safetyPause = quota.safetyPause && typeof quota.safetyPause === 'object' ? quota.safetyPause : null;
+    const summary = {
+      senderSentBefore: Math.max(0, Number(quota.senderSentBefore ?? quota.senderSent) || 0),
+      packageSentBefore: Math.max(0, Number(quota.packageSentBefore ?? quota.packageSent) || 0),
+      personalMailboxSentBefore: Math.max(0, Number(quota.personalMailboxSentBefore ?? quota.personalMailboxSent) || 0),
+      senderDaySentBefore: Math.max(0, Number(quota.senderDaySentBefore ?? quota.senderDaySent ?? quota.senderSent) || 0),
+      packageDaySentBefore: Math.max(0, Number(quota.packageDaySentBefore ?? quota.packageDaySent ?? quota.packageSent) || 0),
+      personalMailboxDaySentBefore: Math.max(0, Number(quota.personalMailboxDaySentBefore ?? quota.personalMailboxDaySent ?? quota.personalMailboxSent) || 0),
+      senderRemainingBefore: Math.max(0, Number(quota.senderRemainingBefore ?? quota.senderRemaining) || 0),
+      packageRemainingBefore: Math.max(0, Number(quota.packageRemainingBefore ?? quota.packageRemaining) || 0),
+      personalMailboxRemainingBefore: Math.max(0, Number(quota.personalMailboxRemainingBefore ?? quota.personalMailboxRemaining) || 0),
+      senderRollingRemainingBefore: Math.max(0, Number(quota.senderRollingRemainingBefore ?? quota.senderRollingRemaining) || 0),
+      packageRollingRemainingBefore: Math.max(0, Number(quota.packageRollingRemainingBefore ?? quota.packageRollingRemaining) || 0),
+      personalMailboxRollingRemainingBefore: Math.max(0, Number(quota.personalMailboxRollingRemainingBefore ?? quota.personalMailboxRollingRemaining) || 0),
+      safetyPausedUntil: normalizeString(quota.safetyPausedUntil || (safetyPause && safetyPause.until)),
+      safetyPauseReason: truncateText(normalizeString(quota.safetyPauseReason || (safetyPause && safetyPause.reason)), 160),
+    };
+    Object.keys(summary).forEach((key) => {
+      if (summary[key] === '' || summary[key] === undefined || summary[key] === null) delete summary[key];
+    });
+    return summary;
+  }
+
+  function sanitizeColdmailAutopilotSmtpDiagnostic(value) {
+    if (!value || typeof value !== 'object') return undefined;
+    const sanitizeBooleanMap = (input = {}) => Object.fromEntries(
+      Object.entries(input && typeof input === 'object' ? input : {})
+        .filter(([, raw]) => typeof raw === 'boolean')
+        .map(([key, raw]) => [key, Boolean(raw)])
+    );
+    const runtimeEnv = {};
+    Object.entries(value.runtimeEnv && typeof value.runtimeEnv === 'object' ? value.runtimeEnv : {})
+      .slice(0, 4)
+      .forEach(([group, flags]) => {
+        runtimeEnv[group] = {
+          key: truncateText(normalizeString(flags && flags.key), 80),
+          ...sanitizeBooleanMap(flags),
+        };
+      });
+    return {
+      resolved: sanitizeBooleanMap(value.resolved),
+      mailboxAccount: sanitizeBooleanMap(value.mailboxAccount),
+      mailboxAccountsRawConfigured: Boolean(value.mailboxAccountsRawConfigured),
+      runtimeEnv,
+      reason: truncateText(normalizeString(value.reason), 160),
+    };
+  }
+
   function getColdmailSenderQuotaDaySent(quota = {}) {
     return Math.max(0, Number(quota.senderDaySent ?? quota.senderSent) || 0);
   }
@@ -3838,6 +3889,111 @@ function createColdmailCampaignService(deps = {}) {
       .slice(-30);
   }
 
+  function findJsonObjectKeyValueStart(rawText, key) {
+    const marker = `"${key}"`;
+    const keyIndex = rawText.indexOf(marker);
+    if (keyIndex < 0) return -1;
+    const colonIndex = rawText.indexOf(':', keyIndex + marker.length);
+    if (colonIndex < 0) return -1;
+    for (let index = colonIndex + 1; index < rawText.length; index += 1) {
+      if (!/\s/.test(rawText[index])) return index;
+    }
+    return -1;
+  }
+
+  function extractBalancedJsonValue(rawText, startIndex) {
+    const opening = rawText[startIndex];
+    const closing = opening === '{' ? '}' : opening === '[' ? ']' : '';
+    if (!closing) return '';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = startIndex; index < rawText.length; index += 1) {
+      const char = rawText[index];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === opening) depth += 1;
+      if (char === closing) {
+        depth -= 1;
+        if (depth === 0) return rawText.slice(startIndex, index + 1);
+      }
+    }
+    return '';
+  }
+
+  function extractJsonObjectFieldFromPossiblyTruncatedText(rawText, key) {
+    const startIndex = findJsonObjectKeyValueStart(rawText, key);
+    if (startIndex < 0) return null;
+    const valueText = extractBalancedJsonValue(rawText, startIndex);
+    if (!valueText) return null;
+    return safeJsonParse(valueText, null);
+  }
+
+  function extractJsonStringFieldFromPossiblyTruncatedText(rawText, key) {
+    const startIndex = findJsonObjectKeyValueStart(rawText, key);
+    if (startIndex < 0 || rawText[startIndex] !== '"') return '';
+    let escaped = false;
+    for (let index = startIndex + 1; index < rawText.length; index += 1) {
+      const char = rawText[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        return safeJsonParse(rawText.slice(startIndex, index + 1), '');
+      }
+    }
+    return '';
+  }
+
+  function parseColdmailAutopilotStateValue(rawValue) {
+    const rawText = normalizeString(rawValue);
+    if (!rawText) return {};
+    const parsed = safeJsonParse(rawText, null);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    const recovered = {};
+    const enabledMatch = rawText.match(/"enabled"\s*:\s*(true|false)/);
+    if (enabledMatch) recovered.enabled = enabledMatch[1] === 'true';
+    const versionMatch = rawText.match(/"version"\s*:\s*([0-9]+)/);
+    if (versionMatch) recovered.version = Math.max(1, Number(versionMatch[1]) || 1);
+    ['config', 'schedule', 'lock', 'lastResult'].forEach((key) => {
+      const value = extractJsonObjectFieldFromPossiblyTruncatedText(rawText, key);
+      if (value && typeof value === 'object' && !Array.isArray(value)) recovered[key] = value;
+    });
+    const log = extractJsonObjectFieldFromPossiblyTruncatedText(rawText, 'log');
+    if (Array.isArray(log)) recovered.log = log;
+    [
+      'lastRunAt',
+      'lastStartedAt',
+      'updatedAt',
+      'updatedBy',
+      'emergencyStoppedAt',
+      'emergencyStopReason',
+    ].forEach((key) => {
+      const value = extractJsonStringFieldFromPossiblyTruncatedText(rawText, key);
+      if (value) recovered[key] = value;
+    });
+    return recovered;
+  }
+
   function normalizeColdmailAutopilotState(value) {
     const defaults = getDefaultColdmailAutopilotState();
     const raw = value && typeof value === 'object' ? value : {};
@@ -3867,7 +4023,7 @@ function createColdmailCampaignService(deps = {}) {
       schedule: normalizeColdmailAutopilotSchedule(mergedSchedule),
       lastRunAt: normalizeString(raw.lastRunAt),
       lastStartedAt: normalizeString(raw.lastStartedAt),
-      lastResult: raw.lastResult && typeof raw.lastResult === 'object' ? raw.lastResult : null,
+      lastResult: raw.lastResult && typeof raw.lastResult === 'object' ? compactColdmailAutopilotResult(raw.lastResult) : null,
       lock: raw.lock && typeof raw.lock === 'object'
         ? {
             startedAt: normalizeString(raw.lock.startedAt),
@@ -3889,8 +4045,9 @@ function createColdmailCampaignService(deps = {}) {
     const rawValue = values[coldmailAutopilotKey];
     const hasValue = Object.prototype.hasOwnProperty.call(values, coldmailAutopilotKey) &&
       Boolean(normalizeString(rawValue));
+    const parsedValue = parseColdmailAutopilotStateValue(rawValue || '{}');
     return {
-      state: normalizeColdmailAutopilotState(safeJsonParse(rawValue || '{}', {})),
+      state: normalizeColdmailAutopilotState(parsedValue),
       hasValue,
       source: normalizeString(state && state.source),
       updatedAt: normalizeString(state && state.updatedAt),
@@ -3922,12 +4079,96 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
+  function trimColdmailAutopilotProfilesForStorage(config = {}) {
+    const normalized = normalizeColdmailAutopilotConfig(config);
+    const senderProfiles = {};
+    Object.entries(normalized.senderProfiles || {}).forEach(([email, profile]) => {
+      senderProfiles[email] = {
+        ...profile,
+        subject: truncateText(normalizeString(profile && profile.subject), 220),
+        body: truncateText(normalizeString(profile && profile.body), 8000),
+        aiInstructions: truncateText(normalizeString(profile && profile.aiInstructions), 3000),
+      };
+    });
+    return {
+      ...normalized,
+      subject: truncateText(normalized.subject, 220),
+      body: truncateText(normalized.body, 8000),
+      aiInstructions: truncateText(normalized.aiInstructions, 3000),
+      senderProfiles,
+    };
+  }
+
+  function buildColdmailAutopilotStateStoragePayload(state) {
+    let normalized = normalizeColdmailAutopilotState(state);
+    let payload = JSON.stringify(normalized);
+    if (payload.length <= COLDMAIL_AUTOPILOT_STATE_VALUE_SOFT_LIMIT) {
+      return { normalized, payload };
+    }
+
+    normalized = {
+      ...normalized,
+      lastResult: normalized.lastResult ? compactColdmailAutopilotResult(normalized.lastResult) : null,
+      log: normalizeColdmailAutopilotLog(normalized.log).slice(-10),
+    };
+    payload = JSON.stringify(normalized);
+    if (payload.length <= COLDMAIL_AUTOPILOT_STATE_VALUE_SOFT_LIMIT) {
+      return { normalized, payload };
+    }
+
+    normalized = {
+      ...normalized,
+      log: [],
+      lastResult: normalized.lastResult
+        ? {
+            ok: normalized.lastResult.ok !== false,
+            skipped: Boolean(normalized.lastResult.skipped),
+            reason: truncateText(normalizeString(normalized.lastResult.reason), 120),
+            message: truncateText(normalizeString(normalized.lastResult.message), 240),
+            at: normalizeString(normalized.lastResult.at) || now().toISOString(),
+            sent: Math.max(0, Number(normalized.lastResult.sent || 0) || 0),
+            failed: Math.max(0, Number(normalized.lastResult.failed || 0) || 0),
+            senderEmail: normalizeEmailAddress(normalized.lastResult.senderEmail),
+          }
+        : null,
+    };
+    payload = JSON.stringify(normalized);
+    if (payload.length <= COLDMAIL_AUTOPILOT_STATE_VALUE_SOFT_LIMIT) {
+      return { normalized, payload };
+    }
+
+    normalized = {
+      ...normalized,
+      config: trimColdmailAutopilotProfilesForStorage(normalized.config),
+    };
+    payload = JSON.stringify(normalized);
+    if (payload.length <= COLDMAIL_AUTOPILOT_STATE_VALUE_SOFT_LIMIT) {
+      return { normalized, payload };
+    }
+
+    normalized = {
+      ...normalized,
+      lastResult: {
+        ok: true,
+        skipped: true,
+        reason: 'state_compacted',
+        message: 'Autopilot-status is veilig compact opgeslagen.',
+        at: now().toISOString(),
+        sent: 0,
+        failed: 0,
+      },
+      log: [],
+    };
+    payload = JSON.stringify(normalized);
+    return { normalized, payload };
+  }
+
   async function saveColdmailAutopilotState(state, actor = 'coldmail-autopilot') {
-    const normalized = normalizeColdmailAutopilotState(state);
+    const { normalized, payload } = buildColdmailAutopilotStateStoragePayload(state);
     await setUiStateValues(
       coldmailAutopilotScope,
       {
-        [coldmailAutopilotKey]: JSON.stringify(normalized),
+        [coldmailAutopilotKey]: payload,
       },
       {
         source: 'coldmail-autopilot',
@@ -4497,7 +4738,7 @@ function createColdmailCampaignService(deps = {}) {
       selected: Math.max(0, Number(result.selected || 0) || 0),
       requested: Math.max(0, Number(result.requested || 0) || 0),
       sendJitterSeconds: Math.max(0, Number(result.sendJitterSeconds || 0) || 0) || undefined,
-      dailyQuota: result.dailyQuota && typeof result.dailyQuota === 'object' ? result.dailyQuota : undefined,
+      dailyQuota: summarizeColdmailAutopilotDailyQuota(result.dailyQuota),
       senderSkips: Array.isArray(result.senderSkips)
         ? result.senderSkips.slice(0, 10).map((item) => ({
           senderEmail: normalizeEmailAddress(item && item.senderEmail),
@@ -4508,10 +4749,7 @@ function createColdmailCampaignService(deps = {}) {
           senderDaySent: Math.max(0, Number(item && item.senderDaySent) || 0),
           senderRemaining: Math.max(0, Number(item && item.senderRemaining) || 0),
           packageRemaining: Math.max(0, Number(item && item.packageRemaining) || 0),
-          smtpDiagnostic:
-            item && item.smtpDiagnostic && typeof item.smtpDiagnostic === 'object'
-              ? item.smtpDiagnostic
-              : undefined,
+          smtpDiagnostic: sanitizeColdmailAutopilotSmtpDiagnostic(item && item.smtpDiagnostic),
         }))
         : undefined,
       webdesignPreparation:
