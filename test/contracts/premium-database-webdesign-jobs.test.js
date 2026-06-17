@@ -801,6 +801,53 @@ test('premium database webdesign bulk cancel stops the remaining server batch wo
   assert.equal(pipelineCalls.length, 1);
 });
 
+test('premium database webdesign bulk cancel hides active batch jobs from the running jobs list', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => ({ image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } }),
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+  const ownerKey = 'owner@softora.nl::owner';
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 1 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  const jobResult = await coordinator.startJob({
+    ownerKey,
+    batchId,
+    batchTargetIndex: 0,
+    jobId: 'job_orphan_batch_123',
+    websiteUrl: 'https://cancel-loader.test',
+    customer: { id: 'cancel-loader', bedrijf: 'Cancel Loader' },
+  });
+  assert.equal(jobResult.ok, true);
+
+  const beforeList = createResponseRecorder();
+  await coordinator.listJobsResponse({ premiumAuth: auth }, beforeList);
+  assert.equal(beforeList.body.jobs.length, 1);
+  assert.equal(beforeList.body.jobs[0].id, 'job_orphan_batch_123');
+
+  const cancelRes = createResponseRecorder();
+  await coordinator.cancelBatchResponse({ premiumAuth: auth, params: { batchId } }, cancelRes);
+  assert.equal(cancelRes.statusCode, 200);
+  assert.equal(cancelRes.body.cancelled, true);
+  assert.deepEqual(cancelRes.body.cancelledJobIds, ['job_orphan_batch_123']);
+
+  const afterList = createResponseRecorder();
+  await coordinator.listJobsResponse({ premiumAuth: auth }, afterList);
+  assert.equal(afterList.statusCode, 200);
+  assert.equal(afterList.body.jobs.length, 0);
+  assert.equal(store.jobs.get('job_orphan_batch_123').status, 'error');
+  assert.equal(store.jobs.get('job_orphan_batch_123').cancelled, true);
+});
+
 test('premium database webdesign bulk cancel reports storage cause when saving fails', async () => {
   const baseStore = createInMemoryWebdesignBatchStore();
   const store = {

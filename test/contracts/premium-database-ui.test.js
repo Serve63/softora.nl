@@ -1232,7 +1232,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260617a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(webdesignAssetStateScriptSource, /function buildWebdesignAssetState\(customer, helpers, runtimeState\)/);
   assert.doesNotMatch(webdesignAssetStateScriptSource, /SUSPECT_MOCKUP_RENDERERS/);
@@ -1462,7 +1462,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260617a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1552,6 +1552,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignBulkScriptSource, /RESTORE_RETRY_DELAYS_MS = \[2000, 6000, 15000, 30000\]/);
   assert.match(webdesignBulkScriptSource, /function pickRestorableBatch\(batches\)/);
   assert.match(webdesignBulkScriptSource, /function hideStatus\(\)/);
+  assert.match(webdesignBulkScriptSource, /const onCancel = typeof options\.onCancel === "function" \? options\.onCancel : null;/);
+  assert.match(webdesignBulkScriptSource, /cancelledJobIds: Array\.isArray\(payload\.cancelledJobIds\) \? payload\.cancelledJobIds : \[\]/);
   assert.match(webdesignBulkScriptSource, /if \(status === "cancelled"\) \{[\s\S]*hideStatus\(\);[\s\S]*return;[\s\S]*\}/);
   assert.doesNotMatch(webdesignBulkScriptSource, /status === "done" \|\| status === "error" \|\| status === "cancelled"/);
   assert.match(webdesignBulkScriptSource, /function scheduleRestoreRetry\(\)/);
@@ -1591,8 +1593,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260617b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260616c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260617c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260617a/);
+  assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
+  assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
   assert.match(webdesignBulkScriptSource, /const WORKER_KICK_INTERVAL_MS = 8000;/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
