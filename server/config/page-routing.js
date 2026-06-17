@@ -39,6 +39,9 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   if (map.has('premium-ai-coldmailing')) {
     map.set('premium-leads', map.get('premium-ai-coldmailing'));
   }
+  if (map.has('premium-kvk-database')) {
+    map.set('kvk-database', map.get('premium-kvk-database'));
+  }
   // Zelfde coldmailing-UI als /premium-bevestigingsmails, aparte URL voor legacy/bookmarks.
   if (map.has('premium-bevestigingsmails')) {
     map.set('premium-ai-lead-generator', map.get('premium-bevestigingsmails'));
