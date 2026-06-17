@@ -105,6 +105,7 @@ test('premium database email verification softora provider works without paid ap
   const rows = [
     { id: 'good', bedrijf: 'Groen BV', email: 'julia@groen.nl', status: 'benaderbaar', mail: true },
     { id: 'role', bedrijf: 'Role BV', email: 'info@role.nl', status: 'benaderbaar', mail: true },
+    { id: 'risky-role', bedrijf: 'Risky Role BV', email: 'privacy@risk.nl', status: 'benaderbaar', mail: true },
     { id: 'disposable', bedrijf: 'Temp BV', email: 'lead@mailinator.com', status: 'benaderbaar', mail: true },
     { id: 'nomail', bedrijf: 'No Mail BV', email: 'team@nomail.nl', status: 'benaderbaar', mail: true },
     {
@@ -142,24 +143,46 @@ test('premium database email verification softora provider works without paid ap
   assert.equal(service.getStatus().configured, true);
   assert.deepEqual(service.getStatus().missing, []);
 
-  const result = await service.verifyDatabaseEmails({ limit: 5, actor: 'Servé' });
+  const result = await service.verifyDatabaseEmails({ limit: 6, actor: 'Servé' });
 
   assert.equal(result.provider, 'softora');
-  assert.equal(result.summary.green, 1);
+  assert.equal(result.summary.green, 2);
   assert.equal(result.summary.orange, 1);
   assert.equal(result.summary.red, 3);
   assert.equal(savedRows[0].emailVerificationVerdict, 'green');
   assert.equal(savedRows[0].emailVerificationScore, 100);
-  assert.equal(savedRows[1].emailVerificationVerdict, 'orange');
+  assert.equal(savedRows[1].emailVerificationVerdict, 'green');
+  assert.equal(savedRows[1].emailVerificationMailReady, true);
+  assert.equal(savedRows[1].emailVerificationScore, 85);
   assert.match(savedRows[1].emailVerificationSignals, /role_based/);
-  assert.match(getEmailVerificationBlockReason(savedRows[1]), /Role-based/);
-  assert.equal(savedRows[2].emailVerificationVerdict, 'red');
-  assert.equal(savedRows[2].doNotMail, true);
-  assert.match(savedRows[2].emailVerificationSignals, /disposable_domain/);
+  assert.equal(getEmailVerificationBlockReason(savedRows[1]), '');
+  assert.equal(savedRows[2].emailVerificationVerdict, 'orange');
+  assert.match(getEmailVerificationBlockReason(savedRows[2]), /Role-based/);
   assert.equal(savedRows[3].emailVerificationVerdict, 'red');
-  assert.match(savedRows[3].emailVerificationSignals, /null_mx/);
+  assert.equal(savedRows[3].doNotMail, true);
+  assert.match(savedRows[3].emailVerificationSignals, /disposable_domain/);
   assert.equal(savedRows[4].emailVerificationVerdict, 'red');
-  assert.match(savedRows[4].emailVerificationSignals, /prior_hard_bounce/);
+  assert.match(savedRows[4].emailVerificationSignals, /null_mx/);
+  assert.equal(savedRows[5].emailVerificationVerdict, 'red');
+  assert.match(savedRows[5].emailVerificationSignals, /prior_hard_bounce/);
+});
+
+test('premium database email verification softora provider allows public company inboxes with healthy DNS', async () => {
+  const checkedAt = '2026-06-17T09:45:00.000Z';
+  const helpers = {
+    resolveMx: async (domain) => [{ priority: 10, exchange: `mx.${domain}` }],
+    resolve4: async () => ['203.0.113.10'],
+    resolve6: async () => [],
+  };
+
+  for (const email of ['info@bedrijf.nl', 'admin@bedrijf.nl', 'support@bedrijf.nl']) {
+    const result = await classifySoftoraResult(email, {}, checkedAt, helpers);
+    assert.equal(result.verdict, 'green', email);
+    assert.equal(result.mailReady, true, email);
+    assert.equal(result.roleBased, true, email);
+    assert.equal(result.subStatus, 'role_based', email);
+    assert.equal(result.score, 85, email);
+  }
 });
 
 test('premium database email verification defaults to softora and requires green for outbound', () => {
