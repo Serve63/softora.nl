@@ -310,6 +310,13 @@ function createService(overrides = {}) {
         };
       }
       if (scope === 'premium_coldmail_autopilot') {
+        if (Object.prototype.hasOwnProperty.call(overrides, 'autopilotRawValue')) {
+          return {
+            values: {
+              softora_coldmail_autopilot_v1: overrides.autopilotRawValue,
+            },
+          };
+        }
         if (autopilotReadStates && autopilotReadStates.length) {
           const nextState = autopilotReadStates.shift();
           if (nextState === null) return null;
@@ -1244,6 +1251,135 @@ test('coldmail autopilot disable toggle keeps sender configuration and live sche
   assert.equal(state.schedule.senderMaxIntervalMinutes, 82);
   assert.equal(state.schedule.sendJitterMinSeconds, 45);
   assert.equal(state.schedule.sendJitterMaxSeconds, 240);
+});
+
+test('coldmail autopilot compacts oversized run details before saving state', async () => {
+  const hugeGuardEntries = Array.from({ length: 4500 }, (_, index) => ({
+    at: '2026-06-17T09:00:00.000Z',
+    senderEmail: 'serve@softora.nl',
+    count: 1,
+    recipientEmail: `lead-${index}@example.test`,
+    recipientCompany: `Voorbeeldbedrijf ${index}`,
+  }));
+  const { service, getAutopilotState, getSavedState } = createService({
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+      },
+      lastResult: {
+        ok: true,
+        skipped: false,
+        reason: 'sent',
+        message: '1 coldmail veilig verzonden.',
+        at: '2026-06-17T09:05:00.000Z',
+        sent: 1,
+        dailyQuota: {
+          entries: hugeGuardEntries,
+          recipientEntries: hugeGuardEntries,
+          senderSent: 9,
+          packageSent: 44,
+          personalMailboxSent: 0,
+          senderDaySent: 9,
+          packageDaySent: 44,
+          personalMailboxDaySent: 0,
+          senderRemaining: 0,
+          packageRemaining: 37,
+          personalMailboxRemaining: 9,
+          senderRollingRemaining: 0,
+          packageRollingRemaining: 37,
+          personalMailboxRollingRemaining: 9,
+        },
+      },
+      log: [
+        {
+          ok: true,
+          skipped: false,
+          reason: 'sent',
+          message: '1 coldmail veilig verzonden.',
+          at: '2026-06-17T09:05:00.000Z',
+          sent: 1,
+        },
+      ],
+    },
+  });
+
+  await service.updateColdmailAutopilotSettings({ enabled: true }, 'Dashboard toggle');
+
+  const savedRaw = getSavedState().values.softora_coldmail_autopilot_v1;
+  const state = getAutopilotState();
+  assert.ok(savedRaw.length < 200000);
+  assert.equal(state.enabled, true);
+  assert.equal(state.lastResult.reason, 'sent');
+  assert.equal(state.lastResult.dailyQuota.entries, undefined);
+  assert.equal(state.lastResult.dailyQuota.recipientEntries, undefined);
+  assert.equal(state.lastResult.dailyQuota.senderDaySentBefore, 9);
+  assert.equal(state.lastResult.dailyQuota.packageDaySentBefore, 44);
+});
+
+test('coldmail autopilot recovers enabled state from a truncated live state value', async () => {
+  const oversizedState = {
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 7,
+      endHour: 17,
+      minIntervalMinutes: 5,
+      senderMinIntervalMinutes: 60,
+      senderMaxIntervalMinutes: 74,
+    },
+    lastResult: {
+      ok: true,
+      reason: 'sent',
+      at: '2026-06-17T09:05:00.000Z',
+      dailyQuota: {
+        entries: Array.from({ length: 5000 }, (_, index) => ({
+          at: '2026-06-17T09:00:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: `lead-${index}@example.test`,
+          recipientCompany: `Voorbeeldbedrijf ${index}`,
+          campaignId: `campaign-${index}`,
+        })),
+      },
+    },
+  };
+  const truncatedRaw = JSON.stringify(oversizedState).slice(0, 200002);
+  const { service } = createService({
+    autopilotRawValue: truncatedRaw,
+  });
+
+  const status = await service.getColdmailAutopilotStatus();
+
+  assert.equal(status.autopilot.enabled, true);
+  assert.deepEqual(status.autopilot.config.senderEmails, ['serve@softora.nl']);
+  assert.equal(status.autopilot.schedule.startHour, 7);
+  assert.equal(status.autopilot.schedule.senderMinIntervalMinutes, 60);
 });
 
 test('coldmail autopilot sends a small safe batch through the existing campaign service', async () => {
