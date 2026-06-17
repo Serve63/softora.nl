@@ -432,6 +432,8 @@ test('ai automation page owns its internal links inside the page content', () =>
   assert.match(html, /href="\/chatbot-laten-maken"/);
   assert.match(html, /href="\/voicesoftware-op-maat"/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(html, /href="\/blog\/ai-automatisering-offerte-opvolging-mkb"/);
+  assert.match(html, /href="\/kennisbank\/wat-is-offerte-automatisering"/);
   assert.doesNotMatch(html, /softora-seo-footer-links/);
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
@@ -448,6 +450,8 @@ test('crm page owns its internal links inside the page content', () => {
   assert.match(html, /href="\/ai-automatisering"/);
   assert.match(html, /href="\/chatbot-laten-maken"/);
   assert.match(html, /href="\/voicesoftware-op-maat"/);
+  assert.match(html, /href="\/kennisbank\/wat-is-offerte-automatisering"/);
+  assert.match(html, /href="\/blog\/ai-automatisering-offerte-opvolging-mkb"/);
   assert.doesNotMatch(html, /softora-seo-footer-links/);
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });

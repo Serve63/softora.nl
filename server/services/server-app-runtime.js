@@ -54,9 +54,15 @@ const {
   primeServerAppRuntime,
   startServerAppRuntime,
 } = require('./server-app-runtime-startup');
-require('dotenv').config();
 const { version: APP_VERSION = '0.0.0' } = require('../../package.json');
 const PROJECT_ROOT_DIR = path.resolve(__dirname, '../..');
+const { loadSoftoraLocalEnv } = require('../config/load-local-env');
+
+loadSoftoraLocalEnv({
+  projectRootDir: PROJECT_ROOT_DIR,
+  cwd: process.cwd(),
+});
+
 const {
   app,
   runtimeEnv,
