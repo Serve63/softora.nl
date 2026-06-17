@@ -516,6 +516,12 @@ test('coldmail outbound guard backfill reports repeated webdesign contacts witho
     options: parseArgs([]),
   });
   assert.equal(report.ok, false);
+  assert.deepEqual(report.blockingProblems, [
+    {
+      code: 'missing_central_outbound_guard',
+      count: 4,
+    },
+  ]);
   assert.equal(report.summary.missingGuardKeys, 4);
   assert.equal(report.summary.webdesignContactDuplicateDomains, 1);
   assert.equal(report.summary.softoraDuplicateRecipients, 0);
@@ -614,11 +620,11 @@ test('coldmail outbound guard audit reports mailbox sent-index coverage gaps per
 
   const serve = coverage.find((item) => item.accountEmail === 'serve@softora.nl');
   assert.equal(serve.sentIndexedRows, 1);
-  assert.ok(serve.warnings.includes('sent_sync_limit_reached'));
+  assert.ok(serve.notes.includes('sent_sync_limit_reached_monitoring_only'));
 
   const gmail = coverage.find((item) => item.accountEmail === 'servecreusen7@gmail.com');
   assert.equal(gmail.sentIndexedRows, 0);
-  assert.ok(gmail.warnings.includes('sent_index_empty'));
+  assert.ok(gmail.notes.includes('sent_index_empty_monitoring_only'));
 
   const report = buildReport({
     events: [],
@@ -629,8 +635,9 @@ test('coldmail outbound guard audit reports mailbox sent-index coverage gaps per
     mailboxCoverage: coverage,
     options: parseArgs([]),
   });
-  assert.equal(report.summary.mailboxSentIndexEmpty >= 1, true);
-  assert.equal(report.summary.mailboxSentSyncLimitReached, 1);
+  assert.equal(report.ok, true);
+  assert.equal(report.summary.mailboxSentIndexEmptyMonitoringOnly >= 1, true);
+  assert.equal(report.summary.mailboxSentSyncLimitReachedMonitoringOnly, 1);
 });
 
 test('coldmail outbound guard backfill includes old send guard state as outbound evidence', () => {
@@ -707,7 +714,7 @@ test('coldmail outbound guard backfill never matches unrelated customers through
   );
 });
 
-test('coldmail outbound guard backfill reports post-pause sends and defaults to check mode', () => {
+test('coldmail outbound guard backfill keeps historical post-pause sends visible without blocking live readiness', () => {
   const options = parseArgs(['--post-pause-after=2026-06-08T08:27:00.000Z']);
   assert.equal(options.apply, false);
 
@@ -727,7 +734,14 @@ test('coldmail outbound guard backfill reports post-pause sends and defaults to 
     options,
   });
 
-  assert.equal(report.ok, false);
+  assert.equal(report.ok, true);
+  assert.deepEqual(report.blockingProblems, []);
   assert.equal(report.summary.postPauseInitialSends, 1);
+  assert.deepEqual(report.historicalWarnings, [
+    {
+      code: 'historical_post_pause_initial_sends',
+      count: 1,
+    },
+  ]);
   assert.equal(report.postPauseEvents[0].email, 'info@late-send.nl');
 });

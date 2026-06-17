@@ -494,7 +494,7 @@ function sanitizeMailboxDisplayText(value) {
 const INDEX_STALE_MS = 2 * 60 * 1000;
 const DEFAULT_SYNC_FOLDERS = ['inbox', 'sent'];
 const DEFAULT_SYNC_LIMIT = 50;
-const CRON_SYNC_LIMIT = 100;
+const CRON_SYNC_LIMIT = 30;
 
 function createMailboxService(deps = {}) {
   const {
