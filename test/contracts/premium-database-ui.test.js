@@ -128,20 +128,6 @@ function loadDatabaseColdmailGuardClient() {
   return sandbox.window.SoftoraDatabaseColdmailGuard;
 }
 
-function loadDatabaseEmailVerificationClient() {
-  const scriptPath = path.join(__dirname, '../../assets/premium-database-email-verification.js');
-  const source = fs.readFileSync(scriptPath, 'utf8');
-  const sandbox = {
-    window: {
-      document: null,
-      setTimeout,
-      clearTimeout,
-    },
-  };
-  vm.runInNewContext(source, sandbox);
-  return sandbox.window.SoftoraDatabaseEmailVerification;
-}
-
 function loadDatabaseWebdesignActionClient(options = {}) {
   const previewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
@@ -860,28 +846,6 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(merged[0].websiteMockupAssetReady, true);
 });
 
-test('premium database email verification client renders badges and blocks risky verified rows', () => {
-  const verificationClient = loadDatabaseEmailVerificationClient();
-
-  assert.equal(verificationClient.isOutboundAllowed({ emailVerificationVerdict: 'green' }), true);
-  assert.equal(verificationClient.isOutboundAllowed({ emailVerificationVerdict: 'orange' }), false);
-  assert.equal(verificationClient.isOutboundAllowed({ emailVerificationVerdict: 'red' }), false);
-  assert.equal(verificationClient.isOutboundAllowed({}, { requireGreen: true }), false);
-  assert.match(
-    verificationClient.renderEmailCell('info@example.nl', {
-      emailVerificationVerdict: 'orange',
-      emailVerificationReason: 'Role-based adres',
-    }),
-    /email-verification-badge is-orange/
-  );
-  assert.match(
-    verificationClient.renderEmailCell('bad@example.nl', {
-      emailVerificationVerdict: 'red',
-    }),
-    /Blokkeren/
-  );
-});
-
 test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -1089,6 +1053,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<\/div><\/div>\s*<\/div>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617a/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
@@ -1219,11 +1184,6 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /thead th:nth-child\(5\), tbody td:nth-child\(5\) \{ width: 14\.285%; min-width: 72px; text-align: center; padding-left: 6px; padding-right: 6px; \}/);
   assert.doesNotMatch(pageSource, /target=\\"_blank\\" rel=\\"noopener\\">" \+ escapeHtml\(websiteValue\) \+ "<\/a>"/);
   assert.match(pageSource, /escapeHtml\(customer\.email \|\| "—"\)/);
-  assert.match(pageSource, /SoftoraDatabaseEmailVerification\.renderEmailCell\(customer && customer\.email, customer\)/);
-  assert.match(pageSource, /assets\/premium-database-email-verification\.js\?v=20260617a/);
-  assert.match(pageSource, /id="emailVerificationButton"/);
-  assert.match(pageSource, /SoftoraDatabaseEmailVerification\.isOutboundAllowed\(customer, \{ requireGreen: false \}\)/);
-  assert.match(pageSource, /emailVerificationVerdict: normalizeString\(raw && raw\.emailVerificationVerdict\)/);
   assert.match(pageSource, /escapeHtml\(formatPhoneNumber\(customer\.tel\)\)/);
   assert.match(pageSource, /formatPhoneNumber\(raw && \(raw\.tel \|\| raw\.telefoon \|\| raw\.contactPhone\)\)/);
   assert.match(pageSource, /tel: normalizeString\(nodes\.modalPhone\.value\) \|\| "—",/);
@@ -1510,7 +1470,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260616c/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617a/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260612b/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260616a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -1526,7 +1486,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.filter-search \.search\s*\{[\s\S]*width: 100%;/);
   assert.doesNotMatch(filterGroupsCssSource, /database-search-row/);
   assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-block;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: center;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: center;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: flex-start;[\s\S]*padding: 0;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: left;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(5, minmax\(110px, 1fr\)\);[\s\S]*"\. \. note note note"[\s\S]*"autopilot today sent deals ratio";[\s\S]*gap: 6px;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--autopilot\s*\{[\s\S]*grid-area: autopilot;/);
@@ -1558,7 +1518,6 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.website-open-icon\s*\{[\s\S]*width: 15px;[\s\S]*height: 15px;/);
   assert.match(filterGroupsCssSource, /\.table-load-more\s*\{/);
   assert.match(filterGroupsCssSource, /\.load-more-btn\s*\{/);
-  assert.match(pageSource, /assets\/premium-database-email-verification\.js\?v=20260617a/);
   assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260604-exact-upload/);
   assert.match(instantlySyncScriptSource, /SAFE_UPLOAD_ENDPOINT = '\/api\/outreach\/provider-upload'/);
   assert.doesNotMatch(instantlySyncScriptSource, /SYNC_ENDPOINT = '\/api\/outreach\/provider-sync'/);

@@ -22,9 +22,6 @@ const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
-const {
-  registerPremiumDatabaseEmailVerificationRoutes,
-} = require('../routes/premium-database-email-verification');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
@@ -62,7 +59,6 @@ function registerFeatureRoutes(app, deps = {}) {
     mailboxCronSecret = '',
     publicContactCoordinator = null,
     activeOrdersCoordinator,
-    premiumDatabaseEmailVerificationCoordinator = null,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
     requireRuntimeDebugAccess,
@@ -143,10 +139,6 @@ function registerFeatureRoutes(app, deps = {}) {
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
-  });
-  registerPremiumDatabaseEmailVerificationRoutes(app, {
-    coordinator: premiumDatabaseEmailVerificationCoordinator,
-    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,
