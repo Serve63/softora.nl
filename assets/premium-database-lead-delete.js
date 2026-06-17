@@ -13,6 +13,15 @@
         return String(error && error.message || "onbekende fout");
     }
 
+    function getCustomerLabel(customer) {
+        return normalizeString(customer && (customer.bedrijf || customer.company || customer.naam || customer.name)) || "deze lead";
+    }
+
+    function defaultConfirmDelete(customer) {
+        if (typeof global.confirm !== "function") return true;
+        return global.confirm("Weet je zeker dat je " + getCustomerLabel(customer) + " wilt verwijderen?");
+    }
+
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
@@ -32,6 +41,7 @@
         const setStatusMessage = typeof options.setStatusMessage === "function" ? options.setStatusMessage : function () {};
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : function () {};
         const toast = typeof options.toast === "function" ? options.toast : function () {};
+        const confirmDeleteLead = typeof options.confirmDeleteLead === "function" ? options.confirmDeleteLead : defaultConfirmDelete;
         const removingIds = new Set();
 
         ensureStyles();
@@ -49,6 +59,7 @@
                 setStatusMessage("Lead verwijderen is tijdelijk niet beschikbaar.", "error");
                 return;
             }
+            if (!confirmDeleteLead(existing)) return;
 
             removingIds.add(normalizedId);
             const previousCustomers = state.klanten.slice();
