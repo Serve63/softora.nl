@@ -97,6 +97,28 @@ test('server app feature wiring refuses legacy fallback when data-ops write is r
   assert.deepEqual(calls.map((call) => call.target), ['bridge']);
 });
 
+test('server app feature wiring does not legacy-write handled data-ops scopes after a bridge refusal', async () => {
+  const calls = [];
+  const setter = featureCompositionBuilders.createDataOpsAwareUiStateSetter({
+    setUiStateValues: async (scope, values, meta) => {
+      calls.push({ target: 'legacy', scope, values, meta });
+      return { source: 'legacy' };
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      setUiStateValues: async (scope, values, meta) => {
+        calls.push({ target: 'bridge', scope, values, meta });
+        return null;
+      },
+    },
+  });
+
+  const result = await setter('premium_customers_database', { a: 1 }, { source: 'premium-database' });
+
+  assert.equal(result, null);
+  assert.deepEqual(calls.map((call) => call.target), ['bridge']);
+});
+
 test('server app feature wiring uses legacy fallback when data-ops ui-state reads hang', async (t) => {
   const originalSetTimeout = global.setTimeout;
   const originalClearTimeout = global.clearTimeout;
