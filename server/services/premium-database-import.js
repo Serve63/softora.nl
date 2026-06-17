@@ -2120,12 +2120,20 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
   }
 
   async function sendDeleteLeadResponse(req, res) {
-    const customerId = normalizeString(req && req.body && req.body.customerId);
+    const body = req && req.body && typeof req.body === 'object' ? req.body : {};
+    const customerId = normalizeString(body.customerId);
     if (!customerId) {
       return res.status(400).json({
         ok: false,
         code: 'CUSTOMER_ID_REQUIRED',
         error: 'Klant-id ontbreekt.',
+      });
+    }
+    if (body.confirm !== true) {
+      return res.status(400).json({
+        ok: false,
+        code: 'CUSTOMER_DELETE_CONFIRM_REQUIRED',
+        error: 'Bevestig eerst dat je deze lead wilt verwijderen.',
       });
     }
     if (!dataOpsStore || typeof dataOpsStore.deleteCustomers !== 'function') {

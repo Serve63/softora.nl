@@ -374,7 +374,7 @@ test('premium database delete lead route removes one customer through data ops w
   });
   const response = createMockResponse();
 
-  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-413' } }, response);
+  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-413', confirm: true } }, response);
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, { ok: true, customerId: 'customer-413', deleted: true });
@@ -392,13 +392,33 @@ test('premium database delete lead route removes one customer through data ops w
   ]);
 });
 
+test('premium database delete lead route requires explicit confirmation', async () => {
+  const calls = [];
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    dataOpsStore: {
+      deleteCustomers: async (customerIds, meta) => {
+        calls.push({ customerIds, meta });
+        return { ok: true };
+      },
+    },
+  });
+  const response = createMockResponse();
+
+  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-413' } }, response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.code, 'CUSTOMER_DELETE_CONFIRM_REQUIRED');
+  assert.deepEqual(calls, []);
+});
+
 test('premium database delete lead route fails closed without a customer id or data ops delete storage', async () => {
   const coordinator = createPremiumDatabaseImportCoordinator();
   const missingIdResponse = createMockResponse();
   const missingStoreResponse = createMockResponse();
 
   await coordinator.sendDeleteLeadResponse({ body: {} }, missingIdResponse);
-  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-1' } }, missingStoreResponse);
+  await coordinator.sendDeleteLeadResponse({ body: { customerId: 'customer-1', confirm: true } }, missingStoreResponse);
 
   assert.equal(missingIdResponse.statusCode, 400);
   assert.equal(missingIdResponse.body.ok, false);
