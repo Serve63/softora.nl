@@ -1637,6 +1637,43 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return value === 'done' || value === 'error' || value === 'cancelled';
   }
 
+  function getEffectiveBatchStatus(batch, summary) {
+    const status = normalizeString(batch && batch.status).toLowerCase();
+    if (status === 'cancelled') return 'cancelled';
+    if (summary && Math.max(0, Number(summary.cancelled) || 0) > 0) return 'cancelled';
+    return status || 'queued';
+  }
+
+  function hasBatchCancellationSignal(batch, chunks) {
+    const status = normalizeString(batch && batch.status).toLowerCase();
+    if (status === 'cancelled') return true;
+    const summary = summarizeBatchChunks(batch, chunks);
+    return Math.max(0, Number(summary.cancelled) || 0) > 0;
+  }
+
+  async function loadStoredBatchCancellationSignal(batch) {
+    const ownerKey = normalizeString(batch && batch.ownerKey);
+    const batchId = normalizeJobId(batch && batch.id);
+    if (!ownerKey || !batchId) return false;
+    const loaded = await loadBatch(ownerKey, batchId);
+    if (loaded.error || !loaded.batch) return false;
+    return hasBatchCancellationSignal(loaded.batch, []);
+  }
+
+  async function stopIfStoredBatchCancelled(batch) {
+    if (!(await loadStoredBatchCancellationSignal(batch))) return false;
+    batch.status = 'cancelled';
+    batch.finishedAt = batch.finishedAt || now();
+    return true;
+  }
+
+  async function persistBatchUnlessStoredCancelled(batch, action) {
+    if (normalizeString(batch && batch.status).toLowerCase() !== 'cancelled' && (await stopIfStoredBatchCancelled(batch))) {
+      return { ok: true, skipped: true, cancelled: true };
+    }
+    return persistBatch(batch, action);
+  }
+
   function summarizeBatchChunks(batch, chunks) {
     if ((!Array.isArray(chunks) || !chunks.length) && batch && batch.summary && typeof batch.summary === 'object') {
       const stored = batch.summary;
@@ -1706,9 +1743,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function serializeBatch(batch, chunks) {
     const summary = summarizeBatchChunks(batch, chunks);
     const activeJobIds = collectActiveBatchJobIds(chunks);
+    const status = getEffectiveBatchStatus(batch, summary);
     return {
       id: batch.id,
-      status: batch.status,
+      status,
       total: summary.total,
       uploadedTargets: summary.uploadedTargets,
       expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
@@ -1827,6 +1865,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function startPendingBatchTargets(batch, chunks) {
     const changed = new Set();
+    if (hasBatchCancellationSignal(batch, chunks) || (await loadStoredBatchCancellationSignal(batch))) return changed;
     let summary = summarizeBatchChunks(batch, chunks);
     let started = 0;
     let attempted = 0;
@@ -1874,7 +1913,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return changed;
   }
 
-  async function persistChangedBatchChunks(chunks, changedIndexes) {
+  async function persistChangedBatchChunks(chunks, changedIndexes, options = {}) {
+    if (options.batch && !options.allowCancelledBatchWrite && (await stopIfStoredBatchCancelled(options.batch))) {
+      return { ok: true, skipped: true, cancelled: true };
+    }
     for (const chunk of chunks) {
       if (!changedIndexes.has(chunk.index)) continue;
       const saved = await persistBatchChunk(chunk, `batch-blok ${chunk.index} opslaan`);
@@ -1906,6 +1948,27 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     let loadedJobs = 0;
     let missingJobs = 0;
     let completedTargets = 0;
+
+    if (batch.status !== 'running' || hasBatchCancellationSignal(batch, chunks) || (await loadStoredBatchCancellationSignal(batch))) {
+      if (await stopIfStoredBatchCancelled(batch)) {
+        return {
+          loadedJobs,
+          missingJobs,
+          processedJobs: 0,
+          completedTargets,
+          changedChunks: 0,
+          summary: summarizeBatchChunks(batch, chunks),
+        };
+      }
+      return {
+        loadedJobs,
+        missingJobs,
+        processedJobs: 0,
+        completedTargets,
+        changedChunks: 0,
+        summary: summarizeBatchChunks(batch, chunks),
+      };
+    }
 
     for (const chunk of Array.isArray(chunks) ? chunks : []) {
       for (const target of Array.isArray(chunk.targets) ? chunk.targets : []) {
@@ -1948,7 +2011,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       }
     });
 
-    const chunksSaved = await persistChangedBatchChunks(chunks, changed);
+    const chunksSaved = await persistChangedBatchChunks(chunks, changed, { batch });
     if (!chunksSaved || chunksSaved.ok !== true) {
       return {
         loadedJobs,
@@ -1962,11 +2025,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const summary = summarizeBatchChunks(batch, chunks);
     batch.summary = summary;
     batch.uploadedTargets = summary.uploadedTargets;
-    if (batch.status === 'running' && summary.total > 0 && summary.completed >= summary.total && summary.pending === 0 && summary.active === 0) {
+    if (summary.cancelled > 0) {
+      batch.status = 'cancelled';
+      batch.finishedAt = batch.finishedAt || now();
+    } else if (batch.status === 'running' && summary.total > 0 && summary.completed >= summary.total && summary.pending === 0 && summary.active === 0) {
       batch.status = 'done';
       batch.finishedAt = now();
     }
-    const batchSaved = await persistBatch(batch, 'batch-worker samenvatting opslaan');
+    const batchSaved = await persistBatchUnlessStoredCancelled(batch, 'batch-worker samenvatting opslaan');
     if (!batchSaved || batchSaved.ok !== true) {
       return {
         loadedJobs,
@@ -1991,21 +2057,26 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function driveBatch(batch, chunks) {
     const changed = new Set();
+    if (await stopIfStoredBatchCancelled(batch)) return { batch, chunks };
     if (batch.status === 'running') {
       const reconciled = await reconcileBatchJobs(chunks);
       reconciled.forEach((index) => changed.add(index));
       const started = await startPendingBatchTargets(batch, chunks);
       started.forEach((index) => changed.add(index));
-      const chunksSaved = await persistChangedBatchChunks(chunks, changed);
+      if (hasBatchCancellationSignal(batch, chunks) || (await stopIfStoredBatchCancelled(batch))) return { batch, chunks };
+      const chunksSaved = await persistChangedBatchChunks(chunks, changed, { batch });
       if (!chunksSaved || chunksSaved.ok !== true) return { batch, chunks, storageError: chunksSaved };
       const summary = summarizeBatchChunks(batch, chunks);
       batch.summary = summary;
       batch.uploadedTargets = summary.uploadedTargets;
-      if (summary.total > 0 && summary.completed >= summary.total && summary.pending === 0 && summary.active === 0) {
+      if (summary.cancelled > 0) {
+        batch.status = 'cancelled';
+        batch.finishedAt = batch.finishedAt || now();
+      } else if (summary.total > 0 && summary.completed >= summary.total && summary.pending === 0 && summary.active === 0) {
         batch.status = 'done';
         batch.finishedAt = now();
       }
-      const batchSaved = await persistBatch(batch, 'batch-status opslaan');
+      const batchSaved = await persistBatchUnlessStoredCancelled(batch, 'batch-status opslaan');
       if (!batchSaved || batchSaved.ok !== true) return { batch, chunks, storageError: batchSaved };
     }
     return { batch, chunks };
@@ -2079,25 +2150,25 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       }
     }
     (await cancelActiveJobsForBatch(batch, seenCancelledJobIds)).forEach(rememberCancelledJob);
-    const chunksSaved = await persistChangedBatchChunks(chunks, changed);
-    if (!chunksSaved || chunksSaved.ok !== true) {
-      return {
-        ok: false,
-        action: chunksSaved && chunksSaved.action,
-        error: chunksSaved && chunksSaved.error,
-      };
-    }
     const summary = summarizeBatchChunks(batch, chunks);
     batch.status = 'cancelled';
     batch.finishedAt = batch.finishedAt || now();
     batch.summary = summary;
     batch.uploadedTargets = summary.uploadedTargets;
-    const batchSaved = await persistBatch(batch, 'batch-annulering opslaan');
+    const batchSaved = await persistBatch(batch, 'batch-annulering markeren');
     if (!batchSaved || batchSaved.ok !== true) {
       return {
         ok: false,
         action: batchSaved && batchSaved.action,
         error: batchSaved && batchSaved.error,
+      };
+    }
+    const chunksSaved = await persistChangedBatchChunks(chunks, changed, { batch, allowCancelledBatchWrite: true });
+    if (!chunksSaved || chunksSaved.ok !== true) {
+      return {
+        ok: false,
+        action: chunksSaved && chunksSaved.action,
+        error: chunksSaved && chunksSaved.error,
       };
     }
     return {
