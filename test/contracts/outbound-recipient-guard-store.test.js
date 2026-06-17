@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 const { createOutboundRecipientGuardStore } = require('../../server/services/outbound-recipient-guard-store');
@@ -92,6 +94,22 @@ function createStore(client) {
     now: () => new Date('2026-06-08T10:00:00.000Z'),
   });
 }
+
+test('outbound recipient guard schema keeps public roles locked out', () => {
+  const schema = fs.readFileSync(
+    path.resolve(__dirname, '../../supabase/data-ops-schema.sql'),
+    'utf8'
+  );
+
+  assert.match(schema, /create table if not exists public\.softora_outbound_recipient_guards/);
+  assert.match(schema, /guard_key text primary key/);
+  assert.match(schema, /softora_outbound_recipient_guards_key_idx/);
+  assert.match(schema, /alter table public\.softora_outbound_recipient_guards enable row level security;/);
+  assert.match(schema, /revoke all on table public\.softora_outbound_recipient_guards from public;/);
+  assert.match(schema, /revoke all on table public\.softora_outbound_recipient_guards from anon;/);
+  assert.match(schema, /revoke all on table public\.softora_outbound_recipient_guards from authenticated;/);
+  assert.match(schema, /grant select, insert, update, delete on public\.softora_outbound_recipient_guards to service_role;/);
+});
 
 test('outbound recipient guard store blocks a batch conflict before inserting', async () => {
   const { client, calls } = createMockSupabaseClient({
