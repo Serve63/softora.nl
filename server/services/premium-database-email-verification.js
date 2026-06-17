@@ -3,33 +3,127 @@ const {
   readChunkedStateValue,
   safeParseJsonArray,
 } = require('./data-ops-serialization');
+const dnsNative = require('node:dns');
+const dns = dnsNative.promises;
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
-const DEFAULT_PROVIDER = 'zerobounce';
+const SOFTORA_PROVIDER = 'softora';
+const ZEROBOUNCE_PROVIDER = 'zerobounce';
+const DEFAULT_PROVIDER = SOFTORA_PROVIDER;
 const DEFAULT_ZEROBOUNCE_API_BASE_URL = 'https://api-eu.zerobounce.net/v2';
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 const DEFAULT_TIMEOUT_MS = 15000;
+const PERSONAL_MAILBOX_DOMAINS = new Set([
+  'aol.com',
+  'gmail.com',
+  'googlemail.com',
+  'hotmail.com',
+  'icloud.com',
+  'live.com',
+  'mac.com',
+  'me.com',
+  'msn.com',
+  'outlook.com',
+  'proton.me',
+  'protonmail.com',
+  'tuta.com',
+  'tutamail.com',
+  'yahoo.com',
+  'ymail.com',
+]);
 const ROLE_BASED_LOCAL_PARTS = new Set([
   'admin',
   'administratie',
+  'beheer',
   'billing',
   'boekhouding',
+  'compliance',
   'contact',
   'customerservice',
+  'debiteuren',
+  'facturen',
   'finance',
   'hello',
+  'helpdesk',
+  'hosting',
+  'inbox',
   'help',
   'hr',
   'info',
+  'invoice',
+  'jobs',
+  'klantenservice',
+  'marketing',
   'mail',
+  'noreply',
   'office',
+  'orders',
   'post',
+  'privacy',
+  'receptie',
+  'recruitment',
   'sales',
+  'security',
   'service',
+  'spam',
   'support',
+  'webmaster',
 ]);
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  '10minutemail.com',
+  '10minutemail.net',
+  'anonbox.net',
+  'byom.de',
+  'dispostable.com',
+  'discard.email',
+  'emailondeck.com',
+  'fakeinbox.com',
+  'fakemail.net',
+  'getnada.com',
+  'grr.la',
+  'guerrillamail.com',
+  'guerrillamail.net',
+  'hidemail.de',
+  'inboxbear.com',
+  'mail.tm',
+  'mailcatch.com',
+  'maildrop.cc',
+  'mailinator.com',
+  'mailnesia.com',
+  'mintemail.com',
+  'moakt.com',
+  'mytemp.email',
+  'nada.email',
+  'sharklasers.com',
+  'spam4.me',
+  'spamgourmet.com',
+  'temp-mail.org',
+  'tempmail.com',
+  'tempr.email',
+  'throwawaymail.com',
+  'trashmail.com',
+  'yopmail.com',
+]);
+const COMMON_EMAIL_DOMAIN_TYPOS = new Set([
+  'gamil.com',
+  'gmial.com',
+  'gmai.com',
+  'gmail.co',
+  'gmail.con',
+  'gmail.nl',
+  'hotmial.com',
+  'hotmai.com',
+  'hotnail.com',
+  'outlok.com',
+  'outlook.con',
+  'yaho.com',
+  'yahoo.con',
+]);
+const HARD_BOUNCE_TYPES = new Set(['hard', 'instantly']);
+const BLOCKING_INSTANTLY_STATUSES = new Set(['bounced', 'unsubscribed', 'blocked']);
+const BLOCKING_CONTACT_STATUSES = new Set(['geblokkeerd', 'opt_out', 'unsubscribe', 'geen_interesse', 'geenbehoefte']);
 
 function defaultNormalizeString(value) {
   return String(value || '').trim();
@@ -89,6 +183,16 @@ function normalizeStatus(value) {
   return defaultNormalizeString(value).toLowerCase().replace(/[\s-]+/g, '_');
 }
 
+function normalizeDomain(value) {
+  return defaultNormalizeString(value).toLowerCase().replace(/\.+$/g, '');
+}
+
+function getEmailDomain(email) {
+  const normalized = normalizeEmailAddress(email);
+  const at = normalized.lastIndexOf('@');
+  return at === -1 ? '' : normalizeDomain(normalized.slice(at + 1));
+}
+
 function getEmailLocalPart(email) {
   return normalizeEmailAddress(email).split('@')[0].split('+')[0].replace(/\.+/g, '.');
 }
@@ -105,6 +209,80 @@ function isRoleBasedResult(status, subStatus, email) {
   return /role_based/.test(`${status} ${subStatus}`);
 }
 
+function isPersonalMailboxEmail(email) {
+  return PERSONAL_MAILBOX_DOMAINS.has(getEmailDomain(email));
+}
+
+function isDisposableEmail(email) {
+  return DISPOSABLE_EMAIL_DOMAINS.has(getEmailDomain(email));
+}
+
+function isCommonEmailDomainTypo(email) {
+  return COMMON_EMAIL_DOMAIN_TYPOS.has(getEmailDomain(email));
+}
+
+function isExpectedDnsMiss(error) {
+  return Boolean(
+    error &&
+      ['EBADNAME', 'ENODATA', 'ENODOMAIN', 'ENONAME', 'ENOTFOUND'].includes(String(error.code || '').toUpperCase())
+  );
+}
+
+function isNullMxRecord(record) {
+  const exchange = normalizeDomain(record && record.exchange);
+  return !exchange || exchange === '.';
+}
+
+async function resolvesAnyAddress(domain, helpers = {}) {
+  const resolve4 = helpers.resolve4 || ((value) => dns.resolve4(value));
+  const resolve6 = helpers.resolve6 || ((value) => dns.resolve6(value));
+  try {
+    const addresses = await resolve4(domain);
+    if (Array.isArray(addresses) && addresses.length) return true;
+  } catch (error) {
+    if (!isExpectedDnsMiss(error)) throw error;
+  }
+  try {
+    const addresses = await resolve6(domain);
+    return Array.isArray(addresses) && addresses.length > 0;
+  } catch (error) {
+    if (!isExpectedDnsMiss(error)) throw error;
+    return false;
+  }
+}
+
+async function inspectMailDomain(domain, helpers = {}) {
+  const value = normalizeDomain(domain);
+  const resolveMx = helpers.resolveMx || ((target) => dns.resolveMx(target));
+  if (!value) {
+    return { ok: false, status: 'invalid', subStatus: 'missing_domain', mxFound: false };
+  }
+  try {
+    const mxRecords = await resolveMx(value);
+    if (Array.isArray(mxRecords) && mxRecords.length) {
+      if (mxRecords.every(isNullMxRecord)) {
+        return { ok: false, status: 'invalid', subStatus: 'null_mx', mxFound: true, mxRecords };
+      }
+      const usable = mxRecords.filter((record) => !isNullMxRecord(record));
+      for (const record of usable.slice(0, 3)) {
+        const exchange = normalizeDomain(record && record.exchange);
+        if (exchange && (await resolvesAnyAddress(exchange, helpers))) {
+          return { ok: true, status: 'valid', subStatus: 'mx_found', mxFound: true, mxRecords };
+        }
+      }
+      return { ok: false, status: 'invalid', subStatus: 'mx_without_address', mxFound: true, mxRecords };
+    }
+  } catch (error) {
+    if (!isExpectedDnsMiss(error)) {
+      return { ok: false, status: 'unknown', subStatus: 'dns_lookup_failed', mxFound: false, error };
+    }
+  }
+  if (await resolvesAnyAddress(value, helpers)) {
+    return { ok: true, status: 'risky', subStatus: 'implicit_mx_fallback', mxFound: false };
+  }
+  return { ok: false, status: 'invalid', subStatus: 'no_mail_dns', mxFound: false };
+}
+
 function buildLocalSyntaxResult(email, nowIso) {
   return {
     provider: 'local',
@@ -116,6 +294,85 @@ function buildLocalSyntaxResult(email, nowIso) {
     checkedAt: nowIso,
     raw: null,
   };
+}
+
+function buildSoftoraResult({ email, nowIso, status, subStatus, verdict, score, reason, flags = {}, signals = [] }) {
+  return {
+    provider: SOFTORA_PROVIDER,
+    status,
+    subStatus,
+    verdict,
+    mailReady: verdict === 'green',
+    reason,
+    checkedAt: nowIso,
+    roleBased: flags.roleBased === true,
+    catchAll: flags.catchAll === true,
+    disposable: flags.disposable === true,
+    mxFound: flags.mxFound === true,
+    score,
+    raw: {
+      email,
+      score,
+      signals,
+    },
+  };
+}
+
+function addRiskSignal(signals, signal) {
+  const code = normalizeStatus(signal && signal.code);
+  if (!code) return;
+  if (signals.some((item) => normalizeStatus(item && item.code) === code)) return;
+  signals.push({
+    level: normalizeStatus(signal.level || 'orange'),
+    code,
+    reason: defaultNormalizeString(signal.reason),
+    penalty: Math.max(0, Number(signal.penalty) || 0),
+  });
+}
+
+function addRowHistorySignals(row, signals) {
+  const status = normalizeStatus(row && (row.databaseStatus || row.status));
+  const instantlyStatus = normalizeStatus(row && row.instantlyStatus);
+  const bounceType = normalizeStatus(row && row.coldmailBounceType);
+  if (row && (row.doNotMail === true || row.mail === false || row.canMail === false || BLOCKING_CONTACT_STATUSES.has(status))) {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: 'softora_do_not_mail',
+      reason: 'Lead staat al op niet mailen of geblokkeerd in Softora.',
+      penalty: 100,
+    });
+  }
+  if (BLOCKING_INSTANTLY_STATUSES.has(instantlyStatus)) {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: 'instantly_blocked_status',
+      reason: 'Instantly meldde eerder bounce, unsubscribe of blokkade.',
+      penalty: 100,
+    });
+  }
+  if (HARD_BOUNCE_TYPES.has(bounceType)) {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: 'prior_hard_bounce',
+      reason: 'Softora zag eerder een harde bounce op deze lead.',
+      penalty: 100,
+    });
+  } else if (bounceType || defaultNormalizeString(row && row.coldmailBounceAt)) {
+    addRiskSignal(signals, {
+      level: 'orange',
+      code: 'prior_mailserver_warning',
+      reason: 'Softora zag eerder een bounce- of mailservermelding op deze lead.',
+      penalty: 35,
+    });
+  }
+  if (defaultNormalizeString(row && (row.coldmailUnsubscribedAt || row.unsubscribedAt || row.unsubscribeAt))) {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: 'prior_unsubscribe',
+      reason: 'Ontvanger heeft zich eerder afgemeld.',
+      penalty: 100,
+    });
+  }
 }
 
 function classifyZeroBounceResult(data, email, nowIso) {
@@ -154,7 +411,7 @@ function classifyZeroBounceResult(data, email, nowIso) {
   }
 
   return {
-    provider: DEFAULT_PROVIDER,
+    provider: ZEROBOUNCE_PROVIDER,
     status: status || 'unknown',
     subStatus,
     verdict,
@@ -165,8 +422,108 @@ function classifyZeroBounceResult(data, email, nowIso) {
     catchAll,
     disposable,
     mxFound: data?.mx_found === true || data?.mx_found === 'true',
+    score: verdict === 'green' ? 100 : verdict === 'orange' ? 65 : 0,
     raw: data && typeof data === 'object' ? data : null,
   };
+}
+
+async function classifySoftoraResult(email, row, nowIso, helpers = {}) {
+  const signals = [];
+  const normalizedEmail = normalizeEmailAddress(email, helpers.normalizeString || defaultNormalizeString);
+  const domain = getEmailDomain(normalizedEmail);
+  addRowHistorySignals(row, signals);
+
+  if (isCommonEmailDomainTypo(normalizedEmail)) {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: 'common_domain_typo',
+      reason: 'E-maildomein lijkt een bekende typefout.',
+      penalty: 100,
+    });
+  }
+  if (isDisposableEmail(normalizedEmail)) {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: 'disposable_domain',
+      reason: 'Tijdelijk of disposable e-mailadres; niet gebruiken voor outreach.',
+      penalty: 100,
+    });
+  }
+  const roleBased = isRoleBasedEmail(normalizedEmail);
+  if (roleBased) {
+    addRiskSignal(signals, {
+      level: 'orange',
+      code: 'role_based',
+      reason: 'Role-based adres; grotere kans op lage betrokkenheid of klachten.',
+      penalty: 35,
+    });
+  }
+  const personalMailbox = isPersonalMailboxEmail(normalizedEmail);
+  if (personalMailbox) {
+    addRiskSignal(signals, {
+      level: 'orange',
+      code: 'personal_mailbox',
+      reason: 'Persoonlijke mailbox; apart behandelen voor zakelijke cold outreach.',
+      penalty: 25,
+    });
+  }
+
+  const domainInspection = await inspectMailDomain(domain, helpers);
+  if (domainInspection.status === 'invalid') {
+    addRiskSignal(signals, {
+      level: 'red',
+      code: domainInspection.subStatus,
+      reason:
+        domainInspection.subStatus === 'null_mx'
+          ? 'Domein publiceert null-MX en accepteert geen e-mail.'
+          : domainInspection.subStatus === 'mx_without_address'
+            ? 'MX-records hebben geen bruikbaar serveradres.'
+            : 'Domein heeft geen bruikbare mail-DNS.',
+      penalty: 100,
+    });
+  } else if (domainInspection.status === 'unknown') {
+    addRiskSignal(signals, {
+      level: 'orange',
+      code: domainInspection.subStatus,
+      reason: 'DNS-controle faalde tijdelijk; niet automatisch mailen.',
+      penalty: 40,
+    });
+  } else if (domainInspection.subStatus === 'implicit_mx_fallback') {
+    addRiskSignal(signals, {
+      level: 'orange',
+      code: 'implicit_mx_fallback',
+      reason: 'Domein heeft geen MX-record; alleen oude SMTP fallback is mogelijk.',
+      penalty: 45,
+    });
+  }
+
+  const redSignal = signals.find((signal) => signal.level === 'red');
+  const penalty = signals.reduce((total, signal) => total + signal.penalty, 0);
+  const score = Math.max(0, Math.min(100, 100 - penalty));
+  const orangeSignal = signals.find((signal) => signal.level === 'orange');
+  const verdict = redSignal ? 'red' : orangeSignal ? 'orange' : 'green';
+  const primary = redSignal || orangeSignal;
+  const subStatus = primary ? primary.code : domainInspection.subStatus || 'softora_clean';
+  const status = verdict === 'green' ? 'valid' : verdict === 'red' ? 'invalid' : 'risky';
+  const reason = primary
+    ? primary.reason
+    : 'Softora-check groen: syntax, domein en bestaande mailhistorie geven geen bounce-risico.';
+
+  return buildSoftoraResult({
+    email: normalizedEmail,
+    nowIso,
+    status,
+    subStatus,
+    verdict,
+    score,
+    reason,
+    flags: {
+      roleBased,
+      disposable: isDisposableEmail(normalizedEmail),
+      mxFound: domainInspection.mxFound === true,
+    },
+    signals,
+  });
 }
 
 function buildVerificationPatch(result, truncateText = defaultTruncateText) {
@@ -182,6 +539,10 @@ function buildVerificationPatch(result, truncateText = defaultTruncateText) {
     emailVerificationCatchAll: result.catchAll === true,
     emailVerificationDisposable: result.disposable === true,
     emailVerificationMxFound: result.mxFound === true,
+    emailVerificationScore: Number.isFinite(Number(result.score)) ? Number(result.score) : '',
+    emailVerificationSignals: Array.isArray(result.raw && result.raw.signals)
+      ? result.raw.signals.map((signal) => signal.code).filter(Boolean).join(',')
+      : '',
   };
 }
 
@@ -249,6 +610,9 @@ function createPremiumDatabaseEmailVerificationService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
+    resolveMx = (value) => dns.resolveMx(value),
+    resolve4 = (value) => dns.resolve4(value),
+    resolve6 = (value) => dns.resolve6(value),
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     normalizeString = defaultNormalizeString,
@@ -261,14 +625,17 @@ function createPremiumDatabaseEmailVerificationService(deps = {}) {
     provider: normalizeProvider(emailVerificationConfig.provider),
     zeroBounceApiKey: normalizeString(emailVerificationConfig.zeroBounceApiKey || emailVerificationConfig.apiKey),
     zeroBounceApiBaseUrl: normalizeApiBaseUrl(emailVerificationConfig.zeroBounceApiBaseUrl || emailVerificationConfig.apiBaseUrl),
-    requireGreenForOutbound: parseBoolean(emailVerificationConfig.requireGreenForOutbound, false),
+    requireGreenForOutbound: parseBoolean(emailVerificationConfig.requireGreenForOutbound, true),
     timeoutMs: Math.max(3000, Math.min(60000, Number(emailVerificationConfig.timeoutMs) || DEFAULT_TIMEOUT_MS)),
   };
 
   function getMissingConfig() {
     if (!config.enabled) return ['EMAIL_VERIFICATION_ENABLED'];
-    if (config.provider !== DEFAULT_PROVIDER) return ['EMAIL_VERIFICATION_PROVIDER'];
-    return [!config.zeroBounceApiKey ? 'ZEROBOUNCE_API_KEY' : null].filter(Boolean);
+    if (config.provider === SOFTORA_PROVIDER) return [];
+    if (config.provider === ZEROBOUNCE_PROVIDER) {
+      return [!config.zeroBounceApiKey ? 'ZEROBOUNCE_API_KEY' : null].filter(Boolean);
+    }
+    return ['EMAIL_VERIFICATION_PROVIDER'];
   }
 
   function getStatus() {
@@ -317,10 +684,18 @@ function createPremiumDatabaseEmailVerificationService(deps = {}) {
     return classifyZeroBounceResult(data, email, now().toISOString());
   }
 
-  async function verifyEmail(email) {
+  async function verifyEmail(email, row = {}) {
     const checkedAt = now().toISOString();
     if (!isLikelyValidEmail(email, normalizeString)) {
       return buildLocalSyntaxResult(email, checkedAt);
+    }
+    if (config.provider === SOFTORA_PROVIDER) {
+      return classifySoftoraResult(email, row, checkedAt, {
+        normalizeString,
+        resolveMx,
+        resolve4,
+        resolve6,
+      });
     }
     return verifyWithZeroBounce(email);
   }
@@ -353,7 +728,7 @@ function createPremiumDatabaseEmailVerificationService(deps = {}) {
 
     for (const item of selected) {
       try {
-        const result = await verifyEmail(item.email);
+        const result = await verifyEmail(item.email, item.row);
         results.push({
           id: item.id,
           bedrijf: item.bedrijf,
@@ -430,11 +805,14 @@ function createPremiumDatabaseEmailVerificationService(deps = {}) {
 }
 
 module.exports = {
+  DEFAULT_PROVIDER,
   DEFAULT_ZEROBOUNCE_API_BASE_URL,
   applyVerificationResultToRow,
+  classifySoftoraResult,
   classifyZeroBounceResult,
   createPremiumDatabaseEmailVerificationService,
   getEmailVerificationBlockReason,
+  inspectMailDomain,
   isEmailVerificationAllowedForOutbound,
   isLikelyValidEmail,
 };
