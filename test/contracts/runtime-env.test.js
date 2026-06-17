@@ -116,6 +116,14 @@ test('loadRuntimeEnv reads Instantly coldmail provider configuration', () => {
   assert.equal(runtimeEnv.emailVerification.timeoutMs, 22000);
 });
 
+test('loadRuntimeEnv defaults email verification to strict Softora shield', () => {
+  const runtimeEnv = loadRuntimeEnv({});
+
+  assert.equal(runtimeEnv.emailVerification.enabled, true);
+  assert.equal(runtimeEnv.emailVerification.provider, 'softora');
+  assert.equal(runtimeEnv.emailVerification.requireGreenForOutbound, true);
+});
+
 test('loadRuntimeEnv lets the agenda app reuse the existing settings pin', () => {
   const fallbackRuntimeEnv = loadRuntimeEnv({
     PREMIUM_SETTINGS_CONFIRM_PIN: ' 123456 ',

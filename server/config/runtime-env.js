@@ -352,14 +352,14 @@ function loadRuntimeEnv(env = process.env) {
     },
     emailVerification: {
       enabled: readBooleanEnvFlag(safeEnv.EMAIL_VERIFICATION_ENABLED, true),
-      provider: normalizeString(safeEnv.EMAIL_VERIFICATION_PROVIDER || 'zerobounce').toLowerCase(),
+      provider: normalizeString(safeEnv.EMAIL_VERIFICATION_PROVIDER || 'softora').toLowerCase(),
       zeroBounceApiKey: normalizeString(safeEnv.ZEROBOUNCE_API_KEY || ''),
       zeroBounceApiBaseUrl: normalizeString(
         safeEnv.ZEROBOUNCE_API_BASE_URL || 'https://api-eu.zerobounce.net/v2'
       ),
       requireGreenForOutbound: readBooleanEnvFlag(
         safeEnv.EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND,
-        false
+        true
       ),
       timeoutMs: readBoundedNumberEnv(
         safeEnv.EMAIL_VERIFICATION_TIMEOUT_MS,

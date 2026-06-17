@@ -170,13 +170,13 @@ services:
       - key: EMAIL_VERIFICATION_ENABLED
         value: true
       - key: EMAIL_VERIFICATION_PROVIDER
-        value: zerobounce
+        value: softora
       - key: ZEROBOUNCE_API_KEY
         sync: false
       - key: ZEROBOUNCE_API_BASE_URL
         value: https://api-eu.zerobounce.net/v2
       - key: EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND
-        value: false
+        value: true
       - key: EMAIL_VERIFICATION_TIMEOUT_MS
         value: 15000
       - key: GOOGLE_CALENDAR_SYNC_ENABLED

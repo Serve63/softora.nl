@@ -110,7 +110,7 @@ function buildServerAppEnvConfig(runtimeEnv) {
     INSTANTLY_REQUIRE_WEBDESIGN_ASSETS: instantly.requireWebdesignAssets !== false,
     INSTANTLY_DEFAULT_SENDER_EMAIL: instantly.defaultSenderEmail || 'serve@softora.nl',
     EMAIL_VERIFICATION_ENABLED: emailVerification.enabled !== false,
-    EMAIL_VERIFICATION_PROVIDER: emailVerification.provider || 'zerobounce',
+    EMAIL_VERIFICATION_PROVIDER: emailVerification.provider || 'softora',
     ZEROBOUNCE_API_KEY: emailVerification.zeroBounceApiKey || '',
     ZEROBOUNCE_API_BASE_URL: emailVerification.zeroBounceApiBaseUrl || 'https://api-eu.zerobounce.net/v2',
     EMAIL_VERIFICATION_REQUIRE_GREEN_FOR_OUTBOUND: Boolean(emailVerification.requireGreenForOutbound),

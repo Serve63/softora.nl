@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  classifySoftoraResult,
   classifyZeroBounceResult,
   createPremiumDatabaseEmailVerificationService,
   getEmailVerificationBlockReason,
@@ -53,6 +54,7 @@ test('premium database email verification writes results and hard-blocks red row
   const fetchCalls = [];
   const service = createPremiumDatabaseEmailVerificationService({
     emailVerificationConfig: {
+      provider: 'zerobounce',
       zeroBounceApiKey: 'zb-key',
       zeroBounceApiBaseUrl: 'https://api-eu.zerobounce.test/v2',
     },
@@ -97,6 +99,112 @@ test('premium database email verification writes results and hard-blocks red row
   assert.equal(savedRows[2].hist[0].source, 'premium-database-email-verification');
   assert.match(getEmailVerificationBlockReason(savedRows[1]), /Role-based/);
   assert.equal(getEmailVerificationBlockReason(savedRows[0]), '');
+});
+
+test('premium database email verification softora provider works without paid api key', async () => {
+  const rows = [
+    { id: 'good', bedrijf: 'Groen BV', email: 'julia@groen.nl', status: 'benaderbaar', mail: true },
+    { id: 'role', bedrijf: 'Role BV', email: 'info@role.nl', status: 'benaderbaar', mail: true },
+    { id: 'disposable', bedrijf: 'Temp BV', email: 'lead@mailinator.com', status: 'benaderbaar', mail: true },
+    { id: 'nomail', bedrijf: 'No Mail BV', email: 'team@nomail.nl', status: 'benaderbaar', mail: true },
+    {
+      id: 'bounced',
+      bedrijf: 'Bounce BV',
+      email: 'jan@bounce.nl',
+      status: 'benaderbaar',
+      mail: true,
+      coldmailBounceType: 'hard',
+    },
+  ];
+  let savedRows = null;
+  const service = createPremiumDatabaseEmailVerificationService({
+    emailVerificationConfig: {
+      provider: 'softora',
+    },
+    getUiStateValues: async () => ({
+      values: {
+        softora_customers_premium_v1: JSON.stringify(rows),
+      },
+    }),
+    setUiStateValues: async (_scope, values) => {
+      savedRows = JSON.parse(values.softora_customers_premium_v1);
+      return { ok: true };
+    },
+    resolveMx: async (domain) => {
+      if (domain === 'nomail.nl') return [{ priority: 0, exchange: '.' }];
+      return [{ priority: 10, exchange: `mx.${domain}` }];
+    },
+    resolve4: async () => ['203.0.113.10'],
+    resolve6: async () => [],
+    now: () => new Date('2026-06-17T09:45:00.000Z'),
+  });
+
+  assert.equal(service.getStatus().configured, true);
+  assert.deepEqual(service.getStatus().missing, []);
+
+  const result = await service.verifyDatabaseEmails({ limit: 5, actor: 'Servé' });
+
+  assert.equal(result.provider, 'softora');
+  assert.equal(result.summary.green, 1);
+  assert.equal(result.summary.orange, 1);
+  assert.equal(result.summary.red, 3);
+  assert.equal(savedRows[0].emailVerificationVerdict, 'green');
+  assert.equal(savedRows[0].emailVerificationScore, 100);
+  assert.equal(savedRows[1].emailVerificationVerdict, 'orange');
+  assert.match(savedRows[1].emailVerificationSignals, /role_based/);
+  assert.match(getEmailVerificationBlockReason(savedRows[1]), /Role-based/);
+  assert.equal(savedRows[2].emailVerificationVerdict, 'red');
+  assert.equal(savedRows[2].doNotMail, true);
+  assert.match(savedRows[2].emailVerificationSignals, /disposable_domain/);
+  assert.equal(savedRows[3].emailVerificationVerdict, 'red');
+  assert.match(savedRows[3].emailVerificationSignals, /null_mx/);
+  assert.equal(savedRows[4].emailVerificationVerdict, 'red');
+  assert.match(savedRows[4].emailVerificationSignals, /prior_hard_bounce/);
+});
+
+test('premium database email verification defaults to softora and requires green for outbound', () => {
+  const service = createPremiumDatabaseEmailVerificationService({});
+  const status = service.getStatus();
+
+  assert.equal(status.provider, 'softora');
+  assert.equal(status.configured, true);
+  assert.equal(status.requireGreenForOutbound, true);
+  assert.equal(getEmailVerificationBlockReason({}, { requireGreen: status.requireGreenForOutbound }), 'E-mailadres is nog niet groen geverifieerd.');
+});
+
+test('premium database email verification still supports zerobounce when explicitly configured', () => {
+  const service = createPremiumDatabaseEmailVerificationService({
+    emailVerificationConfig: {
+      provider: 'zerobounce',
+      zeroBounceApiKey: 'zb-key',
+    },
+  });
+  const status = service.getStatus();
+
+  assert.equal(status.provider, 'zerobounce');
+  assert.equal(status.configured, true);
+  assert.deepEqual(status.missing, []);
+});
+
+test('premium database email verification softora provider treats mx fallback as risky', async () => {
+  const checkedAt = '2026-06-17T09:45:00.000Z';
+  const dnsMiss = Object.assign(new Error('no mx'), { code: 'ENODATA' });
+  const result = await classifySoftoraResult(
+    'julia@fallback.nl',
+    {},
+    checkedAt,
+    {
+      resolveMx: async () => {
+        throw dnsMiss;
+      },
+      resolve4: async () => ['203.0.113.10'],
+      resolve6: async () => [],
+    }
+  );
+
+  assert.equal(result.verdict, 'orange');
+  assert.equal(result.subStatus, 'implicit_mx_fallback');
+  assert.equal(result.mailReady, false);
 });
 
 test('premium database email verification routes require admin and expose safe errors', async () => {
