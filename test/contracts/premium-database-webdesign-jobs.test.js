@@ -848,6 +848,111 @@ test('premium database webdesign bulk cancel hides active batch jobs from the ru
   assert.equal(store.jobs.get('job_orphan_batch_123').cancelled, true);
 });
 
+test('premium database webdesign bulk treats completed batches with cancelled targets as cancelled', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => ({ image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } }),
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+  const ownerKey = 'owner@softora.nl::owner';
+  const batchId = 'webdesign_batch_done_after_cancel';
+  store.batches.set(batchId, {
+    id: batchId,
+    ownerKey,
+    status: 'done',
+    total: 1806,
+    uploadedTargets: 1806,
+    summary: { total: 1806, uploadedTargets: 1806, pending: 0, queued: 0, running: 0, done: 336, failed: 64, cancelled: 1406 },
+    createdAt: Date.now() - 1000,
+    updatedAt: Date.now(),
+    finishedAt: Date.now(),
+  });
+
+  const listRes = createResponseRecorder();
+  await coordinator.listBatchesResponse({ premiumAuth: auth }, listRes);
+
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.body.batches.length, 1);
+  assert.equal(listRes.body.batches[0].status, 'cancelled');
+  assert.equal(listRes.body.batches[0].made, 336);
+  assert.equal(listRes.body.batches[0].cancelled, 1406);
+  assert.equal(listRes.body.batches[0].remaining, 0);
+});
+
+test('premium database webdesign bulk stale workers cannot overwrite a stored cancellation', async () => {
+  const baseStore = createInMemoryWebdesignBatchStore();
+  const ownerKey = 'owner@softora.nl::owner';
+  const batchId = 'webdesign_batch_stale_worker_cancelled';
+  const staleBatch = {
+    id: batchId,
+    ownerKey,
+    status: 'running',
+    total: 2,
+    uploadedTargets: 2,
+    summary: { total: 2, uploadedTargets: 2, pending: 0, queued: 0, running: 2, done: 0, failed: 0, cancelled: 0 },
+    createdAt: Date.now() - 1000,
+    updatedAt: Date.now() - 500,
+  };
+  const staleChunks = [{
+    id: `${batchId}_chunk_00000`,
+    ownerKey,
+    batchId,
+    index: 0,
+    targets: [
+      { index: 0, status: 'done', jobId: 'job_done_1', websiteUrl: 'https://stale-1.test', customer: { id: 'stale-1', bedrijf: 'Stale 1' } },
+      { index: 1, status: 'error', jobId: 'job_done_2', error: 'Webdesign maken is mislukt.', websiteUrl: 'https://stale-2.test', customer: { id: 'stale-2', bedrijf: 'Stale 2' } },
+    ],
+  }];
+  baseStore.batches.set(batchId, {
+    id: batchId,
+    ownerKey,
+    status: 'cancelled',
+    total: 2,
+    uploadedTargets: 2,
+    summary: { total: 2, uploadedTargets: 2, pending: 0, queued: 0, running: 0, done: 0, failed: 0, cancelled: 2 },
+    finishedAt: Date.now(),
+  });
+  const savedBatchStatuses = [];
+  const store = {
+    ...baseStore,
+    async listRunnableWebdesignBatches() {
+      return [cloneJson(staleBatch)];
+    },
+    async listWebdesignBatchChunks() {
+      return cloneJson(staleChunks);
+    },
+    async upsertWebdesignBatch(batch) {
+      savedBatchStatuses.push(batch.status);
+      return baseStore.upsertWebdesignBatch(batch);
+    },
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => ({ image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } }),
+    },
+  });
+
+  const run = await coordinator.runBatchWorker({ batchLimit: 1, jobLimit: 2, concurrency: 1 });
+
+  assert.equal(run.ok, true);
+  assert.equal(run.batches[0].status, 'cancelled');
+  assert.deepEqual(savedBatchStatuses, []);
+  assert.equal(baseStore.batches.get(batchId).status, 'cancelled');
+  assert.equal(baseStore.batches.get(batchId).summary.cancelled, 2);
+});
+
 test('premium database webdesign bulk cancel reports storage cause when saving fails', async () => {
   const baseStore = createInMemoryWebdesignBatchStore();
   const store = {
@@ -907,9 +1012,9 @@ test('premium database webdesign bulk cancel reports storage cause when saving f
 
   assert.equal(cancelRes.statusCode, 503);
   assert.equal(cancelRes.body.ok, false);
-  assert.match(cancelRes.body.detail, /Oorzaak: batch-annulering opslaan - new row violates softora_webdesign_jobs_status_check/);
+  assert.match(cancelRes.body.detail, /Oorzaak: batch-annulering markeren - new row violates softora_webdesign_jobs_status_check/);
   assert.doesNotMatch(cancelRes.body.detail, /\[object Object\]/);
-  assert.equal(cancelRes.body.action, 'batch-annulering opslaan');
+  assert.equal(cancelRes.body.action, 'batch-annulering markeren');
   assert.equal(cancelRes.body.cause, 'new row violates softora_webdesign_jobs_status_check');
 });
 
