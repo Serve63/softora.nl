@@ -275,7 +275,7 @@ test('data ops store merges duplicate customer identities before structured upse
         hist: [{ type: 'klant', label: 'Klant geworden', date: '2026-05-10' }],
       },
     ],
-    { source: 'contract-test' }
+    { source: 'contract-test', replaceMissing: true }
   );
 
   assert.equal(result.ok, true);
@@ -289,6 +289,36 @@ test('data ops store merges duplicate customer identities before structured upse
     ['klant', 'import']
   );
   assert.deepEqual(recorder.deletedIds, ['lead-1']);
+});
+
+test('data ops store blocks implicit customer replaces that would hide existing customers', async () => {
+  const { client, recorder } = createSupabaseClientRecorder(['lead-1', 'lead-2', 'lead-3']);
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-17T21:05:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.replaceCustomers(
+    [
+      {
+        id: 'lead-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'benaderbaar',
+        databaseStatus: 'benaderbaar',
+      },
+    ],
+    { source: 'premium-database-email-verification' }
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.blocked, true);
+  assert.equal(result.error.code, 'DATA_OPS_UNSAFE_CUSTOMER_REPLACE');
+  assert.equal(result.missingCount, 2);
+  assert.deepEqual(recorder.upsertRows, []);
+  assert.deepEqual(recorder.deletedIds, []);
 });
 
 test('data ops store can soft-delete explicit customer ids without replacing the full customer list', async () => {
@@ -444,7 +474,7 @@ test('data ops store saves customers with write timeout and cooldown bypass', as
 
   assert.equal(result.ok, true);
   assert.equal(recorder.upsertRows.length, 1);
-  assert.deepEqual(clientOptions[0], {
+  assert.deepEqual(clientOptions.find((options) => options && options.timeoutMs === 12000), {
     timeoutMs: 12000,
     ignoreFailureCooldown: true,
     suppressFailureCooldown: true,

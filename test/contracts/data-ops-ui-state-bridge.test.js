@@ -222,6 +222,24 @@ test('data ops ui-state bridge can partial-upsert customer patches without full 
   assert.deepEqual(store.calls[0].meta, { source: 'coldmail-campaign' });
 });
 
+test('data ops ui-state bridge forwards explicit full customer replace flags', async () => {
+  const store = createStore();
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+
+  await bridge.setUiStateValues(
+    SCOPES.customers,
+    buildChunkedStatePatch(KEYS.customers, JSON.stringify([{ id: 'cust-1', bedrijf: 'Softora' }])),
+    { source: 'premium-database-sync', replaceMissing: true }
+  );
+
+  assert.equal(store.calls.length, 1);
+  assert.equal(store.calls[0].type, 'customers');
+  assert.deepEqual(store.calls[0].meta, {
+    source: 'premium-database-sync',
+    replaceMissing: true,
+  });
+});
+
 test('data ops ui-state bridge stores photo chunks as structured photo entries', async () => {
   const store = createStore();
   const bridge = createSoftoraDataOpsUiStateBridge({ store });
