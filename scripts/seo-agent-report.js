@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-require('dotenv').config();
-
 const fs = require('fs');
 const path = require('path');
+const { loadSoftoraLocalEnv } = require('../server/config/load-local-env');
 const {
   DEFAULT_SITE_ORIGIN,
   DEFAULT_SITE_URL,
@@ -14,6 +13,11 @@ const {
   getSearchConsoleConfigFromEnv,
   hasSearchConsoleCredentials,
 } = require('./lib/search-console-agent-report');
+
+loadSoftoraLocalEnv({
+  projectRootDir: path.resolve(__dirname, '..'),
+  cwd: process.cwd(),
+});
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {

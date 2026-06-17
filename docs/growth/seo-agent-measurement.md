@@ -31,6 +31,14 @@ GSC_CLIENT_SECRET=...
 GSC_REFRESH_TOKEN=...
 ```
 
+Voor een worktree-onafhankelijke lokale setup op deze laptop kan hetzelfde blok ook in een gedeeld bestand staan:
+
+```bash
+~/.config/softora/search-console.env
+```
+
+De SEO-agent laadt eerst repo-lokale `.env*` bestanden en valt daarna terug op dit gedeelde bestand. Zo blijven nieuwe Codex-worktrees ook toegang houden tot dezelfde Search Console OAuth-config zonder secrets te tracken.
+
 Optioneel kan tijdelijk een kortlevende access token gebruikt worden:
 
 ```bash
