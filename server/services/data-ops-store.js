@@ -997,6 +997,25 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
+  async function upsertCustomers(customers, meta = {}) {
+    const rows = dedupeCustomerRowsForReplace(
+      (Array.isArray(customers) ? customers : []).map((item, index) =>
+        buildCustomerRow(item, index, meta.source)
+      ),
+      meta.source
+    );
+    if (!rows.length) return { ok: true, data: [], upserted: 0 };
+    const guardWrite = await ensureSentOutboundRecipientGuards(rows, meta);
+    if (!guardWrite.ok) return guardWrite;
+    const upsert = await run(
+      'upsert-customers-partial',
+      (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
+      getWriteOperationOptions()
+    );
+    if (upsert.ok) forgetReads('customers');
+    return upsert.ok ? { ...upsert, upserted: rows.length } : upsert;
+  }
+
   async function deleteCustomers(customerIds, meta = {}) {
     const ids = Array.from(new Set((Array.isArray(customerIds) ? customerIds : []).map(normalizeString).filter(Boolean)));
     if (!ids.length) return { ok: true, data: [], deleted: 0 };
@@ -2170,6 +2189,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     replaceCustomers,
     replaceDesignPhotos,
     replaceOrderRuntime,
+    upsertCustomers,
     uploadDesignPhoto,
     upsertDesignPhotos,
     upsertWebdesignBatch,

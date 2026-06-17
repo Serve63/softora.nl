@@ -370,7 +370,27 @@ function createService(overrides = {}) {
       }
       if (scope === 'premium_customers_database') {
         const rawRows = readChunkedStateValue(values, 'softora_customers_premium_v1');
-        rows = JSON.parse(rawRows || '[]');
+        const savedRows = JSON.parse(rawRows || '[]');
+        if (meta && meta.upsertOnly) {
+          const nextById = new Map();
+          savedRows.forEach((row) => {
+            const id = String(row && (row.id || row.customerId || row.databaseId) || '').trim();
+            if (id) nextById.set(id, row);
+          });
+          const seen = new Set();
+          rows = rows.map((row) => {
+            const id = String(row && (row.id || row.customerId || row.databaseId) || '').trim();
+            if (!id || !nextById.has(id)) return row;
+            seen.add(id);
+            return nextById.get(id);
+          });
+          savedRows.forEach((row) => {
+            const id = String(row && (row.id || row.customerId || row.databaseId) || '').trim();
+            if (id && !seen.has(id)) rows.push(row);
+          });
+        } else {
+          rows = savedRows;
+        }
       }
       if (overrideSetResult !== undefined) return overrideSetResult;
       return { ok: true };
@@ -478,7 +498,10 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.match(sentMessages[0].html, /<!-- Softora referentie SF-20260424-PROSPECT/);
   assert.doesNotMatch(sentMessages[0].html, />Referentie: SF-/);
 
+  assert.equal(getSavedState().meta.upsertOnly, true);
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  assert.equal(savedRows.length, 1);
+  assert.equal(savedRows[0].id, 'prospect-1');
   assert.equal(savedRows[0].status, 'gemaild');
   assert.equal(savedRows[0].databaseStatus, 'gemaild');
   assert.equal(savedRows[0].lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
@@ -486,7 +509,6 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].activeColdmailCampaignUntil, '2026-05-08T12:00:00.000Z');
   assert.equal(savedRows[0].coldmailTrackingId, undefined);
   assert.equal(savedRows[0].coldmailOpenTrackingId, undefined);
-  assert.equal(savedRows[1].status, 'klant');
 });
 
 test('coldmail live stats count real sends from the guard and Softora/Gmail database signals', async () => {
@@ -3774,7 +3796,7 @@ test('coldmail campaign sends Martijn mail with the full sender display name', a
 });
 
 test('coldmail campaign unsubscribe link marks the database row as no interest', async () => {
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'prospect-1',
@@ -3806,7 +3828,9 @@ test('coldmail campaign unsubscribe link marks the database row as no interest',
   assert.equal(preview.ok, true);
   assert.equal(preview.email, 'ruben@example.test');
   assert.equal(preview.bedrijf, 'Bakkerij Zon');
-  const previewRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  const previewRows = JSON.parse(
+    getSavedStates().find((state) => state.scope === 'premium_customers_database').values.softora_customers_premium_v1
+  );
   assert.notEqual(previewRows[0].doNotMail, true);
   assert.notEqual(previewRows[0].mail, false);
 
@@ -3816,7 +3840,8 @@ test('coldmail campaign unsubscribe link marks the database row as no interest',
   assert.equal(result.unsubscribed, true);
   assert.equal(result.email, 'ruben@example.test');
   assert.equal(result.status, 'geblokkeerd');
-  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
+  const customerSaves = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  const savedRows = JSON.parse(customerSaves[customerSaves.length - 1].values.softora_customers_premium_v1);
   assert.equal(savedRows[0].status, 'geblokkeerd');
   assert.equal(savedRows[0].databaseStatus, 'geblokkeerd');
   assert.equal(savedRows[0].mail, false);
@@ -5047,7 +5072,7 @@ test('coldmail campaign can disable automatic campaign end date', async () => {
 });
 
 test('coldmail campaign refuses webdesign action when no ready website-design is available', async () => {
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'prospect-no-photo',
@@ -5079,12 +5104,12 @@ test('coldmail campaign refuses webdesign action when no ready website-design is
   );
 
   assert.equal(sentMessages.length, 0);
-  assert.equal(getSavedState(), null);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
 });
 
 test('coldmail campaign starts webdesign preparation for the exact next mailable lead when stock is empty', async () => {
   const preparedJobs = [];
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'recently-mailed',
@@ -5149,7 +5174,7 @@ test('coldmail campaign starts webdesign preparation for the exact next mailable
   );
 
   assert.equal(sentMessages.length, 0);
-  assert.equal(getSavedState(), null);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
   assert.equal(preparedJobs.length, 1);
   assert.equal(preparedJobs[0].customer.id, 'prospect-no-photo');
   assert.equal(preparedJobs[0].websiteUrl, 'https://zonderfoto.nl/');
@@ -5157,7 +5182,7 @@ test('coldmail campaign starts webdesign preparation for the exact next mailable
 
 test('coldmail campaign prepares fresh webdesign when ready stock is only duplicate-guarded', async () => {
   const preparedJobs = [];
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'ready-but-sent',
@@ -5230,7 +5255,7 @@ test('coldmail campaign prepares fresh webdesign when ready stock is only duplic
   );
 
   assert.equal(sentMessages.length, 0);
-  assert.equal(getSavedState(), null);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
   assert.equal(preparedJobs.length, 1);
   assert.equal(preparedJobs[0].customer.id, 'needs-fresh-design');
   assert.equal(preparedJobs[0].websiteUrl, 'https://nieuwevoorraad.nl/');
@@ -5600,7 +5625,7 @@ test('coldmail campaign prefers stored design photo records over stale row mocku
 });
 
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'test-recipient',
@@ -5624,7 +5649,7 @@ test('coldmail campaign sends test recipient without marking database row as mai
   assert.equal(result.sent, 1);
   assert.equal(result.persisted, 0);
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
-  assert.equal(getSavedState(), null);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
 });
 
 test('coldmail campaign test mode sends only the safe test inbox', async () => {
@@ -6671,7 +6696,7 @@ test('coldmail auto-reply blocks opt-out replies without creating customer lifec
 });
 
 test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed status', async () => {
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'mcv-test-company',
@@ -6700,7 +6725,7 @@ test('coldmail campaign keeps MCV E-commerce reusable even after earlier mailed 
   assert.equal(result.sent, 1);
   assert.equal(result.persisted, 0);
   assert.equal(sentMessages[0].to, 'mcv-test@example.test');
-  assert.equal(getSavedState(), null);
+  assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
 });
 
 test('coldmail campaign previews selected recipients before sending', async () => {
@@ -8522,7 +8547,7 @@ test('coldmail campaign does not mark daily-limit skipped rows as mailed', async
     databaseStatus: 'prospect',
     mail: true,
   }));
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows,
     coldmailCampaignSendLimit: 9,
     coldmailDailySendLimit: 9,
@@ -8554,11 +8579,15 @@ test('coldmail campaign does not mark daily-limit skipped rows as mailed', async
   assert.match(result.failedItems[0].error, /Daglimiet/);
   assert.match(result.failedItems[1].error, /Daglimiet/);
 
-  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
-  assert.equal(savedRows[0].status, 'gemaild');
-  assert.equal(savedRows[1].status, 'gemaild');
-  assert.equal(savedRows[2].status, 'prospect');
-  assert.equal(savedRows[3].status, 'prospect');
+  const customerSaves = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  assert.equal(customerSaves.length, 2);
+  assert.equal(customerSaves.every((state) => state.meta.upsertOnly === true), true);
+  const savedRows = customerSaves.flatMap((state) => JSON.parse(state.values.softora_customers_premium_v1));
+  assert.deepEqual(
+    savedRows.map((row) => row.id),
+    ['prospect-1', 'prospect-2']
+  );
+  assert.equal(savedRows.every((row) => row.status === 'gemaild'), true);
 });
 
 test('coldmail campaign sends personal mailbox domains by default', async () => {
@@ -9103,7 +9132,7 @@ test('coldmail reply sync safety-pauses on generic Strato provider warnings', as
 });
 
 test('coldmail campaign skips recipients whose domain does not receive mail', async () => {
-  const { service, sentMessages, getSavedState } = createService({
+  const { service, sentMessages, getSavedStates } = createService({
     rows: [
       {
         id: 'bad-domain',
@@ -9140,15 +9169,20 @@ test('coldmail campaign skips recipients whose domain does not receive mail', as
   assert.equal(sentMessages[0].to, 'ruben@example.test');
   assert.equal(sentMessages[0].bcc, undefined);
 
-  const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
-  assert.equal(savedRows[0].status, 'geblokkeerd');
-  assert.equal(savedRows[0].databaseStatus, 'geblokkeerd');
-  assert.equal(savedRows[0].mail, false);
-  assert.equal(savedRows[0].canMail, false);
-  assert.equal(savedRows[0].doNotMail, true);
-  assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
-  assert.equal(savedRows[0].hist[0].source, 'coldmail-invalid-email-domain');
-  assert.equal(savedRows[1].status, 'gemaild');
+  const customerSaves = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  assert.equal(customerSaves.length, 2);
+  assert.equal(customerSaves.every((state) => state.meta.upsertOnly === true), true);
+  const savedRows = customerSaves.flatMap((state) => JSON.parse(state.values.softora_customers_premium_v1));
+  const blockedRow = savedRows.find((row) => row.id === 'bad-domain');
+  const sentRow = savedRows.find((row) => row.id === 'good-domain');
+  assert.equal(blockedRow.status, 'geblokkeerd');
+  assert.equal(blockedRow.databaseStatus, 'geblokkeerd');
+  assert.equal(blockedRow.mail, false);
+  assert.equal(blockedRow.canMail, false);
+  assert.equal(blockedRow.doNotMail, true);
+  assert.equal(blockedRow.coldmailInvalidEmailDomain, 'mcvecommerce.nl');
+  assert.equal(blockedRow.hist[0].source, 'coldmail-invalid-email-domain');
+  assert.equal(sentRow.status, 'gemaild');
 });
 
 test('coldmail campaign skips rows that are already active in Instantly', async () => {

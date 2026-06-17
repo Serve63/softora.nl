@@ -307,6 +307,36 @@ test('data ops store can soft-delete explicit customer ids without replacing the
   assert.deepEqual(recorder.upsertRows, []);
 });
 
+test('data ops store can upsert customer patches without deleting missing customers', async () => {
+  const { client, recorder } = createSupabaseClientRecorder(['lead-1', 'lead-2', 'lead-3']);
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-17T14:35:00.000Z'),
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const result = await store.upsertCustomers(
+    [
+      {
+        id: 'lead-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'benaderbaar',
+        databaseStatus: 'benaderbaar',
+      },
+    ],
+    { source: 'coldmail-campaign' }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.upserted, 1);
+  assert.equal(recorder.upsertRows.length, 1);
+  assert.equal(recorder.upsertRows[0].customer_id, 'lead-1');
+  assert.deepEqual(recorder.deletedIds, []);
+});
+
 test('data ops store writes outbound guards before saving sent customers', async () => {
   const { client, recorder } = createSupabaseCustomerGuardRecorder({
     currentCustomerIds: ['lead-1'],

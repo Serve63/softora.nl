@@ -6906,12 +6906,14 @@ function createColdmailCampaignService(deps = {}) {
       return markRowFromColdmailInvalidEmailDomain(row, failure, actor);
     });
     if (!marked) return { rows, marked: 0 };
+    const markedRows = nextRows.filter((row, index) => failuresById.has(getRowId(row, index)));
     await setUiStateValues(
       customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows),
+      buildCustomerRowsStateValues({}, markedRows),
       {
         source: 'coldmail-invalid-email-domain',
         actor,
+        upsertOnly: true,
       }
     );
     return { rows: nextRows, marked };
@@ -7047,10 +7049,11 @@ function createColdmailCampaignService(deps = {}) {
     nextRows[match.index] = markRowAsOpened(rows[match.index], payload, actor);
     await setUiStateValues(
       customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows),
+      buildCustomerRowsStateValues({}, [nextRows[match.index]]),
       {
         source: 'coldmail-open-tracking',
         actor,
+        upsertOnly: true,
       }
     );
 
@@ -7281,10 +7284,11 @@ function createColdmailCampaignService(deps = {}) {
     );
     await setUiStateValues(
       customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows),
+      buildCustomerRowsStateValues({}, [nextRows[match.index]]),
       {
         source: 'coldmail-bounce',
         actor: normalizeString(actor) || 'coldmail-bounce',
+        upsertOnly: true,
       }
     );
     return {
@@ -7348,10 +7352,11 @@ function createColdmailCampaignService(deps = {}) {
     );
     await setUiStateValues(
       customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows),
+      buildCustomerRowsStateValues({}, [nextRows[match.index]]),
       {
         source: 'coldmail-inbound-reply',
         actor: normalizeString(actor) || 'coldmail-auto-reply',
+        upsertOnly: true,
       }
     );
     return {
@@ -7379,10 +7384,11 @@ function createColdmailCampaignService(deps = {}) {
     nextRows[match.index] = markRowFromColdmailUnsubscribe(rows[match.index], payload, actor);
     await setUiStateValues(
       customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows),
+      buildCustomerRowsStateValues({}, [nextRows[match.index]]),
       {
         source: 'coldmail-unsubscribe-link',
         actor,
+        upsertOnly: true,
       }
     );
 
@@ -7518,10 +7524,11 @@ function createColdmailCampaignService(deps = {}) {
     );
     await setUiStateValues(
       customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows),
+      buildCustomerRowsStateValues({}, [nextRows[index]]),
       {
         source: 'webdesign-outreach-action',
         actor: normalizeString(input.actor) || 'Webdesign outreach',
+        upsertOnly: true,
       }
     );
 
@@ -8029,26 +8036,32 @@ function createColdmailCampaignService(deps = {}) {
               actor,
             })
           );
+          let markedRow = null;
           const updatedRows = rows.map((currentRow, rowIndex) => {
             const rowId = getRowId(currentRow, rowIndex);
             if (rowId !== item.id) return currentRow;
-            return markRowAsMailed(currentRow, actor, input.durationDays, {
+            markedRow = markRowAsMailed(currentRow, actor, input.durationDays, {
               senderEmail,
               specialAction: effectiveSpecialAction,
               messageId: sentItem.messageId,
               trackingId: sentItem.trackingId,
             });
+            return markedRow;
           });
+          if (!markedRow) {
+            throw new Error('Klantstatus kon niet veilig worden opgeslagen: verzonden klant niet gevonden.');
+          }
           await runColdmailPostSmtpPersistenceStep(
             'klantstatus/teller',
             async () => {
               const result = await setUiStateValues(
                 customerDbScope,
-                buildCustomerRowsStateValues(values, updatedRows),
+                buildCustomerRowsStateValues({}, [markedRow]),
                 {
                   source: 'coldmail-campaign',
                   actor,
                   requireDataOps: true,
+                  upsertOnly: true,
                 }
               );
               return assertColdmailPostSmtpPersistenceResult('klantstatus/teller', result);
