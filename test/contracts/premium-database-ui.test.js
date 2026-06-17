@@ -1057,7 +1057,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="filter-bar">[\s\S]*?<div class="filter-search"><div class="search">[\s\S]*?<\/div><\/div>\s*<\/div>/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617c/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
@@ -1478,7 +1478,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617b/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617c/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260617a/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260616a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -1495,7 +1495,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(filterGroupsCssSource, /database-search-row/);
   assert.match(filterGroupsCssSource, /\.mail-roi-calculator\s*\{[\s\S]*display: inline-block;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-note\s*\{[\s\S]*grid-area: note;[\s\S]*justify-content: flex-start;[\s\S]*padding: 0;[\s\S]*font-size: 11px;[\s\S]*font-weight: 600;[\s\S]*text-align: left;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(6, minmax\(110px, 1fr\)\);[\s\S]*"\. \. note note note note"[\s\S]*"autopilot today bounces sent deals ratio";[\s\S]*gap: 6px;/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-cards\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(6, minmax\(110px, 1fr\)\);[\s\S]*"\. \. \. note note note"[\s\S]*"autopilot today bounces sent deals ratio";[\s\S]*gap: 6px;/);
+  assert.match(filterGroupsCssSource, /@media \(max-width: 860px\) \{[\s\S]*\.mail-roi-cards\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(110px, 1fr\)\);[\s\S]*"autopilot today"[\s\S]*"bounces \."[\s\S]*"note note"[\s\S]*"sent deals"[\s\S]*"ratio ratio";/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card\s*\{[\s\S]*min-width: 110px;[\s\S]*border: 1px solid #e0ddd8;/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--autopilot\s*\{[\s\S]*grid-area: autopilot;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);[\s\S]*box-shadow: 0 8px 18px rgba\(139, 34, 82, \.055\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--today\s*\{[\s\S]*grid-area: today;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);/);
