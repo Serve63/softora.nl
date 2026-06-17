@@ -71,6 +71,26 @@ const ROLE_BASED_LOCAL_PARTS = new Set([
   'support',
   'webmaster',
 ]);
+const MAILABLE_ROLE_BASED_LOCAL_PARTS = new Set([
+  'admin',
+  'administratie',
+  'beheer',
+  'contact',
+  'customerservice',
+  'hello',
+  'help',
+  'helpdesk',
+  'inbox',
+  'info',
+  'klantenservice',
+  'mail',
+  'office',
+  'post',
+  'receptie',
+  'sales',
+  'service',
+  'support',
+]);
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   '10minutemail.com',
   '10minutemail.net',
@@ -201,6 +221,13 @@ function isRoleBasedEmail(email) {
   const local = getEmailLocalPart(email);
   if (!local) return false;
   if (ROLE_BASED_LOCAL_PARTS.has(local)) return true;
+  return /^(admin|info|sales|support|contact|office|service|help|hello)[._-]/i.test(local);
+}
+
+function isMailableRoleBasedEmail(email) {
+  const local = getEmailLocalPart(email);
+  if (!local) return false;
+  if (MAILABLE_ROLE_BASED_LOCAL_PARTS.has(local)) return true;
   return /^(admin|info|sales|support|contact|office|service|help|hello)[._-]/i.test(local);
 }
 
@@ -451,11 +478,14 @@ async function classifySoftoraResult(email, row, nowIso, helpers = {}) {
   }
   const roleBased = isRoleBasedEmail(normalizedEmail);
   if (roleBased) {
+    const mailableRole = isMailableRoleBasedEmail(normalizedEmail);
     addRiskSignal(signals, {
-      level: 'orange',
+      level: mailableRole ? 'notice' : 'orange',
       code: 'role_based',
-      reason: 'Role-based adres; grotere kans op lage betrokkenheid of klachten.',
-      penalty: 35,
+      reason: mailableRole
+        ? 'Algemene bedrijfsinbox; toegestaan als domein, historie en DNS verder gezond zijn.'
+        : 'Role-based adres; grotere kans op lage betrokkenheid of klachten.',
+      penalty: mailableRole ? 15 : 35,
     });
   }
   const personalMailbox = isPersonalMailboxEmail(normalizedEmail);
@@ -503,11 +533,14 @@ async function classifySoftoraResult(email, row, nowIso, helpers = {}) {
   const orangeSignal = signals.find((signal) => signal.level === 'orange');
   const verdict = redSignal ? 'red' : orangeSignal ? 'orange' : 'green';
   const primary = redSignal || orangeSignal;
-  const subStatus = primary ? primary.code : domainInspection.subStatus || 'softora_clean';
+  const noticeSignal = signals.find((signal) => signal.level === 'notice');
+  const subStatus = primary ? primary.code : noticeSignal ? noticeSignal.code : domainInspection.subStatus || 'softora_clean';
   const status = verdict === 'green' ? 'valid' : verdict === 'red' ? 'invalid' : 'risky';
   const reason = primary
     ? primary.reason
-    : 'Softora-check groen: syntax, domein en bestaande mailhistorie geven geen bounce-risico.';
+    : noticeSignal
+      ? `Softora-check groen: ${noticeSignal.reason}`
+      : 'Softora-check groen: syntax, domein en bestaande mailhistorie geven geen bounce-risico.';
 
   return buildSoftoraResult({
     email: normalizedEmail,
