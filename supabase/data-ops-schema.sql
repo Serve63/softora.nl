@@ -222,6 +222,12 @@ alter table public.softora_design_photos enable row level security;
 alter table public.softora_webdesign_jobs enable row level security;
 alter table public.softora_mailbox_messages enable row level security;
 alter table public.softora_mailbox_sync_state enable row level security;
+alter table public.softora_outbound_recipient_guards enable row level security;
+
+revoke all on table public.softora_outbound_recipient_guards from public;
+revoke all on table public.softora_outbound_recipient_guards from anon;
+revoke all on table public.softora_outbound_recipient_guards from authenticated;
 
 grant select, insert, update, delete on public.softora_mailbox_messages to service_role;
 grant select, insert, update, delete on public.softora_mailbox_sync_state to service_role;
+grant select, insert, update, delete on public.softora_outbound_recipient_guards to service_role;

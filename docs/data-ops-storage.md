@@ -12,6 +12,7 @@ De gestructureerde bronnen zijn:
 - `softora_webdesign_jobs`: status van AI-webdesignfoto-jobs.
 - `softora_mailbox_messages`: snelle mailbox-index met metadata en recente tekstbody's.
 - `softora_mailbox_sync_state`: status en lockinformatie voor IMAP-naar-index synchronisatie.
+- `softora_outbound_recipient_guards`: server-side duplicate-guard voor Softora/Gmail/Strato en Instantly-outbound.
 
 ## Compatibiliteit
 De oude UI-state scopes blijven tijdelijk fallback:
