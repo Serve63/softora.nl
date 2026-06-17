@@ -28,5 +28,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(pageSource, /"all":1123744/);
   assert.match(pageSource, /"usable":263/);
   assert.match(pageSource, /"bedrijfsnaam":"Scouting St\. Joris Haaren"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260617b/);
+  assert.match(pageSource, /id="planning-search-input"/);
+  assert.doesNotMatch(pageSource, /id="progress-bar"/);
+  assert.doesNotMatch(pageSource, /id="progress-label"/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260617c/);
 });
