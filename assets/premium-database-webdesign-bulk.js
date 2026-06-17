@@ -44,6 +44,7 @@
         const onCancel = typeof options.onCancel === "function" ? options.onCancel : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
         let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false, restoreRetryTimer = null, restoreRetryAttempt = 0, restoreInFlight = false;
+        const cancelledBatchIds = new Set();
         ensureStyles();
 
         function ensureStatusNode() {
@@ -135,6 +136,16 @@
             if (node) node.hidden = true;
         }
 
+        function rememberCancelledBatch(batchId) {
+            const id = normalizeString(batchId);
+            if (id) cancelledBatchIds.add(id);
+        }
+
+        function isCancelledBatch(batchId) {
+            const id = normalizeString(batchId);
+            return Boolean(id && cancelledBatchIds.has(id));
+        }
+
         async function confirmCancelBatch() {
             const message = "Weet je zeker dat je de resterende webdesigns wilt annuleren? Gemaakte webdesigns blijven staan.";
             if (global.SoftoraDialogs && typeof global.SoftoraDialogs.confirm === "function") {
@@ -164,6 +175,7 @@
                 });
                 const payload = await readJson(response);
                 if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk annuleren is mislukt.");
+                rememberCancelledBatch((payload.batch && payload.batch.id) || id);
                 handleBatch(payload.batch, "cancelled");
                 if (onCancel) {
                     try { onCancel({ batch: payload.batch, cancelledJobIds: Array.isArray(payload.cancelledJobIds) ? payload.cancelledJobIds : [], payload: payload }); }
@@ -254,13 +266,20 @@
 
         function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
+            const batchId = normalizeString(batch.id);
             const status = normalizeString(batch.status).toLowerCase();
-            if (status === "cancelled") {
+            if (isCancelledBatch(batchId)) {
                 queuePhotoRefresh(batch);
                 hideStatus();
                 return;
             }
-            activeBatchId = batch.id;
+            if (status === "cancelled") {
+                rememberCancelledBatch(batchId);
+                queuePhotoRefresh(batch);
+                hideStatus();
+                return;
+            }
+            activeBatchId = batchId || batch.id;
             clearRestoreRetry();
             renderStatus(batch, phase);
             queuePhotoRefresh(batch);
@@ -278,6 +297,10 @@
         async function pollBatch(batchId) {
             const id = normalizeString(batchId || activeBatchId);
             if (!id || pollInFlight) return;
+            if (isCancelledBatch(id)) {
+                hideStatus();
+                return;
+            }
             pollInFlight = true;
             try {
                 const response = await fetch(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
@@ -324,6 +347,7 @@
             if (!total) return null;
             const created = await postJsonWithRetry(BATCH_ENDPOINT, { total: total });
             const batchId = created.id;
+            cancelledBatchIds.delete(normalizeString(batchId));
             const expectedChunks = Math.ceil(total / BULK_UPLOAD_CHUNK_SIZE);
             let latest = created;
             handleBatch(created, "uploading");
@@ -337,7 +361,7 @@
         }
 
         function pickRestorableBatch(batches) {
-            const sorted = (Array.isArray(batches) ? batches : []).filter(Boolean).sort(function (left, right) { return getBatchSortTime(right) - getBatchSortTime(left); });
+            const sorted = (Array.isArray(batches) ? batches : []).filter(function (item) { return item && !isCancelledBatch(item.id); }).sort(function (left, right) { return getBatchSortTime(right) - getBatchSortTime(left); });
             return sorted.find(function (item) { return item && item.id && isActiveBatchStatus(item.status); }) || sorted.find(function (item) {
                 const status = normalizeString(item && item.status).toLowerCase();
                 const sortTime = getBatchSortTime(item);

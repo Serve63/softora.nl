@@ -44,7 +44,7 @@ function createFakeElement(document, tagName) {
   return element;
 }
 
-function createHarness(fetchImpl) {
+function createHarness(fetchImpl, options = {}) {
   const document = {
     __elements: new Map(),
     head: null,
@@ -69,10 +69,10 @@ function createHarness(fetchImpl) {
     Array,
     JSON,
     Promise,
-    setTimeout() {
+    setTimeout: options.setTimeout || function () {
       return 1;
     },
-    clearTimeout() {},
+    clearTimeout: options.clearTimeout || function () {},
     requestAnimationFrame(callback) {
       callback();
     },
@@ -121,6 +121,82 @@ test('webdesign bulk cancel hides the status bar after the server confirms cance
   assert.equal(document.getElementById('webdesignBulkStatus').hidden, true);
   assert.deepEqual(cancelCallbacks.map((result) => result.cancelledJobIds), [['job-cancelled-1']]);
   assert.equal(fetchCalls.some((call) => String(call.url).endsWith('/batch-1/cancel')), true);
+});
+
+test('webdesign bulk cancel keeps the status bar hidden when an older poll returns running later', async () => {
+  const timers = [];
+  let releaseStalePoll;
+  let stalePollRequested = false;
+  const stalePollGate = new Promise((resolve) => {
+    releaseStalePoll = resolve;
+  });
+  const { context, document } = createHarness(
+    async (url, options = {}) => {
+      const target = String(url || '');
+      if (target.endsWith('/run')) return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      if (target.endsWith('/batch-race/cancel')) {
+        assert.equal(options.method, 'POST');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            batch: { id: 'batch-race', status: 'cancelled', total: 10, made: 4, done: 4, cancelled: 6 },
+            cancelledJobIds: [],
+          }),
+        };
+      }
+      if (target.endsWith('/batch-race')) {
+        stalePollRequested = true;
+        await stalePollGate;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ batch: { id: 'batch-race', status: 'running', total: 10, made: 4, done: 4 } }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          batches: [{ id: 'batch-race', status: 'running', total: 10, made: 4, done: 4, createdAt: Date.now() }],
+        }),
+      };
+    },
+    {
+      setTimeout(callback, delay) {
+        const timer = { callback, delay };
+        timers.push(timer);
+        return timer;
+      },
+      clearTimeout(timer) {
+        const index = timers.indexOf(timer);
+        if (index >= 0) timers.splice(index, 1);
+      },
+    }
+  );
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+
+  await controller.loadLatestBatch();
+  await Promise.resolve();
+  await Promise.resolve();
+  const node = document.getElementById('webdesignBulkStatus');
+  assert.equal(node.hidden, false);
+
+  const pollTimer = timers.find((timer) => Number(timer.delay) === 0);
+  assert.ok(pollTimer, 'running batch should schedule a status poll');
+  pollTimer.callback();
+  await Promise.resolve();
+  assert.equal(stalePollRequested, true);
+
+  await controller.cancelActiveBatch();
+  assert.equal(node.hidden, true);
+
+  releaseStalePoll();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(node.hidden, true);
 });
 
 test('webdesign bulk restore ignores cancelled batches instead of showing a cancelled bar', async () => {
