@@ -58,6 +58,7 @@ const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS = [250, 1000, 2500];
+const COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS = 90 * 1000;
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_AUTOPILOT_DISABLED',
   'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
@@ -65,6 +66,7 @@ const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_RECIPIENT_RECENTLY_SENT',
   'COLDMAIL_SAFETY_PAUSED',
   'COLDMAIL_SEND_IN_PROGRESS',
+  'COLDMAIL_SENDER_COOLDOWN_ACTIVE',
   'EMPTY_MAIL_CONTENT',
   'NO_RECIPIENTS',
   'NO_SENDER_CAPACITY',
@@ -1577,6 +1579,80 @@ function createColdmailCampaignService(deps = {}) {
         error: error && error.message ? error.message : error,
       });
     }
+  }
+
+  function buildColdmailSenderCooldownIdentity(senderEmail) {
+    const email = normalizeEmailAddress(senderEmail);
+    return email ? { recipientKey: `coldmail-sender-cooldown:${email}` } : { recipientKey: '' };
+  }
+
+  function getColdmailSenderCooldownLockMs(input = {}) {
+    const raw = input.senderCooldownLock && typeof input.senderCooldownLock === 'object'
+      ? input.senderCooldownLock
+      : {};
+    const minutes = Math.max(0, Number(raw.senderMinIntervalMinutes || raw.minIntervalMinutes) || 0);
+    if (!minutes) return 0;
+    return minutes * 60 * 1000 + COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS;
+  }
+
+  function shouldReserveColdmailSenderCooldown(input = {}) {
+    const raw = input.senderCooldownLock && typeof input.senderCooldownLock === 'object'
+      ? input.senderCooldownLock
+      : {};
+    return raw.enabled === true && getColdmailSenderCooldownLockMs(input) > 0;
+  }
+
+  function buildColdmailSenderCooldownConflictError(senderEmail, conflict) {
+    const retryAt = normalizeString(conflict && (conflict.expires_at || conflict.updated_at || conflict.last_seen_at));
+    const detail = retryAt ? ` Actieve lock loopt tot ongeveer ${retryAt}.` : '';
+    const error = new Error(
+      `Sender ${normalizeEmailAddress(senderEmail) || senderEmail} zit nog in de centrale cooldown.${detail}`
+    );
+    error.code = 'COLDMAIL_SENDER_COOLDOWN_ACTIVE';
+    error.status = 429;
+    error.senderEmail = normalizeEmailAddress(senderEmail);
+    error.conflict = conflict || null;
+    return error;
+  }
+
+  async function reserveSupabaseColdmailSenderCooldown(senderEmail, input = {}, actor) {
+    if (!shouldReserveColdmailSenderCooldown(input)) return null;
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
+      const error = new Error('Centrale sender-cooldown guard ontbreekt; coldmail niet verzonden.');
+      error.code = 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE';
+      error.status = 503;
+      throw error;
+    }
+    const ttlMs = getColdmailSenderCooldownLockMs(input);
+    const reservation = await outboundRecipientGuardStore.reserveRecipients(
+      [buildColdmailSenderCooldownIdentity(senderEmail)],
+      {
+        provider: 'softora',
+        channel: 'coldmail-sender-cooldown',
+        senderEmail,
+        source: 'softora-coldmail-sender-cooldown',
+        actor,
+        status: 'reserved',
+        permanent: false,
+        ttlMs,
+        payload: {
+          kind: 'coldmail_sender_cooldown',
+          senderEmail: normalizeEmailAddress(senderEmail),
+          minIntervalMinutes:
+            Math.max(0, Number(input.senderCooldownLock && input.senderCooldownLock.senderMinIntervalMinutes) || 0),
+        },
+      }
+    );
+    if (reservation && reservation.conflict) {
+      throw buildColdmailSenderCooldownConflictError(senderEmail, reservation.conflict);
+    }
+    if (!isCompleteOutboundGuardReservation(reservation)) {
+      const error = new Error('Centrale sender-cooldown guard kon niet reserveren; coldmail niet verzonden.');
+      error.code = 'COLDMAIL_OUTBOUND_GUARD_FAILED';
+      error.status = 502;
+      throw error;
+    }
+    return reservation;
   }
 
   function hasPriorOutboundMailSignal(row) {
@@ -4531,9 +4607,7 @@ function createColdmailCampaignService(deps = {}) {
     const currentMinuteOfDay = getColdmailAutopilotMinuteOfDay(normalized, now());
     const targetWaitMinutes = Math.max(0, targetMinuteOfDay - currentMinuteOfDay);
     const targetReadyAtMs = currentMs + targetWaitMinutes * 60 * 1000;
-    const floorReadyAtMs =
-      lastSentAtMs +
-      Math.max(0, normalized.senderMinIntervalMinutes * 60 * 1000 - normalized.sendJitterMinSeconds * 1000);
+    const floorReadyAtMs = lastSentAtMs + normalized.senderMinIntervalMinutes * 60 * 1000;
     const readyAtMs = Math.max(targetReadyAtMs, floorReadyAtMs);
     if (readyAtMs <= currentMs + COLDMAIL_AUTOPILOT_DAY_SLOT_READY_GRACE_MS) {
       return { ok: true, readyAtMs, cooldownMinutes: 0 };
@@ -5079,6 +5153,10 @@ function createColdmailCampaignService(deps = {}) {
         publicBaseUrl: input.publicBaseUrl,
         actor,
         beforeSendGuard: assertColdmailAutopilotStillEnabledBeforeSend,
+        senderCooldownLock: {
+          enabled: true,
+          senderMinIntervalMinutes: normalizeColdmailAutopilotSchedule(state.schedule).senderMinIntervalMinutes,
+        },
       });
       return finishColdmailAutopilotRun(
         state,
@@ -5130,7 +5208,11 @@ function createColdmailCampaignService(deps = {}) {
         {
           ok: knownSkip,
           skipped: knownSkip,
-          reason: code === 'COLDMAIL_AUTOPILOT_DISABLED' ? 'disabled' : code.toLowerCase(),
+          reason: code === 'COLDMAIL_AUTOPILOT_DISABLED'
+            ? 'disabled'
+            : code === 'COLDMAIL_SENDER_COOLDOWN_ACTIVE'
+            ? 'sender_cooldown'
+            : code.toLowerCase(),
           message: truncateText(
             normalizeString(error && error.message) || 'Coldmail autopilot kon niet veilig draaien.',
             500
@@ -8027,10 +8109,21 @@ function createColdmailCampaignService(deps = {}) {
             row,
           });
         }
-        const outboundReservation = !isTestRecipientRow(row, to)
-          ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor)
+        const shouldReserveGuards = !isTestRecipientRow(row, to);
+        const senderCooldownReservation = shouldReserveGuards
+          ? await reserveSupabaseColdmailSenderCooldown(senderEmail, input, actor)
           : null;
+        let outboundReservation = null;
+        try {
+          outboundReservation = shouldReserveGuards
+            ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor)
+            : null;
+        } catch (error) {
+          await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
+          throw error;
+        }
         if (outboundReservation && outboundReservation.conflict) {
+          await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
           failed.push(outboundReservation.conflict);
           continue;
         }
@@ -8050,6 +8143,7 @@ function createColdmailCampaignService(deps = {}) {
           }
         } catch (error) {
           await releaseSupabaseOutboundRecipientReservation(outboundReservation, { to });
+          await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
           throw error;
         }
         const sentItem = {
@@ -8160,6 +8254,9 @@ function createColdmailCampaignService(deps = {}) {
       const outboundGuardFailure = failed.every((item) =>
         /^COLDMAIL_OUTBOUND_GUARD_(?:UNAVAILABLE|FAILED|CONFIRM_FAILED)$/i.test(normalizeString(item && item.code))
       );
+      const senderCooldownFailure = failed.every((item) =>
+        normalizeString(item && item.code) === 'COLDMAIL_SENDER_COOLDOWN_ACTIVE'
+      );
       const autopilotGuardFailure = failed.every((item) =>
         ['COLDMAIL_AUTOPILOT_DISABLED', 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE'].includes(
           normalizeString(item && item.code)
@@ -8169,17 +8266,21 @@ function createColdmailCampaignService(deps = {}) {
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
       const error = new Error(firstFailure ? `Geen mails verzonden: ${firstFailure}` : 'Geen mails verzonden.');
-      error.code = safetyPause
-        ? 'COLDMAIL_SAFETY_PAUSED'
-        : recipientGuardFailure
-          ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
-          : outboundGuardFailure
-          ? 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE'
-          : autopilotGuardFailure
-          ? normalizeString(failed[0] && failed[0].code) || 'COLDMAIL_AUTOPILOT_DISABLED'
-          : webdesignAssetFailure
-          ? 'NO_WEBDESIGN_PHOTOS'
-          : 'SMTP_SEND_FAILED';
+      if (safetyPause) {
+        error.code = 'COLDMAIL_SAFETY_PAUSED';
+      } else if (recipientGuardFailure) {
+        error.code = 'COLDMAIL_RECIPIENT_RECENTLY_SENT';
+      } else if (outboundGuardFailure) {
+        error.code = 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE';
+      } else if (senderCooldownFailure) {
+        error.code = 'COLDMAIL_SENDER_COOLDOWN_ACTIVE';
+      } else if (autopilotGuardFailure) {
+        error.code = normalizeString(failed[0] && failed[0].code) || 'COLDMAIL_AUTOPILOT_DISABLED';
+      } else if (webdesignAssetFailure) {
+        error.code = 'NO_WEBDESIGN_PHOTOS';
+      } else {
+        error.code = 'SMTP_SEND_FAILED';
+      }
       error.failedItems = failed;
       if (safetyPause) error.quota = { ...(quota || {}), safetyPause };
       throw error;
