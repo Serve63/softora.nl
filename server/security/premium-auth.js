@@ -316,6 +316,9 @@ function createPremiumAuthStateManager(options = {}) {
       if (requestPath === '/api/premium-database/webdesign-photo-batches/run' && method === 'GET') {
         return true;
       }
+      if (requestPath === '/api/kvk-database/snapshot' && method === 'POST') {
+        return true;
+      }
       if (
         requestPath === '/api/twilio/voice' &&
         (method === 'GET' || method === 'POST')

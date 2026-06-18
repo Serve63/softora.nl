@@ -22,6 +22,7 @@ const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
+const { registerKvkDatabaseRoutes } = require('../routes/kvk-database');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
@@ -32,6 +33,7 @@ const {
 const {
   createPremiumDatabaseMailReadySnapshotService,
 } = require('./premium-database-mail-ready-snapshot');
+const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
 const {
   createPublicWebdesignPreviewService,
 } = require('./public-webdesign-preview');
@@ -64,6 +66,7 @@ function registerFeatureRoutes(app, deps = {}) {
     requireRuntimeDebugAccess,
     seoReadCoordinator,
     seoWriteCoordinator,
+    kvkDatabaseSnapshot,
   } = deps;
   const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
     getUiStateValues: deps.getUiStateValues,
@@ -77,6 +80,10 @@ function registerFeatureRoutes(app, deps = {}) {
   const publicWebdesignPreviewCoordinator = createPublicWebdesignPreviewService({
     getUiStateValues: deps.getUiStateValues,
     dataOpsStore: deps.dataOpsStore,
+  });
+  const kvkDatabaseSnapshotCoordinator = createKvkDatabaseSnapshotService({
+    ...(kvkDatabaseSnapshot || {}),
+    fallbackSyncToken: mailboxCronSecret,
   });
 
   registerColdcallingWebhookRoutes(app, {
@@ -139,6 +146,9 @@ function registerFeatureRoutes(app, deps = {}) {
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
+  });
+  registerKvkDatabaseRoutes(app, {
+    coordinator: kvkDatabaseSnapshotCoordinator,
   });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,

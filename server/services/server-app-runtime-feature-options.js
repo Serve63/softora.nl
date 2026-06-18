@@ -221,6 +221,7 @@ function buildFeatureRoutesOptions({
   requireRuntimeDebugAccess,
   seoReadCoordinator,
   seoWriteCoordinator,
+  kvkDatabaseSnapshot,
   getUiStateValues,
   setUiStateValues,
 }) {
@@ -251,6 +252,7 @@ function buildFeatureRoutesOptions({
     requireRuntimeDebugAccess,
     seoReadCoordinator,
     seoWriteCoordinator,
+    kvkDatabaseSnapshot,
     getUiStateValues,
     setUiStateValues,
   };
