@@ -140,7 +140,7 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   const entry = getRegistryEntry('crm-systeem-op-maat.html');
 
   assert.match(source, /<title>CRM systeem op maat laten maken voor MKB \| Softora<\/title>/);
-  assert.match(source, /<meta name="description" content="Laat een CRM systeem op maat maken voor leadpipeline/);
+  assert.match(source, /<meta name="description" content="Laat CRM software op maat bouwen voor leadpipeline/);
   assert.match(source, /<meta name="robots" content="index, follow">/);
   assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
@@ -171,7 +171,7 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
   assert.equal(entry.title, 'CRM systeem op maat laten maken voor MKB');
-  assert.match(entry.description, /leadpipeline, klantbeheer, offerteflow/);
+  assert.match(entry.description, /CRM software op maat/);
   assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));

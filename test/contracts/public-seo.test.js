@@ -462,8 +462,10 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
       fileName: 'crm-systeem-op-maat.html',
       terms: [
         'crm systeem op maat',
+        'crm software op maat',
         'crm op maat',
         'crm offerte systeem',
+        'automatisch offerte systeem',
         'klantportaal',
         'dashboard laten ontwikkelen',
         'sales pipeline',
@@ -471,7 +473,14 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
     },
     {
       fileName: 'premium-bedrijfssoftware.html',
-      terms: ['bedrijfssoftware laten maken', 'dashboard laten ontwikkelen', 'klantportaal', 'crm offerte systeem'],
+      terms: [
+        'bedrijfssoftware laten maken',
+        'bedrijfsapplicatie',
+        'dashboard laten ontwikkelen',
+        'klantportaal',
+        'crm offerte systeem',
+        'automatisch offerte systeem',
+      ],
     },
     {
       fileName: 'ai-automatisering.html',
