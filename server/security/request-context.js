@@ -8,6 +8,7 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/api/twilio/status',
   '/api/coldmailing/unsubscribe',
   '/api/instantly/webhook',
+  '/api/kvk-database/snapshot',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
   '/retell/webhook',
