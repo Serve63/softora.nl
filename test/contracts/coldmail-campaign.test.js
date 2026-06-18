@@ -2096,7 +2096,7 @@ test('coldmail autopilot day-paces each mailbox across the full 07-17 workday', 
         },
       ],
     },
-    now: () => new Date('2026-06-08T06:30:00.000Z'),
+    now: () => new Date('2026-06-08T06:31:00.000Z'),
   });
 
   const safelyReadyResult = await safelyReady.service.runColdmailAutopilot({
@@ -2107,6 +2107,107 @@ test('coldmail autopilot day-paces each mailbox across the full 07-17 workday', 
   assert.equal(safelyReadyResult.reason, 'sent');
   assert.equal(safelyReady.sentMessages.length, 1);
   assert.equal(safelyReady.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
+});
+
+test('coldmail autopilot blocks stale reads with a central sender cooldown lock', async () => {
+  const outboundCalls = [];
+  const outboundRecipientGuardStore = {
+    findRecipientConflict: async () => null,
+    reserveRecipients: async (items, options) => {
+      outboundCalls.push({ type: 'reserve', items, options });
+      if (options && options.channel === 'coldmail-sender-cooldown') {
+        return {
+          ok: false,
+          reservationId: 'active-sender-lock',
+          expectedCount: 1,
+          conflict: {
+            guard_key: 'custom:coldmail-sender-cooldown-serve-softora-nl',
+            sender_email: 'serve@softora.nl',
+            channel: 'coldmail-sender-cooldown',
+            status: 'reserved',
+            expires_at: '2026-06-18T09:51:30.000Z',
+          },
+        };
+      }
+      return {
+        ok: true,
+        reservationId: `recipient-${outboundCalls.length}`,
+        count: (Array.isArray(items) ? items.length : 0) * 4,
+        expectedCount: (Array.isArray(items) ? items.length : 0) * 4,
+      };
+    },
+    confirmReservation: async (reservationId, options) => {
+      outboundCalls.push({ type: 'confirm', reservationId, options });
+      return { ok: true, count: 4 };
+    },
+    releaseReservation: async (reservationId) => {
+      outboundCalls.push({ type: 'release', reservationId });
+      return { ok: true };
+    },
+  };
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    outboundRecipientGuardStore,
+    sendGuardState: { entries: [] },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-18T08:40:00.000Z',
+    },
+    now: () => new Date('2026-06-18T08:50:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sender_cooldown');
+  assert.equal(sentMessages.length, 0);
+  assert.equal(outboundCalls.length, 1);
+  assert.equal(outboundCalls[0].options.channel, 'coldmail-sender-cooldown');
 });
 
 test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', async () => {
