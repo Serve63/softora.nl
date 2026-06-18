@@ -516,6 +516,15 @@ function buildServerAppFeatureWiringRuntimeContext({
         },
       },
       mailboxCronSecret: env.CRON_SECRET || '',
+      kvkDatabaseSnapshot: {
+        fetchSupabaseRowByKeyViaRest: platformRuntime.fetchSupabaseRowByKeyViaRest,
+        upsertSupabaseRowViaRest: platformRuntime.upsertSupabaseRowViaRest,
+        supabaseStateKey: envConfig.SUPABASE_STATE_KEY,
+        kvkDatabaseSyncToken:
+          shared.normalizeString(env.KVK_DATABASE_SYNC_TOKEN || env.SOFTORA_KVK_SYNC_TOKEN || ''),
+        normalizeString: shared.normalizeString,
+        truncateText: shared.truncateText,
+      },
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,
       dataOpsStore: uiSeoRuntime.dataOpsStore,
