@@ -71,7 +71,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     legacyPaths: ['/premium-bedrijfssoftware'],
     title: 'Bedrijfssoftware laten maken voor CRM en dashboards',
     description:
-      'Laat bedrijfssoftware maken voor CRM, dashboard, klantportaal, offerteflow, planning en AI automatisering die dagelijks werk versnelt.',
+      'Laat bedrijfssoftware of een bedrijfsapplicatie maken voor CRM, dashboard, klantportaal, offerteflow, planning en AI automatisering.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
@@ -87,7 +87,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     path: '/crm-systeem-op-maat',
     title: 'CRM systeem op maat laten maken voor MKB',
     description:
-      'Laat een CRM systeem op maat maken voor leadpipeline, klantbeheer, offerteflow, klantportaal, dashboards, reminders en AI-opvolging.',
+      'Laat CRM software op maat bouwen voor leadpipeline, klantbeheer, offerteflow, klantportaal, dashboards, reminders en AI-opvolging.',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [
