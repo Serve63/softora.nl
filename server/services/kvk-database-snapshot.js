@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 
 const DEFAULT_STATE_KEY_SUFFIX = 'kvk_database_snapshot_v1';
 const MAX_SNAPSHOT_BYTES = 7_500_000;
+const DEFAULT_SNAPSHOT_READ_TIMEOUT_MS = 15_000;
+const DEFAULT_SNAPSHOT_WRITE_TIMEOUT_MS = 30_000;
 
 function createKvkDatabaseSnapshotService(deps = {}) {
   const {
@@ -10,6 +12,8 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     supabaseStateKey = 'core',
     kvkDatabaseSyncToken = '',
     fallbackSyncToken = '',
+    snapshotReadTimeoutMs = DEFAULT_SNAPSHOT_READ_TIMEOUT_MS,
+    snapshotWriteTimeoutMs = DEFAULT_SNAPSHOT_WRITE_TIMEOUT_MS,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     now = () => new Date(),
@@ -94,7 +98,11 @@ function createKvkDatabaseSnapshotService(deps = {}) {
   }
 
   async function sendGetSnapshotResponse(_req, res) {
-    const result = await fetchSupabaseRowByKeyViaRest(snapshotStateKey, 'payload,updated_at');
+    const result = await fetchSupabaseRowByKeyViaRest(snapshotStateKey, 'payload,updated_at', {
+      timeoutMs: snapshotReadTimeoutMs,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
     if (!result || !result.ok) {
       return res.status(503).json({
         ok: false,
@@ -137,11 +145,18 @@ function createKvkDatabaseSnapshotService(deps = {}) {
       updatedAt,
       summary: summarizeSnapshot(snapshot),
     };
-    const result = await upsertSupabaseRowViaRest({
-      state_key: snapshotStateKey,
-      payload,
-      updated_at: updatedAt,
-    });
+    const result = await upsertSupabaseRowViaRest(
+      {
+        state_key: snapshotStateKey,
+        payload,
+        updated_at: updatedAt,
+      },
+      {
+        timeoutMs: snapshotWriteTimeoutMs,
+        ignoreFailureCooldown: true,
+        suppressFailureCooldown: true,
+      }
+    );
 
     if (!result || !result.ok) {
       return res.status(502).json({
