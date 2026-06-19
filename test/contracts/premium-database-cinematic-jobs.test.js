@@ -330,6 +330,79 @@ test('premium database cinematic coordinator herhaalt Veo niet bij auth of quota
   assert.match(advanced.job.error, /API key is not allowed/);
 });
 
+test('premium database cinematic coordinator downloadt relatieve Veo video-uri via Gemini base url', async () => {
+  let currentTime = 4000;
+  let pollUrl = '';
+  let downloadUrl = '';
+  let downloadApiKey = '';
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options = {}) => {
+    downloadUrl = String(url || '');
+    downloadApiKey = String(options.headers && options.headers['x-goog-api-key'] || '');
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (name) => (String(name).toLowerCase() === 'content-type' ? 'video/mp4' : '') },
+      arrayBuffer: async () => Buffer.from('video-bytes').buffer,
+    };
+  };
+  try {
+    const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+      now: () => currentTime,
+      random: () => 0.54,
+      getOpenAiApiKey: () => 'openai-key',
+      getGeminiApiKey: () => 'gemini-key',
+      geminiApiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/',
+      fetchWebsitePreviewScanFromUrl: async (url) => ({
+        normalizedUrl: url,
+        finalUrl: 'https://relative-video.example/',
+        scan: { host: 'relative-video.example', h1: 'Relative Video BV' },
+      }),
+      generateCinematicImages: async () => ({
+        images: [{ mimeType: 'image/png', base64: 'START_FRAME' }],
+      }),
+      submitVeoVideo: async () => ({ operationName: '/v1beta/operations/relative-video-op', raw: {} }),
+      fetchJsonWithTimeout: async (url) => {
+        pollUrl = String(url || '');
+        return {
+          response: { ok: true },
+          data: {
+            done: true,
+            response: {
+              generateVideoResponse: {
+                generatedSamples: [{ video: { uri: 'files/relative-video:download?alt=media' } }],
+              },
+            },
+          },
+        };
+      },
+    });
+
+    const started = await coordinator.startJob({
+      ownerKey: 'serve@example.com::user-1',
+      customer: { id: 'customer-relative-video', bedrijf: 'Relative Video BV', dom: 'relative-video.example' },
+    });
+    await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
+    currentTime += 11000;
+    const finished = await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
+    const videoResponse = await callRouteHandlers([
+      (req, res) => coordinator.getVideoResponse(req, res),
+    ], {
+      premiumAuth: { email: 'serve@example.com', userId: 'user-1' },
+      params: { jobId: started.job.id },
+    });
+
+    assert.equal(finished.job.status, 'done');
+    assert.equal(pollUrl, 'https://generativelanguage.googleapis.com/v1beta/operations/relative-video-op');
+    assert.equal(downloadUrl, 'https://generativelanguage.googleapis.com/v1beta/files/relative-video:download?alt=media');
+    assert.equal(downloadApiKey, 'gemini-key');
+    assert.equal(videoResponse.statusCode, 200);
+    assert.equal(videoResponse.headers['Content-Type'], 'video/mp4');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('premium database cinematic coordinator hergebruikt bestaande site voordat AI opnieuw draait', async () => {
   let currentTime = 2000;
   let imageCalls = 0;

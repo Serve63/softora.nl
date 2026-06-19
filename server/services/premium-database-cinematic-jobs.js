@@ -334,12 +334,27 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const message = veoSubmitErrorMessage(data);
     return /unsupported|supported usage|unknown|unrecognized|invalid|remove|value type|needs to be|inlineData|bytesBase64Encoded|imageBytes|durationSeconds|personGeneration|resolution|aspectRatio|parameters/i.test(message);
   }
+  function geminiApiRoot() {
+    return String(geminiApiBaseUrl || DEFAULT_GEMINI_API_BASE_URL).replace(/\/+$/, '');
+  }
+  function geminiApiUrl(value) {
+    const raw = normalizeString(value);
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const clean = raw.replace(/^\/+/, '');
+    const base = geminiApiRoot();
+    try {
+      const parsedBase = new URL(base);
+      const basePath = parsedBase.pathname.replace(/^\/+|\/+$/g, '');
+      if (basePath && clean.startsWith(`${basePath}/`)) return `${parsedBase.origin}/${clean}`;
+    } catch (_) {}
+    return `${base}/${clean}`;
+  }
   async function defaultSubmitVeo(job, images) {
     const apiKey = normalizeString(getGeminiApiKey());
     if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY ontbreekt voor Veo 3.1'), { status: 503 });
     const first = images[0];
     if (!first?.base64) throw Object.assign(new Error('Cinematic startbeeld ontbreekt voor Veo.'), { status: 422 });
-    const endpoint = `${String(geminiApiBaseUrl || DEFAULT_GEMINI_API_BASE_URL).replace(/\/+$/, '')}/models/${encodeURIComponent(normalizeString(veoModel) || DEFAULT_VEO_MODEL)}:predictLongRunning`;
+    const endpoint = geminiApiUrl(`models/${encodeURIComponent(normalizeString(veoModel) || DEFAULT_VEO_MODEL)}:predictLongRunning`);
     const variants = veoSubmitPayloadVariants(job, first);
     let lastError = null;
     for (let index = 0; index < variants.length; index += 1) {
@@ -366,7 +381,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY ontbreekt voor Veo 3.1'), { status: 503 });
     const operationName = normalizeString(job.videoOperationName);
     if (!operationName) throw Object.assign(new Error('Veo operation ontbreekt.'), { status: 422 });
-    const { response, data } = await fetchJsonWithTimeout(`${String(geminiApiBaseUrl || DEFAULT_GEMINI_API_BASE_URL).replace(/\/+$/, '')}/${operationName.replace(/^\/+/, '')}`, { method: 'GET', headers: { 'x-goog-api-key': apiKey } }, 45000);
+    const { response, data } = await fetchJsonWithTimeout(geminiApiUrl(operationName), { method: 'GET', headers: { 'x-goog-api-key': apiKey } }, 45000);
     if (!response?.ok || data?.error) throw Object.assign(new Error(normalizeString(data?.error?.message || data?.error?.detail || data?.message) || 'Veo 3.1 status mislukt'), { status: Number(response?.status) || 502, data });
     if (!data?.done) return { done: false, raw: data };
     const videoUri = extractVideoUri(data);
@@ -516,7 +531,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const apiKey = normalizeString(getGeminiApiKey());
     if (!apiKey) return res.status(503).json({ ok: false, error: 'GEMINI_API_KEY ontbreekt voor video download' });
     try {
-      const response = await fetch(job.videoUri, { method: 'GET', headers: { 'x-goog-api-key': apiKey }, redirect: 'follow' });
+      const response = await fetch(geminiApiUrl(job.videoUri), { method: 'GET', headers: { 'x-goog-api-key': apiKey }, redirect: 'follow' });
       if (!response.ok) return res.status(response.status || 502).json({ ok: false, error: 'Video downloaden mislukt' });
       res.setHeader('Content-Type', response.headers.get('content-type') || 'video/mp4');
       res.setHeader('Cache-Control', 'private, max-age=300');
