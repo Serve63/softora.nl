@@ -242,7 +242,7 @@ test('premium database cinematic coordinator stuurt Veo een geldige image-to-vid
   assert.equal(capturedBody.instances[0].image.mimeType, 'image/png');
   assert.equal(capturedBody.instances[0].image.inlineData, undefined);
   assert.equal(capturedBody.instances[0].referenceImages, undefined);
-  assert.equal(capturedBody.parameters.durationSeconds, '8');
+  assert.equal(capturedBody.parameters.durationSeconds, 8);
   assert.equal(capturedBody.parameters.personGeneration, 'allow_adult');
 });
 
