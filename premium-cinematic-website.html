@@ -12,17 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
 <link rel="stylesheet" href="/assets/premium-cinematic-website.css?v=20260619a">
-<script>
-  (function () {
-    document.documentElement.setAttribute("data-personnel-loading", "true");
-    try {
-      document.documentElement.setAttribute("data-theme-mode", "light");
-      document.documentElement.setAttribute("data-theme", "light");
-    } catch (_) {
-      /* ignore */
-    }
-  })();
-</script>
+<script>(function(){document.documentElement.setAttribute("data-personnel-loading","true");try{document.documentElement.setAttribute("data-theme-mode","light");document.documentElement.setAttribute("data-theme","light");}catch(_){}})();</script>
 <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
 <script src="/assets/premium-boot-one-second.js?v=20260502a"></script>
 </head>
@@ -35,7 +25,6 @@
       </div>
       <div class="job-pill" id="jobPill">Nieuwe opdracht</div>
     </header>
-
     <main class="cinematic-main">
       <section class="process-panel" aria-live="polite">
         <div>
@@ -43,7 +32,6 @@
           <h1 class="company-title" id="companyTitle">Cinematic website</h1>
           <p class="company-meta" id="companyMeta">Website wordt voorbereid.</p>
         </div>
-
         <div class="progress-wrap">
           <div class="progress-label">
             <span id="stageLabel">Opdracht staat klaar</span>
@@ -53,22 +41,13 @@
             <div class="progress-bar" id="progressBar"></div>
           </div>
         </div>
-
-        <ol class="stage-list" id="stageList">
-          <li class="stage-item" data-stage="scanning"><span class="stage-dot"></span><span>Website scan</span></li>
-          <li class="stage-item" data-stage="images"><span class="stage-dot"></span><span>AI beelden</span></li>
-          <li class="stage-item" data-stage="video"><span class="stage-dot"></span><span>Veo 3.1 video</span></li>
-          <li class="stage-item" data-stage="site"><span class="stage-dot"></span><span>Website build</span></li>
-        </ol>
-
+        <ol class="stage-list" id="stageList"><li class="stage-item" data-stage="scanning"><span class="stage-dot"></span><span>Website scan</span></li><li class="stage-item" data-stage="images"><span class="stage-dot"></span><span>AI beelden</span></li><li class="stage-item" data-stage="video"><span class="stage-dot"></span><span>Veo 3.1 video</span></li><li class="stage-item" data-stage="site"><span class="stage-dot"></span><span>Website build</span></li></ol>
         <p class="status-copy" id="statusCopy">We zetten de opdracht klaar.</p>
-
         <div class="error-box" id="errorBox" hidden>
           <div id="errorText">Proces gestopt.</div>
           <button class="reset-button" type="button" id="resetButton">Opnieuw starten</button>
         </div>
       </section>
-
       <section class="preview-panel">
         <div class="preview-head">
           <div class="preview-title">Live resultaat</div>
@@ -87,7 +66,6 @@
       </section>
     </main>
   </div>
-
   <script src="/assets/premium-cinematic-website.js?v=20260619a" defer></script>
 </body>
 </html>

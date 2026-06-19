@@ -9,6 +9,9 @@ function registerPremiumDatabaseCinematicJobRoutes(app, deps = {}) {
   app.post('/api/premium-database/cinematic-jobs', requirePremiumApiAccess, (req, res) =>
     coordinator.startJobResponse(req, res)
   );
+  app.get('/api/premium-database/cinematic-jobs/config', requirePremiumApiAccess, (req, res) =>
+    coordinator.configResponse(req, res)
+  );
   app.get('/api/premium-database/cinematic-jobs/:jobId/video', requirePremiumApiAccess, (req, res) =>
     coordinator.getVideoResponse(req, res)
   );

@@ -47,6 +47,28 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
   const createJobId = () => `cin_${now().toString(36)}_${Math.floor(random() * 1e12).toString(36)}`;
   const getVideoRoute = (jobId) => `/api/premium-database/cinematic-jobs/${encodeURIComponent(jobId)}/video`;
 
+  function getProviderStatus() {
+    const openAiConfigured = Boolean(normalizeString(getOpenAiApiKey()));
+    const geminiConfigured = Boolean(normalizeString(getGeminiApiKey()));
+    const missing = [];
+    if (!openAiConfigured) missing.push('OPENAI_API_KEY');
+    if (!geminiConfigured) missing.push('GEMINI_API_KEY');
+    return {
+      ready: missing.length === 0,
+      missing,
+      openAi: {
+        configured: openAiConfigured,
+        imageModel: normalizeString(openAiImageModel) || DEFAULT_IMAGE_MODEL,
+        apiBaseUrlConfigured: Boolean(normalizeString(openAiApiBaseUrl)),
+      },
+      veo: {
+        configured: geminiConfigured,
+        model: normalizeString(veoModel) || DEFAULT_VEO_MODEL,
+        apiBaseUrlConfigured: Boolean(normalizeString(geminiApiBaseUrl)),
+      },
+    };
+  }
+
   function normalizeWebsiteUrl(value) {
     const raw = normalizeString(value);
     if (!raw) return '';
@@ -404,6 +426,17 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     }
     const completedSite = await findCompletedSite(ownerKey, customer, websiteUrl);
     if (completedSite) return { ok: true, statusCode: 200, existing: true, cached: true, job: serializeJob(completedSite) };
+    const providerStatus = getProviderStatus();
+    if (!providerStatus.ready) {
+      return {
+        ok: false,
+        statusCode: 503,
+        code: 'CINEMATIC_PROVIDER_NOT_CONFIGURED',
+        error: 'Cinematic API niet compleet',
+        detail: `Configureer eerst ${providerStatus.missing.join(' en ')} voordat een nieuwe cinematic website gemaakt kan worden.`,
+        providerStatus,
+      };
+    }
     const job = { id: createJobId(), ownerKey, customer, websiteUrl, status: 'queued', stage: 'queued', progress: 5, site: null, scan: null, imageCount: 0, videoReady: false, videoUri: '', videoOperationName: '', rawVideoOperation: null, result: null, error: null, createdAt: now(), startedAt: null, updatedAt: now(), finishedAt: null, nextPollAt: null };
     jobs.set(job.id, job);
     await persistJob(job);
@@ -422,6 +455,9 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const result = await startJob({ ...body, ownerKey: ownerKeyFromReq(req), customer: body.customer || body });
     return res.status(Math.max(100, Math.min(599, Number(result.statusCode) || 500))).json(result);
+  }
+  async function configResponse(_req, res) {
+    return res.status(200).json({ ok: true, providerStatus: getProviderStatus() });
   }
   async function getJobResponse(req, res) {
     const result = await getJob({ ownerKey: ownerKeyFromReq(req), jobId: req.params && req.params.jobId });
@@ -447,7 +483,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       return res.status(502).json({ ok: false, error: 'Video downloaden mislukt' });
     }
   }
-  return { startJob, getJob, startJobResponse, getJobResponse, getVideoResponse };
+  return { startJob, getJob, getProviderStatus, startJobResponse, configResponse, getJobResponse, getVideoResponse };
 }
 
 function createFetchJsonWithTimeout() {
