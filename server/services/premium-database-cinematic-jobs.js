@@ -4,10 +4,10 @@ const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
 const DEFAULT_VEO_MODEL = 'veo-3.1-generate-preview';
-const DEFAULT_IMAGE_COUNT = 6;
+const DEFAULT_IMAGE_COUNT = 8;
 const MIN_IMAGE_SEQUENCE_COUNT = 4;
 const MAX_IMAGE_SEQUENCE_COUNT = 8;
-const SITE_BUILDER_VERSION = 'image-sequence-v2';
+const SITE_BUILDER_VERSION = 'scroll-scrub-sequence-v1';
 const JOB_SCOPE = 'premium_database_cinematic_jobs';
 const JOB_KEY = 'softora_premium_database_cinematic_jobs_v1';
 const SITE_KEY = 'softora_premium_database_cinematic_sites_v1';
@@ -25,7 +25,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || DEFAULT_GEMINI_API_BASE_URL,
     openAiImageModel = process.env.OPENAI_CINEMATIC_IMAGE_MODEL || process.env.WEBSITE_PREVIEW_IMAGE_MODEL || process.env.OPENAI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL,
     veoModel = process.env.GEMINI_VEO_MODEL || process.env.VEO_MODEL || DEFAULT_VEO_MODEL,
-    imageCount = process.env.PREMIUM_CINEMATIC_IMAGE_COUNT || 2,
+    imageCount = process.env.PREMIUM_CINEMATIC_IMAGE_COUNT || DEFAULT_IMAGE_COUNT,
     imageSize = process.env.PREMIUM_CINEMATIC_IMAGE_SIZE || '2048x1152',
     imageQuality = process.env.PREMIUM_CINEMATIC_IMAGE_QUALITY || 'medium',
     veoPollIntervalMs = process.env.PREMIUM_CINEMATIC_VEO_POLL_MS || 10000,
@@ -38,6 +38,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     submitVeoVideo = null,
     pollVeoOperation = null,
     buildCinematicSiteHtml = null,
+    useVeo = process.env.PREMIUM_CINEMATIC_USE_VEO === '1',
   } = deps;
 
   const jobs = new Map();
@@ -46,6 +47,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     MIN_IMAGE_SEQUENCE_COUNT,
     Math.min(MAX_IMAGE_SEQUENCE_COUNT, Math.floor(Number(imageCount) || DEFAULT_IMAGE_COUNT))
   );
+  const USE_VEO = useVeo === true || /^1|true|yes$/i.test(normalizeString(useVeo));
   const VEO_POLL_INTERVAL_MS = Math.max(2500, Math.min(60000, Number(veoPollIntervalMs) || 10000));
 
   const ownerKeyFromReq = (req) => {
@@ -64,7 +66,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const geminiConfigured = Boolean(normalizeString(getGeminiApiKey()));
     const missing = [];
     if (!openAiConfigured) missing.push('OPENAI_API_KEY');
-    if (!geminiConfigured) missing.push('GEMINI_API_KEY');
+    if (USE_VEO && !geminiConfigured) missing.push('GEMINI_API_KEY');
     return {
       ready: missing.length === 0,
       missing,
@@ -74,6 +76,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         apiBaseUrlConfigured: Boolean(normalizeString(openAiApiBaseUrl)),
       },
       veo: {
+        enabled: USE_VEO,
         configured: geminiConfigured,
         model: normalizeString(veoModel) || DEFAULT_VEO_MODEL,
         apiBaseUrlConfigured: Boolean(normalizeString(geminiApiBaseUrl)),
@@ -177,7 +180,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       scanning: 'Website wordt geanalyseerd',
       images: 'Cinematic beelden worden gemaakt',
       video: 'Veo 3.1 video wordt gebouwd',
-      site: 'Premium website wordt samengesteld',
+      site: 'Scrollsite wordt samengesteld',
       done: 'Cinematic website staat klaar',
       error: 'Proces gestopt',
     }[stage] || 'Opdracht staat klaar';
@@ -777,7 +780,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         scenes: [
           ['Het ritueel opent', 'Een klein detail vouwt open alsof de bezoeker de eerste handeling zelf inzet.'],
           ['Smaak komt los', 'De camera zakt naar het moment waarop warmte, geur en aandacht zichtbaar worden.'],
-          ['Handen maken het tastbaar', 'Het product voelt niet meer als aanbod, maar als ervaring die je bijna kunt aanraken.'],
+          ['Warmte maakt het tastbaar', 'Het product voelt niet meer als aanbod, maar als ervaring die je bijna kunt aanraken.'],
           ['Van beleving naar actie', 'De site gebruikt dat gevoel om bezoekers vanzelf richting contact of aankoop te trekken.'],
         ],
       };
@@ -789,7 +792,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         scenes: [
           ['Het dossier opent', 'De eerste scroll voelt als een exclusief dossier dat met precisie wordt geopend.'],
           ['Bewijs krijgt focus', 'Belangrijke argumenten schuiven naar voren zonder de rust en autoriteit te verliezen.'],
-          ['Handen brengen zekerheid', 'Het moment voelt persoonlijk: expertise wordt tastbaar in plaats van alleen verteld.'],
+          ['Zekerheid wordt tastbaar', 'Het moment voelt persoonlijk: expertise wordt tastbaar in plaats van alleen verteld.'],
           ['Van twijfel naar gesprek', 'De website leidt bezoekers naar een duidelijke volgende stap met premium vertrouwen.'],
         ],
       };
@@ -800,7 +803,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       scenes: [
         ['Het verhaal opent', 'De eerste scroll haalt de bezoeker uit een gewone pagina en in een merkervaring.'],
         ['De kern komt vrij', 'Belangrijke details schuiven naar voren alsof de camera door het bedrijf beweegt.'],
-        ['Het aanbod wordt tastbaar', 'Beweging, diepte en menselijke aandacht maken de waarde direct voelbaar.'],
+        ['Het aanbod wordt tastbaar', 'Beweging, diepte en warme materialen maken de waarde direct voelbaar.'],
         ['Momentum naar contact', 'De laatste scène zet de energie om in vertrouwen, keuze en actie.'],
       ],
     };
@@ -822,6 +825,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
 <title>${company} - cinematic website</title>
 <style>
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;color:#171719;background:#f6f7f2}h1,h2,p{margin:0}a{color:inherit}.hero{min-height:92vh;position:relative;display:grid;align-items:end;overflow:hidden;background:#101012;color:#fff}.hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.74;filter:saturate(1.02) contrast(1.06)}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.9),rgba(8,8,10,.46) 48%,rgba(8,8,10,.12))}.hero-copy{position:relative;z-index:1;width:min(1040px,92%);padding:96px 6% 82px}.kicker,.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}.kicker{color:#6ee7d8}.hero h1{max-width:780px;margin-top:18px;font-family:Impact,Arial Black,Inter,sans-serif;font-size:88px;line-height:.9;letter-spacing:0;text-transform:uppercase}.hero p{max-width:680px;margin-top:24px;font-size:20px;line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.story{--story-progress:0;min-height:420vh;position:relative;background:#111;color:#fff}.story-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.75fr);gap:38px;align-items:center;padding:64px 6%;background:radial-gradient(circle at 30% 45%,rgba(15,159,147,.2),transparent 34%),linear-gradient(135deg,#101012,#191719 58%,#0f1112)}.story-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;filter:saturate(.85) contrast(1.12)}.story-stage:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(0,0,0,.08),rgba(0,0,0,.48));pointer-events:none}.story-visual,.story-copy{position:relative;z-index:1}.story-visual{height:min(620px,72vh);display:grid;place-items:center}.cinematic-object{position:relative;width:min(520px,78vw);aspect-ratio:1;border-radius:50%;display:grid;place-items:center}.cinematic-object:before{content:"";position:absolute;inset:10%;border:1px solid rgba(255,255,255,.12);border-radius:50%;transform:scale(calc(.92 + var(--story-progress) * .16));opacity:.8}.object-shadow{position:absolute;bottom:12%;width:64%;height:11%;border-radius:50%;background:rgba(0,0,0,.38);filter:blur(14px);transform:scaleX(calc(.72 + var(--story-progress) * .34))}.object-core{position:absolute;width:44%;height:40%;border-radius:14px;background:linear-gradient(135deg,#f7f1e7,#d6c2a2);box-shadow:0 34px 90px rgba(0,0,0,.42);transform:translateY(24px) rotate(-7deg);transition:transform .7s ease,border-radius .7s ease}.object-lid{position:absolute;top:25%;left:28%;width:44%;height:18%;border-radius:12px 12px 4px 4px;background:linear-gradient(135deg,#fffaf2,#d7c3a0);transform-origin:50% 100%;transition:transform .7s ease}.object-detail{position:absolute;width:28%;height:28%;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(110,231,216,.12);opacity:0;transform:translateY(60px) scale(.72);transition:opacity .6s ease,transform .7s ease}.hand{position:absolute;width:34%;height:18%;border-radius:999px;background:linear-gradient(135deg,#f4cfad,#c88b64);opacity:0;filter:drop-shadow(0 18px 28px rgba(0,0,0,.26));transition:opacity .7s ease,transform .8s ease}.hand.left{left:5%;bottom:24%;transform:translateX(-90px) rotate(12deg)}.hand.right{right:5%;bottom:26%;transform:translateX(90px) rotate(-14deg)}.steam{position:absolute;top:19%;width:8px;height:76px;border-radius:999px;border-left:2px solid rgba(110,231,216,.55);opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}.steam.one{left:44%}.steam.two{left:52%;transition-delay:.06s}.steam.three{left:60%;transition-delay:.12s}.motif-tea .object-core{border-radius:0 0 48% 48%;background:linear-gradient(180deg,#f0d5aa,#b9834d)}.motif-tea .object-lid{top:20%;height:22%;background:linear-gradient(135deg,#fff6dd,#d6a256)}.motif-tea .object-detail{width:46%;height:30%;bottom:18%;border-radius:0 0 80px 80px;background:linear-gradient(180deg,#f6efe7,#c88a58)}.motif-legal .object-core{border-radius:8px;background:linear-gradient(135deg,#f3efe8,#c9b98d)}.motif-legal .object-lid{top:26%;background:linear-gradient(135deg,#e7d7ad,#9b2358)}.motif-legal .object-detail{width:42%;height:30%;border-radius:8px;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(255,255,255,.32))}.story[data-active="1"] .object-lid{transform:translateY(-54px) rotateX(68deg) rotate(-4deg)}.story[data-active="1"] .object-detail{opacity:.75;transform:translateY(18px) scale(.92)}.story[data-active="2"] .object-core{transform:translateY(40px) rotate(0deg) scale(.82)}.story[data-active="2"] .object-detail{opacity:1;transform:translateY(34px) scale(1.12)}.story[data-active="2"] .hand{opacity:1}.story[data-active="2"] .hand.left{transform:translateX(10px) rotate(5deg)}.story[data-active="2"] .hand.right{transform:translateX(-10px) rotate(-7deg)}.story[data-active="3"] .object-lid{transform:translateY(-72px) rotateX(76deg)}.story[data-active="3"] .object-detail{opacity:1;transform:translateY(10px) scale(1.28)}.story[data-active="3"] .steam{opacity:1;transform:translateY(-24px)}.story-copy{align-self:center;max-width:560px}.scene-count{color:#6ee7d8;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.story-copy h2{margin-top:18px;font-size:56px;line-height:.98;letter-spacing:0;text-transform:uppercase}.story-copy p{margin-top:18px;color:rgba(255,255,255,.75);font-size:18px;line-height:1.7}.story-progress{margin-top:32px;height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}.story-progress span{display:block;height:100%;width:calc(var(--story-progress) * 100%);background:linear-gradient(90deg,#b7295f,#0f9f93)}.story-steps{position:absolute;left:6%;right:6%;bottom:34px;z-index:2;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.story-step{min-height:74px;padding:14px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);backdrop-filter:blur(12px);opacity:.5;transition:opacity .3s ease,transform .3s ease}.story-step span{display:block;color:#6ee7d8;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.story-step b{display:block;margin-top:7px;font-size:13px;line-height:1.25;text-transform:uppercase}.story[data-active="0"] .story-step[data-scene="0"],.story[data-active="1"] .story-step[data-scene="1"],.story[data-active="2"] .story-step[data-scene="2"],.story[data-active="3"] .story-step[data-scene="3"]{opacity:1;transform:translateY(-6px);border-color:rgba(110,231,216,.48)}.proof{padding:88px 6%;background:#f6f7f2;color:#171719}.proof-inner{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:56px;align-items:start}.label{color:#b7295f}.proof h2{margin-top:14px;font-size:52px;line-height:1;letter-spacing:0;text-transform:uppercase}.proof p{margin-top:18px;color:#595f66;font-size:17px;line-height:1.75}.proof-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}.proof-list li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;min-height:58px;border-bottom:1px solid rgba(23,23,25,.14);font-weight:900;text-transform:uppercase}.proof-list span{color:#0f9f93;font-size:12px}.final-band{padding:76px 6%;background:#171719;color:#fff}.final-inner{width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:28px}.final-band h2{font-size:48px;line-height:1;letter-spacing:0;text-transform:uppercase}.final-band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.72);line-height:1.7}.domain{color:#6ee7d8;font-weight:900;text-transform:uppercase}@media(max-width:900px){.hero h1{font-size:58px}.story-stage{grid-template-columns:1fr;padding:54px 22px 138px}.story-visual{height:42vh}.story-copy h2{font-size:38px}.story-steps{left:22px;right:22px;grid-template-columns:1fr 1fr}.proof-inner,.final-inner{display:grid;grid-template-columns:1fr}.proof h2,.final-band h2{font-size:38px}}@media(max-width:560px){.hero{min-height:82vh}.hero-copy{padding:72px 22px}.hero h1{font-size:46px}.hero p,.story-copy p{font-size:16px}.story{min-height:460vh}.story-stage{height:100svh}.story-visual{height:36vh}.story-steps{grid-template-columns:1fr;bottom:18px}.story-step{min-height:48px;padding:10px}.story-step b{font-size:12px}.proof,.final-band{padding:58px 22px}}
+.story-frame{transition:none!important}
 </style>
 </head>
 <body>
@@ -859,7 +863,7 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
 </section>
 <section class="proof" id="aanpak">
 <div class="proof-inner">
-<div><div class="label">Van website naar ervaring</div><h2>Een site die zich laag voor laag ontvouwt.</h2><p>Deze versie gebruikt de bestaande website als bron, maar bouwt er een premium scrollverhaal omheen: video, beweging, tastbare details en duidelijke conversie.</p></div>
+<div><div class="label">Van website naar ervaring</div><h2>Een site die zich laag voor laag ontvouwt.</h2><p>Deze versie gebruikt de bestaande website als bron, maar bouwt er een premium scrollverhaal omheen: AI-beelden, scrollbeweging, tastbare details en duidelijke conversie.</p></div>
 <ul class="proof-list">${proofItems}</ul>
 </div>
 </section>
@@ -941,8 +945,6 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
     const steps = safeFrames.map((frame, index) => `<article class="story-step" data-scene="${index}" data-title="${escapeHtml(frame.title)}" data-copy="${escapeHtml(frame.copy)}"><span>Frame ${String(index + 1).padStart(2, '0')}</span><b>${escapeHtml(frame.title)}</b></article>`).join('');
     const proofItems = headings.map((item, index) => `<li><span>${String(index + 1).padStart(2, '0')}</span>${escapeHtml(item)}</li>`).join('');
     const storyMinHeight = Math.max(420, safeFrames.length * 92 + 120);
-    const heroVideo = job.videoReady && job.videoUri ? `<video class="hero-video" autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video>` : '';
-    const storyVideo = job.videoReady && job.videoUri ? `<video class="story-video" autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video>` : '';
     const heroImage = firstFrame.url ? `<img class="hero-image" src="${escapeHtml(firstFrame.url)}" alt="${escapeHtml(firstFrame.fileName)}">` : '';
     return `<!doctype html>
 <html lang="nl">
@@ -951,16 +953,18 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${company} - cinematic website</title>
 <style>
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;color:#171719;background:#f6f7f2}h1,h2,p{margin:0}a{color:inherit}.hero{min-height:92vh;position:relative;display:grid;align-items:end;overflow:hidden;background:#101012;color:#fff}.hero-image,.hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.hero-image{opacity:.78;filter:saturate(1.04) contrast(1.05)}.hero-video{opacity:.38;mix-blend-mode:screen;filter:saturate(1.08) contrast(1.06)}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.92),rgba(8,8,10,.55) 44%,rgba(8,8,10,.12)),linear-gradient(0deg,rgba(8,8,10,.76),transparent 44%)}.hero-copy{position:relative;z-index:1;width:min(1040px,92%);padding:96px 6% 82px}.kicker,.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}.kicker{color:#6ee7d8}.hero h1{max-width:820px;margin-top:18px;font-family:Impact,Arial Black,Inter,sans-serif;font-size:88px;line-height:.9;letter-spacing:0;text-transform:uppercase}.hero p{max-width:720px;margin-top:24px;font-size:20px;line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.story{--story-progress:0;min-height:${storyMinHeight}vh;position:relative;background:#0f0f11;color:#fff}.story-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.18fr) minmax(360px,.72fr);gap:42px;align-items:center;padding:62px 6% 120px;background:#0f0f11}.story-stage:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 38% 42%,rgba(15,159,147,.18),transparent 34%),radial-gradient(circle at 76% 68%,rgba(183,41,95,.18),transparent 32%)}.story-stage:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(0,0,0,.08),rgba(0,0,0,.58));pointer-events:none}.story-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.12;filter:saturate(.85) contrast(1.12)}.frame-stage,.story-copy{position:relative;z-index:1}.frame-stage{height:min(680px,72vh);border-radius:8px;overflow:hidden;background:#070708;box-shadow:0 34px 110px rgba(0,0,0,.5);isolation:isolate}.frame-stage:after{content:"";position:absolute;inset:0;border:1px solid rgba(255,255,255,.12);border-radius:8px;pointer-events:none}.story-frame{position:absolute;inset:0;margin:0;opacity:0;transform:scale(1.045);transition:opacity .7s ease,transform 1.2s ease;will-change:opacity,transform}.story-frame.is-active{opacity:1;transform:scale(calc(1.018 - var(--story-progress) * .018))}.story-frame img{width:100%;height:100%;display:block;object-fit:cover}.story-copy{align-self:center;max-width:560px}.scene-count{color:#6ee7d8;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.story-copy h2{margin-top:18px;font-size:56px;line-height:.98;letter-spacing:0;text-transform:uppercase}.story-copy p{margin-top:18px;color:rgba(255,255,255,.75);font-size:18px;line-height:1.7}.story-progress{margin-top:32px;height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}.story-progress span{display:block;height:100%;width:calc(var(--story-progress) * 100%);background:linear-gradient(90deg,#b7295f,#0f9f93)}.story-steps{position:absolute;left:6%;right:6%;bottom:28px;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.story-step{min-height:70px;padding:13px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);backdrop-filter:blur(12px);opacity:.46;transition:opacity .3s ease,transform .3s ease,border-color .3s ease}.story-step span{display:block;color:#6ee7d8;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.story-step b{display:block;margin-top:7px;font-size:12px;line-height:1.25;text-transform:uppercase}.story-step.is-active{opacity:1;transform:translateY(-6px);border-color:rgba(110,231,216,.48)}.proof{padding:88px 6%;background:#f6f7f2;color:#171719}.proof-inner{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:56px;align-items:start}.label{color:#b7295f}.proof h2{margin-top:14px;font-size:52px;line-height:1;letter-spacing:0;text-transform:uppercase}.proof p{margin-top:18px;color:#595f66;font-size:17px;line-height:1.75}.proof-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}.proof-list li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;min-height:58px;border-bottom:1px solid rgba(23,23,25,.14);font-weight:900;text-transform:uppercase}.proof-list span{color:#0f9f93;font-size:12px}.final-band{padding:76px 6%;background:#171719;color:#fff}.final-inner{width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:28px}.final-band h2{font-size:48px;line-height:1;letter-spacing:0;text-transform:uppercase}.final-band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.72);line-height:1.7}.domain{color:#6ee7d8;font-weight:900;text-transform:uppercase}@media(max-width:900px){.hero h1{font-size:58px}.story-stage{grid-template-columns:1fr;padding:42px 22px 150px}.frame-stage{height:44vh}.story-copy h2{font-size:38px}.story-steps{left:22px;right:22px;grid-template-columns:1fr 1fr}.proof-inner,.final-inner{display:grid;grid-template-columns:1fr}.proof h2,.final-band h2{font-size:38px}}@media(max-width:560px){.hero{min-height:82vh}.hero-copy{padding:72px 22px}.hero h1{font-size:46px}.hero p,.story-copy p{font-size:16px}.story-stage{height:100svh}.frame-stage{height:36vh}.story-steps{grid-template-columns:1fr;bottom:18px}.story-step{min-height:46px;padding:10px}.story-step b{font-size:12px}.proof,.final-band{padding:58px 22px}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;color:#171719;background:#f6f7f2}h1,h2,p{margin:0}a{color:inherit}.hero{min-height:92vh;position:relative;display:grid;align-items:end;overflow:hidden;background:#101012;color:#fff}.hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.78;filter:saturate(1.04) contrast(1.05)}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.92),rgba(8,8,10,.55) 44%,rgba(8,8,10,.12)),linear-gradient(0deg,rgba(8,8,10,.76),transparent 44%)}.hero-copy{position:relative;z-index:1;width:min(1040px,92%);padding:96px 6% 82px}.kicker,.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}.kicker{color:#6ee7d8}.hero h1{max-width:820px;margin-top:18px;font-family:Impact,Arial Black,Inter,sans-serif;font-size:88px;line-height:.9;letter-spacing:0;text-transform:uppercase}.hero p{max-width:720px;margin-top:24px;font-size:20px;line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.story{--story-progress:0;min-height:${storyMinHeight}vh;position:relative;background:#0f0f11;color:#fff}.story-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.18fr) minmax(360px,.72fr);gap:42px;align-items:center;padding:62px 6% 120px;background:#0f0f11}.story-stage:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 38% 42%,rgba(15,159,147,.18),transparent 34%),radial-gradient(circle at 76% 68%,rgba(183,41,95,.18),transparent 32%)}.story-stage:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(0,0,0,.08),rgba(0,0,0,.58));pointer-events:none}.frame-stage,.story-copy{position:relative;z-index:1}.frame-stage{height:min(680px,72vh);border-radius:8px;overflow:hidden;background:#070708;box-shadow:0 34px 110px rgba(0,0,0,.5);isolation:isolate}.frame-stage:after{content:"";position:absolute;inset:0;border:1px solid rgba(255,255,255,.12);border-radius:8px;pointer-events:none}.story-frame{position:absolute;inset:0;margin:0;opacity:0;transform:scale(1.045);transition:opacity .7s ease,transform 1.2s ease;will-change:opacity,transform}.story-frame.is-active{opacity:1;transform:scale(calc(1.018 - var(--story-progress) * .018))}.story-frame img{width:100%;height:100%;display:block;object-fit:cover}.story-copy{align-self:center;max-width:560px}.scene-count{color:#6ee7d8;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.story-copy h2{margin-top:18px;font-size:56px;line-height:.98;letter-spacing:0;text-transform:uppercase}.story-copy p{margin-top:18px;color:rgba(255,255,255,.75);font-size:18px;line-height:1.7}.story-progress{margin-top:32px;height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}.story-progress span{display:block;height:100%;width:calc(var(--story-progress) * 100%);background:linear-gradient(90deg,#b7295f,#0f9f93)}.story-steps{position:absolute;left:6%;right:6%;bottom:28px;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.story-step{min-height:70px;padding:13px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);backdrop-filter:blur(12px);opacity:.46;transition:opacity .3s ease,transform .3s ease,border-color .3s ease}.story-step span{display:block;color:#6ee7d8;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.story-step b{display:block;margin-top:7px;font-size:12px;line-height:1.25;text-transform:uppercase}.story-step.is-active{opacity:1;transform:translateY(-6px);border-color:rgba(110,231,216,.48)}.proof{padding:88px 6%;background:#f6f7f2;color:#171719}.proof-inner{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:56px;align-items:start}.label{color:#b7295f}.proof h2{margin-top:14px;font-size:52px;line-height:1;letter-spacing:0;text-transform:uppercase}.proof p{margin-top:18px;color:#595f66;font-size:17px;line-height:1.75}.proof-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}.proof-list li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;min-height:58px;border-bottom:1px solid rgba(23,23,25,.14);font-weight:900;text-transform:uppercase}.proof-list span{color:#0f9f93;font-size:12px}.final-band{padding:76px 6%;background:#171719;color:#fff}.final-inner{width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:28px}.final-band h2{font-size:48px;line-height:1;letter-spacing:0;text-transform:uppercase}.final-band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.72);line-height:1.7}.domain{color:#6ee7d8;font-weight:900;text-transform:uppercase}@media(max-width:900px){.hero h1{font-size:58px}.story-stage{grid-template-columns:1fr;padding:42px 22px 150px}.frame-stage{height:44vh}.story-copy h2{font-size:38px}.story-steps{left:22px;right:22px;grid-template-columns:1fr 1fr}.proof-inner,.final-inner{display:grid;grid-template-columns:1fr}.proof h2,.final-band h2{font-size:38px}}@media(max-width:560px){.hero{min-height:82vh}.hero-copy{padding:72px 22px}.hero h1{font-size:46px}.hero p,.story-copy p{font-size:16px}.story-stage{height:100svh}.frame-stage{height:36vh}.story-steps{grid-template-columns:1fr;bottom:18px}.story-step{min-height:46px;padding:10px}.story-step b{font-size:12px}.proof,.final-band{padding:58px 22px}}
+</style>
+<style>
+.story-frame{transition:none!important}.story-frame[data-scrubbed="true"]{transition:none!important}.story-frame img{user-select:none}
 </style>
 </head>
 <body>
 <main>
 <section class="hero">
 ${heroImage}
-${heroVideo}
 <div class="hero-copy">
-<div class="kicker">${domain || 'Premium webdesign'} / ${escapeHtml(motif.label)} / GPT Image 2 sequence</div>
+<div class="kicker">${domain || 'Premium webdesign'} / ${escapeHtml(motif.label)} / scroll-scrub sequence</div>
 <h1>${company}</h1>
 <p>${description}</p>
 <div class="cta-row"><a class="cta primary" href="#contact">Plan kennismaking</a><a class="cta secondary" href="#scrollfilm">Start de scrollfilm</a></div>
@@ -968,7 +972,6 @@ ${heroVideo}
 </section>
 <section class="story" id="scrollfilm" data-cinematic-scroll-story data-active="0">
 <div class="story-stage">
-${storyVideo}
 <div class="frame-stage" aria-label="GPT Image 2 cinematic frames">
 ${frameFigures}
 </div>
@@ -1005,17 +1008,29 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
   var copy=story.querySelector('[data-scene-copy]');
   var ticking=false;
   function clamp(value,min,max){return Math.max(min,Math.min(max,value));}
+  function setFrameVisual(frame,index,frameProgress){
+    var distance=Math.abs(frameProgress-index);
+    var opacity=clamp(1-distance,0,1);
+    var focus=1-clamp(distance,0,1);
+    var scale=1.035-(focus*.022);
+    frame.dataset.scrubbed='true';
+    frame.style.opacity=String(opacity);
+    frame.style.transform='scale('+scale.toFixed(4)+')';
+    frame.classList.toggle('is-active',opacity>.5);
+    frame.setAttribute('aria-hidden',opacity>.08?'false':'true');
+  }
   function render(){
     ticking=false;
     var rect=story.getBoundingClientRect();
     var max=Math.max(1,rect.height-window.innerHeight);
     var progress=clamp(-rect.top/max,0,1);
     var total=Math.max(1,steps.length||frames.length);
-    var active=Math.min(total-1,Math.floor(progress*total));
+    var frameProgress=total>1?progress*(total-1):0;
+    var active=Math.min(total-1,Math.round(frameProgress));
     var step=steps[active];
     story.dataset.active=String(active);
     story.style.setProperty('--story-progress',progress.toFixed(4));
-    frames.forEach(function(frame,index){frame.classList.toggle('is-active',index===active);});
+    frames.forEach(function(frame,index){setFrameVisual(frame,index,frameProgress);});
     steps.forEach(function(item,index){item.classList.toggle('is-active',index===active);});
     if(step){
       if(count)count.textContent='Frame '+String(active+1).padStart(2,'0');
@@ -1056,14 +1071,24 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
           job.imagePrompt = generated?.prompt || '';
           job.imageModel = generated?.model || '';
           await persistCinematicFrames(job, images, generated?.scenes || []);
-          setStage(job, 'video', 58);
-          const submitted = await (submitVeoVideo || defaultSubmitVeo)(job, images);
-          job.videoOperationName = submitted.operationName;
-          job.rawVideoOperation = submitted.raw || null;
-          job.nextPollAt = now() + VEO_POLL_INTERVAL_MS;
-          setStage(job, 'video', 68);
-          await persistJob(job);
-          return job;
+          if (!USE_VEO) {
+            job.videoOperationName = '';
+            job.rawVideoOperation = null;
+            job.videoUri = '';
+            job.videoReady = false;
+            job.nextPollAt = null;
+            setStage(job, 'site', 86);
+            await persistJob(job);
+          } else {
+            setStage(job, 'video', 58);
+            const submitted = await (submitVeoVideo || defaultSubmitVeo)(job, images);
+            job.videoOperationName = submitted.operationName;
+            job.rawVideoOperation = submitted.raw || null;
+            job.nextPollAt = now() + VEO_POLL_INTERVAL_MS;
+            setStage(job, 'video', 68);
+            await persistJob(job);
+            return job;
+          }
         }
         if (job.stage === 'video') {
           if (job.nextPollAt && now() < job.nextPollAt && !job.videoReady) return job;
