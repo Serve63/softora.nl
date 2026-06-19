@@ -1,3 +1,5 @@
+const { Readable } = require('node:stream');
+
 const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
@@ -535,6 +537,11 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       if (!response.ok) return res.status(response.status || 502).json({ ok: false, error: 'Video downloaden mislukt' });
       res.setHeader('Content-Type', response.headers.get('content-type') || 'video/mp4');
       res.setHeader('Cache-Control', 'private, max-age=300');
+      if (response.body && typeof Readable.fromWeb === 'function' && typeof res.write === 'function') {
+        res.status(200);
+        await pipeReadableToResponse(Readable.fromWeb(response.body), res);
+        return null;
+      }
       return res.status(200).send(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
       if (typeof logger.warn === 'function') logger.warn('[PremiumDatabaseCinematicJobs][video]', error?.message || error);
@@ -542,6 +549,21 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     }
   }
   return { startJob, getJob, getProviderStatus, startJobResponse, configResponse, getJobResponse, getVideoResponse };
+}
+
+function pipeReadableToResponse(readable, res) {
+  return (async () => {
+    for await (const chunk of readable) {
+      const canContinue = res.write(chunk);
+      if (canContinue === false && typeof res.once === 'function') {
+        await new Promise((resolve, reject) => {
+          res.once('drain', resolve);
+          res.once('error', reject);
+        });
+      }
+    }
+    if (typeof res.end === 'function') res.end();
+  })();
 }
 
 function createFetchJsonWithTimeout() {

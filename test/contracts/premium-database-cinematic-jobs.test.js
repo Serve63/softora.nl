@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { Readable } = require('node:stream');
 
 const {
   createPremiumDatabaseCinematicJobsCoordinator,
@@ -14,7 +15,10 @@ function createResponseRecorder() {
   return {
     statusCode: null,
     body: null,
+    chunks: [],
+    ended: false,
     headers: {},
+    events: {},
     status(code) {
       this.statusCode = code;
       return this;
@@ -28,6 +32,21 @@ function createResponseRecorder() {
     },
     send(payload) {
       this.body = payload;
+      return this;
+    },
+    write(payload) {
+      this.chunks.push(Buffer.isBuffer(payload) ? payload : Buffer.from(payload));
+      return true;
+    },
+    end(payload) {
+      if (payload) this.write(payload);
+      this.ended = true;
+      this.body = Buffer.concat(this.chunks);
+      if (typeof this.events.finish === 'function') this.events.finish();
+      return this;
+    },
+    on(event, handler) {
+      this.events[event] = handler;
       return this;
     },
   };
@@ -336,6 +355,7 @@ test('premium database cinematic coordinator downloadt relatieve Veo video-uri v
   let downloadUrl = '';
   let downloadApiKey = '';
   const originalFetch = global.fetch;
+  let arrayBufferCalled = false;
   global.fetch = async (url, options = {}) => {
     downloadUrl = String(url || '');
     downloadApiKey = String(options.headers && options.headers['x-goog-api-key'] || '');
@@ -343,7 +363,11 @@ test('premium database cinematic coordinator downloadt relatieve Veo video-uri v
       ok: true,
       status: 200,
       headers: { get: (name) => (String(name).toLowerCase() === 'content-type' ? 'video/mp4' : '') },
-      arrayBuffer: async () => Buffer.from('video-bytes').buffer,
+      body: Readable.toWeb(Readable.from([Buffer.from('video-bytes')])),
+      arrayBuffer: async () => {
+        arrayBufferCalled = true;
+        return Buffer.from('video-bytes').buffer;
+      },
     };
   };
   try {
@@ -398,6 +422,10 @@ test('premium database cinematic coordinator downloadt relatieve Veo video-uri v
     assert.equal(downloadApiKey, 'gemini-key');
     assert.equal(videoResponse.statusCode, 200);
     assert.equal(videoResponse.headers['Content-Type'], 'video/mp4');
+    assert.equal(arrayBufferCalled, false);
+    assert.equal(videoResponse.ended, true);
+    assert.equal(Buffer.isBuffer(videoResponse.body), true);
+    assert.equal(videoResponse.body.toString('utf8'), 'video-bytes');
   } finally {
     global.fetch = originalFetch;
   }
