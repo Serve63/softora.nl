@@ -6,6 +6,9 @@ const { createWebsitePreviewBatchCoordinator } = require('./website-preview-batc
 const {
   createPremiumDatabaseWebdesignJobsCoordinator,
 } = require('./premium-database-webdesign-jobs');
+const {
+  createPremiumDatabaseCinematicJobsCoordinator,
+} = require('./premium-database-cinematic-jobs');
 const { createMailboxService } = require('./mailbox');
 const { createPublicContactService } = require('./public-contact');
 const {
@@ -42,6 +45,18 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     setUiStateValues: featureRouteOptions.setUiStateValues,
     dataOpsStore: featureRouteOptions.dataOpsStore,
   });
+  const premiumDatabaseCinematicJobsCoordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    logger: aiDashboardOptions.logger || console,
+    normalizeString: aiDashboardOptions.normalizeString,
+    truncateText: aiDashboardOptions.truncateText,
+    fetchWebsitePreviewScanFromUrl: aiDashboardOptions.fetchWebsitePreviewScanFromUrl,
+    fetchJsonWithTimeout: aiDashboardOptions.fetchJsonWithTimeout,
+    getOpenAiApiKey: aiDashboardOptions.getOpenAiApiKey,
+    openAiApiBaseUrl: aiDashboardOptions.openAiApiBaseUrl,
+    openAiImageModel: aiDashboardOptions.openAiImageModel,
+    getUiStateValues: featureRouteOptions.getUiStateValues,
+    setUiStateValues: featureRouteOptions.setUiStateValues,
+  });
   const coldmailCampaignService =
     featureRouteOptions.coldmailing && featureRouteOptions.coldmailing.coldmailCampaignService;
   if (
@@ -64,6 +79,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
       activeOrdersCoordinator,
       websitePreviewBatchCoordinator,
       premiumDatabaseWebdesignJobsCoordinator,
+      premiumDatabaseCinematicJobsCoordinator,
       mailboxCoordinator,
       publicContactCoordinator,
     })

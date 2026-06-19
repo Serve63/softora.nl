@@ -13,6 +13,9 @@ const {
   registerPremiumDatabaseWebdesignJobRoutes,
 } = require('../routes/premium-database-webdesign-jobs');
 const {
+  registerPremiumDatabaseCinematicJobRoutes,
+} = require('../routes/premium-database-cinematic-jobs');
+const {
   registerPublicWebdesignPreviewRoutes,
 } = require('../routes/public-webdesign-preview');
 const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
@@ -54,6 +57,7 @@ function registerFeatureRoutes(app, deps = {}) {
     websitePreviewLibraryCoordinator,
     websitePreviewBatchCoordinator = null,
     premiumDatabaseWebdesignJobsCoordinator = null,
+    premiumDatabaseCinematicJobsCoordinator = null,
     openAiCostSummary = null,
     supabaseCostSummary = null,
     supabaseMaintenance = null,
@@ -124,6 +128,10 @@ function registerFeatureRoutes(app, deps = {}) {
   registerPremiumDatabaseWebdesignJobRoutes(app, {
     coordinator: premiumDatabaseWebdesignJobsCoordinator,
     cronSecret: mailboxCronSecret,
+    requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
+  });
+  registerPremiumDatabaseCinematicJobRoutes(app, {
+    coordinator: premiumDatabaseCinematicJobsCoordinator,
     requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
   });
   registerPublicWebdesignPreviewRoutes(app, {
