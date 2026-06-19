@@ -79,6 +79,7 @@ test('premium database cinematic job routes expose start, status and video endpo
     ['POST', '/api/premium-database/cinematic-jobs'],
     ['GET', '/api/premium-database/cinematic-jobs/config'],
     ['GET', '/api/premium-database/cinematic-jobs/:jobId/video'],
+    ['GET', '/api/premium-database/cinematic-jobs/:jobId/frame/:frameIndex'],
     ['GET', '/api/premium-database/cinematic-jobs/:jobId'],
   ]);
 });
@@ -88,6 +89,7 @@ test('premium database cinematic routes require premium api access', async () =>
   let configHandlers = null;
   let statusHandlers = null;
   let videoHandlers = null;
+  let frameHandlers = null;
   let accessCalls = 0;
   const app = {
     post(pathname, ...handlers) {
@@ -96,6 +98,7 @@ test('premium database cinematic routes require premium api access', async () =>
     get(pathname, ...handlers) {
       if (pathname === '/api/premium-database/cinematic-jobs/config') configHandlers = handlers;
       if (pathname === '/api/premium-database/cinematic-jobs/:jobId/video') videoHandlers = handlers;
+      if (pathname === '/api/premium-database/cinematic-jobs/:jobId/frame/:frameIndex') frameHandlers = handlers;
       if (pathname === '/api/premium-database/cinematic-jobs/:jobId') statusHandlers = handlers;
     },
   };
@@ -110,6 +113,7 @@ test('premium database cinematic routes require premium api access', async () =>
       configResponse: async (_req, res) => res.status(200).json({ ok: true }),
       getJobResponse: async (_req, res) => res.status(200).json({ ok: true }),
       getVideoResponse: async (_req, res) => res.status(200).send(Buffer.from('video')),
+      getFrameResponse: async (_req, res) => res.status(200).send(Buffer.from('frame')),
     },
   });
 
@@ -117,7 +121,8 @@ test('premium database cinematic routes require premium api access', async () =>
   assert.equal((await callRouteHandlers(configHandlers)).statusCode, 200);
   assert.equal((await callRouteHandlers(statusHandlers, { params: { jobId: 'cin_1' } })).statusCode, 200);
   assert.equal((await callRouteHandlers(videoHandlers, { params: { jobId: 'cin_1' } })).statusCode, 200);
-  assert.equal(accessCalls, 4);
+  assert.equal((await callRouteHandlers(frameHandlers, { params: { jobId: 'cin_1', frameIndex: '1' } })).statusCode, 200);
+  assert.equal(accessCalls, 5);
 });
 
 test('premium database cinematic coordinator drives scan, image, veo and site stages', async () => {
@@ -218,12 +223,18 @@ test('premium database cinematic coordinator drives scan, image, veo and site st
   assert.equal(finished.job.stage, 'done');
   assert.equal(finished.job.video.ready, true);
   assert.equal(finished.job.video.url, `/api/premium-database/cinematic-jobs/${started.job.id}/video`);
+  assert.equal(finished.job.frameCount, 2);
+  assert.equal(finished.job.frames[0].url, `/api/premium-database/cinematic-jobs/${started.job.id}/frame/1`);
   assert.match(finished.job.result.html, /Example BV/);
-  assert.match(finished.job.result.html, /<video autoplay muted loop playsinline/);
+  assert.match(finished.job.result.html, /<video class="hero-video" autoplay muted loop playsinline/);
   assert.match(finished.job.result.html, /data-cinematic-scroll-story/);
+  assert.match(finished.job.result.html, /class="story-frame is-active"/);
   assert.match(finished.job.result.html, /class="story-step"/);
   assert.match(finished.job.result.html, /requestAnimationFrame\(render\)/);
   assert.match(finished.job.result.html, /Merkfilm op scroll/);
+  assert.match(finished.job.result.html, /GPT Image 2 sequence/);
+  assert.doesNotMatch(finished.job.result.html, /cinematic-object/);
+  assert.doesNotMatch(finished.job.result.html, /object-core/);
   assert.equal(calls.polledOperation, 'operations/video-123');
 });
 
@@ -264,11 +275,52 @@ test('premium database cinematic coordinator bouwt een scrollfilm met thee-motie
   const finished = await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
 
   assert.equal(finished.job.status, 'done');
-  assert.match(finished.job.result.html, /motif-tea/);
+  assert.equal(finished.job.frameCount, 1);
   assert.match(finished.job.result.html, /Productritueel/);
   assert.match(finished.job.result.html, /Het ritueel opent/);
-  assert.match(finished.job.result.html, /hand left/);
-  assert.match(finished.job.result.html, /steam one/);
+  assert.match(finished.job.result.html, new RegExp(`/api/premium-database/cinematic-jobs/${started.job.id}/frame/1`));
+  assert.match(finished.job.result.html, /GPT Image 2 sequence/);
+  assert.doesNotMatch(finished.job.result.html, /motif-tea/);
+  assert.doesNotMatch(finished.job.result.html, /hand left/);
+  assert.doesNotMatch(finished.job.result.html, /steam one/);
+});
+
+test('premium database cinematic coordinator serveert gegenereerde image frames apart', async () => {
+  const frameBase64 = Buffer.from('frame-one').toString('base64');
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => 2500,
+    random: () => 0.49,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://frames.example/',
+      scan: { host: 'frames.example', h1: 'Frames BV' },
+    }),
+    generateCinematicImages: async () => ({
+      images: [{ mimeType: 'image/png', base64: frameBase64, title: 'Generated Frame' }],
+    }),
+    submitVeoVideo: async () => ({ operationName: 'operations/frame-video', raw: {} }),
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => ({ ok: true }),
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-frames', bedrijf: 'Frames BV', dom: 'frames.example' },
+  });
+  await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
+  const frameResponse = await callRouteHandlers([
+    (req, res) => coordinator.getFrameResponse(req, res),
+  ], {
+    premiumAuth: { email: 'serve@example.com', userId: 'user-1' },
+    params: { jobId: started.job.id, frameIndex: '1' },
+  });
+
+  assert.equal(frameResponse.statusCode, 200);
+  assert.equal(frameResponse.headers['Content-Type'], 'image/png');
+  assert.equal(Buffer.isBuffer(frameResponse.body), true);
+  assert.equal(frameResponse.body.toString('utf8'), 'frame-one');
 });
 
 test('premium database cinematic coordinator stuurt Veo een geldige image-to-video payload', async () => {
@@ -569,6 +621,55 @@ test('premium database cinematic coordinator hergebruikt bestaande site voordat 
   assert.equal(loadedFromSiteLibrary.statusCode, 200);
   assert.equal(loadedFromSiteLibrary.job.status, 'done');
   assert.equal(loadedFromSiteLibrary.job.video.url, `/api/premium-database/cinematic-jobs/${first.job.id}/video`);
+});
+
+test('premium database cinematic coordinator negeert oude cached sites zonder image sequence builder versie', async () => {
+  const ownerKey = 'serve@example.com::user-1';
+  const oldJobId = 'cin_old_cached_123';
+  const store = {
+    softora_premium_database_cinematic_jobs_v1: JSON.stringify({
+      [oldJobId]: {
+        id: oldJobId,
+        ownerKey,
+        status: 'done',
+        stage: 'done',
+        progress: 100,
+        customer: { id: 'customer-old-cache', bedrijf: 'Old Cache BV', dom: 'old-cache.example' },
+        websiteUrl: 'https://old-cache.example/',
+        result: { html: '<main class="cinematic-object">old builder</main>' },
+      },
+    }),
+    softora_premium_database_cinematic_sites_v1: JSON.stringify({
+      'serve-example-com-user-1:customer:customer-old-cache': {
+        id: oldJobId,
+        ownerKey,
+        customer: { id: 'customer-old-cache', bedrijf: 'Old Cache BV', dom: 'old-cache.example' },
+        websiteUrl: 'https://old-cache.example/',
+        result: { html: '<main class="cinematic-object">old site cache</main>' },
+      },
+    }),
+  };
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => 6200,
+    random: () => 0.62,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    getUiStateValues: async () => ({ values: store }),
+    setUiStateValues: async (_scope, values) => {
+      Object.assign(store, values);
+      return { ok: true };
+    },
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey,
+    customer: { id: 'customer-old-cache', bedrijf: 'Old Cache BV', dom: 'old-cache.example' },
+  });
+
+  assert.equal(started.statusCode, 202);
+  assert.equal(started.existing, false);
+  assert.notEqual(started.job.id, oldJobId);
+  assert.equal(started.job.stage, 'queued');
 });
 
 test('premium database cinematic coordinator hervat lopende opgeslagen job na serverwissel', async () => {

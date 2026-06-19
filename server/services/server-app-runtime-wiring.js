@@ -56,6 +56,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     openAiImageModel: aiDashboardOptions.openAiImageModel,
     getUiStateValues: featureRouteOptions.getUiStateValues,
     setUiStateValues: featureRouteOptions.setUiStateValues,
+    dataOpsStore: featureRouteOptions.dataOpsStore,
   });
   const coldmailCampaignService =
     featureRouteOptions.coldmailing && featureRouteOptions.coldmailing.coldmailCampaignService;

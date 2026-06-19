@@ -15,6 +15,9 @@ function registerPremiumDatabaseCinematicJobRoutes(app, deps = {}) {
   app.get('/api/premium-database/cinematic-jobs/:jobId/video', requirePremiumApiAccess, (req, res) =>
     coordinator.getVideoResponse(req, res)
   );
+  app.get('/api/premium-database/cinematic-jobs/:jobId/frame/:frameIndex', requirePremiumApiAccess, (req, res) =>
+    coordinator.getFrameResponse(req, res)
+  );
   app.get('/api/premium-database/cinematic-jobs/:jobId', requirePremiumApiAccess, (req, res) =>
     coordinator.getJobResponse(req, res)
   );
