@@ -305,8 +305,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY ontbreekt voor Veo 3.1'), { status: 503 });
     const first = images[0];
     if (!first?.base64) throw Object.assign(new Error('Cinematic startbeeld ontbreekt voor Veo.'), { status: 422 });
-    const referenceImages = images.slice(1, 3).map((image) => ({ image: { inlineData: { mimeType: image.mimeType || 'image/png', data: image.base64 } }, referenceType: 'asset' }));
-    const body = { instances: [{ prompt: veoPrompt(job), image: { inlineData: { mimeType: first.mimeType || 'image/png', data: first.base64 } }, ...(referenceImages.length ? { referenceImages } : {}) }], parameters: { aspectRatio: '16:9', durationSeconds: '8', personGeneration: 'allow_adult', resolution: '720p' } };
+    const body = { instances: [{ prompt: veoPrompt(job), image: { inlineData: { mimeType: first.mimeType || 'image/png', data: first.base64 } } }], parameters: { aspectRatio: '16:9', durationSeconds: '8', personGeneration: 'allow_adult', resolution: '720p' } };
     const endpoint = `${String(geminiApiBaseUrl || DEFAULT_GEMINI_API_BASE_URL).replace(/\/+$/, '')}/models/${encodeURIComponent(normalizeString(veoModel) || DEFAULT_VEO_MODEL)}:predictLongRunning`;
     const { response, data } = await fetchJsonWithTimeout(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body) }, 90000);
     if (!response?.ok) throw Object.assign(new Error(normalizeString(data?.error?.message || data?.error?.detail || data?.message) || 'Veo 3.1 starten mislukt'), { status: Number(response?.status) || 502, data });

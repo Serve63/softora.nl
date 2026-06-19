@@ -204,6 +204,47 @@ test('premium database cinematic coordinator drives scan, image, veo and site st
   assert.equal(calls.polledOperation, 'operations/video-123');
 });
 
+test('premium database cinematic coordinator stuurt Veo een geldige image-to-video payload', async () => {
+  let capturedBody = null;
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => 3000,
+    random: () => 0.51,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://veo.example/',
+      scan: { host: 'veo.example', h1: 'Veo BV' },
+    }),
+    generateCinematicImages: async () => ({
+      images: [
+        { mimeType: 'image/png', base64: 'START_FRAME' },
+        { mimeType: 'image/png', base64: 'REFERENCE_FRAME' },
+      ],
+    }),
+    fetchJsonWithTimeout: async (_url, options) => {
+      capturedBody = JSON.parse(options.body);
+      return { response: { ok: true }, data: { name: 'operations/veo-default' } };
+    },
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-veo', bedrijf: 'Veo BV', dom: 'veo.example' },
+  });
+  const advanced = await coordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: started.job.id,
+  });
+
+  assert.equal(advanced.job.stage, 'video');
+  assert.equal(capturedBody.instances[0].image.inlineData.data, 'START_FRAME');
+  assert.equal(capturedBody.instances[0].image.inlineData.mimeType, 'image/png');
+  assert.equal(capturedBody.instances[0].referenceImages, undefined);
+  assert.equal(capturedBody.parameters.durationSeconds, '8');
+  assert.equal(capturedBody.parameters.personGeneration, 'allow_adult');
+});
+
 test('premium database cinematic coordinator hergebruikt bestaande site voordat AI opnieuw draait', async () => {
   let currentTime = 2000;
   let imageCalls = 0;
