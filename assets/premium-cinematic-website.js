@@ -3,7 +3,7 @@
 
   var JOB_ENDPOINT = "/api/premium-database/cinematic-jobs";
   var POLL_INTERVAL_MS = 2600;
-  var STAGE_ORDER = ["scanning", "images", "video", "site", "done"];
+  var STAGE_ORDER = ["scanning", "images", "site", "done"];
   var pollTimer = null;
   var currentJob = null;
 
@@ -28,6 +28,18 @@
     var numeric = Number(value);
     if (!Number.isFinite(numeric)) return 0;
     return Math.max(0, Math.min(100, Math.round(numeric)));
+  }
+
+  function getPreviewFrame(job) {
+    var frames = Array.isArray(job && job.frames) ? job.frames : [];
+    for (var index = 0; index < frames.length; index += 1) {
+      var url = normalizeString(frames[index] && frames[index].url);
+      if (url) return {
+        url: url,
+        label: normalizeString(frames[index].title || frames[index].fileName)
+      };
+    }
+    return null;
   }
 
   function readLaunchInput() {
@@ -65,7 +77,7 @@
     currentJob = job;
     var progress = clampProgress(job.progress);
     var progressBar = getNode("progressBar");
-    var video = getNode("previewVideo");
+    var image = getNode("previewImage");
     var frame = getNode("previewFrame");
     var empty = getNode("previewEmpty");
     var errorBox = getNode("errorBox");
@@ -87,7 +99,7 @@
       setHidden(errorBox, false);
       setText("previewState", "Gestopt");
       setHidden(empty, false);
-      setHidden(video, true);
+      setHidden(image, true);
       setHidden(frame, true);
       return;
     }
@@ -96,29 +108,30 @@
     if (job.result && job.result.html && frame) {
       if (frame.srcdoc !== job.result.html) frame.srcdoc = job.result.html;
       setHidden(frame, false);
-      setHidden(video, true);
+      setHidden(image, true);
       setHidden(empty, true);
       setText("previewState", "Website klaar");
       return;
     }
 
-    if (job.video && job.video.ready && job.video.url && video) {
-      if (video.getAttribute("src") !== job.video.url) {
-        video.setAttribute("src", job.video.url);
-        video.load();
+    var previewFrame = getPreviewFrame(job);
+    if (previewFrame && image) {
+      if (image.getAttribute("src") !== previewFrame.url) {
+        image.setAttribute("src", previewFrame.url);
+        image.setAttribute("alt", previewFrame.label || "Cinematic frame preview");
       }
-      setHidden(video, false);
+      setHidden(image, false);
       setHidden(frame, true);
       setHidden(empty, true);
-      setText("previewState", "Video klaar");
+      setText("previewState", stage === "site" ? "Frames klaar" : "AI beeld");
       return;
     }
 
-    setHidden(video, true);
+    setHidden(image, true);
     setHidden(frame, true);
     setHidden(empty, false);
-    setText("previewState", stage === "video" ? "Renderen" : "Laden");
-    setText("previewEmptyText", stage === "video" ? "Veo is de hero-video aan het renderen." : "De eerste preview verschijnt zodra het AI-proces genoeg materiaal heeft.");
+    setText("previewState", "Laden");
+    setText("previewEmptyText", "De eerste frame-preview verschijnt zodra het AI-proces genoeg materiaal heeft.");
   }
 
   function buildStatusCopy(job) {
@@ -127,8 +140,7 @@
     if (stage === "queued") return "We zetten de opdracht klaar.";
     if (stage === "scanning") return "De website wordt gelezen zodat de nieuwe site inhoudelijk klopt.";
     if (stage === "images") return "OpenAI maakt cinematic startbeelden voor de premium richting.";
-    if (stage === "video") return "Veo 3.1 zet de beelden om naar een korte hero-video.";
-    if (stage === "site") return "De website wordt opgebouwd rond de video, propositie en conversie.";
+    if (stage === "site") return "De scrollsite wordt opgebouwd rond de AI-beelden, propositie en conversie.";
     if (stage === "done") return "De cinematic premium website staat klaar.";
     if (stage === "error") return "Het proces is gestopt.";
     return "Proces loopt.";
