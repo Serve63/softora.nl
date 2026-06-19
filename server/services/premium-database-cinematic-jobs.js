@@ -300,18 +300,62 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const company = job.customer.bedrijf || job.scan?.h1 || job.scan?.host || 'dit bedrijf';
     return `Cinematic premium website hero video for ${company}. Animate the supplied brand still into a smooth 8 second commercial website hero. Camera movement: slow dolly-in, subtle parallax, soft practical light, elegant reflections, confident premium pacing. Mood: modern, trustworthy, high-performance, made for a premium Dutch business website. No readable text overlays, no distorted logos, no unrealistic artifacts.`;
   }
+  function veoSubmitPayloadVariants(job, first) {
+    const prompt = veoPrompt(job);
+    const mimeType = first.mimeType || 'image/png';
+    const base64 = first.base64;
+    const bytesImage = { bytesBase64Encoded: base64, mimeType };
+    const sdkStyleImage = { imageBytes: base64, mimeType };
+    return [
+      {
+        label: 'bytes-full',
+        body: { instances: [{ prompt, image: bytesImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, personGeneration: 'allow_adult', resolution: '720p' } },
+      },
+      {
+        label: 'bytes-core',
+        body: { instances: [{ prompt, image: bytesImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, resolution: '720p' } },
+      },
+      {
+        label: 'bytes-minimal',
+        body: { instances: [{ prompt, image: bytesImage }] },
+      },
+      {
+        label: 'imageBytes-core',
+        body: { instances: [{ prompt, image: sdkStyleImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, resolution: '720p' } },
+      },
+    ];
+  }
+  function veoSubmitErrorMessage(data) {
+    return normalizeString(data?.error?.message || data?.error?.detail || data?.message);
+  }
+  function shouldRetryVeoSubmit(response, data) {
+    const status = Number(response?.status || 0);
+    if (![400, 422].includes(status)) return false;
+    const message = veoSubmitErrorMessage(data);
+    return /unsupported|supported usage|unknown|unrecognized|invalid|remove|value type|needs to be|inlineData|bytesBase64Encoded|imageBytes|durationSeconds|personGeneration|resolution|aspectRatio|parameters/i.test(message);
+  }
   async function defaultSubmitVeo(job, images) {
     const apiKey = normalizeString(getGeminiApiKey());
     if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY ontbreekt voor Veo 3.1'), { status: 503 });
     const first = images[0];
     if (!first?.base64) throw Object.assign(new Error('Cinematic startbeeld ontbreekt voor Veo.'), { status: 422 });
-    const body = { instances: [{ prompt: veoPrompt(job), image: { bytesBase64Encoded: first.base64, mimeType: first.mimeType || 'image/png' } }], parameters: { aspectRatio: '16:9', durationSeconds: 8, personGeneration: 'allow_adult', resolution: '720p' } };
     const endpoint = `${String(geminiApiBaseUrl || DEFAULT_GEMINI_API_BASE_URL).replace(/\/+$/, '')}/models/${encodeURIComponent(normalizeString(veoModel) || DEFAULT_VEO_MODEL)}:predictLongRunning`;
-    const { response, data } = await fetchJsonWithTimeout(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body) }, 90000);
-    if (!response?.ok) throw Object.assign(new Error(normalizeString(data?.error?.message || data?.error?.detail || data?.message) || 'Veo 3.1 starten mislukt'), { status: Number(response?.status) || 502, data });
-    const operationName = normalizeString(data?.name || data?.operation?.name || '');
-    if (!operationName) throw Object.assign(new Error('Veo 3.1 gaf geen operation name terug.'), { status: 502, data });
-    return { operationName, raw: data };
+    const variants = veoSubmitPayloadVariants(job, first);
+    let lastError = null;
+    for (let index = 0; index < variants.length; index += 1) {
+      const variant = variants[index];
+      const { response, data } = await fetchJsonWithTimeout(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(variant.body) }, 90000);
+      if (response?.ok) {
+        const operationName = normalizeString(data?.name || data?.operation?.name || '');
+        if (!operationName) throw Object.assign(new Error('Veo 3.1 gaf geen operation name terug.'), { status: 502, data });
+        return { operationName, raw: data, requestVariant: variant.label };
+      }
+      const message = veoSubmitErrorMessage(data) || 'Veo 3.1 starten mislukt';
+      lastError = Object.assign(new Error(message), { status: Number(response?.status) || 502, data });
+      if (index >= variants.length - 1 || !shouldRetryVeoSubmit(response, data)) throw lastError;
+      if (typeof logger.warn === 'function') logger.warn(`[PremiumDatabaseCinematicJobs][submit-retry] ${variant.label}`, message);
+    }
+    throw lastError || Object.assign(new Error('Veo 3.1 starten mislukt'), { status: 502 });
   }
   function extractVideoUri(operation) {
     const response = operation?.response || {};
