@@ -197,6 +197,95 @@ test('premium database cinematic coordinator drives scan, image, veo and site st
   assert.equal(calls.polledOperation, 'operations/video-123');
 });
 
+test('premium database cinematic coordinator hergebruikt bestaande site voordat AI opnieuw draait', async () => {
+  let currentTime = 2000;
+  let imageCalls = 0;
+  const store = {};
+  const sharedDeps = {
+    now: () => currentTime,
+    random: () => 0.33,
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://cached.example/',
+      scan: {
+        host: 'cached.example',
+        h1: 'Cached BV',
+        headings: ['Premium'],
+      },
+    }),
+    submitVeoVideo: async () => ({ operationName: 'operations/cached-video', raw: {} }),
+    pollVeoOperation: async () => ({
+      done: true,
+      videoUri: 'https://video.example/cached.mp4',
+      raw: { done: true },
+    }),
+    getUiStateValues: async () => ({ values: store }),
+    setUiStateValues: async (_scope, values) => {
+      Object.assign(store, values);
+      return { ok: true };
+    },
+  };
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    ...sharedDeps,
+    generateCinematicImages: async () => {
+      imageCalls += 1;
+      return {
+        images: [{ mimeType: 'image/png', base64: 'AAA' }],
+      };
+    },
+  });
+
+  const first = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: {
+      id: 'customer-cached',
+      bedrijf: 'Cached BV',
+      dom: 'cached.example',
+    },
+  });
+  currentTime += 1000;
+  await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: first.job.id });
+  currentTime += 11000;
+  const finished = await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: first.job.id });
+
+  assert.equal(finished.job.status, 'done');
+  assert.equal(imageCalls, 1);
+  assert.match(store.softora_premium_database_cinematic_sites_v1, /customer-cached/);
+
+  const reusedCoordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    ...sharedDeps,
+    generateCinematicImages: async () => {
+      throw new Error('AI hoort niet opnieuw te starten');
+    },
+  });
+  store.softora_premium_database_cinematic_jobs_v1 = '{}';
+
+  const reused = await reusedCoordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: {
+      id: 'customer-cached',
+      bedrijf: 'Cached BV',
+      dom: 'cached.example',
+    },
+  });
+
+  assert.equal(reused.statusCode, 200);
+  assert.equal(reused.existing, true);
+  assert.equal(reused.cached, true);
+  assert.equal(reused.job.status, 'done');
+  assert.equal(reused.job.cachedSite, true);
+  assert.equal(reused.job.result.html, finished.job.result.html);
+
+  const loadedFromSiteLibrary = await reusedCoordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: first.job.id,
+  });
+
+  assert.equal(loadedFromSiteLibrary.statusCode, 200);
+  assert.equal(loadedFromSiteLibrary.job.status, 'done');
+  assert.equal(loadedFromSiteLibrary.job.video.url, `/api/premium-database/cinematic-jobs/${first.job.id}/video`);
+});
+
 test('premium cinematic website page starts the cinematic job flow', () => {
   const root = path.join(__dirname, '../..');
   const pageSource = fs.readFileSync(path.join(root, 'premium-cinematic-website.html'), 'utf8');
@@ -207,5 +296,6 @@ test('premium cinematic website page starts the cinematic job flow', () => {
   assert.match(scriptSource, /var JOB_ENDPOINT = "\/api\/premium-database\/cinematic-jobs";/);
   assert.match(scriptSource, /new URLSearchParams\(global\.location\.search \|\| ""\)/);
   assert.match(scriptSource, /method: "POST"/);
+  assert.match(scriptSource, /data\.job\.status !== "done"/);
   assert.match(scriptSource, /JOB_ENDPOINT \+ "\/" \+ encodeURIComponent\(currentJob\.id\)/);
 });

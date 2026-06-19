@@ -75,7 +75,7 @@
 
     setText("companyTitle", company);
     setText("companyMeta", host || normalizeString(job.websiteUrl) || "Website wordt voorbereid.");
-    setText("jobPill", normalizeString(job.id) || "Nieuwe opdracht");
+    setText("jobPill", job.cachedSite ? "Bestaande cinematic site" : normalizeString(job.id) || "Nieuwe opdracht");
     setText("stageLabel", normalizeString(job.stageLabel) || "Proces loopt");
     setText("progressLabel", progress + "%");
     setText("statusCopy", buildStatusCopy(job));
@@ -123,6 +123,7 @@
 
   function buildStatusCopy(job) {
     var stage = normalizeString(job.stage);
+    if (job.cachedSite) return "Dit bedrijf had al een cinematic website. We laden het bestaande resultaat direct.";
     if (stage === "queued") return "We zetten de opdracht klaar.";
     if (stage === "scanning") return "De website wordt gelezen zodat de nieuwe site inhoudelijk klopt.";
     if (stage === "images") return "OpenAI maakt cinematic startbeelden voor de premium richting.";
@@ -167,7 +168,9 @@
     });
     var data = await readJsonResponse(response);
     renderJob(data.job);
-    schedulePoll(650);
+    if (data.job && data.job.status !== "done" && data.job.status !== "error") {
+      schedulePoll(650);
+    }
   }
 
   async function pollJob() {
