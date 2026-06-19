@@ -522,6 +522,75 @@ test('premium database cinematic coordinator hergebruikt bestaande site voordat 
   assert.equal(loadedFromSiteLibrary.job.video.url, `/api/premium-database/cinematic-jobs/${first.job.id}/video`);
 });
 
+test('premium database cinematic coordinator hervat lopende opgeslagen job na serverwissel', async () => {
+  let currentTime = 7000;
+  let imageCalls = 0;
+  const store = {};
+  const sharedDeps = {
+    now: () => currentTime,
+    random: () => 0.61,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    getUiStateValues: async () => ({ values: store }),
+    setUiStateValues: async (_scope, values) => {
+      Object.assign(store, values);
+      return { ok: true };
+    },
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://resume.example/',
+      scan: { host: 'resume.example', h1: 'Resume BV' },
+    }),
+    generateCinematicImages: async () => {
+      imageCalls += 1;
+      return { images: [{ mimeType: 'image/png', base64: 'START_FRAME' }] };
+    },
+    submitVeoVideo: async () => ({ operationName: 'operations/resume-video', raw: {} }),
+  };
+  const firstCoordinator = createPremiumDatabaseCinematicJobsCoordinator(sharedDeps);
+  const started = await firstCoordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-resume', bedrijf: 'Resume BV', dom: 'resume.example' },
+  });
+  await firstCoordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
+
+  assert.equal(imageCalls, 1);
+  assert.match(store.softora_premium_database_cinematic_jobs_v1, /operations\/resume-video/);
+
+  const resumedCoordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    ...sharedDeps,
+    generateCinematicImages: async () => {
+      throw new Error('AI hoort niet opnieuw te starten voor dezelfde lopende job');
+    },
+    pollVeoOperation: async (job) => ({
+      done: true,
+      videoUri: 'https://video.example/resumed.mp4',
+      raw: { polledOperation: job.videoOperationName },
+    }),
+  });
+  const resumedStart = await resumedCoordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-resume', bedrijf: 'Resume BV', dom: 'resume.example' },
+  });
+
+  assert.equal(resumedStart.statusCode, 202);
+  assert.equal(resumedStart.existing, true);
+  assert.equal(resumedStart.job.id, started.job.id);
+  assert.equal(resumedStart.job.stage, 'video');
+
+  currentTime += 11000;
+  const finished = await resumedCoordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: started.job.id,
+  });
+
+  assert.equal(finished.statusCode, 200);
+  assert.equal(finished.job.status, 'done');
+  assert.equal(finished.job.video.ready, true);
+  assert.match(finished.job.result.html, /Resume BV/);
+  assert.equal(imageCalls, 1);
+});
+
 test('premium database cinematic API stopt nieuwe jobs wanneer provider-config ontbreekt', async () => {
   let imageCalls = 0;
   const coordinator = createPremiumDatabaseCinematicJobsCoordinator({

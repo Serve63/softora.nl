@@ -247,6 +247,18 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     }
     return null;
   }
+  async function findStoredActiveJob(ownerKey, customer, websiteUrl) {
+    const candidates = Object.values(await readMap(JOB_KEY))
+      .map((record) => hydrateJob(record))
+      .filter((job) => {
+        if (!job || job.ownerKey !== ownerKey || job.status === 'error') return false;
+        return job.customer?.id === customer.id || job.websiteUrl === websiteUrl;
+      })
+      .sort((left, right) => Number(right.updatedAt || right.createdAt || 0) - Number(left.updatedAt || left.createdAt || 0));
+    const job = candidates[0] || null;
+    if (job) jobs.set(job.id, job);
+    return job;
+  }
   async function loadJob(jobId) {
     const id = normalizeJobId(jobId);
     if (!id) return null;
@@ -483,6 +495,13 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       if (existing.customer?.id !== customer.id && existing.websiteUrl !== websiteUrl) continue;
       if (existing.status === 'done' && existing.result?.html) return { ok: true, statusCode: 200, existing: true, cached: true, job: serializeJob(existing) };
       if (existing.status !== 'error') return { ok: true, statusCode: 202, existing: true, job: serializeJob(existing) };
+    }
+    const storedActiveJob = await findStoredActiveJob(ownerKey, customer, websiteUrl);
+    if (storedActiveJob) {
+      if (storedActiveJob.status === 'done' && storedActiveJob.result?.html) {
+        return { ok: true, statusCode: 200, existing: true, cached: true, job: serializeJob(storedActiveJob) };
+      }
+      return { ok: true, statusCode: 202, existing: true, job: serializeJob(storedActiveJob) };
     }
     const completedSite = await findCompletedSite(ownerKey, customer, websiteUrl);
     if (completedSite) return { ok: true, statusCode: 200, existing: true, cached: true, job: serializeJob(completedSite) };
