@@ -296,7 +296,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const headings = Array.isArray(scan.headings) ? scan.headings.slice(0, 6).join(', ') : '';
     const paragraphs = Array.isArray(scan.paragraphs) ? scan.paragraphs.slice(0, 4).join(' ') : '';
     const palette = Array.isArray(scan.brandPalette) && scan.brandPalette.length ? scan.brandPalette.join(', ') : 'deep crimson accents, warm white space, refined black typography, one fresh teal highlight';
-    return [`Create ${IMAGE_COUNT} cinematic still frames for a premium website for ${company}.`, 'The images are not screenshots. They are high-end brand visuals that will be animated into a website hero video.', 'Style: cinematic commercial direction, premium service business, confident lighting, clean composition, realistic materials, expensive but not flashy.', `Brand palette hints: ${palette}.`, headings ? `Website themes: ${headings}.` : '', paragraphs ? `Business context: ${paragraphs}` : '', 'Avoid readable text in the image. Avoid logos unless they are abstract. Keep space for web copy overlays.', 'Return crisp 16:9 frames with strong depth, natural detail, and a polished premium website mood.'].filter(Boolean).join('\n');
+    return [`Create ${IMAGE_COUNT} cinematic still frames for a premium scroll-driven website for ${company}.`, 'The images are not screenshots. They are high-end brand visuals that become the first act of a scroll film.', 'Think in physical scenes: an object opens, a detail is revealed, hands or motion enter the frame, then the website assembles into a premium conversion moment.', 'Style: cinematic commercial direction, premium service business, confident lighting, clean composition, realistic materials, expensive but not flashy.', `Brand palette hints: ${palette}.`, headings ? `Website themes: ${headings}.` : '', paragraphs ? `Business context: ${paragraphs}` : '', 'Avoid readable text in the image. Avoid logos unless they are abstract. Leave negative space for web copy overlays and scroll-triggered interface layers.', 'Return crisp 16:9 frames with strong depth, natural detail, and a polished premium website mood.'].filter(Boolean).join('\n');
   }
   async function defaultGenerateImages(job) {
     const apiKey = normalizeString(getOpenAiApiKey());
@@ -312,7 +312,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
   }
   function veoPrompt(job) {
     const company = job.customer.bedrijf || job.scan?.h1 || job.scan?.host || 'dit bedrijf';
-    return `Cinematic premium website hero video for ${company}. Animate the supplied brand still into a smooth 8 second commercial website hero. Camera movement: slow dolly-in, subtle parallax, soft practical light, elegant reflections, confident premium pacing. Mood: modern, trustworthy, high-performance, made for a premium Dutch business website. No readable text overlays, no distorted logos, no unrealistic artifacts.`;
+    return `Cinematic premium website scroll-film for ${company}. Animate the supplied brand still into a smooth 8 second commercial sequence that feels like the first act of an interactive website: slow dolly-in, subtle parallax, a reveal of a tactile detail, elegant light movement, premium pacing. Mood: modern, trustworthy, high-performance, made for a premium Dutch business website. No readable text overlays, no distorted logos, no unrealistic artifacts.`;
   }
   function veoSubmitPayloadVariants(job, first) {
     const prompt = veoPrompt(job);
@@ -403,13 +403,152 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     return { done: true, videoUri, raw: data };
   }
 
+  function scrollMotif(job) {
+    const scan = job.scan || {};
+    const text = [
+      job.customer?.bedrijf,
+      job.customer?.dom,
+      scan.host,
+      scan.title,
+      scan.metaDescription,
+      scan.h1,
+      Array.isArray(scan.headings) ? scan.headings.join(' ') : '',
+      Array.isArray(scan.paragraphs) ? scan.paragraphs.join(' ') : '',
+      scan.bodyTextSample,
+    ].join(' ').toLowerCase();
+    if (/\b(thee|tea|teashop|theezak|theezakje|kop thee|infusie|koffie|coffee|barista|horeca)\b/i.test(text)) {
+      return {
+        key: 'tea',
+        label: 'Productritueel',
+        scenes: [
+          ['Het ritueel opent', 'Een klein detail vouwt open alsof de bezoeker de eerste handeling zelf inzet.'],
+          ['Smaak komt los', 'De camera zakt naar het moment waarop warmte, geur en aandacht zichtbaar worden.'],
+          ['Handen maken het tastbaar', 'Het product voelt niet meer als aanbod, maar als ervaring die je bijna kunt aanraken.'],
+          ['Van beleving naar actie', 'De site gebruikt dat gevoel om bezoekers vanzelf richting contact of aankoop te trekken.'],
+        ],
+      };
+    }
+    if (/\b(advocaat|advocaten|juridisch|law|legal|recht|notaris|dossier|zaak)\b/i.test(text)) {
+      return {
+        key: 'legal',
+        label: 'Vertrouwen in beeld',
+        scenes: [
+          ['Het dossier opent', 'De eerste scroll voelt als een exclusief dossier dat met precisie wordt geopend.'],
+          ['Bewijs krijgt focus', 'Belangrijke argumenten schuiven naar voren zonder de rust en autoriteit te verliezen.'],
+          ['Handen brengen zekerheid', 'Het moment voelt persoonlijk: expertise wordt tastbaar in plaats van alleen verteld.'],
+          ['Van twijfel naar gesprek', 'De website leidt bezoekers naar een duidelijke volgende stap met premium vertrouwen.'],
+        ],
+      };
+    }
+    return {
+      key: 'brand',
+      label: 'Merkfilm op scroll',
+      scenes: [
+        ['Het verhaal opent', 'De eerste scroll haalt de bezoeker uit een gewone pagina en in een merkervaring.'],
+        ['De kern komt vrij', 'Belangrijke details schuiven naar voren alsof de camera door het bedrijf beweegt.'],
+        ['Het aanbod wordt tastbaar', 'Beweging, diepte en menselijke aandacht maken de waarde direct voelbaar.'],
+        ['Momentum naar contact', 'De laatste scène zet de energie om in vertrouwen, keuze en actie.'],
+      ],
+    };
+  }
+
   function defaultSiteHtml(job) {
     const company = escapeHtml(job.customer.bedrijf || job.scan?.h1 || job.scan?.host || 'Premium bedrijf');
     const domain = escapeHtml(job.scan?.host || job.customer.dom || '');
     const description = escapeHtml(job.scan?.metaDescription || job.scan?.bodyTextSample || `Een premium websiteconcept voor ${company}.`);
-    const headings = Array.isArray(job.scan?.headings) && job.scan.headings.length ? job.scan.headings.slice(0, 4) : ['Strategie', 'Design', 'Automatisering', 'Groei'];
-    const tiles = headings.map((item) => `<article class="tile"><b>${escapeHtml(item)}</b><span>Een compact onderdeel dat vertrouwen opbouwt en bezoekers richting actie beweegt.</span></article>`).join('');
-    return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${company} - cinematic website</title><style>*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;color:#161616;background:#f7f8f5}h1,h2,p{margin:0}.hero{min-height:78vh;display:grid;align-items:end;position:relative;overflow:hidden;background:#111}.hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.76}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,10,12,.88),rgba(10,10,12,.42) 48%,rgba(10,10,12,.12))}.hero-copy{position:relative;z-index:1;width:min(980px,90vw);padding:9vh 6vw;color:#fff}.kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#6ee7d8;font-weight:800}.hero h1{max-width:760px;margin-top:16px;font-size:clamp(44px,8vw,104px);line-height:.92;letter-spacing:0;text-transform:uppercase}.hero p{max-width:660px;margin-top:22px;font-size:clamp(16px,2vw,22px);line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-weight:800;letter-spacing:.03em}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.section{padding:72px 6vw}.section-inner{width:min(1180px,100%);margin:0 auto}.intro{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);gap:42px;align-items:start}.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#b7295f;font-weight:900}.intro h2{margin-top:12px;font-size:clamp(30px,5vw,58px);line-height:1.02;letter-spacing:0}.intro p{margin-top:18px;color:#555b61;font-size:17px;line-height:1.75}.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:42px}.tile{border:1px solid #dcded8;background:#fff;border-radius:8px;padding:22px;min-height:150px}.tile b{display:block;font-size:14px;text-transform:uppercase;letter-spacing:.08em}.tile span{display:block;margin-top:12px;color:#62666a;line-height:1.55}.band{background:#171717;color:#fff}.band .section-inner{display:grid;grid-template-columns:1fr auto;gap:26px;align-items:center}.band h2{font-size:clamp(28px,5vw,56px);letter-spacing:0}.band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.75);line-height:1.7}.domain{color:#6ee7d8;font-weight:900}@media(max-width:820px){.intro,.band .section-inner{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}.section{padding:52px 22px}.hero-copy{padding:72px 22px}}@media(max-width:560px){.tiles{grid-template-columns:1fr}.hero{min-height:72vh}}</style></head><body><main><section class="hero"><video autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video><div class="hero-copy"><div class="kicker">${domain || 'Premium webdesign'}</div><h1>${company}</h1><p>${description}</p><div class="cta-row"><a class="cta primary" href="#contact">Plan kennismaking</a><a class="cta secondary" href="#aanpak">Bekijk aanpak</a></div></div></section><section class="section" id="aanpak"><div class="section-inner intro"><div><div class="label">Nieuwe digitale ervaring</div><h2>Cinematic uitstraling met een website die direct verkoopt.</h2></div><p>Deze opzet gebruikt de bestaande website als bron, maar tilt de presentatie naar een premium niveau.</p></div><div class="section-inner tiles">${tiles}</div></section><section class="section band" id="contact"><div class="section-inner"><div><div class="label">Premium conversie</div><h2>Klaar om van interesse momentum te maken.</h2><p>De site voelt als een merkfilm, maar blijft strak gebouwd rond aanvragen, vertrouwen en meetbare groei.</p></div><div class="domain">${domain}</div></div></section></main></body></html>`;
+    const headings = Array.isArray(job.scan?.headings) && job.scan.headings.length ? job.scan.headings.slice(0, 4) : ['Strategie', 'Design', 'Beleving', 'Conversie'];
+    const motif = scrollMotif(job);
+    const steps = motif.scenes.map((scene, index) => `<article class="story-step" data-scene="${index}" data-title="${escapeHtml(scene[0])}" data-copy="${escapeHtml(scene[1])}"><span>Act ${String(index + 1).padStart(2, '0')}</span><b>${escapeHtml(scene[0])}</b></article>`).join('');
+    const proofItems = headings.map((item, index) => `<li><span>${String(index + 1).padStart(2, '0')}</span>${escapeHtml(item)}</li>`).join('');
+    return `<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${company} - cinematic website</title>
+<style>
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;color:#171719;background:#f6f7f2}h1,h2,p{margin:0}a{color:inherit}.hero{min-height:92vh;position:relative;display:grid;align-items:end;overflow:hidden;background:#101012;color:#fff}.hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.74;filter:saturate(1.02) contrast(1.06)}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.9),rgba(8,8,10,.46) 48%,rgba(8,8,10,.12))}.hero-copy{position:relative;z-index:1;width:min(1040px,92%);padding:96px 6% 82px}.kicker,.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}.kicker{color:#6ee7d8}.hero h1{max-width:780px;margin-top:18px;font-family:Impact,Arial Black,Inter,sans-serif;font-size:88px;line-height:.9;letter-spacing:0;text-transform:uppercase}.hero p{max-width:680px;margin-top:24px;font-size:20px;line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.story{--story-progress:0;min-height:420vh;position:relative;background:#111;color:#fff}.story-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.75fr);gap:38px;align-items:center;padding:64px 6%;background:radial-gradient(circle at 30% 45%,rgba(15,159,147,.2),transparent 34%),linear-gradient(135deg,#101012,#191719 58%,#0f1112)}.story-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;filter:saturate(.85) contrast(1.12)}.story-stage:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(0,0,0,.08),rgba(0,0,0,.48));pointer-events:none}.story-visual,.story-copy{position:relative;z-index:1}.story-visual{height:min(620px,72vh);display:grid;place-items:center}.cinematic-object{position:relative;width:min(520px,78vw);aspect-ratio:1;border-radius:50%;display:grid;place-items:center}.cinematic-object:before{content:"";position:absolute;inset:10%;border:1px solid rgba(255,255,255,.12);border-radius:50%;transform:scale(calc(.92 + var(--story-progress) * .16));opacity:.8}.object-shadow{position:absolute;bottom:12%;width:64%;height:11%;border-radius:50%;background:rgba(0,0,0,.38);filter:blur(14px);transform:scaleX(calc(.72 + var(--story-progress) * .34))}.object-core{position:absolute;width:44%;height:40%;border-radius:14px;background:linear-gradient(135deg,#f7f1e7,#d6c2a2);box-shadow:0 34px 90px rgba(0,0,0,.42);transform:translateY(24px) rotate(-7deg);transition:transform .7s ease,border-radius .7s ease}.object-lid{position:absolute;top:25%;left:28%;width:44%;height:18%;border-radius:12px 12px 4px 4px;background:linear-gradient(135deg,#fffaf2,#d7c3a0);transform-origin:50% 100%;transition:transform .7s ease}.object-detail{position:absolute;width:28%;height:28%;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(110,231,216,.12);opacity:0;transform:translateY(60px) scale(.72);transition:opacity .6s ease,transform .7s ease}.hand{position:absolute;width:34%;height:18%;border-radius:999px;background:linear-gradient(135deg,#f4cfad,#c88b64);opacity:0;filter:drop-shadow(0 18px 28px rgba(0,0,0,.26));transition:opacity .7s ease,transform .8s ease}.hand.left{left:5%;bottom:24%;transform:translateX(-90px) rotate(12deg)}.hand.right{right:5%;bottom:26%;transform:translateX(90px) rotate(-14deg)}.steam{position:absolute;top:19%;width:8px;height:76px;border-radius:999px;border-left:2px solid rgba(110,231,216,.55);opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}.steam.one{left:44%}.steam.two{left:52%;transition-delay:.06s}.steam.three{left:60%;transition-delay:.12s}.motif-tea .object-core{border-radius:0 0 48% 48%;background:linear-gradient(180deg,#f0d5aa,#b9834d)}.motif-tea .object-lid{top:20%;height:22%;background:linear-gradient(135deg,#fff6dd,#d6a256)}.motif-tea .object-detail{width:46%;height:30%;bottom:18%;border-radius:0 0 80px 80px;background:linear-gradient(180deg,#f6efe7,#c88a58)}.motif-legal .object-core{border-radius:8px;background:linear-gradient(135deg,#f3efe8,#c9b98d)}.motif-legal .object-lid{top:26%;background:linear-gradient(135deg,#e7d7ad,#9b2358)}.motif-legal .object-detail{width:42%;height:30%;border-radius:8px;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(255,255,255,.32))}.story[data-active="1"] .object-lid{transform:translateY(-54px) rotateX(68deg) rotate(-4deg)}.story[data-active="1"] .object-detail{opacity:.75;transform:translateY(18px) scale(.92)}.story[data-active="2"] .object-core{transform:translateY(40px) rotate(0deg) scale(.82)}.story[data-active="2"] .object-detail{opacity:1;transform:translateY(34px) scale(1.12)}.story[data-active="2"] .hand{opacity:1}.story[data-active="2"] .hand.left{transform:translateX(10px) rotate(5deg)}.story[data-active="2"] .hand.right{transform:translateX(-10px) rotate(-7deg)}.story[data-active="3"] .object-lid{transform:translateY(-72px) rotateX(76deg)}.story[data-active="3"] .object-detail{opacity:1;transform:translateY(10px) scale(1.28)}.story[data-active="3"] .steam{opacity:1;transform:translateY(-24px)}.story-copy{align-self:center;max-width:560px}.scene-count{color:#6ee7d8;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.story-copy h2{margin-top:18px;font-size:56px;line-height:.98;letter-spacing:0;text-transform:uppercase}.story-copy p{margin-top:18px;color:rgba(255,255,255,.75);font-size:18px;line-height:1.7}.story-progress{margin-top:32px;height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}.story-progress span{display:block;height:100%;width:calc(var(--story-progress) * 100%);background:linear-gradient(90deg,#b7295f,#0f9f93)}.story-steps{position:absolute;left:6%;right:6%;bottom:34px;z-index:2;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.story-step{min-height:74px;padding:14px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);backdrop-filter:blur(12px);opacity:.5;transition:opacity .3s ease,transform .3s ease}.story-step span{display:block;color:#6ee7d8;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.story-step b{display:block;margin-top:7px;font-size:13px;line-height:1.25;text-transform:uppercase}.story[data-active="0"] .story-step[data-scene="0"],.story[data-active="1"] .story-step[data-scene="1"],.story[data-active="2"] .story-step[data-scene="2"],.story[data-active="3"] .story-step[data-scene="3"]{opacity:1;transform:translateY(-6px);border-color:rgba(110,231,216,.48)}.proof{padding:88px 6%;background:#f6f7f2;color:#171719}.proof-inner{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:56px;align-items:start}.label{color:#b7295f}.proof h2{margin-top:14px;font-size:52px;line-height:1;letter-spacing:0;text-transform:uppercase}.proof p{margin-top:18px;color:#595f66;font-size:17px;line-height:1.75}.proof-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}.proof-list li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;min-height:58px;border-bottom:1px solid rgba(23,23,25,.14);font-weight:900;text-transform:uppercase}.proof-list span{color:#0f9f93;font-size:12px}.final-band{padding:76px 6%;background:#171719;color:#fff}.final-inner{width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:28px}.final-band h2{font-size:48px;line-height:1;letter-spacing:0;text-transform:uppercase}.final-band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.72);line-height:1.7}.domain{color:#6ee7d8;font-weight:900;text-transform:uppercase}@media(max-width:900px){.hero h1{font-size:58px}.story-stage{grid-template-columns:1fr;padding:54px 22px 138px}.story-visual{height:42vh}.story-copy h2{font-size:38px}.story-steps{left:22px;right:22px;grid-template-columns:1fr 1fr}.proof-inner,.final-inner{display:grid;grid-template-columns:1fr}.proof h2,.final-band h2{font-size:38px}}@media(max-width:560px){.hero{min-height:82vh}.hero-copy{padding:72px 22px}.hero h1{font-size:46px}.hero p,.story-copy p{font-size:16px}.story{min-height:460vh}.story-stage{height:100svh}.story-visual{height:36vh}.story-steps{grid-template-columns:1fr;bottom:18px}.story-step{min-height:48px;padding:10px}.story-step b{font-size:12px}.proof,.final-band{padding:58px 22px}}
+</style>
+</head>
+<body>
+<main>
+<section class="hero">
+<video autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video>
+<div class="hero-copy">
+<div class="kicker">${domain || 'Premium webdesign'} / ${escapeHtml(motif.label)}</div>
+<h1>${company}</h1>
+<p>${description}</p>
+<div class="cta-row"><a class="cta primary" href="#contact">Plan kennismaking</a><a class="cta secondary" href="#scrollfilm">Start de scrollfilm</a></div>
+</div>
+</section>
+<section class="story motif-${escapeHtml(motif.key)}" id="scrollfilm" data-cinematic-scroll-story data-active="0">
+<div class="story-stage">
+<video class="story-video" autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video>
+<div class="story-visual" aria-hidden="true">
+<div class="cinematic-object">
+<div class="object-shadow"></div>
+<div class="object-lid"></div>
+<div class="object-core"></div>
+<div class="object-detail"></div>
+<div class="hand left"></div><div class="hand right"></div>
+<div class="steam one"></div><div class="steam two"></div><div class="steam three"></div>
+</div>
+</div>
+<div class="story-copy" data-story-copy>
+<div class="scene-count" data-scene-count>Act 01</div>
+<h2 data-scene-title>${escapeHtml(motif.scenes[0][0])}</h2>
+<p data-scene-copy>${escapeHtml(motif.scenes[0][1])}</p>
+<div class="story-progress"><span></span></div>
+</div>
+${steps ? `<div class="story-steps">${steps}</div>` : ''}
+</div>
+</section>
+<section class="proof" id="aanpak">
+<div class="proof-inner">
+<div><div class="label">Van website naar ervaring</div><h2>Een site die zich laag voor laag ontvouwt.</h2><p>Deze versie gebruikt de bestaande website als bron, maar bouwt er een premium scrollverhaal omheen: video, beweging, tastbare details en duidelijke conversie.</p></div>
+<ul class="proof-list">${proofItems}</ul>
+</div>
+</section>
+<section class="final-band" id="contact">
+<div class="final-inner">
+<div><div class="label">Premium conversie</div><h2>Klaar om van aandacht actie te maken.</h2><p>De ervaring voelt als een merkfilm, maar blijft gebouwd rond vertrouwen, momentum en aanvragen.</p></div>
+<div class="domain">${domain}</div>
+</div>
+</section>
+</main>
+<script>
+(function(){
+  var story=document.querySelector('[data-cinematic-scroll-story]');
+  if(!story)return;
+  var steps=Array.prototype.slice.call(story.querySelectorAll('.story-step'));
+  var count=story.querySelector('[data-scene-count]');
+  var title=story.querySelector('[data-scene-title]');
+  var copy=story.querySelector('[data-scene-copy]');
+  var ticking=false;
+  function clamp(value,min,max){return Math.max(min,Math.min(max,value));}
+  function render(){
+    ticking=false;
+    var rect=story.getBoundingClientRect();
+    var max=Math.max(1,rect.height-window.innerHeight);
+    var progress=clamp(-rect.top/max,0,1);
+    var active=steps.length?Math.min(steps.length-1,Math.floor(progress*steps.length)):0;
+    var step=steps[active];
+    story.dataset.active=String(active);
+    story.style.setProperty('--story-progress',progress.toFixed(4));
+    if(step){
+      if(count)count.textContent='Act '+String(active+1).padStart(2,'0');
+      if(title)title.textContent=step.getAttribute('data-title')||'';
+      if(copy)copy.textContent=step.getAttribute('data-copy')||'';
+    }
+  }
+  function request(){if(!ticking){ticking=true;requestAnimationFrame(render);}}
+  window.addEventListener('scroll',request,{passive:true});
+  window.addEventListener('resize',request);
+  render();
+}());
+</script>
+</body>
+</html>`;
   }
 
   async function advanceJob(job) {

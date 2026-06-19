@@ -220,7 +220,55 @@ test('premium database cinematic coordinator drives scan, image, veo and site st
   assert.equal(finished.job.video.url, `/api/premium-database/cinematic-jobs/${started.job.id}/video`);
   assert.match(finished.job.result.html, /Example BV/);
   assert.match(finished.job.result.html, /<video autoplay muted loop playsinline/);
+  assert.match(finished.job.result.html, /data-cinematic-scroll-story/);
+  assert.match(finished.job.result.html, /class="story-step"/);
+  assert.match(finished.job.result.html, /requestAnimationFrame\(render\)/);
+  assert.match(finished.job.result.html, /Merkfilm op scroll/);
   assert.equal(calls.polledOperation, 'operations/video-123');
+});
+
+test('premium database cinematic coordinator bouwt een scrollfilm met thee-motief wanneer de site daarom vraagt', async () => {
+  let currentTime = 2000;
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => currentTime,
+    random: () => 0.47,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://thee.example/',
+      scan: {
+        host: 'thee.example',
+        h1: 'Thee Atelier',
+        headings: ['Losse thee', 'Theerituelen', 'Contact'],
+        paragraphs: ['Een theezakje opent en twee handen houden een warme kop thee vast.'],
+      },
+    }),
+    generateCinematicImages: async () => ({ images: [{ mimeType: 'image/png', base64: 'TEA' }] }),
+    submitVeoVideo: async () => ({ operationName: 'operations/tea-video', raw: {} }),
+    pollVeoOperation: async () => ({
+      done: true,
+      videoUri: 'https://video.example/tea.mp4',
+      raw: { done: true },
+    }),
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => ({ ok: true }),
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-tea', bedrijf: 'Thee Atelier', dom: 'thee.example' },
+  });
+  await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
+  currentTime += 11000;
+  const finished = await coordinator.getJob({ ownerKey: 'serve@example.com::user-1', jobId: started.job.id });
+
+  assert.equal(finished.job.status, 'done');
+  assert.match(finished.job.result.html, /motif-tea/);
+  assert.match(finished.job.result.html, /Productritueel/);
+  assert.match(finished.job.result.html, /Het ritueel opent/);
+  assert.match(finished.job.result.html, /hand left/);
+  assert.match(finished.job.result.html, /steam one/);
 });
 
 test('premium database cinematic coordinator stuurt Veo een geldige image-to-video payload', async () => {
@@ -259,6 +307,7 @@ test('premium database cinematic coordinator stuurt Veo een geldige image-to-vid
   assert.equal(advanced.job.stage, 'video');
   assert.equal(capturedBody.instances[0].image.bytesBase64Encoded, 'START_FRAME');
   assert.equal(capturedBody.instances[0].image.mimeType, 'image/png');
+  assert.match(capturedBody.instances[0].prompt, /scroll-film/);
   assert.equal(capturedBody.instances[0].image.inlineData, undefined);
   assert.equal(capturedBody.instances[0].referenceImages, undefined);
   assert.equal(capturedBody.parameters.durationSeconds, 8);
