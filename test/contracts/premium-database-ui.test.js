@@ -1358,10 +1358,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
   assert.match(webdesignActionScriptSource, /photo-drop-image\{width:100%;height:100%;object-fit:cover;display:block;opacity:0;/);
   assert.match(webdesignActionScriptSource, /\.photo-cell\{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0\}/);
-  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:120px;min-width:120px\}/);
+  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:146px;min-width:146px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
+  assert.match(webdesignPreviewScriptSource, /const DIAMOND_ICON = "<span class=\\"photo-diamond-badge\\"/);
   assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\/" \+ escapeHtml\(slug\) \+ "\\"/);
   assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
+  assert.match(webdesignPreviewScriptSource, /aria-label=\\"Diamant\\"/);
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
@@ -1475,7 +1477,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260617a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260529c/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260619a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
@@ -2107,8 +2109,12 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-public-preview-id="customer-1"/);
   assert.match(html, /aria-label="Open openbare previewpagina"/);
+  assert.match(html, /class="photo-diamond-badge"/);
+  assert.match(html, /aria-label="Diamant"/);
   assert.match(html, /class="lead-delete-button"/);
   assert.match(html, /data-delete-lead-id="customer-1"/);
+  assert.ok(html.indexOf('class="photo-diamond-badge"') > html.indexOf('class="photo-compare-link"'));
+  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-diamond-badge"'));
   assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
 });
 
