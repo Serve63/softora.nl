@@ -429,12 +429,12 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         ]),
       },
       {
-        title: 'Hands Wrapping Cup',
+        title: 'Cup Wrapped In Warmth',
         overlayTitle: 'Menselijke aandacht',
-        overlayCopy: 'Twee handen maken de ervaring persoonlijk, warm en direct voelbaar.',
+        overlayCopy: 'Het product krijgt warmte en nabijheid zonder dat het beeld risicovol wordt.',
         prompt: framePrompt([
           prefix,
-          'The same stunning handblown glass tea cup filled with glowing deep amber tea floating in the exact vertical center of the frame, two elegant hands entering the frame slowly from both sides, fingers gently curling around the outside of the warm glass cup, the amber glow visibly warming the hands, steam still rising from the top, the hands hold the cup with complete stillness and intention, floating completely in mid-air with no surface, no floor, no table beneath it.',
+          'The same stunning handblown glass tea cup filled with glowing deep amber tea floating in the exact vertical center of the frame, two soft linen ribbons and warm translucent glass support arcs slowly wrapping around the cup from both sides, the amber glow visibly warming the materials, steam still rising from the top, floating completely in mid-air with no people, no skin, no faces, no body parts, no surface, no floor, no table beneath it.',
         ]),
       },
       {
@@ -465,7 +465,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       ['Pages Revealing', 'Bewijs krijgt focus', 'Bij elke scroll komen details naar voren alsof argumenten zorgvuldig worden opgebouwd.', 'The same legal dossier now opening in mid-air, several cream paper sheets lifting upward in slow motion, abstract evidence markers and subtle glass tabs floating around it, no readable text anywhere, controlled luxury lighting.'],
       ['Arguments Aligning', 'Structuur wordt zichtbaar', 'Complexiteit valt op zijn plek en verandert in helderheid.', 'The same papers and evidence elements now arranging into a perfect orbital formation, translucent lines of light connecting details, polished metal pen floating nearby, authoritative and calm, no readable writing, no logos.'],
       ['Decision Moment', 'Zekerheid ontstaat', 'De scène verschuift van informatie naar overtuiging.', 'A premium fountain pen and an open dossier suspended in mid-air, warm light catching paper fibers, a subtle seal-like abstract symbol glowing without text, cinematic depth of field, no desk or office clutter.'],
-      ['Hands With Dossier', 'Expertise wordt menselijk', 'Menselijke handen maken het premium gevoel persoonlijk en betrouwbaar.', 'Two elegant professional hands entering from both sides, gently holding the open dossier in mid-air, fingers careful and confident, warm light on skin and paper, no readable text, no table, no floor.'],
+      ['Trust Anchors', 'Expertise wordt tastbaar', 'Subtiele materialen maken het premium gevoel persoonlijk en betrouwbaar.', 'Two refined brushed-metal support arcs and translucent glass markers gently holding the open dossier in mid-air, careful and confident composition, warm light on paper fibers, no people, no skin, no faces, no body parts, no readable text, no table, no floor.'],
       ['Trust Tableau', 'Van twijfel naar gesprek', 'Het verhaal eindigt in een duidelijke, premium volgende stap.', 'A final cinematic brand tableau built from the same dossier, pen, floating papers and warm light, negative space for web copy overlays, refined premium legal website mood, no actual letters or logos.'],
     ].map(([title, overlayTitle, overlayCopy, prompt]) => ({ title, overlayTitle, overlayCopy, prompt: framePrompt([prefix, prompt]) }));
   }
@@ -478,8 +478,8 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       ['Value Cascade', 'Waarde wordt beweging', 'Details stromen naar voren alsof de bezoeker door het aanbod heen beweegt.', 'The same abstract service details now falling and orbiting in slow motion, glass fragments, light trails and tactile materials cascading downward, premium cinematic depth, controlled energy, no text.'],
       ['Service In Action', 'Het aanbod wordt tastbaar', 'Het verhaal voelt niet meer als uitleg, maar als iets dat je bijna kunt aanraken.', 'A cinematic macro scene where the abstract company value becomes physical: refined tools, materials, light and motion converging around the same object, center frame, expensive product photography, no people yet, no text.'],
       ['Outcome Formed', 'De belofte is helder', 'Alles komt samen in een rustig, overtuigend premium resultaat.', 'The same object now fully transformed into a glowing refined final form, clean symmetry, elegant reflections, warm highlight and subtle teal accent, strong negative space for website overlay copy, no readable marks.'],
-      ['Human Contact', 'Menselijke aandacht', 'Handen brengen vertrouwen, schaal en actie in het beeld.', 'Two elegant human hands entering slowly from both sides and gently interacting with the transformed object, fingers careful and confident, premium light warming the hands, the object still floating mid-air, no surface, no floor, no text.'],
-      ['Premium Website Hero', 'Van film naar website', 'De scène wordt een digitale premium ervaring met conversie als eindpunt.', 'A high-end cinematic web hero composition built from the same object, light, particles and human detail, abstract browser-like layout without readable text, no letters, no logos, deep background and refined negative space.'],
+      ['Guided Contact', 'Menselijke aandacht', 'Warme materialen brengen vertrouwen, schaal en actie in het beeld.', 'Two elegant translucent support arcs entering slowly from both sides and gently interacting with the transformed object, careful and confident premium composition, warm light moving through glass and brushed metal, the object still floating mid-air, no people, no skin, no faces, no body parts, no surface, no floor, no text.'],
+      ['Premium Website Hero', 'Van film naar website', 'De scène wordt een digitale premium ervaring met conversie als eindpunt.', 'A high-end cinematic web hero composition built from the same object, light, particles and tactile material detail, abstract browser-like layout without readable text, no letters, no logos, deep background and refined negative space.'],
       ['Conversion Tableau', 'Klaar voor actie', 'De laatste scène zet aandacht om in vertrouwen en contact.', 'Final premium brand tableau using the same transformed object and lighting language, confident quiet luxury, a clear focal point and empty space for a call to action overlay, no readable text or logos.'],
     ].map(([title, overlayTitle, overlayCopy, prompt]) => ({ title, overlayTitle, overlayCopy, prompt: framePrompt([prefix, prompt]) }));
   }
@@ -496,6 +496,31 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     return buildImageScenes(job)
       .map((scene, index) => `Image ${index + 1} - ${scene.title}\nSave as: ${scene.fileName}\n${scene.prompt}`)
       .join('\n\n');
+  }
+  function openAiErrorMessage(data = {}) {
+    return normalizeString(data?.error?.message || data?.error?.detail || data?.message);
+  }
+  function isOpenAiImageSafetyRejection(response, data = {}) {
+    const status = Number(response?.status || 0);
+    const message = [
+      openAiErrorMessage(data),
+      normalizeString(data?.error?.code),
+      normalizeString(data?.error?.type),
+      normalizeString(data?.error?.param),
+    ].join(' ');
+    return Boolean(status >= 400 && /safety|rejected|violation|sexual|content policy|moderation/i.test(message));
+  }
+  function safetyFallbackPrompt(scene = {}, job = {}) {
+    const { company, headings, palette } = companyContext(job);
+    return framePrompt([
+      `Premium cinematic scroll website frame for ${company}.`,
+      `Scene: ${scene.title || 'Cinematic frame'}.`,
+      headings ? `Website themes: ${headings}.` : '',
+      `Brand palette hints: ${palette}.`,
+      'Strictly object-only commercial still life. No people or anatomy. Avoid figure-like sculpture forms.',
+      'Use abstract premium materials only: glass, stone, brushed metal, paper, light, particles, refined product details, elegant negative space.',
+      'Pure deep background, controlled studio spotlight, photorealistic 8K, 16:9 composition, no readable text, no labels, no logos, no watermarks.',
+    ]);
   }
   async function mapWithConcurrency(items, limit, worker) {
     const list = Array.isArray(items) ? items : [];
@@ -517,11 +542,18 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const model = normalizeString(openAiImageModel) || DEFAULT_IMAGE_MODEL;
     const scenes = buildImageScenes(job);
     const endpoint = `${String(openAiApiBaseUrl || DEFAULT_OPENAI_API_BASE_URL).replace(/\/+$/, '')}/images/generations`;
-    const images = await mapWithConcurrency(scenes, 2, async (scene, index) => {
-      const body = { model, prompt: scene.prompt, size: normalizeString(imageSize) || '2048x1152', quality: normalizeString(imageQuality) || 'medium', n: 1 };
+    async function requestImage(scene, index, prompt, safetyFallback = false) {
+      const body = { model, prompt, size: normalizeString(imageSize) || '2048x1152', quality: normalizeString(imageQuality) || 'medium', n: 1 };
       if (/^dall-e-[23]$/i.test(model)) body.response_format = 'b64_json';
       const { response, data } = await fetchJsonWithTimeout(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: JSON.stringify(body) }, 240000);
-      if (!response?.ok) throw Object.assign(new Error(normalizeString(data?.error?.message || data?.error?.detail || data?.message) || `OpenAI cinematic beeld ${index + 1} mislukt`), { status: Number(response?.status) || 502, data });
+      if (!response?.ok) {
+        if (!safetyFallback && isOpenAiImageSafetyRejection(response, data)) {
+          if (typeof logger.warn === 'function') logger.warn(`[PremiumDatabaseCinematicJobs][image-safety-retry] frame ${index + 1}`, openAiErrorMessage(data) || 'safety rejection');
+          return requestImage(scene, index, safetyFallbackPrompt(scene, job), true);
+        }
+        const message = openAiErrorMessage(data) || `OpenAI cinematic beeld ${index + 1} mislukt`;
+        throw Object.assign(new Error(message), { status: Number(response?.status) || 502, data });
+      }
       const entry = Array.isArray(data?.data) ? data.data[0] : null;
       const base64 = normalizeString(entry?.b64_json || entry?.b64Json || '');
       if (!base64) throw Object.assign(new Error(`OpenAI gaf geen beelddata terug voor frame ${index + 1}.`), { status: 502, data });
@@ -534,8 +566,12 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         base64,
         revisedPrompt: normalizeString(entry?.revised_prompt || ''),
         fileName: scene.fileName,
-        prompt: scene.prompt,
+        prompt,
+        safetyFallback,
       };
+    }
+    const images = await mapWithConcurrency(scenes, 2, async (scene, index) => {
+      return requestImage(scene, index, scene.prompt, false);
     });
     if (!images.length) throw Object.assign(new Error('OpenAI gaf geen cinematic beeld terug.'), { status: 502 });
     return { images, prompt: imagePrompt(job), model, scenes };
