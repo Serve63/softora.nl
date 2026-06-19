@@ -323,6 +323,67 @@ test('premium database cinematic coordinator serveert gegenereerde image frames 
   assert.equal(frameResponse.body.toString('utf8'), 'frame-one');
 });
 
+test('premium database cinematic coordinator probeert Image 2 opnieuw met object-only prompt bij safety reject', async () => {
+  let currentTime = 2750;
+  let rejectedOnce = false;
+  const prompts = [];
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => currentTime,
+    random: () => 0.5,
+    imageCount: 6,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://patriz.example/',
+      scan: {
+        host: 'patriz.example',
+        h1: 'Atelier en Beeldentuin Patriz',
+        headings: ['Atelier', 'Beeldentuin', 'Kunst'],
+        paragraphs: ['Een atelier en beeldentuin met sculpturen, tuinervaring en kunstobjecten.'],
+      },
+    }),
+    fetchJsonWithTimeout: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      prompts.push(body.prompt);
+      if (!rejectedOnce && /Guided Contact|Menselijke aandacht|support arcs/i.test(body.prompt)) {
+        rejectedOnce = true;
+        return {
+          response: { ok: false, status: 400 },
+          data: {
+            error: {
+              message: 'Your request was rejected by the safety system. safety_violations=[sexual].',
+            },
+          },
+        };
+      }
+      return {
+        response: { ok: true },
+        data: { data: [{ b64_json: Buffer.from(`frame-${prompts.length}`).toString('base64') }] },
+      };
+    },
+    submitVeoVideo: async () => ({ operationName: 'operations/safety-retry-video', raw: {} }),
+    getUiStateValues: async () => ({ values: {} }),
+    setUiStateValues: async () => ({ ok: true }),
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-patriz', bedrijf: 'Atelier en Beeldentuin Patriz', dom: 'patriz.example' },
+  });
+  const advanced = await coordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: started.job.id,
+  });
+
+  assert.equal(advanced.job.stage, 'video');
+  assert.equal(advanced.job.imageCount, 6);
+  assert.equal(rejectedOnce, true);
+  assert.ok(prompts.some((prompt) => /Strictly object-only commercial still life/.test(prompt)));
+  const retryPrompt = prompts.find((prompt) => /Strictly object-only commercial still life/.test(prompt));
+  assert.doesNotMatch(retryPrompt, /\bhands?\b|\bfingers?\b|\bskin\b|\bfaces?\b|\bhuman figures?\b/i);
+});
+
 test('premium database cinematic coordinator stuurt Veo een geldige image-to-video payload', async () => {
   let capturedBody = null;
   const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
