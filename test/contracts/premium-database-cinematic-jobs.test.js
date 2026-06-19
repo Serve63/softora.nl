@@ -246,6 +246,90 @@ test('premium database cinematic coordinator stuurt Veo een geldige image-to-vid
   assert.equal(capturedBody.parameters.personGeneration, 'allow_adult');
 });
 
+test('premium database cinematic coordinator probeert Veo opnieuw met sobere payload bij schemafouten', async () => {
+  const capturedBodies = [];
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => 3500,
+    random: () => 0.52,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://retry-veo.example/',
+      scan: { host: 'retry-veo.example', h1: 'Retry Veo BV' },
+    }),
+    generateCinematicImages: async () => ({
+      images: [{ mimeType: 'image/png', base64: 'START_FRAME' }],
+    }),
+    fetchJsonWithTimeout: async (_url, options) => {
+      capturedBodies.push(JSON.parse(options.body));
+      if (capturedBodies.length === 1) {
+        return {
+          response: { ok: false, status: 400 },
+          data: { error: { message: 'Unknown name "personGeneration" at parameters: Cannot find field.' } },
+        };
+      }
+      return { response: { ok: true }, data: { name: 'operations/veo-retry' } };
+    },
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-veo-retry', bedrijf: 'Retry Veo BV', dom: 'retry-veo.example' },
+  });
+  const advanced = await coordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: started.job.id,
+  });
+
+  assert.equal(advanced.job.stage, 'video');
+  assert.equal(capturedBodies.length, 2);
+  assert.equal(capturedBodies[0].parameters.personGeneration, 'allow_adult');
+  assert.equal(capturedBodies[1].parameters.personGeneration, undefined);
+  assert.equal(capturedBodies[1].parameters.durationSeconds, 8);
+  assert.equal(capturedBodies[1].instances[0].image.bytesBase64Encoded, 'START_FRAME');
+  assert.equal(capturedBodies[1].instances[0].image.inlineData, undefined);
+  assert.equal(capturedBodies[1].instances[0].referenceImages, undefined);
+});
+
+test('premium database cinematic coordinator herhaalt Veo niet bij auth of quota fouten', async () => {
+  let attempts = 0;
+  const coordinator = createPremiumDatabaseCinematicJobsCoordinator({
+    now: () => 3600,
+    random: () => 0.53,
+    getOpenAiApiKey: () => 'openai-key',
+    getGeminiApiKey: () => 'gemini-key',
+    fetchWebsitePreviewScanFromUrl: async (url) => ({
+      normalizedUrl: url,
+      finalUrl: 'https://no-retry-veo.example/',
+      scan: { host: 'no-retry-veo.example', h1: 'No Retry Veo BV' },
+    }),
+    generateCinematicImages: async () => ({
+      images: [{ mimeType: 'image/png', base64: 'START_FRAME' }],
+    }),
+    fetchJsonWithTimeout: async () => {
+      attempts += 1;
+      return {
+        response: { ok: false, status: 403 },
+        data: { error: { message: 'API key is not allowed to use this model.' } },
+      };
+    },
+  });
+
+  const started = await coordinator.startJob({
+    ownerKey: 'serve@example.com::user-1',
+    customer: { id: 'customer-veo-no-retry', bedrijf: 'No Retry Veo BV', dom: 'no-retry-veo.example' },
+  });
+  const advanced = await coordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: started.job.id,
+  });
+
+  assert.equal(advanced.job.status, 'error');
+  assert.equal(attempts, 1);
+  assert.match(advanced.job.error, /API key is not allowed/);
+});
+
 test('premium database cinematic coordinator hergebruikt bestaande site voordat AI opnieuw draait', async () => {
   let currentTime = 2000;
   let imageCalls = 0;
