@@ -3,7 +3,7 @@
 
   var JOB_ENDPOINT = "/api/premium-database/cinematic-jobs";
   var POLL_INTERVAL_MS = 2600;
-  var STAGE_ORDER = ["scanning", "images", "site", "done"];
+  var STAGE_ORDER = ["scanning", "images", "video", "site", "done"];
   var pollTimer = null;
   var currentJob = null;
 
@@ -140,7 +140,8 @@
     if (stage === "queued") return "We zetten de opdracht klaar.";
     if (stage === "scanning") return "De website wordt gelezen zodat de nieuwe site inhoudelijk klopt.";
     if (stage === "images") return "OpenAI maakt cinematic startbeelden voor de premium richting.";
-    if (stage === "site") return "De scrollsite wordt opgebouwd rond de AI-beelden, propositie en conversie.";
+    if (stage === "video") return "Veo maakt de motion-laag. Straks speelt die niet vanzelf af: scroll bestuurt elk frame.";
+    if (stage === "site") return "De canvas-scrollsite wordt opgebouwd rond de Veo-video, AI-beelden en conversie.";
     if (stage === "done") return "De cinematic premium website staat klaar.";
     if (stage === "error") return "Het proces is gestopt.";
     return "Proces loopt.";
