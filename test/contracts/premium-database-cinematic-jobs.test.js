@@ -200,6 +200,18 @@ test('premium database cinematic coordinator drives scan, image and scrollsite s
   assert.equal(started.job.stage, 'queued');
 
   currentTime += 1000;
+  const videoPending = await coordinator.getJob({
+    ownerKey: 'serve@example.com::user-1',
+    jobId: started.job.id,
+  });
+
+  assert.equal(videoPending.statusCode, 202);
+  assert.equal(videoPending.job.status, 'running');
+  assert.equal(videoPending.job.stage, 'video');
+  assert.deepEqual(calls.veoImages, ['AAA', 'BBB']);
+  assert.equal(videoPending.job.video.ready, false);
+
+  currentTime += 11000;
   const finished = await coordinator.getJob({
     ownerKey: 'serve@example.com::user-1',
     jobId: started.job.id,
@@ -211,14 +223,17 @@ test('premium database cinematic coordinator drives scan, image and scrollsite s
   assert.equal(finished.job.imageCount, 2);
   assert.equal(calls.scanUrl, 'https://example.com/');
   assert.equal(calls.imageJob, started.job.id);
-  assert.equal(calls.veoImages, null);
-  assert.equal(calls.polledOperation, '');
-  assert.equal(finished.job.video.ready, false);
-  assert.equal(finished.job.video.url, '');
+  assert.equal(calls.polledOperation, 'operations/video-123');
+  assert.equal(finished.job.video.ready, true);
+  assert.equal(finished.job.video.url, `/api/premium-database/cinematic-jobs/${started.job.id}/video`);
   assert.equal(finished.job.frameCount, 2);
   assert.equal(finished.job.frames[0].url, `/api/premium-database/cinematic-jobs/${started.job.id}/frame/1`);
   assert.match(finished.job.result.html, /Example BV/);
   assert.match(finished.job.result.html, /data-cinematic-scroll-story/);
+  assert.match(finished.job.result.html, /id="scrollVideo"/);
+  assert.match(finished.job.result.html, /id="scrollCanvas"/);
+  assert.match(finished.job.result.html, /function extractFrames/);
+  assert.match(finished.job.result.html, /function drawVideoProgress/);
   assert.match(finished.job.result.html, /class="story-frame is-active"/);
   assert.match(finished.job.result.html, /class="story-step"/);
   assert.match(finished.job.result.html, /scroll-scrub sequence/);
@@ -226,8 +241,7 @@ test('premium database cinematic coordinator drives scan, image and scrollsite s
   assert.match(finished.job.result.html, /frameProgress=total&gt;1\?progress\*\(total-1\):0|frameProgress=total>1\?progress\*\(total-1\):0/);
   assert.match(finished.job.result.html, /requestAnimationFrame\(render\)/);
   assert.match(finished.job.result.html, /Merkfilm op scroll/);
-  assert.doesNotMatch(finished.job.result.html, /<video\b/);
-  assert.doesNotMatch(finished.job.result.html, /autoplay muted loop/);
+  assert.doesNotMatch(finished.job.result.html, /<video[^>]*autoplay/i);
   assert.doesNotMatch(finished.job.result.html, /cinematic-object/);
   assert.doesNotMatch(finished.job.result.html, /object-core/);
 });
@@ -273,8 +287,13 @@ test('premium database cinematic coordinator bouwt een scrollfilm met thee-motie
   assert.match(finished.job.result.html, /Productritueel/);
   assert.match(finished.job.result.html, /Het ritueel opent/);
   assert.match(finished.job.result.html, new RegExp(`/api/premium-database/cinematic-jobs/${started.job.id}/frame/1`));
+  assert.match(finished.job.result.html, new RegExp(`/api/premium-database/cinematic-jobs/${started.job.id}/video`));
   assert.match(finished.job.result.html, /scroll-scrub sequence/);
-  assert.doesNotMatch(finished.job.result.html, /<video\b/);
+  assert.match(finished.job.result.html, /id="scrollVideo"/);
+  assert.match(finished.job.result.html, /id="scrollCanvas"/);
+  assert.match(finished.job.result.html, /min-height:800vh/);
+  assert.match(finished.job.result.html, /De video speelt nooit vanzelf/);
+  assert.doesNotMatch(finished.job.result.html, /<video[^>]*autoplay/i);
   assert.doesNotMatch(finished.job.result.html, /motif-tea/);
   assert.doesNotMatch(finished.job.result.html, /hand left/);
   assert.doesNotMatch(finished.job.result.html, /steam one/);
@@ -326,6 +345,7 @@ test('premium database cinematic coordinator probeert Image 2 opnieuw met object
     now: () => currentTime,
     random: () => 0.5,
     imageCount: 6,
+    useVeo: false,
     getOpenAiApiKey: () => 'openai-key',
     getGeminiApiKey: () => 'gemini-key',
     fetchWebsitePreviewScanFromUrl: async (url) => ({
@@ -341,7 +361,7 @@ test('premium database cinematic coordinator probeert Image 2 opnieuw met object
     fetchJsonWithTimeout: async (_url, options) => {
       const body = JSON.parse(options.body);
       prompts.push(body.prompt);
-      if (!rejectedOnce && /Guided Contact|Menselijke aandacht|support arcs/i.test(body.prompt)) {
+      if (!rejectedOnce && /shedding small stone chips|finished abstract non-figurative sculpture|final cinematic website hero composition/i.test(body.prompt)) {
         rejectedOnce = true;
         return {
           response: { ok: false, status: 400 },
@@ -374,6 +394,9 @@ test('premium database cinematic coordinator probeert Image 2 opnieuw met object
   assert.equal(advanced.job.stage, 'done');
   assert.equal(advanced.job.imageCount, 6);
   assert.equal(rejectedOnce, true);
+  assert.ok(prompts.some((prompt) => /abstract non-figurative sculpture/i.test(prompt)));
+  assert.ok(prompts.some((prompt) => /Camera completely locked, zero movement/i.test(prompt)));
+  assert.ok(prompts.some((prompt) => /No artificial glow\. No light trails\. No energy effects/i.test(prompt)));
   assert.ok(prompts.some((prompt) => /Strictly object-only commercial still life/.test(prompt)));
   const retryPrompt = prompts.find((prompt) => /Strictly object-only commercial still life/.test(prompt));
   assert.doesNotMatch(retryPrompt, /\bhands?\b|\bfingers?\b|\bskin\b|\bfaces?\b|\bhuman figures?\b/i);
@@ -416,11 +439,15 @@ test('premium database cinematic coordinator stuurt Veo een geldige image-to-vid
   assert.equal(advanced.job.stage, 'video');
   assert.equal(capturedBody.instances[0].image.bytesBase64Encoded, 'START_FRAME');
   assert.equal(capturedBody.instances[0].image.mimeType, 'image/png');
-  assert.match(capturedBody.instances[0].prompt, /scroll-film/);
+  assert.equal(capturedBody.parameters.lastFrame.bytesBase64Encoded, 'REFERENCE_FRAME');
+  assert.equal(capturedBody.parameters.lastFrame.mimeType, 'image/png');
+  assert.match(capturedBody.instances[0].prompt, /Ultra slow motion seamless transformation/);
+  assert.match(capturedBody.instances[0].prompt, /Camera completely locked, zero movement/);
   assert.equal(capturedBody.instances[0].image.inlineData, undefined);
+  assert.equal(capturedBody.instances[0].lastFrame, undefined);
   assert.equal(capturedBody.instances[0].referenceImages, undefined);
   assert.equal(capturedBody.parameters.durationSeconds, 8);
-  assert.equal(capturedBody.parameters.personGeneration, 'allow_adult');
+  assert.equal(capturedBody.parameters.personGeneration, undefined);
 });
 
 test('premium database cinematic coordinator probeert Veo opnieuw met sobere payload bij schemafouten', async () => {
@@ -819,9 +846,9 @@ test('premium database cinematic API stopt nieuwe jobs wanneer provider-config o
 
   const status = coordinator.getProviderStatus();
   assert.equal(status.ready, false);
-  assert.deepEqual(status.missing, ['OPENAI_API_KEY']);
+  assert.deepEqual(status.missing, ['OPENAI_API_KEY', 'GEMINI_API_KEY']);
   assert.equal(status.openAi.configured, false);
-  assert.equal(status.veo.enabled, false);
+  assert.equal(status.veo.enabled, true);
   assert.equal(status.veo.configured, false);
 
   const result = await coordinator.startJob({
@@ -832,7 +859,7 @@ test('premium database cinematic API stopt nieuwe jobs wanneer provider-config o
   assert.equal(result.statusCode, 503);
   assert.equal(result.code, 'CINEMATIC_PROVIDER_NOT_CONFIGURED');
   assert.match(result.detail, /OPENAI_API_KEY/);
-  assert.doesNotMatch(result.detail, /GEMINI_API_KEY/);
+  assert.match(result.detail, /GEMINI_API_KEY/);
   assert.equal(imageCalls, 0);
   assert.equal(result.providerStatus.ready, false);
 });
@@ -845,12 +872,14 @@ test('premium cinematic website page starts the cinematic job flow', () => {
   assert.match(pageSource, /assets\/premium-cinematic-website\.css\?v=20260619b/);
   assert.match(pageSource, /assets\/premium-cinematic-website\.js\?v=20260619b/);
   assert.match(pageSource, /id="previewImage"/);
-  assert.doesNotMatch(pageSource, /Veo 3\.1 video/);
+  assert.match(pageSource, /Veo motion/);
   assert.doesNotMatch(pageSource, /preview-video/);
   assert.doesNotMatch(pageSource, /autoplay muted loop/);
   assert.match(scriptSource, /var JOB_ENDPOINT = "\/api\/premium-database\/cinematic-jobs";/);
+  assert.match(scriptSource, /var STAGE_ORDER = \["scanning", "images", "video", "site", "done"\];/);
   assert.match(scriptSource, /function getPreviewFrame/);
-  assert.match(scriptSource, /De scrollsite wordt opgebouwd rond de AI-beelden/);
+  assert.match(scriptSource, /Veo maakt de motion-laag/);
+  assert.match(scriptSource, /De canvas-scrollsite wordt opgebouwd rond de Veo-video/);
   assert.doesNotMatch(scriptSource, /previewVideo/);
   assert.match(scriptSource, /new URLSearchParams\(global\.location\.search \|\| ""\)/);
   assert.match(scriptSource, /method: "POST"/);

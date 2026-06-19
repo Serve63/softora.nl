@@ -7,7 +7,7 @@ const DEFAULT_VEO_MODEL = 'veo-3.1-generate-preview';
 const DEFAULT_IMAGE_COUNT = 8;
 const MIN_IMAGE_SEQUENCE_COUNT = 4;
 const MAX_IMAGE_SEQUENCE_COUNT = 8;
-const SITE_BUILDER_VERSION = 'scroll-scrub-sequence-v1';
+const SITE_BUILDER_VERSION = 'scroll-veo-canvas-v2';
 const JOB_SCOPE = 'premium_database_cinematic_jobs';
 const JOB_KEY = 'softora_premium_database_cinematic_jobs_v1';
 const SITE_KEY = 'softora_premium_database_cinematic_sites_v1';
@@ -38,7 +38,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     submitVeoVideo = null,
     pollVeoOperation = null,
     buildCinematicSiteHtml = null,
-    useVeo = process.env.PREMIUM_CINEMATIC_USE_VEO === '1',
+    useVeo = normalizeString(process.env.PREMIUM_CINEMATIC_USE_VEO || '1'),
   } = deps;
 
   const jobs = new Map();
@@ -47,7 +47,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     MIN_IMAGE_SEQUENCE_COUNT,
     Math.min(MAX_IMAGE_SEQUENCE_COUNT, Math.floor(Number(imageCount) || DEFAULT_IMAGE_COUNT))
   );
-  const USE_VEO = useVeo === true || /^1|true|yes$/i.test(normalizeString(useVeo));
+  const USE_VEO = !(useVeo === false || /^(0|false|no|off)$/i.test(normalizeString(useVeo)));
   const VEO_POLL_INTERVAL_MS = Math.max(2500, Math.min(60000, Number(veoPollIntervalMs) || 10000));
 
   const ownerKeyFromReq = (req) => {
@@ -382,9 +382,22 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
   function framePrompt(parts = []) {
     return parts.filter(Boolean).join('\n');
   }
+  function lockedStudioRules(job, subject, extraContext = '') {
+    const { company, headings, paragraphs, palette } = companyContext(job);
+    return framePrompt([
+      `Premium cinematic scroll website frame for ${company}. Subject: ${subject}.`,
+      'Keep the whole sequence perfectly consistent: exact same camera position, exact same lens, exact same central object scale, camera completely locked, zero movement.',
+      'Pure black background, single warm amber studio light from directly above, soft realistic shadows, professional DSLR macro product photography, ultra photorealistic 8K, 16:9 composition.',
+      'Realistic physics only. No artificial glow. No light trails. No energy effects. No CGI glow. No energy rings. No artificial light effects.',
+      'No readable text, no letters, no labels, no logos, no watermarks.',
+      `Brand palette hints: ${palette}.`,
+      headings ? `Website themes: ${headings}.` : '',
+      paragraphs ? `Business context: ${paragraphs}` : '',
+      extraContext,
+    ]);
+  }
   function buildTeaScenes(job) {
-    const { company, palette } = companyContext(job);
-    const prefix = `Premium cinematic scroll website frame for ${company}. Keep the whole series consistent: exact same camera distance, pure black background, warm amber top spotlight, luxury wellness product photography, photorealistic 8K, 16:9 composition, no readable text, no labels, no logos, no watermarks. Brand palette hints: ${palette}.`;
+    const prefix = lockedStudioRules(job, 'a premium tea ritual with one glass cup and botanical ingredients');
     return [
       {
         title: 'Tea Bag Sealed',
@@ -392,7 +405,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         overlayCopy: 'De eerste scroll voelt als een luxe productmoment dat net gaat beginnen.',
         prompt: framePrompt([
           prefix,
-          'A single premium tea bag floating in the exact vertical center of the frame, completely sealed and intact, delicate cream cotton fabric texture, string attached at top, floating in mid-air with no surface, no floor, no table beneath it, subtle warm amber glow underneath.',
+          'A single premium tea bag floating in the exact vertical center of the frame, completely sealed and intact, delicate cream cotton fabric texture, string attached at top, suspended in mid-air with no surface, no floor, no table beneath it.',
         ]),
       },
       {
@@ -401,7 +414,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         overlayCopy: 'Het centrale object opent en de ingrediënten komen als een filmisch detail naar voren.',
         prompt: framePrompt([
           prefix,
-          'The same tea bag fully open with four fabric flaps peeled back, center of frame, green herb leaves floating above, dried rose petals drifting to the sides, cardamom pods floating outward, all in a perfect orbital formation glowing in amber backlight.',
+          'The same tea bag fully open with four fabric flaps peeled back, center of frame, green herb leaves suspended above, dried rose petals drifting to the sides, cardamom pods floating outward, all in a clean orbital formation under the same warm amber top light.',
         ]),
       },
       {
@@ -410,7 +423,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         overlayCopy: 'De scène verandert in een cascade die de bezoeker letterlijk door het verhaal trekt.',
         prompt: framePrompt([
           prefix,
-          'The same ingredients from the tea bag now falling downward in dramatic slow motion, center of frame, herb leaves and petals streaming downward like a waterfall of botanicals, each ingredient glowing, a beautiful cascade of nature falling toward the bottom of the frame.',
+          'The same dried herb leaves, rose petals and cardamom pods now falling downward in slow motion above the same open tea bag. Gravity is visible: rose petals tumble and rotate slowly, herb leaves drift with slight air resistance, cardamom pods drop with more weight, fine spice dust falls last. No artificial glow or fantasy effects.',
         ]),
       },
       {
@@ -419,25 +432,25 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         overlayCopy: 'Warmte, beweging en productwaarde komen samen in één premium kernbeeld.',
         prompt: framePrompt([
           prefix,
-          'A stunning handblown glass tea cup with no handles floating in the exact vertical center of the frame, crystal clear thin walls filled with hot steaming water, ingredients actively falling from above into the hot water, green herb leaves piercing the surface with tiny splash ripples, rose petals landing, cardamom pods splashing in, golden spice dust cascading downward, tiny amber color bleeding outward into clear water like ink dissolving, steam intensifies, floating completely in mid-air with no surface, no floor, no table beneath it.',
+          'A stunning handblown glass tea cup with no handles floating in the exact vertical center of the frame, crystal clear thin walls filled with hot steaming water. The same botanical ingredients enter the cup from above one by one, rose petals pierce the water surface with tiny circular ripples, herb leaves spread open, cardamom pods sink slowly, golden spice dust blooms outward as amber color bleeds through clear water like ink dissolving.',
         ]),
       },
       {
-        title: 'Brewed Cup Glowing',
+        title: 'Brewed Cup',
         overlayTitle: 'De belofte is helder',
         overlayCopy: 'Alles is nu één rustige, overtuigende premium ervaring.',
         prompt: framePrompt([
           prefix,
-          'The same handblown glass tea cup now completely filled with fully brewed glowing amber-gold tea liquid, all ingredients settled and floating at different depths visible through crystal clear glass walls, the liquid radiating warm golden light from within like a liquid amber gemstone, delicate wisps of white steam rising gently, floating completely in mid-air with no surface, no floor, no table beneath it.',
+          'The same handblown glass tea cup now completely filled with brewed amber-gold tea liquid. All ingredients are settled and floating at different depths, visible through the crystal clear glass walls. Delicate wisps of white steam rise gently, the cup floats completely in mid-air with no surface, no floor, no table beneath it.',
         ]),
       },
       {
-        title: 'Cup Wrapped In Warmth',
+        title: 'Hands Wrapping Cup',
         overlayTitle: 'Menselijke aandacht',
         overlayCopy: 'Het product krijgt warmte en nabijheid zonder dat het beeld risicovol wordt.',
         prompt: framePrompt([
           prefix,
-          'The same stunning handblown glass tea cup filled with glowing deep amber tea floating in the exact vertical center of the frame, two soft linen ribbons and warm translucent glass support arcs slowly wrapping around the cup from both sides, the amber glow visibly warming the materials, steam still rising from the top, floating completely in mid-air with no people, no skin, no faces, no body parts, no surface, no floor, no table beneath it.',
+          'The same handblown glass tea cup filled with amber tea floating in the exact vertical center of the frame. Two elegant hands wearing matte cream cotton gloves enter slowly from both sides, fingers gently curling around the outside of the warm glass cup. Only the gloved hands are visible, no faces, no skin, no body, no sensual pose, no table, no floor.',
         ]),
       },
       {
@@ -446,7 +459,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         overlayCopy: 'Het ritueel wordt vertaald naar een high-end digitale merkervaring.',
         prompt: framePrompt([
           prefix,
-          'The same glowing tea cup and botanical ingredients now arranged as a luxury hero visual for a premium website, deep black negative space, subtle glass reflections, no readable text, no logos, no labels, cinematic web hero composition, expensive product photography mood.',
+          'The same tea cup and botanical ingredients now arranged as a luxury hero visual for a premium website, deep black negative space, subtle realistic glass reflections, expensive product photography mood, no interface text and no brand marks.',
         ]),
       },
       {
@@ -455,40 +468,57 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         overlayCopy: 'De filmische energie eindigt in een websitebeeld dat vertrouwen en actie oproept.',
         prompt: framePrompt([
           prefix,
-          'A final cinematic website hero moment built from the same tea cup, steam, amber light and botanical details, premium interface-like composition without readable text, no actual letters or logos, deep black background, strong negative space for overlay copy, high-end conversion website mood.',
+          'A final cinematic website hero moment built from the same tea cup, steam, amber light and botanical details, premium layout composition without readable text, deep black background, strong negative space for overlay copy, high-end conversion website mood.',
         ]),
       },
     ];
   }
   function buildLegalScenes(job) {
-    const { company, headings, paragraphs, palette } = companyContext(job);
-    const prefix = `Premium cinematic scroll website frame for ${company}, a professional legal or advisory business. Keep the series consistent: pure black studio background, restrained warm spotlight, refined materials, premium Dutch business website mood, photorealistic 8K, 16:9 composition, no readable text, no labels, no logos, no watermarks. Brand palette hints: ${palette}. ${headings ? `Website themes: ${headings}.` : ''} ${paragraphs ? `Business context: ${paragraphs}` : ''}`;
+    const prefix = lockedStudioRules(job, 'a premium legal dossier and advisory materials');
     return [
-      ['Sealed Dossier', 'Het dossier opent', 'De bezoeker komt binnen in een wereld van rust, precisie en vertrouwen.', 'A sealed premium legal dossier floating in the exact center of the frame, matte black leather cover, subtle metallic edge detail, one warm highlight from above, no visible text on the document, no table, no floor, no surface.'],
-      ['Pages Revealing', 'Bewijs krijgt focus', 'Bij elke scroll komen details naar voren alsof argumenten zorgvuldig worden opgebouwd.', 'The same legal dossier now opening in mid-air, several cream paper sheets lifting upward in slow motion, abstract evidence markers and subtle glass tabs floating around it, no readable text anywhere, controlled luxury lighting.'],
-      ['Arguments Aligning', 'Structuur wordt zichtbaar', 'Complexiteit valt op zijn plek en verandert in helderheid.', 'The same papers and evidence elements now arranging into a perfect orbital formation, translucent lines of light connecting details, polished metal pen floating nearby, authoritative and calm, no readable writing, no logos.'],
-      ['Decision Moment', 'Zekerheid ontstaat', 'De scène verschuift van informatie naar overtuiging.', 'A premium fountain pen and an open dossier suspended in mid-air, warm light catching paper fibers, a subtle seal-like abstract symbol glowing without text, cinematic depth of field, no desk or office clutter.'],
-      ['Trust Anchors', 'Expertise wordt tastbaar', 'Subtiele materialen maken het premium gevoel persoonlijk en betrouwbaar.', 'Two refined brushed-metal support arcs and translucent glass markers gently holding the open dossier in mid-air, careful and confident composition, warm light on paper fibers, no people, no skin, no faces, no body parts, no readable text, no table, no floor.'],
-      ['Trust Tableau', 'Van twijfel naar gesprek', 'Het verhaal eindigt in een duidelijke, premium volgende stap.', 'A final cinematic brand tableau built from the same dossier, pen, floating papers and warm light, negative space for web copy overlays, refined premium legal website mood, no actual letters or logos.'],
+      ['Sealed Dossier', 'Het dossier opent', 'De bezoeker komt binnen in een wereld van rust, precisie en vertrouwen.', 'A sealed premium legal dossier floating in the exact center of the frame, matte black leather cover, fine metallic edge detail, no visible text on the document, no table, no floor, no surface.'],
+      ['Pages Revealing', 'Bewijs krijgt focus', 'Bij elke scroll komen details naar voren alsof argumenten zorgvuldig worden opgebouwd.', 'The same legal dossier now opening in mid-air, several cream paper sheets lifting upward in slow motion, abstract evidence markers and subtle glass tabs floating around it, no readable text anywhere.'],
+      ['Arguments Aligning', 'Structuur wordt zichtbaar', 'Complexiteit valt op zijn plek en verandert in helderheid.', 'The same papers and evidence elements now arranging into a precise radial formation, polished metal pen floating nearby, authoritative and calm, realistic paper fibers and metal reflections, no readable writing, no logos.'],
+      ['Decision Moment', 'Zekerheid ontstaat', 'De scene verschuift van informatie naar overtuiging.', 'A premium fountain pen and the same open dossier suspended in mid-air, warm light catching paper fibers, a subtle blind embossed seal shape without text, cinematic depth of field, no desk or office clutter.'],
+      ['Trust Anchors', 'Expertise wordt tastbaar', 'Subtiele materialen maken het premium gevoel persoonlijk en betrouwbaar.', 'Two refined brushed-metal arcs and translucent glass markers hold the open dossier in mid-air like a museum display, careful and confident composition, no people, no skin, no faces, no body parts, no readable text, no table, no floor.'],
+      ['Trust Tableau', 'Van twijfel naar gesprek', 'Het verhaal eindigt in een duidelijke, premium volgende stap.', 'A final cinematic brand tableau built from the same dossier, pen, floating papers and warm amber top light, negative space for web copy overlays, refined premium legal website mood, no actual letters or logos.'],
+    ].map(([title, overlayTitle, overlayCopy, prompt]) => ({ title, overlayTitle, overlayCopy, prompt: framePrompt([prefix, prompt]) }));
+  }
+  function buildSculptureScenes(job) {
+    const prefix = lockedStudioRules(job, 'an abstract non-figurative sculpture for an atelier and sculpture garden', 'Strictly no human figures, no faces, no anatomy, no nude form, no body-like silhouette. Use abstract stone, bronze, clay, patina, moss and garden materials only.');
+    return [
+      ['Raw Stone Block', 'Het materiaal ontwaakt', 'De eerste scroll voelt als een ateliermoment voordat het kunstwerk zichtbaar wordt.', 'A raw rectangular block of pale limestone and dark bronze patina floating in the exact vertical center of the frame, rough chisel marks, tiny dust particles suspended naturally around it, no pedestal, no floor, no wall.'],
+      ['Chisel Dust Suspended', 'Vorm komt los', 'Stof, steen en richting maken de ambachtelijke waarde voelbaar.', 'The same stone and bronze block now showing clean abstract cut lines opening across the surface, fine stone dust and bronze filings suspended in mid-air, realistic gravity beginning to pull the heaviest particles downward.'],
+      ['Fragments Falling', 'Beweging wordt ambacht', 'Het ruwe materiaal valt laag voor laag weg en onthult intentie.', 'The same abstract material now shedding small stone chips and bronze fragments in ultra slow motion. Heavy fragments fall faster, fine dust falls last, each piece casts realistic shadows under the single amber top light, no sparks, no fantasy effects.'],
+      ['Abstract Sculpture Emerging', 'Het kunstwerk verschijnt', 'De scroll onthult een sculptuur zonder uitleg nodig te hebben.', 'The same raw material transforms into a finished abstract non-figurative sculpture, curved stone and brushed bronze surfaces emerging from the center, wet moss accents and garden gravel suspended subtly around it, no human shape, no face, no anatomy.'],
+      ['Garden Gallery Atmosphere', 'Atelier wordt beleving', 'Binnen en buiten komen samen als premium beeldentuinervaring.', 'The same abstract sculpture now surrounded by a restrained hint of sculpture garden atmosphere: dark moss, black gravel, a few soft leaves, and a distant blurred atelier light, all still floating on pure black background, museum-grade product photography.'],
+      ['Finished Sculpture Hero', 'Van kunst naar aanvraag', 'Het eindbeeld voelt als een premium website voor mensen die kwaliteit zoeken.', 'A final cinematic website hero composition built from the same abstract stone and bronze sculpture, warm amber top light, deep black negative space, refined gallery mood, no readable text, no logos, no human figures.'],
+      ['Collector Detail', 'Detail verkoopt waarde', 'Materiaal, textuur en stilte maken het premium gevoel concreet.', 'Extreme macro detail of the same abstract sculpture surface: limestone grain, brushed bronze edge, tiny dust resting in carved grooves, a single moss detail, pure black background, identical lighting language, no letters, no people.'],
+      ['Atelier Tableau', 'Klaar voor contact', 'De laatste scene zet aandacht om in vertrouwen en een duidelijke volgende stap.', 'The same finished abstract sculpture, raw material chips and refined garden textures arranged as an elegant final tableau for a premium atelier website, strong negative space for overlay copy, no readable text, no logos, no body-like forms.'],
     ].map(([title, overlayTitle, overlayCopy, prompt]) => ({ title, overlayTitle, overlayCopy, prompt: framePrompt([prefix, prompt]) }));
   }
   function buildBrandScenes(job) {
-    const { company, headings, paragraphs, palette } = companyContext(job);
-    const prefix = `Premium cinematic scroll website frame for ${company}. Keep the entire sequence visually consistent: same central hero object, same camera distance, same lighting, pure deep background, tactile materials, high-end commercial photography, photorealistic 8K, 16:9 composition, no readable text, no labels, no logos, no watermarks. Brand palette hints: ${palette}. ${headings ? `Website themes: ${headings}.` : ''} ${paragraphs ? `Business context: ${paragraphs}` : ''}`;
+    const prefix = lockedStudioRules(job, 'a physical premium symbol for the company offer');
     return [
-      ['Brand Object Sealed', 'Het verhaal opent', 'De eerste scroll zet een gewoon bedrijf om in een merkervaring.', 'A mysterious premium tactile object representing the company offer floating in the exact vertical center of the frame, closed and intact, matte black and glass materials, subtle accent glow, no surface, no floor, no table beneath it.'],
-      ['Core Reveal', 'De kern komt vrij', 'Het object opent en laat de essentie van het bedrijf zien zonder woorden nodig te hebben.', 'The same central premium object now opening in four elegant panels, abstract service details and particles emerging from within, clean negative space, luxurious backlight, no readable interface or text.'],
-      ['Value Cascade', 'Waarde wordt beweging', 'Details stromen naar voren alsof de bezoeker door het aanbod heen beweegt.', 'The same abstract service details now falling and orbiting in slow motion, glass fragments, light trails and tactile materials cascading downward, premium cinematic depth, controlled energy, no text.'],
-      ['Service In Action', 'Het aanbod wordt tastbaar', 'Het verhaal voelt niet meer als uitleg, maar als iets dat je bijna kunt aanraken.', 'A cinematic macro scene where the abstract company value becomes physical: refined tools, materials, light and motion converging around the same object, center frame, expensive product photography, no people yet, no text.'],
-      ['Outcome Formed', 'De belofte is helder', 'Alles komt samen in een rustig, overtuigend premium resultaat.', 'The same object now fully transformed into a glowing refined final form, clean symmetry, elegant reflections, warm highlight and subtle teal accent, strong negative space for website overlay copy, no readable marks.'],
-      ['Guided Contact', 'Menselijke aandacht', 'Warme materialen brengen vertrouwen, schaal en actie in het beeld.', 'Two elegant translucent support arcs entering slowly from both sides and gently interacting with the transformed object, careful and confident premium composition, warm light moving through glass and brushed metal, the object still floating mid-air, no people, no skin, no faces, no body parts, no surface, no floor, no text.'],
-      ['Premium Website Hero', 'Van film naar website', 'De scène wordt een digitale premium ervaring met conversie als eindpunt.', 'A high-end cinematic web hero composition built from the same object, light, particles and tactile material detail, abstract browser-like layout without readable text, no letters, no logos, deep background and refined negative space.'],
-      ['Conversion Tableau', 'Klaar voor actie', 'De laatste scène zet aandacht om in vertrouwen en contact.', 'Final premium brand tableau using the same transformed object and lighting language, confident quiet luxury, a clear focal point and empty space for a call to action overlay, no readable text or logos.'],
+      ['Brand Object Sealed', 'Het verhaal opent', 'De eerste scroll zet een gewoon bedrijf om in een merkervaring.', 'A mysterious premium tactile object representing the company offer floating in the exact vertical center of the frame, closed and intact, matte black ceramic, brushed metal and clear glass materials, no surface, no floor, no table beneath it.'],
+      ['Core Reveal', 'De kern komt vrij', 'Het object opent en laat de essentie van het bedrijf zien zonder woorden nodig te hebben.', 'The same central premium object now opening in four elegant panels, physical service tokens made of glass and metal emerging from within, clean negative space, realistic top light, no readable interface or text.'],
+      ['Value Falling', 'Waarde wordt beweging', 'Details stromen naar voren alsof de bezoeker door het aanbod heen beweegt.', 'The same glass and metal service tokens now falling downward in ultra slow motion with realistic physics, heavier metal pieces drop faster, thin glass pieces rotate slowly, fine dust falls last, no light trails, no energy effects, no fantasy particles.'],
+      ['Service In Action', 'Het aanbod wordt tastbaar', 'Het verhaal voelt niet meer als uitleg, maar als iets dat je bijna kunt aanraken.', 'A cinematic macro scene where the abstract company value becomes physical: refined tools, tactile materials and controlled motion converging around the same central object, expensive product photography, no people, no text.'],
+      ['Outcome Formed', 'De belofte is helder', 'Alles komt samen in een rustig, overtuigend premium resultaat.', 'The same object now fully transformed into a refined final form with clean symmetry, realistic glass reflections, warm amber highlight and one subtle teal accent, strong negative space for website overlay copy, no readable marks.'],
+      ['Guided Detail', 'Vertrouwen krijgt vorm', 'Warme materialen brengen schaal, rust en actie in het beeld.', 'Two elegant translucent glass support arcs and brushed metal guides hold the transformed object in mid-air like a museum display, careful and confident premium composition, no people, no skin, no faces, no body parts, no surface, no floor, no text.'],
+      ['Premium Website Hero', 'Van film naar website', 'De scene wordt een digitale premium ervaring met conversie als eindpunt.', 'A high-end cinematic web hero composition built from the same object and tactile material detail, abstract layout without readable text, no letters, no logos, deep background and refined negative space.'],
+      ['Conversion Tableau', 'Klaar voor actie', 'De laatste scene zet aandacht om in vertrouwen en contact.', 'Final premium brand tableau using the same transformed object and lighting language, confident quiet luxury, a clear focal point and empty space for a call to action overlay, no readable text or logos.'],
     ].map(([title, overlayTitle, overlayCopy, prompt]) => ({ title, overlayTitle, overlayCopy, prompt: framePrompt([prefix, prompt]) }));
   }
   function buildImageScenes(job) {
     const motif = scrollMotif(job);
-    const baseScenes = motif.key === 'tea' ? buildTeaScenes(job) : motif.key === 'legal' ? buildLegalScenes(job) : buildBrandScenes(job);
+    const baseScenes = motif.key === 'tea'
+      ? buildTeaScenes(job)
+      : motif.key === 'legal'
+        ? buildLegalScenes(job)
+        : motif.key === 'sculpture'
+          ? buildSculptureScenes(job)
+          : buildBrandScenes(job);
     return baseScenes.slice(0, IMAGE_COUNT).map((scene, index) => ({
       index,
       ...scene,
@@ -522,7 +552,9 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
       `Brand palette hints: ${palette}.`,
       'Strictly object-only commercial still life. No people or anatomy. Avoid figure-like sculpture forms.',
       'Use abstract premium materials only: glass, stone, brushed metal, paper, light, particles, refined product details, elegant negative space.',
-      'Pure deep background, controlled studio spotlight, photorealistic 8K, 16:9 composition, no readable text, no labels, no logos, no watermarks.',
+      'Camera completely locked, zero movement. Pure black background, single warm amber studio light from directly above, realistic physics only.',
+      'No artificial glow. No light trails. No energy effects. No CGI glow. No energy rings. No artificial light effects.',
+      'Photorealistic 8K, 16:9 composition, no readable text, no letters, no labels, no logos, no watermarks.',
     ]);
   }
   async function mapWithConcurrency(items, limit, worker) {
@@ -580,16 +612,41 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     return { images, prompt: imagePrompt(job), model, scenes };
   }
   function veoPrompt(job) {
+    const motif = scrollMotif(job);
     const company = job.customer.bedrijf || job.scan?.h1 || job.scan?.host || 'dit bedrijf';
-    return `Cinematic premium website scroll-film for ${company}. Animate the supplied brand still into a smooth 8 second commercial sequence that feels like the first act of an interactive website: slow dolly-in, subtle parallax, a reveal of a tactile detail, elegant light movement, premium pacing. Mood: modern, trustworthy, high-performance, made for a premium Dutch business website. No readable text overlays, no distorted logos, no unrealistic artifacts.`;
+    return [
+      `Ultra slow motion seamless transformation for a premium scroll-driven website for ${company}.`,
+      `Narrative motif: ${motif.label}.`,
+      'Shot on a professional DSLR macro camera. Camera completely locked, zero movement, no dolly, no pan, no zoom.',
+      'Pure black background under a single warm amber studio light from directly above.',
+      'Use the supplied start image as the first frame and, when an end frame is supplied, naturally bridge toward it.',
+      'Realistic physics only: objects drift, fall, settle and rotate with believable weight and air resistance.',
+      'No artificial glow. No light trails. No energy effects. No CGI glow. No energy rings. No artificial light effects.',
+      'No readable text, no letters, no logos, no labels, no watermarks, no distorted interface elements.',
+      'The final website will scrub this video frame-by-frame with scroll, so motion must be clean, slow and continuous.',
+    ].join(' ');
   }
-  function veoSubmitPayloadVariants(job, first) {
+  function veoSubmitPayloadVariants(job, first, last = null) {
     const prompt = veoPrompt(job);
     const mimeType = first.mimeType || 'image/png';
     const base64 = first.base64;
     const bytesImage = { bytesBase64Encoded: base64, mimeType };
+    const lastBytesImage = last?.base64 ? { bytesBase64Encoded: last.base64, mimeType: last.mimeType || mimeType } : null;
     const sdkStyleImage = { imageBytes: base64, mimeType };
-    return [
+    const variants = [];
+    if (lastBytesImage) {
+      variants.push(
+        {
+          label: 'bytes-first-last-config',
+          body: { instances: [{ prompt, image: bytesImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, resolution: '720p', lastFrame: lastBytesImage } },
+        },
+        {
+          label: 'bytes-first-last-instance',
+          body: { instances: [{ prompt, image: bytesImage, lastFrame: lastBytesImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, resolution: '720p' } },
+        }
+      );
+    }
+    variants.push(
       {
         label: 'bytes-full',
         body: { instances: [{ prompt, image: bytesImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, personGeneration: 'allow_adult', resolution: '720p' } },
@@ -606,7 +663,8 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         label: 'imageBytes-core',
         body: { instances: [{ prompt, image: sdkStyleImage }], parameters: { aspectRatio: '16:9', durationSeconds: 8, resolution: '720p' } },
       },
-    ];
+    );
+    return variants;
   }
   function veoSubmitErrorMessage(data) {
     return normalizeString(data?.error?.message || data?.error?.detail || data?.message);
@@ -615,7 +673,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const status = Number(response?.status || 0);
     if (![400, 422].includes(status)) return false;
     const message = veoSubmitErrorMessage(data);
-    return /unsupported|supported usage|unknown|unrecognized|invalid|remove|value type|needs to be|inlineData|bytesBase64Encoded|imageBytes|durationSeconds|personGeneration|resolution|aspectRatio|parameters/i.test(message);
+    return /unsupported|supported usage|unknown|unrecognized|invalid|remove|value type|needs to be|inlineData|bytesBase64Encoded|imageBytes|lastFrame|last_frame|durationSeconds|personGeneration|resolution|aspectRatio|parameters/i.test(message);
   }
   function geminiApiRoot() {
     return String(geminiApiBaseUrl || DEFAULT_GEMINI_API_BASE_URL).replace(/\/+$/, '');
@@ -636,9 +694,10 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
     const apiKey = normalizeString(getGeminiApiKey());
     if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY ontbreekt voor Veo 3.1'), { status: 503 });
     const first = images[0];
+    const last = images.length > 1 ? images[images.length - 1] : null;
     if (!first?.base64) throw Object.assign(new Error('Cinematic startbeeld ontbreekt voor Veo.'), { status: 422 });
     const endpoint = geminiApiUrl(`models/${encodeURIComponent(normalizeString(veoModel) || DEFAULT_VEO_MODEL)}:predictLongRunning`);
-    const variants = veoSubmitPayloadVariants(job, first);
+    const variants = veoSubmitPayloadVariants(job, first, last);
     let lastError = null;
     for (let index = 0; index < variants.length; index += 1) {
       const variant = variants[index];
@@ -797,6 +856,18 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
         ],
       };
     }
+    if (/\b(atelier|beeldentuin|kunst|kunstenaar|sculptuur|sculpturen|sculpture|gallery|galerie|beeldhouwer|brons|bronze|steen|stone|keramiek|ceramic|art object|artwork)\b/i.test(text)) {
+      return {
+        key: 'sculpture',
+        label: 'Atelierfilm op scroll',
+        scenes: [
+          ['Het materiaal ontwaakt', 'De eerste scroll opent op steen, brons en stof voordat het kunstwerk zichtbaar wordt.'],
+          ['Vorm komt los', 'Materiaal valt langzaam weg en laat vakmanschap voelen zonder uitleg nodig te hebben.'],
+          ['Het kunstwerk verschijnt', 'De sculptuur wordt het centrale premium object van de digitale ervaring.'],
+          ['Van atelier naar aanvraag', 'De laatste scene zet aandacht om in vertrouwen, bezoek en contact.'],
+        ],
+      };
+    }
     return {
       key: 'brand',
       label: 'Merkfilm op scroll',
@@ -831,7 +902,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
 <body>
 <main>
 <section class="hero">
-<video autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video>
+<video muted playsinline preload="metadata" src="${escapeHtml(getVideoRoute(job.id))}"></video>
 <div class="hero-copy">
 <div class="kicker">${domain || 'Premium webdesign'} / ${escapeHtml(motif.label)}</div>
 <h1>${company}</h1>
@@ -841,7 +912,7 @@ function createPremiumDatabaseCinematicJobsCoordinator(deps = {}) {
 </section>
 <section class="story motif-${escapeHtml(motif.key)}" id="scrollfilm" data-cinematic-scroll-story data-active="0">
 <div class="story-stage">
-<video class="story-video" autoplay muted loop playsinline src="${escapeHtml(getVideoRoute(job.id))}"></video>
+<video class="story-video" muted playsinline preload="metadata" src="${escapeHtml(getVideoRoute(job.id))}"></video>
 <div class="story-visual" aria-hidden="true">
 <div class="cinematic-object">
 <div class="object-shadow"></div>
@@ -938,14 +1009,21 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
       fileName: 'cinematic-frame-1.png',
       url: '',
     }];
+    const hasScrollVideo = Boolean(job.videoReady && job.videoUri);
     const firstFrame = safeFrames[0];
     const frameFigures = safeFrames.map((frame, index) => frame.url
       ? `<figure class="story-frame${index === 0 ? ' is-active' : ''}" data-frame="${index}"><img src="${escapeHtml(frame.url)}" alt="${escapeHtml(frame.fileName)}" loading="${index === 0 ? 'eager' : 'lazy'}"></figure>`
       : '').join('');
     const steps = safeFrames.map((frame, index) => `<article class="story-step" data-scene="${index}" data-title="${escapeHtml(frame.title)}" data-copy="${escapeHtml(frame.copy)}"><span>Frame ${String(index + 1).padStart(2, '0')}</span><b>${escapeHtml(frame.title)}</b></article>`).join('');
     const proofItems = headings.map((item, index) => `<li><span>${String(index + 1).padStart(2, '0')}</span>${escapeHtml(item)}</li>`).join('');
-    const storyMinHeight = Math.max(420, safeFrames.length * 92 + 120);
+    const storyMinHeight = hasScrollVideo ? 800 : Math.max(420, safeFrames.length * 92 + 120);
     const heroImage = firstFrame.url ? `<img class="hero-image" src="${escapeHtml(firstFrame.url)}" alt="${escapeHtml(firstFrame.fileName)}">` : '';
+    const scrollVideoMarkup = hasScrollVideo ? `<video id="scrollVideo" class="scroll-video-source" muted playsinline preload="auto" crossorigin="anonymous" src="${escapeHtml(getVideoRoute(job.id))}"></video><canvas id="scrollCanvas" class="scroll-canvas" aria-label="Scroll-controlled cinematic video"></canvas><div class="canvas-loader" data-canvas-loader><div class="canvas-loader-title">${company}</div><div class="canvas-loader-track"><span data-canvas-loader-bar></span></div><p data-canvas-loader-copy>Preparing scroll frames...</p></div>` : '';
+    const proofLabel = hasScrollVideo ? 'Van Veo naar scroll-canvas' : 'Van losse beelden naar scrollfilm';
+    const proofTitle = hasScrollVideo ? 'De video speelt nooit vanzelf.' : 'Elk hoofdbeeld is AI-gegenereerd.';
+    const proofCopy = hasScrollVideo
+      ? 'Deze versie gebruikt Image 2 beelden als keyframes, laat Veo daar motion van maken en tekent daarna video-frames op canvas. De bezoeker bestuurt het resultaat met scroll.'
+      : 'Deze versie gebruikt GPT Image 2 frames als visuele basis. De website tekent geen nep-objecten meer, maar laat de bezoeker door echte gegenereerde scenes scrollen.';
     return `<!doctype html>
 <html lang="nl">
 <head>
@@ -953,7 +1031,7 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${company} - cinematic website</title>
 <style>
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;color:#171719;background:#f6f7f2}h1,h2,p{margin:0}a{color:inherit}.hero{min-height:92vh;position:relative;display:grid;align-items:end;overflow:hidden;background:#101012;color:#fff}.hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.78;filter:saturate(1.04) contrast(1.05)}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.92),rgba(8,8,10,.55) 44%,rgba(8,8,10,.12)),linear-gradient(0deg,rgba(8,8,10,.76),transparent 44%)}.hero-copy{position:relative;z-index:1;width:min(1040px,92%);padding:96px 6% 82px}.kicker,.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}.kicker{color:#6ee7d8}.hero h1{max-width:820px;margin-top:18px;font-family:Impact,Arial Black,Inter,sans-serif;font-size:88px;line-height:.9;letter-spacing:0;text-transform:uppercase}.hero p{max-width:720px;margin-top:24px;font-size:20px;line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.story{--story-progress:0;min-height:${storyMinHeight}vh;position:relative;background:#0f0f11;color:#fff}.story-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.18fr) minmax(360px,.72fr);gap:42px;align-items:center;padding:62px 6% 120px;background:#0f0f11}.story-stage:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 38% 42%,rgba(15,159,147,.18),transparent 34%),radial-gradient(circle at 76% 68%,rgba(183,41,95,.18),transparent 32%)}.story-stage:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(0,0,0,.08),rgba(0,0,0,.58));pointer-events:none}.frame-stage,.story-copy{position:relative;z-index:1}.frame-stage{height:min(680px,72vh);border-radius:8px;overflow:hidden;background:#070708;box-shadow:0 34px 110px rgba(0,0,0,.5);isolation:isolate}.frame-stage:after{content:"";position:absolute;inset:0;border:1px solid rgba(255,255,255,.12);border-radius:8px;pointer-events:none}.story-frame{position:absolute;inset:0;margin:0;opacity:0;transform:scale(1.045);transition:opacity .7s ease,transform 1.2s ease;will-change:opacity,transform}.story-frame.is-active{opacity:1;transform:scale(calc(1.018 - var(--story-progress) * .018))}.story-frame img{width:100%;height:100%;display:block;object-fit:cover}.story-copy{align-self:center;max-width:560px}.scene-count{color:#6ee7d8;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.story-copy h2{margin-top:18px;font-size:56px;line-height:.98;letter-spacing:0;text-transform:uppercase}.story-copy p{margin-top:18px;color:rgba(255,255,255,.75);font-size:18px;line-height:1.7}.story-progress{margin-top:32px;height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}.story-progress span{display:block;height:100%;width:calc(var(--story-progress) * 100%);background:linear-gradient(90deg,#b7295f,#0f9f93)}.story-steps{position:absolute;left:6%;right:6%;bottom:28px;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.story-step{min-height:70px;padding:13px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);backdrop-filter:blur(12px);opacity:.46;transition:opacity .3s ease,transform .3s ease,border-color .3s ease}.story-step span{display:block;color:#6ee7d8;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.story-step b{display:block;margin-top:7px;font-size:12px;line-height:1.25;text-transform:uppercase}.story-step.is-active{opacity:1;transform:translateY(-6px);border-color:rgba(110,231,216,.48)}.proof{padding:88px 6%;background:#f6f7f2;color:#171719}.proof-inner{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:56px;align-items:start}.label{color:#b7295f}.proof h2{margin-top:14px;font-size:52px;line-height:1;letter-spacing:0;text-transform:uppercase}.proof p{margin-top:18px;color:#595f66;font-size:17px;line-height:1.75}.proof-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}.proof-list li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;min-height:58px;border-bottom:1px solid rgba(23,23,25,.14);font-weight:900;text-transform:uppercase}.proof-list span{color:#0f9f93;font-size:12px}.final-band{padding:76px 6%;background:#171719;color:#fff}.final-inner{width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:28px}.final-band h2{font-size:48px;line-height:1;letter-spacing:0;text-transform:uppercase}.final-band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.72);line-height:1.7}.domain{color:#6ee7d8;font-weight:900;text-transform:uppercase}@media(max-width:900px){.hero h1{font-size:58px}.story-stage{grid-template-columns:1fr;padding:42px 22px 150px}.frame-stage{height:44vh}.story-copy h2{font-size:38px}.story-steps{left:22px;right:22px;grid-template-columns:1fr 1fr}.proof-inner,.final-inner{display:grid;grid-template-columns:1fr}.proof h2,.final-band h2{font-size:38px}}@media(max-width:560px){.hero{min-height:82vh}.hero-copy{padding:72px 22px}.hero h1{font-size:46px}.hero p,.story-copy p{font-size:16px}.story-stage{height:100svh}.frame-stage{height:36vh}.story-steps{grid-template-columns:1fr;bottom:18px}.story-step{min-height:46px;padding:10px}.story-step b{font-size:12px}.proof,.final-band{padding:58px 22px}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;color:#171719;background:#f6f7f2}h1,h2,p{margin:0}a{color:inherit}.hero{min-height:92vh;position:relative;display:grid;align-items:end;overflow:hidden;background:#101012;color:#fff}.hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.78;filter:saturate(1.04) contrast(1.05)}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,8,10,.92),rgba(8,8,10,.55) 44%,rgba(8,8,10,.12)),linear-gradient(0deg,rgba(8,8,10,.76),transparent 44%)}.hero-copy{position:relative;z-index:1;width:min(1040px,92%);padding:96px 6% 82px}.kicker,.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900}.kicker{color:#6ee7d8}.hero h1{max-width:820px;margin-top:18px;font-family:Impact,Arial Black,Inter,sans-serif;font-size:88px;line-height:.9;letter-spacing:0;text-transform:uppercase}.hero p{max-width:720px;margin-top:24px;font-size:20px;line-height:1.55;color:rgba(255,255,255,.82)}.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}.cta{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.cta.primary{background:#b7295f;color:#fff}.cta.secondary{border:1px solid rgba(255,255,255,.32);color:#fff}.story{--story-progress:0;min-height:${storyMinHeight}vh;position:relative;background:#0f0f11;color:#fff}.story-stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.18fr) minmax(360px,.72fr);gap:42px;align-items:center;padding:62px 6% 120px;background:#0f0f11}.story-stage:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 38% 42%,rgba(15,159,147,.18),transparent 34%),radial-gradient(circle at 76% 68%,rgba(183,41,95,.18),transparent 32%)}.story-stage:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(0,0,0,.08),rgba(0,0,0,.58));pointer-events:none}.frame-stage,.story-copy{position:relative;z-index:1}.frame-stage{height:min(680px,72vh);border-radius:8px;overflow:hidden;background:#070708;box-shadow:0 34px 110px rgba(0,0,0,.5);isolation:isolate}.frame-stage:after{content:"";position:absolute;inset:0;border:1px solid rgba(255,255,255,.12);border-radius:8px;pointer-events:none}.story-frame{position:absolute;inset:0;margin:0;opacity:0;transform:scale(1.045);transition:opacity .7s ease,transform 1.2s ease;will-change:opacity,transform}.story-frame.is-active{opacity:1;transform:scale(calc(1.018 - var(--story-progress) * .018))}.story-frame img{width:100%;height:100%;display:block;object-fit:cover}.frame-stage.has-video .story-frame{display:none}.scroll-video-source{display:none}.scroll-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#070708}.canvas-loader{position:absolute;inset:0;z-index:3;display:grid;place-content:center;gap:14px;padding:28px;text-align:center;background:#030303;color:#fff;transition:opacity .8s ease,visibility .8s ease}.canvas-loader.is-hidden{opacity:0;visibility:hidden}.canvas-loader-title{font-family:Impact,Arial Black,Inter,sans-serif;font-size:clamp(28px,5vw,54px);line-height:.92;text-transform:uppercase;color:#d69a2d}.canvas-loader-track{width:220px;max-width:62vw;height:2px;margin:0 auto;background:rgba(214,154,45,.18);overflow:hidden}.canvas-loader-track span{display:block;width:0;height:100%;background:rgba(214,154,45,.9);transition:width .18s ease}.canvas-loader p{margin:0;color:rgba(255,255,255,.58);font-size:11px;letter-spacing:.08em;text-transform:uppercase}.story-copy{align-self:center;max-width:560px}.scene-count{color:#6ee7d8;font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.story-copy h2{margin-top:18px;font-size:56px;line-height:.98;letter-spacing:0;text-transform:uppercase}.story-copy p{margin-top:18px;color:rgba(255,255,255,.75);font-size:18px;line-height:1.7}.story-progress{margin-top:32px;height:4px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}.story-progress span{display:block;height:100%;width:calc(var(--story-progress) * 100%);background:linear-gradient(90deg,#b7295f,#0f9f93)}.story-steps{position:absolute;left:6%;right:6%;bottom:28px;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.story-step{min-height:70px;padding:13px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);backdrop-filter:blur(12px);opacity:.46;transition:opacity .3s ease,transform .3s ease,border-color .3s ease}.story-step span{display:block;color:#6ee7d8;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.story-step b{display:block;margin-top:7px;font-size:12px;line-height:1.25;text-transform:uppercase}.story-step.is-active{opacity:1;transform:translateY(-6px);border-color:rgba(110,231,216,.48)}.proof{padding:88px 6%;background:#f6f7f2;color:#171719}.proof-inner{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:56px;align-items:start}.label{color:#b7295f}.proof h2{margin-top:14px;font-size:52px;line-height:1;letter-spacing:0;text-transform:uppercase}.proof p{margin-top:18px;color:#595f66;font-size:17px;line-height:1.75}.proof-list{margin:0;padding:0;list-style:none;display:grid;gap:12px}.proof-list li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;min-height:58px;border-bottom:1px solid rgba(23,23,25,.14);font-weight:900;text-transform:uppercase}.proof-list span{color:#0f9f93;font-size:12px}.final-band{padding:76px 6%;background:#171719;color:#fff}.final-inner{width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:28px}.final-band h2{font-size:48px;line-height:1;letter-spacing:0;text-transform:uppercase}.final-band p{max-width:620px;margin-top:14px;color:rgba(255,255,255,.72);line-height:1.7}.domain{color:#6ee7d8;font-weight:900;text-transform:uppercase}@media(max-width:900px){.hero h1{font-size:58px}.story-stage{grid-template-columns:1fr;padding:42px 22px 150px}.frame-stage{height:44vh}.story-copy h2{font-size:38px}.story-steps{left:22px;right:22px;grid-template-columns:1fr 1fr}.proof-inner,.final-inner{display:grid;grid-template-columns:1fr}.proof h2,.final-band h2{font-size:38px}}@media(max-width:560px){.hero{min-height:82vh}.hero-copy{padding:72px 22px}.hero h1{font-size:46px}.hero p,.story-copy p{font-size:16px}.story-stage{height:100svh}.frame-stage{height:36vh}.story-steps{grid-template-columns:1fr;bottom:18px}.story-step{min-height:46px;padding:10px}.story-step b{font-size:12px}.proof,.final-band{padding:58px 22px}}
 </style>
 <style>
 .story-frame{transition:none!important}.story-frame[data-scrubbed="true"]{transition:none!important}.story-frame img{user-select:none}
@@ -972,7 +1050,8 @@ ${heroImage}
 </section>
 <section class="story" id="scrollfilm" data-cinematic-scroll-story data-active="0">
 <div class="story-stage">
-<div class="frame-stage" aria-label="GPT Image 2 cinematic frames">
+<div class="frame-stage${hasScrollVideo ? ' has-video' : ''}" aria-label="${hasScrollVideo ? 'Veo scroll-controlled canvas' : 'GPT Image 2 cinematic frames'}">
+${scrollVideoMarkup}
 ${frameFigures}
 </div>
 <div class="story-copy" data-story-copy>
@@ -986,7 +1065,7 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
 </section>
 <section class="proof" id="aanpak">
 <div class="proof-inner">
-<div><div class="label">Van losse beelden naar scrollfilm</div><h2>Elk hoofdbeeld is AI-gegenereerd.</h2><p>Deze versie gebruikt GPT Image 2 frames als visuele basis. De website tekent geen nep-objecten meer, maar laat de bezoeker door echte gegenereerde scènes scrollen.</p></div>
+<div><div class="label">${proofLabel}</div><h2>${proofTitle}</h2><p>${proofCopy}</p></div>
 <ul class="proof-list">${proofItems}</ul>
 </div>
 </section>
@@ -1003,11 +1082,128 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
   if(!story)return;
   var steps=Array.prototype.slice.call(story.querySelectorAll('.story-step'));
   var frames=Array.prototype.slice.call(story.querySelectorAll('.story-frame'));
+  var video=story.querySelector('#scrollVideo');
+  var canvas=story.querySelector('#scrollCanvas');
+  var ctx=canvas&&canvas.getContext?canvas.getContext('2d'):null;
+  var loader=story.querySelector('[data-canvas-loader]');
+  var loaderBar=story.querySelector('[data-canvas-loader-bar]');
+  var loaderCopy=story.querySelector('[data-canvas-loader-copy]');
   var count=story.querySelector('[data-scene-count]');
   var title=story.querySelector('[data-scene-title]');
   var copy=story.querySelector('[data-scene-copy]');
+  var extractedFrames=[];
+  var hasVideo=Boolean(video&&canvas&&ctx);
+  var seeking=false;
   var ticking=false;
   function clamp(value,min,max){return Math.max(min,Math.min(max,value));}
+  function setLoader(progress,label){
+    if(loaderBar)loaderBar.style.width=Math.round(clamp(progress,0,1)*100)+'%';
+    if(loaderCopy&&label)loaderCopy.textContent=label;
+  }
+  function hideLoader(){
+    if(loader)loader.classList.add('is-hidden');
+  }
+  function resizeCanvas(){
+    if(!canvas)return;
+    var rect=canvas.getBoundingClientRect();
+    var ratio=Math.min(2,window.devicePixelRatio||1);
+    var width=Math.max(1,Math.round(rect.width*ratio));
+    var height=Math.max(1,Math.round(rect.height*ratio));
+    if(canvas.width!==width||canvas.height!==height){
+      canvas.width=width;
+      canvas.height=height;
+    }
+  }
+  function drawCover(source){
+    if(!ctx||!source)return;
+    resizeCanvas();
+    var sw=source.videoWidth||source.naturalWidth||source.width||0;
+    var sh=source.videoHeight||source.naturalHeight||source.height||0;
+    if(!sw||!sh)return;
+    var cw=canvas.width;
+    var ch=canvas.height;
+    var scale=Math.max(cw/sw,ch/sh);
+    var dw=sw*scale;
+    var dh=sh*scale;
+    var dx=(cw-dw)/2;
+    var dy=(ch-dh)/2;
+    ctx.clearRect(0,0,cw,ch);
+    ctx.drawImage(source,dx,dy,dw,dh);
+  }
+  function waitForMetadata(){
+    if(!video)return Promise.resolve();
+    if(video.readyState>=1&&Number.isFinite(video.duration))return Promise.resolve();
+    return new Promise(function(resolve,reject){
+      var timeout=setTimeout(function(){cleanup();reject(new Error('Video metadata timeout'));},6000);
+      function cleanup(){
+        clearTimeout(timeout);
+        video.removeEventListener('loadedmetadata',done);
+        video.removeEventListener('error',fail);
+      }
+      function done(){cleanup();resolve();}
+      function fail(){cleanup();reject(new Error('Video load failed'));}
+      video.addEventListener('loadedmetadata',done);
+      video.addEventListener('error',fail);
+      video.load();
+    });
+  }
+  function seekVideo(time){
+    return new Promise(function(resolve){
+      if(!video||!Number.isFinite(video.duration)){resolve();return;}
+      var target=clamp(time,0,Math.max(0,video.duration-.04));
+      var settled=false;
+      function done(){
+        if(settled)return;
+        settled=true;
+        video.removeEventListener('seeked',done);
+        clearTimeout(timer);
+        resolve();
+      }
+      var timer=setTimeout(done,1400);
+      video.addEventListener('seeked',done);
+      try{video.currentTime=target;}catch(_){done();}
+    });
+  }
+  function decodeImage(img){
+    if(img.decode)return img.decode().catch(function(){});
+    return new Promise(function(resolve){
+      img.onload=resolve;
+      img.onerror=resolve;
+    });
+  }
+  async function extractFrames(){
+    if(!hasVideo)return false;
+    try{
+      video.pause();
+      video.muted=true;
+      await waitForMetadata();
+      resizeCanvas();
+      var duration=Math.max(.25,Number(video.duration)||8);
+      var targetCount=64;
+      var offscreen=document.createElement('canvas');
+      offscreen.width=960;
+      offscreen.height=540;
+      var offctx=offscreen.getContext('2d');
+      if(!offctx)throw new Error('Canvas unavailable');
+      for(var index=0;index<targetCount;index+=1){
+        var progress=targetCount<=1?0:index/(targetCount-1);
+        await seekVideo(progress*duration);
+        offctx.clearRect(0,0,offscreen.width,offscreen.height);
+        offctx.drawImage(video,0,0,offscreen.width,offscreen.height);
+        var img=new Image();
+        img.decoding='async';
+        img.src=offscreen.toDataURL('image/jpeg',.86);
+        await decodeImage(img);
+        extractedFrames.push(img);
+        setLoader((index+1)/targetCount,'Preparing scroll frames '+Math.round(((index+1)/targetCount)*100)+'%');
+      }
+      hideLoader();
+      return true;
+    }catch(_){
+      hideLoader();
+      return false;
+    }
+  }
   function setFrameVisual(frame,index,frameProgress){
     var distance=Math.abs(frameProgress-index);
     var opacity=clamp(1-distance,0,1);
@@ -1018,6 +1214,22 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
     frame.style.transform='scale('+scale.toFixed(4)+')';
     frame.classList.toggle('is-active',opacity>.5);
     frame.setAttribute('aria-hidden',opacity>.08?'false':'true');
+  }
+  function drawVideoProgress(progress){
+    if(!hasVideo)return;
+    if(extractedFrames.length){
+      var frameIndex=Math.min(extractedFrames.length-1,Math.round(progress*(extractedFrames.length-1)));
+      drawCover(extractedFrames[frameIndex]);
+      return;
+    }
+    if(video&&video.readyState>=2&&Number.isFinite(video.duration)){
+      var target=clamp(progress,0,1)*Math.max(.25,video.duration);
+      if(!seeking&&Math.abs(video.currentTime-target)>.05){
+        seeking=true;
+        try{video.currentTime=target;}catch(_){seeking=false;}
+      }
+      drawCover(video);
+    }
   }
   function render(){
     ticking=false;
@@ -1030,7 +1242,7 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
     var step=steps[active];
     story.dataset.active=String(active);
     story.style.setProperty('--story-progress',progress.toFixed(4));
-    frames.forEach(function(frame,index){setFrameVisual(frame,index,frameProgress);});
+    if(hasVideo){drawVideoProgress(progress);}else{frames.forEach(function(frame,index){setFrameVisual(frame,index,frameProgress);});}
     steps.forEach(function(item,index){item.classList.toggle('is-active',index===active);});
     if(step){
       if(count)count.textContent='Frame '+String(active+1).padStart(2,'0');
@@ -1039,8 +1251,13 @@ ${steps ? `<div class="story-steps">${steps}</div>` : ''}
     }
   }
   function request(){if(!ticking){ticking=true;requestAnimationFrame(render);}}
+  if(video)video.addEventListener('seeked',function(){seeking=false;request();});
   window.addEventListener('scroll',request,{passive:true});
   window.addEventListener('resize',request);
+  if(hasVideo){
+    setLoader(.04,'Preparing scroll frames...');
+    extractFrames().then(function(){request();});
+  }
   render();
 }());
 </script>
