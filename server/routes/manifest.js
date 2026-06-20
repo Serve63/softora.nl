@@ -12,7 +12,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/diensten', marker: 'Digitale diensten die verkeer omzetten in leads' },
   { path: '/ai-automatisering', marker: 'AI automatisering voor leads, taken en opvolging' },
   { path: '/bedrijfssoftware-op-maat', marker: 'Bedrijfssoftware op maat' },
-  { path: '/crm-systeem-op-maat', marker: 'CRM systeem op maat voor leadpipeline en offerteflow' },
+  { path: '/crm-systeem-op-maat', marker: 'CRM op maat laten bouwen voor sales pipeline en offertes' },
   { path: '/ai-telefonist', marker: 'Laat geen telefoontje meer zonder opvolging' },
   { path: '/voicesoftware-op-maat', marker: 'Voicesoftware op maat' },
   { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },

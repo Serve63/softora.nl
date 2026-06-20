@@ -85,9 +85,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
     fileName: 'crm-systeem-op-maat.html',
     path: '/crm-systeem-op-maat',
-    title: 'CRM systeem op maat laten maken voor MKB',
+    title: 'CRM op maat laten bouwen voor MKB',
     description:
-      'Laat CRM software op maat bouwen voor leadpipeline, klantbeheer, offerteflow, klantportaal, dashboards, reminders en AI-opvolging.',
+      'Laat een maatwerk CRM bouwen voor sales pipeline, offertebeheer, klantportaal, dashboards en AI-opvolging. Voor MKB-teams die CRM willen laten maken.',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [
