@@ -139,18 +139,22 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   const source = readPage('crm-systeem-op-maat.html');
   const entry = getRegistryEntry('crm-systeem-op-maat.html');
 
-  assert.match(source, /<title>CRM systeem op maat laten maken voor MKB \| Softora<\/title>/);
-  assert.match(source, /<meta name="description" content="Laat CRM software op maat bouwen voor leadpipeline/);
+  assert.match(source, /<title>CRM op maat laten bouwen voor MKB \| Softora<\/title>/);
+  assert.match(source, /<meta name="description" content="Laat een maatwerk CRM bouwen voor sales pipeline/);
   assert.match(source, /<meta name="robots" content="index, follow">/);
   assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/crm-systeem-op-maat">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(source, /<h1>CRM systeem op maat voor leadpipeline en offerteflow<\/h1>/);
+  assert.match(source, /<h1>CRM op maat laten bouwen voor sales pipeline en offertes<\/h1>/);
   assert.match(source, /Leadpipeline/);
   assert.match(source, /Klantbeheer/);
   assert.match(source, /CRM offerte systeem/);
   assert.match(source, /Klantportaal laten maken/);
   assert.match(source, /Dashboard laten ontwikkelen/);
+  assert.match(source, /Wanneer maatwerk CRM sterker is dan extra losse tools/);
+  assert.match(source, /CRM systeem laten maken/);
+  assert.match(source, /CRM laten bouwen met offertebeheer/);
+  assert.match(source, /CRM software laten maken die kan meegroeien/);
   assert.match(source, /Reminders en taken/);
   assert.match(source, /AI-samenvattingen/);
   assert.match(source, /Dashboards/);
@@ -170,8 +174,8 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'CRM systeem op maat laten maken voor MKB');
-  assert.match(entry.description, /CRM software op maat/);
+  assert.equal(entry.title, 'CRM op maat laten bouwen voor MKB');
+  assert.match(entry.description, /maatwerk CRM/);
   assert.ok(entry.relatedLinks.includes('/bedrijfssoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
