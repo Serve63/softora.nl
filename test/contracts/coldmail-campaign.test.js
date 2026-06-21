@@ -1880,6 +1880,72 @@ test('coldmail autopilot waits a configured send jitter before sending', async (
   assert.equal(getAutopilotState().lastResult.sendJitterSeconds, 37);
 });
 
+test('coldmail autopilot rechecks safe hours after send jitter before SMTP', async () => {
+  let currentNow = new Date('2026-06-19T14:59:00.000Z');
+  const { service, sentMessages, sleeps, outboundGuardCalls } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        sendJitterMinSeconds: 70,
+        sendJitterMaxSeconds: 70,
+      },
+    },
+    now: () => currentNow,
+    sleep: async (ms) => {
+      currentNow = new Date(currentNow.getTime() + ms);
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'outside_safe_hours');
+  assert.equal(result.sent, 0);
+  assert.deepEqual(sleeps, [70000]);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(outboundGuardCalls.length, 0);
+});
+
 test('coldmail autopilot supports a deterministic random per-sender cooldown range', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [

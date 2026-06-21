@@ -67,6 +67,7 @@ const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_SAFETY_PAUSED',
   'COLDMAIL_SEND_IN_PROGRESS',
   'COLDMAIL_SENDER_COOLDOWN_ACTIVE',
+  'COLDMAIL_AUTOPILOT_OUTSIDE_SCHEDULE',
   'EMPTY_MAIL_CONTENT',
   'NO_RECIPIENTS',
   'NO_SENDER_CAPACITY',
@@ -4977,6 +4978,14 @@ function createColdmailCampaignService(deps = {}) {
       error.code = 'COLDMAIL_AUTOPILOT_DISABLED';
       throw error;
     }
+    const scheduleCheck = isColdmailAutopilotInSchedule(latestStateRecord.state.schedule, now());
+    if (!scheduleCheck.ok) {
+      const error = new Error(scheduleCheck.message || 'Autopilot staat buiten het veilige verzendvenster. Er is niets verzonden.');
+      error.code = 'COLDMAIL_AUTOPILOT_OUTSIDE_SCHEDULE';
+      error.reason = scheduleCheck.reason || 'outside_safe_hours';
+      error.status = 429;
+      throw error;
+    }
   }
 
   async function runColdmailAutopilot(input = {}) {
@@ -5212,6 +5221,8 @@ function createColdmailCampaignService(deps = {}) {
             ? 'disabled'
             : code === 'COLDMAIL_SENDER_COOLDOWN_ACTIVE'
             ? 'sender_cooldown'
+            : code === 'COLDMAIL_AUTOPILOT_OUTSIDE_SCHEDULE'
+            ? normalizeString(error && error.reason) || 'outside_safe_hours'
             : code.toLowerCase(),
           message: truncateText(
             normalizeString(error && error.message) || 'Coldmail autopilot kon niet veilig draaien.',
@@ -8217,6 +8228,7 @@ function createColdmailCampaignService(deps = {}) {
           bedrijf: getRowCompany(row),
           email: to,
           code: normalizeString(error && error.code),
+          reason: normalizeString(error && error.reason),
           error: truncateText(normalizeString(error && error.message), 500),
         });
         const errorCode = normalizeString(error && error.code);
@@ -8258,7 +8270,11 @@ function createColdmailCampaignService(deps = {}) {
         normalizeString(item && item.code) === 'COLDMAIL_SENDER_COOLDOWN_ACTIVE'
       );
       const autopilotGuardFailure = failed.every((item) =>
-        ['COLDMAIL_AUTOPILOT_DISABLED', 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE'].includes(
+        [
+          'COLDMAIL_AUTOPILOT_DISABLED',
+          'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
+          'COLDMAIL_AUTOPILOT_OUTSIDE_SCHEDULE',
+        ].includes(
           normalizeString(item && item.code)
         )
       );
@@ -8276,6 +8292,7 @@ function createColdmailCampaignService(deps = {}) {
         error.code = 'COLDMAIL_SENDER_COOLDOWN_ACTIVE';
       } else if (autopilotGuardFailure) {
         error.code = normalizeString(failed[0] && failed[0].code) || 'COLDMAIL_AUTOPILOT_DISABLED';
+        error.reason = normalizeString(failed[0] && failed[0].reason);
       } else if (webdesignAssetFailure) {
         error.code = 'NO_WEBDESIGN_PHOTOS';
       } else {
