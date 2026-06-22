@@ -4705,26 +4705,6 @@ function createColdmailCampaignService(deps = {}) {
         skipped: smtpConfigSkips,
       };
     }
-    const daySlotPacing = isColdmailAutopilotDaySlotPacingSchedule(schedule);
-    if (daySlotPacing && senderOptions.length > 0 && skipped.length > 0) {
-      const selectableMinDaySent = senderOptions
-        .map((item) => getColdmailSenderQuotaDaySent(item.quota))
-        .reduce((lowest, value) => Math.min(lowest, value), Number.POSITIVE_INFINITY);
-      const lowerRoundSkips = skipped
-        .filter((item) => Number.isFinite(Number(item && item.senderDaySent)))
-        .filter((item) => Number(item.senderDaySent) < selectableMinDaySent)
-        .sort((left, right) => {
-          const dayDiff = Number(left.senderDaySent) - Number(right.senderDaySent);
-          if (dayDiff !== 0) return dayDiff;
-          return (Number(left.index) || 0) - (Number(right.index) || 0);
-        });
-      if (lowerRoundSkips.length > 0) {
-        return {
-          selected: null,
-          skipped: lowerRoundSkips,
-        };
-      }
-    }
     senderOptions.sort((left, right) => {
       const leftDaySent = getColdmailSenderQuotaDaySent(left.quota);
       const rightDaySent = getColdmailSenderQuotaDaySent(right.quota);
