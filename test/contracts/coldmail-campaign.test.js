@@ -2175,6 +2175,91 @@ test('coldmail autopilot day-paces each mailbox across the full 07-17 workday', 
   assert.equal(safelyReady.getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
 });
 
+test('coldmail autopilot does not let a cooling lower-round sender block a ready sender', async () => {
+  const senderEmails = ['serve@softora.nl', 'martijn@softora.nl'];
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify(senderEmails.map((email) => ({
+      email,
+      smtpHost: 'smtp.strato.com',
+      smtpUser: email,
+      smtpPass: `${email}-secret`,
+    }))),
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-22T05:10:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+        {
+          at: '2026-06-22T06:59:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+        {
+          at: '2026-06-22T07:30:00.000Z',
+          senderEmail: 'martijn@softora.nl',
+          count: 1,
+          personalCount: 0,
+        },
+      ],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails,
+        senderProfiles: Object.fromEntries(senderEmails.map((email) => [
+          email,
+          {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        ])),
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-22T07:54:00.000Z',
+    },
+    now: () => new Date('2026-06-22T08:00:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
+});
+
 test('coldmail autopilot blocks stale reads with a central sender cooldown lock', async () => {
   const outboundCalls = [];
   const outboundRecipientGuardStore = {
