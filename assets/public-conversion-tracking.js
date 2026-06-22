@@ -55,6 +55,34 @@
     return eventData;
   }
 
+  function sendFirstPartyConversion(eventData) {
+    try {
+      var body = JSON.stringify(eventData);
+      if (
+        window.navigator &&
+        typeof window.navigator.sendBeacon === 'function' &&
+        typeof window.Blob === 'function'
+      ) {
+        window.navigator.sendBeacon(
+          '/api/public-conversion',
+          new window.Blob([body], { type: 'application/json' })
+        );
+        return;
+      }
+
+      if (typeof window.fetch === 'function') {
+        window.fetch('/api/public-conversion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          keepalive: true,
+        }).catch(function () {});
+      }
+    } catch {
+      /* Conversion routing must never depend on measurement. */
+    }
+  }
+
   function handleConversionClick(event) {
     var link = event.target && event.target.closest
       ? event.target.closest('a[data-softora-conversion][data-softora-conversion-target="whatsapp"],a[href]')
@@ -64,7 +92,7 @@
     var href = getAttr(link, 'href');
     if (!isMartijnWhatsappUrl(href)) return;
 
-    recordConversion(link);
+    sendFirstPartyConversion(recordConversion(link));
     link.setAttribute('href', MARTIJN_WHATSAPP_URL);
   }
 
@@ -97,7 +125,7 @@
     var form = event && event.target;
     if (form && form.checkValidity && !form.checkValidity()) return;
 
-    recordConversion(control);
+    sendFirstPartyConversion(recordConversion(control));
 
     if (event && !event.defaultPrevented) {
       event.preventDefault();

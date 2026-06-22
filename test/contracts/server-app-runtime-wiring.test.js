@@ -106,6 +106,8 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
   assert.equal(typeof capturedRouteOptions.mailboxCoordinator.accountsResponse, 'function');
   assert.ok(capturedRouteOptions.publicContactCoordinator);
   assert.equal(typeof capturedRouteOptions.publicContactCoordinator.submitResponse, 'function');
+  assert.ok(capturedRouteOptions.publicConversionCoordinator);
+  assert.equal(typeof capturedRouteOptions.publicConversionCoordinator.recordResponse, 'function');
   assert.equal(capturedRouteOptions.premiumRouteRuntime.sessionSecret, 'secret');
   assert.equal(capturedRouteOptions.coldcalling.openAiModel, 'gpt-test');
 });
