@@ -4599,7 +4599,9 @@ function createColdmailCampaignService(deps = {}) {
       Math.max(0, windowMinutes - finalBufferMinutes),
       senderIndex * normalized.minIntervalMinutes
     );
-    const slotSpacingMinutes = normalized.senderMinIntervalMinutes + normalized.minIntervalMinutes;
+    // Keep each mailbox on its own hourly cadence; the global interval is already enforced
+    // between cron runs and should not accumulate inside every sender's day slots.
+    const slotSpacingMinutes = normalized.senderMinIntervalMinutes;
     const targetMinuteOfDay =
       normalized.startHour * 60 +
       firstWaveOffsetMinutes +
