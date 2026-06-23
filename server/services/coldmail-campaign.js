@@ -188,7 +188,7 @@ const SENDER_DISPLAY_NAMES = {
   'martijnven123@gmail.com': 'Martijn van de Ven',
   'serve290@gmail.com': 'Servé Creusen',
   'servecreusen7@gmail.com': 'Servé Creusen',
-  'contact.venvisuals@gmail.com': 'Servé Creusen',
+  'contact.venvisuals@gmail.com': 'Martijn van de Ven',
 };
 const SENDER_LOCATION_NAMES = {
   'serve@softora.nl': 'Liempde',
@@ -199,7 +199,7 @@ const SENDER_LOCATION_NAMES = {
   'martijnven123@gmail.com': 'Alphen',
   'serve290@gmail.com': 'Liempde',
   'servecreusen7@gmail.com': 'Liempde',
-  'contact.venvisuals@gmail.com': 'Liempde',
+  'contact.venvisuals@gmail.com': 'Alphen',
 };
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
