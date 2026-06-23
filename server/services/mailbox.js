@@ -40,8 +40,9 @@ const MAILBOX_DISPLAY_NAMES = {
   'martijnven123@gmail.com': 'Martijn van de Ven',
   'serve290@gmail.com': 'Servé Creusen',
   'servecreusen7@gmail.com': 'Servé Creusen',
-  'contact.venvisuals@gmail.com': 'Servé Creusen',
+  'contact.venvisuals@gmail.com': 'Martijn van de Ven',
 };
+const CANONICAL_MAILBOX_DISPLAY_NAMES = new Set(Object.values(MAILBOX_DISPLAY_NAMES));
 const MAILBOX_LOCATION_NAMES = {
   'serve@softora.nl': 'Liempde',
   'martijn@softora.nl': 'Alphen',
@@ -51,7 +52,7 @@ const MAILBOX_LOCATION_NAMES = {
   'martijnven123@gmail.com': 'Alphen',
   'serve290@gmail.com': 'Liempde',
   'servecreusen7@gmail.com': 'Liempde',
-  'contact.venvisuals@gmail.com': 'Liempde',
+  'contact.venvisuals@gmail.com': 'Alphen',
 };
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
@@ -570,7 +571,19 @@ function createMailboxService(deps = {}) {
     const name = normalizeString(preferredName);
     const canonicalName = MAILBOX_DISPLAY_NAMES[address] || '';
     const shortName = address.split('@')[0] || '';
-    if (canonicalName && (!name || name.toLowerCase() === shortName)) return canonicalName;
+    if (
+      canonicalName &&
+      (
+        !name ||
+        name.toLowerCase() === shortName ||
+        (
+          CANONICAL_MAILBOX_DISPLAY_NAMES.has(name) &&
+          name.toLowerCase() !== canonicalName.toLowerCase()
+        )
+      )
+    ) {
+      return canonicalName;
+    }
     return name || canonicalName || address;
   }
 

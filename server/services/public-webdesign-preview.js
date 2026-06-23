@@ -58,7 +58,7 @@ const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
   'servec321@gmail.com': 'serve',
   'serve290@gmail.com': 'serve',
   'servecreusen7@gmail.com': 'serve',
-  'contact.venvisuals@gmail.com': 'serve',
+  'contact.venvisuals@gmail.com': 'martijn',
   'serve@websoftora.com': 'serve',
   'servecreusen@websoftora.com': 'serve',
   'martijn@softora.nl': 'martijn',
