@@ -2493,7 +2493,10 @@ test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', a
 
   const workdayStartMs = Date.parse('2026-06-12T05:00:00.000Z');
   for (let tick = 0; tick < 120; tick += 1) {
-    currentNow = new Date(workdayStartMs + tick * 5 * 60 * 1000);
+    const scheduledNow = new Date(workdayStartMs + tick * 5 * 60 * 1000);
+    if (currentNow.getTime() < scheduledNow.getTime()) {
+      currentNow = scheduledNow;
+    }
     await service.runColdmailAutopilot({
       publicBaseUrl: 'https://www.softora.nl',
       actor: 'Coldmail Autopilot Cron',
