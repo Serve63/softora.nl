@@ -2647,6 +2647,12 @@ test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', a
   assert.equal(sentMessages.length, 81);
   assert.deepEqual(perSender, Object.fromEntries(senderEmails.map((email) => [email, 9])));
   assert.equal(todayEntries.length, 81);
+  const countSentBy = (isoTimestamp) =>
+    todayEntries.filter((entry) => Date.parse(entry.at) <= Date.parse(isoTimestamp)).length;
+  assert.equal(countSentBy('2026-06-12T07:30:00.000Z') >= 20, true);
+  assert.equal(countSentBy('2026-06-12T10:30:00.000Z') >= 45, true);
+  assert.equal(countSentBy('2026-06-12T13:30:00.000Z') >= 70, true);
+  assert.equal(countSentBy('2026-06-12T14:30:00.000Z'), 81);
 
   const latestSentAtMs = Math.max(...todayEntries.map((entry) => Date.parse(entry.at)));
   assert.equal(latestSentAtMs < Date.parse('2026-06-12T15:00:00.000Z'), true);
