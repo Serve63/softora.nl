@@ -473,6 +473,23 @@ function createRuntimeOpsCoordinator(deps = {}) {
     return parseStateUpdatedAtMs(fallbackState) > parseStateUpdatedAtMs(sportschoolState);
   }
 
+  function getPreferredSportschoolLogbookState(leftState, rightState) {
+    const leftQuality = getSportschoolLogbookStateQuality(leftState);
+    const rightQuality = getSportschoolLogbookStateQuality(rightState);
+    if (!leftQuality.usable) return rightQuality.usable ? rightState : null;
+    if (!rightQuality.usable) return leftState;
+    if (leftQuality.rank !== rightQuality.rank) {
+      return leftQuality.rank > rightQuality.rank ? leftState : rightState;
+    }
+    return parseStateUpdatedAtMs(leftState) >= parseStateUpdatedAtMs(rightState) ? leftState : rightState;
+  }
+
+  function isOlderSportschoolLogbookWrite(incomingState, existingState) {
+    const incomingQuality = getSportschoolLogbookStateQuality(incomingState);
+    const existingQuality = getSportschoolLogbookStateQuality(existingState);
+    return existingQuality.usable && incomingQuality.usable && incomingQuality.rank < existingQuality.rank;
+  }
+
   async function sendSportschoolLogbookGetResponse(_req, res) {
     const sportschoolState =
       sportschoolLogbookStore &&
@@ -531,6 +548,30 @@ function createRuntimeOpsCoordinator(deps = {}) {
       source: normalizeString(body.source || 'sportschool-logboek'),
       actor: normalizeString(body.actor || 'serve'),
     };
+    const currentSportschoolState =
+      sportschoolLogbookStore &&
+      typeof sportschoolLogbookStore.readLogbookState === 'function'
+        ? await sportschoolLogbookStore.readLogbookState()
+        : null;
+    const currentFallbackState = await getUiStateValuesForScope(SPORTSCHOOL_LOGBOOK_SCOPE);
+    const currentState = getPreferredSportschoolLogbookState(currentSportschoolState, currentFallbackState);
+    const incomingState = {
+      values: valuesToSave,
+      source: 'request',
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (isOlderSportschoolLogbookWrite(incomingState, currentState)) {
+      return res.status(409).json({
+        ok: false,
+        scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+        error: 'Verouderde sportschool logboekdata geweigerd.',
+        values: (currentState && currentState.values) || {},
+        source: (currentState && currentState.source) || 'supabase',
+        updatedAt: (currentState && currentState.updatedAt) || null,
+      });
+    }
+
     const sportschoolState =
       sportschoolLogbookStore &&
       typeof sportschoolLogbookStore.writeLogbookSnapshot === 'function'
