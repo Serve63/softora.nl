@@ -123,6 +123,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
     dataOpsUiStateBridge = null,
+    sportschoolLogbookStore = null,
     dataOpsUiStateReadTimeoutMs = 2500,
     dataOpsUiStateReadTimeoutMsByScope = {},
     uiStateReadTimeoutMs = 4500,
@@ -419,14 +420,96 @@ function createRuntimeOpsCoordinator(deps = {}) {
     return sendUiStateSetSuccessResponse(res, scope, mirroredState || state, valuesToSave);
   }
 
+  function hasSportschoolLogbookValue(state) {
+    return Boolean(
+      state &&
+        state.values &&
+        typeof state.values === 'object' &&
+        Object.prototype.hasOwnProperty.call(state.values, SPORTSCHOOL_LOGBOOK_KEY)
+    );
+  }
+
+  function parseSportschoolLogbookStateSnapshot(state) {
+    if (!hasSportschoolLogbookValue(state)) return null;
+    try {
+      const raw = state.values[SPORTSCHOOL_LOGBOOK_KEY];
+      const snapshot = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) ? snapshot : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function getSportschoolLogbookStateQuality(state) {
+    const snapshot = parseSportschoolLogbookStateSnapshot(state);
+    if (!snapshot) return { usable: false, rank: 0 };
+    const version = Number(snapshot.version) || 1;
+    const hasExerciseSources = Boolean(
+      snapshot.exerciseSources &&
+        typeof snapshot.exerciseSources === 'object' &&
+        !Array.isArray(snapshot.exerciseSources)
+    );
+    return {
+      usable: true,
+      rank: version * 10 + (hasExerciseSources ? 1 : 0),
+      version,
+      hasExerciseSources,
+    };
+  }
+
+  function parseStateUpdatedAtMs(state) {
+    const parsed = Date.parse(normalizeString(state && state.updatedAt));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function shouldPreferLegacySportschoolLogbook(fallbackState, sportschoolState) {
+    const fallbackQuality = getSportschoolLogbookStateQuality(fallbackState);
+    if (!fallbackQuality.usable) return false;
+    const sportschoolQuality = getSportschoolLogbookStateQuality(sportschoolState);
+    if (!sportschoolQuality.usable) return true;
+    if (fallbackQuality.rank !== sportschoolQuality.rank) {
+      return fallbackQuality.rank > sportschoolQuality.rank;
+    }
+    return parseStateUpdatedAtMs(fallbackState) > parseStateUpdatedAtMs(sportschoolState);
+  }
+
   async function sendSportschoolLogbookGetResponse(_req, res) {
-    const state = await getUiStateValuesForScope(SPORTSCHOOL_LOGBOOK_SCOPE);
+    const sportschoolState =
+      sportschoolLogbookStore &&
+      typeof sportschoolLogbookStore.readLogbookState === 'function'
+        ? await sportschoolLogbookStore.readLogbookState()
+        : null;
+    const fallbackState = await getUiStateValuesForScope(SPORTSCHOOL_LOGBOOK_SCOPE);
+    const shouldRecoverLegacy = shouldPreferLegacySportschoolLogbook(fallbackState, sportschoolState);
+    if (
+      shouldRecoverLegacy &&
+      sportschoolLogbookStore &&
+      typeof sportschoolLogbookStore.writeLogbookSnapshot === 'function'
+    ) {
+      await sportschoolLogbookStore.writeLogbookSnapshot(fallbackState.values[SPORTSCHOOL_LOGBOOK_KEY], {
+        source: 'sportschool-logboek-legacy-recovery',
+        actor: 'runtime-ops',
+      });
+    }
+    const selectedState = shouldRecoverLegacy ? fallbackState : sportschoolState || fallbackState;
+    if (
+      selectedState === sportschoolState &&
+      hasSportschoolLogbookValue(sportschoolState) &&
+      (!hasSportschoolLogbookValue(fallbackState) ||
+        getSportschoolLogbookStateQuality(sportschoolState).rank >
+          getSportschoolLogbookStateQuality(fallbackState).rank)
+    ) {
+      await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, sportschoolState.values, {
+        source: 'sportschool-logboek-canonical-sync',
+        actor: 'runtime-ops',
+      });
+    }
     return res.status(200).json({
       ok: true,
       scope: SPORTSCHOOL_LOGBOOK_SCOPE,
-      values: (state && state.values) || {},
-      source: (state && state.source) || 'supabase',
-      updatedAt: (state && state.updatedAt) || null,
+      values: (selectedState && selectedState.values) || {},
+      source: (selectedState && selectedState.source) || 'supabase',
+      updatedAt: (selectedState && selectedState.updatedAt) || null,
     });
   }
 
@@ -448,7 +531,16 @@ function createRuntimeOpsCoordinator(deps = {}) {
       source: normalizeString(body.source || 'sportschool-logboek'),
       actor: normalizeString(body.actor || 'serve'),
     };
+    const sportschoolState =
+      sportschoolLogbookStore &&
+      typeof sportschoolLogbookStore.writeLogbookSnapshot === 'function'
+        ? await sportschoolLogbookStore.writeLogbookSnapshot(snapshotJson, meta)
+        : null;
+    if (sportschoolState) {
+      await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta);
+    }
     const state =
+      sportschoolState ||
       (await mirrorUiStateValuesToDataOps(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta)) ||
       (await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta));
 

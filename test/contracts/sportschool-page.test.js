@@ -43,6 +43,11 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /snapshot: JSON\.parse\(snapshotJson\)/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /persistRemoteSave/);
+  assert.match(scriptSource, /exerciseSources/);
+  assert.match(scriptSource, /exerciseKeyForTitle/);
+  assert.match(scriptSource, /mergeExerciseSource/);
+  assert.match(scriptSource, /if \(isApplyingRemoteState \|\| !isReady\) return;/);
+  assert.match(scriptSource, /window\.setTimeout\(boot, REMOTE_RETRY_DELAY_MS\)/);
   assert.match(scriptSource, /keepalive: options\.keepalive === true/);
   assert.match(scriptSource, /pagehide/);
   assert.match(scriptSource, /visibilitychange/);
