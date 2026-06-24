@@ -3882,12 +3882,25 @@ function createColdmailCampaignService(deps = {}) {
       0,
       23
     );
+    const startMinute = parsePositiveInt(
+      raw.startMinute ?? raw.safeStartMinute,
+      0,
+      0,
+      59
+    );
     const endHour = parsePositiveInt(
       raw.endHour ?? raw.safeEndHour,
       DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR,
       1,
       24
     );
+    const rawEndMinute = parsePositiveInt(
+      raw.endMinute ?? raw.safeEndMinute,
+      0,
+      0,
+      59
+    );
+    const endMinute = endHour >= 24 ? 0 : rawEndMinute;
     const senderMinIntervalMinutesRaw = parsePositiveInt(
       raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
       DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES,
@@ -3924,7 +3937,9 @@ function createColdmailCampaignService(deps = {}) {
     );
     const isLegacyWorkdayPace =
       startHour === DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR &&
+      startMinute === 0 &&
       endHour === DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR &&
+      endMinute === 0 &&
       minIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES &&
       senderMinIntervalMinutesRaw === 70 &&
       senderMaxIntervalMinutesRaw === 82;
@@ -3941,13 +3956,45 @@ function createColdmailCampaignService(deps = {}) {
         true
       ),
       startHour,
-      endHour: Math.max(startHour + 1, endHour),
+      startMinute,
+      ...normalizeColdmailAutopilotScheduleEnd({ startHour, startMinute, endHour, endMinute }),
       minIntervalMinutes,
       senderMinIntervalMinutes,
       senderMaxIntervalMinutes,
       sendJitterMinSeconds,
       sendJitterMaxSeconds,
     };
+  }
+
+  function normalizeColdmailAutopilotScheduleEnd(value = {}) {
+    const startMinuteOfDay =
+      Math.max(0, Math.min(23, Number(value.startHour) || 0)) * 60 +
+      Math.max(0, Math.min(59, Number(value.startMinute) || 0));
+    let endMinuteOfDay =
+      Math.max(1, Math.min(24, Number(value.endHour) || DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR)) * 60 +
+      Math.max(0, Math.min(59, Number(value.endMinute) || 0));
+    if (endMinuteOfDay > 24 * 60) endMinuteOfDay = 24 * 60;
+    if (endMinuteOfDay <= startMinuteOfDay) {
+      endMinuteOfDay = Math.min(24 * 60, startMinuteOfDay + 60);
+    }
+    return {
+      endHour: Math.floor(endMinuteOfDay / 60),
+      endMinute: endMinuteOfDay % 60,
+    };
+  }
+
+  function getColdmailAutopilotScheduleStartMinuteOfDay(schedule) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    return normalized.startHour * 60 + normalized.startMinute;
+  }
+
+  function getColdmailAutopilotScheduleEndMinuteOfDay(schedule) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    return normalized.endHour * 60 + normalized.endMinute;
+  }
+
+  function formatColdmailAutopilotScheduleTime(hour, minute = 0) {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   }
 
   function hasColdmailAutopilotUsableSenderConfig(value) {
@@ -3966,7 +4013,9 @@ function createColdmailCampaignService(deps = {}) {
     if (schedule.timezone === DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) score += 1;
     if (schedule.weekdaysOnly) score += 1;
     if (schedule.startHour <= DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR) score += 1;
-    if (schedule.endHour >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR) score += 1;
+    if (getColdmailAutopilotScheduleEndMinuteOfDay(schedule) >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR * 60) {
+      score += 1;
+    }
     if (schedule.minIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES) score += 1;
     if (schedule.senderMinIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES) score += 1;
     if (schedule.senderMaxIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES) score += 1;
@@ -3978,7 +4027,9 @@ function createColdmailCampaignService(deps = {}) {
   function isLegacyColdmailAutopilotDashboardSchedule(value) {
     const schedule = normalizeColdmailAutopilotSchedule(value);
     return schedule.startHour === 8 &&
+      schedule.startMinute === 0 &&
       schedule.endHour === 17 &&
+      schedule.endMinute === 0 &&
       schedule.minIntervalMinutes === 5 &&
       schedule.senderMinIntervalMinutes === 14 &&
       schedule.senderMaxIntervalMinutes === 18 &&
@@ -4034,7 +4085,9 @@ function createColdmailCampaignService(deps = {}) {
         timezone: env.COLDMAIL_AUTOPILOT_TIMEZONE,
         weekdaysOnly: env.COLDMAIL_AUTOPILOT_WEEKDAYS_ONLY,
         startHour: env.COLDMAIL_AUTOPILOT_START_HOUR,
+        startMinute: env.COLDMAIL_AUTOPILOT_START_MINUTE,
         endHour: env.COLDMAIL_AUTOPILOT_END_HOUR,
+        endMinute: env.COLDMAIL_AUTOPILOT_END_MINUTE,
         minIntervalMinutes: env.COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
         senderMinIntervalMinutes:
           env.COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES ||
@@ -4623,7 +4676,8 @@ function createColdmailCampaignService(deps = {}) {
     return normalized.timezone === DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE &&
       normalized.weekdaysOnly &&
       normalized.startHour === DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR &&
-      normalized.endHour === DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR &&
+      normalized.startMinute === 0 &&
+      getColdmailAutopilotScheduleEndMinuteOfDay(normalized) >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR * 60 &&
       normalized.minIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES &&
       normalized.senderMinIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES &&
       normalized.senderMaxIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES;
@@ -4655,7 +4709,8 @@ function createColdmailCampaignService(deps = {}) {
     if (!lastSentAtMs || senderSent <= 0 || senderSent >= dailyLimit || dailyLimit < 2) return null;
     const windowMinutes = Math.max(
       normalized.minIntervalMinutes,
-      (normalized.endHour - normalized.startHour) * 60
+      getColdmailAutopilotScheduleEndMinuteOfDay(normalized) -
+        getColdmailAutopilotScheduleStartMinuteOfDay(normalized)
     );
     const senderIndex = Math.max(0, Number(options.senderIndex) || 0);
     const slotIndex = Math.min(senderSent, dailyLimit - 1);
@@ -4668,7 +4723,7 @@ function createColdmailCampaignService(deps = {}) {
     // between cron runs and should not accumulate inside every sender's day slots.
     const slotSpacingMinutes = normalized.senderMinIntervalMinutes;
     const targetMinuteOfDay =
-      normalized.startHour * 60 +
+      getColdmailAutopilotScheduleStartMinuteOfDay(normalized) +
       firstWaveOffsetMinutes +
       slotIndex * slotSpacingMinutes;
     const currentMs = now().getTime();
@@ -4866,11 +4921,14 @@ function createColdmailCampaignService(deps = {}) {
         message: 'Autopilot wacht tot de volgende werkdag.',
       };
     }
-    if (parts.hour < normalized.startHour || parts.hour >= normalized.endHour) {
+    const currentMinuteOfDay = parts.hour * 60 + parts.minute;
+    const startMinuteOfDay = getColdmailAutopilotScheduleStartMinuteOfDay(normalized);
+    const endMinuteOfDay = getColdmailAutopilotScheduleEndMinuteOfDay(normalized);
+    if (currentMinuteOfDay < startMinuteOfDay || currentMinuteOfDay >= endMinuteOfDay) {
       return {
         ok: false,
         reason: 'outside_safe_hours',
-        message: `Autopilot mailt alleen tussen ${String(normalized.startHour).padStart(2, '0')}:00 en ${String(normalized.endHour).padStart(2, '0')}:00.`,
+        message: `Autopilot mailt alleen tussen ${formatColdmailAutopilotScheduleTime(normalized.startHour, normalized.startMinute)} en ${formatColdmailAutopilotScheduleTime(normalized.endHour, normalized.endMinute)}.`,
       };
     }
     return { ok: true };
