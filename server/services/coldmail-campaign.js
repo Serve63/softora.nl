@@ -3281,6 +3281,82 @@ function createColdmailCampaignService(deps = {}) {
     return 'unknown';
   }
 
+  function normalizeColdmailLiveBounceTypeFromText(value) {
+    const text = normalizeString(value).toLowerCase();
+    if (!/bounce|bounced/.test(text)) return '';
+    if (/\bhard[_\s-]*bounce\b|\bhard\b/.test(text)) return 'hard';
+    if (/\bsoft[_\s-]*bounce\b|\bsoft\b/.test(text)) return 'soft';
+    if (/\binstantly\b/.test(text)) return 'instantly';
+    return 'unknown';
+  }
+
+  function getColdmailLiveBounceHistoryEntry(row) {
+    return (Array.isArray(row && row.hist) ? row.hist : []).find((entry) => {
+      const text = normalizeString(
+        [
+          entry && entry.type,
+          entry && entry.status,
+          entry && entry.label,
+          entry && entry.title,
+          entry && entry.message,
+          entry && entry.description,
+          entry && entry.note,
+          entry && entry.source,
+          entry && entry.actor,
+        ].join(' ')
+      );
+      return Boolean(normalizeColdmailLiveBounceTypeFromText(text));
+    }) || null;
+  }
+
+  function getColdmailLiveBounceSignal(row) {
+    if (!row || typeof row !== 'object') return null;
+    const historyEntry = getColdmailLiveBounceHistoryEntry(row);
+    const providerStatus = normalizeInstantlyColdmailStatus(
+      row.instantlyStatus ||
+        row.lastColdmailProviderStatus ||
+        row.providerStatus ||
+        row.outreachProviderStatus
+    );
+    const explicitAt = normalizeString(row.coldmailBounceAt || row.lastColdmailBounceAt || row.bouncedAt);
+    const explicitType = normalizeColdmailLiveBounceType(row.coldmailBounceType || row.lastColdmailBounceType);
+    const historyText = historyEntry
+      ? [
+          historyEntry.type,
+          historyEntry.status,
+          historyEntry.label,
+          historyEntry.title,
+          historyEntry.message,
+          historyEntry.description,
+          historyEntry.note,
+          historyEntry.source,
+          historyEntry.actor,
+        ].join(' ')
+      : '';
+    const historyType = normalizeColdmailLiveBounceTypeFromText(historyText);
+    const providerType = providerStatus === 'bounced' ? 'instantly' : '';
+    const hasSignal = Boolean(
+      explicitAt ||
+        normalizeString(row.coldmailBounceType || row.lastColdmailBounceType) ||
+        providerType ||
+        historyType
+    );
+    if (!hasSignal) return null;
+    return {
+      type: explicitType !== 'unknown' ? explicitType : providerType || historyType || explicitType,
+      at: normalizeString(
+        explicitAt ||
+          row.instantlyLastEventAt ||
+          row.instantlyUpdatedAt ||
+          row.lastColdmailProviderUpdatedAt ||
+          row.lastColdmailReplyAt ||
+          (historyEntry && (historyEntry.at || historyEntry.date || historyEntry.createdAt || historyEntry.updatedAt)) ||
+          row.updatedAt ||
+          row.updated_at
+      ),
+    };
+  }
+
   function summarizeColdmailDatabaseLiveStats(rows) {
     let databaseTotalSent = 0;
     let webdesignTotalSent = 0;
@@ -3350,11 +3426,12 @@ function createColdmailCampaignService(deps = {}) {
       if (['interesse', 'afspraak', 'klant'].includes(status)) interestedTotal += 1;
       if (isRowInActiveColdmailCampaign(row)) activeCampaignTotal += 1;
 
-      const bounceAt = normalizeString(row && (row.coldmailBounceAt || row.lastColdmailBounceAt || row.bouncedAt));
+      const bounceSignal = getColdmailLiveBounceSignal(row);
+      const bounceAt = normalizeString(bounceSignal && bounceSignal.at);
       const bounceAtMs = parseTimestampMs(bounceAt);
-      if (bounceAtMs && !isTestRecipientRow(row, getRowEmail(row))) {
+      if (bounceSignal && !isTestRecipientRow(row, getRowEmail(row))) {
         const bounceKey = recipientKey || `row:${index}`;
-        const bounceType = normalizeColdmailLiveBounceType(row && row.coldmailBounceType);
+        const bounceType = normalizeColdmailLiveBounceType(bounceSignal.type);
         const bounceItem = {
           company: truncateText(getRowCompany(row), 120),
           email: getRowEmail(row),
@@ -3368,6 +3445,7 @@ function createColdmailCampaignService(deps = {}) {
           bounceItems.push(bounceItem);
         }
         if (
+          bounceAtMs &&
           getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey &&
           !bounceTodayRecipientKeys.has(bounceKey)
         ) {
