@@ -1993,6 +1993,96 @@ test('coldmail autopilot rechecks safe hours after send jitter before SMTP', asy
   assert.equal(outboundGuardCalls.length, 0);
 });
 
+test('coldmail autopilot supports a 23:30 safe end window without raising the daily caps', async () => {
+  const buildAutopilotState = () => ({
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+      branch: 'Horeca & Restaurants',
+      specialAction: '',
+      radiusKm: '',
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 7,
+      startMinute: 0,
+      endHour: 23,
+      endMinute: 30,
+      minIntervalMinutes: 5,
+      senderMinIntervalMinutes: 60,
+      senderMaxIntervalMinutes: 74,
+      sendJitterMinSeconds: 1,
+      sendJitterMaxSeconds: 1,
+    },
+  });
+  const rows = [
+    {
+      id: 'prospect-1',
+      bedrijf: 'Bakkerij Zon',
+      naam: 'Ruben',
+      email: 'ruben@example.test',
+      status: 'prospect',
+      branche: 'Horeca & Restaurants',
+      stad: 'Oisterwijk',
+      mail: true,
+    },
+  ];
+  const mailboxAccountsRaw = JSON.stringify([
+    {
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.strato.com',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'serve-secret',
+    },
+  ]);
+  let currentNow = new Date('2026-06-19T21:29:00.000Z');
+  const inside = createService({
+    rows,
+    mailboxAccountsRaw,
+    autopilotState: buildAutopilotState(),
+    now: () => currentNow,
+    sleep: async (ms) => {
+      currentNow = new Date(currentNow.getTime() + ms);
+    },
+  });
+
+  const sentResult = await inside.service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(sentResult.sent, 1);
+  assert.equal(inside.sentMessages.length, 1);
+  assert.equal(inside.getAutopilotState().schedule.endMinute, 30);
+  assert.equal(sentResult.dailyQuota.senderRemainingBefore, 9);
+  assert.equal(sentResult.dailyQuota.packageRemainingBefore, 81);
+
+  currentNow = new Date('2026-06-19T21:30:00.000Z');
+  const outside = createService({
+    rows,
+    mailboxAccountsRaw,
+    autopilotState: buildAutopilotState(),
+    now: () => currentNow,
+  });
+  const blockedResult = await outside.service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(blockedResult.reason, 'outside_safe_hours');
+  assert.match(blockedResult.message, /07:00 en 23:30/);
+  assert.equal(blockedResult.sent, 0);
+  assert.equal(outside.sentMessages.length, 0);
+});
+
 test('coldmail autopilot supports a deterministic random per-sender cooldown range', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
