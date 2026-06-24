@@ -525,7 +525,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /ontvanger-email, ontvanger-domein, company key en stabiel customer id/);
   assert.match(agentsSource, /## Softora coldmail dagtempo/);
   assert.match(agentsSource, /totale dagdoel 81/);
-  assert.match(agentsSource, /verzendvenster is 07:00-17:00 Europe\/Amsterdam/);
+  assert.match(agentsSource, /verzendvenster is 07:00-23:30 Europe\/Amsterdam/);
   assert.match(agentsSource, /dag-slot pacing/);
   assert.match(agentsSource, /senderMinIntervalMinutes=60/);
   assert.match(agentsSource, /senderMaxIntervalMinutes=74/);
