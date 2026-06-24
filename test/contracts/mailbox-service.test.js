@@ -759,6 +759,54 @@ test('mailbox service sends Martijn mail with the full display name', async () =
   assert.equal(sent[0].message.from, 'Martijn van de Ven <martijn@softora.nl>');
 });
 
+test('mailbox service maps contact venvisuals to Martijn even when stored with the wrong name', async () => {
+  const sent = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'contact.venvisuals@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.example.test',
+        smtpPort: 587,
+        smtpUser: 'contact.venvisuals@gmail.com',
+        smtpPass: 'secret',
+      },
+    ]),
+    createTransport: (config) => ({
+      sendMail: async (message) => {
+        sent.push({ config, message });
+        return { messageId: 'm-1', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+  const accountsRes = createResponseRecorder();
+  const sendRes = createResponseRecorder();
+
+  await service.accountsResponse({}, accountsRes);
+  await service.sendMessageResponse(
+    {
+      body: {
+        account: 'contact.venvisuals@gmail.com',
+        to: 'klant@example.nl',
+        subject: 'Test',
+        body: 'Hallo',
+      },
+    },
+    sendRes
+  );
+
+  assert.equal(accountsRes.statusCode, 200);
+  assert.equal(
+    accountsRes.body.accounts.find((account) => account.email === 'contact.venvisuals@gmail.com').name,
+    'Martijn van de Ven'
+  );
+  assert.equal(sendRes.statusCode, 200);
+  assert.equal(sendRes.body.ok, true);
+  assert.equal(sent[0].config.auth.user, 'contact.venvisuals@gmail.com');
+  assert.equal(sent[0].message.from, 'Martijn van de Ven <contact.venvisuals@gmail.com>');
+});
+
 test('mailbox service stores app-sent mail in the resolved sent folder when IMAP is available', async () => {
   const sent = [];
   const client = createFakeImapClient({

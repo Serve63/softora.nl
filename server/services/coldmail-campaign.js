@@ -188,7 +188,7 @@ const SENDER_DISPLAY_NAMES = {
   'martijnven123@gmail.com': 'Martijn van de Ven',
   'serve290@gmail.com': 'Servé Creusen',
   'servecreusen7@gmail.com': 'Servé Creusen',
-  'contact.venvisuals@gmail.com': 'Servé Creusen',
+  'contact.venvisuals@gmail.com': 'Martijn van de Ven',
 };
 const SENDER_LOCATION_NAMES = {
   'serve@softora.nl': 'Liempde',
@@ -199,7 +199,7 @@ const SENDER_LOCATION_NAMES = {
   'martijnven123@gmail.com': 'Alphen',
   'serve290@gmail.com': 'Liempde',
   'servecreusen7@gmail.com': 'Liempde',
-  'contact.venvisuals@gmail.com': 'Liempde',
+  'contact.venvisuals@gmail.com': 'Alphen',
 };
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
@@ -4599,7 +4599,9 @@ function createColdmailCampaignService(deps = {}) {
       Math.max(0, windowMinutes - finalBufferMinutes),
       senderIndex * normalized.minIntervalMinutes
     );
-    const slotSpacingMinutes = normalized.senderMinIntervalMinutes + normalized.minIntervalMinutes;
+    // Keep each mailbox on its own hourly cadence; the global interval is already enforced
+    // between cron runs and should not accumulate inside every sender's day slots.
+    const slotSpacingMinutes = normalized.senderMinIntervalMinutes;
     const targetMinuteOfDay =
       normalized.startHour * 60 +
       firstWaveOffsetMinutes +

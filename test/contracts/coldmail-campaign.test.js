@@ -755,6 +755,53 @@ test('coldmail campaign removes Martijn LinkedIn CTA before sending', async () =
   }
 });
 
+test('coldmail campaign maps contact venvisuals sender identity to Martijn', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'contactven-identity-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        plaats: 'Boxtel',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'contact.venvisuals@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.test',
+        smtpUser: 'contact.venvisuals@gmail.com',
+        smtpPass: 'contactven-secret',
+      },
+    ]),
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: [
+      'Goedendag {{naam}},',
+      '',
+      'Ik heb een korte vraag.',
+      '',
+      'Met vriendelijke groet,',
+      '{{afzender}}',
+      '',
+      '📍 {{stad}}',
+    ].join('\n'),
+    senderEmail: 'contact.venvisuals@gmail.com',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages[0].from, 'Martijn van de Ven <contact.venvisuals@gmail.com>');
+  assert.equal(sentMessages[0].replyTo, 'contact.venvisuals@gmail.com');
+  assert.match(sentMessages[0].text, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
+  assert.doesNotMatch(sentMessages[0].text, /Serv[ée] Creusen/);
+});
+
 test('coldmail campaign keeps the standard subject and body when variants are provided', async () => {
   const { service, sentMessages } = createService({
     rows: [
@@ -2446,7 +2493,10 @@ test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', a
 
   const workdayStartMs = Date.parse('2026-06-12T05:00:00.000Z');
   for (let tick = 0; tick < 120; tick += 1) {
-    currentNow = new Date(workdayStartMs + tick * 5 * 60 * 1000);
+    const scheduledNow = new Date(workdayStartMs + tick * 5 * 60 * 1000);
+    if (currentNow.getTime() < scheduledNow.getTime()) {
+      currentNow = scheduledNow;
+    }
     await service.runColdmailAutopilot({
       publicBaseUrl: 'https://www.softora.nl',
       actor: 'Coldmail Autopilot Cron',
