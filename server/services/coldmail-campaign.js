@@ -59,6 +59,8 @@ const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS = [250, 1000, 2500];
 const COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS = 90 * 1000;
+const COLDMAIL_SENDER_COOLDOWN_PREFLIGHT_TTL_MS =
+  DEFAULT_COLDMAIL_AUTOPILOT_LOCK_MS + COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS;
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_AUTOPILOT_DISABLED',
   'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
@@ -1596,6 +1598,12 @@ function createColdmailCampaignService(deps = {}) {
     return minutes * 60 * 1000 + COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS;
   }
 
+  function getColdmailSenderCooldownPreflightLockMs(input = {}) {
+    const fullLockMs = getColdmailSenderCooldownLockMs(input);
+    if (!fullLockMs) return 0;
+    return Math.min(fullLockMs, COLDMAIL_SENDER_COOLDOWN_PREFLIGHT_TTL_MS);
+  }
+
   function shouldReserveColdmailSenderCooldown(input = {}) {
     const raw = input.senderCooldownLock && typeof input.senderCooldownLock === 'object'
       ? input.senderCooldownLock
@@ -1616,6 +1624,33 @@ function createColdmailCampaignService(deps = {}) {
     return error;
   }
 
+  function isActiveColdmailSenderCooldownConflict(conflict) {
+    if (!conflict || typeof conflict !== 'object') return false;
+    const channel = normalizeString(conflict.channel);
+    if (channel && channel !== 'coldmail-sender-cooldown') return false;
+    const expiresAtMs = parseTimestampMs(conflict.expires_at);
+    if (expiresAtMs && expiresAtMs <= now().getTime()) return false;
+    return true;
+  }
+
+  async function findSupabaseColdmailSenderCooldownConflict(senderEmail) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.findRecipientConflict !== 'function') {
+      return null;
+    }
+    try {
+      const conflict = await outboundRecipientGuardStore.findRecipientConflict(
+        buildColdmailSenderCooldownIdentity(senderEmail)
+      );
+      return isActiveColdmailSenderCooldownConflict(conflict) ? conflict : null;
+    } catch (error) {
+      logger.warn('[ColdmailSenderCooldown][lookup]', {
+        senderEmail: normalizeEmailAddress(senderEmail),
+        error: error && error.message ? error.message : error,
+      });
+      return null;
+    }
+  }
+
   async function reserveSupabaseColdmailSenderCooldown(senderEmail, input = {}, actor) {
     if (!shouldReserveColdmailSenderCooldown(input)) return null;
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
@@ -1624,7 +1659,7 @@ function createColdmailCampaignService(deps = {}) {
       error.status = 503;
       throw error;
     }
-    const ttlMs = getColdmailSenderCooldownLockMs(input);
+    const ttlMs = getColdmailSenderCooldownPreflightLockMs(input);
     const reservation = await outboundRecipientGuardStore.reserveRecipients(
       [buildColdmailSenderCooldownIdentity(senderEmail)],
       {
@@ -1654,6 +1689,36 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     return reservation;
+  }
+
+  async function confirmSupabaseColdmailSenderCooldown(reservation, senderEmail, input = {}, actor) {
+    const reservationId = normalizeString(reservation && reservation.reservationId);
+    if (!reservationId || !outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
+      return;
+    }
+    const ttlMs = getColdmailSenderCooldownLockMs(input);
+    if (!ttlMs) return;
+    try {
+      await outboundRecipientGuardStore.confirmReservation(reservationId, {
+        status: 'reserved',
+        permanent: false,
+        expiresAt: new Date(now().getTime() + ttlMs).toISOString(),
+        payload: {
+          kind: 'coldmail_sender_cooldown',
+          senderEmail: normalizeEmailAddress(senderEmail),
+          minIntervalMinutes:
+            Math.max(0, Number(input.senderCooldownLock && input.senderCooldownLock.senderMinIntervalMinutes) || 0),
+          confirmedAfterSmtp: true,
+          actor: truncateText(normalizeString(actor), 160),
+        },
+      });
+    } catch (error) {
+      logger.warn('[ColdmailSenderCooldown][confirm]', {
+        reservationId,
+        senderEmail: normalizeEmailAddress(senderEmail),
+        error: error && error.message ? error.message : error,
+      });
+    }
   }
 
   function hasPriorOutboundMailSignal(row) {
@@ -4692,6 +4757,24 @@ function createColdmailCampaignService(deps = {}) {
             }));
             continue;
           }
+        }
+        const centralCooldownConflict = await findSupabaseColdmailSenderCooldownConflict(senderEmail);
+        if (centralCooldownConflict) {
+          const readyAt = normalizeString(
+            centralCooldownConflict.expires_at ||
+            centralCooldownConflict.updated_at ||
+            centralCooldownConflict.last_seen_at
+          );
+          const readyAtMs = parseTimestampMs(readyAt);
+          skipped.push(buildColdmailSenderSkip(senderEmail, 'sender_cooldown', {
+            index,
+            quota,
+            readyAt,
+            cooldownMinutes: readyAtMs
+              ? Math.max(0, Math.ceil((readyAtMs - currentMs) / (60 * 1000)))
+              : undefined,
+          }));
+          continue;
         }
         senderOptions.push({ senderEmail, quota, remaining, index });
       } catch (error) {
@@ -8138,6 +8221,9 @@ function createColdmailCampaignService(deps = {}) {
           await releaseSupabaseOutboundRecipientReservation(outboundReservation, { to });
           await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
           throw error;
+        }
+        if (!isTestRecipientRow(row, to)) {
+          await confirmSupabaseColdmailSenderCooldown(senderCooldownReservation, senderEmail, input, actor);
         }
         const sentItem = {
           id: item.id,
