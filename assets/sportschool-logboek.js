@@ -5,8 +5,10 @@
   const DIRECT_SUPABASE_TABLE = 'softora_sportschool_logbook';
   const DIRECT_SUPABASE_ROW_ID = 'serve_logbook';
   const REMOTE_SAVE_DELAY_MS = 450;
+  const REMOTE_RETRY_DELAY_MS = 1800;
   const SWIPE_WIDTH = 108;
   const REORDER_START_THRESHOLD = 6;
+  const DRAFT_EXERCISE_TITLE = 'NIEUWE OEFENING';
   const DEFAULT_DAY_EXERCISES = {
     monday: [
       { order: 1, title: 'Chest Press', notes: '', sets: '3', reps: '8', kg: '82' },
@@ -82,11 +84,33 @@
   let lastRemoteSnapshotJson = '';
   let logbookState = createDefaultState();
   let cleanedLegacyNotesDuringLoad = false;
+  let shouldPersistLoadedSnapshot = false;
 
   addButton.disabled = true;
 
   function upper(value) {
     return String(value || '').toLocaleUpperCase('nl-NL');
+  }
+
+  function normalizeExerciseTitle(value) {
+    return upper(value).replace(/\s+/g, ' ').trim();
+  }
+
+  function exerciseSlotKey(day, order) {
+    return `slot:${storageDay(day)}:${Number(order) || 0}`;
+  }
+
+  function exerciseKeyForTitle(title, fallbackKey = '') {
+    const normalizedTitle = normalizeExerciseTitle(title);
+    if (!normalizedTitle || normalizedTitle === DRAFT_EXERCISE_TITLE) return fallbackKey;
+    return `name:${normalizedTitle}`;
+  }
+
+  function ensureExerciseSources(state = logbookState) {
+    if (!state.exerciseSources || typeof state.exerciseSources !== 'object' || Array.isArray(state.exerciseSources)) {
+      state.exerciseSources = {};
+    }
+    return state.exerciseSources;
   }
 
   function cleanNotes(value, options = {}) {
@@ -111,7 +135,7 @@
     const storedDay = storageDay(day);
     return DEFAULT_DAY_EXERCISES[storedDay]?.find((exercise) => exercise.order === order) || {
       order,
-      title: 'Nieuwe oefening',
+      title: DRAFT_EXERCISE_TITLE,
       notes: '',
       sets: '',
       reps: '',
@@ -133,27 +157,80 @@
     };
   }
 
-  function createDefaultDayState(day) {
+  function normalizeExerciseSource(day, order, exercise = {}, options = {}) {
+    const normalized = normalizeExercise(day, order, exercise, options);
+    return {
+      title: normalized.title,
+      notes: normalized.notes,
+      sets: normalized.sets,
+      reps: normalized.reps,
+      kg: normalized.kg,
+    };
+  }
+
+  function createDefaultDayState(day, state = logbookState) {
     const exercises = DEFAULT_DAY_EXERCISES[storageDay(day)] || [];
+    const sources = ensureExerciseSources(state);
     return {
       orders: exercises.map((exercise) => exercise.order),
       exercises: Object.fromEntries(
-        exercises.map((exercise) => [String(exercise.order), normalizeExercise(day, exercise.order, exercise)])
+        exercises.map((exercise) => {
+          const normalized = normalizeExerciseSource(day, exercise.order, exercise);
+          const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, exercise.order));
+          if (!sources[exerciseKey]) sources[exerciseKey] = normalized;
+          return [String(exercise.order), { exerciseKey, ...normalized }];
+        })
       ),
     };
   }
 
   function createDefaultState() {
-    return {
-      version: 1,
-      days: Object.fromEntries(STORAGE_DAYS.map((day) => [day, createDefaultDayState(day)])),
-    };
+    const state = { version: 2, exerciseSources: {}, days: {} };
+    STORAGE_DAYS.forEach((day) => {
+      state.days[day] = createDefaultDayState(day, state);
+    });
+    return state;
   }
 
   function getDayState(day) {
     const storedDay = storageDay(day);
     if (!logbookState.days[storedDay]) logbookState.days[storedDay] = createDefaultDayState(storedDay);
     return logbookState.days[storedDay];
+  }
+
+  function resolveExerciseKey(day, order, exercise = {}) {
+    const normalizedTitle = normalizeExerciseTitle(exercise.title || exercise.name || '');
+    const titleKey = exerciseKeyForTitle(normalizedTitle, '');
+    if (titleKey) return titleKey;
+    const explicitKey = String(exercise.exerciseKey || '').trim();
+    return explicitKey || exerciseSlotKey(day, order);
+  }
+
+  function mergeExerciseSource(existing, incoming, fallback = {}) {
+    if (!existing) return { ...incoming };
+    const merged = { ...existing };
+    ['notes', 'sets', 'reps', 'kg'].forEach((field) => {
+      const incomingValue = String(incoming[field] ?? '');
+      const existingValue = String(existing[field] ?? '');
+      const fallbackValue = String(fallback[field] ?? '');
+      if (!incomingValue) return;
+      if (!existingValue || (existingValue === fallbackValue && incomingValue !== fallbackValue)) {
+        merged[field] = incomingValue;
+      }
+    });
+    if (!merged.title && incoming.title) merged.title = incoming.title;
+    return merged;
+  }
+
+  function getExerciseSource(day, order, stored = {}, options = {}) {
+    const fallback = normalizeExerciseSource(day, order, stored, options);
+    const exerciseKey = resolveExerciseKey(day, order, { ...fallback, ...stored });
+    const sources = ensureExerciseSources();
+    sources[exerciseKey] = mergeExerciseSource(sources[exerciseKey], fallback, normalizeExerciseSource(day, order));
+    return {
+      exerciseKey,
+      source: sources[exerciseKey],
+    };
   }
 
   function readOrders(day) {
@@ -170,7 +247,12 @@
     dayState.orders = uniqueOrders;
     uniqueOrders.forEach((order) => {
       const key = String(order);
-      if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(day, order);
+      if (!dayState.exercises[key]) {
+        const normalized = normalizeExerciseSource(day, order);
+        const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, order));
+        ensureExerciseSources()[exerciseKey] = normalized;
+        dayState.exercises[key] = { exerciseKey, ...normalized };
+      }
     });
     if (!options.silent) scheduleRemoteSave();
   }
@@ -178,23 +260,40 @@
   function readExercise(day, order) {
     const dayState = getDayState(day);
     const stored = dayState.exercises?.[String(order)] || {};
-    const normalized = normalizeExercise(day, order, stored);
+    const { exerciseKey, source } = getExerciseSource(day, order, stored);
+    dayState.exercises[String(order)] = { exerciseKey, ...source };
     return {
       order,
-      title: normalized.title,
-      notes: normalized.notes,
-      sets: normalized.sets,
-      reps: normalized.reps,
-      kg: normalized.kg,
+      exerciseKey,
+      title: source.title,
+      notes: source.notes,
+      sets: source.sets,
+      reps: source.reps,
+      kg: source.kg,
     };
   }
 
   function writeField(day, order, field, value) {
     const dayState = getDayState(day);
     const key = String(order);
-    if (!dayState.exercises[key]) dayState.exercises[key] = normalizeExercise(day, order);
     const targetField = field === 'name' ? 'title' : field === 'kilograms' ? 'kg' : field;
-    dayState.exercises[key][targetField] = targetField === 'title' || targetField === 'notes' ? upper(value) : value;
+    if (!dayState.exercises[key]) dayState.exercises[key] = readExercise(day, order);
+    if (targetField === 'title') {
+      const title = normalizeExerciseTitle(value);
+      const previousExercise = readExercise(day, order);
+      const nextExerciseKey = exerciseKeyForTitle(title, exerciseSlotKey(day, order));
+      const sources = ensureExerciseSources();
+      sources[nextExerciseKey] = mergeExerciseSource(
+        sources[nextExerciseKey],
+        { ...previousExercise, title },
+        normalizeExerciseSource(day, order)
+      );
+      dayState.exercises[key] = { exerciseKey: nextExerciseKey, ...sources[nextExerciseKey] };
+    } else {
+      const { exerciseKey, source } = getExerciseSource(day, order, dayState.exercises[key]);
+      source[targetField] = targetField === 'notes' ? upper(value) : value;
+      dayState.exercises[key] = { exerciseKey, ...source };
+    }
     scheduleRemoteSave();
   }
 
@@ -209,6 +308,7 @@
 
   function buildSnapshotFromState() {
     const days = {};
+    const usedExerciseKeys = new Set();
     STORAGE_DAYS.forEach((day) => {
       const dayState = logbookState.days[day] || createDefaultDayState(day);
       const safeOrders = Array.isArray(dayState.orders) ? dayState.orders : [];
@@ -216,15 +316,33 @@
         orders: safeOrders,
         exercises: Object.fromEntries(
           safeOrders.map((order) => {
-            return [String(order), normalizeExercise(day, order, dayState.exercises?.[String(order)])];
+            const exercise = readExercise(day, order);
+            usedExerciseKeys.add(exercise.exerciseKey);
+            return [
+              String(order),
+              {
+                exerciseKey: exercise.exerciseKey,
+                title: exercise.title,
+                notes: exercise.notes,
+                sets: exercise.sets,
+                reps: exercise.reps,
+                kg: exercise.kg,
+              },
+            ];
           })
         ),
       };
     });
+    const sources = ensureExerciseSources();
+    const exerciseSources = {};
+    usedExerciseKeys.forEach((exerciseKey) => {
+      if (sources[exerciseKey]) exerciseSources[exerciseKey] = normalizeExerciseSource('monday', 0, sources[exerciseKey]);
+    });
 
     return {
-      version: 1,
+      version: 2,
       updatedAt: new Date().toISOString(),
+      exerciseSources,
       days,
     };
   }
@@ -244,20 +362,41 @@
     if (!snapshot || typeof snapshot !== 'object') return false;
     isApplyingRemoteState = true;
     try {
-      const nextState = createDefaultState();
+      const nextState = { version: 2, exerciseSources: {}, days: {} };
+      if (snapshot.exerciseSources && typeof snapshot.exerciseSources === 'object' && !Array.isArray(snapshot.exerciseSources)) {
+        Object.entries(snapshot.exerciseSources).forEach(([exerciseKey, source]) => {
+          const key = String(exerciseKey || '').trim();
+          if (!key) return;
+          nextState.exerciseSources[key] = normalizeExerciseSource('monday', 0, source, { markLegacyNotes: true });
+        });
+      } else {
+        shouldPersistLoadedSnapshot = true;
+      }
       STORAGE_DAYS.forEach((day) => {
         const dayState = snapshot.days?.[day];
-        if (!dayState || typeof dayState !== 'object') return;
+        if (!dayState || typeof dayState !== 'object') {
+          nextState.days[day] = createDefaultDayState(day, nextState);
+          return;
+        }
         const orders = Array.isArray(dayState.orders)
           ? dayState.orders.map((order) => Number.parseInt(order, 10)).filter(Number.isFinite)
           : [];
         nextState.days[day] = {
           orders,
           exercises: Object.fromEntries(
-            orders.map((order) => [
-              String(order),
-              normalizeExercise(day, order, dayState.exercises?.[String(order)], { markLegacyNotes: true }),
-            ])
+            orders.map((order) => {
+              const stored = dayState.exercises?.[String(order)] || {};
+              const normalized = normalizeExerciseSource(day, order, stored, { markLegacyNotes: true });
+              const exerciseKey = resolveExerciseKey(day, order, { ...normalized, ...stored });
+              const fallback = normalizeExerciseSource(day, order);
+              nextState.exerciseSources[exerciseKey] = mergeExerciseSource(
+                nextState.exerciseSources[exerciseKey],
+                normalized,
+                fallback
+              );
+              if (!stored.exerciseKey) shouldPersistLoadedSnapshot = true;
+              return [String(order), { exerciseKey, ...nextState.exerciseSources[exerciseKey] }];
+            })
           ),
         };
       });
@@ -393,20 +532,21 @@
       const raw = state?.values?.[REMOTE_STATE_KEY] || state?.values?.gymLogbookJson || '';
       const snapshot = parseRemoteSnapshot(raw);
       if (!snapshot) {
-        scheduleRemoteSave();
-        return;
+        return false;
       }
       lastRemoteSnapshotJson = JSON.stringify(snapshot);
       cleanedLegacyNotesDuringLoad = false;
+      shouldPersistLoadedSnapshot = false;
       applyRemoteSnapshot(snapshot);
-      if (cleanedLegacyNotesDuringLoad) scheduleRemoteSave();
+      if (cleanedLegacyNotesDuringLoad) shouldPersistLoadedSnapshot = true;
+      return true;
     } catch (_error) {
-      // Lokaal blijft de app direct werken; sync probeert later opnieuw.
+      return false;
     }
   }
 
   function scheduleRemoteSave() {
-    if (isApplyingRemoteState) return;
+    if (isApplyingRemoteState || !isReady) return;
     window.clearTimeout(remoteSaveTimer);
     remoteSaveTimer = window.setTimeout(() => {
       persistRemoteSave();
@@ -414,7 +554,7 @@
   }
 
   async function persistRemoteSave(options = {}) {
-    if (isApplyingRemoteState) return;
+    if (isApplyingRemoteState || !isReady) return;
     const snapshot = buildSnapshotFromState();
     const snapshotJson = JSON.stringify(snapshot);
     if (snapshotJson === lastRemoteSnapshotJson) return;
@@ -736,13 +876,15 @@
   });
 
   async function boot() {
-    try {
-      await loadRemoteState();
-    } finally {
-      isReady = true;
-      addButton.disabled = false;
-      render();
+    const loaded = await loadRemoteState();
+    if (!loaded) {
+      window.setTimeout(boot, REMOTE_RETRY_DELAY_MS);
+      return;
     }
+    isReady = true;
+    addButton.disabled = false;
+    render();
+    if (shouldPersistLoadedSnapshot) persistRemoteSave();
   }
 
   boot();
