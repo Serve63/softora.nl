@@ -3288,17 +3288,26 @@ function createColdmailCampaignService(deps = {}) {
     let interestedTotal = 0;
     let activeCampaignTotal = 0;
     let lastDatabaseSentAt = '';
+    let bounces = 0;
     let bouncesToday = 0;
     const recipientCounts = {};
     const webdesignRecipientCounts = {};
     const webdesignTodayRecipientCounts = {};
+    const bounceRecipientKeys = new Set();
     const bounceTodayRecipientKeys = new Set();
+    const bounceTypes = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
     const bounceTypesToday = {
       hard: 0,
       soft: 0,
       instantly: 0,
       unknown: 0,
     };
+    const bounceItems = [];
     const bounceItemsToday = [];
     let unkeyedTotalSent = 0;
     let webdesignUnkeyedTotalSent = 0;
@@ -3343,23 +3352,29 @@ function createColdmailCampaignService(deps = {}) {
 
       const bounceAt = normalizeString(row && (row.coldmailBounceAt || row.lastColdmailBounceAt || row.bouncedAt));
       const bounceAtMs = parseTimestampMs(bounceAt);
-      if (
-        bounceAtMs &&
-        !isTestRecipientRow(row, getRowEmail(row)) &&
-        getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey
-      ) {
+      if (bounceAtMs && !isTestRecipientRow(row, getRowEmail(row))) {
         const bounceKey = recipientKey || `row:${index}`;
-        if (!bounceTodayRecipientKeys.has(bounceKey)) {
+        const bounceType = normalizeColdmailLiveBounceType(row && row.coldmailBounceType);
+        const bounceItem = {
+          company: truncateText(getRowCompany(row), 120),
+          email: getRowEmail(row),
+          type: bounceType,
+          at: bounceAt,
+        };
+        if (!bounceRecipientKeys.has(bounceKey)) {
+          bounceRecipientKeys.add(bounceKey);
+          bounces += 1;
+          bounceTypes[bounceType] = (bounceTypes[bounceType] || 0) + 1;
+          bounceItems.push(bounceItem);
+        }
+        if (
+          getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey &&
+          !bounceTodayRecipientKeys.has(bounceKey)
+        ) {
           bounceTodayRecipientKeys.add(bounceKey);
-          const bounceType = normalizeColdmailLiveBounceType(row && row.coldmailBounceType);
           bouncesToday += 1;
           bounceTypesToday[bounceType] = (bounceTypesToday[bounceType] || 0) + 1;
-          bounceItemsToday.push({
-            company: truncateText(getRowCompany(row), 120),
-            email: getRowEmail(row),
-            type: bounceType,
-            at: bounceAt,
-          });
+          bounceItemsToday.push(bounceItem);
         }
       }
     });
@@ -3376,6 +3391,12 @@ function createColdmailCampaignService(deps = {}) {
       interestedTotal,
       activeCampaignTotal,
       lastDatabaseSentAt,
+      bounces,
+      totalBounces: bounces,
+      bounceTypes,
+      bounceItems: bounceItems
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
       bouncesToday,
       bounceTypesToday,
       bounceItemsToday: bounceItemsToday
@@ -3539,6 +3560,10 @@ function createColdmailCampaignService(deps = {}) {
         centralGuardUnavailableReason: centralGuardStats.unavailableReason || '',
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
+        bounces: databaseStats.bounces,
+        totalBounces: databaseStats.totalBounces,
+        bounceTypes: databaseStats.bounceTypes,
+        bounceItems: databaseStats.bounceItems,
         bouncesToday: databaseStats.bouncesToday,
         todayBounces: databaseStats.bouncesToday,
         bounceTypesToday: databaseStats.bounceTypesToday,

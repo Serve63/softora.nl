@@ -286,12 +286,17 @@
         return null;
     }
 
-    function readTodayBouncesCountFromStats(stats) {
-        const directFields = ["bouncesToday", "todayBounces"];
+    function readBouncesCountFromStats(stats) {
+        const directFields = ["bounces", "totalBounces", "bouncesTotal", "bouncesToday", "todayBounces"];
         for (let index = 0; index < directFields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[directFields[index]]);
             if (count !== null) return count;
         }
+        const groupedTotalStats = stats && stats.bounceStats && typeof stats.bounceStats === "object"
+            ? stats.bounceStats
+            : null;
+        const groupedTotalCount = readNonNegativeInteger(groupedTotalStats && groupedTotalStats.total);
+        if (groupedTotalCount !== null) return groupedTotalCount;
         const groupedStats = stats && stats.todayBounceStats && typeof stats.todayBounceStats === "object"
             ? stats.todayBounceStats
             : null;
@@ -374,10 +379,10 @@
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
             const sentToday = readTodaySentCountFromStats(stats);
-            const bouncesToday = readTodayBouncesCountFromStats(stats);
+            const bounces = readBouncesCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
-            renderTodayBouncesCount(bouncesToday, false);
+            renderTodayBouncesCount(bounces, false);
             if (systemMailCount !== null) {
                 lastStatsMailCount = systemMailCount;
                 renderSystemMailCount(systemMailCount, false);
