@@ -666,6 +666,26 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
         coldmailBounceAt: '2026-04-23T09:15:00.000Z',
         coldmailBounceType: 'soft',
       },
+      {
+        id: 'bounce-provider-status',
+        bedrijf: 'Provider Bounce BV',
+        email: 'provider-bounce@example.test',
+        status: 'geblokkeerd',
+        databaseStatus: 'geblokkeerd',
+        lastColdmailProvider: 'instantly',
+        instantlyStatus: 'email_bounced',
+        instantlyLastEventAt: '2026-04-22T09:15:00.000Z',
+      },
+      {
+        id: 'bounce-history',
+        bedrijf: 'Historie Bounce BV',
+        email: 'historie-bounce@example.test',
+        status: 'geblokkeerd',
+        databaseStatus: 'geblokkeerd',
+        hist: [
+          { type: 'mail_bounce', label: 'Soft bounce via mailserver', date: '2026-04-21T09:15:00.000Z' },
+        ],
+      },
     ],
   });
 
@@ -695,10 +715,11 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.legacySystemSentToday, 3);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
-  assert.equal(result.stats.bounces, 2);
-  assert.equal(result.stats.totalBounces, 2);
+  assert.equal(result.stats.bounces, 4);
+  assert.equal(result.stats.totalBounces, 4);
   assert.equal(result.stats.bounceTypes.hard, 1);
-  assert.equal(result.stats.bounceTypes.soft, 1);
+  assert.equal(result.stats.bounceTypes.soft, 2);
+  assert.equal(result.stats.bounceTypes.instantly, 1);
   assert.equal(result.stats.bouncesToday, 1);
   assert.equal(result.stats.todayBounces, 1);
   assert.equal(result.stats.bounceTypesToday.hard, 1);
