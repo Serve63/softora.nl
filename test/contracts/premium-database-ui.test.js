@@ -477,7 +477,7 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
   assert.equal(nodes.mailRoiRatio.textContent, '1 op 3');
 });
 
-test('premium database mail ROI calculator toont vandaag verstuurd live in dezelfde kaartjesrij', async () => {
+test('premium database mail ROI calculator toont vandaag verstuurd en totale bounces live in dezelfde kaartjesrij', async () => {
   const requestedUrls = [];
   const nodes = {
     systemMailSentTodayCount: { textContent: '' },
@@ -502,6 +502,7 @@ test('premium database mail ROI calculator toont vandaag verstuurd live in dezel
           stats: {
             sentToday: 31,
             systemSentToday: 31,
+            bounces: 9,
             bouncesToday: 4,
             webdesignSentToday: 26,
             systemTotalSent: 355,
@@ -517,7 +518,7 @@ test('premium database mail ROI calculator toont vandaag verstuurd live in dezel
   await systemMailCountClient.refreshTodaySentCount();
 
   assert.equal(nodes.systemMailSentTodayCount.textContent, '31');
-  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '4');
+  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '9');
   assert.equal(nodes.systemMailSentCount.textContent, '355');
   assert.equal(requestedUrls[0], '/api/coldmailing/stats');
 });
@@ -1061,7 +1062,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
-  assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?id="systemMailSentTodayCount"[\s\S]*?class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Bounces vandaag<\/div>[\s\S]*?id="systemMailBouncesTodayCount"/);
+  assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?id="systemMailSentTodayCount"[\s\S]*?class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Bounces<\/div>[\s\S]*?id="systemMailBouncesTodayCount"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: center;/);
@@ -1073,7 +1074,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"/);
   assert.match(pageSource, /class="mail-roi-label">Vandaag verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"/);
-  assert.match(pageSource, /class="mail-roi-label">Bounces vandaag<\/div>/);
+  assert.match(pageSource, /class="mail-roi-label">Bounces<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot"/);
   assert.match(pageSource, /class="mail-roi-label">Autopilot<\/div>/);
   assert.match(pageSource, /id="databaseAutopilotToggle"/);
