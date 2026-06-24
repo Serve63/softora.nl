@@ -1072,6 +1072,10 @@ test('coldmail autopilot status reports today sends on the Amsterdam day', async
   assert.equal(status.autopilot.todaySends.total, 3);
   assert.equal(status.autopilot.todaySends.limit, 81);
   assert.equal(status.autopilot.todaySends.remaining, 78);
+  assert.equal(status.autopilot.config.dailyTargetMinimum, 81);
+  assert.equal(status.autopilot.todaySends.targetMinimum, 81);
+  assert.equal(status.autopilot.todaySends.targetRemaining, 78);
+  assert.equal(status.autopilot.todaySends.targetMet, false);
   assert.deepEqual(
     status.autopilot.todaySends.senders.map((sender) => [sender.email, sender.sent, sender.remaining]),
     [

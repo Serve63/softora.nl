@@ -35,6 +35,7 @@ const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 81;
+const DEFAULT_COLDMAIL_AUTOPILOT_DAILY_TARGET_MINIMUM = DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT;
 const DEFAULT_COLDMAIL_SEND_DELAY_MS = 90_000;
 const DEFAULT_COLDMAIL_SAFETY_PAUSE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 9;
@@ -3684,9 +3685,9 @@ function createColdmailCampaignService(deps = {}) {
     const todayKey = getColdmailAutopilotDateKey(now(), timezone);
     const dailySendLimit = getColdmailDailySendLimit();
     const packageDailySendLimit = getColdmailPackageDailySendLimit();
-    const configuredSenders = normalizeColdmailAutopilotSenderEmails(
-      config && (config.senderEmails || config.senderEmail)
-    ).filter(isColdmailAutopilotAllowedSenderEmail);
+    const normalizedConfig = normalizeColdmailAutopilotConfig(config);
+    const targetMinimum = Math.min(packageDailySendLimit, normalizedConfig.dailyTargetMinimum);
+    const configuredSenders = normalizedConfig.senderEmails.filter(isColdmailAutopilotAllowedSenderEmail);
     const senderStats = new Map();
     configuredSenders.forEach((email) => {
       senderStats.set(email, {
@@ -3742,6 +3743,9 @@ function createColdmailCampaignService(deps = {}) {
       total,
       limit: packageDailySendLimit,
       remaining: Math.max(0, packageDailySendLimit - total),
+      targetMinimum,
+      targetRemaining: Math.max(0, targetMinimum - total),
+      targetMet: total >= targetMinimum,
       senders: Array.from(senderStats.values())
         .filter((item) => item.email)
         .sort((left, right) => {
@@ -3858,6 +3862,12 @@ function createColdmailCampaignService(deps = {}) {
       specialAction: normalizeString(raw.specialAction),
       durationDays: parsePositiveInt(raw.durationDays, 14, 1, 90),
       radiusKm: normalizeColdmailAutopilotRadiusKm(raw.radiusKm),
+      dailyTargetMinimum: parsePositiveInt(
+        raw.dailyTargetMinimum ?? raw.dailyTarget ?? raw.targetDailySends ?? raw.minimumDailySends,
+        DEFAULT_COLDMAIL_AUTOPILOT_DAILY_TARGET_MINIMUM,
+        1,
+        getColdmailPackageDailySendLimit()
+      ),
       webdesignImageDelivery: normalizeColdmailWebdesignImageDeliveryOverride(
         raw.webdesignImageDelivery || raw.imageDelivery
       ),
@@ -4432,6 +4442,7 @@ function createColdmailCampaignService(deps = {}) {
       specialAction: normalized.specialAction,
       durationDays: normalized.durationDays,
       radiusKm: normalized.radiusKm,
+      dailyTargetMinimum: normalized.dailyTargetMinimum,
       subjectConfigured: Boolean(normalized.subject),
       bodyConfigured: Boolean(normalized.body),
     };
@@ -4462,6 +4473,9 @@ function createColdmailCampaignService(deps = {}) {
             total: 0,
             limit: getColdmailPackageDailySendLimit(),
             remaining: getColdmailPackageDailySendLimit(),
+            targetMinimum: normalized.config.dailyTargetMinimum,
+            targetRemaining: normalized.config.dailyTargetMinimum,
+            targetMet: false,
             senders: [],
           },
     };
