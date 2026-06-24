@@ -1,4 +1,5 @@
 const SPORTSCHOOL_LOGBOOK_TABLE = 'softora_sportschool_logbook';
+const SPORTSCHOOL_LOGBOOK_HISTORY_TABLE = 'softora_sportschool_logbook_history';
 const SPORTSCHOOL_LOGBOOK_ROW_ID = 'serve_logbook';
 const SPORTSCHOOL_LOGBOOK_SCOPE = 'sportschool_logboek';
 const SPORTSCHOOL_LOGBOOK_KEY = 'sportschool_logboek_v1';
@@ -53,6 +54,28 @@ function createSportschoolLogbookStore(deps = {}) {
     }
   }
 
+  async function writeHistorySnapshot(client, currentRow, nextPayload, meta, savedAt) {
+    const current = normalizeSportschoolLogbookPayload(currentRow && currentRow.payload);
+    if (!current) return;
+    const next = normalizeSportschoolLogbookPayload(nextPayload);
+    if (!next || current.serialized === next.serialized) return;
+
+    const { error } = await client.from(SPORTSCHOOL_LOGBOOK_HISTORY_TABLE).insert({
+      logbook_id: SPORTSCHOOL_LOGBOOK_ROW_ID,
+      payload: current.payload,
+      next_payload: next.payload,
+      previous_updated_at: currentRow.updated_at || null,
+      saved_at: savedAt,
+      source: normalizeString(meta.source || 'sportschool-logboek'),
+      actor: normalizeString(meta.actor || 'serve'),
+      meta: {
+        source: normalizeString(meta.source || 'sportschool-logboek'),
+        actor: normalizeString(meta.actor || 'serve'),
+      },
+    });
+    if (error) throw error;
+  }
+
   async function readLogbookState() {
     const client = getClient();
     if (!client) return null;
@@ -79,6 +102,14 @@ function createSportschoolLogbookStore(deps = {}) {
     if (!client) return null;
     const updatedAt = now().toISOString();
     try {
+      const { data: currentRow, error: currentError } = await client
+        .from(SPORTSCHOOL_LOGBOOK_TABLE)
+        .select('payload, updated_at')
+        .eq('id', SPORTSCHOOL_LOGBOOK_ROW_ID)
+        .maybeSingle();
+      if (currentError) throw currentError;
+      await writeHistorySnapshot(client, currentRow, normalized.payload, meta, updatedAt);
+
       const { error } = await client.from(SPORTSCHOOL_LOGBOOK_TABLE).upsert(
         {
           id: SPORTSCHOOL_LOGBOOK_ROW_ID,
@@ -108,6 +139,7 @@ function createSportschoolLogbookStore(deps = {}) {
 }
 
 module.exports = {
+  SPORTSCHOOL_LOGBOOK_HISTORY_TABLE,
   SPORTSCHOOL_LOGBOOK_KEY,
   SPORTSCHOOL_LOGBOOK_SCOPE,
   SPORTSCHOOL_LOGBOOK_TABLE,
