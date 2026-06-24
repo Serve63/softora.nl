@@ -92,7 +92,7 @@ const COLDMAIL_DELIVERY_FAILURE_PATTERN =
 const COLDMAIL_HARD_BOUNCE_PATTERN =
   /\b(user unknown|unknown user|no such user|mailbox unknown|mailbox not found|recipient unknown|unknown address|invalid recipient|invalid address|no such mailbox|unknown local part|not known to us|recipient address rejected|5\.1\.1|5\.1\.10|5\.0\.0)\b/i;
 const COLDMAIL_SOFT_BOUNCE_PATTERN =
-  /\b(mailbox full|quota exceeded|overquota|temporary failure|try again later|temporarily unavailable|deferred|greylist|greylisted|4\.[0-9]\.[0-9]|resources temporarily unavailable|user has exhausted allowed storage space)\b/i;
+  /\b(mailbox full|quota exceeded|overquota|temporary failure|try again later|temporarily unavailable|deferred|delayed|warning: could not send message|could not send message for past|will keep trying|greylist|greylisted|4\.[0-9]\.[0-9]|resources temporarily unavailable|user has exhausted allowed storage space)\b/i;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -374,6 +374,7 @@ function createColdmailCampaignService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     outboundRecipientGuardStore = null,
+    dataOpsStore = null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     leadDbScope = DEFAULT_LEAD_DB_SCOPE,
@@ -3485,6 +3486,164 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function buildColdmailMailboxBounceText(message = {}) {
+    const payload = message && typeof message.payload === 'object' ? message.payload : {};
+    return [
+      normalizeString(message.subject),
+      normalizeString(message.sender_email || message.senderEmail),
+      normalizeString(message.sender_name || message.senderName),
+      normalizeString(message.preview),
+      normalizeString(message.body_text || message.bodyText || message.body),
+      normalizeString(payload.subject),
+      normalizeString(payload.preview),
+      normalizeString(payload.body_text || payload.bodyText || payload.body),
+    ].join('\n');
+  }
+
+  function isColdmailMailboxBounceMessage(message = {}) {
+    const subject = normalizeString(message.subject);
+    const text = buildColdmailMailboxBounceText(message);
+    const fromText = normalizeString(
+      `${message.sender_email || message.senderEmail || ''} ${message.sender_name || message.senderName || ''}`
+    );
+    const providerLike = /\b(mailer-daemon|postmaster|mail delivery|delivery subsystem)\b/i.test(fromText);
+    const deliveryFailure =
+      COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) ||
+      COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text) ||
+      COLDMAIL_HARD_BOUNCE_PATTERN.test(text) ||
+      COLDMAIL_SOFT_BOUNCE_PATTERN.test(text);
+    return Boolean(deliveryFailure && (providerLike || COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) || COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text)));
+  }
+
+  function getColdmailMailboxBounceType(message = {}) {
+    const text = buildColdmailMailboxBounceText(message);
+    if (COLDMAIL_HARD_BOUNCE_PATTERN.test(text)) return 'hard';
+    if (COLDMAIL_SOFT_BOUNCE_PATTERN.test(text)) return 'soft';
+    return 'unknown';
+  }
+
+  function getColdmailMailboxMessageDate(message = {}) {
+    const payload = message && typeof message.payload === 'object' ? message.payload : {};
+    return normalizeString(
+      message.date ||
+        message.internal_date ||
+        message.internalDate ||
+        message.created_at ||
+        message.updated_at ||
+        payload.date ||
+        payload.internal_date ||
+        payload.internalDate
+    );
+  }
+
+  function buildColdmailMailboxBounceKey(message = {}, index = 0) {
+    return normalizeMailboxMessageKey(
+      message.message_key ||
+        message.messageKey ||
+        message.message_id ||
+        message.messageId ||
+        `${message.account_email || message.accountEmail || 'mailbox'}:${message.folder || 'inbox'}:${message.uid || index}`
+    ) || `mailbox-bounce:${index}`;
+  }
+
+  function summarizeColdmailMailboxBounceStats(messages) {
+    const bounceKeys = new Set();
+    const bounceTodayKeys = new Set();
+    const bounceTypes = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
+    const bounceTypesToday = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
+    const bounceItems = [];
+    const bounceItemsToday = [];
+    const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+
+    (Array.isArray(messages) ? messages : []).forEach((message, index) => {
+      if (!message || typeof message !== 'object') return;
+      if (normalizeString(message.deleted_at || message.deletedAt)) return;
+      const folder = normalizeString(message.folder).toLowerCase();
+      if (folder && folder !== 'inbox') return;
+      if (!isColdmailMailboxBounceMessage(message)) return;
+
+      const bounceKey = buildColdmailMailboxBounceKey(message, index);
+      const bounceType = getColdmailMailboxBounceType(message);
+      const at = getColdmailMailboxMessageDate(message);
+      const bounceAtMs = parseTimestampMs(at);
+      const bounceItem = {
+        company: '',
+        email: normalizeEmailAddress(message.sender_email || message.senderEmail),
+        accountEmail: normalizeEmailAddress(message.account_email || message.accountEmail),
+        subject: truncateText(normalizeString(message.subject), 120),
+        type: bounceType,
+        at,
+      };
+
+      if (!bounceKeys.has(bounceKey)) {
+        bounceKeys.add(bounceKey);
+        bounceTypes[bounceType] = (bounceTypes[bounceType] || 0) + 1;
+        bounceItems.push(bounceItem);
+      }
+      if (
+        bounceAtMs &&
+        getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey &&
+        !bounceTodayKeys.has(bounceKey)
+      ) {
+        bounceTodayKeys.add(bounceKey);
+        bounceTypesToday[bounceType] = (bounceTypesToday[bounceType] || 0) + 1;
+        bounceItemsToday.push(bounceItem);
+      }
+    });
+
+    return {
+      available: true,
+      bounces: bounceKeys.size,
+      totalBounces: bounceKeys.size,
+      bounceTypes,
+      bounceItems: bounceItems
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
+      bouncesToday: bounceTodayKeys.size,
+      bounceTypesToday,
+      bounceItemsToday: bounceItemsToday
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
+    };
+  }
+
+  function chooseColdmailLiveBounceStats(databaseStats, mailboxStats) {
+    const safeMailboxStats = mailboxStats && mailboxStats.available ? mailboxStats : null;
+    const totalSource = safeMailboxStats && safeMailboxStats.totalBounces > databaseStats.totalBounces
+      ? safeMailboxStats
+      : databaseStats;
+    const todaySource = safeMailboxStats && safeMailboxStats.bouncesToday > databaseStats.bouncesToday
+      ? safeMailboxStats
+      : databaseStats;
+    const source = totalSource === safeMailboxStats || todaySource === safeMailboxStats
+      ? 'mailbox-index'
+      : 'database';
+    return {
+      source,
+      bounces: Math.max(databaseStats.bounces, safeMailboxStats ? safeMailboxStats.bounces : 0),
+      totalBounces: Math.max(databaseStats.totalBounces, safeMailboxStats ? safeMailboxStats.totalBounces : 0),
+      bounceTypes: totalSource.bounceTypes,
+      bounceItems: totalSource.bounceItems,
+      bouncesToday: Math.max(databaseStats.bouncesToday, safeMailboxStats ? safeMailboxStats.bouncesToday : 0),
+      bounceTypesToday: todaySource.bounceTypesToday,
+      bounceItemsToday: todaySource.bounceItemsToday,
+      mailboxBounces: safeMailboxStats ? safeMailboxStats.totalBounces : null,
+      mailboxBouncesToday: safeMailboxStats ? safeMailboxStats.bouncesToday : null,
+      mailboxBounceStatsAvailable: Boolean(safeMailboxStats),
+      mailboxBounceStatsUnavailableReason: safeMailboxStats ? '' : normalizeString(mailboxStats && mailboxStats.unavailableReason),
+    };
+  }
+
   function summarizeColdmailCentralGuardLiveStats(groups, options = {}) {
     const recipientCounts = {};
     const todayRecipientCounts = {};
@@ -3566,16 +3725,45 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  async function loadColdmailMailboxBounceStats() {
+    if (!dataOpsStore || typeof dataOpsStore.listMailboxMessages !== 'function') {
+      return {
+        ...summarizeColdmailMailboxBounceStats([]),
+        available: false,
+        unavailableReason: 'data_ops_mailbox_store_unavailable',
+      };
+    }
+    try {
+      const configuredSenderEmails = getConfiguredSenderEmails();
+      const accountEmails = configuredSenderEmails.length ? configuredSenderEmails : getAllowedSenderEmails();
+      const messages = await dataOpsStore.listMailboxMessages({
+        accountEmails,
+        folders: ['inbox'],
+        maxRows: 10000,
+      });
+      return summarizeColdmailMailboxBounceStats(messages);
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][mailbox-bounces]', error && error.message ? error.message : error);
+      return {
+        ...summarizeColdmailMailboxBounceStats([]),
+        available: false,
+        unavailableReason: 'mailbox_bounce_read_failed',
+      };
+    }
+  }
+
   async function getColdmailLiveStats() {
-    const [sendGuardState, customerState, centralGuardStats] = await Promise.all([
+    const [sendGuardState, customerState, centralGuardStats, mailboxBounceStats] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
       loadColdmailCentralGuardStats(),
+      loadColdmailMailboxBounceStats(),
     ]);
     const values = customerState && typeof customerState.values === 'object' ? customerState.values : {};
     const rows = parseDatabaseRows(values);
     const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
+    const bounceStats = chooseColdmailLiveBounceStats(databaseStats, mailboxBounceStats);
     const centralGuardAvailable = Boolean(centralGuardStats.available);
     const centralGuardTotalSent = centralGuardAvailable
       ? mergeColdmailRecipientCountTotals(centralGuardStats)
@@ -3638,14 +3826,21 @@ function createColdmailCampaignService(deps = {}) {
         centralGuardUnavailableReason: centralGuardStats.unavailableReason || '',
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
-        bounces: databaseStats.bounces,
-        totalBounces: databaseStats.totalBounces,
-        bounceTypes: databaseStats.bounceTypes,
-        bounceItems: databaseStats.bounceItems,
-        bouncesToday: databaseStats.bouncesToday,
-        todayBounces: databaseStats.bouncesToday,
-        bounceTypesToday: databaseStats.bounceTypesToday,
-        bounceItemsToday: databaseStats.bounceItemsToday,
+        bounces: bounceStats.bounces,
+        totalBounces: bounceStats.totalBounces,
+        bounceStatsSource: bounceStats.source,
+        databaseBounces: databaseStats.totalBounces,
+        databaseBouncesToday: databaseStats.bouncesToday,
+        mailboxBounces: bounceStats.mailboxBounces,
+        mailboxBouncesToday: bounceStats.mailboxBouncesToday,
+        mailboxBounceStatsAvailable: bounceStats.mailboxBounceStatsAvailable,
+        mailboxBounceStatsUnavailableReason: bounceStats.mailboxBounceStatsUnavailableReason,
+        bounceTypes: bounceStats.bounceTypes,
+        bounceItems: bounceStats.bounceItems,
+        bouncesToday: bounceStats.bouncesToday,
+        todayBounces: bounceStats.bouncesToday,
+        bounceTypesToday: bounceStats.bounceTypesToday,
+        bounceItemsToday: bounceStats.bounceItemsToday,
         conversionRate,
         lastSuccessfulSendAt,
         lastSenderEmail: centralGuardStats.lastSenderEmail || guardStats.lastSenderEmail,

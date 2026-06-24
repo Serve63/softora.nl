@@ -24,6 +24,74 @@ test('data ops store restores large premium database webdesign job queues', () =
   assert.match(source, /status,\s*total: Math\.max/);
 });
 
+test('data ops store reads mailbox messages for coldmail bounce stats', async () => {
+  const calls = [];
+  const row = {
+    message_key: 'serve@softora.nl|inbox|101',
+    account_email: 'serve@softora.nl',
+    folder: 'inbox',
+    subject: 'Returned Mail',
+  };
+  const client = {
+    from(table) {
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        limit(value) {
+          calls.push(['limit', value]);
+          return Promise.resolve({ data: [row], error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const rows = await store.listMailboxMessages({
+    accountEmails: ['Serve@Softora.nl'],
+    folders: ['INBOX'],
+    maxRows: 50,
+  });
+
+  assert.deepEqual(rows, [row]);
+  assert.deepEqual(calls[0], [
+    'select',
+    'softora_mailbox_messages',
+    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at',
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'deleted_at', null]);
+  assert.deepEqual(calls.find((call) => call[0] === 'in' && call[1] === 'account_email'), [
+    'in',
+    'account_email',
+    ['serve@softora.nl'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'in' && call[1] === 'folder'), [
+    'in',
+    'folder',
+    ['inbox'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'date', { ascending: false }]);
+  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
+});
+
 test('data ops store saves cancelled webdesign batches with a table-compatible status', async () => {
   const upsertRows = [];
   const client = {

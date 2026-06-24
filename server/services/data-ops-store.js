@@ -1034,6 +1034,49 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
+  async function listMailboxMessages(options = {}) {
+    const accountEmails = Array.from(new Set(
+      (Array.isArray(options.accountEmails) ? options.accountEmails : [])
+        .map((email) => normalizeString(email).toLowerCase())
+        .filter(Boolean)
+    ));
+    const folders = Array.from(new Set(
+      (Array.isArray(options.folders) && options.folders.length ? options.folders : ['inbox'])
+        .map((folder) => normalizeString(folder).toLowerCase())
+        .filter(Boolean)
+    ));
+    const maxRows = Math.max(1, Math.min(20000, Number(options.maxRows) || 5000));
+    const cacheKey = [
+      'mailbox-messages',
+      accountEmails.join(','),
+      folders.join(','),
+      maxRows,
+    ].join('|');
+
+    return cachedRead(cacheKey, async () => {
+      const result = await run('list-mailbox-messages', (client) => {
+        let query = client
+          .from(TABLES.mailboxMessages)
+          .select('message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at')
+          .is('deleted_at', null);
+        if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
+        if (folders.length && typeof query.in === 'function') query = query.in('folder', folders);
+        if (typeof query.order === 'function') query = query.order('date', { ascending: false });
+        if (typeof query.limit === 'function') query = query.limit(maxRows);
+        return query;
+      }, {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
+      return result.ok ? result.data || [] : null;
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
   async function replaceCustomers(customers, meta = {}) {
     const rows = dedupeCustomerRowsForReplace(
       (Array.isArray(customers) ? customers : []).map((item, index) =>
@@ -2240,6 +2283,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listCustomers,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
+    listMailboxMessages,
     listOutboundRecipientGuardKeys,
     listOutboundRecipientGuardsForPreview,
     listVisibleWebdesignBatches,
