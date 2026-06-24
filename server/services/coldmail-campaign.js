@@ -3397,6 +3397,17 @@ function createColdmailCampaignService(deps = {}) {
     let lastSenderEmail = '';
 
     (Array.isArray(groups) ? groups : []).forEach((group) => {
+      const source = normalizeString(group && group.source).toLowerCase();
+      const actor = normalizeString(group && group.actor).toLowerCase();
+      if (
+        source === 'data-ops-customers-sent-guard' ||
+        source === 'coldmail-invalid-email-domain' ||
+        actor === 'coldmail-invalid-email-domain'
+      ) {
+        return;
+      }
+      const senderEmail = normalizeEmailAddress(group.sender_email || group.senderEmail);
+      if (!senderEmail) return;
       const recipientKey = buildColdmailStatsRecipientKey({
         recipientEmail: group.recipient_email || group.recipientEmail,
         recipientDomain: group.recipient_domain || group.recipientDomain,
@@ -3411,7 +3422,7 @@ function createColdmailCampaignService(deps = {}) {
       const sentAtMs = parseTimestampMs(sentAt);
       if (sentAtMs && (!lastSentAt || sentAtMs > parseTimestampMs(lastSentAt))) {
         lastSentAt = sentAt;
-        lastSenderEmail = normalizeEmailAddress(group.sender_email || group.senderEmail);
+        lastSenderEmail = senderEmail;
       }
       if (
         sentAtMs &&
