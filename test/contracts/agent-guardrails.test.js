@@ -418,6 +418,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const safeDeploySource = readRepoFile('scripts/deploy-production-safe.js');
   const coldmailGuardBackfillSource = readRepoFile('scripts/backfill-coldmail-outbound-guards.js');
   const liveWorkflowSource = readRepoFile('.github/workflows/live-production-version.yml');
+  const dependabotSource = readRepoFile('.github/dependabot.yml');
+  const gitignoreSource = readRepoFile('.gitignore');
   const agentsSource = readRepoFile('AGENTS.md');
   const protocolSource = readRepoFile('docs/quality-protocol.md');
   const instantlyRoutesSource = readRepoFile('server/routes/instantly.js');
@@ -439,6 +441,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.equal(packageJson.engines.node, '22.x');
+  assert.equal(packageJson.dependencies.nodemailer, '^9.0.1');
   assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
   assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
@@ -488,6 +491,9 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(liveWaitSource, /assertLiveProductionVersion/);
   assert.match(liveWorkflowSource, /push:\s*[\s\S]*branches:\s*[\s\S]*main/);
   assert.match(liveWorkflowSource, /npm run check:live-production-version:wait/);
+  assert.match(dependabotSource, /package-ecosystem:\s*npm/);
+  assert.match(dependabotSource, /interval:\s*weekly/);
+  assert.match(gitignoreSource, /reports\/\*\.md/);
   assert.match(coldmailGuardBackfillSource, /mailbox-sent-webdesign-backfill-2026-06-08/);
   assert.match(coldmailGuardBackfillSource, /central_outbound_guard_missing_monitor_2026_06_08/);
   assert.match(coldmailGuardBackfillSource, /--pause-on-missing/);
