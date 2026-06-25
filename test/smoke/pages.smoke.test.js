@@ -242,12 +242,12 @@ test('page smoke: public regio article is crawlable service HTML', async () => {
   assert.match(html, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
 });
 
-test('page smoke: /favicon.ico serves the Softora favicon', async () => {
+test('page smoke: /favicon.ico serves the stable Softora search favicon', async () => {
   const response = await fetch(`${serverRef.baseUrl}/favicon.ico`, { cache: 'no-store' });
   const bytes = Buffer.from(await response.arrayBuffer());
 
   assert.equal(response.status, 200, '/favicon.ico');
-  assert.ok(response.url.endsWith('/assets/softora-favicon-round.png?v=20260616a'));
+  assert.ok(response.url.endsWith('/assets/softora-search-favicon.png'));
   assert.match(response.headers.get('content-type') || '', /^image\/png\b/);
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
 });

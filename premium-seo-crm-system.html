@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+    <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
     <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | SEO CRM System — Premium</title>
@@ -1989,7 +1989,7 @@
             const safeDesc = escapeHtml(metaDesc || '');
             const safeSlug = escapeHtml(slug || '');
             const safeBody = escapeHtml(content || '').replace(/\n/g, '<br>\n');
-            return `<!DOCTYPE html>\n<html lang="nl">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">\n  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">\n  <title>${safeTitle}</title>\n  <meta name="description" content="${safeDesc}">\n</head>\n<body>\n  <article>\n    <h1>${escapeHtml(title || 'Blog')}</h1>\n    <p style="color:#6b6b7b;">Slug: ${safeSlug}</p>\n    <div>${safeBody}</div>\n  </article>\n</body>\n</html>`;
+            return `<!DOCTYPE html>\n<html lang="nl">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">\n  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">\n  <title>${safeTitle}</title>\n  <meta name="description" content="${safeDesc}">\n</head>\n<body>\n  <article>\n    <h1>${escapeHtml(title || 'Blog')}</h1>\n    <p style="color:#6b6b7b;">Slug: ${safeSlug}</p>\n    <div>${safeBody}</div>\n  </article>\n</body>\n</html>`;
         }
 
         blogSearch.addEventListener('input', renderBlogList);
