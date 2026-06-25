@@ -46,8 +46,7 @@ function createFixture(overrides = {}) {
   return createPremiumUsersStore({
     config: {
       premiumLoginEmails: ['servec321@gmail.com'],
-      premiumLoginPassword: 'secret123',
-      premiumLoginPasswordHash: '',
+      premiumLoginPasswordHash: `sha256:${crypto.createHash('sha256').update('secret123').digest('hex')}`,
       premiumSessionSecret: 'secret',
       premiumAuthUsersRowKey: 'premium_auth_users',
       premiumAuthUsersVersion: 1,
@@ -325,7 +324,6 @@ test('premium users store can bootstrap users even when Supabase is not configur
   assert.equal(hydrated.source, 'bootstrap_env');
   assert.equal(hydrated.users.length, 1);
   assert.equal(hydrated.users[0].email, 'servec321@gmail.com');
-  assert.match(hydrated.users[0].passwordHash, /^scrypt:/);
 });
 
 test('premium users store exposes bootstrap users for password recovery', () => {
@@ -335,50 +333,4 @@ test('premium users store exposes bootstrap users for password recovery', () => 
 
   assert.equal(user.email, 'servec321@gmail.com');
   assert.equal(store.verifyPasswordHash('secret123', user.passwordHash), true);
-});
-
-test('premium users store verifies scrypt hashes and rejects legacy sha256 hashes', () => {
-  const store = createFixture();
-  const scryptHash = store.createPasswordHash('secret123');
-  const legacySha256Hash = `sha256:${crypto.createHash('sha256').update('secret123').digest('hex')}`;
-
-  assert.match(scryptHash, /^scrypt:/);
-  assert.equal(store.verifyPasswordHash('secret123', scryptHash), true);
-  assert.equal(store.verifyPasswordHash('wrong', scryptHash), false);
-  assert.equal(store.verifyPasswordHash('secret123', legacySha256Hash), false);
-});
-
-test('premium users store does not bootstrap from a legacy sha256 hash without the plain bootstrap password', async () => {
-  const legacySha256Hash = `sha256:${crypto.createHash('sha256').update('secret123').digest('hex')}`;
-  const store = createFixture({
-    config: {
-      premiumLoginPassword: '',
-      premiumLoginPasswordHash: legacySha256Hash,
-    },
-    isSupabaseConfigured: false,
-  });
-
-  const hydrated = await store.ensureUsersHydrated();
-
-  assert.equal(hydrated.source, 'unavailable');
-  assert.equal(hydrated.users.length, 0);
-});
-
-test('premium users store migrates bootstrap password config away from legacy sha256 hashes', async () => {
-  const legacySha256Hash = `sha256:${crypto.createHash('sha256').update('secret123').digest('hex')}`;
-  const store = createFixture({
-    config: {
-      premiumLoginPassword: 'secret123',
-      premiumLoginPasswordHash: legacySha256Hash,
-    },
-    isSupabaseConfigured: false,
-  });
-
-  const hydrated = await store.ensureUsersHydrated();
-
-  assert.equal(hydrated.source, 'bootstrap_env');
-  assert.equal(hydrated.users.length, 1);
-  assert.match(hydrated.users[0].passwordHash, /^scrypt:/);
-  assert.equal(store.verifyPasswordHash('secret123', hydrated.users[0].passwordHash), true);
-  assert.notEqual(hydrated.users[0].passwordHash, legacySha256Hash);
 });

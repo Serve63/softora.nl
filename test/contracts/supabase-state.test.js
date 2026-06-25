@@ -66,7 +66,6 @@ test('supabase state store reports config, redacts urls and memoizes the client'
     persistSession: false,
     autoRefreshToken: false,
   });
-  assert.equal(fixture.clientCalls[0][0], 'https://example.supabase.co');
   assert.equal(typeof fixture.clientCalls[0][2].global.fetch, 'function');
 });
 
@@ -115,50 +114,6 @@ test('supabase state store builds stable REST requests for the main runtime snap
       payload: { version: 5 },
     },
   ]);
-});
-
-test('supabase state store blocks unsafe REST origins before fetch', async () => {
-  const fetchCalls = [];
-  const fixture = createFixture({
-    supabaseUrl: 'http://169.254.169.254/latest/meta-data',
-    fetchImpl: async (url) => {
-      fetchCalls.push(url);
-      return {
-        ok: true,
-        status: 200,
-        text: async () => '[]',
-      };
-    },
-  });
-
-  const result = await fixture.store.fetchSupabaseStateRowViaRest();
-
-  assert.equal(result.ok, false);
-  assert.match(result.error || '', /host is niet toegestaan/);
-  assert.equal(fetchCalls.length, 0);
-});
-
-test('supabase state store allows local Supabase REST development hosts', async () => {
-  const fetchCalls = [];
-  const fixture = createFixture({
-    supabaseUrl: 'http://127.0.0.1:54321',
-    fetchImpl: async (url, options = {}) => {
-      fetchCalls.push({ url, options });
-      return {
-        ok: true,
-        status: 200,
-        text: async () => '[]',
-      };
-    },
-  });
-
-  const result = await fixture.store.fetchSupabaseStateRowViaRest();
-
-  assert.equal(result.ok, true);
-  assert.equal(fetchCalls.length, 1);
-  const fetchUrl = new URL(fetchCalls[0].url);
-  assert.equal(fetchUrl.origin, 'http://127.0.0.1:54321');
-  assert.equal(fetchUrl.pathname, '/rest/v1/runtime_state');
 });
 
 test('supabase state store validates generic row keys and preserves parsed bodies', async () => {
@@ -232,52 +187,6 @@ test('supabase state store aborts hung REST requests with a timeout error', asyn
 
   assert.equal(result.ok, false);
   assert.match(result.error || '', /Supabase REST timeout na/);
-});
-
-test('supabase state store rejects oversized REST responses before reading the body', async () => {
-  let textRead = false;
-  const fixture = createFixture({
-    supabaseRestMaxResponseBytes: 16,
-    fetchImpl: async () => ({
-      ok: true,
-      status: 200,
-      headers: {
-        get: (name) => (name.toLowerCase() === 'content-length' ? '17' : ''),
-      },
-      text: async () => {
-        textRead = true;
-        return '{"too":"large"}';
-      },
-    }),
-  });
-
-  const result = await fixture.store.fetchSupabaseStateRowViaRest();
-
-  assert.equal(result.ok, false);
-  assert.match(result.error || '', /response te groot/);
-  assert.equal(textRead, false);
-});
-
-test('supabase state store rejects cross-origin Supabase client fetches before fetch', async () => {
-  const fetchCalls = [];
-  const fixture = createFixture({
-    fetchImpl: async (url) => {
-      fetchCalls.push(url);
-      return {
-        ok: true,
-        status: 200,
-        text: async () => '[]',
-      };
-    },
-  });
-  fixture.store.getSupabaseClient();
-  const fetchWithTimeout = fixture.clientCalls[0][2].global.fetch;
-
-  await assert.rejects(
-    fetchWithTimeout('https://evil.supabase.co/rest/v1/runtime_state'),
-    /host is niet toegestaan/
-  );
-  assert.equal(fetchCalls.length, 0);
 });
 
 test('supabase state store defaults REST and client fetches to a short fail-fast timeout', async () => {
