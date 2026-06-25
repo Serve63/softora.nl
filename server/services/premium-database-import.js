@@ -32,6 +32,8 @@ const GOOGLE_PLACES_FIELD_MASK = [
   'nextPageToken',
 ].join(',');
 const DEFAULT_REAL_BUSINESS_QUERY = 'bedrijven in Noord-Brabant';
+const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
+const OPENAI_RESPONSES_API_URL = 'https://api.openai.com/v1/responses';
 const DEFAULT_OPENAI_DATABASE_SEARCH_MODEL = 'gpt-5.4';
 const DEFAULT_OPENAI_DATABASE_SEARCH_REASONING_EFFORT = 'medium';
 const DEFAULT_OPENAI_DATABASE_SEARCH_SERVICE_TIER = 'flex';
@@ -43,6 +45,24 @@ const MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS = 760000;
 const DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_RETRIES = 2;
 const DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS = 8000;
 const MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS = 30000;
+const OPENAI_DATABASE_SEARCH_TIMEOUT_BUCKETS_MS = Object.freeze([
+  30000,
+  60000,
+  120000,
+  300000,
+  540000,
+  DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS,
+  MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS,
+]);
+const OPENAI_DATABASE_SEARCH_RETRY_WAIT_BUCKETS_MS = Object.freeze([
+  0,
+  250,
+  1000,
+  3000,
+  DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS,
+  15000,
+  MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS,
+]);
 const ESTIMATED_DEEP_SEARCH_INPUT_TOKENS_PER_BATCH = 6000;
 const ESTIMATED_DEEP_SEARCH_OUTPUT_TOKENS_PER_COMPANY = 1400;
 const ESTIMATED_DEEP_SEARCH_WEB_SEARCH_CALLS_PER_BATCH = 1;
@@ -81,6 +101,12 @@ function parsePositiveNumber(value, fallback, min, max) {
   const parsed = Number.parseFloat(String(value || '').replace(',', '.'));
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function pickOpenAiTimingBucket(value, buckets) {
+  const parsed = Math.ceil(Number(value));
+  if (!Number.isFinite(parsed) || parsed <= 0) return buckets[0];
+  return buckets.find((bucket) => parsed <= bucket) || buckets[buckets.length - 1];
 }
 
 function createServiceError(message, code, statusCode = 400) {
@@ -987,10 +1013,16 @@ function getOpenAiApiKey(deps = {}) {
 
 function getOpenAiApiBaseUrl(deps = {}) {
   const env = deps.env || process.env || {};
-  return normalizeString(deps.openAiApiBaseUrl || env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(
-    /\/+$/,
-    ''
-  );
+  const raw = normalizeString(deps.openAiApiBaseUrl || env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL);
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol === 'https:' && parsed.hostname.toLowerCase() === 'api.openai.com') {
+      return DEFAULT_OPENAI_API_BASE_URL;
+    }
+  } catch (_error) {
+    // Fall through to the same safe error as disallowed hosts.
+  }
+  throw createServiceError('OpenAI API base URL is niet toegestaan.', 'OPENAI_API_BASE_URL_NOT_ALLOWED', 503);
 }
 
 function getOpenAiDatabaseSearchModel(deps = {}) {
@@ -1028,11 +1060,11 @@ function getOpenAiDatabaseSearchTimeoutMs(deps = {}) {
   const env = deps.env || process.env || {};
   const explicitDepsTimeout = Number(deps.openAiTimeoutMs);
   if (Number.isFinite(explicitDepsTimeout) && explicitDepsTimeout > 0) {
-    return Math.min(explicitDepsTimeout, MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS);
+    return pickOpenAiTimingBucket(explicitDepsTimeout, OPENAI_DATABASE_SEARCH_TIMEOUT_BUCKETS_MS);
   }
   const explicitEnvTimeout = Number(env.OPENAI_DATABASE_SEARCH_TIMEOUT_MS);
   if (Number.isFinite(explicitEnvTimeout) && explicitEnvTimeout > 0) {
-    return Math.max(30000, Math.min(explicitEnvTimeout, MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS));
+    return pickOpenAiTimingBucket(explicitEnvTimeout, OPENAI_DATABASE_SEARCH_TIMEOUT_BUCKETS_MS);
   }
   return DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS;
 }
@@ -1077,7 +1109,7 @@ function getHeaderValue(headers, name) {
 function clampOpenAiRateLimitWaitMs(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS;
-  return Math.max(250, Math.min(Math.ceil(parsed), MAX_OPENAI_DATABASE_SEARCH_RATE_LIMIT_WAIT_MS));
+  return pickOpenAiTimingBucket(parsed, OPENAI_DATABASE_SEARCH_RETRY_WAIT_BUCKETS_MS);
 }
 
 function parseRetryAfterMs(value, nowMs = Date.now()) {
@@ -1117,7 +1149,9 @@ function isOpenAiRateLimitResponse(response, data) {
 }
 
 function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  const delayMs = pickOpenAiTimingBucket(ms, OPENAI_DATABASE_SEARCH_RETRY_WAIT_BUCKETS_MS);
+  if (!delayMs) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 function createOpenAiDeepSearchRateLimitError() {
@@ -1861,7 +1895,7 @@ async function fetchDeepSearchBusinessRows(input = {}, deps = {}) {
   const timeout = controller
     ? setTimeout(() => controller.abort(), getOpenAiDatabaseSearchTimeoutMs({ ...deps, env }))
     : null;
-  const requestUrl = `${openAiApiBaseUrl}/responses`;
+  const requestUrl = OPENAI_RESPONSES_API_URL;
   const requestHeaders = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${apiKey}`,
