@@ -6,6 +6,7 @@ node_modules/
 output/
 backups/*.json
 reports/seo-agent/
+reports/*.md
 
 # Xcode local state
 DerivedData/
