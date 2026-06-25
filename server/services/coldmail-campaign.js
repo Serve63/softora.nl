@@ -35,6 +35,7 @@ const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 81;
+const DEFAULT_COLDMAIL_AUTOPILOT_DAILY_TARGET_MINIMUM = DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT;
 const DEFAULT_COLDMAIL_SEND_DELAY_MS = 90_000;
 const DEFAULT_COLDMAIL_SAFETY_PAUSE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_COLDMAIL_PERSONAL_MAILBOX_DAILY_LIMIT = 9;
@@ -59,6 +60,8 @@ const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const COLDMAIL_POST_SMTP_PERSISTENCE_RETRY_DELAYS_MS = [250, 1000, 2500];
 const COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS = 90 * 1000;
+const COLDMAIL_SENDER_COOLDOWN_PREFLIGHT_TTL_MS =
+  DEFAULT_COLDMAIL_AUTOPILOT_LOCK_MS + COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS;
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_AUTOPILOT_DISABLED',
   'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
@@ -89,7 +92,7 @@ const COLDMAIL_DELIVERY_FAILURE_PATTERN =
 const COLDMAIL_HARD_BOUNCE_PATTERN =
   /\b(user unknown|unknown user|no such user|mailbox unknown|mailbox not found|recipient unknown|unknown address|invalid recipient|invalid address|no such mailbox|unknown local part|not known to us|recipient address rejected|5\.1\.1|5\.1\.10|5\.0\.0)\b/i;
 const COLDMAIL_SOFT_BOUNCE_PATTERN =
-  /\b(mailbox full|quota exceeded|overquota|temporary failure|try again later|temporarily unavailable|deferred|greylist|greylisted|4\.[0-9]\.[0-9]|resources temporarily unavailable|user has exhausted allowed storage space)\b/i;
+  /\b(mailbox full|quota exceeded|overquota|temporary failure|try again later|temporarily unavailable|deferred|delayed|warning: could not send message|could not send message for past|will keep trying|greylist|greylisted|4\.[0-9]\.[0-9]|resources temporarily unavailable|user has exhausted allowed storage space)\b/i;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -371,6 +374,7 @@ function createColdmailCampaignService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     outboundRecipientGuardStore = null,
+    dataOpsStore = null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
     leadDbScope = DEFAULT_LEAD_DB_SCOPE,
@@ -1596,6 +1600,12 @@ function createColdmailCampaignService(deps = {}) {
     return minutes * 60 * 1000 + COLDMAIL_SENDER_COOLDOWN_LOCK_SAFETY_MS;
   }
 
+  function getColdmailSenderCooldownPreflightLockMs(input = {}) {
+    const fullLockMs = getColdmailSenderCooldownLockMs(input);
+    if (!fullLockMs) return 0;
+    return Math.min(fullLockMs, COLDMAIL_SENDER_COOLDOWN_PREFLIGHT_TTL_MS);
+  }
+
   function shouldReserveColdmailSenderCooldown(input = {}) {
     const raw = input.senderCooldownLock && typeof input.senderCooldownLock === 'object'
       ? input.senderCooldownLock
@@ -1616,6 +1626,33 @@ function createColdmailCampaignService(deps = {}) {
     return error;
   }
 
+  function isActiveColdmailSenderCooldownConflict(conflict) {
+    if (!conflict || typeof conflict !== 'object') return false;
+    const channel = normalizeString(conflict.channel);
+    if (channel && channel !== 'coldmail-sender-cooldown') return false;
+    const expiresAtMs = parseTimestampMs(conflict.expires_at);
+    if (expiresAtMs && expiresAtMs <= now().getTime()) return false;
+    return true;
+  }
+
+  async function findSupabaseColdmailSenderCooldownConflict(senderEmail) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.findRecipientConflict !== 'function') {
+      return null;
+    }
+    try {
+      const conflict = await outboundRecipientGuardStore.findRecipientConflict(
+        buildColdmailSenderCooldownIdentity(senderEmail)
+      );
+      return isActiveColdmailSenderCooldownConflict(conflict) ? conflict : null;
+    } catch (error) {
+      logger.warn('[ColdmailSenderCooldown][lookup]', {
+        senderEmail: normalizeEmailAddress(senderEmail),
+        error: error && error.message ? error.message : error,
+      });
+      return null;
+    }
+  }
+
   async function reserveSupabaseColdmailSenderCooldown(senderEmail, input = {}, actor) {
     if (!shouldReserveColdmailSenderCooldown(input)) return null;
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
@@ -1624,7 +1661,7 @@ function createColdmailCampaignService(deps = {}) {
       error.status = 503;
       throw error;
     }
-    const ttlMs = getColdmailSenderCooldownLockMs(input);
+    const ttlMs = getColdmailSenderCooldownPreflightLockMs(input);
     const reservation = await outboundRecipientGuardStore.reserveRecipients(
       [buildColdmailSenderCooldownIdentity(senderEmail)],
       {
@@ -1654,6 +1691,36 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     return reservation;
+  }
+
+  async function confirmSupabaseColdmailSenderCooldown(reservation, senderEmail, input = {}, actor) {
+    const reservationId = normalizeString(reservation && reservation.reservationId);
+    if (!reservationId || !outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
+      return;
+    }
+    const ttlMs = getColdmailSenderCooldownLockMs(input);
+    if (!ttlMs) return;
+    try {
+      await outboundRecipientGuardStore.confirmReservation(reservationId, {
+        status: 'reserved',
+        permanent: false,
+        expiresAt: new Date(now().getTime() + ttlMs).toISOString(),
+        payload: {
+          kind: 'coldmail_sender_cooldown',
+          senderEmail: normalizeEmailAddress(senderEmail),
+          minIntervalMinutes:
+            Math.max(0, Number(input.senderCooldownLock && input.senderCooldownLock.senderMinIntervalMinutes) || 0),
+          confirmedAfterSmtp: true,
+          actor: truncateText(normalizeString(actor), 160),
+        },
+      });
+    } catch (error) {
+      logger.warn('[ColdmailSenderCooldown][confirm]', {
+        reservationId,
+        senderEmail: normalizeEmailAddress(senderEmail),
+        error: error && error.message ? error.message : error,
+      });
+    }
   }
 
   function hasPriorOutboundMailSignal(row) {
@@ -3215,6 +3282,82 @@ function createColdmailCampaignService(deps = {}) {
     return 'unknown';
   }
 
+  function normalizeColdmailLiveBounceTypeFromText(value) {
+    const text = normalizeString(value).toLowerCase();
+    if (!/bounce|bounced/.test(text)) return '';
+    if (/\bhard[_\s-]*bounce\b|\bhard\b/.test(text)) return 'hard';
+    if (/\bsoft[_\s-]*bounce\b|\bsoft\b/.test(text)) return 'soft';
+    if (/\binstantly\b/.test(text)) return 'instantly';
+    return 'unknown';
+  }
+
+  function getColdmailLiveBounceHistoryEntry(row) {
+    return (Array.isArray(row && row.hist) ? row.hist : []).find((entry) => {
+      const text = normalizeString(
+        [
+          entry && entry.type,
+          entry && entry.status,
+          entry && entry.label,
+          entry && entry.title,
+          entry && entry.message,
+          entry && entry.description,
+          entry && entry.note,
+          entry && entry.source,
+          entry && entry.actor,
+        ].join(' ')
+      );
+      return Boolean(normalizeColdmailLiveBounceTypeFromText(text));
+    }) || null;
+  }
+
+  function getColdmailLiveBounceSignal(row) {
+    if (!row || typeof row !== 'object') return null;
+    const historyEntry = getColdmailLiveBounceHistoryEntry(row);
+    const providerStatus = normalizeInstantlyColdmailStatus(
+      row.instantlyStatus ||
+        row.lastColdmailProviderStatus ||
+        row.providerStatus ||
+        row.outreachProviderStatus
+    );
+    const explicitAt = normalizeString(row.coldmailBounceAt || row.lastColdmailBounceAt || row.bouncedAt);
+    const explicitType = normalizeColdmailLiveBounceType(row.coldmailBounceType || row.lastColdmailBounceType);
+    const historyText = historyEntry
+      ? [
+          historyEntry.type,
+          historyEntry.status,
+          historyEntry.label,
+          historyEntry.title,
+          historyEntry.message,
+          historyEntry.description,
+          historyEntry.note,
+          historyEntry.source,
+          historyEntry.actor,
+        ].join(' ')
+      : '';
+    const historyType = normalizeColdmailLiveBounceTypeFromText(historyText);
+    const providerType = providerStatus === 'bounced' ? 'instantly' : '';
+    const hasSignal = Boolean(
+      explicitAt ||
+        normalizeString(row.coldmailBounceType || row.lastColdmailBounceType) ||
+        providerType ||
+        historyType
+    );
+    if (!hasSignal) return null;
+    return {
+      type: explicitType !== 'unknown' ? explicitType : providerType || historyType || explicitType,
+      at: normalizeString(
+        explicitAt ||
+          row.instantlyLastEventAt ||
+          row.instantlyUpdatedAt ||
+          row.lastColdmailProviderUpdatedAt ||
+          row.lastColdmailReplyAt ||
+          (historyEntry && (historyEntry.at || historyEntry.date || historyEntry.createdAt || historyEntry.updatedAt)) ||
+          row.updatedAt ||
+          row.updated_at
+      ),
+    };
+  }
+
   function summarizeColdmailDatabaseLiveStats(rows) {
     let databaseTotalSent = 0;
     let webdesignTotalSent = 0;
@@ -3222,17 +3365,26 @@ function createColdmailCampaignService(deps = {}) {
     let interestedTotal = 0;
     let activeCampaignTotal = 0;
     let lastDatabaseSentAt = '';
+    let bounces = 0;
     let bouncesToday = 0;
     const recipientCounts = {};
     const webdesignRecipientCounts = {};
     const webdesignTodayRecipientCounts = {};
+    const bounceRecipientKeys = new Set();
     const bounceTodayRecipientKeys = new Set();
+    const bounceTypes = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
     const bounceTypesToday = {
       hard: 0,
       soft: 0,
       instantly: 0,
       unknown: 0,
     };
+    const bounceItems = [];
     const bounceItemsToday = [];
     let unkeyedTotalSent = 0;
     let webdesignUnkeyedTotalSent = 0;
@@ -3275,25 +3427,33 @@ function createColdmailCampaignService(deps = {}) {
       if (['interesse', 'afspraak', 'klant'].includes(status)) interestedTotal += 1;
       if (isRowInActiveColdmailCampaign(row)) activeCampaignTotal += 1;
 
-      const bounceAt = normalizeString(row && (row.coldmailBounceAt || row.lastColdmailBounceAt || row.bouncedAt));
+      const bounceSignal = getColdmailLiveBounceSignal(row);
+      const bounceAt = normalizeString(bounceSignal && bounceSignal.at);
       const bounceAtMs = parseTimestampMs(bounceAt);
-      if (
-        bounceAtMs &&
-        !isTestRecipientRow(row, getRowEmail(row)) &&
-        getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey
-      ) {
+      if (bounceSignal && !isTestRecipientRow(row, getRowEmail(row))) {
         const bounceKey = recipientKey || `row:${index}`;
-        if (!bounceTodayRecipientKeys.has(bounceKey)) {
+        const bounceType = normalizeColdmailLiveBounceType(bounceSignal.type);
+        const bounceItem = {
+          company: truncateText(getRowCompany(row), 120),
+          email: getRowEmail(row),
+          type: bounceType,
+          at: bounceAt,
+        };
+        if (!bounceRecipientKeys.has(bounceKey)) {
+          bounceRecipientKeys.add(bounceKey);
+          bounces += 1;
+          bounceTypes[bounceType] = (bounceTypes[bounceType] || 0) + 1;
+          bounceItems.push(bounceItem);
+        }
+        if (
+          bounceAtMs &&
+          getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey &&
+          !bounceTodayRecipientKeys.has(bounceKey)
+        ) {
           bounceTodayRecipientKeys.add(bounceKey);
-          const bounceType = normalizeColdmailLiveBounceType(row && row.coldmailBounceType);
           bouncesToday += 1;
           bounceTypesToday[bounceType] = (bounceTypesToday[bounceType] || 0) + 1;
-          bounceItemsToday.push({
-            company: truncateText(getRowCompany(row), 120),
-            email: getRowEmail(row),
-            type: bounceType,
-            at: bounceAt,
-          });
+          bounceItemsToday.push(bounceItem);
         }
       }
     });
@@ -3310,6 +3470,12 @@ function createColdmailCampaignService(deps = {}) {
       interestedTotal,
       activeCampaignTotal,
       lastDatabaseSentAt,
+      bounces,
+      totalBounces: bounces,
+      bounceTypes,
+      bounceItems: bounceItems
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
       bouncesToday,
       bounceTypesToday,
       bounceItemsToday: bounceItemsToday
@@ -3317,6 +3483,164 @@ function createColdmailCampaignService(deps = {}) {
         .slice(0, 12),
       recipientCounts,
       unkeyedTotalSent,
+    };
+  }
+
+  function buildColdmailMailboxBounceText(message = {}) {
+    const payload = message && typeof message.payload === 'object' ? message.payload : {};
+    return [
+      normalizeString(message.subject),
+      normalizeString(message.sender_email || message.senderEmail),
+      normalizeString(message.sender_name || message.senderName),
+      normalizeString(message.preview),
+      normalizeString(message.body_text || message.bodyText || message.body),
+      normalizeString(payload.subject),
+      normalizeString(payload.preview),
+      normalizeString(payload.body_text || payload.bodyText || payload.body),
+    ].join('\n');
+  }
+
+  function isColdmailMailboxBounceMessage(message = {}) {
+    const subject = normalizeString(message.subject);
+    const text = buildColdmailMailboxBounceText(message);
+    const fromText = normalizeString(
+      `${message.sender_email || message.senderEmail || ''} ${message.sender_name || message.senderName || ''}`
+    );
+    const providerLike = /\b(mailer-daemon|postmaster|mail delivery|delivery subsystem)\b/i.test(fromText);
+    const deliveryFailure =
+      COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) ||
+      COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text) ||
+      COLDMAIL_HARD_BOUNCE_PATTERN.test(text) ||
+      COLDMAIL_SOFT_BOUNCE_PATTERN.test(text);
+    return Boolean(deliveryFailure && (providerLike || COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) || COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text)));
+  }
+
+  function getColdmailMailboxBounceType(message = {}) {
+    const text = buildColdmailMailboxBounceText(message);
+    if (COLDMAIL_HARD_BOUNCE_PATTERN.test(text)) return 'hard';
+    if (COLDMAIL_SOFT_BOUNCE_PATTERN.test(text)) return 'soft';
+    return 'unknown';
+  }
+
+  function getColdmailMailboxMessageDate(message = {}) {
+    const payload = message && typeof message.payload === 'object' ? message.payload : {};
+    return normalizeString(
+      message.date ||
+        message.internal_date ||
+        message.internalDate ||
+        message.created_at ||
+        message.updated_at ||
+        payload.date ||
+        payload.internal_date ||
+        payload.internalDate
+    );
+  }
+
+  function buildColdmailMailboxBounceKey(message = {}, index = 0) {
+    return normalizeMailboxMessageKey(
+      message.message_key ||
+        message.messageKey ||
+        message.message_id ||
+        message.messageId ||
+        `${message.account_email || message.accountEmail || 'mailbox'}:${message.folder || 'inbox'}:${message.uid || index}`
+    ) || `mailbox-bounce:${index}`;
+  }
+
+  function summarizeColdmailMailboxBounceStats(messages) {
+    const bounceKeys = new Set();
+    const bounceTodayKeys = new Set();
+    const bounceTypes = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
+    const bounceTypesToday = {
+      hard: 0,
+      soft: 0,
+      instantly: 0,
+      unknown: 0,
+    };
+    const bounceItems = [];
+    const bounceItemsToday = [];
+    const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+
+    (Array.isArray(messages) ? messages : []).forEach((message, index) => {
+      if (!message || typeof message !== 'object') return;
+      if (normalizeString(message.deleted_at || message.deletedAt)) return;
+      const folder = normalizeString(message.folder).toLowerCase();
+      if (folder && folder !== 'inbox') return;
+      if (!isColdmailMailboxBounceMessage(message)) return;
+
+      const bounceKey = buildColdmailMailboxBounceKey(message, index);
+      const bounceType = getColdmailMailboxBounceType(message);
+      const at = getColdmailMailboxMessageDate(message);
+      const bounceAtMs = parseTimestampMs(at);
+      const bounceItem = {
+        company: '',
+        email: normalizeEmailAddress(message.sender_email || message.senderEmail),
+        accountEmail: normalizeEmailAddress(message.account_email || message.accountEmail),
+        subject: truncateText(normalizeString(message.subject), 120),
+        type: bounceType,
+        at,
+      };
+
+      if (!bounceKeys.has(bounceKey)) {
+        bounceKeys.add(bounceKey);
+        bounceTypes[bounceType] = (bounceTypes[bounceType] || 0) + 1;
+        bounceItems.push(bounceItem);
+      }
+      if (
+        bounceAtMs &&
+        getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey &&
+        !bounceTodayKeys.has(bounceKey)
+      ) {
+        bounceTodayKeys.add(bounceKey);
+        bounceTypesToday[bounceType] = (bounceTypesToday[bounceType] || 0) + 1;
+        bounceItemsToday.push(bounceItem);
+      }
+    });
+
+    return {
+      available: true,
+      bounces: bounceKeys.size,
+      totalBounces: bounceKeys.size,
+      bounceTypes,
+      bounceItems: bounceItems
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
+      bouncesToday: bounceTodayKeys.size,
+      bounceTypesToday,
+      bounceItemsToday: bounceItemsToday
+        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+        .slice(0, 12),
+    };
+  }
+
+  function chooseColdmailLiveBounceStats(databaseStats, mailboxStats) {
+    const safeMailboxStats = mailboxStats && mailboxStats.available ? mailboxStats : null;
+    const totalSource = safeMailboxStats && safeMailboxStats.totalBounces > databaseStats.totalBounces
+      ? safeMailboxStats
+      : databaseStats;
+    const todaySource = safeMailboxStats && safeMailboxStats.bouncesToday > databaseStats.bouncesToday
+      ? safeMailboxStats
+      : databaseStats;
+    const source = totalSource === safeMailboxStats || todaySource === safeMailboxStats
+      ? 'mailbox-index'
+      : 'database';
+    return {
+      source,
+      bounces: Math.max(databaseStats.bounces, safeMailboxStats ? safeMailboxStats.bounces : 0),
+      totalBounces: Math.max(databaseStats.totalBounces, safeMailboxStats ? safeMailboxStats.totalBounces : 0),
+      bounceTypes: totalSource.bounceTypes,
+      bounceItems: totalSource.bounceItems,
+      bouncesToday: Math.max(databaseStats.bouncesToday, safeMailboxStats ? safeMailboxStats.bouncesToday : 0),
+      bounceTypesToday: todaySource.bounceTypesToday,
+      bounceItemsToday: todaySource.bounceItemsToday,
+      mailboxBounces: safeMailboxStats ? safeMailboxStats.totalBounces : null,
+      mailboxBouncesToday: safeMailboxStats ? safeMailboxStats.bouncesToday : null,
+      mailboxBounceStatsAvailable: Boolean(safeMailboxStats),
+      mailboxBounceStatsUnavailableReason: safeMailboxStats ? '' : normalizeString(mailboxStats && mailboxStats.unavailableReason),
     };
   }
 
@@ -3331,6 +3655,17 @@ function createColdmailCampaignService(deps = {}) {
     let lastSenderEmail = '';
 
     (Array.isArray(groups) ? groups : []).forEach((group) => {
+      const source = normalizeString(group && group.source).toLowerCase();
+      const actor = normalizeString(group && group.actor).toLowerCase();
+      if (
+        source === 'data-ops-customers-sent-guard' ||
+        source === 'coldmail-invalid-email-domain' ||
+        actor === 'coldmail-invalid-email-domain'
+      ) {
+        return;
+      }
+      const senderEmail = normalizeEmailAddress(group.sender_email || group.senderEmail);
+      if (!senderEmail) return;
       const recipientKey = buildColdmailStatsRecipientKey({
         recipientEmail: group.recipient_email || group.recipientEmail,
         recipientDomain: group.recipient_domain || group.recipientDomain,
@@ -3345,7 +3680,7 @@ function createColdmailCampaignService(deps = {}) {
       const sentAtMs = parseTimestampMs(sentAt);
       if (sentAtMs && (!lastSentAt || sentAtMs > parseTimestampMs(lastSentAt))) {
         lastSentAt = sentAt;
-        lastSenderEmail = normalizeEmailAddress(group.sender_email || group.senderEmail);
+        lastSenderEmail = senderEmail;
       }
       if (
         sentAtMs &&
@@ -3390,16 +3725,45 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  async function loadColdmailMailboxBounceStats() {
+    if (!dataOpsStore || typeof dataOpsStore.listMailboxMessages !== 'function') {
+      return {
+        ...summarizeColdmailMailboxBounceStats([]),
+        available: false,
+        unavailableReason: 'data_ops_mailbox_store_unavailable',
+      };
+    }
+    try {
+      const configuredSenderEmails = getConfiguredSenderEmails();
+      const accountEmails = configuredSenderEmails.length ? configuredSenderEmails : getAllowedSenderEmails();
+      const messages = await dataOpsStore.listMailboxMessages({
+        accountEmails,
+        folders: ['inbox'],
+        maxRows: 10000,
+      });
+      return summarizeColdmailMailboxBounceStats(messages);
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][mailbox-bounces]', error && error.message ? error.message : error);
+      return {
+        ...summarizeColdmailMailboxBounceStats([]),
+        available: false,
+        unavailableReason: 'mailbox_bounce_read_failed',
+      };
+    }
+  }
+
   async function getColdmailLiveStats() {
-    const [sendGuardState, customerState, centralGuardStats] = await Promise.all([
+    const [sendGuardState, customerState, centralGuardStats, mailboxBounceStats] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
       loadColdmailCentralGuardStats(),
+      loadColdmailMailboxBounceStats(),
     ]);
     const values = customerState && typeof customerState.values === 'object' ? customerState.values : {};
     const rows = parseDatabaseRows(values);
     const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
+    const bounceStats = chooseColdmailLiveBounceStats(databaseStats, mailboxBounceStats);
     const centralGuardAvailable = Boolean(centralGuardStats.available);
     const centralGuardTotalSent = centralGuardAvailable
       ? mergeColdmailRecipientCountTotals(centralGuardStats)
@@ -3462,10 +3826,21 @@ function createColdmailCampaignService(deps = {}) {
         centralGuardUnavailableReason: centralGuardStats.unavailableReason || '',
         activeCampaignTotal: databaseStats.activeCampaignTotal,
         interestedTotal: databaseStats.interestedTotal,
-        bouncesToday: databaseStats.bouncesToday,
-        todayBounces: databaseStats.bouncesToday,
-        bounceTypesToday: databaseStats.bounceTypesToday,
-        bounceItemsToday: databaseStats.bounceItemsToday,
+        bounces: bounceStats.bounces,
+        totalBounces: bounceStats.totalBounces,
+        bounceStatsSource: bounceStats.source,
+        databaseBounces: databaseStats.totalBounces,
+        databaseBouncesToday: databaseStats.bouncesToday,
+        mailboxBounces: bounceStats.mailboxBounces,
+        mailboxBouncesToday: bounceStats.mailboxBouncesToday,
+        mailboxBounceStatsAvailable: bounceStats.mailboxBounceStatsAvailable,
+        mailboxBounceStatsUnavailableReason: bounceStats.mailboxBounceStatsUnavailableReason,
+        bounceTypes: bounceStats.bounceTypes,
+        bounceItems: bounceStats.bounceItems,
+        bouncesToday: bounceStats.bouncesToday,
+        todayBounces: bounceStats.bouncesToday,
+        bounceTypesToday: bounceStats.bounceTypesToday,
+        bounceItemsToday: bounceStats.bounceItemsToday,
         conversionRate,
         lastSuccessfulSendAt,
         lastSenderEmail: centralGuardStats.lastSenderEmail || guardStats.lastSenderEmail,
@@ -3619,9 +3994,9 @@ function createColdmailCampaignService(deps = {}) {
     const todayKey = getColdmailAutopilotDateKey(now(), timezone);
     const dailySendLimit = getColdmailDailySendLimit();
     const packageDailySendLimit = getColdmailPackageDailySendLimit();
-    const configuredSenders = normalizeColdmailAutopilotSenderEmails(
-      config && (config.senderEmails || config.senderEmail)
-    ).filter(isColdmailAutopilotAllowedSenderEmail);
+    const normalizedConfig = normalizeColdmailAutopilotConfig(config);
+    const targetMinimum = Math.min(packageDailySendLimit, normalizedConfig.dailyTargetMinimum);
+    const configuredSenders = normalizedConfig.senderEmails.filter(isColdmailAutopilotAllowedSenderEmail);
     const senderStats = new Map();
     configuredSenders.forEach((email) => {
       senderStats.set(email, {
@@ -3677,6 +4052,9 @@ function createColdmailCampaignService(deps = {}) {
       total,
       limit: packageDailySendLimit,
       remaining: Math.max(0, packageDailySendLimit - total),
+      targetMinimum,
+      targetRemaining: Math.max(0, targetMinimum - total),
+      targetMet: total >= targetMinimum,
       senders: Array.from(senderStats.values())
         .filter((item) => item.email)
         .sort((left, right) => {
@@ -3793,6 +4171,12 @@ function createColdmailCampaignService(deps = {}) {
       specialAction: normalizeString(raw.specialAction),
       durationDays: parsePositiveInt(raw.durationDays, 14, 1, 90),
       radiusKm: normalizeColdmailAutopilotRadiusKm(raw.radiusKm),
+      dailyTargetMinimum: parsePositiveInt(
+        raw.dailyTargetMinimum ?? raw.dailyTarget ?? raw.targetDailySends ?? raw.minimumDailySends,
+        DEFAULT_COLDMAIL_AUTOPILOT_DAILY_TARGET_MINIMUM,
+        1,
+        getColdmailPackageDailySendLimit()
+      ),
       webdesignImageDelivery: normalizeColdmailWebdesignImageDeliveryOverride(
         raw.webdesignImageDelivery || raw.imageDelivery
       ),
@@ -3817,12 +4201,25 @@ function createColdmailCampaignService(deps = {}) {
       0,
       23
     );
+    const startMinute = parsePositiveInt(
+      raw.startMinute ?? raw.safeStartMinute,
+      0,
+      0,
+      59
+    );
     const endHour = parsePositiveInt(
       raw.endHour ?? raw.safeEndHour,
       DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR,
       1,
       24
     );
+    const rawEndMinute = parsePositiveInt(
+      raw.endMinute ?? raw.safeEndMinute,
+      0,
+      0,
+      59
+    );
+    const endMinute = endHour >= 24 ? 0 : rawEndMinute;
     const senderMinIntervalMinutesRaw = parsePositiveInt(
       raw.senderMinIntervalMinutes ?? raw.senderCooldownMinutes ?? raw.mailboxIntervalMinutes,
       DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES,
@@ -3859,7 +4256,9 @@ function createColdmailCampaignService(deps = {}) {
     );
     const isLegacyWorkdayPace =
       startHour === DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR &&
+      startMinute === 0 &&
       endHour === DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR &&
+      endMinute === 0 &&
       minIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES &&
       senderMinIntervalMinutesRaw === 70 &&
       senderMaxIntervalMinutesRaw === 82;
@@ -3876,13 +4275,45 @@ function createColdmailCampaignService(deps = {}) {
         true
       ),
       startHour,
-      endHour: Math.max(startHour + 1, endHour),
+      startMinute,
+      ...normalizeColdmailAutopilotScheduleEnd({ startHour, startMinute, endHour, endMinute }),
       minIntervalMinutes,
       senderMinIntervalMinutes,
       senderMaxIntervalMinutes,
       sendJitterMinSeconds,
       sendJitterMaxSeconds,
     };
+  }
+
+  function normalizeColdmailAutopilotScheduleEnd(value = {}) {
+    const startMinuteOfDay =
+      Math.max(0, Math.min(23, Number(value.startHour) || 0)) * 60 +
+      Math.max(0, Math.min(59, Number(value.startMinute) || 0));
+    let endMinuteOfDay =
+      Math.max(1, Math.min(24, Number(value.endHour) || DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR)) * 60 +
+      Math.max(0, Math.min(59, Number(value.endMinute) || 0));
+    if (endMinuteOfDay > 24 * 60) endMinuteOfDay = 24 * 60;
+    if (endMinuteOfDay <= startMinuteOfDay) {
+      endMinuteOfDay = Math.min(24 * 60, startMinuteOfDay + 60);
+    }
+    return {
+      endHour: Math.floor(endMinuteOfDay / 60),
+      endMinute: endMinuteOfDay % 60,
+    };
+  }
+
+  function getColdmailAutopilotScheduleStartMinuteOfDay(schedule) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    return normalized.startHour * 60 + normalized.startMinute;
+  }
+
+  function getColdmailAutopilotScheduleEndMinuteOfDay(schedule) {
+    const normalized = normalizeColdmailAutopilotSchedule(schedule);
+    return normalized.endHour * 60 + normalized.endMinute;
+  }
+
+  function formatColdmailAutopilotScheduleTime(hour, minute = 0) {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   }
 
   function hasColdmailAutopilotUsableSenderConfig(value) {
@@ -3901,7 +4332,9 @@ function createColdmailCampaignService(deps = {}) {
     if (schedule.timezone === DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) score += 1;
     if (schedule.weekdaysOnly) score += 1;
     if (schedule.startHour <= DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR) score += 1;
-    if (schedule.endHour >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR) score += 1;
+    if (getColdmailAutopilotScheduleEndMinuteOfDay(schedule) >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR * 60) {
+      score += 1;
+    }
     if (schedule.minIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES) score += 1;
     if (schedule.senderMinIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES) score += 1;
     if (schedule.senderMaxIntervalMinutes >= DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES) score += 1;
@@ -3913,7 +4346,9 @@ function createColdmailCampaignService(deps = {}) {
   function isLegacyColdmailAutopilotDashboardSchedule(value) {
     const schedule = normalizeColdmailAutopilotSchedule(value);
     return schedule.startHour === 8 &&
+      schedule.startMinute === 0 &&
       schedule.endHour === 17 &&
+      schedule.endMinute === 0 &&
       schedule.minIntervalMinutes === 5 &&
       schedule.senderMinIntervalMinutes === 14 &&
       schedule.senderMaxIntervalMinutes === 18 &&
@@ -3969,7 +4404,9 @@ function createColdmailCampaignService(deps = {}) {
         timezone: env.COLDMAIL_AUTOPILOT_TIMEZONE,
         weekdaysOnly: env.COLDMAIL_AUTOPILOT_WEEKDAYS_ONLY,
         startHour: env.COLDMAIL_AUTOPILOT_START_HOUR,
+        startMinute: env.COLDMAIL_AUTOPILOT_START_MINUTE,
         endHour: env.COLDMAIL_AUTOPILOT_END_HOUR,
+        endMinute: env.COLDMAIL_AUTOPILOT_END_MINUTE,
         minIntervalMinutes: env.COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES,
         senderMinIntervalMinutes:
           env.COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES ||
@@ -4314,6 +4751,7 @@ function createColdmailCampaignService(deps = {}) {
       specialAction: normalized.specialAction,
       durationDays: normalized.durationDays,
       radiusKm: normalized.radiusKm,
+      dailyTargetMinimum: normalized.dailyTargetMinimum,
       subjectConfigured: Boolean(normalized.subject),
       bodyConfigured: Boolean(normalized.body),
     };
@@ -4344,6 +4782,9 @@ function createColdmailCampaignService(deps = {}) {
             total: 0,
             limit: getColdmailPackageDailySendLimit(),
             remaining: getColdmailPackageDailySendLimit(),
+            targetMinimum: normalized.config.dailyTargetMinimum,
+            targetRemaining: normalized.config.dailyTargetMinimum,
+            targetMet: false,
             senders: [],
           },
     };
@@ -4558,7 +4999,8 @@ function createColdmailCampaignService(deps = {}) {
     return normalized.timezone === DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE &&
       normalized.weekdaysOnly &&
       normalized.startHour === DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR &&
-      normalized.endHour === DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR &&
+      normalized.startMinute === 0 &&
+      getColdmailAutopilotScheduleEndMinuteOfDay(normalized) >= DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR * 60 &&
       normalized.minIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES &&
       normalized.senderMinIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES &&
       normalized.senderMaxIntervalMinutes === DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES;
@@ -4590,7 +5032,8 @@ function createColdmailCampaignService(deps = {}) {
     if (!lastSentAtMs || senderSent <= 0 || senderSent >= dailyLimit || dailyLimit < 2) return null;
     const windowMinutes = Math.max(
       normalized.minIntervalMinutes,
-      (normalized.endHour - normalized.startHour) * 60
+      getColdmailAutopilotScheduleEndMinuteOfDay(normalized) -
+        getColdmailAutopilotScheduleStartMinuteOfDay(normalized)
     );
     const senderIndex = Math.max(0, Number(options.senderIndex) || 0);
     const slotIndex = Math.min(senderSent, dailyLimit - 1);
@@ -4603,7 +5046,7 @@ function createColdmailCampaignService(deps = {}) {
     // between cron runs and should not accumulate inside every sender's day slots.
     const slotSpacingMinutes = normalized.senderMinIntervalMinutes;
     const targetMinuteOfDay =
-      normalized.startHour * 60 +
+      getColdmailAutopilotScheduleStartMinuteOfDay(normalized) +
       firstWaveOffsetMinutes +
       slotIndex * slotSpacingMinutes;
     const currentMs = now().getTime();
@@ -4692,6 +5135,24 @@ function createColdmailCampaignService(deps = {}) {
             }));
             continue;
           }
+        }
+        const centralCooldownConflict = await findSupabaseColdmailSenderCooldownConflict(senderEmail);
+        if (centralCooldownConflict) {
+          const readyAt = normalizeString(
+            centralCooldownConflict.expires_at ||
+            centralCooldownConflict.updated_at ||
+            centralCooldownConflict.last_seen_at
+          );
+          const readyAtMs = parseTimestampMs(readyAt);
+          skipped.push(buildColdmailSenderSkip(senderEmail, 'sender_cooldown', {
+            index,
+            quota,
+            readyAt,
+            cooldownMinutes: readyAtMs
+              ? Math.max(0, Math.ceil((readyAtMs - currentMs) / (60 * 1000)))
+              : undefined,
+          }));
+          continue;
         }
         senderOptions.push({ senderEmail, quota, remaining, index });
       } catch (error) {
@@ -4783,11 +5244,14 @@ function createColdmailCampaignService(deps = {}) {
         message: 'Autopilot wacht tot de volgende werkdag.',
       };
     }
-    if (parts.hour < normalized.startHour || parts.hour >= normalized.endHour) {
+    const currentMinuteOfDay = parts.hour * 60 + parts.minute;
+    const startMinuteOfDay = getColdmailAutopilotScheduleStartMinuteOfDay(normalized);
+    const endMinuteOfDay = getColdmailAutopilotScheduleEndMinuteOfDay(normalized);
+    if (currentMinuteOfDay < startMinuteOfDay || currentMinuteOfDay >= endMinuteOfDay) {
       return {
         ok: false,
         reason: 'outside_safe_hours',
-        message: `Autopilot mailt alleen tussen ${String(normalized.startHour).padStart(2, '0')}:00 en ${String(normalized.endHour).padStart(2, '0')}:00.`,
+        message: `Autopilot mailt alleen tussen ${formatColdmailAutopilotScheduleTime(normalized.startHour, normalized.startMinute)} en ${formatColdmailAutopilotScheduleTime(normalized.endHour, normalized.endMinute)}.`,
       };
     }
     return { ok: true };
@@ -8138,6 +8602,9 @@ function createColdmailCampaignService(deps = {}) {
           await releaseSupabaseOutboundRecipientReservation(outboundReservation, { to });
           await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
           throw error;
+        }
+        if (!isTestRecipientRow(row, to)) {
+          await confirmSupabaseColdmailSenderCooldown(senderCooldownReservation, senderEmail, input, actor);
         }
         const sentItem = {
           id: item.id,

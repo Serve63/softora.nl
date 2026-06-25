@@ -277,6 +277,7 @@ function createService(overrides = {}) {
       overrides.outboundRecipientGuardStore === undefined
         ? defaultOutboundRecipientGuardStore
         : overrides.outboundRecipientGuardStore,
+    dataOpsStore: overrides.dataOpsStore || null,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
         return {
@@ -586,6 +587,88 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
           source: 'softora-coldmail-pre-send',
           updated_at: '2026-04-24T08:00:00.000Z',
         },
+        {
+          reservation_id: 'invalid-domain-not-a-send',
+          recipient_email: 'invalid@example.test',
+          recipient_domain: 'example.test',
+          recipient_company_key: 'invalid-domain',
+          recipient_id: 'invalid-domain',
+          sender_email: '',
+          provider: 'softora',
+          channel: 'coldmail',
+          source: 'data-ops-customers-sent-guard',
+          actor: 'coldmail-invalid-email-domain',
+          updated_at: '2026-04-24T08:30:00.000Z',
+        },
+        {
+          reservation_id: 'data-ops-marker-not-a-send',
+          recipient_email: 'marker@example.test',
+          recipient_domain: 'example.test',
+          recipient_company_key: 'data-ops-marker',
+          recipient_id: 'data-ops-marker',
+          sender_email: 'serve@softora.nl',
+          provider: 'softora',
+          channel: 'coldmail',
+          source: 'data-ops-customers-sent-guard',
+          actor: 'coldmail-campaign',
+          updated_at: '2026-04-24T08:40:00.000Z',
+        },
+      ],
+    },
+    dataOpsStore: {
+      listMailboxMessages: async () => [
+        {
+          message_key: 'serve@softora.nl|inbox|bounce-hard',
+          account_email: 'serve@softora.nl',
+          folder: 'inbox',
+          uid: 101,
+          message_id: '<bounce-hard@example.test>',
+          sender_name: 'Mail Delivery System',
+          sender_email: 'mailer-daemon@example.test',
+          subject: 'Returned Mail: Kleine vraag over jullie website',
+          preview: '*** MAIL DELIVERY FAILURE REPORT ***',
+          body_text: 'Diagnostic-Code: smtp; 5.1.1 user unknown',
+          date: '2026-04-24T09:20:00.000Z',
+        },
+        {
+          message_key: 'servecreusen@softora.nl|inbox|bounce-soft',
+          account_email: 'servecreusen@softora.nl',
+          folder: 'inbox',
+          uid: 102,
+          message_id: '<bounce-soft@example.test>',
+          sender_name: 'Mail Delivery System',
+          sender_email: 'postmaster@example.test',
+          subject: 'Warning: could not send message for past 1 hour',
+          preview: 'Delivery is delayed and we will keep trying.',
+          body_text: 'Temporary failure, 4.2.0 mailbox unavailable.',
+          date: '2026-04-24T10:20:00.000Z',
+        },
+        {
+          message_key: 'martijn@softora.nl|inbox|bounce-unknown',
+          account_email: 'martijn@softora.nl',
+          folder: 'inbox',
+          uid: 103,
+          message_id: '<bounce-unknown@example.test>',
+          sender_name: 'Mail Delivery System',
+          sender_email: 'postmaster@example.test',
+          subject: 'Delivery Status Notification (Failure)',
+          preview: 'The message could not be delivered.',
+          body_text: 'Final-Recipient: rfc822; prospect@example.test',
+          date: '2026-04-23T10:20:00.000Z',
+        },
+        {
+          message_key: 'martijn@softora.nl|inbox|not-a-bounce',
+          account_email: 'martijn@softora.nl',
+          folder: 'inbox',
+          uid: 104,
+          message_id: '<not-a-bounce@example.test>',
+          sender_name: 'Newsletter',
+          sender_email: 'no-reply@example.test',
+          subject: 'Nieuwe nieuwsbrief',
+          preview: 'Geen delivery failure.',
+          body_text: 'Gewoon een normale nieuwsbrief.',
+          date: '2026-04-24T11:20:00.000Z',
+        },
       ],
     },
     rows: [
@@ -640,6 +723,26 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
         coldmailBounceAt: '2026-04-23T09:15:00.000Z',
         coldmailBounceType: 'soft',
       },
+      {
+        id: 'bounce-provider-status',
+        bedrijf: 'Provider Bounce BV',
+        email: 'provider-bounce@example.test',
+        status: 'geblokkeerd',
+        databaseStatus: 'geblokkeerd',
+        lastColdmailProvider: 'instantly',
+        instantlyStatus: 'email_bounced',
+        instantlyLastEventAt: '2026-04-22T09:15:00.000Z',
+      },
+      {
+        id: 'bounce-history',
+        bedrijf: 'Historie Bounce BV',
+        email: 'historie-bounce@example.test',
+        status: 'geblokkeerd',
+        databaseStatus: 'geblokkeerd',
+        hist: [
+          { type: 'mail_bounce', label: 'Soft bounce via mailserver', date: '2026-04-21T09:15:00.000Z' },
+        ],
+      },
     ],
   });
 
@@ -669,12 +772,23 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.legacySystemSentToday, 3);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
-  assert.equal(result.stats.bouncesToday, 1);
-  assert.equal(result.stats.todayBounces, 1);
+  assert.equal(result.stats.bounces, 4);
+  assert.equal(result.stats.totalBounces, 4);
+  assert.equal(result.stats.bounceStatsSource, 'mailbox-index');
+  assert.equal(result.stats.databaseBounces, 4);
+  assert.equal(result.stats.databaseBouncesToday, 1);
+  assert.equal(result.stats.mailboxBounces, 3);
+  assert.equal(result.stats.bounceTypes.hard, 1);
+  assert.equal(result.stats.bounceTypes.soft, 2);
+  assert.equal(result.stats.bounceTypes.instantly, 1);
+  assert.equal(result.stats.bouncesToday, 2);
+  assert.equal(result.stats.todayBounces, 2);
+  assert.equal(result.stats.mailboxBouncesToday, 2);
   assert.equal(result.stats.bounceTypesToday.hard, 1);
-  assert.equal(result.stats.bounceTypesToday.soft, 0);
-  assert.deepEqual(result.stats.bounceItemsToday.map((item) => [item.company, item.type]), [
-    ['Bounce Vandaag BV', 'hard'],
+  assert.equal(result.stats.bounceTypesToday.soft, 1);
+  assert.deepEqual(result.stats.bounceItemsToday.map((item) => [item.accountEmail, item.type]), [
+    ['servecreusen@softora.nl', 'soft'],
+    ['serve@softora.nl', 'hard'],
   ]);
   assert.equal(result.stats.conversionRate, 33);
   assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:00:00.000Z');
@@ -1072,6 +1186,10 @@ test('coldmail autopilot status reports today sends on the Amsterdam day', async
   assert.equal(status.autopilot.todaySends.total, 3);
   assert.equal(status.autopilot.todaySends.limit, 81);
   assert.equal(status.autopilot.todaySends.remaining, 78);
+  assert.equal(status.autopilot.config.dailyTargetMinimum, 81);
+  assert.equal(status.autopilot.todaySends.targetMinimum, 81);
+  assert.equal(status.autopilot.todaySends.targetRemaining, 78);
+  assert.equal(status.autopilot.todaySends.targetMet, false);
   assert.deepEqual(
     status.autopilot.todaySends.senders.map((sender) => [sender.email, sender.sent, sender.remaining]),
     [
@@ -1993,6 +2111,96 @@ test('coldmail autopilot rechecks safe hours after send jitter before SMTP', asy
   assert.equal(outboundGuardCalls.length, 0);
 });
 
+test('coldmail autopilot supports a 23:30 safe end window without raising the daily caps', async () => {
+  const buildAutopilotState = () => ({
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+      branch: 'Horeca & Restaurants',
+      specialAction: '',
+      radiusKm: '',
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 7,
+      startMinute: 0,
+      endHour: 23,
+      endMinute: 30,
+      minIntervalMinutes: 5,
+      senderMinIntervalMinutes: 60,
+      senderMaxIntervalMinutes: 74,
+      sendJitterMinSeconds: 1,
+      sendJitterMaxSeconds: 1,
+    },
+  });
+  const rows = [
+    {
+      id: 'prospect-1',
+      bedrijf: 'Bakkerij Zon',
+      naam: 'Ruben',
+      email: 'ruben@example.test',
+      status: 'prospect',
+      branche: 'Horeca & Restaurants',
+      stad: 'Oisterwijk',
+      mail: true,
+    },
+  ];
+  const mailboxAccountsRaw = JSON.stringify([
+    {
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.strato.com',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'serve-secret',
+    },
+  ]);
+  let currentNow = new Date('2026-06-19T21:29:00.000Z');
+  const inside = createService({
+    rows,
+    mailboxAccountsRaw,
+    autopilotState: buildAutopilotState(),
+    now: () => currentNow,
+    sleep: async (ms) => {
+      currentNow = new Date(currentNow.getTime() + ms);
+    },
+  });
+
+  const sentResult = await inside.service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(sentResult.sent, 1);
+  assert.equal(inside.sentMessages.length, 1);
+  assert.equal(inside.getAutopilotState().schedule.endMinute, 30);
+  assert.equal(sentResult.dailyQuota.senderRemainingBefore, 9);
+  assert.equal(sentResult.dailyQuota.packageRemainingBefore, 81);
+
+  currentNow = new Date('2026-06-19T21:30:00.000Z');
+  const outside = createService({
+    rows,
+    mailboxAccountsRaw,
+    autopilotState: buildAutopilotState(),
+    now: () => currentNow,
+  });
+  const blockedResult = await outside.service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(blockedResult.reason, 'outside_safe_hours');
+  assert.match(blockedResult.message, /07:00 en 23:30/);
+  assert.equal(blockedResult.sent, 0);
+  assert.equal(outside.sentMessages.length, 0);
+});
+
 test('coldmail autopilot supports a deterministic random per-sender cooldown range', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     rows: [
@@ -2408,6 +2616,135 @@ test('coldmail autopilot blocks stale reads with a central sender cooldown lock'
   assert.equal(outboundCalls[0].options.channel, 'coldmail-sender-cooldown');
 });
 
+test('coldmail autopilot skips a central sender cooldown lock and sends another ready sender', async () => {
+  const calls = [];
+  const outboundRecipientGuardStore = {
+    findRecipientConflict: async (identity) => {
+      calls.push({ type: 'find', identity });
+      if (identity && identity.recipientKey === 'coldmail-sender-cooldown:contact.venvisuals@gmail.com') {
+        return {
+          guard_key: 'custom:coldmail-sender-cooldown-contact.venvisuals@gmail.com',
+          sender_email: 'contact.venvisuals@gmail.com',
+          channel: 'coldmail-sender-cooldown',
+          status: 'reserved',
+          expires_at: '2026-06-24T07:03:24.258Z',
+        };
+      }
+      return null;
+    },
+    reserveRecipients: async (items, options) => {
+      calls.push({ type: 'reserve', items, options });
+      return {
+        ok: true,
+        reservationId: `${options.channel || 'recipient'}-${calls.length}`,
+        count: (Array.isArray(items) ? items.length : 0) * 4,
+        expectedCount: (Array.isArray(items) ? items.length : 0) * 4,
+      };
+    },
+    confirmReservation: async (reservationId, options) => {
+      calls.push({ type: 'confirm', reservationId, options });
+      return { ok: true, count: 4 };
+    },
+    releaseReservation: async (reservationId) => {
+      calls.push({ type: 'release', reservationId });
+      return { ok: true };
+    },
+  };
+  const { service, sentMessages, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'contact.venvisuals@gmail.com',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'contact.venvisuals@gmail.com',
+        smtpPass: 'contact-secret',
+      },
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    outboundRecipientGuardStore,
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-06-24T05:05:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          personalCount: 0,
+          recipientEmail: 'old@example.test',
+          recipientDomain: 'old-example-test',
+        },
+      ],
+    },
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['contact.venvisuals@gmail.com', 'serve@softora.nl'],
+        senderProfiles: {
+          'contact.venvisuals@gmail.com': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        specialAction: '',
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+        minIntervalMinutes: 5,
+        senderMinIntervalMinutes: 60,
+        senderMaxIntervalMinutes: 74,
+        sendJitterMinSeconds: 45,
+        sendJitterMaxSeconds: 240,
+      },
+      lastStartedAt: '2026-06-24T06:10:00.000Z',
+    },
+    now: () => new Date('2026-06-24T06:20:00.000Z'),
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'sent');
+  assert.equal(sentMessages.length, 1);
+  assert.equal(getAutopilotState().lastResult.senderEmail, 'serve@softora.nl');
+  assert.equal(calls.some((call) =>
+    call.type === 'reserve' &&
+    call.options.channel === 'coldmail-sender-cooldown' &&
+    call.options.senderEmail === 'contact.venvisuals@gmail.com'
+  ), false);
+  assert.equal(calls.some((call) =>
+    call.type === 'reserve' &&
+    call.options.channel === 'coldmail-sender-cooldown' &&
+    call.options.senderEmail === 'serve@softora.nl'
+  ), true);
+});
+
 test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', async () => {
   const senderEmails = [
     'serve@softora.nl',
@@ -2518,6 +2855,12 @@ test('coldmail autopilot reaches 81 sends across nine mailboxes on a workday', a
   assert.equal(sentMessages.length, 81);
   assert.deepEqual(perSender, Object.fromEntries(senderEmails.map((email) => [email, 9])));
   assert.equal(todayEntries.length, 81);
+  const countSentBy = (isoTimestamp) =>
+    todayEntries.filter((entry) => Date.parse(entry.at) <= Date.parse(isoTimestamp)).length;
+  assert.equal(countSentBy('2026-06-12T07:30:00.000Z') >= 20, true);
+  assert.equal(countSentBy('2026-06-12T10:30:00.000Z') >= 45, true);
+  assert.equal(countSentBy('2026-06-12T13:30:00.000Z') >= 70, true);
+  assert.equal(countSentBy('2026-06-12T14:30:00.000Z'), 81);
 
   const latestSentAtMs = Math.max(...todayEntries.map((entry) => Date.parse(entry.at)));
   assert.equal(latestSentAtMs < Date.parse('2026-06-12T15:00:00.000Z'), true);
@@ -8348,6 +8691,84 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
   const customerWriteIndex = calls.findIndex((call) => call.type === 'state:premium_customers_database');
   assert.ok(sendGuardWriteIndex > confirmIndex);
   assert.ok(customerWriteIndex > confirmIndex);
+});
+
+test('coldmail campaign keeps sender cooldown preflight short and extends after SMTP accept', async () => {
+  const calls = [];
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'sender-cooldown-row',
+        bedrijf: 'Sender Cooldown BV',
+        naam: 'Sender Cooldown BV',
+        email: 'info@sender-cooldown.example',
+        website: 'https://sender-cooldown.example',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async () => null,
+      reserveRecipients: async (items, options) => {
+        calls.push({ type: 'reserve', items, options });
+        const channel = options && options.channel === 'coldmail-sender-cooldown'
+          ? 'sender-cooldown'
+          : 'recipient';
+        return {
+          ok: true,
+          reservationId: `${channel}-${calls.length}`,
+          count: (Array.isArray(items) ? items.length : 0) * 4,
+          expectedCount: (Array.isArray(items) ? items.length : 0) * 4,
+        };
+      },
+      confirmReservation: async (reservationId, options) => {
+        calls.push({ type: 'confirm', reservationId, options });
+        return { ok: true, count: 4 };
+      },
+      releaseReservation: async (reservationId) => {
+        calls.push({ type: 'release', reservationId });
+        return { ok: true };
+      },
+    },
+    onSendMail: async () => {
+      calls.push({ type: 'smtp' });
+    },
+    now: () => new Date('2026-06-24T08:00:00.000Z'),
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'info@softora.nl',
+    senderCooldownLock: {
+      enabled: true,
+      senderMinIntervalMinutes: 60,
+    },
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  const senderReserve = calls.find((call) =>
+    call.type === 'reserve' &&
+    call.options.channel === 'coldmail-sender-cooldown'
+  );
+  assert.ok(senderReserve);
+  assert.equal(senderReserve.options.ttlMs, 13.5 * 60 * 1000);
+  const senderConfirm = calls.find((call) =>
+    call.type === 'confirm' &&
+    String(call.reservationId || '').startsWith('sender-cooldown-')
+  );
+  assert.ok(senderConfirm);
+  assert.equal(senderConfirm.options.status, 'reserved');
+  assert.equal(senderConfirm.options.permanent, false);
+  assert.equal(
+    Date.parse(senderConfirm.options.expiresAt) - Date.parse('2026-06-24T08:00:00.000Z'),
+    61.5 * 60 * 1000
+  );
+  const smtpIndex = calls.findIndex((call) => call.type === 'smtp');
+  const senderConfirmIndex = calls.findIndex((call) => call === senderConfirm);
+  assert.ok(senderConfirmIndex > smtpIndex);
 });
 
 test('coldmail campaign releases the central reservation when SMTP fails before accept', async () => {

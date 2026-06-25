@@ -19,9 +19,11 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /apple-mobile-web-app-title" content="Servé's logboek"/);
   assert.match(pageSource, /noindex,nofollow/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260624a/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260624a/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
   assert.match(pageSource, /data-exercise-list/);
@@ -43,6 +45,11 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /snapshot: JSON\.parse\(snapshotJson\)/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /persistRemoteSave/);
+  assert.match(scriptSource, /exerciseSources/);
+  assert.match(scriptSource, /exerciseKeyForTitle/);
+  assert.match(scriptSource, /mergeExerciseSource/);
+  assert.match(scriptSource, /if \(isApplyingRemoteState \|\| !isReady\) return;/);
+  assert.match(scriptSource, /window\.setTimeout\(boot, REMOTE_RETRY_DELAY_MS\)/);
   assert.match(scriptSource, /keepalive: options\.keepalive === true/);
   assert.match(scriptSource, /pagehide/);
   assert.match(scriptSource, /visibilitychange/);

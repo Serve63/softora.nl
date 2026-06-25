@@ -11,6 +11,7 @@ const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-li
 const { createSoftoraDataOpsUiStateBridge } = require('./data-ops-ui-state-bridge');
 const { createSoftoraDataOpsStore } = require('./data-ops-store');
 const { createDataOpsHealthReporter } = require('./data-ops-health');
+const { createSportschoolLogbookStore } = require('./sportschool-logbook-store');
 
 const COLDMAIL_CRITICAL_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
   premium_coldmail_autopilot: 12000,
@@ -132,6 +133,12 @@ function createUiSeoRuntime(deps = {}) {
     legacyReadTimeoutMs: 2500,
     logger,
   });
+  const sportschoolLogbookStore = createSportschoolLogbookStore({
+    isSupabaseConfigured,
+    getSupabaseClient,
+    normalizeString,
+    logger,
+  });
   const dataOpsHealthReporter = createDataOpsHealthReporter({
     fetchSupabaseRowsByStateKeyPrefixViaRest,
     dataOpsStore,
@@ -245,6 +252,7 @@ function createUiSeoRuntime(deps = {}) {
     sanitizeUiStateValues,
     setUiStateValues,
     dataOpsUiStateBridge,
+    sportschoolLogbookStore,
     dataOpsUiStateReadTimeoutMs,
     dataOpsUiStateReadTimeoutMsByScope,
     logger,

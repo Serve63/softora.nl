@@ -67,6 +67,7 @@ function createFixture(overrides = {}) {
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
+    sportschoolLogbookStore: overrides.sportschoolLogbookStore || null,
     dataOpsUiStateReadTimeoutMs: overrides.dataOpsUiStateReadTimeoutMs,
     dataOpsUiStateReadTimeoutMsByScope: overrides.dataOpsUiStateReadTimeoutMsByScope,
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
@@ -308,6 +309,284 @@ test('runtime ops coordinator bewaart sportschool logboek snapshots zonder premi
   assert.equal(writes[0].meta.actor, 'serve');
   assert.equal(typeof writes[0].values.sportschool_logboek_v1, 'string');
   assert.equal(JSON.parse(writes[0].values.sportschool_logboek_v1).days.tuesday.exercises['1'].kg, '100');
+});
+
+test('runtime ops coordinator leest sportschool logboek primair uit formele sportschooltabel', async () => {
+  let legacyRead = false;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      legacyRead = true;
+      return {
+        values: {
+          sportschool_logboek_v1: JSON.stringify({
+            days: {
+              tuesday: {
+                orders: [1],
+                exercises: { 1: { title: 'Leg Extensions', kg: '100' } },
+              },
+            },
+          }),
+        },
+        source: 'supabase',
+        updatedAt: '2026-06-11T10:00:00.000Z',
+      };
+    },
+    sportschoolLogbookStore: {
+      readLogbookState: async () => ({
+        values: {
+          sportschool_logboek_v1: JSON.stringify({
+            days: {
+              tuesday: {
+                orders: [1],
+                exercises: { 1: { title: 'Leg Extensions', kg: '104' } },
+              },
+            },
+          }),
+        },
+        source: 'supabase:sportschool',
+        updatedAt: '2026-06-24T10:00:00.000Z',
+      }),
+      writeLogbookSnapshot: async () => null,
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookGetResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'supabase:sportschool');
+  assert.equal(
+    JSON.parse(res.body.values.sportschool_logboek_v1).days.tuesday.exercises['1'].kg,
+    '104'
+  );
+  assert.equal(legacyRead, true);
+});
+
+test('runtime ops coordinator herstelt nieuwer legacy sportschool logboek naar formele tabel', async () => {
+  const recovered = [];
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: {
+        sportschool_logboek_v1: JSON.stringify({
+          days: {
+            wednesday: {
+              orders: [3],
+              exercises: { 3: { title: 'Chest Press', kg: '68', reps: '10' } },
+            },
+          },
+        }),
+      },
+      source: 'supabase',
+      updatedAt: '2026-06-24T15:02:35.716Z',
+    }),
+    sportschoolLogbookStore: {
+      readLogbookState: async () => ({
+        values: {
+          sportschool_logboek_v1: JSON.stringify({
+            days: {
+              wednesday: {
+                orders: [3],
+                exercises: { 3: { title: 'Chest Press', kg: '82', reps: '8' } },
+              },
+            },
+          }),
+        },
+        source: 'supabase:sportschool',
+        updatedAt: '2026-06-12T13:39:13.418Z',
+      }),
+      writeLogbookSnapshot: async (snapshot, meta) => {
+        recovered.push({ snapshot: JSON.parse(snapshot), meta });
+        return { values: { sportschool_logboek_v1: snapshot }, source: 'supabase:sportschool' };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookGetResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'supabase');
+  assert.equal(JSON.parse(res.body.values.sportschool_logboek_v1).days.wednesday.exercises['3'].kg, '68');
+  assert.equal(recovered.length, 1);
+  assert.equal(recovered[0].meta.source, 'sportschool-logboek-legacy-recovery');
+});
+
+test('runtime ops coordinator laat nieuwere legacy v1 sportschooldata geen formele v2 overschrijven', async () => {
+  const recovered = [];
+  const syncedLegacy = [];
+  const formalSnapshot = {
+    version: 2,
+    exerciseSources: {
+      'name:CHEST PRESS': {
+        title: 'CHEST PRESS',
+        sets: '2',
+        reps: '10',
+        kg: '68',
+        notes: '',
+      },
+    },
+    days: {
+      wednesday: {
+        orders: [3],
+        exercises: {
+          3: {
+            exerciseKey: 'name:CHEST PRESS',
+            title: 'CHEST PRESS',
+            sets: '2',
+            reps: '10',
+            kg: '68',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const legacySnapshot = {
+    version: 1,
+    days: {
+      wednesday: {
+        orders: [3],
+        exercises: {
+          3: {
+            title: 'CHEST PRESS',
+            sets: '2',
+            reps: '10',
+            kg: '68',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: {
+        sportschool_logboek_v1: JSON.stringify(legacySnapshot),
+      },
+      source: 'supabase',
+      updatedAt: '2026-06-24T15:21:33.311Z',
+    }),
+    setUiStateValues: async (scope, values, meta) => {
+      syncedLegacy.push({ scope, values, meta });
+      return {
+        values,
+        source: 'supabase',
+        updatedAt: '2026-06-24T15:30:00.000Z',
+      };
+    },
+    sportschoolLogbookStore: {
+      readLogbookState: async () => ({
+        values: {
+          sportschool_logboek_v1: JSON.stringify(formalSnapshot),
+        },
+        source: 'supabase:sportschool',
+        updatedAt: '2026-06-24T15:17:17.511Z',
+      }),
+      writeLogbookSnapshot: async (snapshot, meta) => {
+        recovered.push({ snapshot: JSON.parse(snapshot), meta });
+        return { values: { sportschool_logboek_v1: snapshot }, source: 'supabase:sportschool' };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookGetResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'supabase:sportschool');
+  assert.equal(JSON.parse(res.body.values.sportschool_logboek_v1).version, 2);
+  assert.equal(recovered.length, 0);
+  assert.equal(syncedLegacy.length, 1);
+  assert.equal(syncedLegacy[0].meta.source, 'sportschool-logboek-canonical-sync');
+  assert.equal(JSON.parse(syncedLegacy[0].values.sportschool_logboek_v1).exerciseSources['name:CHEST PRESS'].kg, '68');
+});
+
+test('runtime ops coordinator weigert stale v1 sportschool writes bovenop formele v2 data', async () => {
+  const formalSnapshot = {
+    version: 2,
+    exerciseSources: {
+      'name:CHEST PRESS': {
+        title: 'CHEST PRESS',
+        sets: '2',
+        reps: '10',
+        kg: '68',
+        notes: '',
+      },
+    },
+    days: {
+      wednesday: {
+        orders: [3],
+        exercises: {
+          3: {
+            exerciseKey: 'name:CHEST PRESS',
+            title: 'CHEST PRESS',
+            sets: '2',
+            reps: '10',
+            kg: '68',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const legacyWriteSnapshot = {
+    version: 1,
+    days: {
+      wednesday: {
+        orders: [3],
+        exercises: {
+          3: {
+            title: 'CHEST PRESS',
+            sets: '3',
+            reps: '8',
+            kg: '50',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  let formalWrites = 0;
+  let legacyWrites = 0;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => null,
+    setUiStateValues: async () => {
+      legacyWrites += 1;
+      return null;
+    },
+    sportschoolLogbookStore: {
+      readLogbookState: async () => ({
+        values: {
+          sportschool_logboek_v1: JSON.stringify(formalSnapshot),
+        },
+        source: 'supabase:sportschool',
+        updatedAt: '2026-06-24T15:17:17.511Z',
+      }),
+      writeLogbookSnapshot: async () => {
+        formalWrites += 1;
+        return null;
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot: legacyWriteSnapshot,
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /Verouderde sportschool logboekdata geweigerd/);
+  assert.equal(JSON.parse(res.body.values.sportschool_logboek_v1).exerciseSources['name:CHEST PRESS'].kg, '68');
+  assert.equal(formalWrites, 0);
+  assert.equal(legacyWrites, 0);
 });
 
 test('runtime ops coordinator schrijft sportschool logboek via data-ops brug wanneer legacy opslag ontbreekt', async () => {
