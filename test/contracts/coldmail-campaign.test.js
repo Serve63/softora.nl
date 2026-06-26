@@ -519,6 +519,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
 });
 
 test('coldmail live stats count real sends from the guard and Softora/Gmail database signals', async () => {
+  let centralGuardStatsOptions = null;
   const { service } = createService({
     sendGuardState: {
       entries: [
@@ -556,70 +557,97 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
       recipientEntries: [],
     },
     outboundRecipientGuardStore: {
-      listSentRecipientGroups: async () => [
-        {
-          reservation_id: 'guard-only-reservation',
-          recipient_email: 'guard-only@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'guard-only-bv',
-          recipient_id: 'guard-only',
-          sender_email: 'serve@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'mailbox-sent-webdesign-backfill-2026-06-08',
-          updated_at: '2026-04-24T07:00:00.000Z',
-        },
-        {
-          reservation_id: 'guard-only-customer-backfill',
-          recipient_email: 'guard-only@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'guard-only-bv',
-          recipient_id: 'guard-only',
-          sender_email: 'serve@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'customer-status-backfill',
-          updated_at: '2026-04-24T07:10:00.000Z',
-        },
-        {
-          reservation_id: 'softora-sent-reservation',
-          recipient_email: 'ruben@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'bakkerij-zon',
-          recipient_id: 'softora-sent',
-          sender_email: 'martijn@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'softora-coldmail-pre-send',
-          updated_at: '2026-04-24T08:00:00.000Z',
-        },
-        {
-          reservation_id: 'invalid-domain-not-a-send',
-          recipient_email: 'invalid@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'invalid-domain',
-          recipient_id: 'invalid-domain',
-          sender_email: '',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'data-ops-customers-sent-guard',
-          actor: 'coldmail-invalid-email-domain',
-          updated_at: '2026-04-24T08:30:00.000Z',
-        },
-        {
-          reservation_id: 'data-ops-marker-not-a-send',
-          recipient_email: 'marker@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'data-ops-marker',
-          recipient_id: 'data-ops-marker',
-          sender_email: 'serve@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'data-ops-customers-sent-guard',
-          actor: 'coldmail-campaign',
-          updated_at: '2026-04-24T08:40:00.000Z',
-        },
-      ],
+      listSentRecipientGroups: async (options) => {
+        centralGuardStatsOptions = options;
+        return [
+          {
+            reservation_id: 'guard-only-reservation',
+            recipient_email: 'guard-only@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'guard-only-bv',
+            recipient_id: 'guard-only',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'mailbox-sent-webdesign-backfill-2026-06-08',
+            updated_at: '2026-04-24T07:00:00.000Z',
+          },
+          {
+            reservation_id: 'guard-only-customer-backfill',
+            recipient_email: 'guard-only@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'guard-only-bv',
+            recipient_id: 'guard-only',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'customer-status-backfill',
+            updated_at: '2026-04-24T07:10:00.000Z',
+          },
+          {
+            reservation_id: 'softora-sent-reservation',
+            recipient_email: 'ruben@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'bakkerij-zon',
+            recipient_id: 'softora-sent',
+            sender_email: 'martijn@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'softora-coldmail-pre-send',
+            updated_at: '2026-04-24T08:00:00.000Z',
+          },
+          {
+            reservation_id: 'instantly-upload-reservation',
+            recipient_email: 'instantly-guard@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'instantly-guard',
+            recipient_id: 'instantly-guard',
+            sender_email: 'serve@softora.nl',
+            provider: 'instantly',
+            channel: 'coldmail',
+            source: 'instantly-safe-upload',
+            updated_at: '2026-04-24T08:05:00.000Z',
+          },
+          {
+            reservation_id: 'sender-cooldown-reservation',
+            recipient_email: '',
+            recipient_domain: '',
+            recipient_company_key: 'serve-softora-nl',
+            recipient_id: 'sender-cooldown',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail-sender-cooldown',
+            source: 'softora-coldmail-sender-cooldown',
+            updated_at: '2026-04-24T08:06:00.000Z',
+          },
+          {
+            reservation_id: 'invalid-domain-not-a-send',
+            recipient_email: 'invalid@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'invalid-domain',
+            recipient_id: 'invalid-domain',
+            sender_email: '',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'data-ops-customers-sent-guard',
+            actor: 'coldmail-invalid-email-domain',
+            updated_at: '2026-04-24T08:30:00.000Z',
+          },
+          {
+            reservation_id: 'data-ops-marker-not-a-send',
+            recipient_email: 'marker@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'data-ops-marker',
+            recipient_id: 'data-ops-marker',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'data-ops-customers-sent-guard',
+            actor: 'coldmail-campaign',
+            updated_at: '2026-04-24T08:40:00.000Z',
+          },
+        ];
+      },
     },
     dataOpsStore: {
       listMailboxMessages: async () => [
@@ -759,6 +787,11 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.dateKey, '2026-04-24');
   assert.equal(result.stats.source, 'central-outbound-recipient-guard');
   assert.equal(result.stats.reliable, true);
+  assert.deepEqual(centralGuardStatsOptions, {
+    provider: 'softora',
+    channel: 'coldmail',
+    maxRows: 20_000,
+  });
   assert.equal(result.stats.sentToday, 2);
   assert.equal(result.stats.systemSentToday, 2);
   assert.equal(result.stats.centralGuardSentToday, 2);
