@@ -91,6 +91,8 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
       limit: 100,
       campaignId: 'campaign-1',
       uploadId: 'upload-1',
+      senderProfile: 'martijn',
+      senderEmail: 'martijn@websoftora.com',
     },
   };
   uploadRoute[2][0](uploadRequest, uploadResponse, () => {});
@@ -101,5 +103,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(uploadInput.limit, 100);
   assert.equal(uploadInput.campaignId, 'campaign-1');
   assert.equal(uploadInput.uploadId, 'upload-1');
+  assert.equal(uploadInput.senderProfile, 'martijn');
+  assert.equal(uploadInput.senderEmail, 'martijn@websoftora.com');
   assert.equal(uploadInput.actor, 'serve@softora.nl');
 });

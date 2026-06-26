@@ -495,6 +495,102 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(rows[1].databaseStatus, 'gemaild');
 });
 
+test('safe Instantly upload stores the explicit sender persona in CSV, guards and customer rows', async () => {
+  const { service, writes, getRows, outboundGuardCalls } = createService({
+    syncEnabled: false,
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        plaats: 'Boxtel',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: 'Goedendag,\n\nMet vriendelijke groet,\nServé Creusen\n\n{{stad}}',
+        },
+        'martijn@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: 'Goedendag,\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n{{stad}}',
+        },
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-martijn',
+    uploadId: 'upload-martijn',
+    limit: 1,
+    senderProfile: 'martijn',
+    senderEmail: 'martijn@websoftora.com',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.senderProfileKey, 'martijn');
+  assert.equal(result.senderName, 'Martijn van de Ven');
+  assert.equal(result.senderEmail, 'martijn@websoftora.com');
+  assert.match(result.csv, /softora_sender_profile/);
+  assert.match(result.csv, /"martijn"/);
+  assert.match(result.csv, /"Martijn van de Ven"/);
+  assert.match(result.csv, /"martijn@websoftora\.com"/);
+  assert.match(result.csv, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
+  assert.doesNotMatch(result.csv, /Servé Creusen/);
+
+  assert.equal(outboundGuardCalls.length, 1);
+  assert.equal(outboundGuardCalls[0].options.senderEmail, 'martijn@websoftora.com');
+  assert.equal(outboundGuardCalls[0].options.payload.senderProfileKey, 'martijn');
+  assert.equal(outboundGuardCalls[0].options.payload.senderName, 'Martijn van de Ven');
+
+  const guardState = JSON.parse(writes[0].values.softora_coldmail_send_guard_v1);
+  assert.equal(guardState.recipientEntries[0].senderEmail, 'martijn@websoftora.com');
+  assert.equal(guardState.recipientEntries[0].senderProfileKey, 'martijn');
+  assert.equal(guardState.recipientEntries[0].senderName, 'Martijn van de Ven');
+
+  const row = getRows()[0];
+  assert.equal(row.instantlySenderProfileKey, 'martijn');
+  assert.equal(row.instantlySenderName, 'Martijn van de Ven');
+  assert.equal(row.instantlySenderEmail, 'martijn@websoftora.com');
+  assert.equal(row.lastColdmailSenderEmail, 'martijn@websoftora.com');
+  assert.equal(row.sentFromEmail, 'martijn@websoftora.com');
+  assert.equal(row.outreachSentFromEmail, 'martijn@websoftora.com');
+  assert.equal(row.replyMailboxAccount, 'martijn@websoftora.com');
+});
+
+test('safe Instantly upload rejects mismatched sender persona and mailbox', async () => {
+  const { service, writes, getRows } = createService({
+    syncEnabled: false,
+  });
+
+  await assert.rejects(
+    () =>
+      service.prepareInstantlyUpload({
+        actor: 'Test',
+        campaignId: 'campaign-martijn',
+        limit: 1,
+        senderProfile: 'martijn',
+        senderEmail: 'serve@websoftora.com',
+      }),
+    (error) => {
+      assert.equal(error.code, 'INSTANTLY_SENDER_PROFILE_MISMATCH');
+      assert.equal(error.status, 400);
+      assert.match(error.message, /senderProfile en senderEmail/);
+      return true;
+    }
+  );
+
+  assert.equal(writes.length, 0);
+  assert.equal(getRows()[0].lastColdmailProvider, undefined);
+});
+
 test('safe Instantly upload preserves existing Softora send guards when reserving leads', async () => {
   const { service, writes } = createService({
     syncEnabled: false,
@@ -1911,6 +2007,7 @@ test('instantly email_sent webhook marks the Softora row as mailed', async () =>
         event_id: 'event-1',
         data: {
           campaign_id: 'campaign-1',
+          from_address_email: 'martijnven@websoftora.com',
           lead: {
             id: 'instantly-lead-1',
             email: 'ruben@example.test',
@@ -1928,6 +2025,10 @@ test('instantly email_sent webhook marks the Softora row as mailed', async () =>
   assert.equal(row.instantlyStatus, 'sent');
   assert.equal(row.lastMailSentAt, '2026-05-25T10:00:00.000Z');
   assert.equal(row.outreachStatus, 'benaderd');
+  assert.equal(row.instantlySenderProfileKey, 'martijn');
+  assert.equal(row.instantlySenderName, 'Martijn van de Ven');
+  assert.equal(row.instantlySenderEmail, 'martijnven@websoftora.com');
+  assert.equal(row.lastColdmailSenderEmail, 'martijnven@websoftora.com');
 });
 
 test('instantly reply aliases keep the row actionable without overwriting interest', async () => {
