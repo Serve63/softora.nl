@@ -1580,12 +1580,17 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignBulkScriptSource, /function hideStatus\(\)/);
   assert.match(webdesignBulkScriptSource, /const onCancel = typeof options\.onCancel === "function" \? options\.onCancel : null;/);
   assert.match(webdesignBulkScriptSource, /const cancelledBatchIds = new Set\(\);/);
+  assert.match(webdesignBulkScriptSource, /const dismissedBatchIds = new Set\(\);/);
   assert.match(webdesignBulkScriptSource, /function rememberCancelledBatch\(batchId\)/);
+  assert.match(webdesignBulkScriptSource, /function rememberDismissedBatch\(batchId\)/);
   assert.match(webdesignBulkScriptSource, /function isCancelledBatch\(batchId\)/);
+  assert.match(webdesignBulkScriptSource, /function isDismissedBatch\(batchId\)/);
   assert.match(webdesignBulkScriptSource, /cancelledJobIds: Array\.isArray\(payload\.cancelledJobIds\) \? payload\.cancelledJobIds : \[\]/);
-  assert.match(webdesignBulkScriptSource, /if \(isCancelledBatch\(batchId\)\) \{[\s\S]*hideStatus\(\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(webdesignBulkScriptSource, /if \(isCancelledBatch\(batchId\) \|\| isDismissedBatch\(batchId\)\) \{[\s\S]*hideStatus\(\);[\s\S]*return;[\s\S]*\}/);
   assert.match(webdesignBulkScriptSource, /if \(isCancelledBatch\(id\)\) \{[\s\S]*hideStatus\(\);[\s\S]*return;[\s\S]*\}/);
   assert.match(webdesignBulkScriptSource, /if \(status === "cancelled"\) \{[\s\S]*hideStatus\(\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(webdesignBulkScriptSource, /if \(!isActiveBatchStatus\(status\)\) \{[\s\S]*rememberDismissedBatch\(visibleId\);[\s\S]*hideStatus\(\);[\s\S]*return null;[\s\S]*\}/);
+  assert.match(webdesignBulkScriptSource, /Webdesign-bulk sluiten/);
   assert.doesNotMatch(webdesignBulkScriptSource, /status === "done" \|\| status === "error" \|\| status === "cancelled"/);
   assert.match(webdesignBulkScriptSource, /function scheduleRestoreRetry\(\)/);
   assert.match(webdesignBulkScriptSource, /if \(!response\.ok\) throw new Error/);
@@ -1624,7 +1629,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260617d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260626a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260617a/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
