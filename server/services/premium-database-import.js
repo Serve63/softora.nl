@@ -932,16 +932,35 @@ function inferBranchFromGoogleTypes(types = []) {
   return 'Overig';
 }
 
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const sourceItems = Array.isArray(items) ? items : [];
+  const output = new Array(sourceItems.length);
+  let cursor = 0;
+  const workerCount = Math.min(sourceItems.length, Math.max(1, concurrency));
+  async function runNext() {
+    while (cursor < sourceItems.length) {
+      const index = cursor;
+      cursor += 1;
+      output[index] = await mapper(sourceItems[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: workerCount }, runNext));
+  return output;
+}
+
 async function mapGooglePlacesToImportRows(places, deps = {}) {
   const shouldEnrichEmails = deps.enrichEmails !== false;
   const rows = [CANONICAL_IMPORT_COLUMNS.map((column) => column.label)];
   const today = new Date().toISOString().slice(0, 10);
+  const enrichmentConcurrency = shouldEnrichEmails
+    ? parsePositiveInt(deps.emailEnrichmentConcurrency, 5, 1, 8)
+    : 1;
 
-  for (const place of places) {
+  const mappedRows = await mapWithConcurrency(places, enrichmentConcurrency, async (place) => {
     const websiteUrl = normalizeWebsiteUrl(place && place.websiteUri);
     const websiteDomain = normalizeWebsiteDomain(websiteUrl);
     const email = shouldEnrichEmails ? await discoverBusinessEmailFromWebsite(websiteUrl, deps) : '';
-    rows.push([
+    return [
       getGooglePlaceName(place),
       normalizeString(place && place.formattedAddress) || 'Onbekend',
       email || '—',
@@ -953,8 +972,9 @@ async function mapGooglePlacesToImportRows(places, deps = {}) {
       'Serve',
       'website',
       today,
-    ]);
-  }
+    ];
+  });
+  rows.push(...mappedRows);
 
   return rows;
 }

@@ -219,6 +219,39 @@ function createRuntimeOpsCoordinator(deps = {}) {
       body.replace === true ||
       body.fullReplace === true ||
       normalizeString(body.mode || '').toLowerCase() === 'replace';
+    const appendRequested = normalizeString(body.mode || '').toLowerCase() === 'append';
+    const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
+    const sourceMeta = {
+      source: normalizeString(body.source || 'frontend'),
+      actor: normalizeString(body.actor || ''),
+    };
+    const appendOnlyDataOpsSet =
+      !replaceRequested &&
+      dataOpsUiStateBridge &&
+      typeof dataOpsUiStateBridge.canHandleAppendOnlySet === 'function' &&
+      dataOpsUiStateBridge.canHandleAppendOnlySet(scope, patchValues);
+    if (appendOnlyDataOpsSet) {
+      const mirroredState = await mirrorUiStateValuesToDataOps(scope, patchValues, sourceMeta);
+      if (!mirroredState) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Kon UI state append niet opslaan zonder geldige gestructureerde opslag.',
+        });
+      }
+      return res.status(200).json({
+        ok: true,
+        scope,
+        values: mirroredState.values || {},
+        source: mirroredState.source || 'supabase:data_ops',
+        updatedAt: mirroredState.updatedAt || null,
+      });
+    }
+    if (appendRequested && !replaceRequested) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon UI state append niet opslaan zonder geldige gestructureerde opslag.',
+      });
+    }
     let valuesToSave;
 
     if (replaceRequested) {
@@ -233,14 +266,10 @@ function createRuntimeOpsCoordinator(deps = {}) {
       }
       const currentValues =
         current && current.values && typeof current.values === 'object' ? current.values : {};
-      const patchValues = sanitizeUiStateValues(patchProvided ? body.patch : valuesProvided ? body.values : {});
       valuesToSave = { ...currentValues, ...patchValues };
     }
 
-    const state = await setUiStateValues(scope, valuesToSave, {
-      source: normalizeString(body.source || 'frontend'),
-      actor: normalizeString(body.actor || ''),
-    });
+    const state = await setUiStateValues(scope, valuesToSave, sourceMeta);
     if (!state) {
       return res.status(503).json({
         ok: false,
@@ -248,10 +277,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
-    const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, {
-      source: normalizeString(body.source || 'frontend'),
-      actor: normalizeString(body.actor || ''),
-    });
+    const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, sourceMeta);
 
     return res.status(200).json({
       ok: true,

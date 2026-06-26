@@ -1569,7 +1569,7 @@
     </div>
     <script src="assets/premium-database-photo-batch.js?v=20260429b"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260529d"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-action.js?v=20260529d"></script><script src="assets/premium-database-webdesign-preview.js?v=20260529c"></script>
-    <script src="assets/premium-database-import.js?v=20260521b"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script><script src="assets/premium-database-email-verification.js?v=20260617a"></script>
+    <script src="assets/premium-database-import.js?v=20260626a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script><script src="assets/premium-database-email-verification.js?v=20260617a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260605a"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-helpers.js?v=20260521b"></script><script src="assets/premium-database-target-coords.js?v=20260522a"></script><script src="assets/premium-database-deep-search.js?v=20260521d"></script><script src="assets/premium-database-distance.js?v=20260522b"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script>
@@ -2095,20 +2095,10 @@
         function customerListsDiffer(nextCustomers) { return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers); }
         function applyCustomerList(nextCustomers, forceRender) { const changed = customerListsDiffer(nextCustomers); logDatabaseMediaDebug("apply-customer-list", { currentCount: state.klanten.length, nextCount: (nextCustomers || []).length, forceRender: Boolean(forceRender), changed: changed }); if (changed || forceRender) { state.klanten = nextCustomers; renderPage(); return; } state.klanten = nextCustomers; }
 
-        function persistCustomerList(customers) {
-            const normalizedCustomers = sortCustomers(customers).filter(function (item) {
-                return !isDerivedOrderPlaceholderCustomer(item);
-            }).map(function (item, index) {
-                const normalized = normalizeCustomer(item, "persist-" + index);
-                return {
-                    ...normalized,
-                    websitePhoto: "",
-                    websitePhotoName: "",
-                    websiteMockup: "",
-                    websiteMockupName: ""
-                };
-            });
+        function buildPersistableCustomerList(customers) { return sortCustomers(customers).filter(function (item) { return !isDerivedOrderPlaceholderCustomer(item); }).map(function (item, index) { const normalized = normalizeCustomer(item, "persist-" + index); return { ...normalized, websitePhoto: "", websitePhotoName: "", websiteMockup: "", websiteMockupName: "" }; }); }
 
+        function persistCustomerList(customers) {
+            const normalizedCustomers = buildPersistableCustomerList(customers);
             return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
                 patch: window.SoftoraDatabaseImport.buildChunkedStatePatch(CUSTOMER_DB_KEY, JSON.stringify(normalizedCustomers)),
                 source: "premium-database",
@@ -2119,6 +2109,8 @@
                 return { ok: false, error: error };
             });
         }
+
+        function persistCustomerUpserts(customers, fallbackCustomers) { return window.SoftoraDatabaseImport.persistCustomerUpserts({ scope: CUSTOMER_DB_SCOPE, key: CUSTOMER_DB_KEY, customers: buildPersistableCustomerList(customers), setUiState: fetchUiStateSetWithFallback, fallback: function () { return persistCustomerList(fallbackCustomers); } }); }
 
         const apiCostLedger = window.SoftoraApiCostLedger.createLedger({
             getUiState: fetchUiStateGetWithFallback,
@@ -2830,7 +2822,8 @@
             state.klanten = sortCustomers(mergeResult.customers);
             renderPage();
 
-            return persistCustomerList(state.klanten).then(function (result) {
+            const customersToPersist = mergeResult.addedCustomers.concat(mergeResult.updatedCustomers);
+            return persistCustomerUpserts(customersToPersist, state.klanten).then(function (result) {
                 if (result.ok) {
                     const labelParts = [];
                     if (mergeResult.addedCount) labelParts.push(mergeResult.addedCount + " toegevoegd");

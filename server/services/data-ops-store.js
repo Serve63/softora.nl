@@ -607,6 +607,21 @@ function createSoftoraDataOpsStore(deps = {}) {
     );
   }
 
+  async function upsertCustomers(customers, meta = {}) {
+    const rows = dedupeCustomerRowsForReplace(
+      (Array.isArray(customers) ? customers : []).map((item, index) =>
+        buildCustomerRow(item, index, meta.source)
+      ),
+      meta.source
+    );
+    if (!rows.length) return { ok: true, data: [] };
+    const upsert = await run('upsert-customers-partial', (client) =>
+      client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' })
+    );
+    if (upsert.ok) forgetReads('customers');
+    return upsert;
+  }
+
   function buildOrderRow(raw, index, source) {
     const payload = raw && typeof raw === 'object' ? { ...raw } : {};
     const id = normalizeString(payload.id || payload.orderId) || `order_${index + 1}`;
@@ -1212,6 +1227,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     replaceDesignPhotos,
     replaceOrderRuntime,
     uploadDesignPhoto,
+    upsertCustomers,
     upsertDesignPhotos,
     upsertWebdesignJob,
   };

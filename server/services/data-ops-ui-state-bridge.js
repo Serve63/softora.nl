@@ -21,6 +21,7 @@ const SCOPES = Object.freeze({
 
 const KEYS = Object.freeze({
   customers: 'softora_customers_premium_v1',
+  customerUpserts: 'softora_customers_premium_v1_upserts_v1',
   activeOrders: 'softora_custom_orders_premium_v1',
   orderRuntime: 'softora_order_runtime_premium_v1',
   photos: 'softora_database_photos_v1',
@@ -72,6 +73,16 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
 
   function canHandleScope(scope) {
     return enabled && Object.values(SCOPES).includes(normalizeString(scope).toLowerCase());
+  }
+
+  function canHandleAppendOnlySet(scope, values) {
+    const stateValues = values && typeof values === 'object' ? values : {};
+    return Boolean(
+      canHandleScope(scope) &&
+        normalizeString(scope).toLowerCase() === SCOPES.customers &&
+        hasKey(stateValues, KEYS.customerUpserts) &&
+        !hasKey(stateValues, KEYS.customers)
+    );
   }
 
   function hasKey(values, key) {
@@ -429,6 +440,13 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
     const sourceMeta = { source: normalizeString(meta.source || 'ui-state-compat') };
 
     try {
+      if (canHandleAppendOnlySet(scope, stateValues)) {
+        const customers = safeParseJsonArray(readChunkedStateValue(stateValues, KEYS.customerUpserts));
+        if (!customers.length) return buildState(scope, stateValues);
+        if (typeof store.upsertCustomers !== 'function') return null;
+        const saved = await store.upsertCustomers(customers, sourceMeta);
+        return saved.ok ? buildState(scope, stateValues) : null;
+      }
       if (scope === SCOPES.customers && hasKey(stateValues, KEYS.customers)) {
         const customers = safeParseJsonArray(readChunkedStateValue(stateValues, KEYS.customers));
         const saved = await store.replaceCustomers(customers, sourceMeta);
@@ -474,6 +492,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
 
   return {
     canHandleScope,
+    canHandleAppendOnlySet,
     getUiStateValues,
     setUiStateValues,
     _constants: { KEYS, PHOTO_DATA_PREFIX, SCOPES },

@@ -17,6 +17,10 @@ function createStore(overrides = {}) {
       calls.push({ type: 'customers', customers, meta });
       return { ok: true };
     }),
+    upsertCustomers: overrides.upsertCustomers || (async (customers, meta) => {
+      calls.push({ type: 'customers-upsert', customers, meta });
+      return { ok: true };
+    }),
     listActiveOrders: overrides.listActiveOrders || (async () => []),
     replaceActiveOrders: overrides.replaceActiveOrders || (async (orders, meta) => {
       calls.push({ type: 'orders', orders, meta });
@@ -200,6 +204,28 @@ test('data ops ui-state bridge dual-writes customer and active order values', as
   assert.equal(store.calls[1].orders[0].title, 'Website');
   assert.equal(store.calls[2].type, 'runtime');
   assert.equal(store.calls[2].runtime['7'].statusKey, 'running');
+});
+
+test('data ops ui-state bridge upserts imported customers without replacing the full list', async () => {
+  const store = createStore();
+  const bridge = createSoftoraDataOpsUiStateBridge({ store });
+  const patch = buildChunkedStatePatch(
+    KEYS.customerUpserts,
+    JSON.stringify([{ id: 'cust-new', bedrijf: 'Snelle Import' }])
+  );
+
+  assert.equal(bridge.canHandleAppendOnlySet(SCOPES.customers, patch), true);
+
+  const state = await bridge.setUiStateValues(
+    SCOPES.customers,
+    patch,
+    { source: 'premium-database-import' }
+  );
+
+  assert.equal(state.source, 'supabase:data_ops');
+  assert.deepEqual(store.calls.map((call) => call.type), ['customers-upsert']);
+  assert.equal(store.calls[0].customers[0].bedrijf, 'Snelle Import');
+  assert.equal(store.calls[0].meta.source, 'premium-database-import');
 });
 
 test('data ops ui-state bridge stores photo chunks as structured photo entries', async () => {

@@ -430,6 +430,53 @@ test('premium database real businesses maps Google Places rows and discovers pub
   assert.equal(calls.filter((call) => call.url.includes('places.googleapis.com')).length, 1);
 });
 
+test('premium database real businesses enriches website emails with bounded concurrency', async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const result = await fetchRealBusinessRows(
+    { query: 'winkels Breda', count: 4, enrichEmails: true },
+    {
+      env: { GOOGLE_MAPS_SERVER_API_KEY: 'maps-key' },
+      emailEnrichmentConcurrency: 2,
+      fetchImpl: async (url) => {
+        if (String(url).includes('places.googleapis.com')) {
+          return {
+            ok: true,
+            async json() {
+              return {
+                places: [1, 2, 3, 4].map((index) => ({
+                  id: `place-${index}`,
+                  displayName: { text: `Winkel ${index}` },
+                  formattedAddress: `Markt ${index}, Breda`,
+                  websiteUri: `https://winkel-${index}.nl`,
+                  businessStatus: 'OPERATIONAL',
+                  types: ['store'],
+                })),
+              };
+            },
+          };
+        }
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        inFlight -= 1;
+        const domain = String(url).replace(/^https?:\/\//, '').replace(/\/$/, '');
+        return {
+          ok: true,
+          headers: { get: () => 'text/html' },
+          async text() {
+            return `<a href="mailto:info@${domain}">Mail</a>`;
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(result.found, 4);
+  assert.equal(result.emailFound, 4);
+  assert.equal(maxInFlight, 2);
+});
+
 test('premium database real businesses route reports missing Google Places key', async () => {
   const coordinator = createPremiumDatabaseImportCoordinator({
     env: {},

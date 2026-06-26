@@ -250,6 +250,94 @@ test('runtime ops coordinator prefers structured data ops reads and mirrors writ
   assert.equal(bridgeCalls[2].meta.source, 'premium-klanten');
 });
 
+test('runtime ops coordinator sends append-only customer imports straight to data ops', async () => {
+  const bridgeCalls = [];
+  let legacyRead = false;
+  let legacyWrite = false;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      legacyRead = true;
+      return { values: { panel: 'legacy' }, source: 'legacy' };
+    },
+    setUiStateValues: async () => {
+      legacyWrite = true;
+      return { values: {}, source: 'legacy' };
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      canHandleAppendOnlySet: (scope, values) =>
+        scope === 'premium_customers_database' &&
+        Object.prototype.hasOwnProperty.call(values, 'softora_customers_premium_v1_upserts_v1'),
+      setUiStateValues: async (scope, values, meta) => {
+        bridgeCalls.push({ scope, values, meta });
+        return {
+          values,
+          source: 'supabase:data_ops',
+          updatedAt: '2026-06-26T12:00:00.000Z',
+        };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        mode: 'append',
+        patch: {
+          softora_customers_premium_v1_upserts_v1: '[{"id":"cust-new"}]',
+        },
+        source: 'premium-database-import',
+      },
+    },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'supabase:data_ops');
+  assert.equal(legacyRead, false);
+  assert.equal(legacyWrite, false);
+  assert.equal(bridgeCalls.length, 1);
+  assert.deepEqual(bridgeCalls[0].values, {
+    softora_customers_premium_v1_upserts_v1: '[{"id":"cust-new"}]',
+  });
+  assert.equal(bridgeCalls[0].meta.source, 'premium-database-import');
+});
+
+test('runtime ops coordinator rejects append-only writes when data ops cannot handle them', async () => {
+  let legacyRead = false;
+  let legacyWrite = false;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      legacyRead = true;
+      return { values: { panel: 'legacy' }, source: 'legacy' };
+    },
+    setUiStateValues: async () => {
+      legacyWrite = true;
+      return { values: {}, source: 'legacy' };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        mode: 'append',
+        patch: {
+          softora_customers_premium_v1_upserts_v1: '[{"id":"cust-new"}]',
+        },
+      },
+    },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(legacyRead, false);
+  assert.equal(legacyWrite, false);
+});
+
 test('runtime ops coordinator uses legacy ui-state when structured data ops reads hang', async () => {
   const warnings = [];
   let legacyRead = false;

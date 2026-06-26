@@ -13,6 +13,10 @@
         return normalizeString(baseKey) + "_chunk_";
     }
 
+    function getCustomerUpsertsKey(baseKey) {
+        return normalizeString(baseKey) + "_upserts_v1";
+    }
+
     function readChunkedStateValue(values, baseKey) {
         const stateValues = values && typeof values === "object" ? values : {};
         const normalizedKey = normalizeString(baseKey);
@@ -61,6 +65,34 @@
             patch[prefix + index] = chunk;
         });
         return patch;
+    }
+
+    function buildCustomerUpsertPatch(baseKey, customers, chunkSize) {
+        return buildChunkedStatePatch(
+            getCustomerUpsertsKey(baseKey),
+            JSON.stringify(Array.isArray(customers) ? customers : []),
+            chunkSize
+        );
+    }
+
+    function persistCustomerUpserts(options) {
+        const settings = options && typeof options === "object" ? options : {};
+        const customers = Array.isArray(settings.customers) ? settings.customers : [];
+        const fallback = typeof settings.fallback === "function" ? settings.fallback : function () { return Promise.resolve({ ok: false, error: new Error("Geen volledige databasefallback beschikbaar.") }); };
+        if (!customers.length || typeof settings.setUiState !== "function") return fallback();
+        return settings.setUiState(settings.scope, {
+            mode: "append",
+            patch: buildCustomerUpsertPatch(settings.key, customers),
+            source: "premium-database-import",
+            actor: "Premium database"
+        }).then(function () {
+            return { ok: true, mode: "upsert" };
+        }).catch(function (error) {
+            if (global.console && typeof global.console.warn === "function") {
+                global.console.warn("Snelle database-import viel terug op volledige opslag:", error);
+            }
+            return fallback();
+        });
     }
 
     function detectDelimitedSeparator(text, preferredSeparator) {
@@ -494,10 +526,13 @@
 
     global.SoftoraDatabaseImport = {
         buildChunkedStatePatch: buildChunkedStatePatch,
+        buildCustomerUpsertPatch: buildCustomerUpsertPatch,
         createController: createController,
         detectDelimitedSeparator: detectDelimitedSeparator,
+        getCustomerUpsertsKey: getCustomerUpsertsKey,
         mergeCustomers: mergeCustomers,
         parseDelimitedRows: parseDelimitedRows,
+        persistCustomerUpserts: persistCustomerUpserts,
         pickRecordValue: pickRecordValue,
         readChunkedStateValue: readChunkedStateValue,
         readRealBusinessRows: readRealBusinessRows,
