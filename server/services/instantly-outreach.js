@@ -509,23 +509,45 @@ function slugifyWebdesignCompany(value, fallback = 'uw-bedrijf', normalizeString
   return slug || fallback;
 }
 
-function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNormalizeString) {
+function buildPublicWebdesignPreviewPath(row, id, options = {}, normalizeString = defaultNormalizeString) {
+  const effectiveNormalizeString = typeof options === 'function' ? options : normalizeString;
+  const pathOptions = typeof options === 'function' ? {} : (options && typeof options === 'object' ? options : {});
   const slug = slugifyWebdesignCompany(
-    getRowCompany(row, normalizeString),
-    slugifyWebdesignCompany(id, 'uw-bedrijf', normalizeString),
-    normalizeString
+    getRowCompany(row, effectiveNormalizeString),
+    slugifyWebdesignCompany(id, 'uw-bedrijf', effectiveNormalizeString),
+    effectiveNormalizeString
   );
-  const directIdentifier = normalizeString(id);
-  const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
-  return `/webdesign/${slug}${directQuery}`;
+  const directIdentifier = effectiveNormalizeString(id);
+  const senderProfileKey = getInstantlySenderProfileKey(
+    pathOptions.senderProfileKey ||
+      pathOptions.senderProfile ||
+      pathOptions.senderKey ||
+      pathOptions.profileKey ||
+      pathOptions.senderEmail,
+    effectiveNormalizeString
+  );
+  const query = new URLSearchParams();
+  if (directIdentifier) query.set('cid', directIdentifier);
+  if (senderProfileKey) query.set('sender', senderProfileKey);
+  const queryString = query.toString();
+  return `/webdesign/${slug}${queryString ? `?${queryString}` : ''}`;
 }
 
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+  const pathOptions = config && typeof config === 'object'
+    ? {
+        senderProfileKey: config.senderProfileKey,
+        senderProfile: config.senderProfile,
+        senderKey: config.senderKey,
+        profileKey: config.profileKey,
+        senderEmail: config.senderEmail,
+      }
+    : {};
   try {
-    return new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl).toString();
+    return new URL(buildPublicWebdesignPreviewPath(row, id, pathOptions, normalizeString), baseUrl).toString();
   } catch (_error) {
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, pathOptions, normalizeString)}`;
   }
 }
 
@@ -2620,8 +2642,6 @@ function createInstantlyOutreachService(deps = {}) {
     );
     const reference = buildColdmailReference(row, item.id, now, normalizeString);
     const unsubscribeUrl = buildColdmailUnsubscribeUrl(row, item.id, reference, config, normalizeString, now);
-    const webdesignPublicPath = buildPublicWebdesignPreviewPath(row, item.id, normalizeString);
-    const webdesignPublicUrl = buildPublicWebdesignPreviewUrl(row, item.id, config, normalizeString);
     const subjectTemplate =
       normalizeString(context.mailProfile && context.mailProfile.subject) || DEFAULT_WEBDESIGN_SUBJECT;
     const bodyTemplate =
@@ -2629,6 +2649,13 @@ function createInstantlyOutreachService(deps = {}) {
     const city = getRowCity(row, normalizeString) || 'uw regio';
     const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
     const sender = context.sender || resolveInstantlySenderProfile({}, config, normalizeString);
+    const webdesignPublicPath = buildPublicWebdesignPreviewPath(row, item.id, {
+      senderProfileKey: sender.key,
+    }, normalizeString);
+    const webdesignPublicUrl = buildPublicWebdesignPreviewUrl(row, item.id, {
+      ...config,
+      senderProfileKey: sender.key,
+    }, normalizeString);
     const senderName = normalizeString(sender.name) || inferInstantlySenderName(bodyTemplate, sender.email, normalizeString);
     const baseMailBody = buildInstantlyWebdesignMailText(row, city, senderName, normalizeString);
     const assets = getReadyWebdesignAssets(item, context);
