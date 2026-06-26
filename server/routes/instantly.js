@@ -23,6 +23,8 @@ function registerInstantlyRoutes(app, deps = {}) {
         limit: body.limit,
         campaignId: body.campaignId || body.campaign || body.defaultCampaignId,
         uploadId: body.uploadId,
+        senderProfile: body.senderProfile || body.senderProfileKey || body.profileKey,
+        senderEmail: body.senderEmail || body.sentFromEmail || body.mailboxAccount,
         actor:
           normalizeString(req.premiumAuth && (req.premiumAuth.displayName || req.premiumAuth.email)) ||
           normalizeString(body.actor) ||

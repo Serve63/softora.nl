@@ -105,6 +105,18 @@ const INSTANTLY_SENDER_PROFILE_ALIASES = Object.freeze({
   'martijnven@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
   'martijnvandeven@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
 });
+const INSTANTLY_SENDER_PROFILES = Object.freeze({
+  serve: Object.freeze({
+    key: 'serve',
+    name: 'Servé Creusen',
+    defaultEmail: 'serve@websoftora.com',
+  }),
+  martijn: Object.freeze({
+    key: 'martijn',
+    name: 'Martijn van de Ven',
+    defaultEmail: 'martijn@websoftora.com',
+  }),
+});
 const STARTUP_SYNC_DELAY_MS = 10_000;
 const EXCLUDED_DATABASE_STATUSES = new Set([
   'gemaild',
@@ -164,6 +176,9 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_customer_id',
   'softora_source',
   'softora_company',
+  'softora_sender_profile',
+  'softora_sender_name',
+  'softora_sender_email',
   'softora_subject',
   'softora_mail_body',
   'softora_instantly_email_html',
@@ -190,6 +205,9 @@ const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
   'softora_company',
   'softora_status',
   'softora_contact_name',
+  'softora_sender_profile',
+  'softora_sender_name',
+  'softora_sender_email',
   'softora_city',
   'softora_city_with_pin',
   'softora_subject',
@@ -289,6 +307,131 @@ function getInstantlySenderProfileEmailCandidateList(values = [], normalizeStrin
     });
   });
   return candidates;
+}
+
+function getInstantlySenderProfileKey(value, normalizeString = defaultNormalizeString) {
+  const normalized = normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9@.]+/g, ' ')
+    .trim();
+  if (!normalized) return '';
+  const email = normalizeEmailAddress(normalized, normalizeString);
+  const source = email || normalized;
+  if (/\bmartijn\b/.test(source) || source.includes('martijn@') || source.includes('martijnven@')) return 'martijn';
+  if (/\bserve\b/.test(source) || source.includes('serve@') || source.includes('servec321@')) return 'serve';
+  return '';
+}
+
+function getInstantlySenderProfile(key) {
+  return INSTANTLY_SENDER_PROFILES[key] || null;
+}
+
+function resolveInstantlySenderProfile(input = {}, config = {}, normalizeString = defaultNormalizeString) {
+  const nestedSender = input.sender && typeof input.sender === 'object' ? input.sender : {};
+  const explicitProfileKey = getInstantlySenderProfileKey(
+    nestedSender.key ||
+      nestedSender.senderProfileKey ||
+      nestedSender.senderProfile ||
+      nestedSender.name ||
+      input.senderProfileKey ||
+      input.senderProfile ||
+      input.profileKey ||
+      input.senderKey,
+    normalizeString
+  );
+  const explicitSenderEmail = normalizeEmailAddress(
+    nestedSender.email ||
+      nestedSender.senderEmail ||
+      input.senderEmail ||
+      input.sentFromEmail ||
+      input.fromEmail ||
+      input.mailboxAccount ||
+      input.replyMailboxAccount,
+    normalizeString
+  );
+  const defaultSenderEmail = normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL, normalizeString);
+  const explicitEmailProfileKey = getInstantlySenderProfileKey(explicitSenderEmail, normalizeString);
+  if (explicitProfileKey && explicitEmailProfileKey && explicitProfileKey !== explicitEmailProfileKey) {
+    throw createInstantlyError(
+      'Instantly senderProfile en senderEmail spreken elkaar tegen. Kies één Servé- of Martijn-combinatie.',
+      'INSTANTLY_SENDER_PROFILE_MISMATCH',
+      400
+    );
+  }
+
+  const defaultEmailProfileKey = getInstantlySenderProfileKey(defaultSenderEmail, normalizeString);
+  const key = explicitProfileKey || explicitEmailProfileKey || defaultEmailProfileKey || 'serve';
+  const profile = getInstantlySenderProfile(key) || INSTANTLY_SENDER_PROFILES.serve;
+  const email =
+    explicitSenderEmail ||
+    (defaultEmailProfileKey === key ? defaultSenderEmail : '') ||
+    profile.defaultEmail ||
+    defaultSenderEmail;
+
+  return {
+    key: profile.key,
+    name: profile.name,
+    email: normalizeEmailAddress(email, normalizeString),
+  };
+}
+
+function hasInstantlySenderOverride(input = {}) {
+  if (input.sender && typeof input.sender === 'object') return true;
+  return Boolean(
+    input.senderProfileKey ||
+      input.senderProfile ||
+      input.profileKey ||
+      input.senderKey ||
+      input.senderEmail ||
+      input.sentFromEmail ||
+      input.fromEmail ||
+      input.mailboxAccount ||
+      input.replyMailboxAccount
+  );
+}
+
+function inferInstantlySenderProfileFromMailProfile(mailProfile = {}, config = {}, normalizeString = defaultNormalizeString) {
+  const defaultSenderEmail = normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL, normalizeString);
+  const inferredName = inferInstantlySenderName(mailProfile && mailProfile.body, defaultSenderEmail, normalizeString);
+  const key =
+    getInstantlySenderProfileKey(inferredName, normalizeString) ||
+    getInstantlySenderProfileKey(defaultSenderEmail, normalizeString) ||
+    'serve';
+  const profile = getInstantlySenderProfile(key) || INSTANTLY_SENDER_PROFILES.serve;
+  const defaultKey = getInstantlySenderProfileKey(defaultSenderEmail, normalizeString);
+  return {
+    key: profile.key,
+    name: profile.name,
+    email: defaultKey === profile.key ? defaultSenderEmail : profile.defaultEmail,
+  };
+}
+
+function buildInstantlySenderRowFields(senderEmail, normalizeString = defaultNormalizeString) {
+  const email = normalizeEmailAddress(senderEmail, normalizeString);
+  if (!email) return {};
+  const key = getInstantlySenderProfileKey(email, normalizeString);
+  const profile = getInstantlySenderProfile(key);
+  if (!profile) {
+    return {
+      instantlyActualSenderEmail: email,
+    };
+  }
+  return {
+    instantlyActualSenderEmail: email,
+    instantlySenderProfileKey: profile.key,
+    instantlySenderName: profile.name,
+    instantlySenderEmail: email,
+    senderProfileKey: profile.key,
+    senderEmail: email,
+    lastColdmailSenderEmail: email,
+    sentFromEmail: email,
+    sent_from_email: email,
+    outreachSentFromEmail: email,
+    outreach_sent_from_email: email,
+    replyMailboxAccount: email,
+  };
 }
 
 function isLikelyValidEmail(value, normalizeString = defaultNormalizeString) {
@@ -2111,7 +2254,7 @@ function createInstantlyOutreachService(deps = {}) {
     return parseCustomerPhotoMap(values[customerPhotoKey], values, rows, normalizeString);
   }
 
-  async function loadColdmailProfile() {
+  async function loadColdmailProfile(senderEmail = '') {
     const [settingsState, autopilotState] = await Promise.all([
       getUiStateValues(coldmailingSettingsScope),
       getUiStateValues(coldmailAutopilotScope),
@@ -2135,13 +2278,13 @@ function createInstantlyOutreachService(deps = {}) {
     return (
       extractColdmailProfileFromAutopilotState(
         autopilot,
-        config.defaultSenderEmail,
+        senderEmail || config.defaultSenderEmail,
         normalizeString,
         truncateText
       ) ||
       extractColdmailProfileFromSettings(
         settings,
-        config.defaultSenderEmail,
+        senderEmail || config.defaultSenderEmail,
         normalizeString,
         truncateText
       ) ||
@@ -2326,11 +2469,13 @@ function createInstantlyOutreachService(deps = {}) {
       );
     }
     const identities = (Array.isArray(items) ? items : []).map(buildOutboundRecipientGuardIdentity);
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const reservation = await outboundRecipientGuardStore.reserveRecipients(identities, {
       provider: 'instantly',
       channel: 'instantly',
       source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
       actor: options.actor,
+      senderEmail: sender.email,
       campaignId: options.campaignId,
       uploadId: options.uploadId,
       status: 'queued',
@@ -2338,6 +2483,9 @@ function createInstantlyOutreachService(deps = {}) {
       payload: {
         campaignId: options.campaignId,
         uploadId: options.uploadId,
+        senderProfileKey: sender.key,
+        senderName: sender.name,
+        senderEmail: sender.email,
         source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
       },
     });
@@ -2357,16 +2505,21 @@ function createInstantlyOutreachService(deps = {}) {
     return reservation;
   }
 
-  async function loadPersonalizationContext(rows = []) {
+  async function loadPersonalizationContext(rows = [], options = {}) {
+    const explicitSender = hasInstantlySenderOverride(options)
+      ? resolveInstantlySenderProfile(options, config, normalizeString)
+      : null;
     const [photoMap, mailProfile, coldmailSendGuardIndex] = await Promise.all([
       loadCustomerPhotoMap(rows),
-      loadColdmailProfile(),
+      loadColdmailProfile(explicitSender ? explicitSender.email : ''),
       loadColdmailSendGuardIndex(),
     ]);
+    const sender = explicitSender || inferInstantlySenderProfileFromMailProfile(mailProfile, config, normalizeString);
     return {
       photoMap,
       photosByIdentity: buildPhotosByIdentity(photoMap, normalizeString),
       mailProfile,
+      sender,
       coldmailSendGuardIndex,
     };
   }
@@ -2475,7 +2628,8 @@ function createInstantlyOutreachService(deps = {}) {
       normalizeString(context.mailProfile && context.mailProfile.body) || DEFAULT_WEBDESIGN_BODY;
     const city = getRowCity(row, normalizeString) || 'uw regio';
     const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
-    const senderName = inferInstantlySenderName(bodyTemplate, config.defaultSenderEmail, normalizeString);
+    const sender = context.sender || resolveInstantlySenderProfile({}, config, normalizeString);
+    const senderName = normalizeString(sender.name) || inferInstantlySenderName(bodyTemplate, sender.email, normalizeString);
     const baseMailBody = buildInstantlyWebdesignMailText(row, city, senderName, normalizeString);
     const assets = getReadyWebdesignAssets(item, context);
     const webdesignLink = assets.ready
@@ -2533,6 +2687,9 @@ function createInstantlyOutreachService(deps = {}) {
       softora_company: company,
       softora_status: normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect',
       softora_contact_name: contact,
+      softora_sender_profile: normalizeString(sender.key),
+      softora_sender_name: senderName,
+      softora_sender_email: normalizeEmailAddress(sender.email, normalizeString),
       softora_city: city,
       softora_city_with_pin: formatPinnedCity(city, normalizeString),
       softora_subject: subject,
@@ -3061,12 +3218,15 @@ function createInstantlyOutreachService(deps = {}) {
     const row = item && item.row;
     const email = getRowEmail(row, normalizeString);
     if (!email) return null;
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const id = getRowId(row, item.index, normalizeString);
     const company = getRowCompany(row, normalizeString);
     const domain = getRowDomain(row, normalizeString) || getEmailDomain(email);
     return {
       at: normalizeString(options.at) || now().toISOString(),
-      senderEmail: '',
+      senderEmail: sender.email,
+      senderProfileKey: sender.key,
+      senderName: sender.name,
       recipientKey: `email:${email}`,
       recipientEmail: email,
       recipientDomain: normalizeColdmailGuardKeyPart(domain, normalizeString),
@@ -3145,6 +3305,7 @@ function createInstantlyOutreachService(deps = {}) {
     const preparedAt = normalizeString(options.at) || now().toISOString();
     const campaignId = normalizeString(options.campaignId);
     const uploadId = normalizeString(options.uploadId);
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const selectedByIndex = new Map((Array.isArray(selectedRows) ? selectedRows : []).map((item) => [item.index, item]));
     return (Array.isArray(rows) ? rows : []).map((row, index) => {
       const item = selectedByIndex.get(index);
@@ -3171,6 +3332,17 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyLastEventAt: preparedAt,
         instantlyManualUploadId: uploadId,
         instantlyManualUploadPreparedAt: preparedAt,
+        instantlySenderProfileKey: sender.key,
+        instantlySenderName: sender.name,
+        instantlySenderEmail: sender.email,
+        senderProfileKey: sender.key,
+        senderEmail: sender.email,
+        lastColdmailSenderEmail: sender.email,
+        sentFromEmail: sender.email,
+        sent_from_email: sender.email,
+        outreachSentFromEmail: sender.email,
+        outreach_sent_from_email: sender.email,
+        replyMailboxAccount: sender.email,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'queued',
         ...buildInstantlyApproachedFields(row, preparedAt),
@@ -3192,11 +3364,12 @@ function createInstantlyOutreachService(deps = {}) {
     }
     const limit = clampNumber(input.limit, DEFAULT_MANUAL_UPLOAD_LIMIT, 1, MAX_MANUAL_UPLOAD_LIMIT);
     const uploadId = normalizeString(input.uploadId) || buildSafeUploadId();
+    const sender = resolveInstantlySenderProfile(input, config, normalizeString);
     const preparedAt = now().toISOString();
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
-    const personalizationContext = await loadPersonalizationContext(rows);
+    const personalizationContext = await loadPersonalizationContext(rows, { sender });
     const { selectedRows, failed } = await collectEligibleRows(rows, limit, personalizationContext);
     let leads = [];
     let sendableRows = [];
@@ -3246,6 +3419,7 @@ function createInstantlyOutreachService(deps = {}) {
         actor,
         campaignId,
         uploadId,
+        sender,
       });
       if (outboundReservation && outboundReservation.conflict) {
         const stillSafeRows = [];
@@ -3286,6 +3460,7 @@ function createInstantlyOutreachService(deps = {}) {
       actor,
       campaignId,
       uploadId,
+      sender,
       source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
     });
     const nextRows = markRowsAsPreparedForInstantlyUpload(rows, sendableRows, {
@@ -3293,6 +3468,7 @@ function createInstantlyOutreachService(deps = {}) {
       actor,
       campaignId,
       uploadId,
+      sender,
     });
     const customerWrite = await setUiStateValues(
       customerDbScope,
@@ -3319,6 +3495,9 @@ function createInstantlyOutreachService(deps = {}) {
       failed,
       campaignId,
       uploadId,
+      senderProfileKey: sender.key,
+      senderName: sender.name,
+      senderEmail: sender.email,
       fileName: buildSafeUploadFileName(sendableRows.length, uploadId),
       csvHeaders: INSTANTLY_SAFE_UPLOAD_CSV_HEADERS,
       csv: buildInstantlyUploadCsv(leads),
@@ -3332,9 +3511,10 @@ function createInstantlyOutreachService(deps = {}) {
     return lastSyncResult;
   }
 
-  function markRowsAsSynced(rows, selectedRows, data, actor) {
+  function markRowsAsSynced(rows, selectedRows, data, actor, options = {}) {
     const syncedAt = now().toISOString();
     const leadIdByEmail = buildLeadIdByEmail(data);
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const selectedByIndex = new Map(selectedRows.map((item) => [item.index, item]));
     return rows.map((row, index) => {
       const item = selectedByIndex.get(index);
@@ -3360,6 +3540,17 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyStatus: chooseInstantlyStatus(row.instantlyStatus, 'synced'),
         instantlySyncedAt: normalizeString(row.instantlySyncedAt) || syncedAt,
         instantlyLastEventAt: syncedAt,
+        instantlySenderProfileKey: sender.key,
+        instantlySenderName: sender.name,
+        instantlySenderEmail: sender.email,
+        senderProfileKey: sender.key,
+        senderEmail: sender.email,
+        lastColdmailSenderEmail: sender.email,
+        sentFromEmail: sender.email,
+        sent_from_email: sender.email,
+        outreachSentFromEmail: sender.email,
+        outreach_sent_from_email: sender.email,
+        replyMailboxAccount: sender.email,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'synced',
         ...buildInstantlyApproachedFields(row, syncedAt),
@@ -3753,6 +3944,7 @@ function createInstantlyOutreachService(deps = {}) {
       actor,
       campaignId: config.defaultCampaignId,
       source: 'instantly-sync',
+      sender: personalizationContext.sender,
     });
     if (outboundReservation && outboundReservation.conflict) {
       for (const item of sendableRows) {
@@ -3782,8 +3974,11 @@ function createInstantlyOutreachService(deps = {}) {
       campaignId: config.defaultCampaignId,
       leadIdByEmail,
       source: 'instantly-sync',
+      sender: personalizationContext.sender,
     });
-    const nextRows = markRowsAsSynced(rows, sendableRows, data, actor);
+    const nextRows = markRowsAsSynced(rows, sendableRows, data, actor, {
+      sender: personalizationContext.sender,
+    });
     await setUiStateValues(
       customerDbScope,
       buildCustomerRowsStateValues(values, nextRows, customerDbKey),
@@ -3900,6 +4095,25 @@ function createInstantlyOutreachService(deps = {}) {
     const timestamp = normalizeString(
       body.timestamp || body.created_at || body.createdAt || data.timestamp || data.created_at || data.createdAt
     );
+    const senderEmail = normalizeEmailAddress(
+      data.from_address_email ||
+        data.from_email ||
+        data.sender_email ||
+        data.senderEmail ||
+        data.eaccount ||
+        data.email_account ||
+        data.emailAccount ||
+        data.account_email ||
+        data.accountEmail ||
+        body.from_address_email ||
+        body.from_email ||
+        body.sender_email ||
+        body.senderEmail ||
+        body.eaccount ||
+        body.email_account ||
+        lead.last_contacted_from,
+      normalizeString
+    );
 
     return {
       eventType,
@@ -3910,6 +4124,7 @@ function createInstantlyOutreachService(deps = {}) {
       customerId,
       eventId,
       timestamp,
+      senderEmail,
       customVariables,
       data,
     };
@@ -3965,6 +4180,7 @@ function createInstantlyOutreachService(deps = {}) {
       instantlyLastEventAt: date,
       lastColdmailProvider: 'instantly',
       lastColdmailProviderStatus: event.eventStatus || event.eventType,
+      ...buildInstantlySenderRowFields(event.senderEmail, normalizeString),
       updatedAt: date,
     };
     const history = (type, label, preview) =>
