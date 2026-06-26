@@ -160,10 +160,12 @@ async function buildRawMessage(nodemailer, mail) {
   const streamTransport = nodemailer.createTransport({
     streamTransport: true,
     buffer: true,
-    newline: 'unix',
+    newline: 'windows',
   });
   const info = await streamTransport.sendMail(mail);
-  return info && info.message ? info.message : null;
+  const raw = info && info.message ? info.message : null;
+  if (!raw) return null;
+  return Buffer.from(String(raw).replace(/\r\n|\r|\n/g, '\r\n'));
 }
 
 function canAppendSentCopy(account) {
