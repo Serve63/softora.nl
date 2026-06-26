@@ -313,7 +313,19 @@ const BLOCKING_INSTANTLY_COLDMAIL_STATUSES = new Set(['bounced', 'unsubscribed',
 function isExpectedDnsMiss(error) {
   return Boolean(
     error &&
-      ['EBADNAME', 'ENODATA', 'ENODOMAIN', 'ENONAME', 'ENOTFOUND'].includes(String(error.code || '').toUpperCase())
+      [
+        'EBADNAME',
+        'ECONNREFUSED',
+        'EAI_AGAIN',
+        'ENODATA',
+        'ENODOMAIN',
+        'ENONAME',
+        'ENOTFOUND',
+        'EREFUSED',
+        'ESERVFAIL',
+        'ETIMEOUT',
+        'ETIMEDOUT',
+      ].includes(String(error.code || '').toUpperCase())
   );
 }
 
@@ -5886,7 +5898,12 @@ function createColdmailCampaignService(deps = {}) {
   async function isDeliverableEmailDomain(email) {
     const domain = getEmailDomain(email);
     if (!domain) return false;
-    return Boolean(await resolveEmailDomain(domain));
+    try {
+      return Boolean(await resolveEmailDomain(domain));
+    } catch (error) {
+      if (isExpectedDnsMiss(error)) return false;
+      throw error;
+    }
   }
 
   function isPersonalMailboxDomain(email) {

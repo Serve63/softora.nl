@@ -438,6 +438,12 @@ function createService(overrides = {}) {
     coldmailAutoReplyModel: 'gpt-5.5-pro',
     coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
     resolveEmailDomain: async (domain) => {
+      const dnsErrorCode = overrides.dnsErrorDomains && overrides.dnsErrorDomains[domain];
+      if (dnsErrorCode) {
+        const error = new Error(`queryMx ${dnsErrorCode} ${domain}`);
+        error.code = dnsErrorCode;
+        throw error;
+      }
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
       return true;
     },
@@ -1830,6 +1836,83 @@ test('coldmail autopilot blocks invalid domains without extending the send coold
   assert.equal(savedRows[0].canMail, false);
   assert.equal(savedRows[0].doNotMail, true);
   assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
+});
+
+test('coldmail autopilot skips DNS timeout domains and still sends the next safe recipient', async () => {
+  const { service, sentMessages, getAutopilotState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'dns-timeout-domain',
+        bedrijf: 'VVV Oisterwijk',
+        naam: 'VVV Oisterwijk',
+        email: 'info@vvvoisterwijk.nl',
+        status: 'benaderbaar',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'good-domain',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'benaderbaar',
+        stad: 'Tilburg',
+        mail: true,
+      },
+    ],
+    dnsErrorDomains: {
+      'vvvoisterwijk.nl': 'ETIMEOUT',
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
+
+  const customerSaves = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  const savedRows = customerSaves.flatMap((state) => JSON.parse(state.values.softora_customers_premium_v1));
+  const blockedRow = savedRows.find((row) => row.id === 'dns-timeout-domain');
+  assert.equal(blockedRow.status, 'geblokkeerd');
+  assert.equal(blockedRow.mail, false);
+  assert.equal(blockedRow.canMail, false);
+  assert.equal(blockedRow.doNotMail, true);
+  assert.equal(blockedRow.coldmailInvalidEmailDomain, 'vvvoisterwijk.nl');
 });
 
 test('coldmail autopilot respects a per-sender cooldown without extending the global send clock', async () => {
