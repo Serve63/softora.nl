@@ -7029,10 +7029,13 @@ test('coldmail campaign saves sent copies into the selected sender sent folder',
   assert.equal(result.sentItems[0].sentCopySaved, true);
   assert.equal(appendedMessages.length, 1);
   assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  const rawSentCopy = String(appendedMessages[0].raw);
   const parsedSentCopy = await simpleParser(appendedMessages[0].raw);
   assert.doesNotMatch(sentMessages[0].html, /\/api\/coldmailing\/open\.gif\?/);
   assert.doesNotMatch(String(parsedSentCopy.html || ''), /\/api\/coldmailing\/open\.gif\?/);
-  assert.match(String(appendedMessages[0].raw), /Subject: Nieuwe website voor Bakkerij Zon/);
+  assert.match(rawSentCopy, /\r\n\r\n/);
+  assert.doesNotMatch(rawSentCopy, /(^|[^\r])\n/);
+  assert.match(rawSentCopy, /Subject: Nieuwe website voor Bakkerij Zon/);
 });
 
 test('coldmail campaign saves sent copies with the selected mailbox account imap settings', async () => {
