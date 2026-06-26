@@ -1442,6 +1442,95 @@ test('instantly sync can refresh existing lead variables without adding duplicat
   assert.doesNotMatch(body.custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
 });
 
+test('instantly sync refreshes remote campaign leads with an explicit sender without adding leads', async () => {
+  const { service, fetchCalls, getRows, writes } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        plaats: 'Boxtel',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        outreachStatus: 'benaderd',
+        mail: true,
+        instantlyLeadId: 'old-lead-id',
+        instantlyCampaignId: 'campaign-serve',
+        instantlyStatus: 'synced',
+        lastColdmailProvider: 'instantly',
+        lastColdmailSenderEmail: 'serve@websoftora.com',
+      },
+    ],
+    remoteInstantlyLeads: [
+      {
+        id: 'martijn-lead-1',
+        campaign_id: 'campaign-martijn',
+        email: 'ruben@example.test',
+        company_name: 'Bakkerij Zon',
+        custom_variables: {
+          softora_customer_id: 'prospect-1',
+          softora_source: 'softora',
+        },
+      },
+    ],
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'martijn@softora.nl': {
+          subject: 'Kleine vraag over jullie website',
+          body: 'Goedendag,\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n{{stad}}',
+        },
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({
+    actor: 'Test',
+    campaignId: 'campaign-martijn',
+    senderProfile: 'martijn',
+    senderEmail: 'martijn@websoftora.com',
+    refreshExistingOnly: true,
+    refreshExistingLimit: 500,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'refreshed_existing_variables');
+  assert.equal(result.refreshedExistingVariables, 1);
+  assert.equal(result.attemptedExistingVariableRefresh, 1);
+  assert.equal(result.updatedExistingRows, 1);
+  assert.equal(result.campaignId, 'campaign-martijn');
+  assert.equal(result.senderProfileKey, 'martijn');
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, 'https://api.instantly.test/api/v2/leads/martijn-lead-1');
+  assert.equal(fetchCalls[0].options.method, 'PATCH');
+  assert.doesNotMatch(fetchCalls[0].url, /\/leads\/add$/);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(body.custom_variables.softora_sender_profile, 'martijn');
+  assert.equal(body.custom_variables.softora_sender_name, 'Martijn van de Ven');
+  assert.equal(body.custom_variables.softora_sender_email, 'martijn@websoftora.com');
+  assert.equal(body.custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon?cid=prospect-1&sender=martijn');
+  assert.equal(body.custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1&sender=martijn');
+  assertInstantlyHtmlUsesTextPreviewLayout(
+    body.personalization,
+    '/webdesign/bakkerij-zon?cid=prospect-1&sender=martijn'
+  );
+
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].scope, 'premium_customers_database');
+  assert.equal(writes[0].meta.source, 'instantly-existing-variable-refresh');
+  const row = getRows()[0];
+  assert.equal(row.instantlyLeadId, 'martijn-lead-1');
+  assert.equal(row.instantlyCampaignId, 'campaign-martijn');
+  assert.equal(row.instantlySenderProfileKey, 'martijn');
+  assert.equal(row.instantlySenderName, 'Martijn van de Ven');
+  assert.equal(row.instantlySenderEmail, 'martijn@websoftora.com');
+  assert.equal(row.lastColdmailSenderEmail, 'martijn@websoftora.com');
+  assert.equal(row.sentFromEmail, 'martijn@websoftora.com');
+  assert.equal(row.replyMailboxAccount, 'martijn@websoftora.com');
+});
+
 test('instantly sync is blocked unless the explicit sync flag is enabled', async () => {
   const { service, fetchCalls, getRows } = createService({ syncEnabled: false });
 

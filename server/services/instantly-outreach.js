@@ -2863,8 +2863,12 @@ function createInstantlyOutreachService(deps = {}) {
     return data;
   }
 
-  async function listInstantlyCampaignLeads(limit = DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT) {
+  async function listInstantlyCampaignLeads(
+    limit = DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT,
+    campaignId = config.defaultCampaignId
+  ) {
     const safeLimit = clampNumber(limit, DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, 1, 5000);
+    const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
     const items = [];
     let startingAfter = '';
 
@@ -2872,7 +2876,7 @@ function createInstantlyOutreachService(deps = {}) {
       const remaining = safeLimit - items.length;
       if (remaining <= 0) break;
       const body = {
-        campaign: config.defaultCampaignId,
+        campaign: cleanCampaignId,
         limit: Math.min(100, remaining),
       };
       if (startingAfter) body.starting_after = startingAfter;
@@ -2915,13 +2919,13 @@ function createInstantlyOutreachService(deps = {}) {
     return {};
   }
 
-  function normalizeRemoteInstantlyLead(lead) {
+  function normalizeRemoteInstantlyLead(lead, fallbackCampaignId = config.defaultCampaignId) {
     const payload = getRemoteLeadPayload(lead);
     const leadId = normalizeString(lead && (lead.id || lead.lead_id || lead.instantly_lead_id));
     return {
       raw: lead,
       leadId,
-      campaignId: normalizeString(lead && (lead.campaign || lead.campaign_id)) || config.defaultCampaignId,
+      campaignId: normalizeString(lead && (lead.campaign || lead.campaign_id)) || normalizeString(fallbackCampaignId) || config.defaultCampaignId,
       customerId: normalizeString(
         payload.softora_customer_id ||
           payload.softoraCustomerId ||
@@ -3087,7 +3091,7 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   async function reconcileRemoteInstantlyCampaignRows(rows, actor) {
-    const remoteLeads = await listInstantlyCampaignLeads();
+    const remoteLeads = await listInstantlyCampaignLeads(DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, config.defaultCampaignId);
     const plan = getRemoteInstantlyReconcilePlan(rows, remoteLeads);
     let nextRows = rows;
     let deletedCount = 0;
@@ -3172,7 +3176,96 @@ function createInstantlyOutreachService(deps = {}) {
       .slice(0, safeLimit);
   }
 
-  async function refreshExistingInstantlyLeadVariables(rows, context, limit) {
+  function buildInstantlyRowPatchFromRemoteCampaign(row, item, sender, markedAt) {
+    const remote = item && item.remote ? item.remote : {};
+    const syncedAt = normalizeString(row && row.instantlySyncedAt) || remote.timestampCreated || markedAt;
+    const lastEventAt = remote.timestampLastContact || remote.timestampUpdated || syncedAt;
+    const nextStatus = chooseInstantlyStatus(row && row.instantlyStatus, remote.status || 'synced') || 'synced';
+    return {
+      ...(row && typeof row === 'object' ? row : {}),
+      instantlyLeadId: item.leadId,
+      instantlyCampaignId: item.campaignId || config.defaultCampaignId,
+      instantlyStatus: nextStatus,
+      instantlySyncedAt: syncedAt,
+      instantlyLastEventAt: lastEventAt,
+      lastColdmailProvider: 'instantly',
+      lastColdmailProviderStatus: nextStatus,
+      ...buildInstantlySenderRowFields(sender && sender.email, normalizeString),
+      updatedAt: markedAt,
+    };
+  }
+
+  function getRemoteInstantlyRowsForVariableRefresh(rows, remoteLeads, campaignId, limit) {
+    const safeLimit = clampNumber(limit, config.batchSize, 1, 5000);
+    const lookup = buildCustomerRowLookup(rows);
+    const seenIndexes = new Set();
+    return (Array.isArray(remoteLeads) ? remoteLeads : [])
+      .map((rawLead) => normalizeRemoteInstantlyLead(rawLead, campaignId))
+      .map((remote) => {
+        const match = getLocalMatchForRemoteInstantlyLead(remote, lookup);
+        if (!remote.leadId || !match || seenIndexes.has(match.index)) return null;
+        seenIndexes.add(match.index);
+        return {
+          ...match,
+          leadId: remote.leadId,
+          campaignId: remote.campaignId || campaignId || config.defaultCampaignId,
+          remote,
+        };
+      })
+      .filter(Boolean)
+      .slice(0, safeLimit);
+  }
+
+  async function refreshRemoteInstantlyCampaignLeadVariables(rows, context, limit, campaignId) {
+    const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
+    const remoteLeads = await listInstantlyCampaignLeads(limit, cleanCampaignId);
+    const candidates = getRemoteInstantlyRowsForVariableRefresh(rows, remoteLeads, cleanCampaignId, limit);
+    const sender = context && context.sender
+      ? context.sender
+      : resolveInstantlySenderProfile({}, config, normalizeString);
+    const markedAt = now().toISOString();
+    let refreshed = 0;
+    const failed = [];
+    const refreshedItems = [];
+
+    for (const item of candidates) {
+      const patchedRow = buildInstantlyRowPatchFromRemoteCampaign(item.row, item, sender, markedAt);
+      try {
+        const lead = await buildInstantlyLead({ ...item, row: patchedRow }, context);
+        await patchInstantlyLeadById(item.leadId, lead);
+        refreshed += 1;
+        refreshedItems.push({ ...item, row: patchedRow });
+      } catch (error) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row, normalizeString),
+          email: getRowEmail(item.row, normalizeString),
+          error:
+            normalizeString(error && error.message) ||
+            'Instantly-lead mist verplichte Softora-variabelen.',
+          missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        });
+      }
+    }
+
+    const rowsByIndex = new Map(refreshedItems.map((item) => [item.index, item.row]));
+    return {
+      refreshed,
+      attempted: candidates.length,
+      failed,
+      remoteLeadCount: remoteLeads.length,
+      rowUpdates: rowsByIndex.size,
+      rows: rowsByIndex.size
+        ? rows.map((row, index) => rowsByIndex.get(index) || row)
+        : rows,
+    };
+  }
+
+  async function refreshExistingInstantlyLeadVariables(rows, context, limit, options = {}) {
+    const campaignId = normalizeString(options.campaignId);
+    if (campaignId) {
+      return refreshRemoteInstantlyCampaignLeadVariables(rows, context, limit, campaignId);
+    }
     const candidates = getExistingInstantlyRowsForVariableRefresh(rows, limit);
     let refreshed = 0;
     const failed = [];
@@ -3197,6 +3290,8 @@ function createInstantlyOutreachService(deps = {}) {
       refreshed,
       attempted: candidates.length,
       failed,
+      rowUpdates: 0,
+      rows,
     };
   }
 
@@ -3763,12 +3858,24 @@ function createInstantlyOutreachService(deps = {}) {
     const values = state && typeof state.values === 'object' ? state.values : {};
     let rows = parseDatabaseRows(values, customerDbKey, normalizeString);
     if (readBool(input.refreshExistingOnly, false)) {
-      const personalizationContext = await loadPersonalizationContext(rows);
+      const personalizationContext = await loadPersonalizationContext(rows, input);
       const existingVariableRefresh = await refreshExistingInstantlyLeadVariables(
         rows,
         personalizationContext,
-        input.refreshExistingLimit || config.batchSize
+        input.refreshExistingLimit || config.batchSize,
+        { campaignId: input.campaignId || input.campaign || input.defaultCampaignId }
       );
+      rows = existingVariableRefresh.rows || rows;
+      if (existingVariableRefresh.rowUpdates) {
+        await setUiStateValues(
+          customerDbScope,
+          buildCustomerRowsStateValues(values, rows, customerDbKey),
+          {
+            source: 'instantly-existing-variable-refresh',
+            actor,
+          }
+        );
+      }
       lastSyncResult = {
         ok: true,
         skipped: true,
@@ -3777,8 +3884,11 @@ function createInstantlyOutreachService(deps = {}) {
         markedBenaderd: 0,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        updatedExistingRows: existingVariableRefresh.rowUpdates || 0,
+        remoteInstantlyLeadCount: existingVariableRefresh.remoteLeadCount,
         failed: existingVariableRefresh.failed || [],
-        campaignId: config.defaultCampaignId,
+        campaignId: normalizeString(input.campaignId || input.campaign || input.defaultCampaignId || config.defaultCampaignId),
+        senderProfileKey: personalizationContext.sender && personalizationContext.sender.key,
         finishedAt: now().toISOString(),
       };
       return lastSyncResult;
@@ -3861,9 +3971,11 @@ function createInstantlyOutreachService(deps = {}) {
       ? await refreshExistingInstantlyLeadVariables(
           rows,
           personalizationContext,
-          input.refreshExistingLimit || config.batchSize
+          input.refreshExistingLimit || config.batchSize,
+          { campaignId: input.campaignId || input.campaign || input.defaultCampaignId }
         )
       : { refreshed: 0, attempted: 0 };
+    rows = existingVariableRefresh.rows || rows;
 
     if (limit <= 0) {
       if (existingApproached.marked) {
