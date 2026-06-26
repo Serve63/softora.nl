@@ -43,8 +43,9 @@
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : null;
         const onCancel = typeof options.onCancel === "function" ? options.onCancel : null;
         const refreshDelayMs = Math.max(100, Number(options.refreshDelayMs) || 900);
-        let activeBatchId = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false, restoreRetryTimer = null, restoreRetryAttempt = 0, restoreInFlight = false;
+        let activeBatchId = "", visibleBatchId = "", visibleBatchStatus = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false, restoreRetryTimer = null, restoreRetryAttempt = 0, restoreInFlight = false;
         const cancelledBatchIds = new Set();
+        const dismissedBatchIds = new Set();
         ensureStyles();
 
         function ensureStatusNode() {
@@ -101,16 +102,21 @@
             const line = getStatusLine(batch);
             const parts = ensureStatusParts(node);
             const status = fallbackNormalize(batch && batch.status).toLowerCase();
+            const terminalStatus = isTerminalBatchStatus(status);
+            const cancelLabel = terminalStatus ? "Webdesign-bulk sluiten" : "Webdesign-bulk annuleren";
+            const cancelTitle = terminalStatus ? "Sluiten" : "Annuleren";
             node.hidden = false;
             if (!parts || !parts.num || !parts.fill || !parts.rest) {
-                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"Webdesign-bulk annuleren\" title=\"Annuleren\"" + (isTerminalBatchStatus(status) ? " hidden" : "") + ">&times;</button>";
+                node.innerHTML = "<span class=\"webdesign-bulk-title\">Webdesigns</span><span class=\"webdesign-bulk-num\">" + escapeHtml(line.num) + "</span><span class=\"webdesign-bulk-track\" aria-hidden=\"true\"><span class=\"webdesign-bulk-fill\" style=\"width:" + visiblePct + "%\"></span></span><span class=\"webdesign-bulk-rest\">" + escapeHtml(line.rest) + "</span><button class=\"webdesign-bulk-cancel\" type=\"button\" aria-label=\"" + escapeHtml(cancelLabel) + "\" title=\"" + escapeHtml(cancelTitle) + "\"" + (status === "cancelled" ? " hidden" : "") + ">&times;</button>";
                 return;
             }
             if (parts && parts.num) parts.num.textContent = line.num;
             if (parts && parts.rest) parts.rest.textContent = line.rest;
             if (parts && parts.cancel) {
-                parts.cancel.hidden = isTerminalBatchStatus(status);
+                parts.cancel.hidden = status === "cancelled";
                 parts.cancel.disabled = cancelInFlight;
+                parts.cancel.title = cancelTitle;
+                if (typeof parts.cancel.setAttribute === "function") parts.cancel.setAttribute("aria-label", cancelLabel);
             }
             if (parts && parts.fill) {
                 const nextWidth = visiblePct + "%";
@@ -131,6 +137,8 @@
             if (pollTimer && typeof global.clearTimeout === "function") global.clearTimeout(pollTimer);
             pollTimer = null;
             activeBatchId = "";
+            visibleBatchId = "";
+            visibleBatchStatus = "";
             clearRestoreRetry();
             const node = global.document && global.document.getElementById ? global.document.getElementById("webdesignBulkStatus") : null;
             if (node) node.hidden = true;
@@ -141,9 +149,19 @@
             if (id) cancelledBatchIds.add(id);
         }
 
+        function rememberDismissedBatch(batchId) {
+            const id = normalizeString(batchId);
+            if (id) dismissedBatchIds.add(id);
+        }
+
         function isCancelledBatch(batchId) {
             const id = normalizeString(batchId);
             return Boolean(id && cancelledBatchIds.has(id));
+        }
+
+        function isDismissedBatch(batchId) {
+            const id = normalizeString(batchId);
+            return Boolean(id && dismissedBatchIds.has(id));
         }
 
         async function confirmCancelBatch() {
@@ -189,6 +207,17 @@
         }
 
         async function confirmAndCancelBatch() {
+            const visibleId = normalizeString(activeBatchId || visibleBatchId);
+            const status = normalizeString(visibleBatchStatus).toLowerCase();
+            if (!visibleId) {
+                hideStatus();
+                return null;
+            }
+            if (!isActiveBatchStatus(status)) {
+                rememberDismissedBatch(visibleId);
+                hideStatus();
+                return null;
+            }
             if (!(await confirmCancelBatch())) return null;
             try {
                 return await cancelActiveBatch();
@@ -268,7 +297,7 @@
             if (!batch || !batch.id) return;
             const batchId = normalizeString(batch.id);
             const status = normalizeString(batch.status).toLowerCase();
-            if (isCancelledBatch(batchId)) {
+            if (isCancelledBatch(batchId) || isDismissedBatch(batchId)) {
                 queuePhotoRefresh(batch);
                 hideStatus();
                 return;
@@ -280,6 +309,8 @@
                 return;
             }
             activeBatchId = batchId || batch.id;
+            visibleBatchId = batchId || batch.id;
+            visibleBatchStatus = status;
             clearRestoreRetry();
             renderStatus(batch, phase);
             queuePhotoRefresh(batch);
@@ -361,7 +392,7 @@
         }
 
         function pickRestorableBatch(batches) {
-            const sorted = (Array.isArray(batches) ? batches : []).filter(function (item) { return item && !isCancelledBatch(item.id); }).sort(function (left, right) { return getBatchSortTime(right) - getBatchSortTime(left); });
+            const sorted = (Array.isArray(batches) ? batches : []).filter(function (item) { return item && !isCancelledBatch(item.id) && !isDismissedBatch(item.id); }).sort(function (left, right) { return getBatchSortTime(right) - getBatchSortTime(left); });
             return sorted.find(function (item) { return item && item.id && isActiveBatchStatus(item.status); }) || sorted.find(function (item) {
                 const status = normalizeString(item && item.status).toLowerCase();
                 const sortTime = getBatchSortTime(item);

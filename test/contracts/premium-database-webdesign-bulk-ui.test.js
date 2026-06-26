@@ -13,6 +13,8 @@ function createFakeElement(document, tagName) {
     style: {},
     parentNode: null,
     __parts: null,
+    __listeners: {},
+    __attributes: {},
     appendChild(child) {
       child.parentNode = this;
       if (child.id) document.__elements.set(child.id, child);
@@ -21,7 +23,19 @@ function createFakeElement(document, tagName) {
     insertBefore(child) {
       return this.appendChild(child);
     },
-    addEventListener() {},
+    addEventListener(type, listener) {
+      this.__listeners[type] = listener;
+    },
+    click() {
+      if (typeof this.__listeners.click === 'function') return this.__listeners.click({ target: this });
+      return undefined;
+    },
+    setAttribute(name, value) {
+      this.__attributes[name] = String(value);
+    },
+    getAttribute(name) {
+      return this.__attributes[name] || '';
+    },
     querySelector(selector) {
       return this.__parts && this.__parts[selector] ? this.__parts[selector] : null;
     },
@@ -212,4 +226,40 @@ test('webdesign bulk restore ignores cancelled batches instead of showing a canc
 
   assert.equal(batch, null);
   assert.equal(document.getElementById('webdesignBulkStatus'), null);
+});
+
+test('webdesign bulk close button stays visible for a completed restored batch', async () => {
+  const fetchCalls = [];
+  const { context, document } = createHarness(async (url) => {
+    fetchCalls.push(String(url || ''));
+    return {
+      ok: true,
+      json: async () => ({
+        batches: [{
+          id: 'batch-done',
+          status: 'done',
+          total: 10,
+          made: 4,
+          done: 4,
+          failed: 6,
+          finishedAt: Date.now(),
+        }],
+      }),
+    };
+  });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+
+  await controller.loadLatestBatch();
+
+  const node = document.getElementById('webdesignBulkStatus');
+  const cancel = node.__parts['.webdesign-bulk-cancel'];
+  assert.equal(node.hidden, false);
+  assert.equal(cancel.hidden, false);
+  assert.equal(cancel.title, 'Sluiten');
+  assert.equal(cancel.getAttribute('aria-label'), 'Webdesign-bulk sluiten');
+
+  cancel.click();
+
+  assert.equal(node.hidden, true);
+  assert.equal(fetchCalls.some((url) => url.endsWith('/batch-done/cancel')), false);
 });
