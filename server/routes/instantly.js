@@ -56,6 +56,9 @@ function registerInstantlyRoutes(app, deps = {}) {
       }
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await instantlyOutreachService.syncInstantlyLeads({
+        campaignId: body.campaignId || body.campaign || body.defaultCampaignId,
+        senderProfile: body.senderProfile || body.senderProfileKey || body.profileKey,
+        senderEmail: body.senderEmail || body.sentFromEmail || body.mailboxAccount,
         refreshExistingVariables: body.refreshExistingVariables === true,
         refreshExistingLimit: body.refreshExistingLimit,
         refreshExistingOnly: body.refreshExistingOnly === true,
