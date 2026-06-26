@@ -4984,6 +4984,45 @@ function createColdmailCampaignService(deps = {}) {
     return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td align="left" style="padding:0;margin:0;"><div style="max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;margin:0;">${html}</div></td></tr></table>`;
   }
 
+  function normalizeRenderableColdmailText(value) {
+    return normalizeString(String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00a0/g, ' '));
+  }
+
+  function visibleColdmailHtmlText(html) {
+    return normalizeRenderableColdmailText(
+      String(html || '')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+        .replace(/<img\b[^>]*>/gi, ' ')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(?:p|div|td|tr|li|h[1-6])>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+    );
+  }
+
+  function assertRenderableColdmailMail(mail) {
+    const hasText = Boolean(normalizeRenderableColdmailText(mail && mail.text));
+    const hasHtmlText = Boolean(visibleColdmailHtmlText(mail && mail.html));
+    if (hasText && hasHtmlText) return;
+    const error = new Error('Coldmail body is leeg of niet zichtbaar; verzending geblokkeerd.');
+    error.code = 'COLDMAIL_EMPTY_RENDERABLE_BODY';
+    throw error;
+  }
+
+  function assertRenderableColdmailTemplate(body, row, input = {}) {
+    const personalized = personalizeTemplate(body, row, { senderEmail: input.senderEmail });
+    if (normalizeRenderableColdmailText(personalized)) return;
+    const error = new Error('Coldmail template is leeg of niet zichtbaar; verzending geblokkeerd.');
+    error.code = 'COLDMAIL_EMPTY_RENDERABLE_BODY';
+    throw error;
+  }
+
   function escapeHtml(value) {
     return normalizeString(value)
       .replace(/&/g, '&amp;')
@@ -5217,7 +5256,7 @@ function createColdmailCampaignService(deps = {}) {
     let match;
     while ((match = domainPattern.exec(cleanText))) {
       html += escapeHtmlRawText(cleanText.slice(lastIndex, match.index + 1));
-      html += `<span style="color:#1a1a2e;text-decoration:none;white-space:nowrap;">${renderNoLinkDomainText(match[1])}</span>`;
+      html += `<span style="text-decoration:none;white-space:nowrap;">${renderNoLinkDomainText(match[1])}</span>`;
       html += ')';
       lastIndex = match.index + match[0].length;
     }
@@ -5239,7 +5278,7 @@ function createColdmailCampaignService(deps = {}) {
             .join('<br>')}</p>`;
       })
       .join('\n');
-    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
+    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;">${body}</div>`;
   }
 
   function getWebdesignPhotoSource(photo) {
@@ -5292,7 +5331,7 @@ function createColdmailCampaignService(deps = {}) {
     };
     const previewBlockHtml = renderEmailImageTable(attachment, attachment.alt || 'Webdesign', '24px 0 0 0');
     const mockupHtml = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''))
-      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>${renderEmailImageTable(
+      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;font-weight:700;">${escapeHtml(mockupCaption)}</p>${renderEmailImageTable(
           attachment.mockup,
           attachment.mockup.alt || 'Device mockup',
           '0'
@@ -6656,6 +6695,7 @@ function createColdmailCampaignService(deps = {}) {
         reference,
         'subject'
       ) || subjectTemplate;
+      assertRenderableColdmailTemplate(selectedBodyTemplate, row, input);
       const baseText = buildMailText(selectedBodyTemplate, row, item.id, input);
       const shouldAppendOptOut = shouldAppendColdmailOptOutText(baseText);
       const unsubscribeUrl = shouldAppendOptOut
@@ -6786,6 +6826,7 @@ function createColdmailCampaignService(deps = {}) {
         if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
           mail.bcc = auditBcc;
         }
+        assertRenderableColdmailMail(mail);
         if (!testMode) {
           await runColdmailBeforeSendGuard(input, {
             actor,

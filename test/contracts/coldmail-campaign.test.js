@@ -2240,8 +2240,9 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   assert.match(sentMessages[0].html, /<div style="max-width:580px;margin:0;">/);
   assert.match(
     sentMessages[0].html,
-    /website \(<span style="color:#1a1a2e;text-decoration:none;white-space:nowrap;">rolsteiger\.&#8203;net<\/span>\) tegen/
+    /website \(<span style="text-decoration:none;white-space:nowrap;">rolsteiger\.&#8203;net<\/span>\) tegen/
   );
+  assert.doesNotMatch(sentMessages[0].html, /<span style="[^"]*color:[^"]*"[^>]*>rolsteiger\.&#8203;net<\/span>/);
   assert.doesNotMatch(sentMessages[0].html, /<a[^>]+rolsteiger\.net/i);
   assert.match(
     sentMessages[0].html,
@@ -2258,6 +2259,27 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   const savedRows = JSON.parse(customerSave.values.softora_customers_premium_v1);
   assert.equal(savedRows[0].coldmailSpecialAction, 'webdesign');
   assert.equal(savedRows[0].outreachCampaignType, 'webdesign');
+});
+
+test('coldmail campaign blocks visually empty mail bodies before SMTP', async () => {
+  const { service, sentMessages, centralGuardReservations } = createService();
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Test',
+      body: '\u200B',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_EMPTY_RENDERABLE_BODY');
+      assert.match(error.message, /Coldmail template is leeg of niet zichtbaar/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
+  assert.equal(centralGuardReservations.length, 0);
 });
 
 test('coldmail autopilot does not send fris webdesign mail when no design assets are ready', async () => {

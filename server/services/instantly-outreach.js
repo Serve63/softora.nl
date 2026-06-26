@@ -1615,7 +1615,7 @@ function renderMailHtmlText(text, normalizeString = defaultNormalizeString) {
   let match;
   while ((match = domainPattern.exec(cleanText))) {
     html += escapeHtmlRawText(cleanText.slice(lastIndex, match.index + 1));
-    html += `<span style="color:#1a1a2e;text-decoration:none;white-space:nowrap;">${renderNoLinkDomainText(match[1], normalizeString)}</span>`;
+    html += `<span style="text-decoration:none;white-space:nowrap;">${renderNoLinkDomainText(match[1], normalizeString)}</span>`;
     html += ')';
     lastIndex = match.index + match[0].length;
   }
@@ -1649,7 +1649,7 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, op
           .join('<br>')}</p>`;
     })
     .join('\n');
-  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
+  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;">${body}</div>`;
 }
 
 function normalizeInstantlyImageAlt(value, normalizeString = defaultNormalizeString) {
