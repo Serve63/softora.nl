@@ -1140,7 +1140,7 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
 });
 
-test('public webdesign preview does not render a personal profile when profile enrichment times out', async () => {
+test('public webdesign preview renders the neutral profile when profile enrichment times out', async () => {
   let customerReads = 0;
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
@@ -1173,12 +1173,14 @@ test('public webdesign preview does not render a personal profile when profile e
   await service.getConceptPageResponse({ params: { companySlug: 'snel-laden' } }, response);
   const elapsedMs = Date.now() - startedAt;
 
-  assert.equal(response.statusCode, 503);
+  assert.equal(response.statusCode, 200);
   assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
-  assert.equal(response.headers['Retry-After'], '2');
+  assert.equal(response.headers['Retry-After'], undefined);
   assert.ok(elapsedMs < 110, `expected slow profile context to return a temporary response, took ${elapsedMs}ms`);
   assert.equal(customerReads, 1);
-  assert.match(response.body, /Preview wordt geladen/);
+  assert.match(response.body, /<strong>Softora<\/strong>/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /Preview wordt geladen/);
   assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
@@ -1220,7 +1222,7 @@ test('public webdesign preview keeps neutral concept pages without sender contex
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
-test('public webdesign preview refuses a temporary personal fallback when outbound guard lookup is slow', async () => {
+test('public webdesign preview renders the neutral profile when outbound guard lookup is slow', async () => {
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
     async getUiStateValues() {
@@ -1255,10 +1257,14 @@ test('public webdesign preview refuses a temporary personal fallback when outbou
 
   await service.getConceptPageResponse({ params: { companySlug: 'trage-guard' } }, response);
 
-  assert.equal(response.statusCode, 503);
-  assert.match(response.body, /Preview wordt geladen/);
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<strong>Softora<\/strong>/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /Preview wordt geladen/);
   assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.doesNotMatch(response.body, /martijn-van-de-ven-profile\.png/);
 });
 
 test('public webdesign preview reuses resolved preview data for follow-up asset requests', async () => {
