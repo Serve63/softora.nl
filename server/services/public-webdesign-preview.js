@@ -400,6 +400,15 @@ function hasPendingPublicPreviewProfileContext(preview) {
   return Boolean(preview && preview.profileContextPending && !hasExplicitPublicPreviewProfile(preview));
 }
 
+function clearPendingPublicPreviewProfileContext(preview) {
+  return preview && typeof preview === 'object'
+    ? {
+        ...preview,
+        profileContextPending: false,
+      }
+    : preview;
+}
+
 function readChunkedDataUrl(values, photoKey, chunkCount) {
   const key = normalizeString(photoKey);
   if (!key) return '';
@@ -1672,8 +1681,9 @@ function createPublicWebdesignPreviewService(options = {}) {
     }
     if (hasPendingPublicPreviewProfileContext(preview)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
-      res.setHeader('Retry-After', '2');
-      return res.status(503).send(buildTemporarilyUnavailableHtml());
+      return res.status(200).send(
+        buildConceptHtml(clearPendingPublicPreviewProfileContext(preview), routeIdentifier, assetIdentifier)
+      );
     }
     if (hasUnresolvedPublicPreviewProfile(preview)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
