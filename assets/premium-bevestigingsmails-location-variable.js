@@ -38,7 +38,7 @@
     pin.textContent = '📍';
     const variable = document.createElement('span');
     variable.className = 'var-tag';
-    variable.textContent = '{{stad}}';
+    variable.textContent = '{{afzenderPlaats}}';
     const websiteVariable = document.createElement('span');
     websiteVariable.className = 'var-tag';
     websiteVariable.textContent = '{{website}}';

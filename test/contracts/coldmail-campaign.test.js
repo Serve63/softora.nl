@@ -459,6 +459,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
+  assert.match(sentMessages[0].html, /<div style="max-width:580px;margin:0;">/);
   assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif\?/);
   assert.match(
@@ -766,6 +767,205 @@ test('coldmail autopilot stays idle until it is explicitly enabled', async () =>
   assert.equal(getAutopilotState().lastResult.reason, 'disabled');
 });
 
+test('coldmail autopilot rechecks the toggle before SMTP send', async () => {
+  const enabledState = {
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+      branch: 'Horeca & Restaurants',
+      service: "Website's",
+      specialAction: '',
+      radiusKm: 250,
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 9,
+      endHour: 17,
+      minIntervalMinutes: 12,
+    },
+  };
+  const disabledState = {
+    ...enabledState,
+    enabled: false,
+    lock: null,
+    updatedAt: '2026-04-24T12:00:05.000Z',
+    updatedBy: 'Dashboard toggle',
+  };
+  const { service, sentMessages, centralGuardReservations, getAutopilotState } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        branche: 'Horeca & Restaurants',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+    ],
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    coldmailingSettings: {
+      senderEmail: 'serve@softora.nl',
+      senders: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    autopilotState: enabledState,
+    autopilotReadStates: [enabledState, disabledState, disabledState],
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'disabled');
+  assert.equal(result.sent, 0);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(centralGuardReservations.length, 0);
+  assert.equal(getAutopilotState().enabled, false);
+  assert.equal(getAutopilotState().lock, null);
+  assert.equal(getAutopilotState().lastResult.reason, 'disabled');
+});
+
+test('coldmail autopilot status reports today sends on the Amsterdam day', async () => {
+  const { service } = createService({
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl', 'martijn@softora.nl'],
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 7,
+        endHour: 17,
+      },
+    },
+    sendGuardState: {
+      entries: [
+        {
+          at: '2026-04-23T21:55:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: 'yesterday@example.test',
+        },
+        {
+          at: '2026-04-23T22:05:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: 'today@example.test',
+          recipientCompany: 'Vandaag BV',
+        },
+        {
+          at: '2026-04-23T22:05:00.000Z',
+          senderEmail: 'serve@softora.nl',
+          count: 1,
+          recipientEmail: 'today@example.test',
+          recipientCompany: 'Vandaag BV',
+        },
+        {
+          at: '2026-04-24T09:00:00.000Z',
+          senderEmail: 'martijn@softora.nl',
+          count: 2,
+          recipientEmail: 'batch@example.test',
+        },
+      ],
+    },
+    replyState: {
+      processed: {
+        'message:yesterday-bounce@example.test': {
+          at: '2026-04-23T21:55:00.000Z',
+          from: 'mailer-daemon@example.test',
+          company: 'Gisteren BV',
+          lifecycleIntent: 'hard_bounce',
+          bounceType: 'hard',
+        },
+        'message:hard-bounce@example.test': {
+          at: '2026-04-23T22:10:00.000Z',
+          from: 'mailer-daemon@example.test',
+          company: 'Hard Vandaag BV',
+          lifecycleIntent: 'hard_bounce',
+          bounceType: 'hard',
+        },
+        'message:soft-bounce@example.test': {
+          at: '2026-04-24T09:30:00.000Z',
+          from: 'postmaster@example.test',
+          company: 'Soft Vandaag BV',
+          lifecycleIntent: 'soft_bounce',
+          bounceType: 'soft',
+        },
+        'message:unknown-bounce@example.test': {
+          at: '2026-04-24T10:30:00.000Z',
+          from: 'postmaster@example.test',
+          company: 'Onbekend Vandaag BV',
+          lifecycleIntent: 'unknown_bounce',
+          bounceType: 'unknown',
+        },
+        'message:provider-warning@example.test': {
+          at: '2026-04-24T10:35:00.000Z',
+          from: 'strato@example.test',
+          lifecycleIntent: 'provider_warning',
+        },
+      },
+    },
+  });
+
+  const status = await service.getColdmailAutopilotStatus();
+
+  assert.equal(status.ok, true);
+  assert.equal(status.autopilot.todaySends.ok, true);
+  assert.equal(status.autopilot.todaySends.timezone, 'Europe/Amsterdam');
+  assert.equal(status.autopilot.todaySends.dateKey, '2026-04-24');
+  assert.equal(status.autopilot.todaySends.total, 3);
+  assert.equal(status.autopilot.todaySends.limit, 81);
+  assert.equal(status.autopilot.todaySends.remaining, 78);
+  assert.deepEqual(
+    status.autopilot.todaySends.senders.map((sender) => [sender.email, sender.sent, sender.remaining]),
+    [
+      ['serve@softora.nl', 1, 8],
+      ['martijn@softora.nl', 2, 7],
+    ]
+  );
+  assert.equal(status.autopilot.todayBounces.ok, true);
+  assert.equal(status.autopilot.todayBounces.timezone, 'Europe/Amsterdam');
+  assert.equal(status.autopilot.todayBounces.dateKey, '2026-04-24');
+  assert.equal(status.autopilot.todayBounces.total, 3);
+  assert.equal(status.autopilot.todayBounces.hard, 1);
+  assert.equal(status.autopilot.todayBounces.soft, 1);
+  assert.equal(status.autopilot.todayBounces.unknown, 1);
+  assert.deepEqual(
+    status.autopilot.todayBounces.items.map((item) => [item.company, item.type]),
+    [
+      ['Onbekend Vandaag BV', 'unknown'],
+      ['Soft Vandaag BV', 'soft'],
+      ['Hard Vandaag BV', 'hard'],
+    ]
+  );
+});
+
 test('coldmail autopilot does not overwrite live settings when state cannot be loaded', async () => {
   const liveState = {
     enabled: true,
@@ -1025,7 +1225,7 @@ test('coldmail autopilot keeps enabled state when latest state read is unavailab
       },
     },
     autopilotState: liveState,
-    autopilotReadStates: [liveState, null],
+    autopilotReadStates: [liveState, liveState, liveState, null],
   });
 
   const result = await service.runColdmailAutopilot({
@@ -1994,10 +2194,25 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
             body: [
               'Goedendag,',
               '',
-              'Afgelopen week kwam ik jullie website ({{website}}) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+              'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+              '',
+              'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+              '',
+              'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+              '',
+              'Als je wilt, stuur ik je ook de online preview,',
+              'zodat je zelf door het ontwerp kunt scrollen.',
+              '',
+              'Laat me vooral weten of je dat zou willen.',
+              '',
+              'Je kunt het webdesign hier bekijken 👈',
+              '',
+              'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
               '',
               'Met vriendelijke groet,',
-              'Servé Creusen',
+              '{{afzender}}',
+              '',
+              '📍 {{afzenderPlaats}}',
             ].join('\n'),
           },
         },
@@ -2014,7 +2229,20 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   assert.equal(result.sent, 1);
   assert.equal(result.senderEmail, 'servec321@gmail.com');
   assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.ok(
+    sentMessages[0].text.indexOf('Laat me vooral weten of je dat zou willen.') <
+      sentMessages[0].text.indexOf('Je kunt het webdesign hier bekijken 👈')
+  );
+  assert.match(sentMessages[0].text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Etten-Leur/);
+  assert.doesNotMatch(sentMessages[0].text, /\{\{afzender/);
   assert.match(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar\?\nBekijk het via hier 👈/);
+  assert.match(sentMessages[0].html, /<div style="max-width:580px;margin:0;">/);
+  assert.match(
+    sentMessages[0].html,
+    /website \(<span style="color:#1a1a2e;text-decoration:none;white-space:nowrap;">rolsteiger\.&#8203;net<\/span>\) tegen/
+  );
+  assert.doesNotMatch(sentMessages[0].html, /<a[^>]+rolsteiger\.net/i);
   assert.match(
     sentMessages[0].html,
     /href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3"/

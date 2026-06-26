@@ -97,8 +97,9 @@ function assertInstantlyHtmlUsesReadableWidth(html) {
 function assertInstantlyHtmlUsesTextPreviewLayout(html, expectedPath = '/webdesign/bakkerij-zon') {
   assertInstantlyHtmlUsesReadableWidth(html);
   assert.equal(extractImageTags(html).length, 0);
-  assert.match(html, /Beste lezer/);
-  assert.match(html, /Je kunt je webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon"/);
+  assert.match(html, /Goedendag/);
+  assert.match(html, /bakkerijzon\.&#8203;test/);
+  assert.match(html, /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon"/);
   assert.match(html, new RegExp(expectedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(html, /PS: Wordt het webdesign niet zichtbaar|<img\b|device mockup/i);
 }
@@ -330,9 +331,13 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(body.leads[0].email, 'ruben@example.test');
   assert.equal(body.leads[0].custom_variables.softora_customer_id, 'prospect-1');
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Nieuw webdesign gemaakt!');
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /Beste lezer/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedendag/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /Je kunt je webdesign hier bekijken 👈/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Je kunt het webdesign hier bekijken 👈/);
+  assert.ok(
+    body.leads[0].custom_variables.softora_mail_body.indexOf('Laat me vooral weten of je dat zou willen.') <
+      body.leads[0].custom_variables.softora_mail_body.indexOf('Je kunt het webdesign hier bekijken 👈')
+  );
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Servé Creusen/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
@@ -775,7 +780,11 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_mail_body, /Servé Creusen/);
   assert.doesNotMatch(variables.softora_mail_body, /Serve Creusen/);
   assert.match(variables.softora_mail_body, /📍 Alphen/);
-  assert.match(variables.softora_mail_body, /Je kunt je webdesign hier bekijken 👈/);
+  assert.match(variables.softora_mail_body, /Je kunt het webdesign hier bekijken 👈/);
+  assert.ok(
+    variables.softora_mail_body.indexOf('Laat me vooral weten of je dat zou willen.') <
+      variables.softora_mail_body.indexOf('Je kunt het webdesign hier bekijken 👈')
+  );
   assert.doesNotMatch(variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
   assert.equal(variables.softora_city, 'Alphen');
@@ -943,7 +952,7 @@ test('instantly sync removes Martijn LinkedIn CTA before syncing', async () => {
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_mail_body, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
-  assert.match(variables.softora_mail_body, /Je kunt je webdesign hier bekijken 👈/);
+  assert.match(variables.softora_mail_body, /Je kunt het webdesign hier bekijken 👈/);
   assert.doesNotMatch(variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(variables.softora_mail_body, /Mijn LinkedIn|linkedin\.com/i);
   assert.doesNotMatch(variables.softora_instantly_email_html, /Mijn LinkedIn|linkedin\.com/i);
@@ -1676,7 +1685,7 @@ test('instantly sync uses the active coldmail autopilot profile before fallback 
   assert.equal(fetchCalls.length, 1);
   const body = JSON.parse(fetchCalls[0].options.body);
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Autopilot webdesign voor Bakkerij Zon');
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /Beste lezer/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedendag/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot/);
 });

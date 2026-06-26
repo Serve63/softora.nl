@@ -52,14 +52,16 @@ const DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE = 'Europe/Amsterdam';
 const DEFAULT_COLDMAIL_AUTOPILOT_START_HOUR = 7;
 const DEFAULT_COLDMAIL_AUTOPILOT_END_HOUR = 17;
 const DEFAULT_COLDMAIL_AUTOPILOT_MIN_INTERVAL_MINUTES = 5;
-const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 70;
-const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 82;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MIN_INTERVAL_MINUTES = 60;
+const DEFAULT_COLDMAIL_AUTOPILOT_SENDER_MAX_INTERVAL_MINUTES = 74;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MIN_SECONDS = 45;
 const DEFAULT_COLDMAIL_AUTOPILOT_SEND_JITTER_MAX_SECONDS = 240;
 const MAX_COLDMAIL_RADIUS_KM = 500;
 const COLDMAIL_SEND_GUARD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLDMAIL_RECIPIENT_GUARD_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
+  'COLDMAIL_AUTOPILOT_DISABLED',
+  'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
   'COLDMAIL_DAILY_LIMIT_REACHED',
   'COLDMAIL_RECIPIENT_RECENTLY_SENT',
   'COLDMAIL_SAFETY_PAUSED',
@@ -117,6 +119,7 @@ const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nB
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)/i;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
+const COLDMAIL_EMAIL_CONTENT_MAX_WIDTH = 580;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
   'serve@softora.nl',
@@ -181,61 +184,31 @@ function loadColdmailPreviewSharpModule() {
   cachedColdmailPreviewSharp = require('sharp');
   return cachedColdmailPreviewSharp;
 }
+const DEFAULT_WEBDESIGN_COLDMAIL_SUBJECT = 'Kleine vraag over jullie website';
+const DEFAULT_WEBDESIGN_COLDMAIL_BODY = "Goedendag,\n\nAfgelopen week kwam ik jullie website ({{website}}) tegen.\n\nVanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.\n\nIk ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁\n\nAls je wilt, stuur ik je ook de online preview,\nzodat je zelf door het ontwerp kunt scrollen.\n\nLaat me vooral weten of je dat zou willen.\n\nJe kunt het webdesign hier bekijken 👈\n\nMocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.\n\nMet vriendelijke groet,\n{{afzender}}\n\n📍 {{afzenderPlaats}}";
+const DEFAULT_WEBDESIGN_COLDMAIL_AI_INSTRUCTIONS =
+  'Gebruik exact deze standaard mailtekst. Geen AI-variaties; vervang alleen vaste variabelen zoals {{website}}, {{naam}}, {{bedrijf}}, {{stad}}, {{afzender}} en {{afzenderPlaats}}.';
+const DEFAULT_WEBDESIGN_COLDMAIL_TONE = 'Persoonlijk, rustig en oprecht';
+
+function buildDefaultWebdesignColdmailProfile() {
+  return {
+    subject: DEFAULT_WEBDESIGN_COLDMAIL_SUBJECT,
+    body: DEFAULT_WEBDESIGN_COLDMAIL_BODY,
+    aiInstructions: DEFAULT_WEBDESIGN_COLDMAIL_AI_INSTRUCTIONS,
+    toneStyle: DEFAULT_WEBDESIGN_COLDMAIL_TONE,
+  };
+}
+
 const DEFAULT_COLDMAIL_SENDER_PROFILES = {
-  'serve@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'martijn@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
-    aiInstructions: "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'servecreusen@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'martijnvandeven@softora.nl': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'servec321@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'martijnven123@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'serve290@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'servecreusen7@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
-  'contact.venvisuals@gmail.com': {
-    subject: 'Korte vraag over uw website - Softora.nl',
-    body: "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    aiInstructions: "Gebruik de standaard mailtekst zonder AI-variaties. Vervang alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}}.",
-    toneStyle: 'Vriendelijk & professioneel',
-  },
+  'serve@softora.nl': buildDefaultWebdesignColdmailProfile(),
+  'martijn@softora.nl': buildDefaultWebdesignColdmailProfile(),
+  'servecreusen@softora.nl': buildDefaultWebdesignColdmailProfile(),
+  'martijnvandeven@softora.nl': buildDefaultWebdesignColdmailProfile(),
+  'servec321@gmail.com': buildDefaultWebdesignColdmailProfile(),
+  'martijnven123@gmail.com': buildDefaultWebdesignColdmailProfile(),
+  'serve290@gmail.com': buildDefaultWebdesignColdmailProfile(),
+  'servecreusen7@gmail.com': buildDefaultWebdesignColdmailProfile(),
+  'contact.venvisuals@gmail.com': buildDefaultWebdesignColdmailProfile(),
 };
 const COLDMAIL_PRIVATE_COPY_BLOCKED_SENDERS = new Set([
   'serve@softora.nl',
@@ -2680,6 +2653,188 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function formatColdmailDateKeyForTimeZone(value, timezone = DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    let parts;
+    try {
+      parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date);
+    } catch (_) {
+      parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date);
+    }
+    const getPart = (type) => {
+      const part = parts.find((item) => item.type === type);
+      return part ? part.value : '';
+    };
+    const year = getPart('year');
+    const month = getPart('month');
+    const day = getPart('day');
+    return year && month && day ? `${year}-${month}-${day}` : '';
+  }
+
+  function buildColdmailEntryCountKey(entry) {
+    const identity = [
+      normalizeString(entry && entry.at),
+      normalizeEmailAddress(entry && entry.senderEmail),
+      normalizeEmailAddress(entry && entry.recipientEmail),
+      normalizeColdmailGuardKeyPart(entry && entry.recipientDomain),
+      normalizeColdmailGuardKeyPart(entry && entry.recipientCompanyKey),
+      normalizeColdmailGuardKeyPart(entry && entry.recipientId),
+      Math.max(0, Number(entry && entry.count) || 0),
+      Math.max(0, Number(entry && entry.personalCount) || 0),
+    ].join('|');
+    return identity;
+  }
+
+  function summarizeColdmailTodaySendStats(sendGuardState, config = {}, schedule = {}) {
+    const timezone =
+      normalizeString(schedule && (schedule.timezone || schedule.timeZone)) ||
+      DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE;
+    const todayKey = formatColdmailDateKeyForTimeZone(now(), timezone);
+    const dailySendLimit = getColdmailDailySendLimit();
+    const packageDailySendLimit = getColdmailPackageDailySendLimit();
+    const configuredSenders = normalizeColdmailAutopilotSenderEmails(
+      config && (config.senderEmails || config.senderEmail)
+    ).filter(isColdmailAutopilotAllowedSenderEmail);
+    const senderStats = new Map();
+    configuredSenders.forEach((email) => {
+      senderStats.set(email, {
+        email,
+        sent: 0,
+        limit: dailySendLimit,
+        remaining: dailySendLimit,
+        lastSentAt: '',
+        lastRecipientEmail: '',
+        lastRecipientCompany: '',
+      });
+    });
+
+    const seen = new Set();
+    let total = 0;
+    (Array.isArray(sendGuardState && sendGuardState.entries) ? sendGuardState.entries : [])
+      .filter((entry) => entry && Math.max(0, Number(entry.count || 0) || 0) > 0)
+      .forEach((entry) => {
+        const at = normalizeString(entry.at);
+        if (!at || formatColdmailDateKeyForTimeZone(at, timezone) !== todayKey) return;
+        const key = buildColdmailEntryCountKey(entry);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const senderEmail = normalizeEmailAddress(entry.senderEmail);
+        const count = Math.max(0, Number(entry.count || 0) || 0);
+        total += count;
+        if (!senderStats.has(senderEmail)) {
+          senderStats.set(senderEmail, {
+            email: senderEmail,
+            sent: 0,
+            limit: dailySendLimit,
+            remaining: dailySendLimit,
+            lastSentAt: '',
+            lastRecipientEmail: '',
+            lastRecipientCompany: '',
+          });
+        }
+        const stat = senderStats.get(senderEmail);
+        stat.sent += count;
+        stat.remaining = Math.max(0, dailySendLimit - stat.sent);
+        if (parseTimestampMs(at) >= parseTimestampMs(stat.lastSentAt)) {
+          stat.lastSentAt = at;
+          stat.lastRecipientEmail = normalizeEmailAddress(entry.recipientEmail);
+          stat.lastRecipientCompany = truncateText(normalizeString(entry.recipientCompany), 120);
+        }
+      });
+
+    return {
+      ok: true,
+      timezone,
+      dateKey: todayKey,
+      updatedAt: now().toISOString(),
+      total,
+      limit: packageDailySendLimit,
+      remaining: Math.max(0, packageDailySendLimit - total),
+      senders: Array.from(senderStats.values())
+        .filter((item) => item.email)
+        .sort((left, right) => {
+          const leftIndex = configuredSenders.indexOf(left.email);
+          const rightIndex = configuredSenders.indexOf(right.email);
+          if (leftIndex !== -1 || rightIndex !== -1) {
+            return (leftIndex === -1 ? 999 : leftIndex) - (rightIndex === -1 ? 999 : rightIndex);
+          }
+          return left.email.localeCompare(right.email);
+        }),
+    };
+  }
+
+  function normalizeColdmailProcessedBounceType(entry) {
+    const rawType = normalizeString(entry && (entry.bounceType || entry.coldmailBounceType)).toLowerCase();
+    if (rawType === 'hard' || rawType === 'soft') return rawType;
+    const intent = normalizeString(entry && (entry.lifecycleIntent || entry.intent)).toLowerCase();
+    if (/\bhard[_\s-]*bounce\b/.test(intent)) return 'hard';
+    if (/\bsoft[_\s-]*bounce\b/.test(intent)) return 'soft';
+    return rawType || /bounce|bounced/.test(intent) ? 'unknown' : '';
+  }
+
+  function isColdmailProcessedBounceEntry(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    if (normalizeColdmailProcessedBounceType(entry)) return true;
+    const status = normalizeString(entry.lifecycleStatus || entry.status).toLowerCase();
+    return /bounce|bounced/.test(status);
+  }
+
+  function summarizeColdmailTodayBounceStats(replyState, schedule = {}) {
+    const timezone =
+      normalizeString(schedule && (schedule.timezone || schedule.timeZone)) ||
+      DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE;
+    const todayKey = formatColdmailDateKeyForTimeZone(now(), timezone);
+    const processed = replyState && replyState.processed && typeof replyState.processed === 'object'
+      ? replyState.processed
+      : {};
+    const stats = {
+      ok: true,
+      timezone,
+      dateKey: todayKey,
+      updatedAt: now().toISOString(),
+      total: 0,
+      hard: 0,
+      soft: 0,
+      unknown: 0,
+      items: [],
+    };
+
+    Object.entries(processed).forEach(([key, entry]) => {
+      if (!isColdmailProcessedBounceEntry(entry)) return;
+      const at = normalizeString(entry && (entry.at || entry.createdAt || entry.updatedAt));
+      if (!at || formatColdmailDateKeyForTimeZone(at, timezone) !== todayKey) return;
+      const type = normalizeColdmailProcessedBounceType(entry) || 'unknown';
+      stats.total += 1;
+      if (type === 'hard') stats.hard += 1;
+      else if (type === 'soft') stats.soft += 1;
+      else stats.unknown += 1;
+      stats.items.push({
+        key: truncateText(normalizeString(key), 140),
+        at,
+        type,
+        from: normalizeEmailAddress(entry && entry.from),
+        company: truncateText(normalizeString(entry && entry.company), 120),
+        subject: truncateText(normalizeString(entry && entry.subject), 160),
+      });
+    });
+
+    stats.items = stats.items
+      .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
+      .slice(0, 12);
+    return stats;
+  }
+
   function normalizeBooleanFlag(value, fallback = false) {
     if (typeof value === 'boolean') return value;
     const text = normalizeString(value).toLowerCase();
@@ -3077,7 +3232,7 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function summarizeColdmailAutopilotState(state) {
+  function summarizeColdmailAutopilotState(state, sendGuardState = null, replyState = null) {
     const normalized = normalizeColdmailAutopilotState(state);
     return {
       version: normalized.version,
@@ -3092,14 +3247,49 @@ function createColdmailCampaignService(deps = {}) {
       updatedAt: normalized.updatedAt,
       updatedBy: normalized.updatedBy,
       safetyLimits: getColdmailSafetyLimits(),
+      todaySends: sendGuardState
+        ? summarizeColdmailTodaySendStats(sendGuardState, normalized.config, normalized.schedule)
+        : {
+            ok: false,
+            unavailable: true,
+            timezone: normalized.schedule.timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+            dateKey: formatColdmailDateKeyForTimeZone(now(), normalized.schedule.timezone),
+            total: 0,
+            limit: getColdmailPackageDailySendLimit(),
+            remaining: getColdmailPackageDailySendLimit(),
+            senders: [],
+          },
+      todayBounces: replyState
+        ? summarizeColdmailTodayBounceStats(replyState, normalized.schedule)
+        : {
+            ok: false,
+            unavailable: true,
+            timezone: normalized.schedule.timezone || DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE,
+            dateKey: formatColdmailDateKeyForTimeZone(now(), normalized.schedule.timezone),
+            total: 0,
+            hard: 0,
+            soft: 0,
+            unknown: 0,
+            items: [],
+          },
     };
   }
 
   async function getColdmailAutopilotStatus() {
     const state = await loadColdmailAutopilotState();
+    const [sendGuardState, replyState] = await Promise.all([
+      loadColdmailSendGuardState().catch((error) => {
+        logger.warn('[ColdmailAutopilot][today-sends]', error && error.message ? error.message : error);
+        return null;
+      }),
+      loadColdmailReplyState().catch((error) => {
+        logger.warn('[ColdmailAutopilot][today-bounces]', error && error.message ? error.message : error);
+        return null;
+      }),
+    ]);
     return {
       ok: true,
-      autopilot: summarizeColdmailAutopilotState(state),
+      autopilot: summarizeColdmailAutopilotState(state, sendGuardState, replyState),
     };
   }
 
@@ -3145,9 +3335,19 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
     const saved = await saveColdmailAutopilotState(nextState, actor);
+    const [sendGuardState, replyState] = await Promise.all([
+      loadColdmailSendGuardState().catch((error) => {
+        logger.warn('[ColdmailAutopilot][today-sends]', error && error.message ? error.message : error);
+        return null;
+      }),
+      loadColdmailReplyState().catch((error) => {
+        logger.warn('[ColdmailAutopilot][today-bounces]', error && error.message ? error.message : error);
+        return null;
+      }),
+    ]);
     return {
       ok: true,
-      autopilot: summarizeColdmailAutopilotState(saved),
+      autopilot: summarizeColdmailAutopilotState(saved, sendGuardState, replyState),
     };
   }
 
@@ -3533,6 +3733,22 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  async function assertColdmailAutopilotStillEnabledBeforeSend() {
+    const latestStateRecord = await loadColdmailAutopilotStateRecord().catch(() => null);
+    if (!latestStateRecord || !latestStateRecord.hasValue) {
+      const error = new Error(
+        'Autopilot-state kon vlak voor verzenden niet veilig uit Supabase worden geladen. Er is niets verzonden.'
+      );
+      error.code = 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE';
+      throw error;
+    }
+    if (!latestStateRecord.state.enabled) {
+      const error = new Error('Coldmail autopilot staat uit. Er is niets verzonden.');
+      error.code = 'COLDMAIL_AUTOPILOT_DISABLED';
+      throw error;
+    }
+  }
+
   async function runColdmailAutopilot(input = {}) {
     const actor = truncateText(normalizeString(input.actor), 120) || 'Coldmail Autopilot';
     const stateRecord = await loadColdmailAutopilotStateRecord();
@@ -3699,6 +3915,7 @@ function createColdmailCampaignService(deps = {}) {
         testMode: false,
         publicBaseUrl: input.publicBaseUrl,
         actor,
+        beforeSendGuard: assertColdmailAutopilotStillEnabledBeforeSend,
       });
       return finishColdmailAutopilotRun(
         state,
@@ -3725,8 +3942,16 @@ function createColdmailCampaignService(deps = {}) {
       );
     } catch (error) {
       const code = normalizeString(error && error.code) || 'COLDMAIL_AUTOPILOT_FAILED';
+      if (code === 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE') {
+        return compactColdmailAutopilotResult(buildColdmailAutopilotSkipResult(
+          'state_unavailable',
+          normalizeString(error && error.message) ||
+            'Autopilot-state kon vlak voor verzenden niet veilig worden geladen. Er is niets verzonden.'
+        ));
+      }
       const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
       const shouldKeepPreviousStartTime =
+        code === 'COLDMAIL_AUTOPILOT_DISABLED' ||
         code === 'NO_VALID_RECIPIENT_DOMAINS' ||
         code === 'NO_WEBDESIGN_PHOTOS' ||
         code === 'WEBDESIGN_PREPARATION_QUEUED';
@@ -3740,7 +3965,7 @@ function createColdmailCampaignService(deps = {}) {
         {
           ok: knownSkip,
           skipped: knownSkip,
-          reason: code.toLowerCase(),
+          reason: code === 'COLDMAIL_AUTOPILOT_DISABLED' ? 'disabled' : code.toLowerCase(),
           message: truncateText(
             normalizeString(error && error.message) || 'Coldmail autopilot kon niet veilig draaien.',
             500
@@ -3760,6 +3985,11 @@ function createColdmailCampaignService(deps = {}) {
         actor
       );
     }
+  }
+
+  async function runColdmailBeforeSendGuard(input = {}, context = {}) {
+    if (typeof input.beforeSendGuard !== 'function') return;
+    await input.beforeSendGuard(context);
   }
 
   async function recordColdmailSendGuardEntry({
@@ -4284,22 +4514,28 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function personalizeTemplate(template, row) {
+  function personalizeTemplate(template, row, options = {}) {
     const company = getRowCompany(row) || 'uw bedrijf';
     const contact = getRowContact(row) || company;
     const domain = getRowDomain(row);
     const city = getRowCity(row) || 'uw regio';
+    const senderName =
+      normalizeString(options.senderName) ||
+      getSenderDisplayName(options.senderEmail) ||
+      'Softora';
     return normalizeString(template)
       .replace(/\{\{\s*bedrijf\s*\}\}/gi, company)
       .replace(/\{\{\s*naam\s*\}\}/gi, contact)
       .replace(/\{\{\s*(stad|plaats|locatie)\s*\}\}/gi, city)
       .replace(/\{\{\s*domein\s*\}\}/gi, domain || company)
-      .replace(/\{\{\s*website\s*\}\}/gi, domain || company);
+      .replace(/\{\{\s*website\s*\}\}/gi, domain || company)
+      .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, senderName)
+      .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, city);
   }
 
   function buildMailText(body, row, id, input = {}) {
     return normalizeColdmailMailText(
-      personalizeTemplate(body, row)
+      personalizeTemplate(body, row, { senderEmail: input.senderEmail })
         .replace(/\r\n?/g, '\n')
         .replace(/[ \t]+\n/g, '\n')
         .trim(),
@@ -4742,8 +4978,22 @@ function createColdmailCampaignService(deps = {}) {
     return `${html}\n<img src="${escapeHtml(cleanUrl)}" alt="" width="1" height="1" style="display:none!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;border:0!important;" />`;
   }
 
+  function wrapColdmailEmailHtml(content) {
+    const html = typeof content === 'string' ? content.trim() : normalizeString(content);
+    if (!html) return '';
+    return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td align="left" style="padding:0;margin:0;"><div style="max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;margin:0;">${html}</div></td></tr></table>`;
+  }
+
   function escapeHtml(value) {
     return normalizeString(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function escapeHtmlRawText(value) {
+    return String(value || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -4952,7 +5202,27 @@ function createColdmailCampaignService(deps = {}) {
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(cleanLine, options);
     }
-    return escapeHtml(cleanLine);
+    return renderColdmailHtmlText(cleanLine);
+  }
+
+  function renderNoLinkDomainText(value) {
+    return escapeHtmlRawText(value).replace(/\./g, '.&#8203;');
+  }
+
+  function renderColdmailHtmlText(text) {
+    const cleanText = normalizeString(text);
+    const domainPattern = /\(([^()\s<>@]+\.[^()\s<>@]+)\)/g;
+    let html = '';
+    let lastIndex = 0;
+    let match;
+    while ((match = domainPattern.exec(cleanText))) {
+      html += escapeHtmlRawText(cleanText.slice(lastIndex, match.index + 1));
+      html += `<span style="color:#1a1a2e;text-decoration:none;white-space:nowrap;">${renderNoLinkDomainText(match[1])}</span>`;
+      html += ')';
+      lastIndex = match.index + match[0].length;
+    }
+    html += escapeHtmlRawText(cleanText.slice(lastIndex));
+    return html;
   }
 
   function toHtml(text, options = {}) {
@@ -6327,6 +6597,17 @@ function createColdmailCampaignService(deps = {}) {
     for (const [index, item] of selectedRows.entries()) {
       const row = item.row;
       const to = getRowEmail(row);
+      if (!testMode) {
+        await runColdmailBeforeSendGuard(input, {
+          actor,
+          index,
+          selected: selectedRows.length,
+          senderEmail,
+          to,
+          item,
+          row,
+        });
+      }
       if (!testMode && index > 0) {
         const delayMs = isPersonalMailboxDomain(to)
           ? Math.max(getColdmailSendDelayMs(), getColdmailPersonalMailboxSendDelayMs())
@@ -6381,7 +6662,7 @@ function createColdmailCampaignService(deps = {}) {
         ? buildColdmailUnsubscribeUrl(row, item.id, reference, input)
         : '';
       const text = shouldAppendOptOut ? appendColdmailOptOutText(baseText, unsubscribeUrl) : baseText;
-      const subject = personalizeTemplate(selectedSubjectTemplate, row);
+      const subject = personalizeTemplate(selectedSubjectTemplate, row, { senderEmail });
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
         failed.push({
@@ -6467,7 +6748,7 @@ function createColdmailCampaignService(deps = {}) {
             optOutUrl: unsubscribeUrl,
           })
         : appendColdmailOptOutHtml(htmlBase, unsubscribeUrl);
-      const html = htmlWithContent;
+      const html = wrapColdmailEmailHtml(htmlWithContent);
       const attachments = webdesignPhoto
         ? buildWebdesignImageAttachments(
             webdesignPhoto,
@@ -6504,6 +6785,17 @@ function createColdmailCampaignService(deps = {}) {
         }
         if (auditBcc && auditBcc !== normalizeEmailAddress(to)) {
           mail.bcc = auditBcc;
+        }
+        if (!testMode) {
+          await runColdmailBeforeSendGuard(input, {
+            actor,
+            index,
+            selected: selectedRows.length,
+            senderEmail,
+            to,
+            item,
+            row,
+          });
         }
         const outboundReservation = !isTestRecipientRow(row, to)
           ? await reserveColdmailOutboundRecipient({
@@ -6602,6 +6894,11 @@ function createColdmailCampaignService(deps = {}) {
       const firstFailure = pickFailureMessage(failed, selectedRows);
       const recipientGuardFailure = failed.every((item) => isColdmailRecipientGuardFailure(item));
       const outboundGuardFailure = failed.every((item) => isColdmailOutboundGuardFailure(item));
+      const autopilotGuardFailure = failed.every((item) =>
+        ['COLDMAIL_AUTOPILOT_DISABLED', 'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE'].includes(
+          normalizeString(item && item.code)
+        )
+      );
       const webdesignAssetFailure = shouldIncludeWebdesignPhoto && failed.every((item) =>
         /^Geen (?:webdesign-foto|device-mockup) gevonden voor /i.test(normalizeString(item && item.error))
       );
@@ -6612,6 +6909,8 @@ function createColdmailCampaignService(deps = {}) {
           ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
           : outboundGuardFailure
           ? normalizeString(failed[0] && failed[0].code) || 'OUTBOUND_RECIPIENT_GUARD_FAILED'
+          : autopilotGuardFailure
+          ? normalizeString(failed[0] && failed[0].code) || 'COLDMAIL_AUTOPILOT_DISABLED'
           : webdesignAssetFailure
           ? 'NO_WEBDESIGN_PHOTOS'
           : 'SMTP_SEND_FAILED';

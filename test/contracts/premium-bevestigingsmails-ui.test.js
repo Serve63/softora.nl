@@ -149,7 +149,7 @@ test('premium bevestigingsmails houdt het handmatige coldmailing scherm zichtbaa
   assert.match(pageSource, /AI is momenteel hier niet mee bezig\./);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
   assert.doesNotMatch(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
-  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260527a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-coldmail-autopilot\.js\?v=20260617a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
   assert.match(managementSource, /AI is hier actief bezig met coldmailing\./);
@@ -480,7 +480,7 @@ test('premium bevestigingsmails toont plaats en website als zichtbare variabelen
   assert.match(locationVariableSource, /document\.querySelector\('#mail-panel-5 \.mail-fields'\)/);
   assert.match(locationVariableSource, /host\.appendChild\(note\);/);
   assert.doesNotMatch(locationVariableSource, /insertAdjacentElement\('afterend', note\)/);
-  assert.match(locationVariableSource, /variable\.textContent = '\{\{stad\}\}';/);
+  assert.match(locationVariableSource, /variable\.textContent = '\{\{afzenderPlaats\}\}';/);
   assert.match(locationVariableSource, /websiteVariable\.textContent = '\{\{website\}\}';/);
   assert.match(locationVariableSource, /label\.textContent = 'Plaats en website uit database';/);
   assert.match(locationVariableSource, /wrapGlobalFunction\('applyColdmailingSettings'/);
@@ -499,10 +499,10 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
   assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260602b/);
   assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
-  assert.match(senderSettingsSource, /"martijnven123@gmail\.com": "Goedemorgen \{\{naam\}\}/);
-  assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": "Goedemorgen \{\{naam\}\}/);
-  assert.match(senderSettingsSource, /Servé Creusen/);
-  assert.match(senderSettingsSource, /📍 \{\{stad\}\}/);
+  assert.match(senderSettingsSource, /"martijnven123@gmail\.com": DEFAULT_BODY/);
+  assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": DEFAULT_BODY/);
+  assert.match(senderSettingsSource, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(senderSettingsSource, /📍 \{\{afzenderPlaats\}\}/);
   assert.match(pageSource, /function getCampaignSettingsScope\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_SCOPE : COLDMAILING_SETTINGS_SCOPE;\s*\}/);
   assert.match(pageSource, /function getCampaignSettingsKey\(\) \{\s*return isPremiumAiLeadGeneratorPath\(\) \? LEAD_GENERATOR_SETTINGS_KEY : COLDMAILING_SETTINGS_KEY;\s*\}/);
   assert.match(pageSource, /function getColdmailingSettingsController\(\)/);
@@ -698,12 +698,20 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const autopilotSource = fs.readFileSync(autopilotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260527a/);
+  assert.match(pageSource, /assets\/premium-coldmail-autopilot\.js\?v=20260617a/);
   assert.match(autopilotSource, /const BATCH_SIZE = 1;/);
   assert.match(autopilotSource, /"campaignSenderEmail"/);
   assert.match(autopilotSource, /"start-campaign-btn"/);
   assert.match(autopilotSource, /data-coldmail-autopilot-enabled/);
   assert.match(autopilotSource, /startButton\.insertAdjacentElement\("afterend", row\)/);
+  assert.match(autopilotSource, /coldmail-autopilot-today-card/);
+  assert.match(autopilotSource, /Vandaag verstuurd/);
+  assert.match(autopilotSource, /state\.todaySends/);
+  assert.match(autopilotSource, /coldmailAutopilotTodayProgress/);
+  assert.match(autopilotSource, /coldmail-autopilot-bounce-card/);
+  assert.match(autopilotSource, /Bounces vandaag/);
+  assert.match(autopilotSource, /state\.todayBounces/);
+  assert.match(autopilotSource, /coldmailAutopilotBouncesValue/);
   assert.match(autopilotSource, /let statusLoaded = false;/);
   assert.match(autopilotSource, /let statusUnavailable = false;/);
   assert.match(autopilotSource, /coldmail-autopilot-toggle is-loading/);
@@ -724,6 +732,8 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /notifyAutopilotStatus\(state\)/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/status/);
   assert.match(autopilotSource, /\/api\/coldmailing\/autopilot\/settings/);
+  assert.match(autopilotSource, /"X-Softora-Requested-With": "premium"/);
+  assert.match(autopilotSource, /Object\.assign\(\{\s*Accept: "application\/json"/);
   assert.match(autopilotSource, /const senderEmails = getSenderEmails\(\)/);
   assert.match(autopilotSource, /senderProfiles: buildSenderProfiles\(payload, senderEmails\)/);
   assert.match(autopilotSource, /function getStoredSenderProfiles\(\)/);
@@ -735,8 +745,8 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /startHour: 7/);
   assert.match(autopilotSource, /endHour: 17/);
   assert.match(autopilotSource, /minIntervalMinutes: 5/);
-  assert.match(autopilotSource, /senderMinIntervalMinutes: 70/);
-  assert.match(autopilotSource, /senderMaxIntervalMinutes: 82/);
+  assert.match(autopilotSource, /senderMinIntervalMinutes: 60/);
+  assert.match(autopilotSource, /senderMaxIntervalMinutes: 74/);
   assert.match(autopilotSource, /sendJitterMinSeconds: 45/);
   assert.match(autopilotSource, /sendJitterMaxSeconds: 240/);
   assert.doesNotMatch(autopilotSource, /Handmatige modus/);

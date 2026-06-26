@@ -3,19 +3,20 @@
 
   const DEFAULT_SCOPE = "premium_coldmailing_settings";
   const DEFAULT_KEY = "softora_coldmailing_settings_v1";
-  const DEFAULT_TONE = "Vriendelijk & professioneel";
-  const DEFAULT_AI_INSTRUCTIONS = "Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.";
-  const DEFAULT_SUBJECT = "Korte vraag over uw website - Softora.nl";
+  const DEFAULT_TONE = "Persoonlijk, rustig en oprecht";
+  const DEFAULT_AI_INSTRUCTIONS = "Gebruik exact deze standaard mailtekst. Geen AI-variaties; vervang alleen vaste variabelen zoals {{website}}, {{naam}}, {{bedrijf}}, {{stad}}, {{afzender}} en {{afzenderPlaats}}.";
+  const DEFAULT_SUBJECT = "Kleine vraag over jullie website";
+  const DEFAULT_BODY = "Goedendag,\n\nAfgelopen week kwam ik jullie website ({{website}}) tegen.\n\nVanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.\n\nIk ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁\n\nAls je wilt, stuur ik je ook de online preview,\nzodat je zelf door het ontwerp kunt scrollen.\n\nLaat me vooral weten of je dat zou willen.\n\nJe kunt het webdesign hier bekijken 👈\n\nMocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.\n\nMet vriendelijke groet,\n{{afzender}}\n\n📍 {{afzenderPlaats}}";
   const DEFAULT_BODIES = {
-    "serve@softora.nl": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    "servecreusen@softora.nl": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    "servec321@gmail.com": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    "serve290@gmail.com": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    "servecreusen7@gmail.com": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    "contact.venvisuals@gmail.com": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nServé Creusen\n\n📍 {{stad}}\n\nSoftora.nl | +31 6 43 26 27 92",
-    "martijn@softora.nl": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
-    "martijnvandeven@softora.nl": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
-    "martijnven123@gmail.com": "Goedemorgen {{naam}},\n\nIk zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.\n\nBij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.\n\nZou u hier open voor staan?\n\nMet vriendelijke groet,\nMartijn van de Ven\n\n📍 {{stad}}\n\nSoftora.nl",
+    "serve@softora.nl": DEFAULT_BODY,
+    "servecreusen@softora.nl": DEFAULT_BODY,
+    "servec321@gmail.com": DEFAULT_BODY,
+    "serve290@gmail.com": DEFAULT_BODY,
+    "servecreusen7@gmail.com": DEFAULT_BODY,
+    "contact.venvisuals@gmail.com": DEFAULT_BODY,
+    "martijn@softora.nl": DEFAULT_BODY,
+    "martijnvandeven@softora.nl": DEFAULT_BODY,
+    "martijnven123@gmail.com": DEFAULT_BODY,
   };
   const AUTHENTICATED_SENDER_EMAILS = Object.freeze(["serve@softora.nl", "martijn@softora.nl"]);
 

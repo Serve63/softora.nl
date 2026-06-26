@@ -1155,21 +1155,31 @@ html[data-softora-lead-generator-alias="1"] .lead-generator-hidden-setting { dis
         <div class="mail-fields">
           <div class="mf-row" id="mail-subj-row">
             <div class="mf-label">Onderwerp</div>
-            <input class="mf-inp" type="text" id="subj1" value="Korte vraag over uw website — Softora.nl">
+            <input class="mf-inp" type="text" id="subj1" value="Kleine vraag over jullie website">
           </div>
           <div class="mf-row">
             <div class="mf-label">Inhoud</div>
-            <textarea class="mf-ta" id="body1">Goedemorgen {{naam}},
+            <textarea class="mf-ta" id="body1">Goedendag,
 
-Ik zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.
+Afgelopen week kwam ik jullie website ({{website}}) tegen.
 
-Bij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken — snel, persoonlijk en voor een vaste prijs.
+Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.
 
-Zou u hier open voor staan?
+Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁
+
+Als je wilt, stuur ik je ook de online preview,
+zodat je zelf door het ontwerp kunt scrollen.
+
+Laat me vooral weten of je dat zou willen.
+
+Je kunt het webdesign hier bekijken 👈
+
+Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.
 
 Met vriendelijke groet,
-Servé Creusen
-Softora.nl | +31 6 43 26 27 92</textarea>
+{{afzender}}
+
+📍 {{afzenderPlaats}}</textarea>
           </div>
         </div>
       </div>
@@ -1180,6 +1190,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           <div class="mf-row">
             <div class="mf-label">Toon & stijl</div>
             <select class="mf-sel" id="ai-tone-style">
+              <option selected>Persoonlijk, rustig en oprecht</option>
               <option>Vriendelijk & professioneel</option>
               <option>Zakelijk & direct</option>
               <option>Informeel & persoonlijk</option>
@@ -1188,7 +1199,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
           </div>
           <div class="mf-row">
             <div class="mf-label">Vaste standaardtekst</div>
-            <textarea class="mf-ta" id="ai-instructies" style="min-height:120px">Gebruik de standaard mailtekst zonder AI-variaties. Alleen vaste variabelen zoals {{naam}}, {{bedrijf}}, {{stad}} en {{website}} worden vervangen door databasegegevens.</textarea>
+            <textarea class="mf-ta" id="ai-instructies" style="min-height:120px">Gebruik exact deze standaard mailtekst. Geen AI-variaties; vervang alleen vaste variabelen zoals {{website}}, {{naam}}, {{bedrijf}}, {{stad}}, {{afzender}} en {{afzenderPlaats}}.</textarea>
           </div>
           <div class="mf-row">
             <div class="mf-label">Beschikbare variabelen</div>
@@ -1198,6 +1209,8 @@ Softora.nl | +31 6 43 26 27 92</textarea>
               <span class="var-tag">{{branche}}</span>
               <span class="var-tag">{{stad}}</span>
               <span class="var-tag">{{website}}</span>
+              <span class="var-tag">{{afzender}}</span>
+              <span class="var-tag">{{afzenderPlaats}}</span>
               <span class="var-tag">{{datum}}</span>
             </div>
           </div>
@@ -1427,7 +1440,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
   </div>
 </div>
 
-<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260527a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260602b"></script><script src="assets/premium-coldmail-send-copy.js?v=20260527a"></script><script src="assets/premium-coldmail-send-freeze.js?v=20260520a"></script><script src="assets/premium-coldmail-autopilot.js?v=20260527a"></script>
+<script src="assets/premium-risky-action-pin.js?v=20260512a"></script><script src="assets/premium-campaign-radius.js?v=20260501a"></script><script src="assets/premium-campaign-test-mode.js?v=20260527a"></script><script src="assets/premium-ai-lead-generator-call-start.js?v=20260512a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260602b"></script><script src="assets/premium-coldmail-send-copy.js?v=20260527a"></script><script src="assets/premium-coldmail-send-freeze.js?v=20260520a"></script><script src="assets/premium-coldmail-autopilot.js?v=20260617a"></script>
 <script src="assets/premium-campaign-selects.js?v=20260511a"></script>
 <script>
 // ── DATA ──

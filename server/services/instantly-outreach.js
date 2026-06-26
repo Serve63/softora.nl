@@ -53,7 +53,7 @@ const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
-const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN = /je\s+kunt\s+je\s+webdesign\s+hier\s+bekijken\s*👈?/i;
+const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN = /je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
@@ -70,36 +70,52 @@ const INSTANTLY_WEBDESIGN_FRAME_CROP_THRESHOLD = 12;
 const INSTANTLY_WEBDESIGN_FRAME_CORNER_TOLERANCE = 32;
 const INSTANTLY_WEBDESIGN_FRAME_EDGE_INSET_PX = 4;
 const MARTIJN_LINKEDIN_CTA_PATTERN = /(?:💼\s*)?mijn\s+linkedin\s*👈?|linkedin\.com\/in\/martijn-van-de-ven/i;
-const DEFAULT_WEBDESIGN_SUBJECT = 'Nieuw webdesign gemaakt!';
+const DEFAULT_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
 const DEFAULT_WEBDESIGN_BODY = [
-  'Goedemorgen {{naam}},',
+  'Goedendag,',
   '',
-  'Ik ben benieuwd wat je ervan vindt.',
+  'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
   '',
-  'Met vriendelijke groeten:',
-  'Servé Creusen',
+  'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
   '',
-  '📍 {{stad}}',
+  'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
   '',
-  '0629917185',
-].join('\n');
-const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
-  'Beste lezer,',
+  'Als je wilt, stuur ik je ook de online preview,',
+  'zodat je zelf door het ontwerp kunt scrollen.',
   '',
-  'Afgelopen week kwam ik jullie website ({{website}}) tegen. Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
-  '',
-  'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening :)',
-  'Als je wilt, stuur ik je ook de online preview, zodat je zelf door het ontwerp kunt scrollen.',
   'Laat me vooral weten of je dat zou willen.',
   '',
-  'Mocht je er niks mee willen doen, lijkt het me alsnog tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van!',
+  'Je kunt het webdesign hier bekijken 👈',
   '',
-  'Je kunt je webdesign hier bekijken 👈',
+  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
   '',
-  '📍 {{stad}}',
+  '📍 {{afzenderPlaats}}',
+].join('\n');
+const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
+  'Goedendag,',
+  '',
+  'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+  '',
+  'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+  '',
+  'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+  '',
+  'Als je wilt, stuur ik je ook de online preview,',
+  'zodat je zelf door het ontwerp kunt scrollen.',
+  '',
+  'Laat me vooral weten of je dat zou willen.',
+  '',
+  'Je kunt het webdesign hier bekijken 👈',
+  '',
+  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
+  '',
+  'Met vriendelijke groet,',
+  '{{afzender}}',
+  '',
+  '📍 {{afzenderPlaats}}',
 ].join('\n');
 const DEFAULT_INSTANTLY_SENDER_EMAIL = 'serve@softora.nl';
 const INSTANTLY_SENDER_PROFILE_ALIASES = Object.freeze({
@@ -1229,6 +1245,7 @@ function inferInstantlySenderName(profileBody, senderEmail = '', normalizeString
 function buildInstantlyWebdesignMailText(row, city, senderName, normalizeString = defaultNormalizeString) {
   const personalized = personalizeTemplate(DEFAULT_INSTANTLY_WEBDESIGN_BODY, row, normalizeString)
     .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, normalizeString(senderName) || 'Martijn van de Ven')
+    .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, normalizeString(city) || 'uw regio')
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
@@ -1531,6 +1548,14 @@ function escapeHtml(value, normalizeString = defaultNormalizeString) {
     .replace(/"/g, '&quot;');
 }
 
+function escapeHtmlRawText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function escapeHtmlAttribute(value, normalizeString = defaultNormalizeString) {
   return escapeHtml(value, normalizeString).replace(/'/g, '&#39;');
 }
@@ -1572,10 +1597,30 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
 function renderInstantlyWebdesignPreviewCtaHtmlLine(line, normalizeString = defaultNormalizeString, options = {}) {
   const href = normalizeString(options.webdesignPreviewUrl);
   if (!href) return escapeHtml(line, normalizeString);
-  return `Je kunt je webdesign <a href="${escapeHtmlAttribute(
+  return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
     href,
     normalizeString
   )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+}
+
+function renderNoLinkDomainText(value, normalizeString = defaultNormalizeString) {
+  return escapeHtmlRawText(value).replace(/\./g, '.&#8203;');
+}
+
+function renderMailHtmlText(text, normalizeString = defaultNormalizeString) {
+  const cleanText = normalizeString(text);
+  const domainPattern = /\(([^()\s<>@]+\.[^()\s<>@]+)\)/g;
+  let html = '';
+  let lastIndex = 0;
+  let match;
+  while ((match = domainPattern.exec(cleanText))) {
+    html += escapeHtmlRawText(cleanText.slice(lastIndex, match.index + 1));
+    html += `<span style="color:#1a1a2e;text-decoration:none;white-space:nowrap;">${renderNoLinkDomainText(match[1], normalizeString)}</span>`;
+    html += ')';
+    lastIndex = match.index + match[0].length;
+  }
+  html += escapeHtmlRawText(cleanText.slice(lastIndex));
+  return html;
 }
 
 function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, options = {}) {
@@ -1599,7 +1644,7 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, op
             if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
               return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString, options);
             }
-            return escapeHtml(cleanLine, normalizeString);
+            return renderMailHtmlText(cleanLine, normalizeString);
           })
           .join('<br>')}</p>`;
     })
