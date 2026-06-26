@@ -120,6 +120,21 @@ const PUBLIC_PREVIEW_PROFILE_NESTED_FIELDS = Object.freeze([
   'responsibleUser',
   'assignedUser',
 ]);
+const PUBLIC_PREVIEW_PROFILE_QUERY_FIELDS = Object.freeze([
+  'sender',
+  'from',
+  'profile',
+  'senderProfile',
+  'sender_profile',
+  'senderProfileKey',
+  'sender_profile_key',
+  'owner',
+  'ownerKey',
+  'mailbox',
+  'senderEmail',
+  'sender_email',
+  'email',
+]);
 
 const {
   buildCustomerIdentityKey,
@@ -376,6 +391,43 @@ function resolvePublicPreviewProfile(record = null, customer = null, outboundCon
     role: fallback.role,
     photoSource: fallback.photoSource,
     source: inferredKey ? 'explicit' : 'default',
+  };
+}
+
+function resolvePublicPreviewProfileOverride(value) {
+  const key = inferPublicPreviewProfileKeyFromText(value);
+  const profile = PUBLIC_PREVIEW_PROFILES[key];
+  if (!profile || (key !== 'serve' && key !== 'martijn')) return null;
+  return {
+    key: profile.key,
+    name: profile.name,
+    role: profile.role,
+    photoSource: profile.photoSource,
+    source: 'explicit',
+  };
+}
+
+function resolvePublicPreviewProfileOverrideFromRequest(req) {
+  const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+  const params = req && req.params && typeof req.params === 'object' ? req.params : {};
+  const candidates = [
+    params.senderProfile,
+    params.sender,
+    ...PUBLIC_PREVIEW_PROFILE_QUERY_FIELDS.map((field) => query[field]),
+  ];
+  for (const candidate of candidates) {
+    const profile = resolvePublicPreviewProfileOverride(candidate);
+    if (profile) return profile;
+  }
+  return null;
+}
+
+function applyPublicPreviewProfileOverride(preview, profile) {
+  if (!preview || !profile) return preview;
+  return {
+    ...preview,
+    profile,
+    profileContextPending: false,
   };
 }
 
@@ -1665,10 +1717,12 @@ function createPublicWebdesignPreviewService(options = {}) {
     const queryIdentifier = query.cid || query.customerId || query.id;
     const assetIdentifier = queryIdentifier || routeIdentifier;
     const diagnostics = createPublicPreviewDiagnostics();
-    const preview = await resolveFirstPreview([
+    const profileOverride = resolvePublicPreviewProfileOverrideFromRequest(req);
+    const resolvedPreview = await resolveFirstPreview([
       queryIdentifier,
       routeIdentifier,
     ], { includeProfileContext: true, diagnostics });
+    const preview = applyPublicPreviewProfileOverride(resolvedPreview, profileOverride);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) {
