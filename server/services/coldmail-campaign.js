@@ -3656,6 +3656,14 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function isSoftoraColdmailCentralGuardGroup(group) {
+    const provider = normalizeString(group && group.provider).toLowerCase();
+    const channel = normalizeString(group && group.channel).toLowerCase();
+    if (provider && provider !== 'softora') return false;
+    if (channel && channel !== 'coldmail') return false;
+    return true;
+  }
+
   function summarizeColdmailCentralGuardLiveStats(groups, options = {}) {
     const recipientCounts = {};
     const todayRecipientCounts = {};
@@ -3667,6 +3675,7 @@ function createColdmailCampaignService(deps = {}) {
     let lastSenderEmail = '';
 
     (Array.isArray(groups) ? groups : []).forEach((group) => {
+      if (!isSoftoraColdmailCentralGuardGroup(group)) return;
       const source = normalizeString(group && group.source).toLowerCase();
       const actor = normalizeString(group && group.actor).toLowerCase();
       if (
