@@ -1263,6 +1263,56 @@ test('public webdesign preview renders the neutral profile when profile enrichme
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
+test('public webdesign preview uses customer sender before slow outbound guard lookup', async () => {
+  let guardReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    profileContextTimeoutMs: 50,
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'safe-dedupe-20260615-row-2541-21644e60a0',
+          bedrijf: 'Kindercentrum T Zonnestraaltje',
+          website: 'https://www.t-zonnestraaltje.nl',
+          instantlySenderProfileKey: 'serve',
+          instantlySenderEmail: 'serve@websoftora.com',
+          lastColdmailSenderEmail: 'serve@websoftora.com',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'safe-dedupe-20260615-row-2541-21644e60a0',
+          identityKey: 'kindercentrum t zonnestraaltje|kindercentrum t zonnestraaltje|www.t-zonnestraaltje.nl',
+          fileName: 'www.t-zonnestraaltje.nl-preview.png',
+          websitePhotoUrl: 'https://signed.softora.test/zonnestraaltje-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/zonnestraaltje-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        guardReads += 1;
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return [];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'kindercentrum-t-zonnestraaltje' },
+    query: { cid: 'safe-dedupe-20260615-row-2541-21644e60a0' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(guardReads, 0);
+  assert.match(response.body, /<h1 class="hero-title">Kindercentrum T Zonnestraaltje<\/h1>/);
+  assert.match(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.match(response.body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Softora<\/strong>/);
+  assert.doesNotMatch(response.body, /softora-strategy-meeting\.jpg/);
+});
+
 test('public webdesign preview keeps neutral concept pages without sender context uncached', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {

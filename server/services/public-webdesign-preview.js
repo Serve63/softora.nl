@@ -69,6 +69,10 @@ const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
   'martijnvandeven@websoftora.com': 'martijn',
 });
 const PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS = Object.freeze([
+  'instantlySenderEmail',
+  'instantly_sender_email',
+  'instantlyActualSenderEmail',
+  'instantly_actual_sender_email',
   'lastColdmailSenderEmail',
   'senderEmail',
   'sender_email',
@@ -86,6 +90,10 @@ const PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS = Object.freeze([
   'mail_from',
 ]);
 const PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS = Object.freeze([
+  'instantlySenderProfileKey',
+  'instantly_sender_profile_key',
+  'instantlySenderProfile',
+  'instantly_sender_profile',
   'senderProfileKey',
   'senderKey',
   'profileKey',
@@ -358,6 +366,13 @@ function inferPublicPreviewProfileKeyFromFields(objects, fields) {
 function hasPublicPreviewProfileFieldSignal(objects, fields) {
   return (Array.isArray(objects) ? objects : []).some((object) =>
     fields.some((field) => Boolean(normalizeString(object && object[field])))
+  );
+}
+
+function hasConfirmedPublicPreviewSenderProfileSignal(objects) {
+  return Boolean(
+    inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS) ||
+      inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS)
   );
 }
 
@@ -1553,35 +1568,36 @@ function createPublicWebdesignPreviewService(options = {}) {
       return preview;
     }
 
-    async function enrichDirectPreview() {
-      let outboundContexts = await loadOutboundContexts(
-        collectPublicPreviewContextIdentifiers(id, directRecords, [])
-      );
-      preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], outboundContexts) || preview;
-      if (preview && hasExplicitPublicPreviewProfile(preview) && normalizeString(preview.title)) {
-        return preview;
-      }
-
-      let customers = [];
+    async function loadCustomersForPreview(source) {
       const loadedCustomers = await retryPublicPreviewRead(
         () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
         STRUCTURED_PREVIEW_READ_ATTEMPTS,
         diagnostics,
-        'customers-direct'
+        source
       );
-      try {
-        customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
-      } catch (_error) {
-        customers = [];
-      }
+      return Array.isArray(loadedCustomers) ? loadedCustomers : [];
+    }
+
+    async function enrichDirectPreview() {
+      const customers = await loadCustomersForPreview('customers-direct');
       const matchedCustomers = directRecords
         .map((record) => findCustomerForPreviewRecord(customers, id, record))
         .filter(Boolean);
-      outboundContexts = await loadOutboundContexts(
+      const customerPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, []) || preview;
+      if (
+        customerPreview &&
+        hasExplicitPublicPreviewProfile(customerPreview) &&
+        normalizeString(customerPreview.title) &&
+        hasConfirmedPublicPreviewSenderProfileSignal([].concat(directRecords, matchedCustomers))
+      ) {
+        return customerPreview;
+      }
+
+      const outboundContexts = await loadOutboundContexts(
         collectPublicPreviewContextIdentifiers(id, directRecords, matchedCustomers)
       );
       const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
-      return enrichedPreview || preview || null;
+      return enrichedPreview || customerPreview || preview || null;
     }
 
     if (preview) {
@@ -1595,18 +1611,7 @@ function createPublicWebdesignPreviewService(options = {}) {
     let outboundContexts = await loadOutboundContexts(
       collectPublicPreviewContextIdentifiers(id, directRecords, [])
     );
-    let customers = [];
-    const loadedCustomers = await retryPublicPreviewRead(
-      () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
-      STRUCTURED_PREVIEW_READ_ATTEMPTS,
-      diagnostics,
-      'customers-candidates'
-    );
-    try {
-      customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
-    } catch (_error) {
-      customers = [];
-    }
+    const customers = await loadCustomersForPreview('customers-candidates');
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
       id,
