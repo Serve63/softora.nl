@@ -71,7 +71,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     legacyPaths: ['/premium-bedrijfssoftware'],
     title: 'Bedrijfssoftware laten maken voor CRM en dashboards',
     description:
-      'Laat bedrijfssoftware of een bedrijfsapplicatie maken voor CRM, dashboard, klantportaal, offerteflow, planning en AI automatisering.',
+      'Laat bedrijfssoftware maken voor CRM, dashboard, klantportaal en offerteflow. Duidelijke scope, koppelingen, veiligheid en doorontwikkeling voor MKB.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
