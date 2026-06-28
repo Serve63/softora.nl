@@ -958,7 +958,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Money pages hebben ondersteunende pagina’s nodig',
         paragraphs: Object.freeze([
-          'Een dienstpagina zoals website laten maken of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
+          'Een dienstpagina zoals website laten maken, bedrijfssoftware op maat of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
           'Zo blijft de commerciële pagina scherp, terwijl de site toch veel nuttige uitleg biedt.',
         ]),
       }),
@@ -972,10 +972,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Blog', href: '/blog' }),
       Object.freeze({ label: 'Diensten', href: '/diensten' }),
       Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
-      Object.freeze({ label: 'Conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
     ]),
   }),
   Object.freeze({

@@ -694,6 +694,10 @@ test('seo linkmachine run date keeps fresh support articles above orphan risk', 
   ]) {
     assert.ok(incoming.get(pathName).size >= 3, `${pathName} heeft te weinig live contextuele ingangen.`);
   }
+
+  const internalLinkStructure = pages.find((page) => page.path === '/kennisbank/wat-is-interne-linkstructuur');
+  assert.ok(internalLinkStructure.html.includes('href="/bedrijfssoftware-op-maat"'));
+  assert.ok(internalLinkStructure.html.includes('href="/crm-systeem-op-maat"'));
 });
 
 test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op publicatiedatum', () => {
