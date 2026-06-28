@@ -981,15 +981,77 @@ function createMailboxService(deps = {}) {
     return /^https?:\/\//i.test(raw) ? raw : DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
   }
 
-  function buildPublicWebdesignPreviewUrl(row, id) {
+  function inferPublicWebdesignPreviewSenderKey(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    const email = normalizeEmail(raw);
+    const normalized = raw
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const compact = normalized.replace(/[^a-z0-9]+/g, '');
+    if (
+      normalized.includes('martijn') ||
+      compact.includes('martijnvandeven') ||
+      email === 'contact.venvisuals@gmail.com'
+    ) {
+      return 'martijn';
+    }
+    if (
+      normalized.includes('serve') ||
+      normalized.includes('creusen') ||
+      compact.includes('servecreusen')
+    ) {
+      return 'serve';
+    }
+    return '';
+  }
+
+  function getPublicWebdesignPreviewSenderKey(row, options = {}) {
+    const candidates = [
+      options.senderProfileKey,
+      options.senderProfile,
+      options.profileKey,
+      options.senderKey,
+      options.senderEmail,
+      options.senderDisplayName,
+      options.senderName,
+      options.fromName,
+      options.accountEmail,
+      options.mailboxAccount,
+      options.body,
+      options.text,
+      options.renderedBody,
+      MAILBOX_DISPLAY_NAMES[normalizeEmail(options.senderEmail)],
+      MAILBOX_DISPLAY_NAMES[normalizeEmail(options.accountEmail)],
+      row && row.senderProfileKey,
+      row && row.instantlySenderProfileKey,
+      row && row.senderEmail,
+      row && row.lastColdmailSenderEmail,
+      row && row.sentFromEmail,
+      row && row.mailboxAccount,
+      row && row.fromEmail,
+    ];
+    for (const candidate of candidates) {
+      const key = inferPublicWebdesignPreviewSenderKey(candidate);
+      if (key) return key;
+    }
+    return '';
+  }
+
+  function buildPublicWebdesignPreviewUrl(row, id, options = {}) {
     const fallbackSlug = slugifyWebdesignCompany(id, 'uw-bedrijf');
     const slug = slugifyWebdesignCompany(getCustomerCompany(row), fallbackSlug);
     const directIdentifier = normalizeString(id);
-    const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
+    const query = new URLSearchParams();
+    if (directIdentifier) query.set('cid', directIdentifier);
+    const senderKey = getPublicWebdesignPreviewSenderKey(row, options);
+    if (senderKey) query.set('sender', senderKey);
+    const queryString = query.toString();
     try {
-      return new URL(`/webdesign/${slug}${directQuery}`, getPublicWebdesignPreviewBaseUrl()).toString();
+      return new URL(`/webdesign/${slug}${queryString ? `?${queryString}` : ''}`, getPublicWebdesignPreviewBaseUrl()).toString();
     } catch (_) {
-      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}${directQuery}`;
+      return `${DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL}/webdesign/${slug}${queryString ? `?${queryString}` : ''}`;
     }
   }
 
@@ -1006,14 +1068,14 @@ function createMailboxService(deps = {}) {
     );
   }
 
-  function buildPublicWebdesignPreviewUrlForMatch(row, meta, id) {
+  function buildPublicWebdesignPreviewUrlForMatch(row, meta, id, options = {}) {
     const previewId = normalizeString(meta && (meta.id || meta.customerId)) || normalizeString(id || getCustomerId(row, 0));
     const previewRow = row && typeof row === 'object'
       ? row
       : {
           bedrijf: getPhotoMetaCompany(meta) || previewId,
         };
-    return buildPublicWebdesignPreviewUrl(previewRow, previewId);
+    return buildPublicWebdesignPreviewUrl(previewRow, previewId, options);
   }
 
   function parseCustomerRows(values = {}) {
@@ -1693,9 +1755,15 @@ function createMailboxService(deps = {}) {
         matchedId,
       });
       const previewUrl = matchedRow
-        ? buildPublicWebdesignPreviewUrlForMatch(matchedRow, matchedMeta, matchedId)
+        ? buildPublicWebdesignPreviewUrlForMatch(matchedRow, matchedMeta, matchedId, {
+            accountEmail,
+            renderedBody: rawText,
+          })
         : matchedMeta
-          ? buildPublicWebdesignPreviewUrlForMatch(null, matchedMeta, matchedId)
+          ? buildPublicWebdesignPreviewUrlForMatch(null, matchedMeta, matchedId, {
+              accountEmail,
+              renderedBody: rawText,
+            })
         : extractPublicWebdesignPreviewUrlFromText(rawText);
       const inlineImages = mailboxWebdesignImageDelivery === 'cid'
         ? await prepareMailboxInlineWebdesignImages(images, matchedId)

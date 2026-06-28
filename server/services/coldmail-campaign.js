@@ -1177,18 +1177,83 @@ function createColdmailCampaignService(deps = {}) {
   function buildPublicWebdesignPreviewPath(row, id) {
     const slug = slugifyWebdesignCompany(getRowCompany(row), slugifyWebdesignCompany(id, 'uw-bedrijf'));
     const directIdentifier = normalizeString(id);
-    const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
-    return `/webdesign/${slug}${directQuery}`;
+    const query = new URLSearchParams();
+    if (directIdentifier) query.set('cid', directIdentifier);
+    const queryString = query.toString();
+    return `/webdesign/${slug}${queryString ? `?${queryString}` : ''}`;
+  }
+
+  function inferPublicWebdesignPreviewSenderKey(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    const normalized = raw
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const compact = normalized.replace(/[^a-z0-9]+/g, '');
+    if (
+      normalized.includes('martijn') ||
+      compact.includes('martijnvandeven') ||
+      normalizeEmailAddress(raw) === 'contact.venvisuals@gmail.com'
+    ) {
+      return 'martijn';
+    }
+    if (
+      normalized.includes('serve') ||
+      normalized.includes('creusen') ||
+      compact.includes('servecreusen')
+    ) {
+      return 'serve';
+    }
+    return '';
+  }
+
+  function getPublicWebdesignPreviewSenderKey(row, input = {}) {
+    const candidates = [
+      input.senderProfileKey,
+      input.senderProfile,
+      input.profileKey,
+      input.senderKey,
+      input.senderEmail,
+      input.senderDisplayName,
+      input.senderName,
+      input.fromName,
+      input.mailboxAccount,
+      input.accountEmail,
+      input.fromEmail,
+      input.body,
+      input.text,
+      input.renderedBody,
+      SENDER_DISPLAY_NAMES[normalizeEmailAddress(input.senderEmail)],
+      SENDER_DISPLAY_NAMES[normalizeEmailAddress(input.accountEmail)],
+      SENDER_DISPLAY_NAMES[normalizeEmailAddress(input.fromEmail)],
+      row && row.senderProfileKey,
+      row && row.instantlySenderProfileKey,
+      row && row.senderEmail,
+      row && row.lastColdmailSenderEmail,
+      row && row.sentFromEmail,
+      row && row.mailboxAccount,
+      row && row.fromEmail,
+    ];
+    for (const candidate of candidates) {
+      const key = inferPublicWebdesignPreviewSenderKey(candidate);
+      if (key) return key;
+    }
+    return '';
   }
 
   function buildPublicWebdesignPreviewUrl(row, id, input = {}) {
     const baseUrl =
       normalizePublicBaseUrl(input.webdesignPublicBaseUrl) ||
       DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+    const path = buildPublicWebdesignPreviewPath(row, id);
+    const senderKey = getPublicWebdesignPreviewSenderKey(row, input);
     try {
-      return new URL(buildPublicWebdesignPreviewPath(row, id), baseUrl).toString();
+      const url = new URL(path, baseUrl);
+      if (senderKey) url.searchParams.set('sender', senderKey);
+      return url.toString();
     } catch (_error) {
-      return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}`;
+      return `${baseUrl}${path}${senderKey ? `${path.includes('?') ? '&' : '?'}sender=${encodeURIComponent(senderKey)}` : ''}`;
     }
   }
 
@@ -8530,7 +8595,13 @@ function createColdmailCampaignService(deps = {}) {
       const htmlBase = appendHiddenColdmailReferenceHtml(
         toHtml(baseText, {
           senderEmail,
-          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, publicWebdesignPreviewId, input),
+          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, publicWebdesignPreviewId, {
+            ...input,
+            senderEmail,
+            senderDisplayName: getSenderDisplayName(senderEmail, smtpAccount),
+            text,
+            renderedBody: text,
+          }),
         }),
         reference
       );
