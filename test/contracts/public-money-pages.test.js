@@ -133,12 +133,16 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /Klantportaal laten maken/);
   assert.match(source, /Eerst scherpe scope, daarna pas bouwen/);
   assert.match(source, /Wat bepaalt de kosten\?/);
+  assert.match(source, /Wanneer bedrijfssoftware laten maken slim wordt/);
+  assert.match(source, /Dubbele invoer remt groei/);
+  assert.match(source, /Uitzonderingen passen niet/);
   assert.match(source, /Koppelingen en veiligheid/);
   assert.match(source, /Rollen en rechten/);
   assert.match(source, /Veelgestelde vragen over bedrijfssoftware/);
   assert.match(source, /Wat kost bedrijfssoftware laten maken\?/);
   assert.match(source, /Hoe lang duurt bedrijfssoftware op maat bouwen\?/);
   assert.match(source, /Kan bedrijfssoftware koppelen met bestaande systemen\?/);
+  assert.match(source, /Wanneer is maatwerk bedrijfssoftware beter dan standaard software\?/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
   assert.match(source, /href="\/maatwerk-platform"/);
   assert.match(source, /href="\/ai-automatisering"/);
@@ -170,6 +174,7 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
       'Wat kost bedrijfssoftware laten maken?',
       'Hoe lang duurt bedrijfssoftware op maat bouwen?',
       'Kan bedrijfssoftware koppelen met bestaande systemen?',
+      'Wanneer is maatwerk bedrijfssoftware beter dan standaard software?',
     ]
   );
   assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/bedrijfssoftware-op-maat#breadcrumb');
