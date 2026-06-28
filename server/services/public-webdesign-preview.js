@@ -16,7 +16,7 @@ const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 const STRUCTURED_PREVIEW_READ_ATTEMPTS = 3;
 const PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS = 10000;
-const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 900;
+const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 2500;
 const PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 5000;
 const PUBLIC_PREVIEW_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS = 45_000_000;
@@ -1583,18 +1583,45 @@ function createPublicWebdesignPreviewService(options = {}) {
       const matchedCustomers = directRecords
         .map((record) => findCustomerForPreviewRecord(customers, id, record))
         .filter(Boolean);
+      const candidateCustomers = findCustomerCandidates(customers, id);
+      const profileCustomers = Array.from(new Set([
+        ...matchedCustomers,
+        ...candidateCustomers,
+      ].filter(Boolean)));
       const customerPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, []) || preview;
       if (
         customerPreview &&
         hasExplicitPublicPreviewProfile(customerPreview) &&
         normalizeString(customerPreview.title) &&
-        hasConfirmedPublicPreviewSenderProfileSignal([].concat(directRecords, matchedCustomers))
+        hasConfirmedPublicPreviewSenderProfileSignal([].concat(directRecords, profileCustomers))
       ) {
         return customerPreview;
       }
 
+      const profileCustomer = profileCustomers.find((customer) =>
+        hasConfirmedPublicPreviewSenderProfileSignal([customer])
+      );
+      if (profileCustomer) {
+        const profileRecord =
+          directRecords.find((record) => findCustomerForPreviewRecord([profileCustomer], id, record)) ||
+          directRecords[0] ||
+          null;
+        const profilePreview = buildPreviewFromRecord(
+          normalizeString(profileRecord && (profileRecord.id || profileRecord.customerId)) ||
+            normalizeString(profileCustomer && (profileCustomer.id || profileCustomer.customerId || profileCustomer.databaseId)) ||
+            id,
+          {},
+          profileRecord,
+          profileCustomer,
+          null
+        );
+        if (profilePreview && hasExplicitPublicPreviewProfile(profilePreview)) {
+          return profilePreview;
+        }
+      }
+
       const outboundContexts = await loadOutboundContexts(
-        collectPublicPreviewContextIdentifiers(id, directRecords, matchedCustomers)
+        collectPublicPreviewContextIdentifiers(id, directRecords, profileCustomers)
       );
       const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
       return enrichedPreview || customerPreview || preview || null;
