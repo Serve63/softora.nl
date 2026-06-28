@@ -299,6 +299,41 @@ test('public webdesign preview concept route switches the profile by sender cont
   assert.doesNotMatch(response.body, /Piggy’s Kadoshop/);
 });
 
+test('public webdesign preview concept route enriches slug-only photo matches with customer sender context', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'safe-dedupe-20260615-row-1181-8d61e8ac53',
+          bedrijf: 'Autobedrijf Stef Spierings',
+          website: 'https://stefspierings.com/',
+          lastColdmailSenderEmail: 'martijn@websoftora.com',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'photo-only-stefspierings',
+          fileName: 'autobedrijf-stef-spierings-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/stefspierings-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/stefspierings-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'autobedrijf-stef-spierings' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<h1 class="hero-title">Autobedrijf Stef Spierings<\/h1>/);
+  assert.match(response.body, /<img src="\/assets\/martijn-van-de-ven-profile\.png\?v=20260609a" alt="Martijn van de Ven"/);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.doesNotMatch(response.body, /<strong>Softora<\/strong>/);
+});
+
 test('public webdesign preview concept route lets Instantly sender query override missing profile context', async () => {
   const service = createPublicWebdesignPreviewService({
     async getUiStateValues() {
