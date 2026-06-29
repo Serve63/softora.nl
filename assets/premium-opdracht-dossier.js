@@ -614,36 +614,6 @@
         throw new Error(lastError || 'AI dossier generatie mislukt.');
     }
 
-    async function copyText(value) {
-        const text = String(value || '');
-        if (!text) return false;
-
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            try {
-                await navigator.clipboard.writeText(text);
-                return true;
-            } catch (_) {
-                // fallback below
-            }
-        }
-
-        try {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.setAttribute('readonly', 'readonly');
-            textarea.style.position = 'fixed';
-            textarea.style.left = '-9999px';
-            document.body.appendChild(textarea);
-            textarea.select();
-            textarea.setSelectionRange(0, textarea.value.length);
-            const ok = document.execCommand('copy');
-            textarea.remove();
-            return Boolean(ok);
-        } catch (_) {
-            return false;
-        }
-    }
-
     function cloneDossierLayout(layout) {
         return safeJsonParse(JSON.stringify(layout || {}), {});
     }
@@ -652,25 +622,14 @@
         const singleLine = options.singleLine === true;
         const maxChars = Number(options.maxChars) || 1000;
         let text = String(value || '').replace(/\u00a0/g, ' ').replace(/\r/g, '\n');
-        if (singleLine) {
-            text = text.replace(/\s+/g, ' ').trim();
-        } else {
-            text = text
-                .replace(/[ \t]+\n/g, '\n')
-                .replace(/\n[ \t]+/g, '\n')
-                .replace(/\n{4,}/g, '\n\n\n')
-                .trim();
-        }
+        text = singleLine
+            ? text.replace(/\s+/g, ' ').trim()
+            : text.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{4,}/g, '\n\n\n').trim();
         return clipText(text, maxChars);
     }
 
     function editableAttrs(field, attrs = {}) {
-        const pairs = {
-            ...attrs,
-            'dossier-editable': '1',
-            'edit-field': field,
-        };
-        const dataAttrs = Object.entries(pairs)
+        const dataAttrs = Object.entries({ ...attrs, 'dossier-editable': '1', 'edit-field': field })
             .map(([key, value]) => `data-${esc(key)}="${esc(value)}"`)
             .join(' ');
         return `contenteditable="plaintext-only" spellcheck="true" ${dataAttrs}`;
@@ -707,12 +666,8 @@
     }
 
     function buildEditableLayoutResponseForSave() {
-        const current = editorState.layout && typeof editorState.layout === 'object'
-            ? editorState.layout
-            : {};
-        const base = editorState.layoutResponse && typeof editorState.layoutResponse === 'object'
-            ? editorState.layoutResponse
-            : {};
+        const current = editorState.layout && typeof editorState.layout === 'object' ? editorState.layout : {};
+        const base = editorState.layoutResponse && typeof editorState.layoutResponse === 'object' ? editorState.layoutResponse : {};
         const layout = {
             documentTitle: clipText(String(current.documentTitle || '').trim(), 220) || `Opdracht #${editorState.orderId || ''}`.trim(),
             subtitle: clipText(String(current.subtitle || '').trim(), 320),
@@ -737,17 +692,12 @@
         const statusEl = document.getElementById('dossierSaveStatus');
         if (!statusEl) return;
         statusEl.textContent = String(message || '');
-        if (status) {
-            statusEl.dataset.status = status;
-        } else {
-            delete statusEl.dataset.status;
-        }
+        if (status) statusEl.dataset.status = status;
+        else delete statusEl.dataset.status;
     }
 
     function scheduleDossierSave() {
-        if (editorState.saveTimer) {
-            window.clearTimeout(editorState.saveTimer);
-        }
+        if (editorState.saveTimer) window.clearTimeout(editorState.saveTimer);
         editorState.saveTimer = window.setTimeout(() => {
             void persistCurrentDossierEdits();
         }, DOSSIER_AUTOSAVE_DELAY_MS);
@@ -766,16 +716,12 @@
             window.clearTimeout(editorState.saveTimer);
             editorState.saveTimer = null;
         }
-        if (!editorState.baseData || !editorState.orderId || !editorState.dossierFingerprint) {
-            return false;
-        }
+        if (!editorState.baseData || !editorState.orderId || !editorState.dossierFingerprint) return false;
         if (editorState.saveInFlight) {
             editorState.saveQueued = true;
             return false;
         }
-        if (!force && !editorState.dirty) {
-            return true;
-        }
+        if (!force && !editorState.dirty) return true;
 
         const savingRevision = editorState.revision;
         editorState.saveInFlight = true;
@@ -784,15 +730,8 @@
             const latestValues = await fetchUiStateValues(REMOTE_SCOPE);
             const latestRawValue = readChunkedStateValue(latestValues, DOSSIER_CACHE_KEY) || editorState.cacheRawValue;
             const layoutResponse = buildEditableLayoutResponseForSave();
-            const saved = await persistDossierCache(
-                latestRawValue,
-                editorState.orderId,
-                editorState.dossierFingerprint,
-                layoutResponse
-            );
-            if (!saved?.ok) {
-                throw new Error('Dossier opslaan mislukt.');
-            }
+            const saved = await persistDossierCache(latestRawValue, editorState.orderId, editorState.dossierFingerprint, layoutResponse);
+            if (!saved?.ok) throw new Error('Dossier opslaan mislukt.');
             editorState.layoutResponse = layoutResponse;
             editorState.lastSavedRevision = savingRevision;
             if (editorState.revision === savingRevision) {
@@ -823,29 +762,24 @@
         const itemIndex = Number(element.dataset.itemIndex);
         const blocks = Array.isArray(editorState.layout.blocks) ? editorState.layout.blocks : [];
         const block = Number.isFinite(blockIndex) ? blocks[blockIndex] : null;
+        const text = element.innerText || element.textContent;
 
         if (field === 'title') {
-            editorState.layout.documentTitle = cleanEditableText(element.innerText || element.textContent, {
-                singleLine: true,
-                maxChars: 220,
-            }) || editorState.layout.documentTitle;
+            editorState.layout.documentTitle = cleanEditableText(text, { singleLine: true, maxChars: 220 }) || editorState.layout.documentTitle;
             return true;
         }
         if (field === 'prompt') {
-            editorState.layout.opusPrompt = cleanEditableText(element.innerText || element.textContent, { maxChars: 22000 });
+            editorState.layout.opusPrompt = cleanEditableText(text, { maxChars: 22000 });
             return true;
         }
         if (!block || typeof block !== 'object') return false;
 
         if (field === 'sectionTitle') {
-            block.title = cleanEditableText(element.innerText || element.textContent, {
-                singleLine: true,
-                maxChars: 120,
-            }) || block.title;
+            block.title = cleanEditableText(text, { singleLine: true, maxChars: 120 }) || block.title;
             return true;
         }
         if (field === 'text') {
-            block.text = cleanEditableText(element.innerText || element.textContent, { maxChars: 5500 });
+            block.text = cleanEditableText(text, { maxChars: 5500 });
             return true;
         }
         if (field === 'metaLabel' || field === 'metaValue') {
@@ -853,25 +787,16 @@
             const pair = Number.isFinite(pairIndex) ? pairs[pairIndex] : null;
             if (!pair) return false;
             if (field === 'metaLabel') {
-                pair.label = cleanEditableText(element.innerText || element.textContent, {
-                    singleLine: true,
-                    maxChars: 80,
-                }) || pair.label;
+                pair.label = cleanEditableText(text, { singleLine: true, maxChars: 80 }) || pair.label;
             } else {
-                pair.value = cleanEditableText(element.innerText || element.textContent, {
-                    singleLine: true,
-                    maxChars: 260,
-                });
+                pair.value = cleanEditableText(text, { singleLine: true, maxChars: 260 });
             }
             return true;
         }
         if (field === 'item') {
             const items = Array.isArray(block.items) ? block.items : [];
             if (!Number.isFinite(itemIndex) || itemIndex < 0 || itemIndex >= items.length) return false;
-            items[itemIndex] = cleanEditableText(element.innerText || element.textContent, {
-                singleLine: true,
-                maxChars: 380,
-            });
+            items[itemIndex] = cleanEditableText(text, { singleLine: true, maxChars: 380 });
             return true;
         }
         return false;
@@ -890,29 +815,21 @@
             const range = document.createRange();
             range.selectNodeContents(element);
             const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
+            selection.removeAllRanges(); selection.addRange(range);
         }
     }
 
     function rerenderCurrentDossier(options = {}) {
         if (!editorState.baseData) return;
         const layoutResponse = buildEditableLayoutResponseForSave();
-        renderDossier(editorState.baseData, layoutResponse, {
-            preserveDirty: true,
-            focus: options.focus || null,
-        });
+        renderDossier(editorState.baseData, layoutResponse, { preserveDirty: true, focus: options.focus || null });
     }
 
     function addTextBlock() {
         if (!editorState.layout) return;
         if (!Array.isArray(editorState.layout.blocks)) editorState.layout.blocks = [];
         const blockIndex = editorState.layout.blocks.length;
-        editorState.layout.blocks.push({
-            kind: 'text',
-            title: 'Extra notitie',
-            text: 'Nieuwe tekst',
-        });
+        editorState.layout.blocks.push({ kind: 'text', title: 'Extra notitie', text: 'Nieuwe tekst' });
         rerenderCurrentDossier({ focus: { field: 'text', blockIndex, select: true } });
         markDossierDirty();
     }
@@ -1008,12 +925,10 @@
         }
 
         const printBtn = document.getElementById('printBtn');
-        if (printBtn) {
-            printBtn.addEventListener('click', async () => {
-                await persistCurrentDossierEdits({ force: true });
-                window.print();
-            });
-        }
+        if (printBtn) printBtn.addEventListener('click', async () => {
+            await persistCurrentDossierEdits({ force: true });
+            window.print();
+        });
     }
 
     function syncPaperScale() {
