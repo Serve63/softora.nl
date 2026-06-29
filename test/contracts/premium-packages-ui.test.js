@@ -48,7 +48,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /id="tab-onderhoud" class="tab-panel theme-website"/);
   assert.doesNotMatch(pageSource, /id="tab-onderhoud" class="tab-panel theme-website active"/);
   assert.doesNotMatch(pageSource, /Maandelijks opzegbaar/);
-  assert.equal((pageSource.match(/Jaarlijks opzegbaar/g) || []).length, 12);
+  assert.equal((pageSource.match(/Jaarlijks opzegbaar/g) || []).length, 9);
   assert.match(pageSource, /\.onderhoud-card \.features-list::before\s*\{[\s\S]*content:\s*"Realistische taken";/);
   assert.match(scriptSource, /routes: \["routes"\]/);
   assert.match(scriptSource, /website: \["bouwen", "onderhoud"\]/);
@@ -60,7 +60,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(scriptSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/);
 });
 
-test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden zonder losse kaartintro', () => {
+test('website onderhoudspakketten tonen de aangeleverde foto-prijzen en taken', () => {
   const pageSource = readPage();
   const sectionStart = pageSource.indexOf('<div id="tab-onderhoud"');
   const sectionEnd = pageSource.indexOf('<div id="tab-bedrijfssoftware"', sectionStart);
@@ -70,18 +70,38 @@ test('website onderhoudspakketten tonen vaste uren per maand met taakvoorbeelden
   assert.doesNotMatch(websiteMaintenanceSection, /10 uur per maand voor doorlopend beheer en zichtbare verbeteringen\./);
   assert.doesNotMatch(websiteMaintenanceSection, /15 uur per maand voor actief optimaliseren en sneller doorpakken\./);
   assert.doesNotMatch(websiteMaintenanceSection, /25 uur per maand voor intensief beheer, campagnes en doorontwikkeling\./);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€89<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 1 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€199<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 3 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€329<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 5 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /<div class="price-amount">€649<span class="price-suffix">\/mnd<\/span><\/div><span class="price-hours">· 10 uur\/mnd<\/span>/);
-  assert.match(websiteMaintenanceSection, /Updates, backups en monitoring/);
-  assert.match(websiteMaintenanceSection, /Kleine tekst- en fotowijzigingen/);
-  assert.match(websiteMaintenanceSection, /Nieuwe secties, acties of pagina-updates/);
-  assert.match(websiteMaintenanceSection, /SEO, snelheid en conversie verbeteren/);
-  assert.match(websiteMaintenanceSection, /Campagnepagina's, funnels en grotere uitbreidingen/);
+  assert.match(websiteMaintenanceSection, /<div class="section-title">Website Onderhoud Pakketten<\/div>/);
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Onderhoud<\/div>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€37,95<span class="price-suffix">\/mnd<\/span><\/div>/);
+  assert.match(websiteMaintenanceSection, /Technisch onderhoud van de website/);
+  assert.match(websiteMaintenanceSection, /Updates en controle van de website/);
+  assert.match(websiteMaintenanceSection, /Basiscontrole op veiligheid en werking/);
+  assert.match(websiteMaintenanceSection, /Monitoring zodat alles goed blijft draaien/);
+  assert.match(websiteMaintenanceSection, /<div class="card-badge">Aanbevolen<\/div>/);
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Onderhoud \+ Wijzigingen<\/div>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€74,95<span class="price-suffix">\/mnd<\/span><\/div>/);
+  assert.match(websiteMaintenanceSection, /Alles uit pakket 1 inbegrepen/);
+  assert.match(websiteMaintenanceSection, /Tekstwijzigingen op de website/);
+  assert.match(websiteMaintenanceSection, /Afbeeldingen vervangen of toevoegen/);
+  assert.match(websiteMaintenanceSection, /Aanpassingen aan bestaande pagina's/);
+  assert.match(websiteMaintenanceSection, /Extra support bij vragen of verbeteringen/);
+  assert.match(websiteMaintenanceSection, /<div class="card-name">Continue Aanpassingen<\/div>/);
+  assert.match(websiteMaintenanceSection, /<div class="price-amount">€497,-<span class="price-suffix">\/mnd<\/span><\/div>/);
+  assert.match(websiteMaintenanceSection, /Alles uit pakket 2 inbegrepen/);
+  assert.match(websiteMaintenanceSection, /Onbeperkte tekstwijzigingen/);
+  assert.match(websiteMaintenanceSection, /Onbeperkte aanpassingen op de website/);
+  assert.match(websiteMaintenanceSection, /Nieuwe pagina's toevoegen/);
+  assert.match(websiteMaintenanceSection, /Prioriteit en snelle doorlooptijd/);
+  assert.match(websiteMaintenanceSection, /Proactieve optimalisaties en verbeteringen/);
+  assert.doesNotMatch(websiteMaintenanceSection, /€89<span class="price-suffix">\/mnd/);
+  assert.doesNotMatch(websiteMaintenanceSection, /€199<span class="price-suffix">\/mnd/);
+  assert.doesNotMatch(websiteMaintenanceSection, /€329<span class="price-suffix">\/mnd/);
+  assert.doesNotMatch(websiteMaintenanceSection, /€649<span class="price-suffix">\/mnd/);
+  assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Basis<\/div>/);
+  assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Plus<\/div>/);
+  assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Enterprise<\/div>/);
   assert.doesNotMatch(websiteMaintenanceSection, /uur p\/m · Excl\. BTW/);
   assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Pro<\/div>/);
-  assert.doesNotMatch(websiteMaintenanceSection, /Onbeperkte aanpassingen/);
 });
 
 test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () => {
@@ -125,14 +145,21 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
 
 test('pakketkaarten gebruiken interne Softora CTA labels', () => {
   const pageSource = readPage();
+  const websiteBuildStart = pageSource.indexOf('<div id="tab-bouwen"');
+  const websiteBuildEnd = pageSource.indexOf('<div id="tab-onderhoud"', websiteBuildStart);
+  const websiteBuildSection = pageSource.slice(websiteBuildStart, websiteBuildEnd);
   const ctaLabels = Array.from(
     pageSource.matchAll(/<button class="card-cta(?![^"]*is-locked)[^"]*" type="button">([^<]+)<\/button>/g),
     (match) => match[1].trim()
   );
 
-  assert.equal(ctaLabels.length, 29);
+  assert.equal(ctaLabels.length, 31);
   assert.deepEqual([...new Set(ctaLabels)], ['Softora']);
-  assert.equal((pageSource.match(/class="card-cta[^"]*is-locked/g) || []).length, 3);
+  assert.equal((pageSource.match(/class="card-cta[^"]*is-locked/g) || []).length, 0);
+  assert.equal((websiteBuildSection.match(/<button class="card-cta[^"]*" type="button">Softora<\/button>/g) || []).length, 4);
+  assert.doesNotMatch(websiteBuildSection, /is-locked/);
+  assert.doesNotMatch(websiteBuildSection, /disabled/);
+  assert.doesNotMatch(pageSource, />Tijdelijk vergrendeld</);
   assert.match(pageSource, /€749,-/);
   assert.match(pageSource, /€1\.350,-/);
   assert.doesNotMatch(
