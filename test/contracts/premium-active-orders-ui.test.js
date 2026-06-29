@@ -42,6 +42,21 @@ function readActiveOrdersSources() {
   };
 }
 
+function readOrderDossierSources() {
+  const pagePath = path.join(__dirname, '../../premium-opdracht-dossier.html');
+  const scriptPath = path.join(__dirname, '../../assets/premium-opdracht-dossier.js');
+  const stylePath = path.join(__dirname, '../../assets/premium-opdracht-dossier-editor.css');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  const styleSource = fs.readFileSync(stylePath, 'utf8');
+  return {
+    pageSource,
+    scriptSource,
+    styleSource,
+    combinedSource: `${pageSource}\n${scriptSource}\n${styleSource}`,
+  };
+}
+
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const { assignmentFilterStyleSource, customerDbScriptSource, pageSource, scriptSource, openLeadsScriptSource, manualLeadsScriptSource, combinedSource: source } = readActiveOrdersSources();
 
@@ -320,9 +335,10 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
 });
 
 test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus opnieuw genereert', () => {
-  const filePath = path.join(__dirname, '../../premium-opdracht-dossier.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const { pageSource, combinedSource: source } = readOrderDossierSources();
 
+  assert.match(pageSource, /assets\/premium-opdracht-dossier\.js\?v=20260629a/);
+  assert.match(pageSource, /assets\/premium-opdracht-dossier-editor\.css\?v=20260629a/);
   assert.match(source, /const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';/);
   assert.match(source, /const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';/);
   assert.match(source, /function readChunkedStateValue\(values, baseKey\)/);
@@ -352,7 +368,8 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /const opusPrompt = opusFromLayout \|\| buildShortOpusPrompt\(baseData\);/);
   assert.match(source, /if \(shouldHideLegacyDossierBlockTitle\(title\)\) return null;/);
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);
-  assert.match(source, /void persistDossierCache\(readChunkedStateValue\(values, DOSSIER_CACHE_KEY\), orderId, dossierFingerprint, layoutResponse\);/);
+  assert.match(source, /const dossierCacheRawValue = readChunkedStateValue\(values, DOSSIER_CACHE_KEY\);/);
+  assert.match(source, /void persistDossierCache\(dossierCacheRawValue, orderId, dossierFingerprint, layoutResponse\);/);
   assert.doesNotMatch(source, /source-chip/);
   assert.doesNotMatch(source, /Dynamisch via/);
   assert.doesNotMatch(source, /Klantwensen \(bron\):/);
@@ -386,8 +403,7 @@ test('server opdrachtdossier filtert legacy planningsblokken en zet een echte bo
 });
 
 test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina volledig uitlopen', () => {
-  const filePath = path.join(__dirname, '../../premium-opdracht-dossier.html');
-  const source = fs.readFileSync(filePath, 'utf8');
+  const { combinedSource: source } = readOrderDossierSources();
 
   assert.doesNotMatch(source, /Uitvoerdossier voor uitvoering/);
   assert.doesNotMatch(source, /Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie\./);
@@ -400,9 +416,32 @@ test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina vo
   assert.match(source, /\.paper-stage \{[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
   assert.match(source, /\.dossier-page \{[\s\S]*position:\s*relative;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
   assert.match(source, /\.page-body \{[\s\S]*overflow:\s*visible;/);
-  assert.match(source, /root\.innerHTML = `\s*<div class="page-toolbar screen-only" id="pageToolbar" style="justify-content: flex-end;">[\s\S]*<div class="paper-shell" id="paperShell">/);
+  assert.match(source, /root\.innerHTML = `\s*<div class="page-toolbar screen-only" id="pageToolbar">[\s\S]*<div class="paper-shell" id="paperShell">/);
+  assert.match(source, /<button type="button" class="btn btn-primary" id="printBtn">Download PDF<\/button>/);
   assert.match(
     source,
     /function syncPaperScale\(\) \{[\s\S]*paperShell\.style\.setProperty\('--paper-scale', String\(s\)\);/
   );
+});
+
+test('premium opdrachtdossier ondersteunt inline A4 bewerken en slaat edits veilig op', () => {
+  const { combinedSource: source, styleSource } = readOrderDossierSources();
+
+  assert.match(source, /const DOSSIER_INLINE_EDIT_VERSION = '20260629a';/);
+  assert.match(source, /function editableAttrs\(field, attrs = \{\}\) \{/);
+  assert.match(source, /contenteditable="plaintext-only" spellcheck="true"/);
+  assert.match(source, /data-dossier-editable="1"/);
+  assert.match(source, /<h1 class="title" \$\{editableAttrs\('title'\)\}>/);
+  assert.match(source, /<pre class="prompt-box" id="opusPromptDisplay" \$\{editableAttrs\('prompt'\)\}>/);
+  assert.match(source, /id="addTextBlockBtn" title="Tekst toevoegen" aria-label="Tekst toevoegen">/);
+  assert.match(source, /function addTextBlock\(\) \{/);
+  assert.match(source, /function applyEditableElementChange\(element\) \{/);
+  assert.match(source, /function persistCurrentDossierEdits\(options = \{\}\) \{/);
+  assert.match(source, /const latestRawValue = readChunkedStateValue\(latestValues, DOSSIER_CACHE_KEY\) \|\| editorState\.cacheRawValue;/);
+  assert.match(source, /inlineEdited: true,/);
+  assert.match(source, /await persistCurrentDossierEdits\(\{ force: true \}\);\s*window\.print\(\);/);
+  assert.match(styleSource, /\[data-dossier-editable="1"\]:focus/);
+  assert.match(styleSource, /\.dossier-add-button/);
+  assert.doesNotMatch(source, /window\.localStorage/);
+  assert.doesNotMatch(source, /window\.sessionStorage/);
 });
