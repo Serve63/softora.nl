@@ -7,6 +7,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     orderScope = 'premium_active_orders',
     orderKey = 'softora_custom_orders_premium_v1',
     orderRuntimeKey = 'softora_order_runtime_premium_v1',
+    listDashboardCustomers = null,
   } = deps;
 
   function normalizeDate(value) {
@@ -636,6 +637,29 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
   }
 
+  async function readDashboardCustomers() {
+    if (typeof listDashboardCustomers !== 'function') return null;
+    try {
+      const rows = await listDashboardCustomers({
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
+        maxRows: 5000,
+      });
+      if (!Array.isArray(rows)) return null;
+      return sortCustomers(
+        rows.map((item, index) =>
+          setExplicitResponsibleMetadata(
+            normalizeCustomer(item, `dashboard-klant-${index}`),
+            getResponsibleSourceValue(item)
+          )
+        )
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   function buildBootstrapStateSnapshot(state) {
     return {
       values: state && state.values && typeof state.values === 'object' ? state.values : {},
@@ -666,10 +690,25 @@ function createCustomersPageBootstrapService(deps = {}) {
       };
     }
 
-    const remoteState = await readBootstrapUiState(customerScope);
-    const orderState = await readBootstrapUiState(orderScope);
-    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
+    const shouldPreferDashboardCustomers = options.preferDashboardCustomers === true;
+    const [orderState, dashboardCustomers] = await Promise.all([
+      readBootstrapUiState(orderScope),
+      shouldPreferDashboardCustomers ? readDashboardCustomers() : Promise.resolve(null),
+    ]);
     const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
+
+    if (shouldPreferDashboardCustomers && Array.isArray(dashboardCustomers) && dashboardCustomers.length) {
+      return {
+        ok: true,
+        loadedAt: new Date().toISOString(),
+        source: 'dashboard-customers',
+        customers: mergeCustomersWithResponsible(dashboardCustomers, orders),
+        activeOrdersState: buildBootstrapStateSnapshot(orderState),
+      };
+    }
+
+    const remoteState = await readBootstrapUiState(customerScope);
+    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
 
     if (remoteCustomers.length) {
       return {

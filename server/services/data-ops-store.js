@@ -1013,6 +1013,56 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
+  async function listDashboardCustomers(options = {}) {
+    return cachedRead('dashboard-customers', async () => {
+      const result = await collectPagedRows('list-dashboard-customers', (client) => {
+        let query = client
+          .from(TABLES.customers)
+          .select('customer_id,payload,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at')
+          .is('deleted_at', null);
+        if (query && typeof query.or === 'function') {
+          query = query.or('database_status.eq.klant,lifecycle_status.eq.klant');
+        }
+        if (query && typeof query.order === 'function') {
+          query = query.order('updated_at', { ascending: false });
+        }
+        return query;
+      }, {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        maxRows: Math.max(1, Math.min(5000, Number(options.maxRows) || 5000)),
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
+      if (!result.ok) return null;
+      return (result.data || [])
+        .map((row) => {
+          const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+          return {
+            ...payload,
+            id: normalizeString(payload.id || row.customer_id),
+            naam: normalizeString(payload.naam || payload.contactName || row.contact_name),
+            bedrijf: normalizeString(payload.bedrijf || payload.companyName || row.company),
+            telefoon: normalizeString(payload.telefoon || payload.tel || payload.phone || row.phone),
+            tel: normalizeString(payload.tel || payload.telefoon || payload.phone || row.phone),
+            email: normalizeString(payload.email || payload.contactEmail || row.email),
+            website: normalizeString(payload.website || payload.dom || payload.domain || row.website),
+            databaseStatus: normalizeString(payload.databaseStatus || row.database_status || row.lifecycle_status),
+            status: normalizeString(payload.status || row.lifecycle_status || row.database_status),
+            verantwoordelijk: normalizeString(payload.verantwoordelijk || payload.responsible || row.responsible),
+            updatedAt: normalizeString(payload.updatedAt || row.updated_at),
+          };
+        })
+        .filter((customer) => {
+          const status = normalizeString(customer.databaseStatus || customer.status).toLowerCase();
+          return status === 'klant' || status === 'betaald';
+        });
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
   async function listCustomerSnapshotRows(options = {}) {
     return cachedRead('customers-snapshot', async () => {
       const result = await collectPagedRows('list-customers-snapshot', (client) =>
@@ -1099,7 +1149,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
-    forgetReads('customers');
+    forgetReads('customers', 'dashboard-customers');
     return deleteMissingCustomerIds(missingDeletePlan.data, meta.source);
   }
 
@@ -1118,7 +1168,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
       getWriteOperationOptions()
     );
-    if (upsert.ok) forgetReads('customers');
+    if (upsert.ok) forgetReads('customers', 'dashboard-customers');
     return upsert.ok ? { ...upsert, upserted: rows.length } : upsert;
   }
 
@@ -1138,7 +1188,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('customer_id', ids),
       getWriteOperationOptions()
     );
-    if (result.ok) forgetReads('customers');
+    if (result.ok) forgetReads('customers', 'dashboard-customers');
     return result;
   }
 
@@ -2278,6 +2328,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listRunnableWebdesignBatches,
     deleteDesignPhotos,
     listCustomerSnapshotRows,
+    listDashboardCustomers,
     listDesignPhotoAssetFlags,
     listActiveOrders,
     listCustomers,

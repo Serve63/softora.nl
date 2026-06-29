@@ -292,6 +292,10 @@ function buildServerAppAgendaWiringRuntimeContext({
         }
         return legacyGetUiStateValues(scope, ...args);
       },
+      listDashboardCustomers: (...args) =>
+        typeof uiSeoRuntime.dataOpsStore?.listDashboardCustomers === 'function'
+          ? uiSeoRuntime.dataOpsStore.listDashboardCustomers(...args)
+          : null,
       setUiStateValues: uiSeoRuntime.setUiStateValues,
       premiumActiveOrdersScope: bootstrapState.PREMIUM_ACTIVE_ORDERS_SCOPE,
       premiumActiveCustomOrdersKey: bootstrapState.PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY,
