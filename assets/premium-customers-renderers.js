@@ -109,15 +109,12 @@
         cell.textContent = cellConfig[2];
         row.appendChild(cell);
       });
-      const priceCell = createCell("Prijs", "service-cell");
+      const priceCell = createCell("Betaalde prijs", "service-cell");
       priceCell.appendChild(createPriceContent(customer, helpers));
       row.appendChild(priceCell);
       const maintenanceCell = createCell("Onderhoud", "service-cell");
       maintenanceCell.appendChild(createServiceContent(customer, "maintenance", helpers));
       row.appendChild(maintenanceCell);
-      const statusCell = createCell("Status", "");
-      appendText(statusCell, "span", "status-text " + (customer.status === "Betaald" ? "is-paid" : "is-open"), customer.status);
-      row.appendChild(statusCell);
       const assignedCell = createCell("Toegewezen aan", "muted-cell cell-assigned");
       assignedCell.textContent = helpers.formatResponsibleDisplayName(customer.verantwoordelijk || "Serve");
       row.appendChild(assignedCell);

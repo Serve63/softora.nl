@@ -31,6 +31,10 @@ test('premium customers page supports toegewezen aan in table, modal and order i
 
   assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
   assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
+  assert.match(pageSource, /<th>Betaalde prijs<\/th>/);
+  assert.doesNotMatch(pageSource, /<th>Status<\/th>/);
+  assert.doesNotMatch(rendererSource, /createCell\("Status"/);
+  assert.doesNotMatch(rendererSource, /status-text/);
   assert.match(pageSource, /<label class="form-label" for="fieldResponsible">Toegewezen aan<\/label>/);
   assert.match(pageSource, /<select class="form-select" id="fieldResponsible" name="verantwoordelijk" required data-custom-select="true">/);
   assert.match(pageSource, /<option value="Team" selected>Team<\/option>/);
@@ -91,9 +95,14 @@ test('premium customers modal uses Softora custom dropdowns instead of native br
   const pagePath = path.join(__dirname, '../../premium-klanten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  ['fieldService', 'fieldMaintenanceEnabled', 'fieldStatus', 'fieldActive', 'fieldReview', 'fieldResponsible'].forEach((fieldId) => {
+  ['fieldService', 'fieldMaintenanceEnabled', 'fieldActive', 'fieldReview', 'fieldResponsible'].forEach((fieldId) => {
     assert.match(pageSource, new RegExp(`<select class="form-select" id="${fieldId}"[\\s\\S]*?data-custom-select="true"`));
   });
+  assert.doesNotMatch(pageSource, /id="fieldStatus"/);
+  assert.match(pageSource, /<label class="form-label" for="fieldWebsiteAmount">Betaalde prijs \(EUR\)<\/label>/);
+  assert.match(pageSource, /status: "Betaald",/);
+  assert.match(pageSource, /function isPaidCustomerRecord\(raw\)/);
+  assert.match(pageSource, /if \(!paidDate && order\.status !== "betaald"\) return;/);
   assert.match(pageSource, /assets\/custom-selects\.css\?v=20260511a/);
   assert.match(pageSource, /assets\/custom-selects\.js\?v=20260511a/);
   assert.match(pageSource, /\.modal \.site-select-trigger\{min-height:2\.85rem!important/);
