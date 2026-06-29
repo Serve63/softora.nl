@@ -17,6 +17,7 @@ const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
+  customerIdentityKeys: 'softora_customer_identity_keys',
   activeOrders: 'softora_active_orders',
   orderRuntime: 'softora_order_runtime',
   designPhotos: 'softora_design_photos',
@@ -1192,6 +1193,53 @@ function createSoftoraDataOpsStore(deps = {}) {
     return result;
   }
 
+  function normalizeCustomerIdentityKeyRow(raw, source) {
+    const keyType = normalizeString(raw?.key_type || raw?.type).toLowerCase().slice(0, 80);
+    const keyValue = normalizeString(raw?.key_value || raw?.value).toLowerCase().slice(0, 320);
+    const customerId = normalizeString(raw?.customer_id || raw?.customerId).slice(0, 160);
+    if (!keyType || !keyValue || !customerId) return null;
+    return { key_type: keyType, key_value: keyValue, customer_id: customerId, source: normalizeString(source || raw.source || 'data-ops').slice(0, 120), updated_at: isoNow() };
+  }
+
+  async function listCustomerIdentityKeys(keys = []) {
+    const grouped = new Map();
+    (Array.isArray(keys) ? keys : []).forEach((key) => {
+      const row = normalizeCustomerIdentityKeyRow({ ...key, customer_id: key.customer_id || key.customerId || 'lookup' }, 'lookup');
+      if (!row) return;
+      const values = grouped.get(row.key_type) || new Set();
+      values.add(row.key_value);
+      grouped.set(row.key_type, values);
+    });
+    const output = [];
+    for (const [keyType, values] of grouped.entries()) {
+      const result = await run('list-customer-identity-keys', (client) => client
+        .from(TABLES.customerIdentityKeys)
+        .select('key_type,key_value,customer_id,updated_at')
+        .eq('key_type', keyType)
+        .in('key_value', Array.from(values))
+        .is('deleted_at', null));
+      if (!result.ok) return result;
+      output.push(...(Array.isArray(result.data) ? result.data : []));
+    }
+    return { ok: true, data: output };
+  }
+
+  async function upsertCustomerIdentityKeys(entries = [], meta = {}) {
+    const seen = new Set();
+    const rows = [];
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const row = normalizeCustomerIdentityKeyRow(entry, meta.source);
+      if (!row) return;
+      const key = `${row.key_type}:${row.key_value}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(row);
+    });
+    return rows.length
+      ? run('upsert-customer-identity-keys', (client) => client.from(TABLES.customerIdentityKeys).upsert(rows, { onConflict: 'key_type,key_value', ignoreDuplicates: true }))
+      : { ok: true, data: [] };
+  }
+
   function buildOrderRow(raw, index, source) {
     const payload = raw && typeof raw === 'object' ? { ...raw } : {};
     const id = normalizeString(payload.id || payload.orderId) || `order_${index + 1}`;
@@ -2332,6 +2380,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listDesignPhotoAssetFlags,
     listActiveOrders,
     listCustomers,
+    listCustomerIdentityKeys,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
     listMailboxMessages,
@@ -2349,6 +2398,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     replaceOrderRuntime,
     upsertCustomers,
     uploadDesignPhoto,
+    upsertCustomerIdentityKeys,
     upsertDesignPhotos,
     upsertWebdesignBatch,
     upsertWebdesignBatchChunk,

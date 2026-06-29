@@ -686,6 +686,101 @@ test('data ops store reads compact dashboard customers from structured rows', as
   assert.equal(customers[0].databaseStatus, 'klant');
 });
 
+test('data ops store reads and claims customer identity keys through the dedicated registry table', async () => {
+  const calls = {
+    selects: [],
+    upserts: [],
+  };
+  const identityRows = [
+    {
+      key_type: 'domain',
+      key_value: 'softora.test',
+      customer_id: 'customer-1',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+    {
+      key_type: 'email',
+      key_value: 'info@softora.test',
+      customer_id: 'customer-1',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+  ];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customer_identity_keys');
+      return {
+        select(columns) {
+          const query = { columns, keyType: '', keyValues: [] };
+          calls.selects.push(query);
+          const chain = {
+            eq(column, value) {
+              assert.equal(column, 'key_type');
+              query.keyType = value;
+              return chain;
+            },
+            in(column, values) {
+              assert.equal(column, 'key_value');
+              query.keyValues = values;
+              return chain;
+            },
+            is(column, value) {
+              assert.equal(column, 'deleted_at');
+              assert.equal(value, null);
+              return Promise.resolve({
+                data: identityRows.filter((row) => (
+                  row.key_type === query.keyType && query.keyValues.includes(row.key_value)
+                )),
+                error: null,
+              });
+            },
+          };
+          return chain;
+        },
+        upsert(rows, options) {
+          calls.upserts.push({ rows, options });
+          return Promise.resolve({ data: rows, error: null });
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-29T12:00:00.000Z'),
+    logger: { error() {} },
+  });
+
+  const listed = await store.listCustomerIdentityKeys([
+    { type: 'domain', value: 'Softora.Test' },
+    { type: 'email', value: 'INFO@SOFTORA.TEST' },
+  ]);
+  const claimed = await store.upsertCustomerIdentityKeys([
+    { key_type: 'domain', key_value: 'Softora.Test', customer_id: 'customer-1' },
+    { key_type: 'domain', key_value: 'softora.test', customer_id: 'customer-1' },
+    { key_type: 'phone', key_value: '+31 13 123 4567', customer_id: 'customer-1' },
+  ], { source: 'premium-database-mass-research' });
+
+  assert.equal(listed.ok, true);
+  assert.deepEqual(
+    listed.data.map((row) => `${row.key_type}:${row.key_value}:${row.customer_id}`),
+    ['domain:softora.test:customer-1', 'email:info@softora.test:customer-1']
+  );
+  assert.equal(calls.selects.length, 2);
+  assert.equal(claimed.ok, true);
+  assert.equal(calls.upserts.length, 1);
+  assert.deepEqual(calls.upserts[0].options, {
+    onConflict: 'key_type,key_value',
+    ignoreDuplicates: true,
+  });
+  assert.deepEqual(
+    calls.upserts[0].rows.map((row) => `${row.key_type}:${row.key_value}:${row.customer_id}:${row.source}`),
+    [
+      'domain:softora.test:customer-1:premium-database-mass-research',
+      'phone:+31 13 123 4567:customer-1:premium-database-mass-research',
+    ]
+  );
+});
+
 test('data ops store returns quickly when customer reads hang', async () => {
   const client = {
     from(table) {
