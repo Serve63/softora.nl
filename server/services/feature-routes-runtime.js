@@ -23,6 +23,9 @@ const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const {
+  registerPremiumDatabaseMassResearchRoutes,
+} = require('../routes/premium-database-mass-research');
+const {
   registerPremiumDatabaseEmailVerificationRoutes,
 } = require('../routes/premium-database-email-verification');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
@@ -32,6 +35,9 @@ const { registerSeoWriteRoutes } = require('../routes/seo-write');
 const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
+const {
+  createPremiumDatabaseMassResearchCoordinator,
+} = require('./premium-database-mass-research');
 const {
   createPublicWebdesignPreviewService,
 } = require('./public-webdesign-preview');
@@ -67,6 +73,11 @@ function registerFeatureRoutes(app, deps = {}) {
     seoWriteCoordinator,
   } = deps;
   const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
+    getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
+  });
+  const premiumDatabaseMassResearchCoordinator = createPremiumDatabaseMassResearchCoordinator({
+    dataOpsStore: deps.dataOpsStore,
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
   });
@@ -132,6 +143,10 @@ function registerFeatureRoutes(app, deps = {}) {
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,
+  });
+  registerPremiumDatabaseMassResearchRoutes(app, {
+    coordinator: premiumDatabaseMassResearchCoordinator,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerPremiumDatabaseEmailVerificationRoutes(app, {
     coordinator: premiumDatabaseEmailVerificationCoordinator,
