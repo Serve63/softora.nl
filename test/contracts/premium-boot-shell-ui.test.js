@@ -57,13 +57,16 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     assert.match(source, /assets\/premium-boot-one-second\.js\?v=20260502a/, file);
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
-        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260526a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-active-order-manual-open-leads\.js\?v=20260519a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/, file);
+        assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260629a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-active-order-manual-open-leads\.js\?v=20260519a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/, file);
         const activeOrdersBootPath = path.join(__dirname, '../../assets/premium-active-orders-boot.js');
         const activeOrdersPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+        const activeOrdersEditPath = path.join(__dirname, '../../assets/premium-active-orders-edit-data.js');
         const activeOrdersBootSource = fs.readFileSync(activeOrdersBootPath, 'utf8');
         const activeOrdersSource = fs.readFileSync(activeOrdersPath, 'utf8');
+        const activeOrdersEditSource = fs.readFileSync(activeOrdersEditPath, 'utf8');
         assert.match(activeOrdersBootSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
         assert.match(activeOrdersSource, /boot\.releaseAfterMinimum/, file);
+        assert.match(activeOrdersEditSource, /document\.getElementById\('createOrderForm'\)\?\.addEventListener\('submit', handleEditSubmit, true\);/, file);
       } else if (file === 'premium-pdfs.html') {
         assert.match(source, /<script src="assets\/premium-pdfs-builder\.js\?v=20260427a"><\/script>/, file);
         const pdfBuilderPath = path.join(__dirname, '../../assets/premium-pdfs-builder.js');

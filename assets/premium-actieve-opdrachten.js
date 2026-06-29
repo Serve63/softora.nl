@@ -2740,7 +2740,6 @@ function openModal(id) {
             deleteBtn.style.display = 'none';
         }
     }
-
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
 }
