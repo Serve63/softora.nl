@@ -199,14 +199,19 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
   });
 });
 
-test('runtime ops coordinator prefers structured data ops reads and mirrors writes safely', async () => {
+test('runtime ops coordinator prefers structured data ops reads and writes handled patches straight to data ops', async () => {
   const bridgeCalls = [];
+  let legacyWrite = false;
   const { coordinator } = createFixture({
     getUiStateValues: async () => ({
       values: { panel: 'legacy' },
       source: 'legacy',
       updatedAt: '2026-04-07T12:00:00.000Z',
     }),
+    setUiStateValues: async () => {
+      legacyWrite = true;
+      return { values: {}, source: 'legacy' };
+    },
     dataOpsUiStateBridge: {
       canHandleScope: (scope) => scope === 'premium_customers_database',
       getUiStateValues: async (scope, options) => {
@@ -246,8 +251,60 @@ test('runtime ops coordinator prefers structured data ops reads and mirrors writ
   assert.equal(getRes.body.source, 'supabase:data_ops');
   assert.equal(setRes.statusCode, 200);
   assert.equal(setRes.body.source, 'supabase:data_ops');
-  assert.deepEqual(bridgeCalls.map((call) => call.type), ['get', 'get', 'set']);
-  assert.equal(bridgeCalls[2].meta.source, 'premium-klanten');
+  assert.deepEqual(bridgeCalls.map((call) => call.type), ['get', 'set']);
+  assert.equal(bridgeCalls[1].meta.source, 'premium-klanten');
+  assert.equal(legacyWrite, false);
+});
+
+test('runtime ops coordinator saves customer patches to data ops when legacy ui-state reads are unavailable', async () => {
+  const bridgeCalls = [];
+  let legacyRead = false;
+  let legacyWrite = false;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      legacyRead = true;
+      return null;
+    },
+    setUiStateValues: async () => {
+      legacyWrite = true;
+      return null;
+    },
+    dataOpsUiStateBridge: {
+      canHandleScope: (scope) => scope === 'premium_customers_database',
+      setUiStateValues: async (scope, values, meta) => {
+        bridgeCalls.push({ scope, values, meta });
+        return {
+          values,
+          source: 'supabase:data_ops',
+          updatedAt: '2026-06-29T14:10:00.000Z',
+        };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      body: {
+        patch: {
+          softora_customers_premium_v1: '[{"id":"cust-live"}]',
+        },
+        source: 'premium-klanten',
+      },
+    },
+    res,
+    'premium_customers_database'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.source, 'supabase:data_ops');
+  assert.equal(bridgeCalls.length, 1);
+  assert.deepEqual(bridgeCalls[0].values, {
+    softora_customers_premium_v1: '[{"id":"cust-live"}]',
+  });
+  assert.equal(bridgeCalls[0].meta.source, 'premium-klanten');
+  assert.equal(legacyRead, false);
+  assert.equal(legacyWrite, false);
 });
 
 test('runtime ops coordinator sends append-only customer imports straight to data ops', async () => {

@@ -167,6 +167,32 @@ function createRuntimeOpsCoordinator(deps = {}) {
     return dataOpsUiStateBridge.setUiStateValues(scope, values, meta);
   }
 
+  async function tryPrimaryDataOpsUiStateSet(scope, values, meta) {
+    try {
+      return await mirrorUiStateValuesToDataOps(scope, values, meta);
+    } catch (error) {
+      const log = logger && (typeof logger.warn === 'function' ? logger.warn : logger.error);
+      if (typeof log === 'function') {
+        log.call(
+          logger,
+          '[DataOps][ui-state-primary-set-fallback]',
+          JSON.stringify({ scope, message: error?.message || String(error || 'onbekende fout') })
+        );
+      }
+      return null;
+    }
+  }
+
+  function sendUiStateSetSuccessResponse(res, scope, state, fallbackSource = 'supabase') {
+    return res.status(200).json({
+      ok: true,
+      scope,
+      values: state.values || {},
+      source: state.source || fallbackSource,
+      updatedAt: state.updatedAt || null,
+    });
+  }
+
   async function sendUiStateGetResponse(req, res, scopeRaw) {
     const scope = normalizeUiStateScope(scopeRaw);
     if (!scope) {
@@ -231,20 +257,14 @@ function createRuntimeOpsCoordinator(deps = {}) {
       typeof dataOpsUiStateBridge.canHandleAppendOnlySet === 'function' &&
       dataOpsUiStateBridge.canHandleAppendOnlySet(scope, patchValues);
     if (appendOnlyDataOpsSet) {
-      const mirroredState = await mirrorUiStateValuesToDataOps(scope, patchValues, sourceMeta);
+      const mirroredState = await tryPrimaryDataOpsUiStateSet(scope, patchValues, sourceMeta);
       if (!mirroredState) {
         return res.status(503).json({
           ok: false,
           error: 'Kon UI state append niet opslaan zonder geldige gestructureerde opslag.',
         });
       }
-      return res.status(200).json({
-        ok: true,
-        scope,
-        values: mirroredState.values || {},
-        source: mirroredState.source || 'supabase:data_ops',
-        updatedAt: mirroredState.updatedAt || null,
-      });
+      return sendUiStateSetSuccessResponse(res, scope, mirroredState, 'supabase:data_ops');
     }
     if (appendRequested && !replaceRequested) {
       return res.status(503).json({
@@ -252,10 +272,22 @@ function createRuntimeOpsCoordinator(deps = {}) {
         error: 'Kon UI state append niet opslaan zonder geldige gestructureerde opslag.',
       });
     }
+
+    if (!replaceRequested) {
+      const primaryDataOpsState = await tryPrimaryDataOpsUiStateSet(scope, patchValues, sourceMeta);
+      if (primaryDataOpsState) {
+        return sendUiStateSetSuccessResponse(res, scope, primaryDataOpsState, 'supabase:data_ops');
+      }
+    }
+
     let valuesToSave;
 
     if (replaceRequested) {
       valuesToSave = sanitizeUiStateValues(valuesProvided ? body.values : {});
+      const primaryDataOpsState = await tryPrimaryDataOpsUiStateSet(scope, valuesToSave, sourceMeta);
+      if (primaryDataOpsState) {
+        return sendUiStateSetSuccessResponse(res, scope, primaryDataOpsState, 'supabase:data_ops');
+      }
     } else {
       const current = await getUiStateValuesForScope(scope);
       if (!current) {
@@ -279,13 +311,16 @@ function createRuntimeOpsCoordinator(deps = {}) {
 
     const mirroredState = await mirrorUiStateValuesToDataOps(scope, state.values || valuesToSave, sourceMeta);
 
-    return res.status(200).json({
-      ok: true,
+    return sendUiStateSetSuccessResponse(
+      res,
       scope,
-      values: (mirroredState && mirroredState.values) || state.values || {},
-      source: (mirroredState && mirroredState.source) || state.source || 'supabase',
-      updatedAt: (mirroredState && mirroredState.updatedAt) || state.updatedAt || null,
-    });
+      {
+        values: (mirroredState && mirroredState.values) || state.values || {},
+        source: (mirroredState && mirroredState.source) || state.source || 'supabase',
+        updatedAt: (mirroredState && mirroredState.updatedAt) || state.updatedAt || null,
+      },
+      'supabase'
+    );
   }
 
   function sendDashboardActivityCreateResponse(req, res) {
