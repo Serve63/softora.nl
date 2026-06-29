@@ -114,10 +114,10 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   const source = readPage('premium-bedrijfssoftware.html');
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
 
-  assert.match(source, /<title>Bedrijfssoftware laten maken voor CRM en dashboards \| Softora<\/title>/);
+  assert.match(source, /<title>Bedrijfssoftware laten maken voor MKB, CRM en dashboards \| Softora<\/title>/);
   assert.match(
     source,
-    /<meta name="description" content="Laat bedrijfssoftware maken voor CRM, dashboard, klantportaal en offerteflow/
+    /<meta name="description" content="Bedrijfssoftware laten maken voor MKB\? Softora bouwt CRM, dashboards, klantportalen en offerteflows/
   );
   assert.match(source, /<meta name="robots" content="index, follow">/);
   assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
@@ -131,6 +131,8 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /AI automatisering/);
   assert.match(source, /Welke bedrijfssoftware heb je nodig\?/);
   assert.match(source, /Klantportaal laten maken/);
+  assert.match(source, /Automatisch offerte systeem/);
+  assert.match(source, /offerte automatisering/);
   assert.match(source, /Eerst scherpe scope, daarna pas bouwen/);
   assert.match(source, /Wat bepaalt de kosten\?/);
   assert.match(source, /Wanneer bedrijfssoftware laten maken slim wordt/);
@@ -141,6 +143,7 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /Veelgestelde vragen over bedrijfssoftware/);
   assert.match(source, /Wat kost bedrijfssoftware laten maken\?/);
   assert.match(source, /Hoe lang duurt bedrijfssoftware op maat bouwen\?/);
+  assert.match(source, /Kun je ook een dashboard, klantportaal of offertesysteem laten maken\?/);
   assert.match(source, /Kan bedrijfssoftware koppelen met bestaande systemen\?/);
   assert.match(source, /Wanneer is maatwerk bedrijfssoftware beter dan standaard software\?/);
   assert.match(source, /href="\/crm-systeem-op-maat"/);
@@ -148,6 +151,7 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /href="\/ai-automatisering"/);
   assert.match(source, /href="\/kennisbank\/wat-is-een-crm-systeem"/);
   assert.match(source, /href="\/kennisbank\/wat-is-een-klantportaal"/);
+  assert.match(source, /href="\/kennisbank\/wat-is-offerte-automatisering"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
   assert.match(source, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
@@ -155,10 +159,11 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.doesNotMatch(source, /Website Tool|AI Website Generator/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor CRM en dashboards');
-  assert.match(entry.description, /Duidelijke scope, koppelingen, veiligheid/);
+  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor MKB, CRM en dashboards');
+  assert.match(entry.description, /duidelijke scope, koppelingen en veilige doorgroei/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
+  assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-offerte-automatisering'));
 
   const graph = getStructuredDataGraph(source);
   const service = graph.find((item) => item['@type'] === 'Service');
@@ -173,6 +178,7 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
     [
       'Wat kost bedrijfssoftware laten maken?',
       'Hoe lang duurt bedrijfssoftware op maat bouwen?',
+      'Kun je ook een dashboard, klantportaal of offertesysteem laten maken?',
       'Kan bedrijfssoftware koppelen met bestaande systemen?',
       'Wanneer is maatwerk bedrijfssoftware beter dan standaard software?',
     ]
