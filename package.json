@@ -29,24 +29,24 @@
     "node": "22.x"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.97.0",
+    "@supabase/supabase-js": "^2.108.2",
     "compression": "^1.8.1",
     "dotenv": "^16.4.5",
     "express": "^4.22.1",
     "express-rate-limit": "^7.5.1",
-    "helmet": "^8.0.0",
-    "imapflow": "^1.2.18",
-    "mailparser": "^3.9.6",
+    "helmet": "^8.2.0",
+    "imapflow": "^1.4.3",
+    "mailparser": "^3.9.12",
     "nodemailer": "^9.0.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.2"
   },
   "overrides": {
     "path-to-regexp": "0.1.13"
   },
   "optionalDependencies": {
-    "@img/sharp-libvips-linux-arm64": "^1.2.4",
-    "@img/sharp-libvips-linux-x64": "^1.2.4",
-    "@img/sharp-linux-arm64": "^0.34.5",
-    "@img/sharp-linux-x64": "^0.34.5"
+    "@img/sharp-libvips-linux-arm64": "^1.3.1",
+    "@img/sharp-libvips-linux-x64": "^1.3.1",
+    "@img/sharp-linux-arm64": "^0.35.2",
+    "@img/sharp-linux-x64": "^0.35.2"
   }
 }
