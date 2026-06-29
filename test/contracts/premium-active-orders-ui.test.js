@@ -299,6 +299,8 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
   assert.match(source, /<input id="newOrderAssignee" name="assignee" type="hidden" required>/);
   assert.match(source, /<div class="create-order-assignee-options" id="newOrderAssigneeOptions" role="radiogroup" aria-labelledby="newOrderAssigneeLabel">/);
   assert.match(source, /data-create-order-assignee="Martijn"[\s\S]*data-create-order-assignee="Servé"/);
+  assert.match(source, /<input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="1" placeholder="2800" required>/);
+  assert.doesNotMatch(source, /id="newOrderAmount"[^>]+step="100"/);
   assert.match(source, /function setAssignee\(value, options\) \{[\s\S]*button\.classList\.toggle\('is-active', active\);/);
   assert.match(source, /window\.SoftoraCreateOrderAssignee = \{ set: setAssignee \};/);
   assert.match(source, /window\.SoftoraCreateOrderAssignee\?\.set\?\.\(suggestedAssignee, \{ agendaAutofill: true \}\);/);
