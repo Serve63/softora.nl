@@ -5,24 +5,52 @@ const path = require('path');
 
 const { createKnownPrettyPageSlugToFile, resolveLegacyPrettyPageRedirect } = require('../../server/config/page-routing');
 
+function readPngDimensions(filePath) {
+  const source = fs.readFileSync(filePath);
+  assert.equal(source.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  return {
+    width: source.readUInt32BE(16),
+    height: source.readUInt32BE(20),
+  };
+}
+
 test('sportschool logboek page is available as installable pretty page', () => {
   const pagePath = path.join(__dirname, '../../sportschool.html');
   const logoPath = path.join(__dirname, '../../assets/sportschool-logboek-logo.png');
+  const icon192Path = path.join(__dirname, '../../assets/sportschool-logboek-icon-192.png');
+  const touchIconPath = path.join(__dirname, '../../assets/sportschool-logboek-touch-icon.png');
+  const manifestPath = path.join(__dirname, '../../assets/sportschool-logboek.webmanifest');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const prettyPages = createKnownPrettyPageSlugToFile(new Set(['sportschool.html']));
 
   assert.equal(prettyPages.get('logboek'), 'sportschool.html');
   assert.equal(resolveLegacyPrettyPageRedirect('sportschool'), 'logboek');
   assert.equal(fs.existsSync(logoPath), true);
+  assert.deepEqual(readPngDimensions(logoPath), { width: 512, height: 512 });
+  assert.deepEqual(readPngDimensions(icon192Path), { width: 192, height: 192 });
+  assert.deepEqual(readPngDimensions(touchIconPath), { width: 180, height: 180 });
+  assert.equal(manifest.start_url, '/logboek');
+  assert.equal(manifest.display, 'standalone');
+  assert.deepEqual(
+    manifest.icons.map((icon) => `${icon.src}:${icon.sizes}:${icon.purpose}`),
+    [
+      '/assets/sportschool-logboek-icon-192.png?v=20260629b:192x192:any',
+      '/assets/sportschool-logboek-logo.png?v=20260629b:512x512:any maskable',
+    ]
+  );
   assert.match(pageSource, /<title>Servé's Logboek<\/title>/);
   assert.match(pageSource, /apple-mobile-web-app-capable/);
   assert.match(pageSource, /apple-mobile-web-app-title" content="Servé's logboek"/);
   assert.match(pageSource, /noindex,nofollow/);
-  assert.match(pageSource, /<img class="gym-logo" src="\/assets\/sportschool-logboek-logo\.png\?v=20260629a" alt="Servé's logboek">/);
+  assert.match(pageSource, /<link rel="manifest" href="\/assets\/sportschool-logboek\.webmanifest\?v=20260629b">/);
+  assert.match(pageSource, /<link rel="icon" type="image\/png" href="\/assets\/sportschool-logboek-icon-192\.png\?v=20260629b" sizes="192x192">/);
+  assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
+  assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260629a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260629b/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
@@ -35,7 +63,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /html\s*\{[\s\S]*?overflow: hidden;/);
   assert.match(stylesSource, /body\s*\{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/);
   assert.match(stylesSource, /\.gym-app\s*\{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/);
-  assert.match(stylesSource, /\.gym-logo\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?object-fit: cover;/);
+  assert.doesNotMatch(stylesSource, /\.gym-logo/);
   assert.match(stylesSource, /\.delete-action/);
   assert.match(stylesSource, /\.drag-handle/);
   assert.match(stylesSource, /\.exercise-swipe\.is-reordering/);

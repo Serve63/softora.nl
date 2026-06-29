@@ -77,8 +77,8 @@ input:focus-visible {
   z-index: 10;
   display: grid;
   place-items: center;
-  min-height: calc(140px + var(--safe-top));
-  padding: calc(14px + var(--safe-top)) 18px 14px;
+  min-height: calc(94px + var(--safe-top));
+  padding: calc(18px + var(--safe-top)) 18px 14px;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(18px);
 }
@@ -86,16 +86,7 @@ input:focus-visible {
 .gym-header-center {
   display: grid;
   justify-items: center;
-  gap: 4px;
-}
-
-.gym-logo {
-  display: block;
-  width: 58px;
-  height: 58px;
-  border-radius: 15px;
-  object-fit: cover;
-  box-shadow: 0 10px 24px rgba(155, 35, 85, 0.2);
+  gap: 2px;
 }
 
 .gym-header h1,
