@@ -673,6 +673,61 @@ test('premium database deep search uses OpenAI web search and returns complete r
   assert.equal(result.sources[0].url, 'https://bakkerijzon.nl/contact');
 });
 
+test('premium database deep search keeps OpenAI endpoint and timeout server-owned', async () => {
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const timeoutDelays = [];
+  const calls = [];
+  global.setTimeout = (_callback, delay) => {
+    timeoutDelays.push(delay);
+    return { __testTimeout: true };
+  };
+  global.clearTimeout = () => {};
+
+  try {
+    const result = await fetchDeepSearchBusinessRows(
+      {
+        target: 'Nederland | Noord-Brabant | Altena | Almkerk',
+        count: 1,
+      },
+      {
+        env: {
+          OPENAI_API_KEY: 'openai-key',
+          OPENAI_API_BASE_URL: 'https://example.invalid/v1',
+          OPENAI_DATABASE_SEARCH_TIMEOUT_MS: '1',
+        },
+        openAiApiBaseUrl: 'https://169.254.169.254/v1',
+        openAiTimeoutMs: 1,
+        fetchImpl: async (url) => {
+          calls.push(String(url));
+          return {
+            ok: true,
+            async json() {
+              return {
+                output_text: JSON.stringify({
+                  target: 'Almkerk',
+                  businesses: [],
+                  placeComplete: true,
+                  completionReason: 'Geen extra complete bedrijven gevonden.',
+                  notes: '',
+                }),
+                output: [],
+              };
+            },
+          };
+        },
+      }
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(calls, ['https://api.openai.com/v1/responses']);
+    assert.deepEqual(timeoutDelays, [720000]);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+});
+
 test('premium database deep search prompt v2 stays behind an explicit flag', async () => {
   let capturedPayload = null;
   const result = await fetchDeepSearchBusinessRows(
@@ -819,33 +874,52 @@ test('premium database deep search hides raw OpenAI rate limit text after retrie
 });
 
 test('premium database deep search reports OpenAI aborts as a clean timeout', async () => {
-  await assert.rejects(
-    fetchDeepSearchBusinessRows(
-      {
-        target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
-        count: 25,
-      },
-      {
-        env: { OPENAI_API_KEY: 'openai-key' },
-        openAiTimeoutMs: 5,
-        fetchImpl: async (_url, options = {}) =>
-          new Promise((_resolve, reject) => {
-            assert.ok(options.signal, 'OpenAI request should receive an abort signal');
-            options.signal.addEventListener(
-              'abort',
-              () => reject(new Error('This operation was aborted')),
-              { once: true }
-            );
-          }),
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  let timeoutDelay = 0;
+  global.setTimeout = (callback, delay) => {
+    timeoutDelay = delay;
+    return originalSetTimeout(callback, 0);
+  };
+  global.clearTimeout = (timeout) => originalClearTimeout(timeout);
+
+  try {
+    await assert.rejects(
+      fetchDeepSearchBusinessRows(
+        {
+          target: 'Nederland | Noord-Brabant | Oisterwijk | Oisterwijk',
+          count: 25,
+        },
+        {
+          env: { OPENAI_API_KEY: 'openai-key' },
+          openAiTimeoutMs: 5,
+          fetchImpl: async (_url, options = {}) =>
+            new Promise((_resolve, reject) => {
+              assert.ok(options.signal, 'OpenAI request should receive an abort signal');
+              if (options.signal.aborted) {
+                reject(new Error('This operation was aborted'));
+                return;
+              }
+              options.signal.addEventListener(
+                'abort',
+                () => reject(new Error('This operation was aborted')),
+                { once: true }
+              );
+            }),
+        }
+      ),
+      (error) => {
+        assert.equal(error.code, 'OPENAI_DEEP_SEARCH_TIMEOUT');
+        assert.equal(error.statusCode, 504);
+        assert.match(error.message, /AI zoeken duurde te lang/);
+        return true;
       }
-    ),
-    (error) => {
-      assert.equal(error.code, 'OPENAI_DEEP_SEARCH_TIMEOUT');
-      assert.equal(error.statusCode, 504);
-      assert.match(error.message, /AI zoeken duurde te lang/);
-      return true;
-    }
-  );
+    );
+    assert.equal(timeoutDelay, 720000);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
 });
 
 test('premium database deep search hard-filters businesses already in the exclude list', async () => {
