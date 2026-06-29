@@ -73,6 +73,21 @@ const staticSidebarPages = [
   'premium-socialmedia.html',
 ];
 
+test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
+  const source = readRepoFile('premium-opdracht-dossier.html');
+  const asideEnd = source.indexOf('</aside>');
+  const editorScriptIndex = source.indexOf('assets/premium-opdracht-dossier.js?v=20260629a');
+  const editorStyleIndex = source.indexOf('assets/premium-opdracht-dossier-editor.css?v=20260629a');
+
+  assert.ok(asideEnd > 0, 'opdrachtdossier hoort de statische sidebar te behouden');
+  assert.ok(editorStyleIndex > -1, 'opdrachtdossier hoort de editor-stylesheet te laden');
+  assert.ok(editorScriptIndex > asideEnd, 'opdrachtdossier editor-script hoort buiten de sidebar te staan');
+  assert.deepEqual(
+    extractSidebarSections(source).map((section) => section.label),
+    ['Overzicht', 'Beheer', "ADVERTENTIE'S", 'Socialmedia', 'Extra']
+  );
+});
+
 test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
