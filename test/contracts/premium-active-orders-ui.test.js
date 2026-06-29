@@ -13,6 +13,7 @@ function readActiveOrdersSources() {
   const assignmentFilterStylePath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.css');
   const assignmentPagesScriptPath = path.join(__dirname, '../../assets/premium-personal-assignment-pages.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
+  const editDataScriptPath = path.join(__dirname, '../../assets/premium-active-orders-edit-data.js');
   const openLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-open-leads.js');
   const manualLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-manual-open-leads.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -24,6 +25,7 @@ function readActiveOrdersSources() {
   const assignmentFilterStyleSource = fs.readFileSync(assignmentFilterStylePath, 'utf8');
   const assignmentPagesScriptSource = fs.readFileSync(assignmentPagesScriptPath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  const editDataScriptSource = fs.readFileSync(editDataScriptPath, 'utf8');
   const openLeadsScriptSource = fs.readFileSync(openLeadsScriptPath, 'utf8');
   const manualLeadsScriptSource = fs.readFileSync(manualLeadsScriptPath, 'utf8');
   return {
@@ -36,9 +38,10 @@ function readActiveOrdersSources() {
     customerDbScriptSource,
     pageSource,
     scriptSource,
+    editDataScriptSource,
     openLeadsScriptSource,
     manualLeadsScriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${openLeadsScriptSource}\n${manualLeadsScriptSource}\n${assignmentPagesScriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${editDataScriptSource}\n${openLeadsScriptSource}\n${manualLeadsScriptSource}\n${assignmentPagesScriptSource}`,
   };
 }
 
@@ -58,7 +61,7 @@ function readOrderDossierSources() {
 }
 
 test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const { assignmentFilterStyleSource, customerDbScriptSource, pageSource, scriptSource, openLeadsScriptSource, manualLeadsScriptSource, combinedSource: source } = readActiveOrdersSources();
+  const { assignmentFilterStyleSource, customerDbScriptSource, pageSource, scriptSource, editDataScriptSource, openLeadsScriptSource, manualLeadsScriptSource, combinedSource: source } = readActiveOrdersSources();
 
   assert.match(pageSource, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/);
   assert.match(pageSource, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/);
@@ -66,7 +69,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle \{[\s\S]*border:\s*1px solid rgba\(139, 34, 82, 0\.2\);[\s\S]*background:\s*rgba\(255, 255, 255, 0\.78\);/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\] \{[\s\S]*border:\s*1\.5px solid rgba\(139, 34, 82, 0\.36\);[\s\S]*background:\s*#fff;/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\]::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;[\s\S]*transform:\s*rotate\(45deg\) scale\(0\);/);
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260526a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-active-order-manual-open-leads\.js\?v=20260519a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260629a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-active-order-manual-open-leads\.js\?v=20260519a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
   assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260518a/);
   assert.match(pageSource, /assets\/premium-active-order-manual-open-leads\.js\?v=20260519a/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
@@ -199,6 +202,13 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /select\.replaceChildren\(\.\.\.options\);/);
   assert.match(source, /document\.getElementById\('modalBtn'\)\?\.addEventListener\('click', handleModalPrimaryAction\);/);
   assert.match(source, /document\.getElementById\('modalDeleteBtn'\)\?\.addEventListener\('click', handleModalDeleteAction\);/);
+  assert.match(editDataScriptSource, /button\.textContent = 'Gegevens bewerken';[\s\S]*deleteBtn\.insertAdjacentElement\('afterend', button\);/);
+  assert.match(editDataScriptSource, /\.modal-btn\.edit-data\{background:rgba\(255,255,255,0\.72\);color:var\(--accent\);border:1px solid rgba\(139,34,82,0\.28\);margin-top:0\.5rem\}/);
+  assert.match(editDataScriptSource, /function setCreateDialogCopy\(isEditing\) \{[\s\S]*Gegevens Bewerken[\s\S]*Gegevens Opslaan/);
+  assert.match(editDataScriptSource, /document\.getElementById\('createOrderForm'\)\?\.addEventListener\('submit', handleEditSubmit, true\);/);
+  assert.match(editDataScriptSource, /event\.stopImmediatePropagation\(\);/);
+  assert.match(editDataScriptSource, /buildPatch\(CUSTOM_ORDERS_KEY, JSON\.stringify\(orders\)\)[\s\S]*buildPatch\(ORDER_RUNTIME_KEY, JSON\.stringify\(runtime\)\)/);
+  assert.match(editDataScriptSource, /window\.setTimeout\(\(\) => window\.location\.reload\(\), 250\);/);
   assert.doesNotMatch(source, /overview\.innerHTML = renderModalOverviewHtml/);
   assert.doesNotMatch(source, /function renderModalOverviewHtml\(id\) \{/);
   assert.doesNotMatch(source, /item\.raw/);
