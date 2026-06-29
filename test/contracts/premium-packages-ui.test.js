@@ -18,15 +18,26 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
 
-  assert.match(pageSource, /<script src="assets\/premium-packages\.js\?v=20260427a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-packages\.js\?v=20260629a"><\/script>/);
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
   assert.match(pageSource, /data-package-tab="routes"/);
   assert.match(pageSource, /data-package-tab="website"/);
   assert.match(pageSource, /data-package-tab="bedrijfssoftware"/);
   assert.match(pageSource, /data-package-tab="voicesoftware"/);
   assert.match(pageSource, /data-package-tab="chatbots"/);
+  assert.equal((pageSource.match(/class="tab [^"]*is-locked/g) || []).length, 3);
+  assert.equal((pageSource.match(/class="tab-lock"/g) || []).length, 3);
+  assert.match(pageSource, /data-package-tab="bedrijfssoftware"[^>]*data-package-tab-locked="true"[^>]*disabled[^>]*aria-disabled="true"/);
+  assert.match(pageSource, /data-package-tab="voicesoftware"[^>]*data-package-tab-locked="true"[^>]*disabled[^>]*aria-disabled="true"/);
+  assert.match(pageSource, /data-package-tab="chatbots"[^>]*data-package-tab-locked="true"[^>]*disabled[^>]*aria-disabled="true"/);
   assert.match(pageSource, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
   assert.match(scriptSource, /var packageTabGroups = \{/);
+  assert.match(scriptSource, /var lockedPackageTabs = \{/);
+  assert.match(scriptSource, /bedrijfssoftware: true/);
+  assert.match(scriptSource, /voicesoftware: true/);
+  assert.match(scriptSource, /chatbots: true/);
+  assert.match(scriptSource, /function isLockedPackageTab\(name, tabEl\)/);
+  assert.match(scriptSource, /if \(isLockedPackageTab\(name, tabEl\)\) return false;/);
   assert.match(pageSource, /Losse oplevering/);
   assert.match(pageSource, /Losse oplevering mét CMS/);
   assert.match(pageSource, /Softora Volledig beheer/);
