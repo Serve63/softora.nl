@@ -629,23 +629,6 @@
             line-height: 1.45;
         }
 
-        .status-text {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.74rem;
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .status-text.is-paid {
-            color: var(--success);
-        }
-
-        .status-text.is-open {
-            color: var(--warning);
-        }
-
         .active-text {
             font-family: 'Oswald', sans-serif;
             font-size: 0.74rem;
@@ -1078,9 +1061,8 @@
                                     <th>Klant</th>
                                     <th>Telefoonnummer</th>
                                     <th>Service</th>
-                                    <th>Prijs</th>
+                                    <th>Betaalde prijs</th>
                                     <th>Onderhoud</th>
-                                    <th>Status</th>
                                     <th>Toegewezen aan</th>
                                     <th>Actief</th>
                                     <th>Review?</th>
@@ -1103,7 +1085,7 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
             <div class="modal-header">
                 <h3 id="modalTitle">Klant toevoegen</h3>
-                <p>Beheer contactgegevens, type werk en betaalstatus vanuit een centrale lijst.</p>
+                <p>Beheer contactgegevens, type werk en betaalinformatie vanuit een centrale lijst.</p>
             </div>
 
             <form id="customerForm" novalidate>
@@ -1141,7 +1123,7 @@
                     </div>
 
                     <div class="form-group" id="websiteAmountGroup">
-                        <label class="form-label" for="fieldWebsiteAmount">Prijs (EUR)</label>
+                        <label class="form-label" for="fieldWebsiteAmount">Betaalde prijs (EUR)</label>
                         <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="1" placeholder="1500">
                     </div>
 
@@ -1150,14 +1132,6 @@
                     <div class="form-group" id="maintenanceAmountGroup">
                         <label class="form-label" for="fieldMaintenanceAmount">Onderhoud per maand (EUR)</label>
                         <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldStatus">Status</label>
-                        <select class="form-select" id="fieldStatus" name="status" required data-custom-select="true">
-                            <option value="Betaald">Betaald</option>
-                            <option value="Open">Open</option>
-                        </select>
                     </div>
 
                     <div class="form-group">
@@ -1274,7 +1248,6 @@
             fieldWebsiteAmount: document.getElementById("fieldWebsiteAmount"),
             fieldMaintenanceEnabled: document.getElementById("fieldMaintenanceEnabled"),
             fieldMaintenanceAmount: document.getElementById("fieldMaintenanceAmount"),
-            fieldStatus: document.getElementById("fieldStatus"),
             fieldActive: document.getElementById("fieldActive"),
             fieldResponsible: document.getElementById("fieldResponsible"),
             fieldDate: document.getElementById("fieldDate")
@@ -1298,7 +1271,6 @@
                 nodes.fieldWebsiteAmount,
                 nodes.fieldMaintenanceEnabled,
                 nodes.fieldMaintenanceAmount,
-                nodes.fieldStatus,
                 nodes.fieldActive,
                 nodes.fieldReview,
                 nodes.fieldResponsible,
@@ -1331,10 +1303,7 @@
             const rawType = normalizeString(raw && raw.type);
             const baseType = rawType === "Onderhoud" || rawType === "Website + onderhoud" ? rawType : "Website";
             const databaseStatus = normalizeCustomerDatabaseStatus(raw);
-            const rawStatus = normalizeString(raw && raw.status);
-            const status = rawStatus === "Open"
-                ? "Open"
-                : (rawStatus === "Betaald" || databaseStatus === "klant" ? "Betaald" : "Open");
+            const status = "Betaald";
             const websiteAmountRaw = normalizeOptionalAmount(raw && raw.websiteBedrag);
             const maintenanceAmountRaw = normalizeOptionalAmount(raw && raw.onderhoudPerMaand);
             const websiteBedrag = websiteAmountRaw !== null
@@ -1370,6 +1339,13 @@
                 verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
                 datum: normalizeDate(raw && raw.datum)
             };
+        }
+
+        function isPaidCustomerRecord(raw) {
+            const status = normalizeString(raw && raw.status).toLowerCase();
+            if (status === "open") return false;
+            if (status === "betaald") return true;
+            return Boolean(normalizeDate(normalizeString(raw && (raw.datum || raw.paidAt)).slice(0, 10)));
         }
 
         function sortCustomers(list) {
@@ -1589,6 +1565,7 @@
         function parseCustomersFromRows(rows) {
             return sortCustomers((Array.isArray(rows) ? rows : [])
                 .filter(isCustomerLifecycleRecord)
+                .filter(isPaidCustomerRecord)
                 .map(function (item, index) {
                     return normalizeCustomer(item, "klant-import-" + index);
                 }));
@@ -1681,7 +1658,7 @@
                 if (seen.has(key)) return;
 
                 const paidDate = normalizeString(order.paidAt).slice(0, 10);
-                const status = paidDate || order.status === "betaald" ? "Betaald" : "Open";
+                if (!paidDate && order.status !== "betaald") return;
 
                 seen.set(key, normalizeCustomer({
                     id: "seed-" + order.id,
@@ -1691,7 +1668,7 @@
                     type: inferTypeFromOrder(order),
                     website: order.title || "-",
                     bedrag: order.amount || 0,
-                    status: status,
+                    status: "Betaald",
                     actief: "Ja",
                     verantwoordelijk: customerSeed.verantwoordelijk,
                     datum: paidDate
@@ -1736,6 +1713,7 @@
             state.sharedCustomerRows = rawCustomers;
             return sortCustomers(rawCustomers
                 .filter(isCustomerLifecycleRecord)
+                .filter(isPaidCustomerRecord)
                 .map(function (item, index) {
                     return normalizeCustomer(item, "klant-bootstrap-" + index);
                 }));
@@ -1792,7 +1770,6 @@
                     customer.service,
                     formatCustomerServiceLabel(customer.service),
                     customer.review,
-                    customer.status,
                     customer.verantwoordelijk,
                     customer.actief
                 ].join(" ").toLowerCase();
@@ -1829,7 +1806,6 @@
         function resetForm() {
             nodes.form.reset();
             if (nodes.fieldService) nodes.fieldService.value = "website";
-            nodes.fieldStatus.value = "Betaald";
             if (nodes.fieldActive) nodes.fieldActive.value = "Ja";
             if (nodes.fieldReview) nodes.fieldReview.value = "Nee";
             if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Team";
@@ -1873,7 +1849,6 @@
                         : "";
                 }
                 if (nodes.fieldMaintenanceEnabled) nodes.fieldMaintenanceEnabled.value = customerHasMaintenance(customer) ? "Ja" : "Nee";
-                nodes.fieldStatus.value = customer.status;
                 if (nodes.fieldActive) nodes.fieldActive.value = customer.actief || "Ja";
                 if (nodes.fieldReview) nodes.fieldReview.value = customer.review || "Nee";
                 if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Team";
@@ -1962,7 +1937,7 @@
                 websiteBedrag: websiteBedrag,
                 onderhoudActief: onderhoudActief,
                 onderhoudPerMaand: onderhoudPerMaand,
-                status: nodes.fieldStatus.value,
+                status: "Betaald",
                 actief: nodes.fieldActive ? nodes.fieldActive.value : "Ja",
                 review: nodes.fieldReview ? nodes.fieldReview.value : "Nee",
                 verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Team",
