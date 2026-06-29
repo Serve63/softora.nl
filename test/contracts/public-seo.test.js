@@ -376,6 +376,7 @@ const CORE_INTERNAL_LINK_EXPECTATIONS = [
       '/maatwerk-platform',
       '/kennisbank/wat-is-bedrijfssoftware-op-maat',
       '/ai-automatisering',
+      '/kennisbank/wat-is-offerte-automatisering',
     ],
   },
   {

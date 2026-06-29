@@ -69,9 +69,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
     legacyPaths: ['/premium-bedrijfssoftware'],
-    title: 'Bedrijfssoftware laten maken voor CRM en dashboards',
+    title: 'Bedrijfssoftware laten maken voor MKB, CRM en dashboards',
     description:
-      'Laat bedrijfssoftware maken voor CRM, dashboard, klantportaal en offerteflow. Duidelijke scope, koppelingen, veiligheid en doorontwikkeling voor MKB.',
+      'Bedrijfssoftware laten maken voor MKB? Softora bouwt CRM, dashboards, klantportalen en offerteflows met duidelijke scope, koppelingen en veilige doorgroei.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
@@ -79,6 +79,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/maatwerk-platform',
       '/kennisbank/wat-is-bedrijfssoftware-op-maat',
       '/ai-automatisering',
+      '/kennisbank/wat-is-offerte-automatisering',
       '/vergelijkingen/maatwerk-software-vs-standaard-software',
     ],
   },
