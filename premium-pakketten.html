@@ -392,8 +392,6 @@ body {
     box-shadow: 0 14px 36px rgba(26, 26, 46, 0.08);
     transform: translateY(-2px);
   }
-  .card.is-locked { opacity: 0.78; }
-  .card.is-locked:hover { box-shadow: var(--shadow); transform: none; }
   .card-cta svg { width: 13px; height: 13px; flex-shrink: 0; }
   .routes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
   .route-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 28px 26px; position: relative; box-shadow: var(--shadow); } .route-card.featured { border-color: var(--crimson); border-width: 2px; } .route-title { font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 800; text-transform: uppercase; color: var(--text-dark); margin-bottom: 12px; } .route-desc { color: var(--text-mid); font-size: 13px; line-height: 1.5; min-height: 42px; margin-bottom: 20px; }
@@ -482,8 +480,6 @@ body {
     transition: all 0.15s ease;
   }
   .card-cta[disabled], .card-cta[aria-disabled="true"] { cursor: not-allowed; opacity: 0.62; }
-  .card-cta.is-locked { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: rgba(139, 34, 82, 0.05); border-color: rgba(139, 34, 82, 0.16); color: var(--text-light); }
-
   .card-cta.outline {
     background: transparent;
     border: 1px solid var(--border);
@@ -694,7 +690,7 @@ body {
 
   .onderhoud-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 32px;
   }
@@ -1447,7 +1443,7 @@ body {
     <div class="section-title">Website Bouw Pakketten</div>
 
     <div class="cards-grid">
-      <div class="card is-locked" aria-disabled="true">
+      <div class="card">
         <div class="card-tier">Pakket 01</div>
         <div class="card-name">Starter</div>
         <div class="card-desc">Voor starters die snel online willen.</div>
@@ -1460,10 +1456,10 @@ body {
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Mobielvriendelijk design</li>
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Contactformulier</li>
         </ul>
-        <button class="card-cta outline is-locked" type="button" disabled aria-disabled="true" title="Tijdelijk vergrendeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>Tijdelijk vergrendeld</button>
+        <button class="card-cta outline" type="button">Softora</button>
       </div>
 
-      <div class="card featured is-locked" aria-disabled="true">
+      <div class="card featured">
         <div class="card-badge">Meest gekozen</div>
         <div class="card-tier">Pakket 02</div>
         <div class="card-name">Business</div>
@@ -1478,10 +1474,10 @@ body {
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Geavanceerde SEO + sitemap</li>
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Chat/WhatsApp knop</li>
         </ul>
-        <button class="card-cta filled is-locked" type="button" disabled aria-disabled="true" title="Tijdelijk vergrendeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>Tijdelijk vergrendeld</button>
+        <button class="card-cta filled" type="button">Softora</button>
       </div>
 
-      <div class="card is-locked" aria-disabled="true">
+      <div class="card">
         <div class="card-tier">Pakket 03</div>
         <div class="card-name">Premium</div>
         <div class="card-desc">Volledig maatwerk voor ambitieuze bedrijven.</div>
@@ -1495,7 +1491,7 @@ body {
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Webshop/reserveringen</li>
           <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Meertalig (NL/EN)</li>
         </ul>
-        <button class="card-cta outline is-locked" type="button" disabled aria-disabled="true" title="Tijdelijk vergrendeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>Tijdelijk vergrendeld</button>
+        <button class="card-cta outline" type="button">Softora</button>
       </div>
 
       <div class="card">
@@ -1519,69 +1515,59 @@ body {
   </div>
 
   <div id="tab-onderhoud" class="tab-panel theme-website">
-    <div class="section-title">Website Onderhoud Abonnementen</div>
+    <div class="section-title">Website Onderhoud Pakketten</div>
     <div class="onderhoud-grid">
       <div class="onderhoud-card">
-        <div class="card-tier">Abonnement 01</div>
-        <div class="card-name">Basis</div>
+        <div class="card-tier">Pakket 01</div>
+        <div class="card-name">Onderhoud</div>
+        <div class="card-desc">Voor een stabiele, veilige website</div>
         <div class="card-price">
-          <div class="price-line"><div class="price-amount">€89<span class="price-suffix">/mnd</span></div><span class="price-hours">· 1 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
+          <div class="price-line"><div class="price-amount">€37,95<span class="price-suffix">/mnd</span></div></div>
+          <div class="price-note">Per maand excl. BTW</div>
         </div>
         <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>1 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Updates, backups en monitoring</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Kleine tekst- en fotowijzigingen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Korte technische controles</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Technisch onderhoud van de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Updates en controle van de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Basiscontrole op veiligheid en werking</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Monitoring zodat alles goed blijft draaien</li>
         </ul>
         <button class="card-cta outline" type="button">Softora</button>
       </div>
 
       <div class="onderhoud-card featured">
-        <div class="card-badge">Meest gekozen</div>
-        <div class="card-tier">Abonnement 02</div>
-        <div class="card-name">Plus</div>
+        <div class="card-badge">Aanbevolen</div>
+        <div class="card-tier">Pakket 02</div>
+        <div class="card-name">Onderhoud + Wijzigingen</div>
+        <div class="card-desc">Voor actief bijhouden en aanpassen</div>
         <div class="card-price">
-          <div class="price-line"><div class="price-amount">€199<span class="price-suffix">/mnd</span></div><span class="price-hours">· 3 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
+          <div class="price-line"><div class="price-amount">€74,95<span class="price-suffix">/mnd</span></div></div>
+          <div class="price-note">Per maand excl. BTW</div>
         </div>
         <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>3 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Basis</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Nieuwe secties, acties of pagina-updates</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Maandelijkse rapportage en advies</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit pakket 1 inbegrepen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tekstwijzigingen op de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Afbeeldingen vervangen of toevoegen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Aanpassingen aan bestaande pagina's</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Extra support bij vragen of verbeteringen</li>
         </ul>
         <button class="card-cta filled" type="button">Softora</button>
       </div>
 
       <div class="onderhoud-card">
-        <div class="card-tier">Abonnement 03</div>
-        <div class="card-name">Premium</div>
+        <div class="card-tier">Pakket 03</div>
+        <div class="card-name">Continue Aanpassingen</div>
+        <div class="card-desc">Voor maximale flexibiliteit en onbeperkte aanpassingen</div>
         <div class="card-price">
-          <div class="price-line"><div class="price-amount">€329<span class="price-suffix">/mnd</span></div><span class="price-hours">· 5 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
+          <div class="price-line"><div class="price-amount">€497,-<span class="price-suffix">/mnd</span></div></div>
+          <div class="price-note">Per maand excl. BTW</div>
         </div>
         <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>5 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Plus</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>SEO, snelheid en conversie verbeteren</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prioriteit bij wijzigingen en bugfixes</li>
-        </ul>
-        <button class="card-cta outline" type="button">Softora</button>
-      </div>
-
-      <div class="onderhoud-card">
-        <div class="card-tier">Abonnement 04</div>
-        <div class="card-name">Enterprise</div>
-        <div class="card-price">
-          <div class="price-line"><div class="price-amount">€649<span class="price-suffix">/mnd</span></div><span class="price-hours">· 10 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Aangepast contract</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>10 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Premium</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Campagnepagina's, funnels en grotere uitbreidingen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Roadmap, advies en vaste contactpersoon</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit pakket 2 inbegrepen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onbeperkte tekstwijzigingen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onbeperkte aanpassingen op de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Nieuwe pagina's toevoegen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prioriteit en snelle doorlooptijd</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Proactieve optimalisaties en verbeteringen</li>
         </ul>
         <button class="card-cta outline" type="button">Softora</button>
       </div>
