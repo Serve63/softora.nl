@@ -38,10 +38,17 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(scriptSource, /chatbots: true/);
   assert.match(scriptSource, /function isLockedPackageTab\(name, tabEl\)/);
   assert.match(scriptSource, /if \(isLockedPackageTab\(name, tabEl\)\) return false;/);
-  assert.match(pageSource, /Losse oplevering/);
-  assert.match(pageSource, /Losse oplevering mét CMS/);
-  assert.match(pageSource, /Softora Volledig beheer/);
-  assert.match(pageSource, /<div class="card-badge">Aanbevolen<\/div>/);
+  assert.match(pageSource, />Richtlijnen<\/button>/);
+  assert.match(pageSource, /Website Richtlijnen/);
+  assert.match(pageSource, /Kies de richtlijn die past bij jouw project/);
+  assert.match(pageSource, /Richtlijn 1/);
+  assert.match(pageSource, /One Page Website/);
+  assert.match(pageSource, /Richtlijn 2/);
+  assert.match(pageSource, /Website met pagina's &amp; tooltjes/);
+  assert.match(pageSource, /Richtlijn 3/);
+  assert.match(pageSource, /Website met veel pagina's/);
+  assert.match(pageSource, /Richtlijn 4/);
+  assert.match(pageSource, /Bedrijfssoftware op maat/);
   assert.doesNotMatch(pageSource, /<div class="card-badge">Flexibel<\/div>/);
   assert.match(pageSource, /id="tab-routes" class="tab-panel theme-routes active"/);
   assert.match(pageSource, /id="tab-bouwen" class="tab-panel theme-website"/);
@@ -50,6 +57,9 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.doesNotMatch(pageSource, /Maandelijks opzegbaar/);
   assert.equal((pageSource.match(/Jaarlijks opzegbaar/g) || []).length, 9);
   assert.match(pageSource, /\.onderhoud-card \.features-list::before\s*\{[\s\S]*content:\s*"Realistische taken";/);
+  assert.match(pageSource, /\.card-cta\s*\{[\s\S]*margin-top:\s*auto;/);
+  assert.match(pageSource, /\.card\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
+  assert.match(pageSource, /\.onderhoud-card\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
   assert.match(scriptSource, /routes: \["routes"\]/);
   assert.match(scriptSource, /website: \["bouwen", "onderhoud"\]/);
   assert.match(scriptSource, /bedrijfssoftware: \["bedrijfssoftware", "bedrijfssoftware-onderhoud"\]/);
@@ -104,43 +114,24 @@ test('website onderhoudspakketten tonen de aangeleverde foto-prijzen en taken', 
   assert.doesNotMatch(websiteMaintenanceSection, /<div class="card-name">Pro<\/div>/);
 });
 
-test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () => {
+test('website richtlijnen tonen de vier keuzes van de Softora richtprijskaart', () => {
   const pageSource = readPage();
   const sectionStart = pageSource.indexOf('<div id="tab-routes"');
   const sectionEnd = pageSource.indexOf('<div id="tab-bouwen"', sectionStart);
-  const routesSection = pageSource.slice(sectionStart, sectionEnd);
-  const route02Start = routesSection.indexOf('<div class="route-card"><div class="card-tier">Route 02');
-  const route03Start = routesSection.indexOf('<div class="route-card featured">');
-  const databaseNoteStart = routesSection.indexOf('<div class="database-hosting-note">');
+  const guidelinesSection = pageSource.slice(sectionStart, sectionEnd);
 
-  assert.match(
-    routesSection,
-    /Softora ontwikkelt en levert de website volledig gebruiksklaar op\. Na oplevering is het project afgerond en zijn wijzigingen uitgesloten, tenzij er aantoonbare gebreken vanuit Softora zijn\./
-  );
-  assert.match(
-    routesSection,
-    /Softora ontwikkelt de website met een eigen CMS-\/beheersysteem\. Minimaal €200 extra voor tekst- en fotobeheer\. Extra wijzigingsopties zijn mogelijk maar verhogen de prijs\./
-  );
-  assert.match(
-    routesSection,
-    /Databaseopslag verloopt via Supabase\. Klanten die gebruikmaken van databasehosting zijn verplicht om Onderhoudsabonnement 1 af te nemen\./
-  );
-  assert.ok(route02Start >= 0, 'Route 02 staat in de routes-sectie');
-  assert.ok(route03Start > route02Start, 'Route 03 staat na Route 02');
-  assert.ok(databaseNoteStart > route03Start, 'De databasehosting-melding staat onder de drie routekaarten');
-  assert.doesNotMatch(routesSection.slice(route02Start, route03Start), /database-hosting-note/);
-  assert.match(pageSource, /\.database-hosting-note \{ grid-column: 1 \/ -1;/);
-  assert.match(
-    routesSection,
-    /Softora ontwikkelt en beheert de website, inclusief monitoring, updates en beveiliging\. Wijzigingen voert Softora op aanvraag uit binnen het onderhoudspakket, zodat de klant technisch volledig wordt ontzorgd\./
-  );
-  assert.doesNotMatch(routesSection, /Softora maakt de website en levert hem volledig af/);
-  assert.doesNotMatch(routesSection, /Wij bouwen de website met een eigen beheersysteem/);
-  assert.doesNotMatch(routesSection, /Wij maken de website, houden hem in beheer/);
-  assert.doesNotMatch(routesSection, /route-price-note/);
-  assert.doesNotMatch(routesSection, /Geen maandbedrag via Softora/);
-  assert.doesNotMatch(routesSection, /CRM vanaf €200 eenmalig/);
-  assert.doesNotMatch(routesSection, /Minimaal €30 per maand/);
+  assert.equal((guidelinesSection.match(/class="route-card guideline-card"/g) || []).length, 4);
+  assert.match(guidelinesSection, /<div class="section-title">Website Richtlijnen<\/div>/);
+  assert.match(guidelinesSection, /Elke website is maatwerk en wordt volledig afgestemd op jouw doelen\./);
+  assert.match(guidelinesSection, /<div class="guideline-number">01<\/div>[\s\S]*<div class="card-tier">Richtlijn 1<\/div>[\s\S]*<div class="route-title">One Page Website<\/div>[\s\S]*<div class="price-amount">€850,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="guideline-number">02<\/div>[\s\S]*<div class="card-tier">Richtlijn 2<\/div>[\s\S]*<div class="route-title">Website met pagina's &amp; tooltjes<\/div>[\s\S]*<div class="price-amount">€1\.350,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="guideline-number">03<\/div>[\s\S]*<div class="card-tier">Richtlijn 3<\/div>[\s\S]*<div class="route-title">Website met veel pagina's<\/div>[\s\S]*<div class="price-amount">€2\.250,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="guideline-number">04<\/div>[\s\S]*<div class="card-tier">Richtlijn 4<\/div>[\s\S]*<div class="route-title">Bedrijfssoftware op maat<\/div>[\s\S]*<div class="price-amount">€3\.500,-<\/div>/);
+  assert.equal((guidelinesSection.match(/Richtprijs excl\. BTW/g) || []).length, 4);
+  assert.doesNotMatch(guidelinesSection, /Losse oplevering/);
+  assert.doesNotMatch(guidelinesSection, /Losse oplevering mét CMS/);
+  assert.doesNotMatch(guidelinesSection, /Softora Volledig beheer/);
+  assert.doesNotMatch(guidelinesSection, /database-hosting-note/);
 });
 
 test('pakketkaarten gebruiken interne Softora CTA labels', () => {
