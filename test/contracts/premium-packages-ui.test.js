@@ -103,7 +103,7 @@ test('website routes tonen aangescherpte oplevering en beheer voorwaarden', () =
   );
   assert.match(
     routesSection,
-    /Databaseopslag verloopt via Supabase\. Klanten die gebruikmaken van databasehosting zijn verplicht om Onderhoudspakket 1 af te nemen\./
+    /Databaseopslag verloopt via Supabase\. Klanten die gebruikmaken van databasehosting zijn verplicht om Onderhoudsabonnement 1 af te nemen\./
   );
   assert.ok(route02Start >= 0, 'Route 02 staat in de routes-sectie');
   assert.ok(route03Start > route02Start, 'Route 03 staat na Route 02');
