@@ -7,6 +7,7 @@ const { createKnownPrettyPageSlugToFile, resolveLegacyPrettyPageRedirect } = req
 
 test('sportschool logboek page is available as installable pretty page', () => {
   const pagePath = path.join(__dirname, '../../sportschool.html');
+  const logoPath = path.join(__dirname, '../../assets/sportschool-logboek-logo.png');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
@@ -14,12 +15,14 @@ test('sportschool logboek page is available as installable pretty page', () => {
 
   assert.equal(prettyPages.get('logboek'), 'sportschool.html');
   assert.equal(resolveLegacyPrettyPageRedirect('sportschool'), 'logboek');
+  assert.equal(fs.existsSync(logoPath), true);
   assert.match(pageSource, /<title>Servé's Logboek<\/title>/);
   assert.match(pageSource, /apple-mobile-web-app-capable/);
   assert.match(pageSource, /apple-mobile-web-app-title" content="Servé's logboek"/);
   assert.match(pageSource, /noindex,nofollow/);
+  assert.match(pageSource, /<img class="gym-logo" src="\/assets\/sportschool-logboek-logo\.png\?v=20260629a" alt="Servé's logboek">/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260624a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260629a/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
@@ -32,6 +35,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /html\s*\{[\s\S]*?overflow: hidden;/);
   assert.match(stylesSource, /body\s*\{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/);
   assert.match(stylesSource, /\.gym-app\s*\{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/);
+  assert.match(stylesSource, /\.gym-logo\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?object-fit: cover;/);
   assert.match(stylesSource, /\.delete-action/);
   assert.match(stylesSource, /\.drag-handle/);
   assert.match(stylesSource, /\.exercise-swipe\.is-reordering/);
