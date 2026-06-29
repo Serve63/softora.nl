@@ -602,6 +602,90 @@ test('data ops store paginates customer reads beyond Supabase default page size'
   ]);
 });
 
+test('data ops store reads compact dashboard customers from structured rows', async () => {
+  const calls = [];
+  const rows = [
+    {
+      customer_id: 'cust-1',
+      payload: {
+        websiteBedrag: 450,
+        status: 'Betaald',
+        datum: '2026-03-23',
+      },
+      company: 'Linszorgt.nl',
+      contact_name: 'Linsey Klaus',
+      phone: '+31 6 13 18 38 44',
+      email: 'linsey@example.nl',
+      website: 'linszorgt.nl',
+      database_status: 'klant',
+      lifecycle_status: 'klant',
+      responsible: 'Serve',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+    {
+      customer_id: 'lead-1',
+      payload: { status: 'gemaild', databaseStatus: 'gemaild' },
+      database_status: 'gemaild',
+      lifecycle_status: 'gemaild',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+  ];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      const query = {
+        select(columns) {
+          calls.push(['select', columns]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        or(value) {
+          calls.push(['or', value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        range(from, to) {
+          calls.push(['range', from, to]);
+          return Promise.resolve({
+            data: rows.slice(from, to + 1),
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const customers = await store.listDashboardCustomers();
+
+  assert.deepEqual(calls[0], [
+    'select',
+    'customer_id,payload,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at',
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'deleted_at', null]);
+  assert.deepEqual(calls.find((call) => call[0] === 'or'), [
+    'or',
+    'database_status.eq.klant,lifecycle_status.eq.klant',
+  ]);
+  assert.equal(customers.length, 1);
+  assert.equal(customers[0].id, 'cust-1');
+  assert.equal(customers[0].naam, 'Linsey Klaus');
+  assert.equal(customers[0].bedrijf, 'Linszorgt.nl');
+  assert.equal(customers[0].websiteBedrag, 450);
+  assert.equal(customers[0].databaseStatus, 'klant');
+});
+
 test('data ops store returns quickly when customer reads hang', async () => {
   const client = {
     from(table) {

@@ -440,6 +440,7 @@ function createAgendaRuntime(deps = {}) {
     customerKey: deps.premiumCustomersKey,
     orderScope: premiumActiveOrdersScope,
     orderKey: premiumActiveCustomOrdersKey,
+    listDashboardCustomers: deps.listDashboardCustomers,
   });
 
   const leadsPageBootstrapService = createLeadsPageBootstrapService({
@@ -501,6 +502,7 @@ function createAgendaRuntime(deps = {}) {
       const isPremiumDatabase = fileName === 'premium-database.html';
       const dashboardPayload = await customersPageBootstrapService.buildCustomersBootstrapPayload({
         includeCustomers: !isPremiumDatabase,
+        preferDashboardCustomers: isPremiumDashboard,
       });
       const bootstrapData = {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
