@@ -8,6 +8,7 @@ const {
   MASS_RESEARCH_SCOPE,
   collectCustomerIdentityKeys,
   createPremiumDatabaseMassResearchCoordinator,
+  getMassResearchPreflightStatus,
   mapWithConcurrency,
 } = require('../../server/services/premium-database-mass-research');
 
@@ -140,9 +141,35 @@ test('mass research routes are registered behind the premium admin api surface',
   assert.match(featureRoutesSource, /coordinator: premiumDatabaseMassResearchCoordinator/);
   assert.match(featureRoutesSource, /requirePremiumAdminApiAccess/);
   assert.match(routeSource, /'post', '\/api\/premium-database\/mass-research-jobs'/);
+  assert.match(routeSource, /'get', '\/api\/premium-database\/mass-research-jobs\/status'/);
   assert.match(routeSource, /'get', '\/api\/premium-database\/mass-research-jobs\/:jobId'/);
   assert.match(routeSource, /'post', '\/api\/premium-database\/mass-research-jobs\/:jobId\/run'/);
   assert.match(routeSource, /'post', '\/api\/premium-database\/mass-research-jobs\/:jobId\/cancel'/);
+});
+
+test('mass research preflight reports safe readiness without exposing secrets', () => {
+  const missing = getMassResearchPreflightStatus({});
+  assert.equal(missing.ok, true);
+  assert.equal(missing.googlePlacesConfigured, false);
+  assert.equal(missing.openAiFallbackConfigured, false);
+  assert.equal(missing.limits.enrichmentConcurrencyDefault, 50);
+  assert.equal(missing.qualityRails.partialUpsertOnly, true);
+  assert.equal(missing.qualityRails.fullCustomerStateRewrite, false);
+  assert.deepEqual(missing.qualityRails.duplicateKeys, [
+    'google_place_id',
+    'domain',
+    'email',
+    'phone',
+    'company_address',
+  ]);
+  assert.doesNotMatch(JSON.stringify(missing), /secret|sk-|maps-key/i);
+
+  const ready = getMassResearchPreflightStatus({
+    GOOGLE_MAPS_SERVER_API_KEY: 'maps-key',
+    OPENAI_API_KEY: 'openai-key',
+  });
+  assert.equal(ready.googlePlacesConfigured, true);
+  assert.equal(ready.openAiFallbackConfigured, true);
 });
 
 test('mass research stores progress in its own UI-state scope and writes only incoming customer upserts', async () => {

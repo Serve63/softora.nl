@@ -1979,6 +1979,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /function handleRealBusinessAdd\(\)/);
   assert.match(massResearchScriptSource, /Massaal zoeken/);
   assert.match(massResearchScriptSource, /\/api\/premium-database\/mass-research-jobs/);
+  assert.match(massResearchScriptSource, /\/api\/premium-database\/mass-research-jobs\/status/);
+  assert.match(massResearchScriptSource, /Google Places server-key ontbreekt/);
+  assert.match(massResearchScriptSource, /partial upsert en duplicate-poort actief/);
+  assert.match(massResearchScriptSource, /Start geblokkeerd tot Google Places is ingesteld/);
   assert.match(massResearchScriptSource, /\/run"/);
   assert.match(massResearchScriptSource, /\/cancel"/);
   assert.match(massResearchScriptSource, /enrichmentConcurrency: parsePositiveInt\(nodes\.concurrency\.value, 50, 1, 100\)/);
