@@ -64,6 +64,32 @@ async function discoverBusinessEmailFromWebsite(websiteUrl, deps = {}) {
   } catch (_error) { return ''; } finally { if (timeout) clearTimeout(timeout); }
 }
 function getGooglePlacesApiKey(env = process.env) { return text(env.GOOGLE_MAPS_SERVER_API_KEY || env.GOOGLE_MAPS_API_KEY || env.GOOGLE_PLACES_API_KEY); }
+function getMassResearchPreflightStatus(env = process.env) {
+  return {
+    ok: true,
+    googlePlacesConfigured: Boolean(getGooglePlacesApiKey(env)),
+    openAiFallbackConfigured: Boolean(text(env.OPENAI_API_KEY)),
+    limits: {
+      desiredDefault: LIMITS.desired[2],
+      desiredMax: LIMITS.desired[1],
+      discoveryConcurrencyDefault: LIMITS.discovery[2],
+      discoveryConcurrencyMax: LIMITS.discovery[1],
+      enrichmentConcurrencyDefault: LIMITS.enrichment[2],
+      enrichmentConcurrencyMax: LIMITS.enrichment[1],
+      domainConcurrencyDefault: LIMITS.domain[2],
+      domainConcurrencyMax: LIMITS.domain[1],
+      maxTasksPerRunDefault: LIMITS.tasks[2],
+      maxTasksPerRunMax: LIMITS.tasks[1],
+      websiteTimeoutMsDefault: LIMITS.timeout[2],
+    },
+    qualityRails: {
+      duplicateKeys: ['google_place_id', 'domain', 'email', 'phone', 'company_address'],
+      partialUpsertOnly: true,
+      fullCustomerStateRewrite: false,
+      openAiFallbackDefault: false,
+    },
+  };
+}
 async function readJsonResponse(response) {
   if (response && typeof response.json === 'function') return response.json();
   if (!response || typeof response.text !== 'function') return {};
@@ -635,6 +661,7 @@ function createPremiumDatabaseMassResearchCoordinator(deps = {}) {
     sendCancelJobResponse: send((req) => cancelJob(req.params && req.params.jobId)),
     sendCreateJobResponse: send((req) => createJob(req.body || {})),
     sendGetJobResponse: send((req) => getJob(req.params && req.params.jobId)),
+    sendGetStatusResponse: send(() => getMassResearchPreflightStatus(env)),
     sendRunJobResponse: send((req) => runJob(req.params && req.params.jobId, req.body || {})),
   };
 }
@@ -644,6 +671,7 @@ module.exports = {
   collectCustomerIdentityKeys,
   createDomainLimiter,
   createPremiumDatabaseMassResearchCoordinator,
+  getMassResearchPreflightStatus,
   mapWithConcurrency,
   normalizeEmail,
   normalizePhone,

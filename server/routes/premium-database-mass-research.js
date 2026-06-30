@@ -3,6 +3,7 @@ function registerPremiumDatabaseMassResearchRoutes(app, deps = {}) {
   const { coordinator, requirePremiumAdminApiAccess = passThrough } = deps;
   [
     ['post', '/api/premium-database/mass-research-jobs', 'sendCreateJobResponse'],
+    ['get', '/api/premium-database/mass-research-jobs/status', 'sendGetStatusResponse'],
     ['get', '/api/premium-database/mass-research-jobs/:jobId', 'sendGetJobResponse'],
     ['post', '/api/premium-database/mass-research-jobs/:jobId/run', 'sendRunJobResponse'],
     ['post', '/api/premium-database/mass-research-jobs/:jobId/cancel', 'sendCancelJobResponse'],
