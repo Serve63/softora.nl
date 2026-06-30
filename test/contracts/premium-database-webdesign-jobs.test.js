@@ -446,6 +446,11 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
   assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
   assert.equal(pipelineCalls[0].options.body.source, 'premium-database');
+  assert.deepEqual(pipelineCalls[0].options.body.softoraOutreachProfile, {
+    name: 'Servé Creusen',
+    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+    source: 'premium-database-webdesign-jobs',
+  });
 });
 
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {
