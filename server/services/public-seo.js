@@ -71,7 +71,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     legacyPaths: ['/premium-bedrijfssoftware'],
     title: 'Bedrijfssoftware laten maken voor MKB, CRM en dashboards',
     description:
-      'Bedrijfssoftware laten maken voor MKB? Softora bouwt CRM, dashboards, klantportalen en offerteflows met duidelijke scope, koppelingen en veilige doorgroei.',
+      'Bedrijfssoftware laten maken voor CRM, dashboards, klantportaal of offerteflow? Softora start met scherpe scope, koppelingen, rechten en veilige doorgroei.',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
