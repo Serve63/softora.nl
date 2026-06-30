@@ -161,12 +161,25 @@ test('ai tools coordinator forwards database preview generation controls to the 
     imageSize: '2160x3840',
     disableReferenceImages: true,
     referenceImageMode: 'prompt-only',
+    body: {
+      source: 'premium-database',
+      action: 'webdesign',
+      softoraOutreachProfile: {
+        name: 'Servé Creusen',
+        roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+      },
+    },
   });
 
   assert.equal(payload.ok, true);
   assert.equal(capturedScan.imageSize, '2160x3840');
   assert.equal(capturedScan.disableReferenceImages, true);
   assert.equal(capturedScan.referenceImageMode, 'prompt-only');
+  assert.deepEqual(capturedScan.softoraOutreachProfile, {
+    name: 'Servé Creusen',
+    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+    source: '',
+  });
 });
 
 test('ai tools coordinator wraps website preview failures in a stable error payload', async () => {
@@ -264,6 +277,10 @@ test('ai tools coordinator lets premium database previews generate with gpt-imag
         domain: 'growingbyknowing.nl',
         source: 'premium-database',
         action: 'webdesign',
+        senderProfile: {
+          senderName: 'Servé Creusen',
+          role: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+        },
       },
     },
     res
@@ -276,6 +293,11 @@ test('ai tools coordinator lets premium database previews generate with gpt-imag
   assert.equal(generatedScans.length, 1);
   assert.equal(generatedScans[0].host, 'growingbyknowing.nl');
   assert.match(generatedScans[0].bodyTextSample, /Growingbyknowing/);
+  assert.deepEqual(generatedScans[0].softoraOutreachProfile, {
+    name: 'Servé Creusen',
+    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+    source: '',
+  });
 });
 
 test('ai tools coordinator validates dossier input and falls back safely on OpenAI errors', async () => {
