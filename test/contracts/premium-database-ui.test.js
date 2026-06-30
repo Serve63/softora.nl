@@ -477,7 +477,6 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const deepSearchScriptPath = path.join(__dirname, '../../assets/premium-database-deep-search.js');
   const contactStatusScriptPath = path.join(__dirname, '../../assets/premium-database-contact-status.js');
   const instantlySyncScriptPath = path.join(__dirname, '../../assets/premium-database-instantly-sync.js');
-  const massResearchScriptPath = path.join(__dirname, '../../assets/premium-database-mass-research.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const photoBatchScriptSource = fs.readFileSync(photoBatchScriptPath, 'utf8');
@@ -490,7 +489,6 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const deepSearchScriptSource = fs.readFileSync(deepSearchScriptPath, 'utf8');
   const contactStatusScriptSource = fs.readFileSync(contactStatusScriptPath, 'utf8');
   const instantlySyncScriptSource = fs.readFileSync(instantlySyncScriptPath, 'utf8');
-  const massResearchScriptSource = fs.readFileSync(massResearchScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -960,7 +958,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260626a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script><script src="assets\/premium-database-mass-research\.js\?v=20260629a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /<input type="file" id="importFileInput" accept="\.csv,text\/csv,\.tsv,text\/tab-separated-values,\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet" hidden>/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";/);
   assert.match(pageSource, /const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";/);
@@ -1165,11 +1163,6 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/add-real-businesses"/);
   assert.match(importScriptSource, /count: 100/);
   assert.match(importScriptSource, /function handleRealBusinessAdd\(\)/);
-  assert.match(massResearchScriptSource, /Massaal zoeken/);
-  assert.match(massResearchScriptSource, /\/api\/premium-database\/mass-research-jobs/);
-  assert.match(massResearchScriptSource, /\/run"/);
-  assert.match(massResearchScriptSource, /\/cancel"/);
-  assert.match(massResearchScriptSource, /enrichmentConcurrency: parsePositiveInt\(nodes\.concurrency\.value, 50, 1, 100\)/);
   assert.doesNotMatch(pageSource, /nodes\.addRealBusinessesButton\.addEventListener\("click"/);
   assert.doesNotMatch(pageSource, /databaseImportController\.handleRealBusinessAdd\(\)/);
   assert.match(pageSource, /void databaseImportController\.startAutoSync\(\);/);
