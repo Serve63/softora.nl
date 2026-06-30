@@ -159,6 +159,29 @@ test('public contact route validates anonymous contact requests server-side', as
   assert.equal(typeof body.error, 'string');
 });
 
+test('public conversion route validates anonymous CTA measurement requests server-side', async () => {
+  const invalid = await postJson('/api/public-conversion', {
+    name: '',
+    page: '/contact',
+    target: 'email',
+  });
+
+  assert.equal(invalid.response.status, 400);
+  assert.equal(invalid.body.ok, false);
+
+  const valid = await postJson('/api/public-conversion', {
+    name: 'public-cta',
+    page: '/contact',
+    target: 'whatsapp',
+    landing: '/contact',
+    path: '/contact',
+    at: '2026-06-22T06:00:00.000Z',
+  });
+
+  assert.equal(valid.response.status, 200);
+  assert.equal(valid.body.ok, true);
+});
+
 test('seo read routes keep their auth boundaries', async () => {
   const pagesResult = await getProtectedApiExpectation('/api/seo/pages');
   if (pagesResult.response.status === 200) {
