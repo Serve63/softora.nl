@@ -26,6 +26,9 @@ const { registerPublicContactRoutes } = require('../routes/public-contact');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerKvkDatabaseRoutes } = require('../routes/kvk-database');
+const {
+  registerPremiumDatabaseMassResearchRoutes,
+} = require('../routes/premium-database-mass-research');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
@@ -37,6 +40,9 @@ const {
   createPremiumDatabaseMailReadySnapshotService,
 } = require('./premium-database-mail-ready-snapshot');
 const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
+const {
+  createPremiumDatabaseMassResearchCoordinator,
+} = require('./premium-database-mass-research');
 const {
   createPublicWebdesignPreviewService,
 } = require('./public-webdesign-preview');
@@ -80,6 +86,11 @@ function registerFeatureRoutes(app, deps = {}) {
   const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
     dataOpsStore: deps.dataOpsStore,
     getUiStateValues: deps.getUiStateValues,
+  });
+  const premiumDatabaseMassResearchCoordinator = createPremiumDatabaseMassResearchCoordinator({
+    dataOpsStore: deps.dataOpsStore,
+    getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
   });
   const publicWebdesignPreviewCoordinator = createPublicWebdesignPreviewService({
     getUiStateValues: deps.getUiStateValues,
@@ -157,6 +168,10 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerKvkDatabaseRoutes(app, {
     coordinator: kvkDatabaseSnapshotCoordinator,
+  });
+  registerPremiumDatabaseMassResearchRoutes(app, {
+    coordinator: premiumDatabaseMassResearchCoordinator,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,

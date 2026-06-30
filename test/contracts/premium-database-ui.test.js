@@ -995,6 +995,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const systemMailCountScriptPath = path.join(__dirname, '../../assets/premium-database-system-mail-count.js');
   const autopilotToggleScriptPath = path.join(__dirname, '../../assets/premium-database-autopilot-toggle.js');
   const instantlySyncScriptPath = path.join(__dirname, '../../assets/premium-database-instantly-sync.js');
+  const massResearchScriptPath = path.join(__dirname, '../../assets/premium-database-mass-research.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const importScriptSource = fs.readFileSync(importScriptPath, 'utf8');
   const availableImportScriptSource = fs.readFileSync(availableImportScriptPath, 'utf8');
@@ -1015,6 +1016,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const systemMailCountScriptSource = fs.readFileSync(systemMailCountScriptPath, 'utf8');
   const autopilotToggleScriptSource = fs.readFileSync(autopilotToggleScriptPath, 'utf8');
   const instantlySyncScriptSource = fs.readFileSync(instantlySyncScriptPath, 'utf8');
+  const massResearchScriptSource = fs.readFileSync(massResearchScriptPath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
@@ -1751,6 +1753,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260617a"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260616a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
+  assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
   assert.match(deepSearchLoaderScriptSource, /function createController\(options\)/);
   assert.match(deepSearchLoaderScriptSource, /function loadScriptOnce\(src\)/);
   assert.match(deepSearchLoaderScriptSource, /loadScriptOnce\(scriptUrls\.deepSearchHelpers\)/);
@@ -1974,6 +1977,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/add-real-businesses"/);
   assert.match(importScriptSource, /count: 100/);
   assert.match(importScriptSource, /function handleRealBusinessAdd\(\)/);
+  assert.match(massResearchScriptSource, /Massaal zoeken/);
+  assert.match(massResearchScriptSource, /\/api\/premium-database\/mass-research-jobs/);
+  assert.match(massResearchScriptSource, /\/run"/);
+  assert.match(massResearchScriptSource, /\/cancel"/);
+  assert.match(massResearchScriptSource, /enrichmentConcurrency: parsePositiveInt\(nodes\.concurrency\.value, 50, 1, 100\)/);
   assert.doesNotMatch(pageSource, /nodes\.addRealBusinessesButton\.addEventListener\("click"/);
   assert.doesNotMatch(pageSource, /databaseImportController\.handleRealBusinessAdd\(\)/);
   assert.match(pageSource, /void databaseImportController\.startAutoSync\(\);/);
