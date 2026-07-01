@@ -81,6 +81,11 @@
   let isApplyingRemoteState = false;
   let isReady = false;
   let remoteSaveTimer = null;
+  let remoteRetryTimer = null;
+  let remoteSaveInFlight = false;
+  let pendingRemoteSave = false;
+  let stateRevision = 0;
+  let lastSavedRevision = 0;
   let lastRemoteSnapshotJson = '';
   let logbookState = createDefaultState();
   let cleanedLegacyNotesDuringLoad = false;
@@ -238,12 +243,25 @@
     return Array.isArray(dayState.orders) ? dayState.orders : [];
   }
 
+  function ordersChanged(previousOrders, nextOrders) {
+    if (!Array.isArray(previousOrders) || previousOrders.length !== nextOrders.length) return true;
+    return previousOrders.some((order, index) => order !== nextOrders[index]);
+  }
+
+  function markStateChanged(options = {}) {
+    if (isApplyingRemoteState || !isReady) return;
+    stateRevision += 1;
+    if (!options.silent) scheduleRemoteSave();
+  }
+
   function saveOrders(day, orders, options = {}) {
     const uniqueOrders = [];
     orders.forEach((order) => {
       if (Number.isFinite(order) && !uniqueOrders.includes(order)) uniqueOrders.push(order);
     });
     const dayState = getDayState(day);
+    const previousOrders = Array.isArray(dayState.orders) ? dayState.orders.slice() : [];
+    let changed = ordersChanged(previousOrders, uniqueOrders);
     dayState.orders = uniqueOrders;
     uniqueOrders.forEach((order) => {
       const key = String(order);
@@ -252,9 +270,10 @@
         const exerciseKey = exerciseKeyForTitle(normalized.title, exerciseSlotKey(day, order));
         ensureExerciseSources()[exerciseKey] = normalized;
         dayState.exercises[key] = { exerciseKey, ...normalized };
+        changed = true;
       }
     });
-    if (!options.silent) scheduleRemoteSave();
+    if (changed) markStateChanged({ silent: options.silent });
   }
 
   function readExercise(day, order) {
@@ -278,6 +297,7 @@
     const key = String(order);
     const targetField = field === 'name' ? 'title' : field === 'kilograms' ? 'kg' : field;
     if (!dayState.exercises[key]) dayState.exercises[key] = readExercise(day, order);
+    let changed = false;
     if (targetField === 'title') {
       const title = normalizeExerciseTitle(value);
       const previousExercise = readExercise(day, order);
@@ -288,13 +308,23 @@
         { ...previousExercise, title },
         normalizeExerciseSource(day, order)
       );
-      dayState.exercises[key] = { exerciseKey: nextExerciseKey, ...sources[nextExerciseKey] };
+      const nextExercise = { exerciseKey: nextExerciseKey, ...sources[nextExerciseKey] };
+      changed =
+        previousExercise.exerciseKey !== nextExercise.exerciseKey ||
+        previousExercise.title !== nextExercise.title ||
+        previousExercise.notes !== nextExercise.notes ||
+        previousExercise.sets !== nextExercise.sets ||
+        previousExercise.reps !== nextExercise.reps ||
+        previousExercise.kg !== nextExercise.kg;
+      dayState.exercises[key] = nextExercise;
     } else {
       const { exerciseKey, source } = getExerciseSource(day, order, dayState.exercises[key]);
-      source[targetField] = targetField === 'notes' ? upper(value) : value;
+      const nextValue = targetField === 'notes' ? upper(value) : value;
+      changed = String(source[targetField] ?? '') !== String(nextValue ?? '');
+      source[targetField] = nextValue;
       dayState.exercises[key] = { exerciseKey, ...source };
     }
-    scheduleRemoteSave();
+    if (changed) markStateChanged();
   }
 
   function dayTitle(day) {
@@ -538,6 +568,9 @@
       cleanedLegacyNotesDuringLoad = false;
       shouldPersistLoadedSnapshot = false;
       applyRemoteSnapshot(snapshot);
+      stateRevision = 0;
+      lastSavedRevision = 0;
+      pendingRemoteSave = false;
       if (cleanedLegacyNotesDuringLoad) shouldPersistLoadedSnapshot = true;
       return true;
     } catch (_error) {
@@ -545,8 +578,23 @@
     }
   }
 
+  function clearRemoteRetryTimer() {
+    window.clearTimeout(remoteRetryTimer);
+    remoteRetryTimer = null;
+  }
+
+  function scheduleRemoteRetry() {
+    if (isApplyingRemoteState || !isReady) return;
+    window.clearTimeout(remoteRetryTimer);
+    remoteRetryTimer = window.setTimeout(() => {
+      remoteRetryTimer = null;
+      persistRemoteSave();
+    }, REMOTE_RETRY_DELAY_MS);
+  }
+
   function scheduleRemoteSave() {
     if (isApplyingRemoteState || !isReady) return;
+    clearRemoteRetryTimer();
     window.clearTimeout(remoteSaveTimer);
     remoteSaveTimer = window.setTimeout(() => {
       persistRemoteSave();
@@ -555,20 +603,51 @@
 
   async function persistRemoteSave(options = {}) {
     if (isApplyingRemoteState || !isReady) return;
+    window.clearTimeout(remoteSaveTimer);
+    if (remoteSaveInFlight && options.allowConcurrent !== true) {
+      pendingRemoteSave = true;
+      return;
+    }
+    const revisionAtStart = stateRevision;
+    if (!options.force && revisionAtStart === lastSavedRevision) return;
     const snapshot = buildSnapshotFromState();
     const snapshotJson = JSON.stringify(snapshot);
-    if (snapshotJson === lastRemoteSnapshotJson) return;
+    if (!options.force && revisionAtStart === lastSavedRevision && snapshotJson === lastRemoteSnapshotJson) return;
+    const tracksInFlight = options.allowConcurrent !== true;
+    let saved = false;
+    if (tracksInFlight) remoteSaveInFlight = true;
     try {
       await saveRemoteState(snapshotJson, options);
-      lastRemoteSnapshotJson = snapshotJson;
+      saved = true;
+      if (revisionAtStart === stateRevision) {
+        lastRemoteSnapshotJson = snapshotJson;
+        lastSavedRevision = revisionAtStart;
+        pendingRemoteSave = false;
+      } else {
+        pendingRemoteSave = true;
+      }
     } catch (_error) {
-      // De eerstvolgende wijziging of online-event probeert opnieuw.
+      pendingRemoteSave = true;
+      if (!options.keepalive) scheduleRemoteRetry();
+    } finally {
+      if (tracksInFlight) {
+        remoteSaveInFlight = false;
+        if (saved && (pendingRemoteSave || stateRevision !== lastSavedRevision)) {
+          pendingRemoteSave = false;
+          window.clearTimeout(remoteSaveTimer);
+          remoteSaveTimer = window.setTimeout(() => {
+            persistRemoteSave();
+          }, 0);
+        }
+      }
     }
   }
 
   function flushRemoteSave() {
     window.clearTimeout(remoteSaveTimer);
-    persistRemoteSave({ keepalive: true });
+    clearRemoteRetryTimer();
+    if (stateRevision === lastSavedRevision && !pendingRemoteSave) return;
+    persistRemoteSave({ keepalive: true, allowConcurrent: true });
   }
 
   function renderDayChoices() {
@@ -884,7 +963,10 @@
     isReady = true;
     addButton.disabled = false;
     render();
-    if (shouldPersistLoadedSnapshot) persistRemoteSave();
+    if (shouldPersistLoadedSnapshot) {
+      markStateChanged({ silent: true });
+      persistRemoteSave();
+    }
   }
 
   boot();
