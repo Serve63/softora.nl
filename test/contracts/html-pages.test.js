@@ -379,7 +379,15 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
   const loggerErrors = [];
   fs.writeFileSync(
     path.join(pagesDir, 'premium-personeel-dashboard.html'),
-    '<!DOCTYPE html><html><head><title>Dashboard</title></head><body><main>Dashboard</main></body></html>'
+    [
+      '<!DOCTYPE html><html><head><title>Dashboard</title></head><body><main>Dashboard</main>',
+      '<div id="kpiRevenueYear"><!-- SOFTORA_DASHBOARD_TOTAL_REVENUE --></div>',
+      '<div id="kpiRecurringRevenue"><!-- SOFTORA_DASHBOARD_RECURRING_REVENUE --></div>',
+      '<div id="kpiTotalClients"><!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS --></div>',
+      '<div id="revenueChart"><!-- SOFTORA_DASHBOARD_REVENUE_CHART --></div>',
+      '<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->',
+      '</body></html>',
+    ].join('')
   );
 
   const coordinator = createHtmlPageCoordinator({
@@ -423,6 +431,14 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
 
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /Dashboard/);
+  assert.match(res.body, /id="kpiRevenueYear">--<\/div>/);
+  assert.match(res.body, /id="kpiRecurringRevenue">--<\/div>/);
+  assert.match(res.body, /id="kpiTotalClients">--<script>/);
+  assert.match(res.body, /Actieve opdrachten tijdelijk niet geladen/);
+  assert.match(res.body, /id="softoraCustomersBootstrap" type="application\/json">/);
+  assert.match(res.body, /"source":"unavailable"/);
+  assert.match(res.body, /<span class="chart-label">Jan<\/span>/);
+  assert.doesNotMatch(res.body, /SOFTORA_DASHBOARD_TOTAL_REVENUE/);
   assert.equal(
     loggerInfos.some(
       (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'

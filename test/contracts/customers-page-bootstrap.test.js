@@ -169,6 +169,45 @@ test('customers page bootstrap gebruikt compacte dashboardklanten zonder zware c
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^1<script>/);
 });
 
+test('customers page bootstrap laat trage actieve opdrachten dashboardklanten niet blokkeren', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      if (scope === 'premium_active_orders') return new Promise(() => {});
+      throw new Error('Zware klantstate mag niet nodig zijn wanneer dashboardklanten geladen zijn.');
+    },
+    listDashboardCustomers: async () => [
+      {
+        id: 'klant-compact-1',
+        naam: 'Linsey Klaus',
+        bedrijf: 'Linszorgt.nl',
+        websiteBedrag: 300,
+        status: 'Betaald',
+        databaseStatus: 'klant',
+        datum: '2026-03-23',
+      },
+    ],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+    dashboardOrderStateTimeoutMs: 5,
+    dashboardCustomersTimeoutMs: 50,
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'dashboard-customers');
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.activeOrdersState.source, 'unavailable');
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac300');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^1<script>/);
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
+});
+
 test('customers page bootstrap vult dashboard actieve-opdrachten teller server-side', () => {
   const orders = JSON.stringify([
     {

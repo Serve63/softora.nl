@@ -592,6 +592,11 @@ function createCustomersPageBootstrapService(deps = {}) {
     }).join('');
   }
 
+  function isDashboardActiveOrdersStateUnavailable(activeOrdersState) {
+    const source = normalizeString(activeOrdersState && activeOrdersState.source).toLowerCase();
+    return source === 'unavailable' || source === 'bootstrap-timeout';
+  }
+
   function buildDashboardHtmlReplacements(payload = {}) {
     const payloadUnavailable =
       !payload ||
@@ -614,7 +619,9 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
 
     const summary = buildDashboardMetricSummary(payload.customers);
-    const activeOrdersBreakdown = buildActiveOrdersBreakdown(payload.activeOrdersState);
+    const activeOrdersBreakdown = isDashboardActiveOrdersStateUnavailable(payload.activeOrdersState)
+      ? null
+      : buildActiveOrdersBreakdown(payload.activeOrdersState);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
@@ -625,15 +632,45 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
   }
 
-  async function readBootstrapUiState(scope) {
+  function buildUnavailableBootstrapState(error) {
+    return {
+      values: {},
+      source: 'unavailable',
+      error: normalizeString(error?.message || error),
+    };
+  }
+
+  async function resolveBootstrapReadWithTimeout(readPromise, timeoutMs, fallbackValue) {
+    const safeTimeoutMs = Math.max(50, Math.min(10000, Number(timeoutMs) || 0));
+    if (!safeTimeoutMs) return readPromise;
+    let timeout = null;
     try {
-      return await getUiStateValues(scope);
+      return await Promise.race([
+        Promise.resolve(readPromise),
+        new Promise((resolve) => {
+          timeout = setTimeout(() => resolve(fallbackValue), safeTimeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  function getDashboardBootstrapReadOptions(scope) {
+    return {
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressReadFailureLog: true,
+      suppressTransientReadFailureLog: true,
+      readFailureCooldownScope: `premium_dashboard_bootstrap_${normalizeString(scope)}`,
+    };
+  }
+
+  async function readBootstrapUiState(scope, options = {}) {
+    try {
+      return await getUiStateValues(scope, options);
     } catch (error) {
-      return {
-        values: {},
-        source: 'unavailable',
-        error: normalizeString(error?.message || error),
-      };
+      return buildUnavailableBootstrapState(error);
     }
   }
 
@@ -691,21 +728,76 @@ function createCustomersPageBootstrapService(deps = {}) {
     }
 
     const shouldPreferDashboardCustomers = options.preferDashboardCustomers === true;
-    const [orderState, dashboardCustomers] = await Promise.all([
-      readBootstrapUiState(orderScope),
-      shouldPreferDashboardCustomers ? readDashboardCustomers() : Promise.resolve(null),
-    ]);
-    const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
-    if (shouldPreferDashboardCustomers && Array.isArray(dashboardCustomers) && dashboardCustomers.length) {
+    if (shouldPreferDashboardCustomers) {
+      const orderStatePromise = resolveBootstrapReadWithTimeout(
+        readBootstrapUiState(orderScope, getDashboardBootstrapReadOptions(orderScope)),
+        options.dashboardOrderStateTimeoutMs || 1800,
+        buildUnavailableBootstrapState(new Error('Dashboard opdrachtstate timeout'))
+      );
+      const dashboardCustomersPromise = resolveBootstrapReadWithTimeout(
+        readDashboardCustomers(),
+        options.dashboardCustomersTimeoutMs || 4200,
+        null
+      );
+
+      const [orderState, dashboardCustomers] = await Promise.all([
+        orderStatePromise,
+        dashboardCustomersPromise,
+      ]);
+      const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
+
+      if (Array.isArray(dashboardCustomers) && dashboardCustomers.length) {
+        return {
+          ok: true,
+          loadedAt: new Date().toISOString(),
+          source: 'dashboard-customers',
+          customers: mergeCustomersWithResponsible(dashboardCustomers, orders),
+          activeOrdersState: buildBootstrapStateSnapshot(orderState),
+        };
+      }
+
+      const remoteState = await resolveBootstrapReadWithTimeout(
+        readBootstrapUiState(customerScope, getDashboardBootstrapReadOptions(customerScope)),
+        options.dashboardFallbackCustomersTimeoutMs || 2800,
+        buildUnavailableBootstrapState(new Error('Dashboard klantstate fallback timeout'))
+      );
+      const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
+
+      if (remoteCustomers.length) {
+        return {
+          ok: true,
+          loadedAt: new Date().toISOString(),
+          source: 'customers',
+          customers: mergeCustomersWithResponsible(remoteCustomers, orders),
+          activeOrdersState: buildBootstrapStateSnapshot(orderState),
+        };
+      }
+
+      const customers = deriveCustomersFromOrders(orders);
+
+      if (!customers.length && (!hasLoadedUiStateValues(remoteState) || !hasLoadedUiStateValues(orderState))) {
+        return {
+          ok: false,
+          loadedAt: new Date().toISOString(),
+          source: 'unavailable',
+          message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
+          customers: [],
+          activeOrdersState: buildBootstrapStateSnapshot(orderState),
+        };
+      }
+
       return {
         ok: true,
         loadedAt: new Date().toISOString(),
-        source: 'dashboard-customers',
-        customers: mergeCustomersWithResponsible(dashboardCustomers, orders),
+        source: customers.length ? 'orders' : 'empty',
+        customers,
         activeOrdersState: buildBootstrapStateSnapshot(orderState),
       };
     }
+
+    const orderState = await readBootstrapUiState(orderScope);
+    const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
     const remoteState = await readBootstrapUiState(customerScope);
     const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
