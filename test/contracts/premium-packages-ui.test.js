@@ -40,7 +40,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(scriptSource, /if \(isLockedPackageTab\(name, tabEl\)\) return false;/);
   assert.doesNotMatch(pageSource, />Richtlijnen<\/button>/);
   assert.match(pageSource, /Website Richtlijnen/);
-  assert.match(pageSource, /Kies de richtlijn die past bij jouw project/);
+  assert.doesNotMatch(pageSource, /Kies de richtlijn die past bij jouw project/);
   assert.match(pageSource, /Richtlijn 1/);
   assert.match(pageSource, /One Page Website/);
   assert.match(pageSource, /Richtlijn 2/);
@@ -119,13 +119,15 @@ test('website richtlijnen tonen de vier keuzes van de Softora richtprijskaart', 
   const sectionEnd = pageSource.indexOf('<div id="tab-onderhoud"', sectionStart);
   const guidelinesSection = pageSource.slice(sectionStart, sectionEnd);
 
-  assert.equal((guidelinesSection.match(/class="route-card guideline-card"/g) || []).length, 4);
+  assert.equal((guidelinesSection.match(/<div class="card(?: featured)?">/g) || []).length, 4);
   assert.match(guidelinesSection, /<div class="section-title">Website Richtlijnen<\/div>/);
-  assert.match(guidelinesSection, /Elke website is maatwerk en wordt volledig afgestemd op jouw doelen\./);
-  assert.match(guidelinesSection, /<div class="guideline-number">01<\/div>[\s\S]*<div class="card-tier">Richtlijn 1<\/div>[\s\S]*<div class="route-title">One Page Website<\/div>[\s\S]*<div class="price-amount">€850,-<\/div>/);
-  assert.match(guidelinesSection, /<div class="guideline-number">02<\/div>[\s\S]*<div class="card-tier">Richtlijn 2<\/div>[\s\S]*<div class="route-title">Website met pagina's &amp; tooltjes<\/div>[\s\S]*<div class="price-amount">€1\.350,-<\/div>/);
-  assert.match(guidelinesSection, /<div class="guideline-number">03<\/div>[\s\S]*<div class="card-tier">Richtlijn 3<\/div>[\s\S]*<div class="route-title">Website met veel pagina's<\/div>[\s\S]*<div class="price-amount">€2\.250,-<\/div>/);
-  assert.match(guidelinesSection, /<div class="guideline-number">04<\/div>[\s\S]*<div class="card-tier">Richtlijn 4<\/div>[\s\S]*<div class="route-title">Bedrijfssoftware op maat<\/div>[\s\S]*<div class="price-amount">€3\.500,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="cards-grid">/);
+  assert.doesNotMatch(guidelinesSection, /route-card guideline-card/);
+  assert.doesNotMatch(guidelinesSection, /guideline-number/);
+  assert.match(guidelinesSection, /<div class="card-tier">Richtlijn 1<\/div>[\s\S]*<div class="card-name">One Page Website<\/div>[\s\S]*<div class="price-amount">€850,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="card-badge">Meest gekozen<\/div>[\s\S]*<div class="card-tier">Richtlijn 2<\/div>[\s\S]*<div class="card-name">Website met pagina's &amp; tooltjes<\/div>[\s\S]*<div class="price-amount">€1\.350,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="card-tier">Richtlijn 3<\/div>[\s\S]*<div class="card-name">Website met veel pagina's<\/div>[\s\S]*<div class="price-amount">€2\.250,-<\/div>/);
+  assert.match(guidelinesSection, /<div class="card-tier">Richtlijn 4<\/div>[\s\S]*<div class="card-name">Bedrijfssoftware op maat<\/div>[\s\S]*<div class="price-amount">€3\.500,-<\/div>/);
   assert.equal((guidelinesSection.match(/Richtprijs excl\. BTW/g) || []).length, 4);
   assert.doesNotMatch(guidelinesSection, /Losse oplevering/);
   assert.doesNotMatch(guidelinesSection, /Losse oplevering mét CMS/);
@@ -145,10 +147,10 @@ test('pakketkaarten gebruiken interne Softora CTA labels', () => {
     (match) => match[1].trim()
   );
 
-  assert.equal(ctaLabels.length, 27);
+  assert.equal(ctaLabels.length, 31);
   assert.deepEqual([...new Set(ctaLabels)], ['Softora']);
   assert.equal((pageSource.match(/class="card-cta[^"]*is-locked/g) || []).length, 0);
-  assert.equal((websiteBuildSection.match(/<button class="card-cta[^"]*" type="button">Softora<\/button>/g) || []).length, 0);
+  assert.equal((websiteBuildSection.match(/<button class="card-cta[^"]*" type="button">Softora<\/button>/g) || []).length, 4);
   assert.doesNotMatch(websiteBuildSection, /is-locked/);
   assert.doesNotMatch(websiteBuildSection, /disabled/);
   assert.doesNotMatch(pageSource, />Tijdelijk vergrendeld</);
