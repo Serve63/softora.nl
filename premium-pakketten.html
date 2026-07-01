@@ -306,7 +306,7 @@ body {
 
   .tabs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     margin-bottom: 32px;
     border-bottom: 2px solid var(--border);
@@ -356,7 +356,6 @@ body {
   }
 
   .tab.theme-website { --tab-accent: #8b2252; }
-  .tab.theme-routes { --tab-accent: #8b2252; }
   .tab.theme-business { --tab-accent: #2563eb; }
   .tab.theme-voice { --tab-accent: #1f9b5a; }
   .tab.theme-chatbot { --tab-accent: #f39c12; }
@@ -1403,95 +1402,24 @@ body {
   </div>
 
   <div class="tabs">
-    <button class="tab theme-routes active" type="button" data-package-tab="routes">Richtlijnen</button>
-    <button class="tab theme-website" type="button" data-package-tab="website">Website</button>
+    <button class="tab theme-website active" type="button" data-package-tab="website">Website</button>
     <button class="tab theme-business is-locked" type="button" data-package-tab="bedrijfssoftware" data-package-tab-locked="true" disabled aria-disabled="true" aria-label="Bedrijfssoftware vergrendeld" title="Vergrendeld"><span>Bedrijfssoftware</span><span class="tab-lock" aria-hidden="true"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/></svg></span></button>
     <button class="tab theme-voice is-locked" type="button" data-package-tab="voicesoftware" data-package-tab-locked="true" disabled aria-disabled="true" aria-label="Voicesoftware vergrendeld" title="Vergrendeld"><span>Voicesoftware</span><span class="tab-lock" aria-hidden="true"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/></svg></span></button>
     <button class="tab theme-chatbot is-locked" type="button" data-package-tab="chatbots" data-package-tab-locked="true" disabled aria-disabled="true" aria-label="Chatbot vergrendeld" title="Vergrendeld"><span>Chatbot</span><span class="tab-lock" aria-hidden="true"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/></svg></span></button>
   </div>
 
-  <div id="tab-routes" class="tab-panel theme-routes active"><div class="section-title">Website Richtlijnen</div><p class="guidelines-intro">Kies de richtlijn die past bij jouw project. Elke website is maatwerk en wordt volledig afgestemd op jouw doelen.</p><div class="routes-grid">
+  <div id="tab-bouwen" class="tab-panel theme-website active">
+    <div class="section-title">Website Richtlijnen</div>
+    <p class="guidelines-intro">Kies de richtlijn die past bij jouw project. Elke website is maatwerk en wordt volledig afgestemd op jouw doelen.</p>
+    <div class="routes-grid">
       <div class="route-card guideline-card"><div class="guideline-number">01</div><div class="card-tier">Richtlijn 1</div><div class="route-title">One Page Website</div><div class="card-price"><div class="price-amount">€850,-</div><div class="price-note">Richtprijs excl. BTW</div></div></div>
       <div class="route-card guideline-card"><div class="guideline-number">02</div><div class="card-tier">Richtlijn 2</div><div class="route-title">Website met pagina's &amp; tooltjes</div><div class="card-price"><div class="price-amount">€1.350,-</div><div class="price-note">Richtprijs excl. BTW</div></div></div>
       <div class="route-card guideline-card"><div class="guideline-number">03</div><div class="card-tier">Richtlijn 3</div><div class="route-title">Website met veel pagina's</div><div class="card-price"><div class="price-amount">€2.250,-</div><div class="price-note">Richtprijs excl. BTW</div></div></div>
       <div class="route-card guideline-card"><div class="guideline-number">04</div><div class="card-tier">Richtlijn 4</div><div class="route-title">Bedrijfssoftware op maat</div><div class="card-price"><div class="price-amount">€3.500,-</div><div class="price-note">Richtprijs excl. BTW</div></div></div>
-    </div></div>
-  <div id="tab-bouwen" class="tab-panel theme-website">
-    <div class="section-title">Website Bouw Pakketten</div>
-
-    <div class="cards-grid">
-      <div class="card">
-        <div class="card-tier">Pakket 01</div>
-        <div class="card-name">Starter</div>
-        <div class="card-desc">Voor starters die snel online willen.</div>
-        <div class="card-price">
-          <div class="price-amount">€749,-<span class="price-suffix">eenmalig</span></div>
-          <div class="price-note">Excl. BTW · Oplevering binnen 2 weken</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tot 5 pagina's</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Mobielvriendelijk design</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Contactformulier</li>
-        </ul>
-        <button class="card-cta outline" type="button">Softora</button>
-      </div>
-
-      <div class="card featured">
-        <div class="card-badge">Meest gekozen</div>
-        <div class="card-tier">Pakket 02</div>
-        <div class="card-name">Business</div>
-        <div class="card-desc">Voor groeiende bedrijven met sterk design.</div>
-        <div class="card-price">
-          <div class="price-amount">€1.350,-<span class="price-suffix">eenmalig</span></div>
-          <div class="price-note">Excl. BTW · Oplevering binnen 3 weken</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tot 10 pagina's</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Design in huisstijl</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Geavanceerde SEO + sitemap</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Chat/WhatsApp knop</li>
-        </ul>
-        <button class="card-cta filled" type="button">Softora</button>
-      </div>
-
-      <div class="card">
-        <div class="card-tier">Pakket 03</div>
-        <div class="card-name">Premium</div>
-        <div class="card-desc">Volledig maatwerk voor ambitieuze bedrijven.</div>
-        <div class="card-price">
-          <div class="price-amount">€2.495<span class="price-suffix">eenmalig</span></div>
-          <div class="price-note">Excl. BTW · Op aanvraag gepland</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onbeperkt pagina's</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Maatwerk design</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Webshop/reserveringen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Meertalig (NL/EN)</li>
-        </ul>
-        <button class="card-cta outline" type="button">Softora</button>
-      </div>
-
-      <div class="card">
-        <div class="card-tier">Pakket 04</div>
-        <div class="card-name">Enterprise</div>
-        <div class="card-desc">Complexe maatwerktrajecten met integraties.</div>
-        <div class="card-price">
-          <div class="price-amount">Op<span class="price-suffix"> aanvraag</span></div>
-          <div class="price-note">Excl. BTW · Planning in overleg</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Intake + scope</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>API/CMS koppelingen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Schaalbare beveiliging</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Projectmanager + SLA</li>
-        </ul>
-        <button class="card-cta outline" type="button">Softora</button>
-      </div>
     </div>
-
   </div>
 
-  <div id="tab-onderhoud" class="tab-panel theme-website">
+  <div id="tab-onderhoud" class="tab-panel theme-website active">
     <div class="section-title">Website Onderhoud Pakketten</div>
     <div class="onderhoud-grid">
       <div class="onderhoud-card">
@@ -1999,6 +1927,6 @@ body {
   </div>
 </main>
 
-<script src="assets/premium-packages.js?v=20260629a"></script>
+<script src="assets/premium-packages.js?v=20260701a"></script>
 </body>
 </html>

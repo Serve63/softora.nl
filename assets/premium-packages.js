@@ -2,7 +2,6 @@
     "use strict";
 
     var packageTabGroups = {
-        routes: ["routes"],
         website: ["bouwen", "onderhoud"],
         bedrijfssoftware: ["bedrijfssoftware", "bedrijfssoftware-onderhoud"],
         voicesoftware: ["voice-software", "voice-software-onderhoud"],

@@ -18,9 +18,9 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
 
-  assert.match(pageSource, /<script src="assets\/premium-packages\.js\?v=20260629a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-packages\.js\?v=20260701a"><\/script>/);
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
-  assert.match(pageSource, /data-package-tab="routes"/);
+  assert.doesNotMatch(pageSource, /data-package-tab="routes"/);
   assert.match(pageSource, /data-package-tab="website"/);
   assert.match(pageSource, /data-package-tab="bedrijfssoftware"/);
   assert.match(pageSource, /data-package-tab="voicesoftware"/);
@@ -30,7 +30,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /data-package-tab="bedrijfssoftware"[^>]*data-package-tab-locked="true"[^>]*disabled[^>]*aria-disabled="true"/);
   assert.match(pageSource, /data-package-tab="voicesoftware"[^>]*data-package-tab-locked="true"[^>]*disabled[^>]*aria-disabled="true"/);
   assert.match(pageSource, /data-package-tab="chatbots"[^>]*data-package-tab-locked="true"[^>]*disabled[^>]*aria-disabled="true"/);
-  assert.match(pageSource, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
+  assert.match(pageSource, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
   assert.match(scriptSource, /var packageTabGroups = \{/);
   assert.match(scriptSource, /var lockedPackageTabs = \{/);
   assert.match(scriptSource, /bedrijfssoftware: true/);
@@ -38,7 +38,7 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(scriptSource, /chatbots: true/);
   assert.match(scriptSource, /function isLockedPackageTab\(name, tabEl\)/);
   assert.match(scriptSource, /if \(isLockedPackageTab\(name, tabEl\)\) return false;/);
-  assert.match(pageSource, />Richtlijnen<\/button>/);
+  assert.doesNotMatch(pageSource, />Richtlijnen<\/button>/);
   assert.match(pageSource, /Website Richtlijnen/);
   assert.match(pageSource, /Kies de richtlijn die past bij jouw project/);
   assert.match(pageSource, /Richtlijn 1/);
@@ -50,17 +50,16 @@ test('premium pakketten gebruikt een asset voor tabgedrag', () => {
   assert.match(pageSource, /Richtlijn 4/);
   assert.match(pageSource, /Bedrijfssoftware op maat/);
   assert.doesNotMatch(pageSource, /<div class="card-badge">Flexibel<\/div>/);
-  assert.match(pageSource, /id="tab-routes" class="tab-panel theme-routes active"/);
-  assert.match(pageSource, /id="tab-bouwen" class="tab-panel theme-website"/);
-  assert.match(pageSource, /id="tab-onderhoud" class="tab-panel theme-website"/);
-  assert.doesNotMatch(pageSource, /id="tab-onderhoud" class="tab-panel theme-website active"/);
+  assert.doesNotMatch(pageSource, /id="tab-routes"/);
+  assert.match(pageSource, /id="tab-bouwen" class="tab-panel theme-website active"/);
+  assert.match(pageSource, /id="tab-onderhoud" class="tab-panel theme-website active"/);
   assert.doesNotMatch(pageSource, /Maandelijks opzegbaar/);
   assert.equal((pageSource.match(/Jaarlijks opzegbaar/g) || []).length, 9);
   assert.match(pageSource, /\.onderhoud-card \.features-list::before\s*\{[\s\S]*content:\s*"Realistische taken";/);
   assert.match(pageSource, /\.card-cta\s*\{[\s\S]*margin-top:\s*auto;/);
   assert.match(pageSource, /\.card\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
   assert.match(pageSource, /\.onderhoud-card\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
-  assert.match(scriptSource, /routes: \["routes"\]/);
+  assert.doesNotMatch(scriptSource, /routes: \["routes"\]/);
   assert.match(scriptSource, /website: \["bouwen", "onderhoud"\]/);
   assert.match(scriptSource, /bedrijfssoftware: \["bedrijfssoftware", "bedrijfssoftware-onderhoud"\]/);
   assert.match(scriptSource, /voicesoftware: \["voice-software", "voice-software-onderhoud"\]/);
@@ -116,8 +115,8 @@ test('website onderhoudspakketten tonen de aangeleverde foto-prijzen en taken', 
 
 test('website richtlijnen tonen de vier keuzes van de Softora richtprijskaart', () => {
   const pageSource = readPage();
-  const sectionStart = pageSource.indexOf('<div id="tab-routes"');
-  const sectionEnd = pageSource.indexOf('<div id="tab-bouwen"', sectionStart);
+  const sectionStart = pageSource.indexOf('<div id="tab-bouwen"');
+  const sectionEnd = pageSource.indexOf('<div id="tab-onderhoud"', sectionStart);
   const guidelinesSection = pageSource.slice(sectionStart, sectionEnd);
 
   assert.equal((guidelinesSection.match(/class="route-card guideline-card"/g) || []).length, 4);
@@ -132,6 +131,8 @@ test('website richtlijnen tonen de vier keuzes van de Softora richtprijskaart', 
   assert.doesNotMatch(guidelinesSection, /Losse oplevering mét CMS/);
   assert.doesNotMatch(guidelinesSection, /Softora Volledig beheer/);
   assert.doesNotMatch(guidelinesSection, /database-hosting-note/);
+  assert.doesNotMatch(pageSource, /Website Bouw Pakketten/);
+  assert.doesNotMatch(pageSource, /<div class="card-tier">Pakket 01<\/div>[\s\S]*<div class="card-name">Starter<\/div>/);
 });
 
 test('pakketkaarten gebruiken interne Softora CTA labels', () => {
@@ -144,15 +145,15 @@ test('pakketkaarten gebruiken interne Softora CTA labels', () => {
     (match) => match[1].trim()
   );
 
-  assert.equal(ctaLabels.length, 31);
+  assert.equal(ctaLabels.length, 27);
   assert.deepEqual([...new Set(ctaLabels)], ['Softora']);
   assert.equal((pageSource.match(/class="card-cta[^"]*is-locked/g) || []).length, 0);
-  assert.equal((websiteBuildSection.match(/<button class="card-cta[^"]*" type="button">Softora<\/button>/g) || []).length, 4);
+  assert.equal((websiteBuildSection.match(/<button class="card-cta[^"]*" type="button">Softora<\/button>/g) || []).length, 0);
   assert.doesNotMatch(websiteBuildSection, /is-locked/);
   assert.doesNotMatch(websiteBuildSection, /disabled/);
   assert.doesNotMatch(pageSource, />Tijdelijk vergrendeld</);
-  assert.match(pageSource, /€749,-/);
-  assert.match(pageSource, /€1\.350,-/);
+  assert.doesNotMatch(websiteBuildSection, /€749,-/);
+  assert.match(websiteBuildSection, /€1\.350,-/);
   assert.doesNotMatch(
     pageSource,
     />\s*(?:Pakket Aanvragen|Pakket aanvragen|Meer Informatie|Meer informatie|Selecteren|Offerte Aanvragen|Offerte aanvragen|Contact Opnemen|Contact opnemen)\s*</

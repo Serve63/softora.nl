@@ -339,12 +339,17 @@ test('page smoke: premium-website.html handles missing cursor elements safely', 
   );
 });
 
-test('page smoke: premium-pakketten.html shows the current Premium package price', () => {
+test('page smoke: premium-pakketten.html shows the current website guideline prices', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-pakketten.html'), 'utf8');
   assert.match(
     html,
-    /<div class="card-name">Premium<\/div>[^]*?<div class="price-amount">€2\.495/,
-    'Premium websitepakket hoort op €2.495 te staan.'
+    /<div class="card-tier">Richtlijn 3<\/div>[^]*?<div class="price-amount">€2\.250,-<\/div>/,
+    'Richtlijn 3 hoort op €2.250,- te staan.'
+  );
+  assert.match(
+    html,
+    /<div class="card-tier">Richtlijn 4<\/div>[^]*?<div class="price-amount">€3\.500,-<\/div>/,
+    'Richtlijn 4 hoort op €3.500,- te staan.'
   );
   assert.match(
     html,
