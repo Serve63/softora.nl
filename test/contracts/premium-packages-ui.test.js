@@ -124,6 +124,9 @@ test('website richtlijnen tonen de vier keuzes van de Softora richtprijskaart', 
   assert.match(guidelinesSection, /<div class="cards-grid">/);
   assert.doesNotMatch(guidelinesSection, /route-card guideline-card/);
   assert.doesNotMatch(guidelinesSection, /guideline-number/);
+  assert.match(pageSource, /#tab-bouwen \.card-name\s*\{[^}]*-webkit-line-clamp:\s*2;[^}]*overflow:\s*hidden;/);
+  assert.match(pageSource, /#tab-bouwen \.card-price\s*\{[^}]*border-bottom:\s*0;[^}]*padding-bottom:\s*0;/);
+  assert.doesNotMatch(pageSource, /\.guideline-card \.card-price/);
   assert.match(guidelinesSection, /<div class="card-tier">Richtlijn 1<\/div>[\s\S]*<div class="card-name">One Page Website<\/div>[\s\S]*<div class="price-amount">€850,-<\/div>/);
   assert.match(guidelinesSection, /<div class="card-badge">Meest gekozen<\/div>[\s\S]*<div class="card-tier">Richtlijn 2<\/div>[\s\S]*<div class="card-name">Website met pagina's &amp; tooltjes<\/div>[\s\S]*<div class="price-amount">€1\.350,-<\/div>/);
   assert.match(guidelinesSection, /<div class="card-tier">Richtlijn 3<\/div>[\s\S]*<div class="card-name">Website met veel pagina's<\/div>[\s\S]*<div class="price-amount">€2\.250,-<\/div>/);
