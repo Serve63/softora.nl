@@ -133,7 +133,7 @@ function createHtmlPageCoordinator(options = {}) {
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
     publicPageDependencyWaitMs = 350,
-    protectedPageBootstrapWaitMs = 2500,
+    protectedPageBootstrapWaitMs = 5500,
     isProduction = process.env.NODE_ENV === 'production',
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;
@@ -236,6 +236,48 @@ function createHtmlPageCoordinator(options = {}) {
     });
 
     return renderedHtml;
+  }
+
+  function buildDashboardUnavailableChartHtml() {
+    const labels = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
+    return labels.map((label, index) => [
+      '<div class="chart-bar-group">',
+      `<div class="chart-bar" data-chart-index="${index}" style="height: 0px;" title="--"></div>`,
+      `<span class="chart-label">${label}</span>`,
+      '</div>',
+    ].join('')).join('');
+  }
+
+  function buildDashboardUnavailableActiveOrdersScript() {
+    return `<script>(function markActiveOrdersUnavailable(){var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',markActiveOrdersUnavailable,{once:true});return;}root.querySelectorAll('[data-kpi-active-website],[data-kpi-active-business],[data-kpi-active-voice],[data-kpi-active-chatbot]').forEach(function(el){el.textContent='--';});root.setAttribute('aria-label','Actieve opdrachten tijdelijk niet geladen');})();</script>`;
+  }
+
+  function buildDashboardBootstrapTimeoutFallback(fileName) {
+    if (fileName !== 'premium-personeel-dashboard.html') return null;
+    const data = {
+      ok: false,
+      loadedAt: new Date().toISOString(),
+      source: 'unavailable',
+      message: 'Dashboarddata tijdelijk niet geladen. Je data is niet verwijderd; het dashboard probeert opnieuw.',
+      customers: [],
+      activeOrdersState: {
+        values: {},
+        source: 'bootstrap-timeout',
+        updatedAt: null,
+      },
+    };
+    return {
+      marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
+      scriptId: 'softoraCustomersBootstrap',
+      data,
+      htmlReplacements: {
+        SOFTORA_DASHBOARD_TOTAL_REVENUE: '--',
+        SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: '--',
+        SOFTORA_DASHBOARD_RECURRING_REVENUE: '--',
+        SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardUnavailableChartHtml(),
+        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardUnavailableActiveOrdersScript()}`,
+      },
+    };
   }
 
   function injectSnippetBeforeHeadClose(html, snippet) {
@@ -526,7 +568,7 @@ function createHtmlPageCoordinator(options = {}) {
                 fileName,
                 label: 'Bootstrap',
                 timeoutMs: bootstrapTimeoutMs,
-                fallbackValue: null,
+                fallbackValue: buildDashboardBootstrapTimeoutFallback(fileName),
               })
             : await getPageBootstrapData(req, fileName)
           : null;

@@ -2031,14 +2031,8 @@
                 </div>
                 <div class="kpi-card highlighted">
                     <div class="kpi-label">Actieve Opdrachten</div>
-                    <div class="kpi-value kpi-value--active-orders" id="kpiActiveOrders" aria-label="Website opdrachten: 0, bedrijfssoftware: 0, voicesoftware: 0, chatbots: 0">
-                        <span class="kpi-active-count-website" data-kpi-active-website>0</span>
-                        <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
-                        <span class="kpi-active-count-business" data-kpi-active-business>0</span>
-                        <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
-                        <span class="kpi-active-count-voice" data-kpi-active-voice>0</span>
-                        <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
-                        <span class="kpi-active-count-chatbot" data-kpi-active-chatbot>0</span>
+                    <div class="kpi-value kpi-value--active-orders" id="kpiActiveOrders" aria-label="Actieve opdrachten tijdelijk niet geladen">
+                        <span class="kpi-active-count-website" data-kpi-active-website>--</span><span class="kpi-active-count-sep" aria-hidden="true"> - </span><span class="kpi-active-count-business" data-kpi-active-business>--</span><span class="kpi-active-count-sep" aria-hidden="true"> - </span><span class="kpi-active-count-voice" data-kpi-active-voice>--</span><span class="kpi-active-count-sep" aria-hidden="true"> - </span><span class="kpi-active-count-chatbot" data-kpi-active-chatbot>--</span>
                     </div>
                 </div>
             </div>
@@ -2090,7 +2084,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260502a"></script><script src="assets/premium-dashboard-data-status.js?v=20260604d"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260701a"></script><script src="assets/premium-dashboard-data-status.js?v=20260604d"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2106,7 +2100,7 @@
             loading: false,
             orders: [],
             customers: [],
-            pollTimer: null,
+            pollTimer: null, recoveryTimer: null, recoveryAttempts: 0,
             refreshPromise: null,
             lastRefreshAt: 0,
             ordersHydrated: false, customersHydrated: false,
@@ -3126,6 +3120,8 @@
 
         }
 
+        function clearPremiumDashboardRecoveryTimer() { if (premiumDashboardState.recoveryTimer) { window.clearTimeout(premiumDashboardState.recoveryTimer); premiumDashboardState.recoveryTimer = null; } premiumDashboardState.recoveryAttempts = 0; } function schedulePremiumDashboardRecovery() { if (premiumDashboardState.recoveryTimer || premiumDashboardState.recoveryAttempts >= 4) return; const delays = [1500, 4000, 9000, 15000]; const delay = delays[premiumDashboardState.recoveryAttempts] || 15000; premiumDashboardState.recoveryAttempts += 1; premiumDashboardState.recoveryTimer = window.setTimeout(() => { premiumDashboardState.recoveryTimer = null; void refreshPremiumDashboard(true); }, delay); }
+
         async function loadPremiumDashboardOrders() {
             if (premiumDashboardState.loading) return false;
             premiumDashboardState.loading = true;
@@ -3167,7 +3163,8 @@
             premiumDashboardState.refreshPromise = (async () => {
                 await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
                 const loaded = premiumDashboardState.orders.length > 0 || premiumDashboardState.customers.length > 0;
-                if (loaded) renderPremiumDashboardOrders(); else if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); premiumDashboardState.lastRefreshAt = Date.now();
+                if (loaded) { clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); } else { if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); schedulePremiumDashboardRecovery(); }
+                premiumDashboardState.lastRefreshAt = Date.now();
                 return loaded;
             })().finally(() => {
                 premiumDashboardState.refreshPromise = null;

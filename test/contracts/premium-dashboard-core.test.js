@@ -78,6 +78,13 @@ test('premium dashboard core formats money and project metadata', () => {
   );
 });
 
+test('premium dashboard core probeert fallbackroutes bij tijdelijke ui-state fouten', () => {
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('UI-state GET mislukt (503)')), false);
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('Dashboard data timeout na 6s')), false);
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('UI-state GET mislukt (401)')), true);
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('UI-state GET mislukt (429)')), true);
+});
+
 test('premium dashboard core hydrates active orders from server bootstrap values', () => {
   const state = { orders: [], ordersHydrated: false };
   const payload = {
