@@ -959,6 +959,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         heading: 'Money pages hebben ondersteunende pagina’s nodig',
         paragraphs: Object.freeze([
           'Een dienstpagina zoals website laten maken, bedrijfssoftware op maat of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
+          'Voor bedrijfssoftware werkt dat bijvoorbeeld met uitleg over CRM, dashboards, klantportalen en offerteflows. Die ondersteunende pagina’s geven context, terwijl de dienstpagina bedrijfssoftware op maat de commerciële keuze en contactstap scherp houdt.',
           'Zo blijft de commerciële pagina scherp, terwijl de site toch veel nuttige uitleg biedt.',
         ]),
       }),
