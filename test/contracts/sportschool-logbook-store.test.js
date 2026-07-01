@@ -7,7 +7,7 @@ const {
   createSportschoolLogbookStore,
 } = require('../../server/services/sportschool-logbook-store');
 
-function createClientFixture(currentRow) {
+function createClientFixture(currentRow, options = {}) {
   const historyInserts = [];
   const upserts = [];
   const client = {
@@ -32,6 +32,7 @@ function createClientFixture(currentRow) {
       if (table === SPORTSCHOOL_LOGBOOK_HISTORY_TABLE) {
         return {
           insert: async (row) => {
+            if (options.historyError) return { error: options.historyError };
             historyInserts.push(row);
             return { error: null };
           },
@@ -118,4 +119,52 @@ test('sportschool logbook store schrijft geen history wanneer snapshot gelijk bl
   assert.equal(result.source, 'supabase:sportschool');
   assert.equal(fixture.historyInserts.length, 0);
   assert.equal(fixture.upserts.length, 1);
+});
+
+test('sportschool logbook store laat history-fout hoofdopslag niet blokkeren', async () => {
+  const errors = [];
+  const previousPayload = {
+    version: 2,
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: { 1: { title: 'LEG EXTENSIONS', sets: '3', reps: '8', kg: '100' } },
+      },
+    },
+  };
+  const nextPayload = {
+    version: 2,
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: { 1: { title: 'LEG EXTENSIONS', sets: '3', reps: '8', kg: '104' } },
+      },
+    },
+  };
+  const fixture = createClientFixture(
+    {
+      payload: previousPayload,
+      updated_at: '2026-07-01T09:00:00.000Z',
+    },
+    { historyError: new Error('history table missing') }
+  );
+  const store = createSportschoolLogbookStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => fixture.client,
+    now: () => new Date('2026-07-01T09:05:00.000Z'),
+    logger: {
+      error: (...args) => errors.push(args.join(' ')),
+    },
+  });
+
+  const result = await store.writeLogbookSnapshot(nextPayload, {
+    source: 'sportschool-logboek',
+    actor: 'serve',
+  });
+
+  assert.equal(result.source, 'supabase:sportschool');
+  assert.equal(fixture.historyInserts.length, 0);
+  assert.equal(fixture.upserts.length, 1);
+  assert.deepEqual(fixture.upserts[0].row.payload, nextPayload);
+  assert.match(errors.join('\n'), /\[SportschoolLogbook\]\[history\]/);
 });

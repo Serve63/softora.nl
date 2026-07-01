@@ -108,7 +108,11 @@ function createSportschoolLogbookStore(deps = {}) {
         .eq('id', SPORTSCHOOL_LOGBOOK_ROW_ID)
         .maybeSingle();
       if (currentError) throw currentError;
-      await writeHistorySnapshot(client, currentRow, normalized.payload, meta, updatedAt);
+      try {
+        await writeHistorySnapshot(client, currentRow, normalized.payload, meta, updatedAt);
+      } catch (error) {
+        logError('history', error);
+      }
 
       const { error } = await client.from(SPORTSCHOOL_LOGBOOK_TABLE).upsert(
         {

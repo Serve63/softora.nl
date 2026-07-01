@@ -54,7 +54,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260624a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260701a/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
   assert.match(pageSource, /data-exercise-list/);
@@ -77,6 +77,12 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /snapshot: JSON\.parse\(snapshotJson\)/);
   assert.match(scriptSource, /scheduleRemoteSave/);
   assert.match(scriptSource, /persistRemoteSave/);
+  assert.match(scriptSource, /remoteSaveInFlight/);
+  assert.match(scriptSource, /pendingRemoteSave/);
+  assert.match(scriptSource, /stateRevision/);
+  assert.match(scriptSource, /lastSavedRevision/);
+  assert.match(scriptSource, /scheduleRemoteRetry/);
+  assert.match(scriptSource, /allowConcurrent/);
   assert.match(scriptSource, /exerciseSources/);
   assert.match(scriptSource, /exerciseKeyForTitle/);
   assert.match(scriptSource, /mergeExerciseSource/);
