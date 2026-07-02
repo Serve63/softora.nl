@@ -139,6 +139,11 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /Een dashboard laten ontwikkelen werkt pas goed/);
   assert.match(source, /Eerst scherpe scope, daarna pas bouwen/);
   assert.match(source, /Wat bepaalt de kosten\?/);
+  assert.match(source, /Bedrijfsapplicatie, CRM of dashboard\?/);
+  assert.match(source, /Bedrijfsapplicatie laten maken/);
+  assert.match(source, /CRM op maat of bedrijfssoftware\?/);
+  assert.match(source, /Dashboard laten ontwikkelen/);
+  assert.match(source, /Automatisch offerte systeem/);
   assert.match(source, /Bedrijfssoftware laten maken begint bij één kernproces/);
   assert.match(source, /Als leads blijven liggen/);
   assert.match(source, /Als management overzicht mist/);
