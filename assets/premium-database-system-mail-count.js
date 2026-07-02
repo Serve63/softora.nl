@@ -4,6 +4,7 @@
     const COLDMAIL_STATS_URL = "/api/coldmailing/stats";
     const TODAY_SENT_REFRESH_MS = 15000;
     let roiControlsBound = false;
+    let roiSaveLifecycleBound = false;
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
@@ -13,6 +14,7 @@
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
     let roiDirtySinceLoad = false;
+    let roiNeedsRemoteSync = false;
 
     function fallbackNormalizeString(value) {
         return value === null || value === undefined ? "" : String(value).trim();
@@ -231,19 +233,35 @@
         return roiStateLoadPromise;
     }
 
-    function persistDealCount() {
+    function persistDealCount(options) {
+        const persistOptions = options || {};
+        const countSnapshot = roiDealsCount;
         const client = getUiStateClient();
-        if (!client) return Promise.resolve(null);
+        if (!client) {
+            roiNeedsRemoteSync = true;
+            return Promise.resolve(null);
+        }
+        roiNeedsRemoteSync = true;
         return client.set(ROI_STATE_SCOPE, {
             patch: {
                 [ROI_STATE_KEY]: JSON.stringify({
-                    dealCount: roiDealsCount,
+                    dealCount: countSnapshot,
                     updatedAt: new Date().toISOString()
                 })
             },
             source: "premium-database-mail-roi",
             actor: "Premium database"
+        }, {
+            keepalive: persistOptions.keepalive !== false,
+            timeoutMs: 10000
+        }).then(function (result) {
+            if (countSnapshot === roiDealsCount) {
+                roiNeedsRemoteSync = false;
+                roiDirtySinceLoad = false;
+            }
+            return result;
         }).catch(function (error) {
+            roiNeedsRemoteSync = true;
             if (typeof console !== "undefined" && typeof console.error === "function") console.error("Mail ROI opslaan mislukt:", error);
             return { ok: false, error: error };
         });
@@ -254,6 +272,23 @@
         if (!options || options.persist !== false) {
             roiDirtySinceLoad = true;
             void persistDealCount();
+        }
+    }
+
+    function flushPendingRoiSave() {
+        if (roiNeedsRemoteSync || roiDirtySinceLoad) void persistDealCount({ keepalive: true });
+    }
+
+    function bindRoiSaveLifecycle() {
+        if (roiSaveLifecycleBound) return;
+        roiSaveLifecycleBound = true;
+        addWindowListener("pagehide", flushPendingRoiSave);
+        addWindowListener("beforeunload", flushPendingRoiSave);
+        const rootDocument = getRootDocument();
+        if (rootDocument && typeof rootDocument.addEventListener === "function") {
+            rootDocument.addEventListener("visibilitychange", function () {
+                if (rootDocument.hidden) flushPendingRoiSave();
+            });
         }
     }
 
@@ -435,6 +470,7 @@
 
     function bindRoiControls() {
         void loadPersistedDealCount();
+        bindRoiSaveLifecycle();
         if (roiControlsBound) return;
         const rootDocument = getRootDocument();
         if (!rootDocument || typeof rootDocument.querySelectorAll !== "function") return;
