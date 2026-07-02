@@ -636,8 +636,8 @@ test('premium database mail ROI calculator persists the customer count', async (
         assert.equal(scope, 'premium_database_mail_roi');
         return { values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 2 }) } };
       },
-      set: async (scope, body) => {
-        writes.push({ scope, body });
+      set: async (scope, body, options) => {
+        writes.push({ scope, body, options });
         return { ok: true };
       },
     },
@@ -666,6 +666,76 @@ test('premium database mail ROI calculator persists the customer count', async (
   assert.equal(writes.length, 1);
   assert.equal(writes[0].scope, 'premium_database_mail_roi');
   assert.equal(JSON.parse(writes[0].body.patch.premium_database_mail_roi_v1).dealCount, 3);
+  assert.equal(writes[0].options.keepalive, true);
+  assert.equal(writes[0].options.timeoutMs, 10000);
+});
+
+test('premium database mail ROI calculator flushes an in-flight customer count before leaving the page', async () => {
+  let plusHandler = null;
+  const writes = [];
+  const windowListeners = {};
+  const nodes = {
+    systemMailSentTodayCount: { textContent: '' },
+    systemMailSentCount: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const systemMailCountClient = loadDatabaseSystemMailCountClient({
+    document: {
+      hidden: false,
+      addEventListener: () => {},
+      getElementById: (id) => nodes[id] || null,
+      querySelectorAll: () => [{
+        getAttribute: () => '1',
+        addEventListener: (eventName, handler) => {
+          if (eventName === 'click') plusHandler = handler;
+        },
+      }],
+    },
+    addEventListener: (eventName, handler) => {
+      windowListeners[eventName] = handler;
+    },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        stats: {
+          sentToday: 8,
+          systemSentToday: 8,
+          systemTotalSent: 8,
+        },
+      }),
+    }),
+    setInterval: () => 0,
+    SoftoraUiStateClient: {
+      get: async (scope) => {
+        assert.equal(scope, 'premium_database_mail_roi');
+        return { values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 1 }) } };
+      },
+      set: async (scope, body, options) => {
+        writes.push({ scope, body, options });
+        return writes.length === 1 ? new Promise(() => {}) : { ok: true };
+      },
+    },
+  });
+
+  systemMailCountClient.render([], {});
+  await systemMailCountClient.refreshTodaySentCount();
+  await systemMailCountClient.loadPersistedDealCount();
+  plusHandler();
+  windowListeners.pagehide();
+
+  assert.equal(nodes.mailRoiDealsCount.textContent, '2');
+  assert.equal(nodes.mailRoiRatio.textContent, '1 op 4');
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].scope, 'premium_database_mail_roi');
+  assert.equal(JSON.parse(writes[0].body.patch.premium_database_mail_roi_v1).dealCount, 2);
+  assert.equal(writes[0].options.keepalive, true);
+  assert.equal(writes[0].options.timeoutMs, 10000);
+  assert.equal(writes[1].scope, 'premium_database_mail_roi');
+  assert.equal(JSON.parse(writes[1].body.patch.premium_database_mail_roi_v1).dealCount, 2);
+  assert.equal(writes[1].options.keepalive, true);
+  assert.equal(writes[1].options.timeoutMs, 10000);
 });
 
 test('premium database table helpers keep coldcalling filters separate and paginate rows', () => {
@@ -1127,6 +1197,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /const ROI_STATE_SCOPE = "premium_database_mail_roi";/);
   assert.match(systemMailCountScriptSource, /const ROI_STATE_KEY = "premium_database_mail_roi_v1";/);
   assert.match(systemMailCountScriptSource, /function loadPersistedDealCount\(\)/);
+  assert.match(systemMailCountScriptSource, /function flushPendingRoiSave\(\)/);
+  assert.match(systemMailCountScriptSource, /addWindowListener\("pagehide", flushPendingRoiSave\)/);
+  assert.match(systemMailCountScriptSource, /keepalive: persistOptions\.keepalive !== false/);
   assert.match(systemMailCountScriptSource, /source: "premium-database-mail-roi"/);
   assert.match(systemMailCountScriptSource, /function render\(customers, helpers\)/);
   assert.match(systemMailCountScriptSource, /hasInstantlyOutreachSignal\(customer\)/);
@@ -1489,7 +1562,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617d/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260617a/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260702a/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260616a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -1750,7 +1823,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260617a"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260616a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260702a"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260616a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
