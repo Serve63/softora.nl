@@ -1825,9 +1825,19 @@ function buildInstantlyEmailHtml(
         normalizeString
       )}</a></p>`
     : '';
-  const content = `${renderMailTextAsHtml(baseText, normalizeString, {
+  const bodyHtml = renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
-  })}${optOut}`;
+  });
+  const webdesignImageHtml = normalizeString(webdesignImageUrl)
+    ? renderImageHtml(webdesignImageUrl, 'Webdesign', '24px 0 0 0', normalizeString, webdesignImageDimensions)
+    : '';
+  const mockupImageHtml = normalizeString(webdesignMockupUrl)
+    ? `\n<p style="margin:20px 0 7px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(
+        COLDMAIL_MOCKUP_CAPTION,
+        normalizeString
+      )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
+    : '';
+  const content = `${bodyHtml}${webdesignImageHtml}${mockupImageHtml}${optOut}`;
   return wrapInstantlyEmailHtml(content, normalizeString);
 }
 
