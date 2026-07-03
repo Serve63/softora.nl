@@ -187,7 +187,7 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
-test('mailbox service enriches normal webdesign sends with public link and no inline images by default', async () => {
+test('mailbox service enriches normal webdesign sends with public link and inline images by default', async () => {
   const sent = [];
   const guardCalls = [];
   const customerId = 'manual-import-pckbv-eu-privacy-0583';
@@ -294,10 +294,17 @@ test('mailbox service enriches normal webdesign sends with public link and no in
     sent[0].message.html,
     /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
   );
-  assert.doesNotMatch(sent[0].message.html, /<img src=/);
-  assert.doesNotMatch(sent[0].message.html, /cid:webdesign|cid:mockup/);
-  assert.doesNotMatch(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
-  assert.equal(sent[0].message.attachments, undefined);
+  assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
+  assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
+  assert.match(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.equal(sent[0].message.attachments.length, 2);
+  assert.deepEqual(
+    sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),
+    [
+      ['webdesign-manual-import-pckbv-eu-privacy-0583-1@softora', 'inline'],
+      ['mockup-manual-import-pckbv-eu-privacy-0583-2@softora', 'inline'],
+    ]
+  );
 });
 
 test('mailbox service enriches webdesign sends from stored photo metadata when customer row is unavailable', async () => {
