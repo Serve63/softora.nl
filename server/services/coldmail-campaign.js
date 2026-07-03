@@ -116,7 +116,7 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
-const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'link';
+const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
@@ -5687,10 +5687,6 @@ function createColdmailCampaignService(deps = {}) {
         imageDelivery: 'cid',
         durationDays: state.config.durationDays,
         radiusKm: state.config.radiusKm,
-        webdesignImageDelivery:
-          normalizeColdmailWebdesignImageDeliveryOverride(state.config.webdesignImageDelivery) ||
-          normalizeColdmailWebdesignImageDeliveryOverride(settings.webdesignImageDelivery) ||
-          undefined,
         mode: 'mail',
         testMode: false,
         publicBaseUrl: input.publicBaseUrl,
