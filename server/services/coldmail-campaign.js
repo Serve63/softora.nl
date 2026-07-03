@@ -3909,6 +3909,8 @@ function createColdmailCampaignService(deps = {}) {
         database: state.config.database,
         senderEmail,
         specialAction: state.config.specialAction,
+        webdesignImageDelivery: 'cid',
+        imageDelivery: 'cid',
         durationDays: state.config.durationDays,
         radiusKm: state.config.radiusKm,
         mode: 'mail',
