@@ -224,9 +224,15 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
   assert.match(source, /Reminders en taken/);
   assert.match(source, /AI-samenvattingen/);
   assert.match(source, /Dashboards/);
+  assert.match(source, /CRM op maat laten bouwen begint met scherpe scope/);
+  assert.match(source, /Wat bepaalt de kosten\?/);
+  assert.match(source, /Hoe lang duurt een eerste versie\?/);
+  assert.match(source, /Hoe blijft klantdata bruikbaar\?/);
   assert.match(source, /CRM op maat of standaard CRM\?/);
   assert.match(source, /Wanneer kies je voor een CRM op maat\?/);
   assert.match(source, /Welke modules zijn logisch\?/);
+  assert.match(source, /Wat bepaalt de kosten van CRM op maat\?/);
+  assert.match(source, /Hoe lang duurt CRM software laten maken\?/);
   assert.match(source, /Moet alles meteen worden gebouwd\?/);
   assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
   assert.match(source, /href="\/ai-automatisering"/);
@@ -260,6 +266,9 @@ test('crm money page is focused on pipeline, customers and AI follow-up', () => 
     [
       'Wanneer kies je voor een CRM systeem op maat in plaats van standaard CRM?',
       'Welke CRM modules kan Softora bouwen?',
+      'Wat bepaalt de kosten van CRM op maat laten bouwen?',
+      'Hoe lang duurt een eerste CRM versie?',
+      'Hoe blijft CRM data veilig en bruikbaar?',
       'Moet alles meteen in een CRM op maat?',
     ]
   );

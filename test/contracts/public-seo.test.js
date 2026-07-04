@@ -474,6 +474,11 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
         'klantportaal',
         'dashboard laten ontwikkelen',
         'sales pipeline',
+        'kosten',
+        'doorlooptijd',
+        'rollen',
+        'rechten',
+        'koppelingen',
       ],
     },
     {
