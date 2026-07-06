@@ -302,10 +302,10 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
   assert.match(sent[0].message.html, /softora-webdesign-image-cell/);
   assert.match(sent[0].message.html, /softora-webdesign-image-gap/);
-  assert.match(sent[0].message.html, /<table class="softora-webdesign-image-table" role="presentation" width="588"/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="286" style="display:block;width:286px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;"/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image" width="286" style="display:block;width:286px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;"/);
-  assert.doesNotMatch(sent[0].message.html, /softora-webdesign-image" width="286" style="display:block;width:100%;max-width:286px/);
+  assert.match(sent[0].message.html, /<table class="softora-webdesign-image-table" role="presentation" width="900"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="300" style="display:block;width:300px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image" width="584" style="display:block;width:584px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;"/);
+  assert.doesNotMatch(sent[0].message.html, /softora-webdesign-image" width="300" style="display:block;width:100%;max-width:300px/);
   assert.doesNotMatch(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.equal(sent[0].message.attachments.length, 2);
   assert.deepEqual(
