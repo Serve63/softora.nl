@@ -279,7 +279,7 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   assert.equal(guardCalls[2].options.status, 'sent');
   assert.match(
     sent[0].message.text,
-    /Je kunt het webdesign hier bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het hier 👈/
   );
   assert.match(sent[0].message.text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Chaam/);
   assert.doesNotMatch(sent[0].message.text, /Martijn van de Ven/);
@@ -292,11 +292,17 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
   assert.match(
     sent[0].message.html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
+  );
+  assert.match(
+    sent[0].message.html,
+    /<span style="white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">pckbv\.eu<\/span>/
   );
   assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
-  assert.match(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.match(sent[0].message.html, /softora-webdesign-image-cell/);
+  assert.match(sent[0].message.html, /softora-webdesign-image-gap/);
+  assert.doesNotMatch(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.equal(sent[0].message.attachments.length, 2);
   assert.deepEqual(
     sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),

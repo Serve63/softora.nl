@@ -62,9 +62,11 @@ const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_MAILBOX_WEBDESIGN_IMAGE_DELIVERY = 'cid';
 const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?)/i;
+const MAILBOX_EMAIL_IMAGE_MAX_WIDTH = 480;
+const MAILBOX_EMAIL_IMAGE_PAIR_WIDTH = 286;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
@@ -1517,9 +1519,9 @@ function createMailboxService(deps = {}) {
   function renderImageVisibilityPsHtmlLine(webdesignPreviewUrl) {
     const href = normalizeString(webdesignPreviewUrl);
     if (!href) return escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS);
-    return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
+    return `Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
       href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈`;
   }
 
   function getMailboxSenderDisplayName(senderEmail) {
@@ -1554,7 +1556,20 @@ function createMailboxService(deps = {}) {
     if (isMailboxImageVisibilityPsLine(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl);
     }
-    return renderInlineMarkdownLinks(line);
+    return renderNonBreakingWebsiteNames(renderInlineMarkdownLinks(line));
+  }
+
+  function renderNonBreakingWebsiteNames(html) {
+    return String(html || '').replace(
+      /(^|[\s(])((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})(?:\/[^\s<>()]*)?)/gi,
+      (match, prefix, token, offset, source) => {
+        const previousChar = offset + String(prefix || '').length > 0
+          ? String(source || '')[offset + String(prefix || '').length - 1]
+          : '';
+        if (previousChar === '@' || /<[^>]*$/.test(String(source || '').slice(0, offset))) return match;
+        return `${prefix}<span style="white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">${token}</span>`;
+      }
+    );
   }
 
   function mailboxImageExtension(contentType) {
@@ -1634,7 +1649,23 @@ function createMailboxService(deps = {}) {
       image.src
     )}" alt="${escapeHtmlAttribute(
       image.alt
-    )}" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
+    )}" width="${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}" style="display:block;width:100%;max-width:${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}px;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
+  }
+
+  function renderMailboxEmailImageTag(image, width = MAILBOX_EMAIL_IMAGE_PAIR_WIDTH) {
+    if (!image || !image.src) return '';
+    return `<img src="${escapeHtmlAttribute(
+      image.src
+    )}" alt="${escapeHtmlAttribute(
+      image.alt
+    )}" class="softora-webdesign-image" width="${width}" style="display:block;width:100%;max-width:${width}px;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" />`;
+  }
+
+  function renderMailboxEmailImagePair(mainImage, mockupImage) {
+    const mainHtml = renderMailboxEmailImageTag(mainImage);
+    const mockupHtml = renderMailboxEmailImageTag(mockupImage);
+    if (!mainHtml || !mockupHtml) return '';
+    return `\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;padding-right:0!important;padding-left:0!important}.softora-webdesign-image-gap{display:none!important}.softora-webdesign-image{width:100%!important;max-width:100%!important}}</style><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:22px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="50%" valign="top" style="padding:0 8px 0 0;margin:0;width:50%;font-size:0;line-height:0;">${mainHtml}</td><td class="softora-webdesign-image-gap" width="16" style="font-size:0;line-height:0;width:16px;">&nbsp;</td><td class="softora-webdesign-image-cell" width="50%" valign="top" style="padding:0 0 0 8px;margin:0;width:50%;font-size:0;line-height:0;">${mockupHtml}</td></tr></table>`;
   }
 
   function renderMailboxWebdesignHtml(text, options = {}) {
@@ -1656,14 +1687,9 @@ function createMailboxService(deps = {}) {
     const inlineImages = Array.isArray(options.inlineImages) ? options.inlineImages : [];
     const mainImage = inlineImages.find((image) => image.type === 'webdesign');
     const mockupImage = inlineImages.find((image) => image.type === 'mockup');
-    const imagesHtml = [
-      renderMailboxEmailImage(mainImage, '22px 0 0 0'),
-      mockupImage
-        ? `\n<p style="margin:22px 0 8px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(
-            COLDMAIL_MOCKUP_CAPTION
-          )}</p>${renderMailboxEmailImage(mockupImage, '0')}`
-        : '',
-    ].join('');
+    const imagesHtml = mainImage && mockupImage
+      ? renderMailboxEmailImagePair(mainImage, mockupImage)
+      : renderMailboxEmailImage(mainImage, '22px 0 0 0');
     const optOutUrl = normalizeString(options.optOutUrl);
     const optOutHtml = optOutUrl
       ? `\n<p style="margin:18px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
