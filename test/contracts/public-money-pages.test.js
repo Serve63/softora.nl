@@ -114,16 +114,16 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   const source = readPage('premium-bedrijfssoftware.html');
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
 
-  assert.match(source, /<title>Bedrijfssoftware laten maken voor MKB, CRM en dashboards \| Softora<\/title>/);
+  assert.match(source, /<title>Bedrijfssoftware op maat laten maken voor MKB \| Softora<\/title>/);
   assert.match(
     source,
-    /<meta name="description" content="Bedrijfssoftware laten maken voor CRM, dashboards, klantportaal of offerteflow\? Softora start met scherpe scope/
+    /<meta name="description" content="Bedrijfssoftware op maat laten maken voor CRM, dashboards, klantportaal of offerteflow\? Softora helpt met scope/
   );
   assert.match(source, /<meta name="robots" content="index, follow">/);
   assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(source, /Bedrijfssoftware <em>laten maken<\/em><\/span> <br>voor jouw team/);
+  assert.match(source, /Bedrijfssoftware <em>op maat<\/em><\/span> <br>laten maken/);
   assert.match(source, /CRM en klantportaal/);
   assert.match(source, /Dashboard laten ontwikkelen/);
   assert.match(source, /CRM offerte systeem/);
@@ -134,6 +134,7 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.match(source, /Automatisch offerte systeem/);
   assert.match(source, /offerte automatisering/);
   assert.match(source, /Als je zoekt op bedrijfssoftware laten maken/);
+  assert.match(source, /Als je zoekt op bedrijfssoftware op maat/);
   assert.match(source, /Als je een dashboard wilt laten maken/);
   assert.match(source, /Als je een klantportaal nodig hebt/);
   assert.match(source, /Een dashboard laten ontwikkelen werkt pas goed/);
@@ -173,8 +174,8 @@ test('bedrijfssoftware money page is focused on CRM, workflows and automation', 
   assert.doesNotMatch(source, /Website Tool|AI Website Generator/);
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
-  assert.equal(entry.title, 'Bedrijfssoftware laten maken voor MKB, CRM en dashboards');
-  assert.match(entry.description, /scherpe scope, koppelingen, rechten en veilige doorgroei/);
+  assert.equal(entry.title, 'Bedrijfssoftware op maat laten maken voor MKB');
+  assert.match(entry.description, /helpt met scope, koppelingen, rechten en veilige doorgroei/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-offerte-automatisering'));
