@@ -109,19 +109,20 @@ function assertInstantlyHtmlUsesVisibleWebdesignImages(html, expectedPath = '/we
   assert.match(html, new RegExp(escapedExpectedPath));
   assert.match(html, /Webdesign niet zichtbaar\? Check het <a [^>]*>hier<\/a> 👈/);
   assert.doesNotMatch(html, /Je kunt (je|het) webdesign/i);
-  assert.match(html, /@media only screen and \(max-width:620px\)/);
+  assert.match(html, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
   assert.match(html, /\.softora-webdesign-image\{width:100%!important;max-width:100%!important;height:auto!important\}/);
   assert.match(html, /class="softora-webdesign-image-pair" style="max-width:900px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"/);
-  assert.match(html, /class="softora-webdesign-image-cell" style="display:inline-block;width:300px;max-width:100%;vertical-align:top;margin:0 16px 16px 0/);
-  assert.match(html, /class="softora-webdesign-image-cell" style="display:inline-block;width:584px;max-width:100%;vertical-align:top;margin:0 0 16px 0/);
+  assert.match(html, /class="softora-webdesign-image-cell" style="display:inline-block;width:300px;max-width:100%;vertical-align:bottom;margin:0 16px 16px 0/);
+  assert.match(html, /class="softora-webdesign-image-cell" style="display:inline-block;width:584px;max-width:100%;vertical-align:bottom;margin:0 0 16px 0/);
   assert.match(imageTags[0], /width="300"/);
   assert.match(imageTags[0], /class="softora-webdesign-image"/);
-  assert.match(imageTags[0], /style="display:block;width:300px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;"/);
+  assert.match(imageTags[0], /style="display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;"/);
   assert.match(imageTags[1], /width="584"/);
-  assert.match(imageTags[1], /class="softora-webdesign-image"/);
-  assert.match(imageTags[1], /style="display:block;width:584px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;"/);
+  assert.match(imageTags[1], /class="softora-webdesign-image softora-webdesign-image--mockup"/);
+  assert.match(imageTags[1], /height="450"/);
+  assert.match(imageTags[1], /style="display:block;width:100%;max-width:100%;height:450px;max-height:450px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;border-radius:6px;"/);
   assert.doesNotMatch(html, /display:flex|flex-wrap|max-width:480px/);
-  assert.match(html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.match(html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(html, /PS: Wordt het webdesign niet zichtbaar|device mockup/i);
 }
 
@@ -1270,7 +1271,7 @@ test('instantly sync caches a stripped webdesign image instead of the decorative
   const body = JSON.parse(fetchCalls[0].options.body);
   const html = body.leads[0].custom_variables.softora_instantly_email_html;
   assertInstantlyHtmlUsesVisibleWebdesignImages(html);
-  assert.doesNotMatch(html, /object-fit|background:#eef3fb|min-height|max-height/);
+  assert.doesNotMatch(html, /background:#eef3fb|min-height/);
   const previewTokens = [
     ...extractPreviewImageTokens(body.leads[0].custom_variables.softora_webdesign_image_url),
     ...extractPreviewImageTokens(body.leads[0].custom_variables.softora_webdesign_mockup_url),

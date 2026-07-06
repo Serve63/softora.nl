@@ -44,7 +44,7 @@ const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*)?(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?)/i;
+  /(?:PS:\s*)?(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?)/i;
 const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
@@ -54,7 +54,9 @@ const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 600;
 const INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
 const INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH = 584;
+const INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT = 450;
 const INSTANTLY_IMAGE_PAIR_GAP_WIDTH = 16;
+const INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX = 980;
 const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
   /(?:je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken|webdesign\s+niet\s+zichtbaar\?\s*check\s+het\s+hier)\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
@@ -1805,7 +1807,7 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
-function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeString, dimensions = null, desktopWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH) {
+function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeString, dimensions = null, desktopWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH, options = {}) {
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
@@ -1818,13 +1820,28 @@ function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeS
     scaleEmailImageDimensions(dimensions, desktopWidth) ||
     scaleEmailImageDimensions(fallbackDimensions, desktopWidth);
   const imageHeight = scaledDimensions ? scaledDimensions.height : desktopWidth;
+  const isMockup = options && options.mockup;
+  const className = isMockup ? 'softora-webdesign-image softora-webdesign-image--mockup' : 'softora-webdesign-image';
+  const outputHeight = isMockup ? INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT : imageHeight;
+  const imageStyle = isMockup
+    ? `display:block;width:100%;max-width:100%;height:${INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT}px;max-height:${INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT}px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;border-radius:6px;`
+    : `display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;`;
   return `<img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" class="softora-webdesign-image" width="${desktopWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:${desktopWidth}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;" />`;
+  )}" class="${className}" width="${desktopWidth}" height="${outputHeight}" loading="eager" decoding="async" fetchpriority="high" style="${imageStyle}" />`;
+}
+
+function renderMobileMockupCaptionHtml(caption, normalizeString = defaultNormalizeString) {
+  const cleanCaption = normalizeString(caption || COLDMAIL_MOCKUP_CAPTION);
+  if (!cleanCaption) return '';
+  return `\n<p class="softora-mobile-mockup-caption" style="display:none;mso-hide:all;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;max-height:0;overflow:hidden;">${escapeHtml(
+    cleanCaption,
+    normalizeString
+  )}</p>`;
 }
 
 function renderInstantlyImagePairHtml(
@@ -1844,10 +1861,7 @@ function renderInstantlyImagePairHtml(
       ? renderImageHtml(cleanWebdesignUrl, 'Webdesign', '24px 0 0 0', normalizeString, webdesignImageDimensions)
       : '';
     const mockupImageHtml = cleanMockupUrl
-      ? `\n<p style="margin:20px 0 7px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(
-          caption,
-          normalizeString
-        )}</p>${renderImageHtml(cleanMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
+      ? `${renderMobileMockupCaptionHtml(caption, normalizeString)}${renderImageHtml(cleanMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
       : '';
     return `${webdesignImageHtml}${mockupImageHtml}`;
   }
@@ -1865,12 +1879,10 @@ function renderInstantlyImagePairHtml(
     'Mockup',
     normalizeString,
     webdesignMockupDimensions,
-    INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH
+    INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH,
+    { mockup: true }
   );
-  return `\n<p style="margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(
-    caption,
-    normalizeString
-  )}</p>\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-pair{max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}}</style><div class="softora-webdesign-image-pair" style="max-width:${pairWidth}px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:top;margin:0 ${INSTANTLY_IMAGE_PAIR_GAP_WIDTH}px 16px 0;padding:0;font-size:16px;line-height:1.4;">${webdesignImageHtml}</div><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:top;margin:0 0 16px 0;padding:0;font-size:16px;line-height:1.4;">${mockupImageHtml}</div></div>`;
+  return `${renderMobileMockupCaptionHtml(caption, normalizeString)}\n<style>@media only screen and (max-width:${INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX}px), only screen and (max-device-width:${INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX}px){.softora-mobile-mockup-caption{display:block!important;mso-hide:none!important;max-height:none!important;overflow:visible!important}.softora-webdesign-image-pair{max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}.softora-webdesign-image--mockup{height:auto!important;max-height:none!important;object-fit:contain!important}}</style><div class="softora-webdesign-image-pair" style="max-width:${pairWidth}px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:bottom;margin:0 ${INSTANTLY_IMAGE_PAIR_GAP_WIDTH}px 16px 0;padding:0;font-size:16px;line-height:1.4;">${webdesignImageHtml}</div><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:16px;line-height:1.4;">${mockupImageHtml}</div></div>`;
 }
 
 function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeString) {
