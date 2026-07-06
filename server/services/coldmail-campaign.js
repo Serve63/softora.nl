@@ -148,6 +148,7 @@ const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?)/i;
 const COLDMAIL_EMAIL_CONTENT_MAX_WIDTH = 600;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 480;
+const COLDMAIL_DESKTOP_IMAGE_PAIR_WIDTH = 286;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
   'serve@softora.nl',
@@ -7013,12 +7014,38 @@ function createColdmailCampaignService(deps = {}) {
     )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈`;
   }
 
+  function renderColdmailDomainToken(rawValue) {
+    const value = normalizeString(rawValue).replace(/[.,;:!?]+$/g, '');
+    if (!value || !/\.[a-z]{2,}(?:\/|$)/i.test(value)) return escapeHtml(rawValue);
+    const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    return `<a href="${escapeHtmlAttribute(href)}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">${escapeHtml(value.replace(/^https?:\/\//i, ''))}</a>${escapeHtml(String(rawValue || '').slice(value.length))}`;
+  }
+
+  function renderColdmailHtmlText(line) {
+    const source = String(line || '');
+    const domainPattern = /(^|[\s(])((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})(?:\/[^\s<>()]*)?)/gi;
+    let html = '';
+    let lastIndex = 0;
+    for (const match of source.matchAll(domainPattern)) {
+      const prefix = match[1] || '';
+      const token = match[2] || '';
+      const tokenStart = (match.index || 0) + prefix.length;
+      const previousChar = tokenStart > 0 ? source[tokenStart - 1] : '';
+      if (previousChar === '@') continue;
+      html += escapeHtml(source.slice(lastIndex, tokenStart));
+      html += renderColdmailDomainToken(token);
+      lastIndex = tokenStart + token.length;
+    }
+    html += escapeHtml(source.slice(lastIndex));
+    return html;
+  }
+
   function renderColdmailHtmlLine(line, options = {}) {
     const cleanLine = normalizeString(line);
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(cleanLine, options);
     }
-    return escapeHtml(cleanLine);
+    return renderColdmailHtmlText(cleanLine);
   }
 
   function isColdmailLinkOnlyImageArtifactLine(line) {
@@ -7106,7 +7133,6 @@ function createColdmailCampaignService(deps = {}) {
     if (!attachment || !imageSrc) return html;
     const optOutText = normalizeString(options.optOutText || '');
     const optOutUrl = normalizeString(options.optOutUrl || '');
-    const mockupCaption = normalizeString(options.mockupCaption || COLDMAIL_MOCKUP_CAPTION);
     const optOutHtml = optOutText
       ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${
           optOutUrl
@@ -7115,24 +7141,30 @@ function createColdmailCampaignService(deps = {}) {
         }</p>`
       : '';
     const emailImageMaxWidth = Math.min(COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH, 640);
-    const renderEmailImageTable = (image, alt, margin) => {
+    const renderEmailImage = (image, alt, width = emailImageMaxWidth) => {
       const src = normalizeString(image && (image.src || (image.cid ? `cid:${image.cid}` : '')));
       if (!src) return '';
-      return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;"><img src="${escapeHtml(
+      return `<img src="${escapeHtml(
         src
       )}" alt="${escapeHtml(
         alt
-      )}" width="${emailImageMaxWidth}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+      )}" class="softora-webdesign-image" width="${width}" style="display:block;width:100%;max-width:${width}px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;" />`;
     };
-    const previewBlockHtml = renderEmailImageTable(attachment, attachment.alt || 'Webdesign', '24px 0 0 0');
-    const mockupHtml = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''))
-      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>${renderEmailImageTable(
-          attachment.mockup,
-          attachment.mockup.alt || 'Device mockup',
-          '0'
-        )}`
-      : '';
-    const imageBlockHtml = `${previewBlockHtml}${mockupHtml}`;
+    const renderEmailImageTable = (image, alt, margin) => {
+      const imageHtml = renderEmailImage(image, alt);
+      if (!imageHtml) return '';
+      return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;">${imageHtml}</td></tr></table>`;
+    };
+    const renderEmailImagePairTable = (mainImage, mockupImage) => {
+      const mainHtml = renderEmailImage(mainImage, mainImage.alt || 'Webdesign', COLDMAIL_DESKTOP_IMAGE_PAIR_WIDTH);
+      const mockupHtml = renderEmailImage(mockupImage, mockupImage.alt || 'Device mockup', COLDMAIL_DESKTOP_IMAGE_PAIR_WIDTH);
+      if (!mainHtml || !mockupHtml) return '';
+      return `\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;padding-right:0!important;padding-left:0!important}.softora-webdesign-image-gap{display:none!important}.softora-webdesign-image{width:100%!important;max-width:100%!important}}</style><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:24px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="50%" valign="top" style="padding:0 8px 0 0;margin:0;width:50%;font-size:0;line-height:0;overflow:visible;">${mainHtml}</td><td class="softora-webdesign-image-gap" width="16" style="font-size:0;line-height:0;width:16px;">&nbsp;</td><td class="softora-webdesign-image-cell" width="50%" valign="top" style="padding:0 0 0 8px;margin:0;width:50%;font-size:0;line-height:0;overflow:visible;">${mockupHtml}</td></tr></table>`;
+    };
+    const hasMockup = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''));
+    const imageBlockHtml = hasMockup
+      ? renderEmailImagePairTable(attachment, attachment.mockup)
+      : renderEmailImageTable(attachment, attachment.alt || 'Webdesign', '24px 0 0 0');
     return `${html}${imageBlockHtml}${optOutHtml}`;
   }
 
