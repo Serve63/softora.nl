@@ -6,6 +6,7 @@ const { createAgendaTravelService } = require('../../server/services/agenda-trav
 function createTravelService(overrides = {}) {
   return createAgendaTravelService({
     env: {
+      GOOGLE_PAID_APIS_ENABLED: 'true',
       GOOGLE_MAPS_SERVER_API_KEY: 'maps-key',
       ...overrides.env,
     },
@@ -148,4 +149,23 @@ test('agenda travel service treats shared appointments as blocking Serve and Mar
 
   assert.equal(result.available, false);
   assert.equal(result.reason, 'travel_from_previous');
+});
+
+test('agenda travel service does not call Google routes when paid APIs are disabled', async () => {
+  const travelService = createTravelService({
+    env: { GOOGLE_PAID_APIS_ENABLED: 'false' },
+    fetchJsonWithTimeout: async () => {
+      throw new Error('Google Maps should not be called while paid APIs are disabled');
+    },
+  });
+
+  const result = await travelService.estimateTravelDuration(
+    { location: 'Oosterwijk', lat: 52.084, lng: 5.121 },
+    { location: 'Amsterdam', lat: 52.3676, lng: 4.9041 },
+    { departureDate: '2099-04-20', departureTime: '11:15' }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source, 'coordinate_estimate');
+  assert.equal(result.minutes > 0, true);
 });

@@ -55,7 +55,8 @@ TWILIO_OUTBOUND_TWIML_URL=https://jouwdomein.nl/api/twilio/voice
 TWILIO_STATUS_CALLBACK_URL=https://jouwdomein.nl/api/twilio/status
 TWILIO_WEBHOOK_SECRET=your_twilio_webhook_secret
 TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
-TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE=wss://example.com/twilio-media
+GOOGLE_PAID_APIS_ENABLED=false
+TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE=
 TWILIO_FROM_NUMBER_GEMINI_FLASH_3_1_LIVE=+31xxxxxxxxx
 
 # Voor Twilio Regions/IE1 (aanbevolen voor NL + Frankfurt)
@@ -72,7 +73,7 @@ AMBIENT_NOISE_LEVEL=0.22
 AMBIENT_DUCK_LEVEL=0.10
 NOISE_GATE_RMS=250
 # Testmodus: alleen ambience, geen Gemini
-# AMBIENT_ONLY_MODE=false
+# AMBIENT_ONLY_MODE=true
 # Standaard gebruikt deze repo de voorbereide office loop:
 # AMBIENT_ASSET_PATH=assets/office-freesound-community-6322-8k.raw
 # Eigen raw 8k mono PCM loopbestand kan ook:

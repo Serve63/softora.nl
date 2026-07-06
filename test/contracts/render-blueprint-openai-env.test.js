@@ -23,3 +23,17 @@ test('render blueprint preserves OpenAI billing and project env placeholders', (
     );
   });
 });
+
+test('render blueprint keeps paid Google APIs disabled by default', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../render.yaml'), 'utf8');
+  const [softoraService, twilioBridgeService = ''] = source.split(
+    /\n  - type: web\n    name: twilio-media-bridge/
+  );
+
+  assert.match(softoraService, /- key: GOOGLE_PAID_APIS_ENABLED\s+value: false/);
+  assert.match(softoraService, /- key: GOOGLE_CALENDAR_SYNC_ENABLED\s+value: false/);
+  assert.match(softoraService, /- key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE\s+value: ""/);
+  assert.match(twilioBridgeService, /- key: GOOGLE_PAID_APIS_ENABLED\s+value: false/);
+  assert.match(twilioBridgeService, /- key: GEMINI_AUTO_START\s+value: false/);
+  assert.match(twilioBridgeService, /- key: AMBIENT_ONLY_MODE\s+value: true/);
+});

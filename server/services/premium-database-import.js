@@ -667,6 +667,15 @@ function getGooglePlacesApiKey(deps = {}) {
   );
 }
 
+function isGooglePaidApisEnabled(deps = {}) {
+  const env = deps.env || process.env || {};
+  const raw =
+    deps.googlePaidApisEnabled !== undefined
+      ? deps.googlePaidApisEnabled
+      : env.GOOGLE_PAID_APIS_ENABLED;
+  return /^(1|true|yes)$/i.test(String(raw || ''));
+}
+
 function normalizeRealBusinessQuery(value) {
   return truncateText(value || DEFAULT_REAL_BUSINESS_QUERY, 140) || DEFAULT_REAL_BUSINESS_QUERY;
 }
@@ -775,6 +784,13 @@ async function fetchGooglePlacesPage({ query, count, pageToken }, deps = {}) {
   const apiKey = getGooglePlacesApiKey(deps);
   if (typeof fetchImpl !== 'function') {
     throw createServiceError('Bedrijven ophalen is niet beschikbaar op deze server.', 'FETCH_UNAVAILABLE', 503);
+  }
+  if (!isGooglePaidApisEnabled(deps)) {
+    throw createServiceError(
+      'Betaalde Google Places-import staat uit. Zet GOOGLE_PAID_APIS_ENABLED=true alleen bewust aan.',
+      'GOOGLE_PAID_APIS_DISABLED',
+      503
+    );
   }
   if (!apiKey) {
     throw createServiceError(

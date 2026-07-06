@@ -179,6 +179,8 @@ services:
         value: false
       - key: EMAIL_VERIFICATION_TIMEOUT_MS
         value: 15000
+      - key: GOOGLE_PAID_APIS_ENABLED
+        value: false
       - key: GOOGLE_CALENDAR_SYNC_ENABLED
         value: false
       - key: GOOGLE_CALENDAR_CLIENT_EMAIL
@@ -190,7 +192,7 @@ services:
       - key: GOOGLE_CALENDAR_MARTIJN_ID
         sync: false
       - key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE
-        value: wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
+        value: ""
       - key: TWILIO_MEDIA_BRIDGE_TOKEN
         sync: false
       - key: TWILIO_API_KEY_SID
@@ -212,6 +214,8 @@ services:
     envVars:
       - key: PORT
         value: 10000
+      - key: GOOGLE_PAID_APIS_ENABLED
+        value: false
       - key: GEMINI_API_KEY
         sync: false
       - key: GOOGLE_API_KEY
@@ -223,12 +227,14 @@ services:
       - key: GEMINI_REQUIRE_CUSTOM_PROMPT
         value: false
       - key: GEMINI_AUTO_START
-        value: true
+        value: false
       - key: GEMINI_SYSTEM_PROMPT
         sync: false
       - key: GEMINI_SYSTEM_PROMPT_LOCKED
         value: true
       - key: AMBIENT_ENABLED
+        value: true
+      - key: AMBIENT_ONLY_MODE
         value: true
       - key: AMBIENT_ASSET_PATH
         value: assets/office-freesound-community-6322-8k.raw

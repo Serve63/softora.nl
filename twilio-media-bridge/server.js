@@ -22,7 +22,11 @@ const {
 
 const PORT = Number(process.env.PORT || 3000);
 const IS_PRODUCTION = /^(production|prod)$/i.test(String(process.env.NODE_ENV || '').trim());
-const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+const GOOGLE_PAID_APIS_ENABLED = /^(1|true|yes)$/i.test(
+  String(process.env.GOOGLE_PAID_APIS_ENABLED || process.env.GEMINI_SPEND_ENABLED || '')
+);
+const RAW_GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+const GEMINI_API_KEY = GOOGLE_PAID_APIS_ENABLED ? RAW_GEMINI_API_KEY : '';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-live-preview';
 const LEGACY_GEMINI_MODEL_ALIASES = new Map([
   ['gemini-live-2.5-flash-preview', DEFAULT_GEMINI_MODEL],
@@ -324,6 +328,10 @@ function isDebugRequestAuthorized(req) {
 
 function probeGeminiSetup(timeoutMs = 9000) {
   return new Promise((resolve) => {
+    if (!GOOGLE_PAID_APIS_ENABLED) {
+      resolve({ ok: false, stage: 'spend-guard', error: 'Google paid APIs disabled' });
+      return;
+    }
     if (!GEMINI_API_KEY) {
       resolve({ ok: false, stage: 'config', error: 'GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt' });
       return;
@@ -398,6 +406,7 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'twilio-media-bridge',
+    googlePaidApisEnabled: GOOGLE_PAID_APIS_ENABLED,
     geminiConfigured: Boolean(GEMINI_API_KEY),
     timestamp: new Date().toISOString(),
   });
@@ -504,8 +513,11 @@ wss.on('connection', (twilioWs, _request, url) => {
   });
 
   if (!AMBIENT_ONLY_MODE && !GEMINI_API_KEY) {
-    console.error('[Bridge] GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt');
-    twilioWs.close(1011, 'GEMINI_API_KEY ontbreekt');
+    const reason = GOOGLE_PAID_APIS_ENABLED
+      ? 'GEMINI_API_KEY ontbreekt'
+      : 'Google paid APIs disabled';
+    console.error(`[Bridge] ${reason}`);
+    twilioWs.close(1011, reason);
     return;
   }
   if (!AMBIENT_ONLY_MODE && GEMINI_REQUIRE_CUSTOM_PROMPT && !CUSTOM_SYSTEM_PROMPT) {
@@ -909,6 +921,7 @@ server.listen(PORT, () => {
     );
   }
   console.log(`[Bridge] model=${GEMINI_MODEL}`);
+  console.log(`[Bridge] googlePaidApisEnabled=${GOOGLE_PAID_APIS_ENABLED}`);
   console.log(`[Bridge] geminiConfigured=${Boolean(GEMINI_API_KEY)}`);
   console.log(
     `[Bridge] ambient enabled=${AMBIENT_LOOP.enabled} onlyMode=${AMBIENT_ONLY_MODE} source=${AMBIENT_LOOP.reason}`

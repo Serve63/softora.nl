@@ -207,6 +207,9 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   );
 
   assert.match(source, /DEFAULT_GEMINI_MODEL = 'gemini-3\.1-flash-live-preview'/);
+  assert.match(source, /GOOGLE_PAID_APIS_ENABLED/);
+  assert.match(source, /RAW_GEMINI_API_KEY/);
+  assert.match(source, /Google paid APIs disabled/);
   assert.match(source, /GEMINI_REQUIRE_CUSTOM_PROMPT \|\| 'false'/);
   assert.match(source, /GEMINI_AUTO_START \|\| 'true'/);
   assert.match(source, /GEMINI_VAD_START_SENSITIVITY \|\| 'START_SENSITIVITY_LOW'/);
