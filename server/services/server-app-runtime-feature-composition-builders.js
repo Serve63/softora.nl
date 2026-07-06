@@ -383,6 +383,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
           outboundRecipientGuardService,
+          dataOpsStore: uiSeoRuntime.dataOpsStore,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
           leadDbScope: 'coldcalling',

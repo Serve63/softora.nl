@@ -1556,8 +1556,8 @@ function buildColdmailPreviewImageUrl(row, id, reference, config, type, normaliz
   return buildColdmailPreviewImageLink(row, id, reference, config, type, normalizeString, now).url;
 }
 
-function buildInstantlyBodyWithWebdesignLinks({ baseText, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
-  return appendColdmailOptOutText(normalizeString(baseText), unsubscribeUrl, normalizeString);
+function buildInstantlyBodyWithWebdesignLinks({ baseText }, normalizeString = defaultNormalizeString) {
+  return normalizeString(baseText);
 }
 
 function escapeHtml(value, normalizeString = defaultNormalizeString) {
@@ -1711,19 +1711,9 @@ function buildInstantlyEmailHtml(
     webdesignImageDimensions,
     webdesignMockupDimensions,
     webdesignPublicUrl,
-    unsubscribeUrl,
   },
   normalizeString = defaultNormalizeString
 ) {
-  const optOut = normalizeString(unsubscribeUrl)
-    ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
-        unsubscribeUrl,
-        normalizeString
-      )}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
-        COLDMAIL_OPT_OUT_LABEL,
-        normalizeString
-      )}</a></p>`
-    : '';
   const bodyHtml = renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
   });
@@ -1736,7 +1726,7 @@ function buildInstantlyEmailHtml(
         normalizeString
       )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
     : '';
-  const content = `${bodyHtml}${webdesignImageHtml}${mockupImageHtml}${optOut}`;
+  const content = `${bodyHtml}${webdesignImageHtml}${mockupImageHtml}`;
   return wrapInstantlyEmailHtml(content, normalizeString);
 }
 
@@ -1768,11 +1758,7 @@ function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeSt
     '0',
     normalizeString
   )}`;
-  const optOut = `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="{{softora_unsubscribe_url}}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
-    COLDMAIL_OPT_OUT_LABEL,
-    normalizeString
-  )}</a></p>`;
-  return wrapInstantlyEmailHtml(`${bodyHtml}${webdesignImageHtml}${mockupImageHtml}${optOut}`, normalizeString);
+  return wrapInstantlyEmailHtml(`${bodyHtml}${webdesignImageHtml}${mockupImageHtml}`, normalizeString);
 }
 
 function buildInstantlyCampaignTemplateInstructions() {
@@ -1781,7 +1767,7 @@ function buildInstantlyCampaignTemplateInstructions() {
     '',
     `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
     `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
-    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink, afmeldlink en tekstvariabelen.',
+    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink en tekstvariabelen.',
     '',
     'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, anders toont Instantly de fotos/preview mogelijk niet.',
   ].join('\n');
@@ -2622,7 +2608,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_city_with_pin: formatPinnedCity(city, normalizeString),
       softora_subject: subject,
       softora_mail_body: baseMailBody,
-      softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
+      softora_mail_body_with_optout: baseMailBody,
       softora_instantly_email_text: instantlyEmailBody,
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,

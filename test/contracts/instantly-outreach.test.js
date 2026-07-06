@@ -362,8 +362,9 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   );
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon');
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
-  assert.match(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
+  assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_body, /Geen webdesign willen ontvangen/);
   assertInstantlyHtmlUsesVisibleWebdesignImages(body.leads[0].custom_variables.softora_instantly_email_html);
+  assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /Geen webdesign willen ontvangen/);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_instantly_email_html, /Bakkerij Zon device mockup/);
   const previewTokens = [
     ...extractPreviewImageTokens(body.leads[0].custom_variables.softora_webdesign_image_url),
@@ -467,7 +468,8 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.match(result.campaignHtmlTemplate, /<img[^>]+src="\{\{softora_webdesign_image_url\}\}"/);
   assert.match(result.campaignHtmlTemplate, /<img[^>]+src="\{\{softora_webdesign_mockup_url\}\}"/);
   assert.match(result.campaignHtmlTemplate, /href="\{\{softora_webdesign_public_url\}\}"/);
-  assert.match(result.campaignHtmlTemplate, /href="\{\{softora_unsubscribe_url\}\}"/);
+  assert.doesNotMatch(result.campaignHtmlTemplate, /softora_unsubscribe_url/);
+  assert.doesNotMatch(result.campaignHtmlTemplate, /Geen webdesign willen ontvangen/);
   assert.match(result.campaignHtmlTemplate, /\{\{softora_sender_name\}\}/);
   assert.match(result.campaignTemplateInstructions, /Gebruik in Instantly als onderwerp: \{\{softora_subject\}\}/);
   assert.match(result.campaignTemplateInstructions, /gebruik niet alleen de CSV als e-mailtekst/i);
