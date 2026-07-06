@@ -538,7 +538,7 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(senderSettingsSource, /"martijnven123@gmail\.com": DEFAULT_WEBDESIGN_BODY/);
   assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": DEFAULT_WEBDESIGN_BODY/);
   assert.match(senderSettingsSource, /Afgelopen week kwam ik jullie website \(\{\{website\}\}\) tegen\./);
-  assert.match(senderSettingsSource, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(senderSettingsSource, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.match(senderSettingsSource, /\{\{afzender\}\}/);
   assert.match(senderSettingsSource, /📍 \{\{stad\}\}/);
   assert.doesNotMatch(senderSettingsSource, /📍 \{\{afzenderPlaats\}\}/);

@@ -136,17 +136,18 @@ const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   '',
   'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
   '',
-  'Je kunt het webdesign hier bekijken 👈',
+  'Webdesign niet zichtbaar? Check het hier 👈',
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
   '',
   '📍 {{stad}}',
 ].join('\n');
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
-const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?)/i;
+const COLDMAIL_EMAIL_CONTENT_MAX_WIDTH = 600;
+const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 480;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
   'serve@softora.nl',
@@ -7007,9 +7008,9 @@ function createColdmailCampaignService(deps = {}) {
     if (!publicLink.href) {
       return escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS);
     }
-    return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
+    return `Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
       publicLink.href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈`;
   }
 
   function renderColdmailHtmlLine(line, options = {}) {
@@ -7072,7 +7073,7 @@ function createColdmailCampaignService(deps = {}) {
             .join('<br>')}</p>`;
       })
       .join('\n');
-    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
+    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;width:100%;">${body}</div>`;
   }
 
   function getWebdesignPhotoSource(photo) {

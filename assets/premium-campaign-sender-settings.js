@@ -22,7 +22,7 @@
     "",
     "Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.",
     "",
-    "Je kunt het webdesign hier bekijken 👈",
+    "Webdesign niet zichtbaar? Check het hier 👈",
     "",
     "Met vriendelijke groet,",
     "{{afzender}}",
