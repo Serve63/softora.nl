@@ -46,14 +46,18 @@ const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me wet
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
+  /(?:PS:\s*)?(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken\s*👈?)/i;
 const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
-const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
+const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
+const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.txt';
+const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
+const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
-const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN = /je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken\s*👈?/i;
+const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
+  /(?:webdesign niet zichtbaar\?\s*check het hier|je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken)\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
@@ -85,7 +89,7 @@ const DEFAULT_WEBDESIGN_BODY = [
   '',
   'Laat me vooral weten of je dat zou willen.',
   '',
-  'Je kunt het webdesign hier bekijken 👈',
+  'Webdesign niet zichtbaar? Check het hier 👈',
   '',
   'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
   '',
@@ -108,7 +112,7 @@ const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
   '',
   'Laat me vooral weten of je dat zou willen.',
   '',
-  'Je kunt het webdesign hier bekijken 👈',
+  'Webdesign niet zichtbaar? Check het hier 👈',
   '',
   'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
   '',
@@ -184,6 +188,7 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_customer_id',
   'softora_source',
   'softora_company',
+  'softora_sender_name',
   'softora_subject',
   'softora_mail_body',
   'softora_instantly_email_html',
@@ -197,7 +202,12 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_webdesign_ready',
 ]);
 const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
-  'email',
+  'EMAIL',
+  'CONTACT',
+  'COMPANY',
+  'WEBSITE',
+  'PERSONALIZATION',
+  'PHONE NUMBER',
   'first_name',
   'last_name',
   'company_name',
@@ -208,6 +218,7 @@ const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
   'softora_customer_id',
   'softora_source',
   'softora_company',
+  'softora_sender_name',
   'softora_status',
   'softora_contact_name',
   'softora_city',
@@ -1242,14 +1253,23 @@ function inferInstantlySenderName(profileBody, senderEmail = '', normalizeString
   return 'Martijn van de Ven';
 }
 
-function buildInstantlyWebdesignMailText(row, city, senderName, normalizeString = defaultNormalizeString) {
-  const personalized = personalizeTemplate(DEFAULT_INSTANTLY_WEBDESIGN_BODY, row, normalizeString)
+function buildInstantlyWebdesignMailText(
+  templateBody,
+  row,
+  id,
+  city,
+  senderName,
+  config,
+  normalizeString = defaultNormalizeString
+) {
+  const sourceBody = normalizeString(templateBody) || DEFAULT_INSTANTLY_WEBDESIGN_BODY;
+  const personalized = buildMailText(sourceBody, row, normalizeString)
     .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, normalizeString(senderName) || 'Martijn van de Ven')
     .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, normalizeString(city) || 'uw regio')
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
-  return ensurePinnedCityInMailText(personalized, city, normalizeString);
+  return normalizeInstantlyMailText(personalized, city, row, id, config, normalizeString);
 }
 
 function normalizeSenderNameInMailText(text, normalizeString = defaultNormalizeString) {
@@ -1588,7 +1608,7 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
   if (!publicLink.href) {
     return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString).replace(/\n/g, '<br>')}</em>`;
   }
-  return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Open het via <a href="${escapeHtmlAttribute(
+  return `<em style="font-style:italic;">Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
     publicLink.href,
     normalizeString
   )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
@@ -1597,10 +1617,10 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
 function renderInstantlyWebdesignPreviewCtaHtmlLine(line, normalizeString = defaultNormalizeString, options = {}) {
   const href = normalizeString(options.webdesignPreviewUrl);
   if (!href) return escapeHtml(line, normalizeString);
-  return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
+  return `Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
     href,
     normalizeString
-  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈`;
 }
 
 function renderNoLinkDomainText(value, normalizeString = defaultNormalizeString) {
@@ -1718,6 +1738,53 @@ function buildInstantlyEmailHtml(
     : '';
   const content = `${bodyHtml}${webdesignImageHtml}${mockupImageHtml}${optOut}`;
   return wrapInstantlyEmailHtml(content, normalizeString);
+}
+
+function buildInstantlyCampaignTemplateText() {
+  return DEFAULT_INSTANTLY_WEBDESIGN_BODY.replace(
+    /\{\{\s*website\s*\}\}/gi,
+    '{{softora_website_domain}}'
+  )
+    .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, '{{softora_sender_name}}')
+    .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, '{{softora_city}}')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeString) {
+  const bodyHtml = renderMailTextAsHtml(buildInstantlyCampaignTemplateText(), normalizeString, {
+    webdesignPreviewUrl: '{{softora_webdesign_public_url}}',
+  });
+  const webdesignImageHtml = renderImageHtml(
+    '{{softora_webdesign_image_url}}',
+    'Webdesign',
+    '24px 0 0 0',
+    normalizeString
+  );
+  const mockupImageHtml = `\n<p style="margin:20px 0 7px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">{{softora_mockup_caption}}</p>${renderImageHtml(
+    '{{softora_webdesign_mockup_url}}',
+    'Mockup',
+    '0',
+    normalizeString
+  )}`;
+  const optOut = `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="{{softora_unsubscribe_url}}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
+    COLDMAIL_OPT_OUT_LABEL,
+    normalizeString
+  )}</a></p>`;
+  return wrapInstantlyEmailHtml(`${bodyHtml}${webdesignImageHtml}${mockupImageHtml}${optOut}`, normalizeString);
+}
+
+function buildInstantlyCampaignTemplateInstructions() {
+  return [
+    'Softora Instantly template',
+    '',
+    `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
+    `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
+    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink, afmeldlink en tekstvariabelen.',
+    '',
+    'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, anders toont Instantly de fotos/preview mogelijk niet.',
+  ].join('\n');
 }
 
 async function warmInstantlyPreviewImageCache(
@@ -2246,6 +2313,59 @@ function createInstantlyOutreachService(deps = {}) {
     return buildColdmailSendGuardIndex(safeJsonObjectParse(values[coldmailSendGuardKey]));
   }
 
+  function buildOutboundGuardKeysForInstantlyItem(item, options = {}) {
+    const payload = createInstantlyOutboundGuardPayload(item, options);
+    if (!payload) return [];
+    if (outboundRecipientGuardService && typeof outboundRecipientGuardService.buildIdentityRowsForRecipient === 'function') {
+      return outboundRecipientGuardService
+        .buildIdentityRowsForRecipient(payload, {
+          provider: 'instantly',
+          channel: 'coldmail',
+          source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+          actor: options.actor,
+          permanent: true,
+          status: 'reserved',
+          at: normalizeString(options.at) || now().toISOString(),
+        })
+        .map((row) => normalizeString(row && row.guard_key))
+        .filter(Boolean);
+    }
+    return [
+      payload.recipientEmail ? `email:${normalizeEmailAddress(payload.recipientEmail, normalizeString)}` : '',
+      payload.recipientDomain ? `domain:${normalizeColdmailGuardKeyPart(payload.recipientDomain, normalizeString)}` : '',
+      payload.recipientCompanyKey
+        ? `company:${normalizeColdmailGuardKeyPart(payload.recipientCompanyKey, normalizeString)}`
+        : '',
+      payload.recipientId ? `id:${normalizeColdmailGuardKeyPart(payload.recipientId, normalizeString)}` : '',
+    ].filter(Boolean);
+  }
+
+  async function loadCentralOutboundGuardConflictKeys(rows = []) {
+    if (!outboundRecipientGuardService || typeof outboundRecipientGuardService.findRecipientConflicts !== 'function') {
+      return new Set();
+    }
+    const recipients = (Array.isArray(rows) ? rows : [])
+      .map((row, index) => createInstantlyOutboundGuardPayload({
+        id: getRowId(row, index, normalizeString),
+        index,
+        row,
+      }))
+      .filter(Boolean);
+    if (!recipients.length) return new Set();
+    const result = await outboundRecipientGuardService.findRecipientConflicts(recipients, {
+      provider: 'instantly',
+      channel: 'coldmail',
+      source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
+      permanent: true,
+      status: 'reserved',
+    });
+    return new Set(
+      (Array.isArray(result && result.conflicts) ? result.conflicts : [])
+        .map((conflict) => normalizeString(conflict && (conflict.guardKey || conflict.guard_key)))
+        .filter(Boolean)
+    );
+  }
+
   function hasColdmailSendGuardMatch(item, context = {}) {
     const guardIndex = context.coldmailSendGuardIndex;
     if (!guardIndex || typeof guardIndex !== 'object') return false;
@@ -2261,16 +2381,18 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   async function loadPersonalizationContext(rows = []) {
-    const [photoMap, mailProfile, coldmailSendGuardIndex] = await Promise.all([
+    const [photoMap, mailProfile, coldmailSendGuardIndex, centralOutboundGuardConflictKeys] = await Promise.all([
       loadCustomerPhotoMap(rows),
       loadColdmailProfile(),
       loadColdmailSendGuardIndex(),
+      loadCentralOutboundGuardConflictKeys(rows),
     ]);
     return {
       photoMap,
       photosByIdentity: buildPhotosByIdentity(photoMap, normalizeString),
       mailProfile,
       coldmailSendGuardIndex,
+      centralOutboundGuardConflictKeys,
     };
   }
 
@@ -2286,6 +2408,11 @@ function createInstantlyOutreachService(deps = {}) {
   async function collectEligibleRows(rows, limit, context = {}) {
     const selectedRows = [];
     const failed = [];
+    const centralConflictKeys =
+      context.centralOutboundGuardConflictKeys instanceof Set
+        ? context.centralOutboundGuardConflictKeys
+        : new Set();
+    const selectedCentralGuardKeys = new Set();
 
     for (let index = 0; index < rows.length && selectedRows.length < limit; index += 1) {
       const row = rows[index];
@@ -2343,6 +2470,29 @@ function createInstantlyOutreachService(deps = {}) {
         });
         continue;
       }
+      const outboundGuardKeys = buildOutboundGuardKeysForInstantlyItem({ id, index, row });
+      const centralConflictKey = outboundGuardKeys.find((guardKey) => centralConflictKeys.has(guardKey));
+      if (centralConflictKey) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          error: 'Lead staat al in de centrale outbound duplicate-guard; niet naar Instantly gestuurd.',
+          guardKey: centralConflictKey,
+        });
+        continue;
+      }
+      const batchConflictKey = outboundGuardKeys.find((guardKey) => selectedCentralGuardKeys.has(guardKey));
+      if (batchConflictKey) {
+        failed.push({
+          id,
+          bedrijf: company,
+          email,
+          error: 'Lead deelt een outbound-identiteit met een andere gekozen Instantly-lead; niet dubbel in dezelfde batch gezet.',
+          guardKey: batchConflictKey,
+        });
+        continue;
+      }
       if (config.blockPersonalMailboxDomains && isPersonalMailboxDomain(email)) {
         failed.push({
           id,
@@ -2375,6 +2525,7 @@ function createInstantlyOutreachService(deps = {}) {
       }
 
       selectedRows.push({ id, index, row });
+      outboundGuardKeys.forEach((guardKey) => selectedCentralGuardKeys.add(guardKey));
     }
 
     return { selectedRows, failed };
@@ -2401,7 +2552,15 @@ function createInstantlyOutreachService(deps = {}) {
     const city = getRowCity(row, normalizeString) || 'uw regio';
     const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
     const senderName = inferInstantlySenderName(bodyTemplate, config.defaultSenderEmail, normalizeString);
-    const baseMailBody = buildInstantlyWebdesignMailText(row, city, senderName, normalizeString);
+    const baseMailBody = buildInstantlyWebdesignMailText(
+      bodyTemplate,
+      row,
+      item.id,
+      city,
+      senderName,
+      config,
+      normalizeString
+    );
     const assets = getReadyWebdesignAssets(item, context);
     const webdesignLink = assets.ready
       ? buildColdmailPreviewImageLink(row, item.id, reference, config, 'webdesign', normalizeString, now)
@@ -2456,6 +2615,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_customer_id: item.id,
       softora_source: 'softora',
       softora_company: company,
+      softora_sender_name: senderName,
       softora_status: normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect',
       softora_contact_name: contact,
       softora_city: city,
@@ -3022,7 +3182,17 @@ function createInstantlyOutreachService(deps = {}) {
     const variables = lead && lead.custom_variables && typeof lead.custom_variables === 'object'
       ? lead.custom_variables
       : {};
+    const contact = [lead && lead.first_name, lead && lead.last_name]
+      .map((value) => normalizeString(value))
+      .filter(Boolean)
+      .join(' ') || normalizeString(variables.softora_contact_name) || normalizeString(lead && lead.company_name);
     return {
+      EMAIL: lead && lead.email,
+      CONTACT: contact,
+      COMPANY: lead && lead.company_name,
+      WEBSITE: lead && lead.website,
+      PERSONALIZATION: lead && lead.personalization,
+      'PHONE NUMBER': lead && lead.phone,
       email: lead && lead.email,
       first_name: lead && lead.first_name,
       last_name: lead && lead.last_name,
@@ -3337,6 +3507,11 @@ function createInstantlyOutreachService(deps = {}) {
       campaignId,
       uploadId,
       fileName: buildSafeUploadFileName(sendableRows.length, uploadId),
+      campaignTemplateFileName: INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME,
+      campaignInstructionsFileName: INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME,
+      campaignSubjectTemplate: INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE,
+      campaignHtmlTemplate: buildInstantlyCampaignHtmlTemplate(normalizeString),
+      campaignTemplateInstructions: buildInstantlyCampaignTemplateInstructions(),
       csvHeaders: INSTANTLY_SAFE_UPLOAD_CSV_HEADERS,
       csv: buildInstantlyUploadCsv(leads),
       leads: sendableRows.map((item) => ({

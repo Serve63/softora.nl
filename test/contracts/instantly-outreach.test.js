@@ -102,9 +102,7 @@ function assertInstantlyHtmlUsesVisibleWebdesignImages(html, expectedPath = '/we
   assert.match(imageTags[0], /src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(imageTags[1], /alt="Mockup"/);
   assert.match(imageTags[1], /src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
-  assert.match(html, /Goedendag/);
-  assert.match(html, /bakkerijzon\.&#8203;test/);
-  assert.match(html, /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon"/);
+  assert.match(html, /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon"/);
   assert.match(html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(html, new RegExp(expectedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(html, /PS: Wordt het webdesign niet zichtbaar|device mockup/i);
@@ -156,6 +154,7 @@ function createService(overrides = {}) {
   const fetchCalls = [];
   const publicImageFetchCalls = [];
   const centralGuardReservations = [];
+  const centralGuardConflictReads = [];
   const writes = [];
   const service = createInstantlyOutreachService({
     instantlyConfig: {
@@ -263,6 +262,16 @@ function createService(overrides = {}) {
     outboundRecipientGuardService:
       overrides.outboundRecipientGuardService ||
       {
+        findRecipientConflicts: async (recipients, options) => {
+          centralGuardConflictReads.push({ recipients, options });
+          return {
+            ok: true,
+            count: Array.isArray(recipients) ? recipients.length : 1,
+            conflicts: Array.isArray(overrides.centralGuardConflicts)
+              ? overrides.centralGuardConflicts
+              : [],
+          };
+        },
         reserveRecipients: async (recipients, options) => {
           centralGuardReservations.push({ recipients, options });
           if (overrides.centralGuardReserveError) throw overrides.centralGuardReserveError;
@@ -283,6 +292,7 @@ function createService(overrides = {}) {
     fetchCalls,
     publicImageFetchCalls,
     centralGuardReservations,
+    centralGuardConflictReads,
     getRows: () => rows,
     writes,
   };
@@ -337,20 +347,18 @@ test('instantly sync pushes eligible Softora leads with campaign dedupe options'
   assert.equal(body.leads[0].email, 'ruben@example.test');
   assert.equal(body.leads[0].custom_variables.softora_customer_id, 'prospect-1');
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Nieuw webdesign gemaakt!');
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedendag/);
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /Je kunt het webdesign hier bekijken 👈/);
-  assert.ok(
-    body.leads[0].custom_variables.softora_mail_body.indexOf('Laat me vooral weten of je dat zou willen.') <
-      body.leads[0].custom_variables.softora_mail_body.indexOf('Je kunt het webdesign hier bekijken 👈')
-  );
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedemorgen Ruben Bakker/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Ik ben benieuwd wat je ervan vindt\./);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Servé Creusen/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /0629917185/);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
   assert.equal(body.leads[0].custom_variables.softora_city_with_pin, '📍 uw regio');
+  assert.equal(body.leads[0].custom_variables.softora_website_domain, 'bakkerijzon.test');
   assert.equal(
     body.leads[0].custom_variables.softora_image_visibility_ps,
-    'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈'
+    'Webdesign niet zichtbaar? Check het hier 👈'
   );
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon');
   assert.equal(body.leads[0].custom_variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon');
@@ -446,10 +454,23 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.equal(result.centralGuardReservationId, 'instantly-safe-manual-upload:campaign-manual:upload-test');
   assert.equal(result.campaignId, 'campaign-manual');
   assert.equal(result.fileName, 'softora-instantly-2-leads-upload-test.csv');
-  assert.match(result.csv, /^email,first_name,last_name,company_name/);
+  assert.match(result.csv, /^EMAIL,CONTACT,COMPANY,WEBSITE,PERSONALIZATION,PHONE NUMBER/);
   assert.match(result.csv, /"ruben@example\.test"/);
   assert.match(result.csv, /"luna@example\.test"/);
   assert.match(result.csv, /softora_customer_id/);
+  assert.match(result.csv, /softora_sender_name/);
+  assert.match(result.csv, /softora_webdesign_image_url/);
+  assert.match(result.csv, /softora_webdesign_mockup_url/);
+  assert.equal(result.campaignTemplateFileName, 'softora-instantly-campaign-template.html');
+  assert.equal(result.campaignInstructionsFileName, 'softora-instantly-lees-mij.txt');
+  assert.equal(result.campaignSubjectTemplate, '{{softora_subject}}');
+  assert.match(result.campaignHtmlTemplate, /<img[^>]+src="\{\{softora_webdesign_image_url\}\}"/);
+  assert.match(result.campaignHtmlTemplate, /<img[^>]+src="\{\{softora_webdesign_mockup_url\}\}"/);
+  assert.match(result.campaignHtmlTemplate, /href="\{\{softora_webdesign_public_url\}\}"/);
+  assert.match(result.campaignHtmlTemplate, /href="\{\{softora_unsubscribe_url\}\}"/);
+  assert.match(result.campaignHtmlTemplate, /\{\{softora_sender_name\}\}/);
+  assert.match(result.campaignTemplateInstructions, /Gebruik in Instantly als onderwerp: \{\{softora_subject\}\}/);
+  assert.match(result.campaignTemplateInstructions, /gebruik niet alleen de CSV als e-mailtekst/i);
   assert.equal(fetchCalls.length, 0, 'manual upload preparation must not call Instantly API');
   assert.equal(centralGuardReservations.length, 1);
   assert.equal(centralGuardReservations[0].options.provider, 'instantly');
@@ -536,6 +557,90 @@ test('safe Instantly upload hard-blocks growsocialmedia.nl from CSV and guards',
   assert.deepEqual(
     centralGuardReservations[0].recipients.map((recipient) => recipient.recipientEmail),
     ['ruben@example.test']
+  );
+  assert.equal(writes.length, 2);
+});
+
+test('safe Instantly upload skips central guard conflicts and fills the requested batch', async () => {
+  const { service, fetchCalls, writes, centralGuardReservations, centralGuardConflictReads } = createService({
+    syncEnabled: false,
+    centralGuardConflicts: [
+      {
+        guardKey: 'email:blocked@example.test',
+        keyType: 'email',
+        keyValue: 'blocked@example.test',
+        provider: 'softora',
+        channel: 'coldmail',
+        status: 'sent',
+      },
+    ],
+    rows: [
+      {
+        id: 'blocked-1',
+        bedrijf: 'Blocked BV',
+        naam: 'Blocked Contact',
+        email: 'blocked@example.test',
+        website: 'https://blocked.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben Bakker',
+        email: 'ruben@example.test',
+        website: 'https://bakkerijzon.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'prospect-2',
+        bedrijf: 'Slagerij Maan',
+        naam: 'Luna Slager',
+        email: 'luna@example.test',
+        website: 'https://slagerijmaan.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'blocked-1': {
+        id: 'blocked-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+      'prospect-2': {
+        id: 'prospect-2',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websiteMockup: TINY_PNG_DATA_URL,
+      },
+    },
+  });
+
+  const result = await service.prepareInstantlyUpload({
+    actor: 'Test',
+    campaignId: 'campaign-manual',
+    uploadId: 'upload-test',
+    limit: 2,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.prepared, 2);
+  assert.equal(fetchCalls.length, 0);
+  assert.equal(centralGuardConflictReads.length, 1);
+  assert.doesNotMatch(result.csv, /blocked@example\.test/);
+  assert.match(result.csv, /"ruben@example\.test"/);
+  assert.match(result.csv, /"luna@example\.test"/);
+  assert.equal(result.failed.length, 1);
+  assert.match(result.failed[0].error, /centrale outbound duplicate-guard/);
+  assert.deepEqual(
+    centralGuardReservations[0].recipients.map((recipient) => recipient.recipientEmail),
+    ['ruben@example.test', 'luna@example.test']
   );
   assert.equal(writes.length, 2);
 });
@@ -786,10 +891,10 @@ test('instantly sync normalizes Serve accent and pins the city line', async () =
   assert.match(variables.softora_mail_body, /Servé Creusen/);
   assert.doesNotMatch(variables.softora_mail_body, /Serve Creusen/);
   assert.match(variables.softora_mail_body, /📍 Alphen/);
-  assert.match(variables.softora_mail_body, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(variables.softora_mail_body, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.ok(
-    variables.softora_mail_body.indexOf('Laat me vooral weten of je dat zou willen.') <
-      variables.softora_mail_body.indexOf('Je kunt het webdesign hier bekijken 👈')
+    variables.softora_mail_body.indexOf('📍 Alphen') <
+      variables.softora_mail_body.indexOf('Webdesign niet zichtbaar? Check het hier 👈')
   );
   assert.doesNotMatch(variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(variables.softora_mail_body, /\nAlphen$/);
@@ -958,7 +1063,7 @@ test('instantly sync removes Martijn LinkedIn CTA before syncing', async () => {
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
   assert.match(variables.softora_mail_body, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
-  assert.match(variables.softora_mail_body, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(variables.softora_mail_body, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.doesNotMatch(variables.softora_mail_body, /PS: Wordt het webdesign niet zichtbaar/);
   assert.doesNotMatch(variables.softora_mail_body, /Mijn LinkedIn|linkedin\.com/i);
   assert.doesNotMatch(variables.softora_instantly_email_html, /Mijn LinkedIn|linkedin\.com/i);
@@ -1691,9 +1796,10 @@ test('instantly sync uses the active coldmail autopilot profile before fallback 
   assert.equal(fetchCalls.length, 1);
   const body = JSON.parse(fetchCalls[0].options.body);
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Autopilot webdesign voor Bakkerij Zon');
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedendag/);
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
-  assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Goedemorgen Ruben Bakker/);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot in uw regio\./);
+  assert.match(body.leads[0].custom_variables.softora_mail_body, /Webdesign niet zichtbaar\? Check het hier 👈/);
+  assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
 });
 
 test('instantly sync respects the daily cap and backfills existing Instantly rows as approached', async () => {
