@@ -52,8 +52,9 @@ const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.tx
 const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 600;
-const INSTANTLY_IMAGE_PAIR_WIDTH = 280;
-const INSTANTLY_IMAGE_PAIR_GAP_WIDTH = 12;
+const INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
+const INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH = 584;
+const INSTANTLY_IMAGE_PAIR_GAP_WIDTH = 16;
 const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
   /(?:je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken|webdesign\s+niet\s+zichtbaar\?\s*check\s+het\s+hier)\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
@@ -1804,7 +1805,7 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
-function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeString, dimensions = null) {
+function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeString, dimensions = null, desktopWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH) {
   const cleanSrc = normalizeString(src);
   if (!cleanSrc) return '';
   const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
@@ -1814,16 +1815,16 @@ function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeS
     height: isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT,
   };
   const scaledDimensions =
-    scaleEmailImageDimensions(dimensions, INSTANTLY_IMAGE_PAIR_WIDTH) ||
-    scaleEmailImageDimensions(fallbackDimensions, INSTANTLY_IMAGE_PAIR_WIDTH);
-  const imageHeight = scaledDimensions ? scaledDimensions.height : INSTANTLY_IMAGE_PAIR_WIDTH;
+    scaleEmailImageDimensions(dimensions, desktopWidth) ||
+    scaleEmailImageDimensions(fallbackDimensions, desktopWidth);
+  const imageHeight = scaledDimensions ? scaledDimensions.height : desktopWidth;
   return `<img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" class="softora-webdesign-image" width="${INSTANTLY_IMAGE_PAIR_WIDTH}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:${INSTANTLY_IMAGE_PAIR_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;" />`;
+  )}" class="softora-webdesign-image" width="${desktopWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:${desktopWidth}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;" />`;
 }
 
 function renderInstantlyImagePairHtml(
@@ -1851,23 +1852,25 @@ function renderInstantlyImagePairHtml(
     return `${webdesignImageHtml}${mockupImageHtml}`;
   }
 
-  const pairWidth = (INSTANTLY_IMAGE_PAIR_WIDTH * 2) + INSTANTLY_IMAGE_PAIR_GAP_WIDTH;
+  const pairWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH + INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH + INSTANTLY_IMAGE_PAIR_GAP_WIDTH;
   const webdesignImageHtml = renderInlinePairImageHtml(
     cleanWebdesignUrl,
     'Webdesign',
     normalizeString,
-    webdesignImageDimensions
+    webdesignImageDimensions,
+    INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH
   );
   const mockupImageHtml = renderInlinePairImageHtml(
     cleanMockupUrl,
     'Mockup',
     normalizeString,
-    webdesignMockupDimensions
+    webdesignMockupDimensions,
+    INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH
   );
   return `\n<p style="margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(
     caption,
     normalizeString
-  )}</p>\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-pair{max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}}</style><div class="softora-webdesign-image-pair" style="max-width:${pairWidth}px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:top;margin:0 ${INSTANTLY_IMAGE_PAIR_GAP_WIDTH}px 16px 0;padding:0;font-size:16px;line-height:1.4;">${webdesignImageHtml}</div><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:top;margin:0 0 16px 0;padding:0;font-size:16px;line-height:1.4;">${mockupImageHtml}</div></div>`;
+  )}</p>\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-pair{max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}}</style><div class="softora-webdesign-image-pair" style="max-width:${pairWidth}px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:top;margin:0 ${INSTANTLY_IMAGE_PAIR_GAP_WIDTH}px 16px 0;padding:0;font-size:16px;line-height:1.4;">${webdesignImageHtml}</div><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:top;margin:0 0 16px 0;padding:0;font-size:16px;line-height:1.4;">${mockupImageHtml}</div></div>`;
 }
 
 function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeString) {

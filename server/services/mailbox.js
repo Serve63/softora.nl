@@ -66,7 +66,8 @@ const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier �
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?)/i;
 const MAILBOX_EMAIL_IMAGE_MAX_WIDTH = 480;
-const MAILBOX_EMAIL_IMAGE_PAIR_WIDTH = 286;
+const MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
+const MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH = 584;
 const MAILBOX_EMAIL_IMAGE_GAP_WIDTH = 16;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
@@ -1653,7 +1654,7 @@ function createMailboxService(deps = {}) {
     )}" width="${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}" style="display:block;width:${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
   }
 
-  function renderMailboxEmailImageTag(image, width = MAILBOX_EMAIL_IMAGE_PAIR_WIDTH) {
+  function renderMailboxEmailImageTag(image, width = MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH) {
     if (!image || !image.src) return '';
     return `<img src="${escapeHtmlAttribute(
       image.src
@@ -1663,11 +1664,11 @@ function createMailboxService(deps = {}) {
   }
 
   function renderMailboxEmailImagePair(mainImage, mockupImage) {
-    const mainHtml = renderMailboxEmailImageTag(mainImage);
-    const mockupHtml = renderMailboxEmailImageTag(mockupImage);
+    const mainHtml = renderMailboxEmailImageTag(mainImage, MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH);
+    const mockupHtml = renderMailboxEmailImageTag(mockupImage, MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH);
     if (!mainHtml || !mockupHtml) return '';
-    const pairTableWidth = (MAILBOX_EMAIL_IMAGE_PAIR_WIDTH * 2) + MAILBOX_EMAIL_IMAGE_GAP_WIDTH;
-    return `\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-table{width:100%!important;max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;padding-right:0!important;padding-left:0!important}.softora-webdesign-image-gap{display:none!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}}</style><table class="softora-webdesign-image-table" role="presentation" width="${pairTableWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${pairTableWidth}px;max-width:100%;margin:22px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="${MAILBOX_EMAIL_IMAGE_PAIR_WIDTH}" valign="top" style="padding:0;margin:0;width:${MAILBOX_EMAIL_IMAGE_PAIR_WIDTH}px;max-width:${MAILBOX_EMAIL_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;">${mainHtml}</td><td class="softora-webdesign-image-gap" width="${MAILBOX_EMAIL_IMAGE_GAP_WIDTH}" style="font-size:0;line-height:0;width:${MAILBOX_EMAIL_IMAGE_GAP_WIDTH}px;">&nbsp;</td><td class="softora-webdesign-image-cell" width="${MAILBOX_EMAIL_IMAGE_PAIR_WIDTH}" valign="top" style="padding:0;margin:0;width:${MAILBOX_EMAIL_IMAGE_PAIR_WIDTH}px;max-width:${MAILBOX_EMAIL_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;">${mockupHtml}</td></tr></table>`;
+    const pairTableWidth = MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH + MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH + MAILBOX_EMAIL_IMAGE_GAP_WIDTH;
+    return `\n<style>@media only screen and (max-width:620px){.softora-webdesign-image-table{width:100%!important;max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;padding-right:0!important;padding-left:0!important}.softora-webdesign-image-gap{display:none!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}}</style><table class="softora-webdesign-image-table" role="presentation" width="${pairTableWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${pairTableWidth}px;max-width:100%;margin:22px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="${MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH}" valign="top" style="padding:0;margin:0;width:${MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:${MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;">${mainHtml}</td><td class="softora-webdesign-image-gap" width="${MAILBOX_EMAIL_IMAGE_GAP_WIDTH}" style="font-size:0;line-height:0;width:${MAILBOX_EMAIL_IMAGE_GAP_WIDTH}px;">&nbsp;</td><td class="softora-webdesign-image-cell" width="${MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH}" valign="top" style="padding:0;margin:0;width:${MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:${MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;">${mockupHtml}</td></tr></table>`;
   }
 
   function renderMailboxWebdesignHtml(text, options = {}) {
