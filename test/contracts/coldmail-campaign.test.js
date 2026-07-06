@@ -420,6 +420,7 @@ function createService(overrides = {}) {
         },
       };
     },
+    dataOpsStore: overrides.dataOpsStore,
     mailboxAccountsRaw: overrides.mailboxAccountsRaw || '',
     createImapClient:
       overrides.createImapClient ||
@@ -5075,6 +5076,68 @@ test('coldmail preview image route accepts portable v2 image tokens across hosts
   assert.equal(image.type, 'webdesign');
   assert.equal(image.contentType, 'image/png');
   assert.equal(image.filename, 'Bakkerij-Zon-webdesign.png');
+});
+
+test('coldmail preview image route refreshes stored webdesign URLs via data ops fallback', async () => {
+  clearPreviewImageCache();
+  const calls = [];
+  const webdesignToken = buildColdmailPreviewImageV2Token({
+    id: 'prospect-1',
+    email: 'ruben@example.test',
+    reference: 'SF-20260424-TEST',
+    type: 'webdesign',
+  });
+  const mockupToken = buildColdmailPreviewImageV2Token({
+    id: 'prospect-1',
+    email: 'ruben@example.test',
+    reference: 'SF-20260424-TEST',
+    type: 'mockup',
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        customerId: 'prospect-1',
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    dataOpsStore: {
+      listDesignPhotosWithSignedUrls: async (options) => {
+        calls.push(options);
+        return [
+          {
+            customerId: 'prospect-1',
+            identityKey: 'bakkerij zon|ruben@example.test',
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+            websiteMockupUrl: TINY_PNG_DATA_URL,
+          },
+        ];
+      },
+    },
+  });
+
+  const webdesignImage = await service.getColdmailPreviewImage({ token: webdesignToken });
+  const mockupImage = await service.getColdmailPreviewImage({ token: mockupToken });
+
+  assert.equal(webdesignImage.type, 'webdesign');
+  assert.equal(mockupImage.type, 'mockup');
+  assert.equal(webdesignImage.contentType, 'image/png');
+  assert.equal(mockupImage.contentType, 'image/png');
+  assert.equal(webdesignImage.content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(mockupImage.content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => call.identifiers.includes('prospect-1')));
+  assert.ok(calls.every((call) => call.expiresInSeconds === 24 * 60 * 60));
 });
 
 test('coldmail preview image route strips decorative webdesign frames for existing email tokens', async () => {
