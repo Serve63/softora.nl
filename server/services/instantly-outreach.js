@@ -47,6 +47,9 @@ const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /(?:PS:\s*)?(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?)/i;
 const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
+const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
+const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.txt';
+const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
 const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
@@ -1683,8 +1686,8 @@ function buildColdmailPreviewImageUrl(row, id, reference, config, type, normaliz
   return buildColdmailPreviewImageLink(row, id, reference, config, type, normalizeString, now).url;
 }
 
-function buildInstantlyBodyWithWebdesignLinks({ baseText, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
-  return appendColdmailOptOutText(normalizeString(baseText), unsubscribeUrl, normalizeString);
+function buildInstantlyBodyWithWebdesignLinks({ baseText }, normalizeString = defaultNormalizeString) {
+  return normalizeString(baseText);
 }
 
 function escapeHtml(value, normalizeString = defaultNormalizeString) {
@@ -1813,19 +1816,9 @@ function buildInstantlyEmailHtml(
     webdesignImageDimensions,
     webdesignMockupDimensions,
     webdesignPublicUrl,
-    unsubscribeUrl,
   },
   normalizeString = defaultNormalizeString
 ) {
-  const optOut = normalizeString(unsubscribeUrl)
-    ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
-        unsubscribeUrl,
-        normalizeString
-      )}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
-        COLDMAIL_OPT_OUT_LABEL,
-        normalizeString
-      )}</a></p>`
-    : '';
   const bodyHtml = renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
   });
@@ -1838,8 +1831,51 @@ function buildInstantlyEmailHtml(
         normalizeString
       )}</p>${renderImageHtml(webdesignMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
     : '';
-  const content = `${bodyHtml}${webdesignImageHtml}${mockupImageHtml}${optOut}`;
+  const content = `${bodyHtml}${webdesignImageHtml}${mockupImageHtml}`;
   return wrapInstantlyEmailHtml(content, normalizeString);
+}
+
+function buildInstantlyCampaignTemplateText() {
+  return DEFAULT_INSTANTLY_WEBDESIGN_BODY.replace(
+    /\{\{\s*website\s*\}\}/gi,
+    '{{softora_website_domain}}'
+  )
+    .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, '{{softora_sender_name}}')
+    .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, '{{softora_city}}')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeString) {
+  const bodyHtml = renderMailTextAsHtml(buildInstantlyCampaignTemplateText(), normalizeString, {
+    webdesignPreviewUrl: '{{softora_webdesign_public_url}}',
+  });
+  const webdesignImageHtml = renderImageHtml(
+    '{{softora_webdesign_image_url}}',
+    'Webdesign',
+    '24px 0 0 0',
+    normalizeString
+  );
+  const mockupImageHtml = `\n<p style="margin:20px 0 7px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">{{softora_mockup_caption}}</p>${renderImageHtml(
+    '{{softora_webdesign_mockup_url}}',
+    'Mockup',
+    '0',
+    normalizeString
+  )}`;
+  return wrapInstantlyEmailHtml(`${bodyHtml}${webdesignImageHtml}${mockupImageHtml}`, normalizeString);
+}
+
+function buildInstantlyCampaignTemplateInstructions() {
+  return [
+    'Softora Instantly template',
+    '',
+    `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
+    `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
+    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink en tekstvariabelen.',
+    '',
+    'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, anders toont Instantly de fotos/preview mogelijk niet.',
+  ].join('\n');
 }
 
 async function warmInstantlyPreviewImageCache(
@@ -2732,7 +2768,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_city_with_pin: formatPinnedCity(city, normalizeString),
       softora_subject: subject,
       softora_mail_body: baseMailBody,
-      softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
+      softora_mail_body_with_optout: baseMailBody,
       softora_instantly_email_text: instantlyEmailBody,
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,
@@ -3634,6 +3670,11 @@ function createInstantlyOutreachService(deps = {}) {
       fileName: buildSafeUploadFileName(sendableRows.length, uploadId),
       csvHeaders: INSTANTLY_SAFE_UPLOAD_CSV_HEADERS,
       csv: buildInstantlyUploadCsv(leads),
+      campaignTemplateFileName: INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME,
+      campaignInstructionsFileName: INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME,
+      campaignSubjectTemplate: INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE,
+      campaignHtmlTemplate: buildInstantlyCampaignHtmlTemplate(normalizeString),
+      campaignTemplateInstructions: buildInstantlyCampaignTemplateInstructions(),
       leads: sendableRows.map((item) => ({
         id: item.id,
         bedrijf: getRowCompany(item.row, normalizeString),

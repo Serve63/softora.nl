@@ -7128,6 +7128,57 @@ function createColdmailCampaignService(deps = {}) {
   function isApprovedWebdesignMockupRecord(photo) {
     return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
   }
+  function collectPreviewImageDataOpsIdentifiers(payload = {}, row = null, photo = null) {
+    const values = [
+      payload.id,
+      payload.email,
+      row && (row.id || row.customerId || row.databaseId),
+      row && (row.identityKey || row.identity_key),
+      row && getRowCompany(row),
+      row && getRowDomain(row),
+      photo && (photo.id || photo.customerId || photo.customer_id),
+      photo && photo.identityKey,
+      photo && (photo.websitePhotoName || photo.photoName || photo.fileName),
+      photo && (photo.websiteMockupName || photo.mockupName),
+    ];
+    if (row) values.push(...buildRowIdentityKeys(row));
+    return Array.from(new Set(values.map(normalizeString).filter(Boolean)));
+  }
+
+  async function resolvePreviewImageFromDataOps(payload = {}, row = null, photo = null) {
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') return null;
+    const identifiers = collectPreviewImageDataOpsIdentifiers(payload, row, photo);
+    if (!identifiers.length) return null;
+    let entries = null;
+    try {
+      entries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+        identifiers,
+        maxMatches: 12,
+        expiresInSeconds: 24 * 60 * 60,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
+        suppressStaleReadCacheLog: true,
+      });
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[Coldmail][preview-image-dataops-fallback]', error?.message || error);
+      }
+      return null;
+    }
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) return null;
+    const expectedIds = new Set(identifiers.map((value) => value.toLowerCase()));
+    const preferred =
+      list.find((entry) => expectedIds.has(normalizeString(entry && entry.customerId).toLowerCase())) ||
+      list.find((entry) => expectedIds.has(normalizeString(entry && entry.identityKey).toLowerCase())) ||
+      list[0];
+    const source = payload.type === 'mockup'
+      ? normalizeString(preferred && preferred.websiteMockupUrl)
+      : normalizeString(preferred && preferred.websitePhotoUrl);
+    if (!source) return null;
+    return resolveImageAttachment(source);
+  }
+
 
   function appendWebdesignImageHtml(html, attachment, options = {}) {
     const imageSrc = normalizeString(attachment && (attachment.src || (attachment.cid ? `cid:${attachment.cid}` : '')));
@@ -8285,7 +8336,9 @@ function createColdmailCampaignService(deps = {}) {
     const source = payload.type === 'mockup'
       ? (isApprovedWebdesignMockupRecord(photo) ? getWebdesignMockupSource(photo) : '')
       : getWebdesignPhotoSource(photo);
-    const image = await resolveImageAttachment(source);
+    const image =
+      await resolveImageAttachment(source) ||
+      await resolvePreviewImageFromDataOps(payload, row, photo);
     if (!image) {
       const error = new Error('Deze foto is niet meer beschikbaar.');
       error.code = 'PREVIEW_IMAGE_NOT_FOUND';
