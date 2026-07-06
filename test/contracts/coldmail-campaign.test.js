@@ -4929,14 +4929,15 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.doesNotMatch(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
   assert.match(sentMessages[0].html, /softora-webdesign-image-gap/);
-  assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
-  assert.match(sentMessages[0].html, /<td class="softora-webdesign-image-cell" width="50%" valign="top" style="[^"]*overflow:visible;"/);
+  assert.match(sentMessages[0].html, /<table class="softora-webdesign-image-table" role="presentation" width="588"/);
+  assert.match(sentMessages[0].html, /<td class="softora-webdesign-image-cell" width="286" valign="top" style="[^"]*width:286px;max-width:286px;[^"]*overflow:visible;"/);
   assert.match(
     sentMessages[0].html,
-    /margin:24px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="50%" valign="top" style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
+    /margin:24px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="286" valign="top" style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" class="softora-webdesign-image" width="286" style="display:block;width:100%;max-width:286px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" class="softora-webdesign-image" width="286" style="display:block;width:100%;max-width:286px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" class="softora-webdesign-image" width="286" style="display:block;width:286px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" class="softora-webdesign-image" width="286" style="display:block;width:286px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image" width="286" style="display:block;width:100%;max-width:286px/);
   assert.doesNotMatch(sentMessages[0].html, /height="360"/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
