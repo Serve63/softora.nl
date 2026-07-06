@@ -5140,6 +5140,71 @@ test('coldmail preview image route refreshes stored webdesign URLs via data ops 
   assert.ok(calls.every((call) => call.expiresInSeconds === 24 * 60 * 60));
 });
 
+test('coldmail preview image route resolves old Instantly tokens through customer identity keys', async () => {
+  clearPreviewImageCache();
+  const identityLookups = [];
+  const photoLookups = [];
+  const token = buildColdmailPreviewImageV2Token({
+    id: 'safe-dedupe-20260615-row-1520-aff51f7be4',
+    email: 'info@louwersmetaal.nl',
+    reference: 'SF-20260626-SAFEDEDUP',
+    type: 'webdesign',
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'safe-dedupe-20260615-row-1520-aff51f7be4',
+        bedrijf: 'Louwers Metaal',
+        email: 'info@louwersmetaal.nl',
+        website: 'louwersmetaal.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'safe-dedupe-20260615-row-1520-aff51f7be4': {
+        id: 'safe-dedupe-20260615-row-1520-aff51f7be4',
+        websitePhotoName: 'verlopen oude webdesign-link',
+      },
+    },
+    dataOpsStore: {
+      listCustomerIdentityKeys: async (keys) => {
+        identityLookups.push(keys);
+        return {
+          ok: true,
+          data: [
+            {
+              key_type: 'email',
+              key_value: 'info@louwersmetaal.nl',
+              customer_id: 'louwers-constructiebedrijf-b-v',
+            },
+          ],
+        };
+      },
+      listDesignPhotosWithSignedUrls: async (options) => {
+        photoLookups.push(options);
+        return [
+          {
+            customerId: 'louwers-constructiebedrijf-b-v',
+            identityKey: 'louwers constructiebedrijf b v||',
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+          },
+        ];
+      },
+    },
+  });
+
+  const image = await service.getColdmailPreviewImage({ token });
+
+  assert.equal(image.type, 'webdesign');
+  assert.equal(image.contentType, 'image/png');
+  assert.equal(image.content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(identityLookups.length, 1);
+  assert.ok(identityLookups[0].some((key) => key.type === 'email' && key.value === 'info@louwersmetaal.nl'));
+  assert.equal(photoLookups.length, 1);
+  assert.ok(photoLookups[0].identifiers.includes('louwers-constructiebedrijf-b-v'));
+});
+
 test('coldmail preview image route strips decorative webdesign frames for existing email tokens', async () => {
   const framedWebdesign = await createFramedWebdesignDataUrl();
   const token = buildColdmailPreviewImageToken({
