@@ -4927,19 +4927,19 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
     sentMessages[0].html,
     /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
-  assert.doesNotMatch(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
-  assert.match(sentMessages[0].html, /@media only screen and \(max-width:620px\)/);
+  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assert.match(sentMessages[0].html, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
   assert.match(sentMessages[0].html, /\.softora-webdesign-image\{width:100%!important;max-width:100%!important;height:auto!important\}/);
   assert.match(sentMessages[0].html, /softora-webdesign-image-pair/);
   assert.match(sentMessages[0].html, /max-width:900px;width:100%;font-size:0;line-height:0;margin:24px 0 0 0;padding:0;/);
-  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell" style="display:inline-block;width:300px;max-width:100%;vertical-align:top;margin:0 16px 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;"/);
-  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell" style="display:inline-block;width:584px;max-width:100%;vertical-align:top;margin:0 0 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;"/);
+  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell" style="display:inline-block;width:300px;max-width:100%;vertical-align:bottom;margin:0 16px 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;"/);
+  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell" style="display:inline-block;width:584px;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;"/);
   assert.match(
     sentMessages[0].html,
     /margin:0 16px 16px 0;[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" class="softora-webdesign-image" width="300" style="display:block;width:300px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" class="softora-webdesign-image" width="584" style="display:block;width:584px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" class="softora-webdesign-image" width="300" style="display:block;width:100%;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="584" height="450" style="display:block;width:100%;max-width:100%;height:450px;max-height:450px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/);
   assert.doesNotMatch(sentMessages[0].html, /display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table/);
   assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image" width="300" style="display:block;width:100%;max-width:300px/);
   assert.doesNotMatch(sentMessages[0].html, /height="360"/);
@@ -5286,9 +5286,9 @@ test('coldmail campaign sends webdesign mails with CID images by default for own
   assert.match(sentMessages[0].html, /softora-webdesign-image-pair/);
   assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
   assert.match(sentMessages[0].html, /display:inline-block;width:300px;max-width:100%;/);
-  assert.match(sentMessages[0].html, /@media only screen and \(max-width:620px\)/);
+  assert.match(sentMessages[0].html, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
   assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image-gap|display:flex|flex-wrap/);
-  assert.doesNotMatch(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
@@ -5544,9 +5544,9 @@ test('coldmail autopilot keeps CID image delivery even when legacy dashboard sta
   assert.match(sentMessages[0].html, /softora-webdesign-image-pair/);
   assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
   assert.match(sentMessages[0].html, /display:inline-block;width:300px;max-width:100%;/);
-  assert.match(sentMessages[0].html, /@media only screen and \(max-width:620px\)/);
+  assert.match(sentMessages[0].html, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
   assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image-gap|display:flex|flex-wrap/);
-  assert.doesNotMatch(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
@@ -5786,7 +5786,7 @@ test('coldmail campaign keeps the closing signature before webdesign photos', as
   assert.ok(imageIndex > phoneIndex);
   assert.ok(mockupIndex > imageIndex);
   assert.match(html, /softora-webdesign-image-cell/);
-  assert.doesNotMatch(html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.match(html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
 });
 
@@ -6752,7 +6752,7 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
-  assert.doesNotMatch(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
+  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /border-top\s*:\s*1px\s+dashed/i);
   assert.doesNotMatch(sentMessages[0].html, /detail-mail-section-signature/);
   assert.equal(sentMessages[0].attachments.length, 2);
