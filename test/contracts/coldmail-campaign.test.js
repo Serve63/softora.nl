@@ -3932,7 +3932,7 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   assert.equal(result.sent, 1);
   assert.equal(result.senderEmail, 'servec321@gmail.com');
   assert.equal(sentMessages.length, 1);
-  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(sentMessages[0].text, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(
     sentMessages[0].html,
@@ -3940,7 +3940,7 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   );
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-import-5-db-mpfntuzo-cifdr3@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-import-5-db-mpfntuzo-cifdr3@softora"/);
@@ -4917,13 +4917,14 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
   assert.match(
     sentMessages[0].text,
-    /📍 Alphen\n\nJe kunt het webdesign hier bekijken 👈/
+    /📍 Alphen\n\nWebdesign niet zichtbaar\? Check het hier 👈/
   );
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(sentMessages[0].html, /📍 Alphen/);
+  assert.match(sentMessages[0].html, /max-width:600px;width:100%;/);
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
   assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
@@ -4932,8 +4933,8 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
     sentMessages[0].html,
     /margin:24px 0 0 0;"><tr><td style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" width="480" style="display:block;width:100%;max-width:480px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
+  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" width="480" style="display:block;width:100%;max-width:480px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
   assert.doesNotMatch(sentMessages[0].html, /height="360"/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
@@ -5215,7 +5216,7 @@ test('coldmail campaign strips legacy webdesign image placeholders before link-o
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /^Goedendag,/);
-  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(sentMessages[0].text, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.doesNotMatch(sentMessages[0].text, /\[image:/i);
   assert.doesNotMatch(sentMessages[0].text, /korte indruk van de eerste versie/i);
   assert.doesNotMatch(sentMessages[0].html, /\[image:/i);
@@ -5398,10 +5399,10 @@ test('coldmail autopilot keeps CID image delivery even when legacy dashboard sta
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /^Goedendag,/);
-  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(sentMessages[0].text, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
