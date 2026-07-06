@@ -348,7 +348,11 @@ test('premium database real businesses maps Google Places rows and discovers pub
   const result = await fetchRealBusinessRows(
     { query: 'bakkerij Breda', count: 2, enrichEmails: true },
     {
-      env: { GOOGLE_PAID_APIS_ENABLED: 'true', GOOGLE_MAPS_SERVER_API_KEY: 'maps-key' },
+      env: {
+        GOOGLE_PAID_APIS_HARD_BLOCK: 'false',
+        GOOGLE_PAID_APIS_ENABLED: 'true',
+        GOOGLE_MAPS_SERVER_API_KEY: 'maps-key',
+      },
       fetchImpl: async (url, options = {}) => {
         calls.push({ url: String(url), options });
         if (String(url).includes('places.googleapis.com')) {
@@ -436,7 +440,11 @@ test('premium database real businesses enriches website emails with bounded conc
   const result = await fetchRealBusinessRows(
     { query: 'winkels Breda', count: 4, enrichEmails: true },
     {
-      env: { GOOGLE_PAID_APIS_ENABLED: 'true', GOOGLE_MAPS_SERVER_API_KEY: 'maps-key' },
+      env: {
+        GOOGLE_PAID_APIS_HARD_BLOCK: 'false',
+        GOOGLE_PAID_APIS_ENABLED: 'true',
+        GOOGLE_MAPS_SERVER_API_KEY: 'maps-key',
+      },
       emailEnrichmentConcurrency: 2,
       fetchImpl: async (url) => {
         if (String(url).includes('places.googleapis.com')) {
@@ -479,7 +487,7 @@ test('premium database real businesses enriches website emails with bounded conc
 
 test('premium database real businesses route reports missing Google Places key', async () => {
   const coordinator = createPremiumDatabaseImportCoordinator({
-    env: { GOOGLE_PAID_APIS_ENABLED: 'true' },
+    env: { GOOGLE_PAID_APIS_HARD_BLOCK: 'false', GOOGLE_PAID_APIS_ENABLED: 'true' },
     fetchImpl: async () => {
       throw new Error('fetch should not run without key');
     },
@@ -505,6 +513,40 @@ test('premium database real businesses route reports missing Google Places key',
   assert.equal(response.statusCode, 503);
   assert.equal(response.body.ok, false);
   assert.equal(response.body.code, 'GOOGLE_PLACES_NOT_CONFIGURED');
+});
+
+test('premium database real businesses hard-block overrides enabled Google paid APIs', async () => {
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    env: {
+      GOOGLE_PAID_APIS_HARD_BLOCK: 'true',
+      GOOGLE_PAID_APIS_ENABLED: 'true',
+      GOOGLE_MAPS_SERVER_API_KEY: 'maps-key',
+    },
+    fetchImpl: async () => {
+      throw new Error('fetch should not run while paid APIs are hard-blocked');
+    },
+  });
+  const response = {
+    statusCode: 0,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await coordinator.sendRealBusinessesResponse(
+    { body: { query: 'bedrijven in Breda', count: 100 } },
+    response
+  );
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.code, 'GOOGLE_PAID_APIS_DISABLED');
 });
 
 test('premium database real businesses route blocks Google Places while paid APIs are disabled', async () => {

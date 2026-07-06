@@ -22,9 +22,12 @@ const {
 
 const PORT = Number(process.env.PORT || 3000);
 const IS_PRODUCTION = /^(production|prod)$/i.test(String(process.env.NODE_ENV || '').trim());
+const GOOGLE_PAID_APIS_HARD_BLOCK = !/^(0|false|no)$/i.test(
+  String(process.env.GOOGLE_PAID_APIS_HARD_BLOCK || 'true')
+);
 const GOOGLE_PAID_APIS_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.GOOGLE_PAID_APIS_ENABLED || process.env.GEMINI_SPEND_ENABLED || '')
-);
+) && !GOOGLE_PAID_APIS_HARD_BLOCK;
 const RAW_GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
 const GEMINI_API_KEY = GOOGLE_PAID_APIS_ENABLED ? RAW_GEMINI_API_KEY : '';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-live-preview';
@@ -406,6 +409,7 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'twilio-media-bridge',
+    googlePaidApisHardBlock: GOOGLE_PAID_APIS_HARD_BLOCK,
     googlePaidApisEnabled: GOOGLE_PAID_APIS_ENABLED,
     geminiConfigured: Boolean(GEMINI_API_KEY),
     timestamp: new Date().toISOString(),
@@ -921,6 +925,7 @@ server.listen(PORT, () => {
     );
   }
   console.log(`[Bridge] model=${GEMINI_MODEL}`);
+  console.log(`[Bridge] googlePaidApisHardBlock=${GOOGLE_PAID_APIS_HARD_BLOCK}`);
   console.log(`[Bridge] googlePaidApisEnabled=${GOOGLE_PAID_APIS_ENABLED}`);
   console.log(`[Bridge] geminiConfigured=${Boolean(GEMINI_API_KEY)}`);
   console.log(

@@ -56,6 +56,7 @@ TWILIO_STATUS_CALLBACK_URL=https://jouwdomein.nl/api/twilio/status
 TWILIO_WEBHOOK_SECRET=your_twilio_webhook_secret
 TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
 GOOGLE_PAID_APIS_ENABLED=false
+GOOGLE_PAID_APIS_HARD_BLOCK=true
 TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE=
 TWILIO_FROM_NUMBER_GEMINI_FLASH_3_1_LIVE=+31xxxxxxxxx
 

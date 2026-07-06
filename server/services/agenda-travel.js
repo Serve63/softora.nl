@@ -134,6 +134,7 @@ function createAgendaTravelService(deps = {}) {
   }
 
   function getGoogleMapsServerApiKey() {
+    if (!/^(0|false|no)$/i.test(String(env.GOOGLE_PAID_APIS_HARD_BLOCK || 'true'))) return '';
     if (!/^(1|true|yes)$/i.test(String(env.GOOGLE_PAID_APIS_ENABLED || ''))) return '';
     return normalizeString(env.GOOGLE_MAPS_SERVER_API_KEY || env.GOOGLE_MAPS_API_KEY || '');
   }

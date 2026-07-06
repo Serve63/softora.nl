@@ -669,6 +669,12 @@ function getGooglePlacesApiKey(deps = {}) {
 
 function isGooglePaidApisEnabled(deps = {}) {
   const env = deps.env || process.env || {};
+  const hardBlockRaw =
+    deps.googlePaidApisHardBlock !== undefined
+      ? deps.googlePaidApisHardBlock
+      : env.GOOGLE_PAID_APIS_HARD_BLOCK;
+  const hardBlock = !/^(0|false|no)$/i.test(String(hardBlockRaw || 'true'));
+  if (hardBlock) return false;
   const raw =
     deps.googlePaidApisEnabled !== undefined
       ? deps.googlePaidApisEnabled

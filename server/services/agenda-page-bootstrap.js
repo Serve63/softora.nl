@@ -10,6 +10,7 @@ function createAgendaPageBootstrapService(deps = {}) {
     logger = console,
     bootstrapPreparationTimeoutMs = 1500,
     getGoogleMapsPlacesBrowserKey = () => {
+      if (!/^(0|false|no)$/i.test(String(process.env.GOOGLE_PAID_APIS_HARD_BLOCK || 'true'))) return '';
       if (!/^(1|true|yes)$/i.test(String(process.env.GOOGLE_PAID_APIS_ENABLED || ''))) return '';
       return String(process.env.GOOGLE_MAPS_PLACES_BROWSER_KEY || process.env.GOOGLE_MAPS_API_KEY || '').trim();
     },
