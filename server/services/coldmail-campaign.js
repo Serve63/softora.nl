@@ -7145,9 +7145,120 @@ function createColdmailCampaignService(deps = {}) {
     return Array.from(new Set(values.map(normalizeString).filter(Boolean)));
   }
 
+  function getDomainFromEmail(value) {
+    const email = normalizeEmailAddress(value);
+    const domain = email.includes('@') ? email.split('@').pop() : '';
+    return normalizeString(domain).replace(/^www\./i, '');
+  }
+
+  function collectPreviewImageCustomerIdentityLookupKeys(payload = {}, row = null) {
+    const keys = [];
+    const seen = new Set();
+    const add = (type, value) => {
+      const keyType = normalizeString(type).toLowerCase();
+      const keyValue = normalizeString(value).toLowerCase();
+      const id = `${keyType}:${keyValue}`;
+      if (!keyType || !keyValue || seen.has(id)) return;
+      seen.add(id);
+      keys.push({ type: keyType, value: keyValue });
+    };
+    const email = normalizeEmailAddress(
+      payload.email ||
+        (row && (row.email || row.contactEmail || row.mail))
+    );
+    add('email', email);
+    add('domain', getDomainFromEmail(email));
+    add('domain', getRowDomain(row || {}));
+    return keys;
+  }
+
+  function collectPreviewImageCustomerMatchTerms(payload = {}, row = null, photo = null) {
+    const values = [
+      payload.id,
+      payload.email,
+      getDomainFromEmail(payload.email),
+      row && (row.id || row.customerId || row.databaseId),
+      row && getRowEmail(row),
+      row && getRowDomain(row),
+      row && getRowCompany(row),
+      photo && (photo.id || photo.customerId || photo.customer_id),
+      photo && photo.identityKey,
+    ];
+    return new Set(values.map(normalizeString).map((value) => value.toLowerCase()).filter(Boolean));
+  }
+
+  function customerMatchesPreviewImageTerms(customer, terms) {
+    if (!customer || !terms || !terms.size) return false;
+    const values = [
+      customer.id,
+      customer.customerId,
+      customer.databaseId,
+      getRowEmail(customer),
+      getRowDomain(customer),
+      getDomainFromEmail(getRowEmail(customer)),
+      getRowCompany(customer),
+      customer.identityKey,
+    ].map(normalizeString).map((value) => value.toLowerCase()).filter(Boolean);
+    return values.some((value) => terms.has(value));
+  }
+
+  async function collectPreviewImageExpandedDataOpsIdentifiers(payload = {}, row = null, photo = null) {
+    const identifiers = new Set(collectPreviewImageDataOpsIdentifiers(payload, row, photo));
+    if (!dataOpsStore) return Array.from(identifiers);
+
+    if (typeof dataOpsStore.listCustomerIdentityKeys === 'function') {
+      const keys = collectPreviewImageCustomerIdentityLookupKeys(payload, row);
+      if (keys.length) {
+        try {
+          const result = await dataOpsStore.listCustomerIdentityKeys(keys);
+          if (result && result.ok && Array.isArray(result.data)) {
+            result.data.forEach((item) => {
+              const customerId = normalizeString(item && (item.customer_id || item.customerId));
+              if (customerId) identifiers.add(customerId);
+            });
+          }
+        } catch (error) {
+          if (logger && typeof logger.warn === 'function') {
+            logger.warn('[Coldmail][preview-image-identity-fallback]', error?.message || error);
+          }
+        }
+      }
+    }
+
+    if (typeof dataOpsStore.listCustomers === 'function') {
+      const terms = collectPreviewImageCustomerMatchTerms(payload, row, photo);
+      try {
+        const customers = await dataOpsStore.listCustomers({
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+          suppressStaleReadCacheLog: true,
+        });
+        (Array.isArray(customers) ? customers : []).forEach((customer) => {
+          if (!customerMatchesPreviewImageTerms(customer, terms)) return;
+          const customerId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId));
+          if (customerId) identifiers.add(customerId);
+          buildRowIdentityKeys(customer).forEach((identityKey) => {
+            if (identityKey) identifiers.add(identityKey);
+          });
+          const domain = getRowDomain(customer);
+          if (domain) identifiers.add(domain);
+          const company = getRowCompany(customer);
+          if (company) identifiers.add(company);
+        });
+      } catch (error) {
+        if (logger && typeof logger.warn === 'function') {
+          logger.warn('[Coldmail][preview-image-customer-fallback]', error?.message || error);
+        }
+      }
+    }
+
+    return Array.from(identifiers).map(normalizeString).filter(Boolean);
+  }
+
   async function resolvePreviewImageFromDataOps(payload = {}, row = null, photo = null) {
     if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') return null;
-    const identifiers = collectPreviewImageDataOpsIdentifiers(payload, row, photo);
+    const identifiers = await collectPreviewImageExpandedDataOpsIdentifiers(payload, row, photo);
     if (!identifiers.length) return null;
     let entries = null;
     try {
