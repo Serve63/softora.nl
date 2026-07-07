@@ -53,7 +53,22 @@ const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
 const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.txt';
-const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{SfSubject}}';
+const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
+const INSTANTLY_LEGACY_TEMPLATE_VARIABLES = Object.freeze({
+  subject: 'softora_subject',
+  senderName: 'softora_sender_name',
+  company: 'softora_company',
+  city: 'softora_city',
+  cityWithPin: 'softora_city_with_pin',
+  websiteDomain: 'softora_website_domain',
+  previewUrl: 'softora_webdesign_public_url',
+  imageUrl: 'softora_webdesign_image_url',
+  mockupUrl: 'softora_webdesign_mockup_url',
+  caption: 'softora_mockup_caption',
+  body: 'softora_mail_body',
+  ready: 'softora_webdesign_ready',
+  reference: 'softora_reference',
+});
 const INSTANTLY_SAFE_TEMPLATE_VARIABLES = Object.freeze({
   subject: 'SfSubject',
   senderName: 'SfSender',
@@ -242,6 +257,19 @@ const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
   'SfBody',
   'SfReady',
   'SfRef',
+  'softora_subject',
+  'softora_sender_name',
+  'softora_company',
+  'softora_city',
+  'softora_city_with_pin',
+  'softora_website_domain',
+  'softora_webdesign_public_url',
+  'softora_webdesign_image_url',
+  'softora_webdesign_mockup_url',
+  'softora_mockup_caption',
+  'softora_mail_body',
+  'softora_webdesign_ready',
+  'softora_reference',
   'SourceId',
   'Status',
 ]);
@@ -1735,7 +1763,7 @@ function buildInstantlyEmailHtml(
 }
 
 function buildInstantlyCampaignTemplateText() {
-  const fields = INSTANTLY_SAFE_TEMPLATE_VARIABLES;
+  const fields = INSTANTLY_LEGACY_TEMPLATE_VARIABLES;
   return DEFAULT_INSTANTLY_WEBDESIGN_BODY.replace(
     /\{\{\s*website\s*\}\}/gi,
     `{{${fields.websiteDomain}}}`
@@ -1748,7 +1776,7 @@ function buildInstantlyCampaignTemplateText() {
 }
 
 function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeString) {
-  const fields = INSTANTLY_SAFE_TEMPLATE_VARIABLES;
+  const fields = INSTANTLY_LEGACY_TEMPLATE_VARIABLES;
   const bodyHtml = renderMailTextAsHtml(buildInstantlyCampaignTemplateText(), normalizeString, {
     webdesignPreviewUrl: `{{${fields.previewUrl}}}`,
   });
@@ -1773,7 +1801,7 @@ function buildInstantlyCampaignTemplateInstructions() {
     '',
     `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
     `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
-    '3. Upload daarna de CSV en map de Sf-kolommen als Custom Variable. De campagnebody gebruikt alleen deze korte Sf-variabelen.',
+    '3. Upload daarna de CSV. De campagnebody gebruikt de softora_-velden; de Sf-kolommen blijven aanwezig als korte fallback.',
     '4. Zet in Instantly Delivery Optimization / text-only uit: niet "Send emails as text-only" en niet "Send first email as text-only".',
     '',
     'Belangrijk: gebruik niet {{Personalization}}, {{softora_mail_body}} of {{softora_instantly_email_html}} als campagnebody. Die velden zijn fallback/data, niet de live template.',
@@ -3218,6 +3246,19 @@ function createInstantlyOutreachService(deps = {}) {
       SfBody: variables[fields.body],
       SfReady: variables[fields.ready],
       SfRef: variables[fields.reference],
+      softora_subject: variables.softora_subject || variables[fields.subject],
+      softora_sender_name: variables.softora_sender_name || variables[fields.senderName],
+      softora_company: variables.softora_company || variables[fields.company],
+      softora_city: variables.softora_city || variables[fields.city],
+      softora_city_with_pin: variables.softora_city_with_pin || variables[fields.cityWithPin],
+      softora_website_domain: variables.softora_website_domain || variables[fields.websiteDomain],
+      softora_webdesign_public_url: variables.softora_webdesign_public_url || variables[fields.previewUrl],
+      softora_webdesign_image_url: variables.softora_webdesign_image_url || variables[fields.imageUrl],
+      softora_webdesign_mockup_url: variables.softora_webdesign_mockup_url || variables[fields.mockupUrl],
+      softora_mockup_caption: variables.softora_mockup_caption || variables[fields.caption],
+      softora_mail_body: variables.softora_mail_body || variables[fields.body],
+      softora_webdesign_ready: variables.softora_webdesign_ready || variables[fields.ready],
+      softora_reference: variables.softora_reference || variables[fields.reference],
       SourceId: variables.softora_customer_id,
       Status: variables.softora_status,
     };
