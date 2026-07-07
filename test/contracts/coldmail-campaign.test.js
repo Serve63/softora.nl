@@ -122,6 +122,72 @@ function extractPreviewImageTokens(html) {
   return matches.map((match) => decodeURIComponent(match[1]));
 }
 
+const COLDMAIL_MOCKUP_CAPTION_TEXT =
+  'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
+
+function assertWebdesignImagePairLayout(html, options = {}) {
+  const value = String(html || '');
+  assert.match(value, /@media only screen and \(max-width:980px\)/);
+  assert.match(
+    value,
+    /\.softora-desktop-image-pair\{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important\}/
+  );
+  assert.match(
+    value,
+    /\.softora-mobile-image-pair\{display:block!important;max-height:none!important;overflow:visible!important\}/
+  );
+  assert.match(value, /\.softora-mobile-image-pair img\{width:100%!important;max-width:100%!important;height:auto!important\}/);
+  assert.match(value, /class="softora-desktop-image-pair" role="presentation" width="900"/);
+  assert.match(value, /style="border-collapse:collapse;width:900px;max-width:100%;margin:24px 0 0 0;"/);
+  assert.match(value, /<td width="300" valign="top" style="[^"]*width:300px;max-width:300px;[^"]*">/);
+  assert.match(value, /<td width="16" style="[^"]*width:16px;min-width:16px;[^"]*">/);
+  assert.match(value, /<td width="584" valign="top" style="[^"]*width:584px;max-width:584px;[^"]*">/);
+  assert.match(
+    value,
+    /class="softora-webdesign-desktop-image" width="300" height="560" style="display:block;width:300px;max-width:300px;height:560px;max-height:560px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/
+  );
+  assert.match(
+    value,
+    /class="softora-webdesign-desktop-image" width="584" height="560" style="display:block;width:584px;max-width:584px;height:560px;max-height:560px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/
+  );
+  assert.match(
+    value,
+    /class="softora-mobile-image-pair" style="display:none;max-height:0;overflow:hidden;mso-hide:all;margin:24px 0 0 0;padding:0;font-size:0;line-height:0;"/
+  );
+  assert.match(
+    value,
+    /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/
+  );
+  assert.match(
+    value,
+    /class="softora-webdesign-image" width="640" style="display:block;width:100%;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/
+  );
+  assert.match(
+    value,
+    /class="softora-webdesign-image softora-webdesign-image--mockup" width="640" style="display:block;width:100%;max-width:100%;height:auto;object-fit:contain;object-position:center top;border:0;outline:none;text-decoration:none;"/
+  );
+
+  const desktopIndex = value.indexOf('class="softora-desktop-image-pair"');
+  const mobileIndex = value.indexOf('class="softora-mobile-image-pair"');
+  const captionIndex = value.indexOf(COLDMAIL_MOCKUP_CAPTION_TEXT);
+  assert.ok(desktopIndex > 0, 'desktop image table is present');
+  assert.ok(mobileIndex > desktopIndex, 'mobile image block follows desktop image table');
+  assert.equal(value.indexOf(COLDMAIL_MOCKUP_CAPTION_TEXT), value.lastIndexOf(COLDMAIL_MOCKUP_CAPTION_TEXT));
+  assert.ok(captionIndex > mobileIndex, 'caption only appears inside the mobile image block');
+
+  if (options.mobileMainAlt && options.mobileMockupAlt) {
+    const mobileMainIndex = value.indexOf(`alt="${options.mobileMainAlt}"`, mobileIndex);
+    const mobileMockupIndex = value.indexOf(`alt="${options.mobileMockupAlt}"`, captionIndex);
+    assert.ok(mobileMainIndex > mobileIndex, 'mobile design image appears before the mobile caption');
+    assert.ok(captionIndex > mobileMainIndex, 'mobile caption appears after the design image');
+    assert.ok(mobileMockupIndex > captionIndex, 'mobile mockup appears after the mobile caption');
+  }
+
+  assert.doesNotMatch(value, /softora-webdesign-image-pair|softora-webdesign-image-cell|display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table/);
+  assert.doesNotMatch(value, /height="360"/);
+  assert.doesNotMatch(value, /background-image/i);
+}
+
 function buildColdmailOpenTrackingToken(input = {}, secret = 'tracking-secret') {
   const encodedPayload = encodeBase64Url(JSON.stringify({
     v: 1,
@@ -4886,7 +4952,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
       },
     },
     onSendMail: async ({ message }) => {
-      const tokens = extractPreviewImageTokens(message.html);
+      const tokens = [...new Set(extractPreviewImageTokens(message.html))];
       assert.equal(tokens.length, 2);
       clearPreviewImageCache();
       overrides.customerValues = {
@@ -4927,28 +4993,17 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
     sentMessages[0].html,
     /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
-  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
-  assert.match(sentMessages[0].html, /@media only screen and \(min-width:981px\)/);
-  assert.match(sentMessages[0].html, /\.softora-mobile-mockup-caption\{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important\}/);
-  assert.match(sentMessages[0].html, /softora-webdesign-image-pair/);
-  assert.match(sentMessages[0].html, /max-width:100%;width:100%;font-size:0;line-height:0;margin:24px 0 0 0;padding:0;/);
-  assert.match(sentMessages[0].html, /\.softora-webdesign-image-cell--main\{display:inline-block!important;width:300px!important;max-width:300px!important;/);
-  assert.match(sentMessages[0].html, /\.softora-webdesign-image-cell--mockup\{display:inline-block!important;width:584px!important;max-width:584px!important;/);
-  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell softora-webdesign-image-cell--main" style="display:block;width:100%;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;"/);
-  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell softora-webdesign-image-cell--mockup" style="display:block;width:100%;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;"/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.match(
     sentMessages[0].html,
-    /softora-webdesign-image-cell--main" style="display:block;width:100%;max-width:100%;[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
+    /softora-desktop-image-pair[\s\S]*<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" class="softora-webdesign-image" width="584" style="display:block;width:100%;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="584" style="display:block;width:100%;max-width:100%;height:auto;object-fit:contain;object-position:center top;border:0;outline:none;text-decoration:none;"/);
-  assert.doesNotMatch(sentMessages[0].html, /display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table/);
-  assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image" width="300" style="display:block;width:100%;max-width:300px/);
-  assert.doesNotMatch(sentMessages[0].html, /height="360"/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
-  assert.doesNotMatch(sentMessages[0].html, /background-image/i);
-  const tokens = extractPreviewImageTokens(sentMessages[0].html);
+  const tokens = [...new Set(extractPreviewImageTokens(sentMessages[0].html))];
   assert.equal(tokens.length, 2);
   const payloads = tokens.map((token) => decodeBase64UrlJson(token.split('.')[0]));
   assert.deepEqual(payloads.map((payload) => payload.type), ['webdesign', 'mockup']);
@@ -5285,12 +5340,10 @@ test('coldmail campaign sends webdesign mails with CID images by default for own
   );
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
-  assert.match(sentMessages[0].html, /softora-webdesign-image-pair/);
-  assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
-  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell softora-webdesign-image-cell--main" style="display:block;width:100%;max-width:100%;/);
-  assert.match(sentMessages[0].html, /@media only screen and \(min-width:981px\)/);
-  assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image-gap|display:flex|flex-wrap/);
-  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
@@ -5543,12 +5596,10 @@ test('coldmail autopilot keeps CID image delivery even when legacy dashboard sta
   );
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
-  assert.match(sentMessages[0].html, /softora-webdesign-image-pair/);
-  assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
-  assert.match(sentMessages[0].html, /class="softora-webdesign-image-cell softora-webdesign-image-cell--main" style="display:block;width:100%;max-width:100%;/);
-  assert.match(sentMessages[0].html, /@media only screen and \(min-width:981px\)/);
-  assert.doesNotMatch(sentMessages[0].html, /softora-webdesign-image-gap|display:flex|flex-wrap/);
-  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
@@ -5787,8 +5838,10 @@ test('coldmail campaign keeps the closing signature before webdesign photos', as
   assert.ok(phoneIndex > closingIndex);
   assert.ok(imageIndex > phoneIndex);
   assert.ok(mockupIndex > imageIndex);
-  assert.match(html, /softora-webdesign-image-cell/);
-  assert.match(html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assertWebdesignImagePairLayout(html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.doesNotMatch(html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
 });
 
@@ -6753,8 +6806,10 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.match(sentMessages[0].text, /website softora\.nl tegen/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
-  assert.match(sentMessages[0].html, /softora-webdesign-image-cell/);
-  assert.match(sentMessages[0].html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Softora Testmodus webdesign',
+    mobileMockupAlt: 'Softora Testmodus device mockup',
+  });
   assert.doesNotMatch(sentMessages[0].html, /border-top\s*:\s*1px\s+dashed/i);
   assert.doesNotMatch(sentMessages[0].html, /detail-mail-section-signature/);
   assert.equal(sentMessages[0].attachments.length, 2);

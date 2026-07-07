@@ -150,7 +150,7 @@ const COLDMAIL_EMAIL_CONTENT_MAX_WIDTH = 600;
 const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 480;
 const COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
 const COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH = 584;
-const COLDMAIL_DESKTOP_MOCKUP_IMAGE_MATCH_HEIGHT = 450;
+const COLDMAIL_DESKTOP_PAIR_IMAGE_HEIGHT = 560;
 const COLDMAIL_DESKTOP_IMAGE_GAP_WIDTH = 16;
 const COLDMAIL_EMAIL_MOBILE_BREAKPOINT_PX = 980;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
@@ -7307,6 +7307,7 @@ function createColdmailCampaignService(deps = {}) {
         }</p>`
       : '';
     const emailImageMaxWidth = Math.min(COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH, 640);
+    const mobileImageMaxWidth = 640;
     const renderEmailImage = (image, alt, width = emailImageMaxWidth, options = {}) => {
       const src = normalizeString(image && (image.src || (image.cid ? `cid:${image.cid}` : '')));
       if (!src) return '';
@@ -7322,17 +7323,42 @@ function createColdmailCampaignService(deps = {}) {
         alt
       )}" class="${className}" width="${width}"${heightAttribute} style="${imageStyle}" />`;
     };
+    const renderDesktopEmailImage = (image, alt, width) => {
+      const src = normalizeString(image && (image.src || (image.cid ? `cid:${image.cid}` : '')));
+      if (!src) return '';
+      return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" class="softora-webdesign-desktop-image" width="${width}" height="${COLDMAIL_DESKTOP_PAIR_IMAGE_HEIGHT}" style="display:block;width:${width}px;max-width:${width}px;height:${COLDMAIL_DESKTOP_PAIR_IMAGE_HEIGHT}px;max-height:${COLDMAIL_DESKTOP_PAIR_IMAGE_HEIGHT}px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;" />`;
+    };
+    const renderMobileEmailImage = (image, alt, options = {}) => {
+      const imageHtml = renderEmailImage(
+        image,
+        alt,
+        mobileImageMaxWidth,
+        options
+      );
+      if (!imageHtml) return '';
+      return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:0 0 16px 0;"><tr><td width="100%" style="padding:0;margin:0;width:100%;max-width:100%;font-size:0;line-height:0;overflow:visible;">${imageHtml}</td></tr></table>`;
+    };
     const renderEmailImageTable = (image, alt, margin) => {
       const imageHtml = renderEmailImage(image, alt);
       if (!imageHtml) return '';
       return `\n<table role="presentation" width="${emailImageMaxWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${emailImageMaxWidth}px;max-width:100%;margin:${margin};"><tr><td width="${emailImageMaxWidth}" style="padding:0;margin:0;width:${emailImageMaxWidth}px;max-width:100%;font-size:0;line-height:0;overflow:visible;">${imageHtml}</td></tr></table>`;
     };
     const renderEmailImagePairTable = (mainImage, mockupImage) => {
-      const mainHtml = renderEmailImage(mainImage, mainImage.alt || 'Webdesign', COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH);
-      const mockupHtml = renderEmailImage(mockupImage, mockupImage.alt || 'Device mockup', COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH, { mockup: true });
-      if (!mainHtml || !mockupHtml) return '';
+      const desktopMainHtml = renderDesktopEmailImage(
+        mainImage,
+        mainImage.alt || 'Webdesign',
+        COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH
+      );
+      const desktopMockupHtml = renderDesktopEmailImage(
+        mockupImage,
+        mockupImage.alt || 'Device mockup',
+        COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH
+      );
+      const mobileMainHtml = renderMobileEmailImage(mainImage, mainImage.alt || 'Webdesign');
+      const mobileMockupHtml = renderMobileEmailImage(mockupImage, mockupImage.alt || 'Device mockup', { mockup: true });
+      if (!desktopMainHtml || !desktopMockupHtml || !mobileMainHtml || !mobileMockupHtml) return '';
       const pairTableWidth = COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH + COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH + COLDMAIL_DESKTOP_IMAGE_GAP_WIDTH;
-      return `\n<p class="softora-mobile-mockup-caption" style="display:block;margin:20px 0 12px 0;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(COLDMAIL_MOCKUP_CAPTION)}</p>\n<style>@media only screen and (min-width:${COLDMAIL_EMAIL_MOBILE_BREAKPOINT_PX + 1}px){.softora-mobile-mockup-caption{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important}.softora-webdesign-image-pair{max-width:${pairTableWidth}px!important}.softora-webdesign-image-cell--main{display:inline-block!important;width:${COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH}px!important;max-width:${COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH}px!important;vertical-align:bottom!important;margin:0 ${COLDMAIL_DESKTOP_IMAGE_GAP_WIDTH}px 16px 0!important;padding:0!important}.softora-webdesign-image-cell--mockup{display:inline-block!important;width:${COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH}px!important;max-width:${COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH}px!important;vertical-align:bottom!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image--mockup{height:${COLDMAIL_DESKTOP_MOCKUP_IMAGE_MATCH_HEIGHT}px!important;max-height:${COLDMAIL_DESKTOP_MOCKUP_IMAGE_MATCH_HEIGHT}px!important;object-fit:cover!important;object-position:center top!important}}</style><div class="softora-webdesign-image-pair" style="max-width:100%;width:100%;font-size:0;line-height:0;margin:24px 0 0 0;padding:0;"><div class="softora-webdesign-image-cell softora-webdesign-image-cell--main" style="display:block;width:100%;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;">${mainHtml}</div><div class="softora-webdesign-image-cell softora-webdesign-image-cell--mockup" style="display:block;width:100%;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:0;line-height:0;overflow:visible;">${mockupHtml}</div></div>`;
+      return `\n<style>@media only screen and (max-width:${COLDMAIL_EMAIL_MOBILE_BREAKPOINT_PX}px){.softora-desktop-image-pair{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important}.softora-mobile-image-pair{display:block!important;max-height:none!important;overflow:visible!important}.softora-mobile-image-pair table{width:100%!important;max-width:100%!important}.softora-mobile-image-pair td{width:100%!important;max-width:100%!important}.softora-mobile-image-pair img{width:100%!important;max-width:100%!important;height:auto!important}}</style><table class="softora-desktop-image-pair" role="presentation" width="${pairTableWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${pairTableWidth}px;max-width:100%;margin:24px 0 0 0;"><tr><td width="${COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH}" valign="top" style="padding:0;margin:0;width:${COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:${COLDMAIL_DESKTOP_WEBDESIGN_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;overflow:hidden;vertical-align:top;">${desktopMainHtml}</td><td width="${COLDMAIL_DESKTOP_IMAGE_GAP_WIDTH}" style="padding:0;margin:0;width:${COLDMAIL_DESKTOP_IMAGE_GAP_WIDTH}px;min-width:${COLDMAIL_DESKTOP_IMAGE_GAP_WIDTH}px;font-size:0;line-height:0;">&nbsp;</td><td width="${COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH}" valign="top" style="padding:0;margin:0;width:${COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:${COLDMAIL_DESKTOP_MOCKUP_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;overflow:hidden;vertical-align:top;">${desktopMockupHtml}</td></tr></table><div class="softora-mobile-image-pair" style="display:none;max-height:0;overflow:hidden;mso-hide:all;margin:24px 0 0 0;padding:0;font-size:0;line-height:0;">${mobileMainHtml}<p class="softora-mobile-mockup-caption" style="display:block;margin:20px 0 12px 0;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(COLDMAIL_MOCKUP_CAPTION)}</p>${mobileMockupHtml}</div>`;
     };
     const hasMockup = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''));
     const imageBlockHtml = hasMockup
