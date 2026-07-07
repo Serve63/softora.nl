@@ -130,13 +130,37 @@ function assertWebdesignImagePairLayout(html, options = {}) {
   assert.match(value, /@media only screen and \(max-width:980px\)/);
   assert.match(
     value,
-    /\.softora-desktop-image-pair\{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important\}/
+    /class="softora-coldmail-body" style="font-family:Arial,sans-serif;font-size:15px;line-height:1\.65;color:#1a1a2e;max-width:600px;width:100%;"/
   );
   assert.match(
     value,
-    /\.softora-mobile-image-pair\{display:block!important;max-height:none!important;overflow:visible!important\}/
+    /\.softora-coldmail-body,\.softora-coldmail-body p,\.softora-coldmail-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
   );
-  assert.match(value, /\.softora-mobile-image-pair img\{width:100%!important;max-width:100%!important;height:auto!important\}/);
+  assert.match(
+    value,
+    /\.softora-desktop-image-pair,\.softora-desktop-image-pair tr,\.softora-desktop-image-pair td,\.softora-desktop-image-pair img\{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important;width:0!important;max-width:0!important;line-height:0!important;font-size:0!important\}/
+  );
+  assert.match(
+    value,
+    /\.softora-mobile-image-pair\{display:block!important;max-height:none!important;overflow:visible!important;font-size:0!important;line-height:0!important\}/
+  );
+  assert.match(
+    value,
+    /\.softora-mobile-image-pair table\{display:table!important;width:100%!important;max-width:100%!important\}/
+  );
+  assert.match(
+    value,
+    /\.softora-mobile-image-pair tr\{display:table-row!important\}/
+  );
+  assert.match(
+    value,
+    /\.softora-mobile-image-pair td\{display:table-cell!important;width:100%!important;max-width:100%!important\}/
+  );
+  assert.match(value, /\.softora-mobile-image-pair img\{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important\}/);
+  assert.match(
+    value,
+    /\.softora-mobile-mockup-caption\{display:block!important;margin:18px 0 12px 0!important;font-size:14px!important;line-height:1\.4!important;color:#111827!important;font-weight:700!important\}/
+  );
   assert.match(value, /class="softora-desktop-image-pair" role="presentation" width="900"/);
   assert.match(value, /style="border-collapse:collapse;width:900px;max-width:100%;margin:24px 0 0 0;"/);
   assert.match(value, /<td width="300" valign="top" style="[^"]*width:300px;max-width:300px;[^"]*">/);
