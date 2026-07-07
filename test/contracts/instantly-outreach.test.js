@@ -57,6 +57,25 @@ async function createFramedWebdesignDataUrl() {
   return `data:image/png;base64,${framed.toString('base64')}`;
 }
 
+async function createNoisyPngDataUrl(width = 960, height = 640) {
+  let seed = 123456789;
+  const raw = Buffer.alloc(width * height * 3);
+  for (let index = 0; index < raw.length; index += 1) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    raw[index] = (seed >>> 24) & 0xff;
+  }
+  const png = await sharp(raw, {
+    raw: {
+      width,
+      height,
+      channels: 3,
+    },
+  })
+    .png()
+    .toBuffer();
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+
 function withCheckedMockupMeta(item) {
   if (!item || typeof item !== 'object' || !item.websiteMockup) return item;
   if (item.mockupQualityStatus || item.mockupOrientation) return item;
@@ -102,6 +121,7 @@ function assertInstantlyHtmlUsesVisibleWebdesignImages(html, expectedPath = '/we
   assert.match(imageTags[0], /src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assert.match(imageTags[1], /alt="Mockup"/);
   assert.match(imageTags[1], /src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.doesNotMatch(imageTags.join('\n'), /\b(?:loading|decoding|fetchpriority)=|aspect-ratio:/i);
   assert.match(html, /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon"/);
   assert.match(html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(html, new RegExp(expectedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -980,6 +1000,47 @@ test('instantly sync prewarms HTTPS webdesign images so the first email open doe
   assert.equal(getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[1], 'mockup')).contentType, 'image/png');
   assert.equal(body.leads[0].custom_variables.softora_webdesign_image_prewarmed, 'true');
   assert.equal(body.leads[0].custom_variables.softora_webdesign_mockup_prewarmed, 'true');
+});
+
+test('instantly sync serves large preview images as lightweight direct JPEG URLs', async () => {
+  const largeWebdesign = await createNoisyPngDataUrl(960, 640);
+  const largeMockup = await createNoisyPngDataUrl(900, 560);
+  const sourceWebdesignBytes = Buffer.from(largeWebdesign.split(',')[1], 'base64').length;
+  const sourceMockupBytes = Buffer.from(largeMockup.split(',')[1], 'base64').length;
+  const { service, fetchCalls } = createService({
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        websitePhoto: largeWebdesign,
+        websiteMockup: largeMockup,
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+  });
+
+  const result = await service.syncInstantlyLeads({ actor: 'Test' });
+
+  assert.equal(result.ok, true);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].options.body);
+  assert.match(body.leads[0].custom_variables.SfImage, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assert.match(body.leads[0].custom_variables.SfMockup, /^https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  const previewTokens = [
+    ...extractPreviewImageTokens(body.leads[0].custom_variables.softora_webdesign_image_url),
+    ...extractPreviewImageTokens(body.leads[0].custom_variables.softora_webdesign_mockup_url),
+  ];
+  assert.equal(previewTokens.length, 2);
+  const webdesignImage = getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[0], 'webdesign'));
+  const mockupImage = getCachedPreviewImage(getPreviewImageCacheKey(previewTokens[1], 'mockup'));
+  assert.equal(webdesignImage.contentType, 'image/jpeg');
+  assert.equal(mockupImage.contentType, 'image/jpeg');
+  assert.ok(webdesignImage.content.length < sourceWebdesignBytes);
+  assert.ok(mockupImage.content.length < sourceMockupBytes);
+  const webdesignMeta = await sharp(webdesignImage.content).metadata();
+  const mockupMeta = await sharp(mockupImage.content).metadata();
+  assert.ok(webdesignMeta.width <= 560);
+  assert.ok(mockupMeta.width <= 560);
 });
 
 test('instantly sync keeps sending lead data when public image prewarm fails', async () => {

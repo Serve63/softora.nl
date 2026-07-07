@@ -77,9 +77,9 @@ const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
 const INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT = 1000;
-const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 128 * 1024;
-const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 720;
-const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 82;
+const COLDMAIL_PREVIEW_IMAGE_OPTIMIZE_MIN_BYTES = 48 * 1024;
+const COLDMAIL_PREVIEW_IMAGE_MAX_WIDTH = 560;
+const COLDMAIL_PREVIEW_IMAGE_JPEG_QUALITY = 74;
 const COLDMAIL_PREVIEW_IMAGE_CACHE_LIMIT = 800;
 const COLDMAIL_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 9000;
 const INSTANTLY_PUBLIC_IMAGE_PREWARM_TIMEOUT_MS = 30_000;
@@ -1688,15 +1688,16 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   const fallbackWidth = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH;
   const fallbackHeight = isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT;
   const scaledDimensions = scaleEmailImageDimensions(dimensions);
-  const imageWidth = scaledDimensions ? scaledDimensions.width : fallbackWidth;
-  const imageHeight = scaledDimensions ? scaledDimensions.height : fallbackHeight;
-  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;background:#f3f6fb;border:1px solid #dbe3f0;"><img src="${escapeHtmlAttribute(
+  const fallbackDimensions = scaleEmailImageDimensions({ width: fallbackWidth, height: fallbackHeight });
+  const imageWidth = scaledDimensions ? scaledDimensions.width : fallbackDimensions.width;
+  const imageHeight = scaledDimensions ? scaledDimensions.height : fallbackDimensions.height;
+  return `\n<table role="presentation" width="${COLDMAIL_EMAIL_IMAGE_WIDTH}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
-  )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
+  )}" width="${imageWidth}" height="${imageHeight}" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
 function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeString) {
