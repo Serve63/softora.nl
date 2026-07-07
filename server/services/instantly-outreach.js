@@ -53,7 +53,22 @@ const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
 const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
 const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.txt';
-const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
+const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{SfSubject}}';
+const INSTANTLY_SAFE_TEMPLATE_VARIABLES = Object.freeze({
+  subject: 'SfSubject',
+  senderName: 'SfSender',
+  company: 'SfCompany',
+  city: 'SfCity',
+  cityWithPin: 'SfCityPin',
+  websiteDomain: 'SfSite',
+  previewUrl: 'SfPreview',
+  imageUrl: 'SfImage',
+  mockupUrl: 'SfMockup',
+  caption: 'SfCaption',
+  body: 'SfBody',
+  ready: 'SfReady',
+  reference: 'SfRef',
+});
 const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
 const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
@@ -192,6 +207,10 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_subject',
   'softora_mail_body',
   'softora_instantly_email_html',
+  INSTANTLY_SAFE_TEMPLATE_VARIABLES.subject,
+  INSTANTLY_SAFE_TEMPLATE_VARIABLES.imageUrl,
+  INSTANTLY_SAFE_TEMPLATE_VARIABLES.mockupUrl,
+  INSTANTLY_SAFE_TEMPLATE_VARIABLES.previewUrl,
   'softora_city',
   'softora_city_with_pin',
   'softora_website_domain',
@@ -202,45 +221,29 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_webdesign_ready',
 ]);
 const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
-  'EMAIL',
-  'CONTACT',
-  'COMPANY',
-  'WEBSITE',
-  'PERSONALIZATION',
-  'PHONE NUMBER',
-  'first_name',
-  'last_name',
-  'company_name',
-  'company',
-  'phone',
-  'website',
-  'personalization',
-  'softora_customer_id',
-  'softora_source',
-  'softora_company',
-  'softora_sender_name',
-  'softora_status',
-  'softora_contact_name',
-  'softora_city',
-  'softora_city_with_pin',
-  'softora_subject',
-  'softora_mail_body',
-  'softora_mail_body_with_optout',
-  'softora_instantly_email_text',
-  'softora_instantly_email_body',
-  'softora_instantly_email_html',
-  'softora_image_visibility_ps',
-  'softora_reference',
-  'softora_unsubscribe_url',
-  'softora_webdesign_public_path',
-  'softora_webdesign_public_url',
-  'softora_webdesign_image_url',
-  'softora_webdesign_mockup_url',
-  'softora_webdesign_image_prewarmed',
-  'softora_webdesign_mockup_prewarmed',
-  'softora_mockup_caption',
-  'softora_website_domain',
-  'softora_webdesign_ready',
+  'Email',
+  'First Name',
+  'Last Name',
+  'Company Name',
+  'Company',
+  'Website',
+  'Phone',
+  'Personalization',
+  'SfSubject',
+  'SfSender',
+  'SfCompany',
+  'SfCity',
+  'SfCityPin',
+  'SfSite',
+  'SfPreview',
+  'SfImage',
+  'SfMockup',
+  'SfCaption',
+  'SfBody',
+  'SfReady',
+  'SfRef',
+  'SourceId',
+  'Status',
 ]);
 let cachedInstantlyPreviewSharp = null;
 
@@ -1731,29 +1734,31 @@ function buildInstantlyEmailHtml(
 }
 
 function buildInstantlyCampaignTemplateText() {
+  const fields = INSTANTLY_SAFE_TEMPLATE_VARIABLES;
   return DEFAULT_INSTANTLY_WEBDESIGN_BODY.replace(
     /\{\{\s*website\s*\}\}/gi,
-    '{{softora_website_domain}}'
+    `{{${fields.websiteDomain}}}`
   )
-    .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, '{{softora_sender_name}}')
-    .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, '{{softora_city}}')
+    .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, `{{${fields.senderName}}}`)
+    .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, `{{${fields.city}}}`)
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
 }
 
 function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeString) {
+  const fields = INSTANTLY_SAFE_TEMPLATE_VARIABLES;
   const bodyHtml = renderMailTextAsHtml(buildInstantlyCampaignTemplateText(), normalizeString, {
-    webdesignPreviewUrl: '{{softora_webdesign_public_url}}',
+    webdesignPreviewUrl: `{{${fields.previewUrl}}}`,
   });
   const webdesignImageHtml = renderImageHtml(
-    '{{softora_webdesign_image_url}}',
+    `{{${fields.imageUrl}}}`,
     'Webdesign',
     '24px 0 0 0',
     normalizeString
   );
-  const mockupImageHtml = `\n<p style="margin:20px 0 7px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">{{softora_mockup_caption}}</p>${renderImageHtml(
-    '{{softora_webdesign_mockup_url}}',
+  const mockupImageHtml = `\n<p style="margin:20px 0 7px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">{{${fields.caption}}}</p>${renderImageHtml(
+    `{{${fields.mockupUrl}}}`,
     'Mockup',
     '0',
     normalizeString
@@ -1767,9 +1772,10 @@ function buildInstantlyCampaignTemplateInstructions() {
     '',
     `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
     `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
-    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink en tekstvariabelen.',
+    '3. Upload daarna de CSV en map de Sf-kolommen als Custom Variable. De campagnebody gebruikt alleen deze korte Sf-variabelen.',
+    '4. Zet in Instantly Delivery Optimization / text-only uit: niet "Send emails as text-only" en niet "Send first email as text-only".',
     '',
-    'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, anders toont Instantly de fotos/preview mogelijk niet.',
+    'Belangrijk: gebruik niet {{Personalization}}, {{softora_mail_body}} of {{softora_instantly_email_html}} als campagnebody. Die velden zijn fallback/data, niet de live template.',
   ].join('\n');
 }
 
@@ -2597,7 +2603,24 @@ function createInstantlyOutreachService(deps = {}) {
       },
       normalizeString
     );
+    const fields = INSTANTLY_SAFE_TEMPLATE_VARIABLES;
+    const safeTemplateVariables = {
+      [fields.subject]: subject,
+      [fields.senderName]: senderName,
+      [fields.company]: company,
+      [fields.city]: city,
+      [fields.cityWithPin]: formatPinnedCity(city, normalizeString),
+      [fields.websiteDomain]: getRowDomain(row, normalizeString),
+      [fields.previewUrl]: webdesignPublicUrl,
+      [fields.imageUrl]: webdesignImageUrl,
+      [fields.mockupUrl]: webdesignMockupUrl,
+      [fields.caption]: COLDMAIL_MOCKUP_CAPTION,
+      [fields.body]: baseMailBody,
+      [fields.ready]: assets.ready ? 'true' : 'false',
+      [fields.reference]: reference,
+    };
     const customVariables = {
+      ...safeTemplateVariables,
       softora_customer_id: item.id,
       softora_source: 'softora',
       softora_company: company,
@@ -2628,7 +2651,7 @@ function createInstantlyOutreachService(deps = {}) {
 
     return {
       email,
-      personalization: instantlyEmailHtml,
+      personalization: instantlyEmailBody,
       first_name: firstName,
       last_name: lastName,
       company_name: company,
@@ -3168,26 +3191,34 @@ function createInstantlyOutreachService(deps = {}) {
     const variables = lead && lead.custom_variables && typeof lead.custom_variables === 'object'
       ? lead.custom_variables
       : {};
-    const contact = [lead && lead.first_name, lead && lead.last_name]
-      .map((value) => normalizeString(value))
-      .filter(Boolean)
-      .join(' ') || normalizeString(variables.softora_contact_name) || normalizeString(lead && lead.company_name);
+    const fields = INSTANTLY_SAFE_TEMPLATE_VARIABLES;
     return {
-      EMAIL: lead && lead.email,
-      CONTACT: contact,
-      COMPANY: lead && lead.company_name,
-      WEBSITE: lead && lead.website,
-      PERSONALIZATION: lead && lead.personalization,
-      'PHONE NUMBER': lead && lead.phone,
-      email: lead && lead.email,
-      first_name: lead && lead.first_name,
-      last_name: lead && lead.last_name,
-      company_name: lead && lead.company_name,
-      company: lead && lead.company_name,
-      phone: lead && lead.phone,
-      website: lead && lead.website,
-      personalization: lead && lead.personalization,
-      ...variables,
+      Email: lead && lead.email,
+      'First Name': lead && lead.first_name,
+      'Last Name': lead && lead.last_name,
+      'Company Name': lead && lead.company_name,
+      Company: lead && lead.company_name,
+      Website: lead && lead.website,
+      Phone: lead && lead.phone,
+      Personalization:
+        normalizeString(lead && lead.personalization) ||
+        normalizeString(variables[fields.body]) ||
+        normalizeString(variables.softora_mail_body),
+      SfSubject: variables[fields.subject],
+      SfSender: variables[fields.senderName],
+      SfCompany: variables[fields.company],
+      SfCity: variables[fields.city],
+      SfCityPin: variables[fields.cityWithPin],
+      SfSite: variables[fields.websiteDomain],
+      SfPreview: variables[fields.previewUrl],
+      SfImage: variables[fields.imageUrl],
+      SfMockup: variables[fields.mockupUrl],
+      SfCaption: variables[fields.caption],
+      SfBody: variables[fields.body],
+      SfReady: variables[fields.ready],
+      SfRef: variables[fields.reference],
+      SourceId: variables.softora_customer_id,
+      Status: variables.softora_status,
     };
   }
 
