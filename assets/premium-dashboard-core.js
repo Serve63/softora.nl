@@ -334,9 +334,12 @@ function formatMoneyEUR(amount) {
 
     function hydratePremiumDashboardCustomersFromBootstrap(state, parseCustomers, payload) {
         if (!state || typeof state !== 'object' || typeof parseCustomers !== 'function') return false;
+        const source = String(payload && payload.source || '').trim().toLowerCase();
+        if (!payload || payload.ok !== true || (source !== 'dashboard-customers' && source !== 'customers')) {
+            return false;
+        }
         const rawCustomers = Array.isArray(payload && payload.customers) ? payload.customers : [];
         const customers = parseCustomers(rawCustomers);
-        if (!customers.length) return false;
         state.customers = customers;
         state.customersHydrated = true;
         return true;
@@ -344,11 +347,18 @@ function formatMoneyEUR(amount) {
 
     function hydratePremiumDashboardOrdersFromBootstrap(state, parseOrders, payload) {
         if (!state || typeof state !== 'object' || typeof parseOrders !== 'function') return false;
-        const values = payload && payload.activeOrdersState && typeof payload.activeOrdersState.values === 'object'
-            ? payload.activeOrdersState.values
+        const orderState = payload && payload.activeOrdersState && typeof payload.activeOrdersState === 'object'
+            ? payload.activeOrdersState
+            : null;
+        const source = String(orderState && orderState.source || '').trim().toLowerCase();
+        const values = orderState && typeof orderState.values === 'object' && !Array.isArray(orderState.values)
+            ? orderState.values
             : {};
+        const orderKey = 'softora_custom_orders_premium_v1';
+        const hasOrderList = Object.prototype.hasOwnProperty.call(values, orderKey) ||
+            Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(orderKey));
+        if (!orderState || source === 'unavailable' || source === 'bootstrap-timeout' || !hasOrderList) return false;
         const orders = parseOrders(values);
-        if (!orders.length) return false;
         state.orders = orders;
         state.ordersHydrated = true;
         return true;

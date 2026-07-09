@@ -118,6 +118,43 @@ test('data ops ui-state bridge skips legacy fallback while structured reads are 
   assert.equal(legacyRead, false);
 });
 
+test('data ops ui-state bridge publiceert ook een formele lege opdrachtenlijst expliciet', async () => {
+  let legacyRead = false;
+  const bridge = createSoftoraDataOpsUiStateBridge({
+    store: createStore({
+      listActiveOrders: async () => [],
+      listOrderRuntime: async () => ({ 7: { statusKey: 'running' } }),
+    }),
+  });
+
+  const state = await bridge.getUiStateValues(SCOPES.activeOrders, {
+    legacyGetUiStateValues: async () => {
+      legacyRead = true;
+      return null;
+    },
+  });
+
+  assert.equal(state.source, 'supabase:data_ops');
+  assert.equal(state.values[KEYS.activeOrders], '[]');
+  assert.match(state.values[KEYS.orderRuntime], /running/);
+  assert.equal(legacyRead, false);
+});
+
+test('data ops ui-state bridge accepteert runtime zonder geladen opdrachtenlijst niet als complete state', async () => {
+  const bridge = createSoftoraDataOpsUiStateBridge({
+    store: createStore({
+      listActiveOrders: async () => null,
+      listOrderRuntime: async () => ({ 7: { statusKey: 'running' } }),
+    }),
+  });
+
+  const state = await bridge.getUiStateValues(SCOPES.activeOrders, {
+    legacyGetUiStateValues: async () => null,
+  });
+
+  assert.equal(state, null);
+});
+
 test('data ops ui-state bridge overlays legacy mailed status onto structured customers', async () => {
   const bridge = createSoftoraDataOpsUiStateBridge({
     legacyContactMergeEnabled: true,

@@ -592,9 +592,26 @@ function createCustomersPageBootstrapService(deps = {}) {
     }).join('');
   }
 
+  function buildDashboardUnavailableRevenueChartHtml() {
+    return DASHBOARD_MONTH_LABELS_SHORT.map((label, index) => [
+      '<div class="chart-bar-group">',
+      `<div class="chart-bar" data-chart-index="${index}" style="height: 0px;" title="--"></div>`,
+      `<span class="chart-label">${label}</span>`,
+      '</div>',
+    ].join('')).join('');
+  }
+
   function isDashboardActiveOrdersStateUnavailable(activeOrdersState) {
+    if (!activeOrdersState || typeof activeOrdersState !== 'object') return true;
     const source = normalizeString(activeOrdersState && activeOrdersState.source).toLowerCase();
-    return source === 'unavailable' || source === 'bootstrap-timeout';
+    const values = activeOrdersState.values && typeof activeOrdersState.values === 'object'
+      ? activeOrdersState.values
+      : null;
+    const hasOrderList = Boolean(values && (
+      Object.prototype.hasOwnProperty.call(values, orderKey) ||
+      Object.prototype.hasOwnProperty.call(values, getChunkMetaKey(orderKey))
+    ));
+    return !source || source === 'unavailable' || source === 'bootstrap-timeout' || !hasOrderList;
   }
 
   function buildDashboardHtmlReplacements(payload = {}) {
@@ -608,20 +625,21 @@ function createCustomersPageBootstrapService(deps = {}) {
           !payload.activeOrdersState.values ||
           Object.keys(payload.activeOrdersState.values || {}).length === 0));
 
+    const activeOrdersBreakdown = isDashboardActiveOrdersStateUnavailable(payload?.activeOrdersState)
+      ? null
+      : buildActiveOrdersBreakdown(payload?.activeOrdersState);
+
     if (payloadUnavailable) {
       return {
         SOFTORA_DASHBOARD_TOTAL_REVENUE: '--',
         SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: '--',
         SOFTORA_DASHBOARD_RECURRING_REVENUE: '--',
-        SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml([]),
-        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(null)}`,
+        SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardUnavailableRevenueChartHtml(),
+        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown)}`,
       };
     }
 
     const summary = buildDashboardMetricSummary(payload.customers);
-    const activeOrdersBreakdown = isDashboardActiveOrdersStateUnavailable(payload.activeOrdersState)
-      ? null
-      : buildActiveOrdersBreakdown(payload.activeOrdersState);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
@@ -732,12 +750,12 @@ function createCustomersPageBootstrapService(deps = {}) {
     if (shouldPreferDashboardCustomers) {
       const orderStatePromise = resolveBootstrapReadWithTimeout(
         readBootstrapUiState(orderScope, getDashboardBootstrapReadOptions(orderScope)),
-        options.dashboardOrderStateTimeoutMs || 1800,
+        options.dashboardOrderStateTimeoutMs || 900,
         buildUnavailableBootstrapState(new Error('Dashboard opdrachtstate timeout'))
       );
       const dashboardCustomersPromise = resolveBootstrapReadWithTimeout(
         readDashboardCustomers(),
-        options.dashboardCustomersTimeoutMs || 4200,
+        options.dashboardCustomersTimeoutMs || 1200,
         null
       );
 
@@ -747,7 +765,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       ]);
       const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
 
-      if (Array.isArray(dashboardCustomers) && dashboardCustomers.length) {
+      if (Array.isArray(dashboardCustomers)) {
         return {
           ok: true,
           loadedAt: new Date().toISOString(),
@@ -757,41 +775,12 @@ function createCustomersPageBootstrapService(deps = {}) {
         };
       }
 
-      const remoteState = await resolveBootstrapReadWithTimeout(
-        readBootstrapUiState(customerScope, getDashboardBootstrapReadOptions(customerScope)),
-        options.dashboardFallbackCustomersTimeoutMs || 2800,
-        buildUnavailableBootstrapState(new Error('Dashboard klantstate fallback timeout'))
-      );
-      const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
-
-      if (remoteCustomers.length) {
-        return {
-          ok: true,
-          loadedAt: new Date().toISOString(),
-          source: 'customers',
-          customers: mergeCustomersWithResponsible(remoteCustomers, orders),
-          activeOrdersState: buildBootstrapStateSnapshot(orderState),
-        };
-      }
-
-      const customers = deriveCustomersFromOrders(orders);
-
-      if (!customers.length && (!hasLoadedUiStateValues(remoteState) || !hasLoadedUiStateValues(orderState))) {
-        return {
-          ok: false,
-          loadedAt: new Date().toISOString(),
-          source: 'unavailable',
-          message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
-          customers: [],
-          activeOrdersState: buildBootstrapStateSnapshot(orderState),
-        };
-      }
-
       return {
-        ok: true,
+        ok: false,
         loadedAt: new Date().toISOString(),
-        source: customers.length ? 'orders' : 'empty',
-        customers,
+        source: 'unavailable',
+        message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
+        customers: [],
         activeOrdersState: buildBootstrapStateSnapshot(orderState),
       };
     }

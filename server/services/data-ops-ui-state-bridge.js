@@ -265,14 +265,14 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
       store.listActiveOrders(),
       store.listOrderRuntime(),
     ]);
-    const hasOrders = Array.isArray(orders) && orders.length > 0;
+    const ordersLoaded = Array.isArray(orders);
     const hasRuntime = runtime && typeof runtime === 'object' && Object.keys(runtime).length > 0;
-    if (!hasOrders && !hasRuntime) {
+    if (!ordersLoaded) {
       if (shouldSkipLegacyAfterStructuredReadFailure()) return null;
       return readLegacyWithTimeout(legacyGetUiStateValues, SCOPES.activeOrders, 'active-orders-fallback');
     }
     return buildState(SCOPES.activeOrders, {
-      ...(hasOrders ? buildChunkedStatePatch(KEYS.activeOrders, JSON.stringify(orders)) : {}),
+      ...buildChunkedStatePatch(KEYS.activeOrders, JSON.stringify(orders)),
       ...(hasRuntime ? { [KEYS.orderRuntime]: JSON.stringify(runtime) } : {}),
     });
   }

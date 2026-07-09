@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const dashboardDataStatus = require('../../assets/premium-dashboard-data-status');
 
 test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
@@ -135,6 +136,11 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   const coreSource = fs.readFileSync(corePath, 'utf8');
   const dataStatusPath = path.join(__dirname, '../../assets/premium-dashboard-data-status.js');
   const dataStatusSource = fs.readFileSync(dataStatusPath, 'utf8');
+  const loadOrdersSource = pageSource.slice(
+    pageSource.indexOf('async function loadPremiumDashboardOrders()'),
+    pageSource.indexOf('async function loadPremiumDashboardCustomers()')
+  );
+  const orderValidationLine = loadOrdersSource.split('\n').find((line) => line.includes('Geen Supabase-opdrachtdata')) || '';
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
   assert.match(pageSource, /<!-- SOFTORA_DASHBOARD_TOTAL_REVENUE -->/);
@@ -147,49 +153,110 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260701a/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260710a/);
   assert.doesNotMatch(pageSource, /assets\/premium-dashboard-core\.js\?v=20260429b/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
   assert.match(pageSource, /const databaseStatus = normalizePremiumDashboardCustomerDatabaseStatus\(item\);/);
   assert.match(pageSource, /databaseStatus,/);
   assert.match(pageSource, /\.filter\(\(customer\) => customer\.databaseStatus === 'klant'\)/);
-  assert.match(pageSource, /const rawCustomers = readPremiumDashboardChunkedStateValue\(values, PREMIUM_CUSTOMERS_KEY\);/);
-  assert.match(pageSource, /const customers = parsePremiumCustomers\(rawCustomers\);/);
+  assert.match(pageSource, /fetchPremiumDashboardJson\('\/api\/dashboard\/customers', \{ method: 'GET', cache: 'no-store' \}, 2500\)/);
+  assert.match(pageSource, /const hasWebsiteBedrag = item && item\.websiteBedrag !== null/);
+  assert.doesNotMatch(pageSource, /fetchPremiumUiState\(PREMIUM_CUSTOMERS_SCOPE\)/);
+  assert.match(orderValidationLine, /PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY/);
+  assert.doesNotMatch(orderValidationLine, /PREMIUM_ACTIVE_RUNTIME_KEY/);
   assert.match(coreSource, /function hydratePremiumDashboardCustomersFromBootstrap\(state, parseCustomers, payload\) \{/);
   assert.match(coreSource, /function hydratePremiumDashboardOrdersFromBootstrap\(state, parseOrders, payload\) \{/);
   assert.match(coreSource, /const rawCustomers = Array\.isArray\(payload && payload\.customers\) \? payload\.customers : \[\];/);
+  assert.match(coreSource, /source !== 'dashboard-customers' && source !== 'customers'/);
   assert.match(coreSource, /const customers = parseCustomers\(rawCustomers\);/);
-  assert.match(pageSource, /const hadPremiumDashboardBootstrapData = \[hydratePremiumDashboardCustomersFromBootstrap\(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload\), typeof dashboardCore\.hydratePremiumDashboardOrdersFromBootstrap === 'function'/);
-  assert.match(pageSource, /totalClientsEl\.textContent = String\(hasCustomerDatabase \? customers\.length : uniqueClients\.size\);/);
+  assert.match(pageSource, /const hadPremiumDashboardCustomers = hydratePremiumDashboardCustomersFromBootstrap\(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload\);/);
+  assert.match(pageSource, /totalClientsEl\.textContent = String\(customers\.length\);/);
+  assert.doesNotMatch(pageSource, /else \{\s*paidOrders\.forEach/);
   assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
-  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260604d/);
+  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260710a/);
   assert.match(dataStatusSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
-  assert.match(dataStatusSource, /function setKpisUnavailable\(\) \{/);
+  assert.match(dataStatusSource, /function setKpisUnavailable\(options = \{\}\) \{/);
+  assert.match(dataStatusSource, /if \(options\.preserveActiveOrders === true\) return;/);
   assert.match(dataStatusSource, /activeOrdersEl\.setAttribute\("aria-label", "Actieve opdrachten tijdelijk niet geladen"\);/);
-  assert.match(dataStatusSource, /function shouldShowUnavailableForEmptyBootstrap\(\) \{/);
+  assert.match(dataStatusSource, /function shouldShowUnavailableForEmptyBootstrap\(payload\) \{/);
+  assert.match(dataStatusSource, /function hasLoadedActiveOrdersBootstrap\(payload\) \{/);
+  assert.match(dataStatusSource, /api\.showUnavailable\(\{ preserveActiveOrders: hasLoadedActiveOrdersBootstrap\(payload\) \}\);/);
   assert.match(dataStatusSource, /payload\.ok === false \|\| payload\.source === "unavailable"/);
   assert.match(dataStatusSource, /payload\.source === "empty"/);
   assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap, \{ once: true \}\);/);
-  assert.match(pageSource, /const loaded = premiumDashboardState\.orders\.length > 0 \|\| premiumDashboardState\.customers\.length > 0;/);
+  assert.match(pageSource, /const loaded = customersLoaded \|\| premiumDashboardState\.customersHydrated;/);
   assert.match(coreSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(coreSource, /status === 401 \|\| status === 403 \|\| status === 429/);
   assert.doesNotMatch(coreSource, /status >= 500/);
   assert.doesNotMatch(coreSource, /\|5\\d\\d/);
   assert.match(pageSource, /dashboardCore\.shouldStopUiStateFallback\?\.\(error\)/);
-  assert.doesNotMatch(pageSource, /const loaded = results\.some\(Boolean\) \|\| premiumDashboardState\.ordersHydrated \|\| premiumDashboardState\.customersHydrated;/);
-  assert.match(pageSource, /if \(!orders\.length && !customers\.length\) \{/);
-  assert.match(pageSource, /if \(window\.SoftoraDashboardDataStatus\) window\.SoftoraDashboardDataStatus\.showUnavailable\(\);\s+return;\s+\}/);
-  assert.match(pageSource, /window\.SoftoraDashboardDataStatus\.showUnavailable\(\)/);
+  assert.doesNotMatch(pageSource, /premiumDashboardState\.orders\.length > 0 \|\| premiumDashboardState\.customers\.length > 0/);
+  assert.match(pageSource, /if \(!premiumDashboardState\.customersHydrated\) \{ showPremiumDashboardUnavailable\(\); return; \}/);
+  assert.match(pageSource, /showUnavailable\(\{ preserveActiveOrders: hasOrders \}\)/);
+  assert.match(pageSource, /if \(premiumDashboardState\.ordersHydrated\) updateKpiActiveOrdersDisplay\(activeOrders\);/);
   assert.match(pageSource, /recoveryTimer: null,/);
   assert.match(pageSource, /function schedulePremiumDashboardRecovery\(\) \{/);
   assert.match(pageSource, /premiumDashboardState\.recoveryAttempts >= 4/);
-  assert.match(pageSource, /void refreshPremiumDashboard\(true\);/);
+  assert.match(pageSource, /void refreshPremiumDashboard\(true, true\);/);
   assert.match(pageSource, /schedulePremiumDashboardRecovery\(\);/);
+  assert.match(pageSource, /const ordersPromise = shouldLoadOrders \? loadPremiumDashboardOrders\(\) : Promise\.resolve\(false\);/);
+  assert.match(pageSource, /const customersLoaded = shouldLoadCustomers \? await loadPremiumDashboardCustomers\(\) : false;/);
+  assert.match(pageSource, /if \(!ordersLoaded\) \{ if \(!premiumDashboardState\.ordersHydrated\) schedulePremiumDashboardRecovery\(\); return; \}/);
+  assert.doesNotMatch(pageSource, /Promise\.all\(\[loadPremiumDashboardCustomers\(\), loadPremiumDashboardOrders\(\)\]\)/);
+  assert.match(pageSource, /if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/);
   assert.doesNotMatch(pageSource, /else if \(!premiumDashboardState\.ordersHydrated && !premiumDashboardState\.customersHydrated && window\.SoftoraDashboardDataStatus\)/);
   assert.doesNotMatch(pageSource, /premiumDashboardState\.(orders|customers) = \[\];/);
+});
+
+test('premium dashboard datastatus behoudt geldige actieve opdrachten bij klanttimeout', () => {
+  const loadedPayload = {
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_custom_orders_premium_v1: '[{"id":1},{"id":2}]' },
+    },
+  };
+  const runtimeOnlyPayload = {
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_order_runtime_premium_v1: '{"7":{"statusKey":"running"}}' },
+    },
+  };
+  const activeValues = ['2', '0', '0', '0'].map((textContent) => ({ textContent }));
+  const activeOrdersElement = {
+    attributes: {},
+    querySelectorAll() { return activeValues; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  const elements = {
+    kpiRevenueYear: { textContent: '€600' },
+    kpiRecurringRevenue: { textContent: '€0' },
+    kpiTotalClients: { textContent: '2' },
+    kpiActiveOrders: activeOrdersElement,
+  };
+  const previousDocument = global.document;
+  global.document = {
+    getElementById(id) { return elements[id] || null; },
+  };
+  try {
+    assert.equal(dashboardDataStatus.hasLoadedActiveOrdersBootstrap(loadedPayload), true);
+    assert.equal(dashboardDataStatus.hasLoadedActiveOrdersBootstrap(runtimeOnlyPayload), false);
+    dashboardDataStatus.setKpisUnavailable({ preserveActiveOrders: true });
+    assert.equal(elements.kpiRevenueYear.textContent, '--');
+    assert.equal(elements.kpiRecurringRevenue.textContent, '--');
+    assert.equal(elements.kpiTotalClients.textContent, '--');
+    assert.deepEqual(activeValues.map((item) => item.textContent), ['2', '0', '0', '0']);
+    assert.equal(activeOrdersElement.attributes['aria-label'], undefined);
+
+    dashboardDataStatus.setKpisUnavailable();
+    assert.deepEqual(activeValues.map((item) => item.textContent), ['--', '--', '--', '--']);
+    assert.equal(activeOrdersElement.attributes['aria-label'], 'Actieve opdrachten tijdelijk niet geladen');
+  } finally {
+    if (previousDocument === undefined) delete global.document;
+    else global.document = previousDocument;
+  }
 });
 
 test('premium dashboard laat de boot-loader niet hangen op trage ui-state requests', () => {
@@ -200,7 +267,8 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
 
   assert.match(pageSource, /startPremiumDashboardBootWatchdog\(\);/);
   assert.match(pageSource, /fetchPremiumDashboardJson\(url, \{ method: 'GET', cache: 'no-store' \}\)/);
-  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 1000\);/);
+  assert.match(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/s);
+  assert.doesNotMatch(pageSource, /await refreshPremiumDashboard\(true\)/);
   assert.match(pageSource, /setAttribute\("data-dashboard-boot-loading", "true"\)/);
   assert.match(pageSource, /html\[data-dashboard-boot-loading="true"\] body::before/);
   assert.doesNotMatch(pageSource, /html\[data-dashboard-boot-loading="true"\] body::after/);
@@ -230,6 +298,19 @@ test('premium dashboard laat de boot-loader niet hangen op trage ui-state reques
   assert.match(coreSource, /installPremiumDashboardBootFailSafe\(\);/);
   assert.match(coreSource, /async function fetchPremiumDashboardJson\(url, options = \{\}, timeoutMs = PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS\) \{/);
   assert.match(coreSource, /timeout = timerRoot\.setTimeout\(\(\) => controller\.abort\(\), safeTimeoutMs\);/);
+});
+
+test('premium dashboard initialiseert core helpers voor AI beheerconfiguratie', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const coreIndex = pageSource.indexOf('const dashboardCore = window.SoftoraPremiumDashboardCore');
+  const destructureEndIndex = pageSource.indexOf('} = dashboardCore;');
+  const configIndex = pageSource.indexOf('aiManagementConfig = normalizeAiManagementConfig(null);');
+
+  assert.ok(coreIndex >= 0);
+  assert.ok(destructureEndIndex > coreIndex);
+  assert.ok(configIndex > destructureEndIndex, 'AI-config mag dashboardCore helpers pas na destructuring gebruiken');
+  assert.doesNotMatch(pageSource, /let aiManagementConfig = normalizeAiManagementConfig\(null\);/);
 });
 
 test('premium dashboard opent AI beheer configuratie met doel en toegestane middelen', () => {
@@ -266,7 +347,7 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260701a/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260710a/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);

@@ -209,6 +209,13 @@ test('runtime ops routes keep their auth boundaries', async () => {
     assert.ok(Array.isArray(activityResult.body.activities));
   }
 
+  const customersResult = await getProtectedApiExpectation('/api/dashboard/customers');
+  if (customersResult.response.status === 200) {
+    assert.equal(customersResult.body.ok, true);
+    assert.equal(customersResult.body.source, 'dashboard-customers');
+    assert.ok(Array.isArray(customersResult.body.customers));
+  }
+
   const createResult = await postProtectedApiExpectation(
     '/api/dashboard/activity',
     {
