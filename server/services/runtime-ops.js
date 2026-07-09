@@ -9,6 +9,44 @@ const SPORTSCHOOL_LOGBOOK_SCOPE = 'sportschool_logboek';
 const SPORTSCHOOL_LOGBOOK_KEY = 'sportschool_logboek_v1';
 const SPORTSCHOOL_LOGBOOK_MAX_LENGTH = 180000;
 
+function normalizeDashboardCustomerAmount(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : null;
+}
+
+function projectDashboardCustomer(raw, index, normalizeString) {
+  const customer = raw && typeof raw === 'object' ? raw : {};
+  const clean = (value, maxLength) => normalizeString(value).slice(0, maxLength);
+  const rawType = clean(customer.type, 80);
+  const type = rawType === 'Onderhoud' || rawType === 'Website + onderhoud' ? rawType : 'Website';
+  const legacyAmount = normalizeDashboardCustomerAmount(customer.bedrag);
+  const websiteAmount = normalizeDashboardCustomerAmount(customer.websiteBedrag);
+  const maintenanceAmount = normalizeDashboardCustomerAmount(customer.onderhoudPerMaand);
+  const websiteBedrag = websiteAmount !== null
+    ? websiteAmount
+    : type === 'Website' || type === 'Website + onderhoud'
+      ? legacyAmount
+      : null;
+  const onderhoudPerMaand = maintenanceAmount !== null
+    ? maintenanceAmount
+    : type === 'Onderhoud'
+      ? legacyAmount
+      : null;
+  return {
+    id: clean(customer.id, 160) || `dashboard-customer-${index}`,
+    naam: clean(customer.naam, 180),
+    bedrijf: clean(customer.bedrijf, 180),
+    type,
+    websiteBedrag,
+    onderhoudPerMaand,
+    bedrag: legacyAmount !== null ? legacyAmount : websiteBedrag ?? onderhoudPerMaand ?? 0,
+    status: clean(customer.status, 40),
+    databaseStatus: clean(customer.databaseStatus, 40),
+    datum: clean(customer.datum, 40),
+  };
+}
+
 function normalizeSportschoolLogbookSnapshot(rawSnapshot) {
   let snapshot = rawSnapshot;
   if (typeof snapshot === 'string') {
@@ -123,6 +161,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
     dataOpsUiStateBridge = null,
+    dataOpsStore = null,
     sportschoolLogbookStore = null,
     dataOpsUiStateReadTimeoutMs = 2500,
     dataOpsUiStateReadTimeoutMsByScope = {},
@@ -153,6 +192,56 @@ function createRuntimeOpsCoordinator(deps = {}) {
       count: Math.min(limit, recentSecurityAuditEvents.length),
       events: recentSecurityAuditEvents.slice(0, limit),
     });
+  }
+
+  async function sendDashboardCustomersResponse(_req, res) {
+    if (typeof res.setHeader === 'function') {
+      res.setHeader('Cache-Control', 'no-store, private');
+    }
+    if (!dataOpsStore || typeof dataOpsStore.listDashboardCustomers !== 'function') {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon formele dashboardklanten niet laden.',
+      });
+    }
+
+    try {
+      const customers = await awaitWithTimeout(
+        dataOpsStore.listDashboardCustomers({
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+          maxRows: 5000,
+        }),
+        1800,
+        'Dashboardklanten read timeout na 2s'
+      );
+      if (!Array.isArray(customers)) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Kon formele dashboardklanten niet laden.',
+        });
+      }
+
+      const dashboardCustomers = customers.map((customer, index) =>
+        projectDashboardCustomer(customer, index, normalizeString)
+      );
+      return res.status(200).json({
+        ok: true,
+        loadedAt: new Date().toISOString(),
+        source: 'dashboard-customers',
+        customers: dashboardCustomers,
+      });
+    } catch (error) {
+      const log = logger && (typeof logger.warn === 'function' ? logger.warn : logger.error);
+      if (typeof log === 'function') {
+        log.call(logger, '[RuntimeOps][dashboard-customers]', error?.message || error);
+      }
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon formele dashboardklanten niet laden.',
+      });
+    }
   }
 
   function requiresAdminUiStateAccess(scope) {
@@ -658,6 +747,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     requiresAdminUiStateAccess,
     sendDashboardActivityCreateResponse,
     sendDashboardActivityResponse,
+    sendDashboardCustomersResponse,
     sendSecurityAuditLogResponse,
     sendSportschoolLogbookGetResponse,
     sendSportschoolLogbookSetResponse,

@@ -169,6 +169,100 @@ test('customers page bootstrap gebruikt compacte dashboardklanten zonder zware c
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^1<script>/);
 });
 
+test('dashboard bootstrap toont geen nep-nullen wanneer alleen opdrachten geladen zijn', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      if (scope !== 'premium_active_orders') {
+        throw new Error('Dashboard mag niet terugvallen op de zware customer-state.');
+      }
+      return {
+        source: 'supabase:data_ops',
+        values: {
+          softora_custom_orders_premium_v1: JSON.stringify([
+            { id: 1, clientName: 'Klant A', title: 'Website opdracht', status: 'wacht' },
+            { id: 2, clientName: 'Klant B', title: 'Website opdracht', status: 'wacht' },
+          ]),
+          softora_order_runtime_premium_v1: '{}',
+        },
+      };
+    },
+    listDashboardCustomers: async () => null,
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+    dashboardCustomersTimeoutMs: 25,
+    dashboardOrderStateTimeoutMs: 25,
+  });
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.source, 'unavailable');
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^--<script>/);
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /"website":2/);
+});
+
+test('dashboard bootstrap behandelt een lege formele klantenlijst als geldige nul', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      return {
+        source: 'supabase:data_ops',
+        values: {
+          softora_custom_orders_premium_v1: '[]',
+          softora_order_runtime_premium_v1: '{}',
+        },
+      };
+    },
+    listDashboardCustomers: async () => [],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'dashboard-customers');
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(service.buildDashboardHtmlReplacements(payload).SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac0');
+});
+
+test('dashboard bootstrap behandelt runtime zonder opdrachtenlijst als onvolledig', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async () => ({
+      source: 'supabase:data_ops',
+      values: {
+        softora_order_runtime_premium_v1: JSON.stringify({ 7: { statusKey: 'running' } }),
+      },
+    }),
+    listDashboardCustomers: async () => [
+      {
+        id: 'klant-1',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        websiteBedrag: 300,
+        datum: '2026-03-23',
+      },
+    ],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({ preferDashboardCustomers: true });
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(payload.ok, true);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac300');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
+  assert.doesNotMatch(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /"website":0/);
+});
+
 test('customers page bootstrap laat trage actieve opdrachten dashboardklanten niet blokkeren', async () => {
   const seenScopes = [];
   const service = createCustomersPageBootstrapService({
@@ -256,6 +350,7 @@ test('customers page bootstrap vult dashboard actieve-opdrachten teller server-s
   const replacements = service.buildDashboardHtmlReplacements({
     customers: [],
     activeOrdersState: {
+      source: 'supabase:data_ops',
       values: {
         softora_custom_orders_premium_v1: '',
         softora_custom_orders_premium_v1_chunks_v1: JSON.stringify({ count: 2 }),
@@ -295,6 +390,8 @@ test('customers page bootstrap toont dashboard data als tijdelijk niet geladen i
   assert.equal(payload.source, 'unavailable');
   assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
   assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
+  assert.doesNotMatch(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /title="€0"/);
+  assert.match(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /title="--"/);
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^--<script>/);
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
 });

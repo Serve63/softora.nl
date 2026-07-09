@@ -7,6 +7,11 @@ function createResponseRecorder() {
   return {
     statusCode: null,
     body: null,
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+      return this;
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -67,6 +72,7 @@ function createFixture(overrides = {}) {
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
+    dataOpsStore: overrides.dataOpsStore || null,
     sportschoolLogbookStore: overrides.sportschoolLogbookStore || null,
     dataOpsUiStateReadTimeoutMs: overrides.dataOpsUiStateReadTimeoutMs,
     dataOpsUiStateReadTimeoutMsByScope: overrides.dataOpsUiStateReadTimeoutMsByScope,
@@ -107,6 +113,70 @@ test('runtime ops coordinator lists dashboard activity and audit events with sta
   assert.equal(auditRes.body.ok, true);
   assert.equal(auditRes.body.count, 1);
   assert.equal(auditRes.body.events.length, 1);
+});
+
+test('runtime ops coordinator levert compacte formele dashboardklanten', async () => {
+  const calls = [];
+  const { coordinator } = createFixture({
+    dataOpsStore: {
+      listDashboardCustomers: async (options) => {
+        calls.push(options);
+        return [
+          {
+            id: 'klant-1',
+            databaseStatus: 'klant',
+            status: 'Betaald',
+            type: 'Website',
+            bedrag: 300,
+            datum: '2026-03-23',
+            interneNotities: 'mag nooit naar het dashboard',
+            history: 'x'.repeat(100_000),
+          },
+        ];
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendDashboardCustomersResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.source, 'dashboard-customers');
+  assert.equal(res.body.customers.length, 1);
+  assert.equal(res.body.customers[0].websiteBedrag, 300);
+  assert.equal(res.body.customers[0].interneNotities, undefined);
+  assert.equal(res.body.customers[0].history, undefined);
+  assert.deepEqual(Object.keys(res.body.customers[0]).sort(), [
+    'bedrag',
+    'bedrijf',
+    'databaseStatus',
+    'datum',
+    'id',
+    'naam',
+    'onderhoudPerMaand',
+    'status',
+    'type',
+    'websiteBedrag',
+  ]);
+  assert.equal(res.headers['Cache-Control'], 'no-store, private');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].bypassReadFailureCooldown, true);
+});
+
+test('runtime ops coordinator faalt veilig als formele dashboardklanten niet laden', async () => {
+  const { coordinator } = createFixture({
+    dataOpsStore: {
+      listDashboardCustomers: async () => null,
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendDashboardCustomersResponse({}, res);
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /dashboardklanten/i);
 });
 
 test('runtime ops coordinator returns 400 or 503 for invalid or unavailable ui-state reads', async () => {

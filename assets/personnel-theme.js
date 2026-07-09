@@ -1329,23 +1329,6 @@
         document.head.appendChild(link);
     }
 
-    function warmVisibleSidebarNavigationTargets() {
-        if (!isPremiumPersonnelContext) return;
-        const run = function () {
-            document
-                .querySelectorAll(".sidebar a[data-sidebar-href], .sidebar a[href^='/premium-']")
-                .forEach(function (anchor, index) {
-                    if (index > 10) return;
-                    warmSidebarNavigationTarget(anchor.dataset.sidebarHref || anchor.getAttribute("href"));
-                });
-        };
-        if (typeof window.requestIdleCallback === "function") {
-            window.requestIdleCallback(run, { timeout: 1800 });
-            return;
-        }
-        window.setTimeout(run, 600);
-    }
-
     function neutralizeSidebarAnchors() {
         if (!isPremiumPersonnelContext) return;
         let initializedCount = 0;
@@ -1392,7 +1375,6 @@
             });
         if (initializedCount > 0) {
             document.body.setAttribute("data-sidebar-nav-ready", "1");
-            warmVisibleSidebarNavigationTargets();
         }
     }
 

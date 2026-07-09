@@ -252,6 +252,7 @@ function createUiSeoRuntime(deps = {}) {
     sanitizeUiStateValues,
     setUiStateValues,
     dataOpsUiStateBridge,
+    dataOpsStore,
     sportschoolLogbookStore,
     dataOpsUiStateReadTimeoutMs,
     dataOpsUiStateReadTimeoutMsByScope,
