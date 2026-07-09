@@ -61,7 +61,7 @@
         },
         unavailableMessage,
     });
-    global.SoftoraDashboardDataStatus = api;
+    if (global && global.document) global.SoftoraDashboardDataStatus = api;
 
     function readCustomersBootstrapPayload() {
         const element = document.getElementById("softoraCustomersBootstrap");
@@ -98,9 +98,15 @@
         }
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", showUnavailableForEmptyBootstrap, { once: true });
-    } else {
-        showUnavailableForEmptyBootstrap();
+    if (typeof module === "object" && module.exports) {
+        module.exports = Object.freeze({ ...api, hasLoadedActiveOrdersBootstrap, shouldShowUnavailableForEmptyBootstrap });
     }
-})(window);
+
+    if (typeof document !== "undefined") {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", showUnavailableForEmptyBootstrap, { once: true });
+        } else {
+            showUnavailableForEmptyBootstrap();
+        }
+    }
+})(typeof window !== "undefined" ? window : globalThis);

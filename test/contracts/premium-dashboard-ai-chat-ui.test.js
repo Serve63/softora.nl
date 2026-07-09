@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const vm = require('node:vm');
+const dashboardDataStatus = require('../../assets/premium-dashboard-data-status');
 
 test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
@@ -183,6 +183,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(dataStatusSource, /activeOrdersEl\.setAttribute\("aria-label", "Actieve opdrachten tijdelijk niet geladen"\);/);
   assert.match(dataStatusSource, /function shouldShowUnavailableForEmptyBootstrap\(payload\) \{/);
   assert.match(dataStatusSource, /function hasLoadedActiveOrdersBootstrap\(payload\) \{/);
+  assert.match(dataStatusSource, /api\.showUnavailable\(\{ preserveActiveOrders: hasLoadedActiveOrdersBootstrap\(payload\) \}\);/);
   assert.match(dataStatusSource, /payload\.ok === false \|\| payload\.source === "unavailable"/);
   assert.match(dataStatusSource, /payload\.source === "empty"/);
   assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap, \{ once: true \}\);/);
@@ -211,69 +212,51 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
 });
 
 test('premium dashboard datastatus behoudt geldige actieve opdrachten bij klanttimeout', () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, '../../assets/premium-dashboard-data-status.js'),
-    'utf8'
-  );
-  const activeValues = ['2', '0', '0', '0'].map((textContent) => ({ textContent }));
-  const statusElement = {
-    textContent: '',
-    hidden: true,
-    classList: { toggle() {} },
+  const loadedPayload = {
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_custom_orders_premium_v1: '[{"id":1},{"id":2}]' },
+    },
   };
+  const runtimeOnlyPayload = {
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_order_runtime_premium_v1: '{"7":{"statusKey":"running"}}' },
+    },
+  };
+  const activeValues = ['2', '0', '0', '0'].map((textContent) => ({ textContent }));
   const activeOrdersElement = {
     attributes: {},
     querySelectorAll() { return activeValues; },
     setAttribute(name, value) { this.attributes[name] = value; },
   };
   const elements = {
-    dashboardDataStatusStyle: {},
-    dashboardDataStatus: statusElement,
-    softoraCustomersBootstrap: {
-      textContent: JSON.stringify({
-        ok: false,
-        source: 'unavailable',
-        customers: [],
-        activeOrdersState: {
-          source: 'supabase:data_ops',
-          values: { softora_custom_orders_premium_v1: '[{"id":1},{"id":2}]' },
-        },
-      }),
-    },
     kpiRevenueYear: { textContent: '€600' },
     kpiRecurringRevenue: { textContent: '€0' },
     kpiTotalClients: { textContent: '2' },
     kpiActiveOrders: activeOrdersElement,
   };
-  const document = {
-    readyState: 'complete',
+  const previousDocument = global.document;
+  global.document = {
     getElementById(id) { return elements[id] || null; },
   };
-  const window = {};
+  try {
+    assert.equal(dashboardDataStatus.hasLoadedActiveOrdersBootstrap(loadedPayload), true);
+    assert.equal(dashboardDataStatus.hasLoadedActiveOrdersBootstrap(runtimeOnlyPayload), false);
+    dashboardDataStatus.setKpisUnavailable({ preserveActiveOrders: true });
+    assert.equal(elements.kpiRevenueYear.textContent, '--');
+    assert.equal(elements.kpiRecurringRevenue.textContent, '--');
+    assert.equal(elements.kpiTotalClients.textContent, '--');
+    assert.deepEqual(activeValues.map((item) => item.textContent), ['2', '0', '0', '0']);
+    assert.equal(activeOrdersElement.attributes['aria-label'], undefined);
 
-  vm.runInNewContext(source, { window, document });
-
-  assert.equal(elements.kpiRevenueYear.textContent, '--');
-  assert.equal(elements.kpiRecurringRevenue.textContent, '--');
-  assert.equal(elements.kpiTotalClients.textContent, '--');
-  assert.deepEqual(activeValues.map((item) => item.textContent), ['2', '0', '0', '0']);
-  assert.equal(activeOrdersElement.attributes['aria-label'], undefined);
-  assert.equal(statusElement.hidden, false);
-
-  elements.softoraCustomersBootstrap.textContent = JSON.stringify({
-    ok: false,
-    source: 'unavailable',
-    activeOrdersState: {
-      source: 'supabase:data_ops',
-      values: { softora_order_runtime_premium_v1: '{"7":{"statusKey":"running"}}' },
-    },
-  });
-  activeValues.forEach((item, index) => { item.textContent = index === 0 ? '2' : '0'; });
-  activeOrdersElement.attributes = {};
-  vm.runInNewContext(source, { window: {}, document });
-
-  assert.deepEqual(activeValues.map((item) => item.textContent), ['--', '--', '--', '--']);
-  assert.equal(activeOrdersElement.attributes['aria-label'], 'Actieve opdrachten tijdelijk niet geladen');
+    dashboardDataStatus.setKpisUnavailable();
+    assert.deepEqual(activeValues.map((item) => item.textContent), ['--', '--', '--', '--']);
+    assert.equal(activeOrdersElement.attributes['aria-label'], 'Actieve opdrachten tijdelijk niet geladen');
+  } finally {
+    if (previousDocument === undefined) delete global.document;
+    else global.document = previousDocument;
+  }
 });
 
 test('premium dashboard laat de boot-loader niet hangen op trage ui-state requests', () => {
