@@ -52,9 +52,11 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
     const pagePath = path.join(__dirname, '../../', file);
     const source = fs.readFileSync(pagePath, 'utf8');
     assert.match(source, /<main[^>]*\bis-premium-boot-host\b/, file);
-    assert.match(source, /class="premium-boot-loader"/, file);
-    assert.match(source, /class="premium-boot-shell is-booting"/, file);
-    assert.match(source, /assets\/premium-boot-one-second\.js\?v=20260502a/, file);
+    if (file !== 'premium-actieve-opdrachten.html') {
+      assert.match(source, /class="premium-boot-loader"/, file);
+      assert.match(source, /class="premium-boot-shell is-booting"/, file);
+      assert.match(source, /assets\/premium-boot-one-second\.js\?v=20260502a/, file);
+    }
     if (file !== 'premium-instellingen.html') {
       if (file === 'premium-actieve-opdrachten.html') {
         assert.match(source, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/, file);

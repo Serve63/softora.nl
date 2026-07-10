@@ -429,6 +429,13 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script>/, 'Opdrachten-script hoort direct te starten.');
 });
 
+test('page smoke: premium-actieve-opdrachten.html renders without a blocking boot loader', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
+  assert.doesNotMatch(html, /premium-boot-loader|premium-boot-one-second\.js/, 'De actieve opdrachtenpagina mag geen laadscherm meer tonen.');
+  assert.doesNotMatch(html, /premium-boot-shell is-booting/, 'De pagina-inhoud mag niet verborgen starten.');
+  assert.match(html, /<div class="premium-boot-shell" aria-busy="false">/, 'De pagina moet direct als niet-busy renderen.');
+});
+
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {
   const js = fs.readFileSync(path.join(repoRoot, 'assets/personnel-theme.js'), 'utf8');
   assert.match(js, /softora_sidebar_counts_v1/, 'Persistente sidebar-count cache ontbreekt.');
