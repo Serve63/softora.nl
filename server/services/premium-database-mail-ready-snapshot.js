@@ -16,6 +16,7 @@ const MAX_LIMIT = 3000;
 const MAX_OFFSET = 10000;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 950000;
+const SNAPSHOT_FORMAT_VERSION = 2;
 const EXCLUDED_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -310,6 +311,7 @@ function parseMailReadySnapshotCacheValue(raw) {
       .slice(0, MAX_LIMIT);
     if (!customers.length && !availableCustomers.length) return null;
     return {
+      version: Math.max(1, Number(parsed.version) || 1),
       generatedAt: normalizeString(parsed.generatedAt),
       total: Math.max(customers.length, Number(parsed.total) || 0),
       customers,
@@ -329,7 +331,7 @@ function serializeMailReadySnapshotCache(data = {}, rowLimit = MAX_LIMIT) {
     .slice(0, Math.max(1, Math.min(MAX_LIMIT, Number(rowLimit) || MAX_LIMIT)));
   if (!customers.length && !availableCustomers.length) return '';
   return JSON.stringify({
-    version: 1,
+    version: SNAPSHOT_FORMAT_VERSION,
     generatedAt: normalizeString(data.generatedAt),
     total: Math.max(customers.length, Number(data.total) || (Array.isArray(data.customers) ? data.customers.length : 0)),
     customers,
@@ -489,6 +491,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   } = deps;
   let snapshotDataCache = null;
   let snapshotDataPromise = null;
+  let snapshotMediaRefreshPromise = null;
   let durableSnapshotReadPromise = null;
 
   async function readCustomerRows() {
@@ -521,6 +524,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         customerIds,
         maxMatches: customerIds.length,
         expiresInSeconds: 24 * 60 * 60,
+        bypassReadCache: true,
+        bypassReadFailureCooldown: true,
         suppressTransientReadFailureLog: true,
         suppressReadFailureCooldown: true,
       });
@@ -683,6 +688,60 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     }
   }
 
+  function getBootstrapSnapshotCustomers(data = {}) {
+    return (Array.isArray(data.customers) ? data.customers : [])
+      .slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT)
+      .concat((Array.isArray(data.availableCustomers) ? data.availableCustomers : []).slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT));
+  }
+
+  function snapshotNeedsBootstrapSignedMedia(data = {}) {
+    return getBootstrapSnapshotCustomers(data).some((customer) => {
+      const needsPhoto = customer && (customer.hasPhoto === true || customer.websitePhotoAssetReady === true);
+      const needsMockup = customer && (customer.hasMockup === true || customer.websiteMockupAssetReady === true);
+      return (needsPhoto && !normalizeString(customer.websitePhoto)) ||
+        (needsMockup && !normalizeString(customer.websiteMockup));
+    });
+  }
+
+  function countBootstrapSignedMedia(data = {}) {
+    return getBootstrapSnapshotCustomers(data).reduce((count, customer) => (
+      count + (normalizeString(customer && customer.websitePhoto) ? 1 : 0) +
+      (normalizeString(customer && customer.websiteMockup) ? 1 : 0)
+    ), 0);
+  }
+
+  function startSnapshotMediaRefresh(data) {
+    if (snapshotMediaRefreshPromise) return snapshotMediaRefreshPromise;
+    const startedAtMs = Date.now();
+    const customerIds = Array.from(new Set(
+      getBootstrapSnapshotCustomers(data)
+        .map((customer) => normalizeString(customer && customer.id))
+        .filter(Boolean)
+    ));
+    snapshotMediaRefreshPromise = readBootstrapSignedMedia(customerIds)
+      .then(async (signedRows) => {
+        if (!signedRows.length) return data;
+        const enriched = {
+          ...data,
+          version: SNAPSHOT_FORMAT_VERSION,
+          customers: enrichSnapshotCustomersWithSignedMedia(data.customers, signedRows),
+          availableCustomers: enrichSnapshotCustomersWithSignedMedia(data.availableCustomers, signedRows),
+          timings: {
+            ...(data.timings && typeof data.timings === 'object' ? data.timings : {}),
+            mediaRefreshMs: Date.now() - startedAtMs,
+          },
+        };
+        if (countBootstrapSignedMedia(enriched) <= countBootstrapSignedMedia(data)) return data;
+        await persistDurableSnapshotData(enriched);
+        snapshotDataCache = { cachedAtMs: nowMs(), data: enriched };
+        return enriched;
+      })
+      .finally(() => {
+        snapshotMediaRefreshPromise = null;
+      });
+    return snapshotMediaRefreshPromise;
+  }
+
   function startSnapshotRefresh() {
     if (!snapshotDataPromise) {
       snapshotDataPromise = loadMailReadySnapshotData()
@@ -717,6 +776,11 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   async function getMailReadySnapshotData() {
     if (!snapshotDataCache) await hydrateDurableSnapshotData();
+    if (snapshotDataCache && snapshotNeedsBootstrapSignedMedia(snapshotDataCache.data)) {
+      startSnapshotMediaRefresh(snapshotDataCache.data).catch((error) => {
+        if (logger && typeof logger.warn === 'function') logger.warn('[PremiumDatabaseMailReadySnapshot][media-refresh]', error?.message || error);
+      });
+    }
     const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
     const cacheAgeMs = snapshotDataCache ? nowMs() - cachedAtMs : Number.POSITIVE_INFINITY;
     if (snapshotDataCache && cacheAgeMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;

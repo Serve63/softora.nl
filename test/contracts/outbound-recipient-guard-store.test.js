@@ -257,6 +257,7 @@ test('outbound recipient guard store groups permanent sent guard rows by reserva
   const groups = await store.listSentRecipientGroups({
     provider: 'softora',
     channel: 'coldmail',
+    keyType: 'email',
   });
 
   assert.equal(groups.length, 2);
@@ -266,6 +267,7 @@ test('outbound recipient guard store groups permanent sent guard rows by reserva
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'permanent' && call.value === true), true);
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'provider' && call.value === 'softora'), true);
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'channel' && call.value === 'coldmail'), true);
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'key_type' && call.value === 'email'), true);
 });
 
 test('outbound recipient guard store paginates sent guard rows beyond Supabase single-page caps', async () => {

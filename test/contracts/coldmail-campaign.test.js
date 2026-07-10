@@ -874,7 +874,8 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.deepEqual(centralGuardStatsOptions, {
     provider: 'softora',
     channel: 'coldmail',
-    maxRows: 20_000,
+    keyType: 'email',
+    maxRows: 5_000,
   });
   assert.equal(result.stats.sentToday, 2);
   assert.equal(result.stats.systemSentToday, 2);
