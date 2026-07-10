@@ -5861,8 +5861,8 @@ function createColdmailCampaignService(deps = {}) {
         database: state.config.database,
         senderEmail,
         specialAction: state.config.specialAction,
-        webdesignImageDelivery: 'cid',
-        imageDelivery: 'cid',
+        webdesignImageDelivery: 'remote',
+        imageDelivery: 'remote',
         durationDays: state.config.durationDays,
         radiusKm: state.config.radiusKm,
         mode: 'mail',
@@ -7263,20 +7263,21 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function toHtml(text, options = {}) {
+    const paragraphStyle = 'margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;';
     const body = normalizeString(text)
       .split(/\n{2,}/)
       .map((paragraph) => {
         const cleanParagraph = normalizeString(paragraph);
         if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanParagraph)) {
-          return `<p>${renderImageVisibilityPsHtmlLine(cleanParagraph, options)}</p>`;
+          return `<p style="${paragraphStyle}">${renderImageVisibilityPsHtmlLine(cleanParagraph, options)}</p>`;
         }
-        return `<p>${paragraph
+        return `<p style="${paragraphStyle}">${paragraph
             .split('\n')
             .map((line) => renderColdmailHtmlLine(line, options))
             .join('<br>')}</p>`;
       })
       .join('\n');
-    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
+    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
   }
 
   function getWebdesignPhotoSource(photo) {
@@ -8963,20 +8964,14 @@ function createColdmailCampaignService(deps = {}) {
           })
         : htmlBase;
       const html = renderWebdesignEmailDocument(htmlWithContent);
-      const attachments = shouldSendWebdesignImages
+      const attachments = shouldSendWebdesignImages && webdesignImageDelivery === 'cid'
         ? buildWebdesignImageAttachments(
             webdesignPhoto,
-            webdesignImageDelivery === 'cid'
-              ? {
-                  inline: true,
-                  webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
-                  mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
-                }
-              : {
-                  inline: false,
-                  webdesignImage: remoteWebdesignAttachment || webdesignPhoto,
-                  mockupImage: remoteMockupAttachment || webdesignPhoto.mockup,
-                }
+            {
+              inline: true,
+              webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
+              mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
+            }
           )
         : undefined;
       try {
