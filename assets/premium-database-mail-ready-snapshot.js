@@ -100,7 +100,7 @@
     }
 
     async function fetchSnapshotPage(config, limit, offset, timeoutMs) {
-        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "no-store" }, timeoutMs);
+        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "default" }, timeoutMs);
         if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
         const payload = await response.json().catch(function () { return {}; });
         if (!payload || payload.ok !== true) throw new Error(String(payload && (payload.detail || payload.error) || "Mailklare snapshot gaf geen geldige data terug."));

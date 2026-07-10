@@ -900,7 +900,7 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(loaded, true);
   assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=100&offset=0');
   assert.equal(requests[0][1].method, 'GET');
-  assert.equal(requests[0][1].cache, 'no-store');
+  assert.equal(requests[0][1].cache, 'default');
   assert.equal(requests[0][2], 6000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0', '100', '200', '300', '400']);
   assert.equal(state.mailReadySnapshotLoaded, true);
@@ -1004,7 +1004,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260617a/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260710b/);
   assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 100;/);
@@ -1018,14 +1018,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotPending && !state\.mailReadySnapshotLoaded/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotFailed && !state\.mailReadySnapshotLoaded/);
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
-  assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">" \+ \(state\.activeStatus === "beschikbaar" \? "Beschikbare data laden\.\.\." : "Mailklare data laden\.\.\."\)/);
+  assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*nodes\.tbody\.innerHTML = ""; return; \}/);
   assert.doesNotMatch(pageSource, /mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount/);
   assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);/);
   assert.match(pageSource, /const resultCountText = blockForMailReadyPending \|\| \(state\.dataLoading && !state\.klanten\.length\) \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten" : visibleResultCount\.toLocaleString\("nl-NL"\) \+ " resultaten";/);
   assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
-  assert.match(pageSource, /Mailklare data laden\.\.\./);
-  assert.match(pageSource, /Beschikbare data laden\.\.\./);
-  assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{ nodes\.tbody\.innerHTML = "<tr><td colspan=\\"7\\"><div class=\\"tbl-empty\\">Database laden\.\.\.<\/div><\/td><\/tr>";/);
+  assert.doesNotMatch(pageSource, /Mailklare data laden\.\.\./);
+  assert.doesNotMatch(pageSource, /Beschikbare data laden\.\.\./);
+  assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{ nodes\.tbody\.innerHTML = "";/);
   assert.match(pageSource, /state\.dataUnavailable = true; renderPage\(\); setStatusMessage\(""\);/);
   assert.match(pageSource, /state\.dataLoading = true; state\.dataUnavailable = false; renderPage\(\);/);
   assert.doesNotMatch(pageSource, /setStatusMessage\("Database laden\.\.\.", "info"\);/);
