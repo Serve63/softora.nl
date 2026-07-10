@@ -2,6 +2,7 @@
     "use strict";
 
     const unavailableMessage = "Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.";
+    let hasClearedUnavailable = false;
 
     function ensureStyle() {
         if (document.getElementById("dashboardDataStatusStyle")) return;
@@ -52,6 +53,7 @@
 
     const api = Object.freeze({
         clear() {
+            hasClearedUnavailable = true;
             setStatus("");
         },
         setKpisUnavailable,
@@ -92,10 +94,15 @@
     }
 
     function showUnavailableForEmptyBootstrap() {
+        if (hasClearedUnavailable) return;
         const payload = readCustomersBootstrapPayload();
         if (shouldShowUnavailableForEmptyBootstrap(payload)) {
             api.showUnavailable({ preserveActiveOrders: hasLoadedActiveOrdersBootstrap(payload) });
         }
+    }
+
+    function scheduleUnavailableForEmptyBootstrap() {
+        global.setTimeout(showUnavailableForEmptyBootstrap, 3200);
     }
 
     if (typeof module === "object" && module.exports) {
@@ -104,9 +111,9 @@
 
     if (typeof document !== "undefined") {
         if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", showUnavailableForEmptyBootstrap, { once: true });
+            document.addEventListener("DOMContentLoaded", scheduleUnavailableForEmptyBootstrap, { once: true });
         } else {
-            showUnavailableForEmptyBootstrap();
+            scheduleUnavailableForEmptyBootstrap();
         }
     }
 })(typeof window !== "undefined" ? window : globalThis);
