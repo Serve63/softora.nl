@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const {
@@ -46,6 +47,6 @@ const html = `<!doctype html>
 </body>
 </html>`;
 
-const outputPath = path.resolve(process.argv[2] || '/tmp/softora-webdesign-email-preview.html');
+const outputPath = path.join(os.tmpdir(), 'softora-webdesign-email-preview.html');
 fs.writeFileSync(outputPath, html);
 process.stdout.write(`${outputPath}\n`);
