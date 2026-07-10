@@ -1377,7 +1377,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710f/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710g/);
   assert.match(webdesignActionScriptSource, /const FALLBACK_ICON = "<span class=\\"photo-fallback-icon\\" aria-hidden=\\"true\\"><\/span>";/);
   assert.match(webdesignActionScriptSource, /\.photo-fallback-icon\{display:none\}/);
   assert.doesNotMatch(webdesignActionScriptSource, /photo-fallback-icon[^\n]*>!<\/span>/);
@@ -1617,7 +1617,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710f/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710g/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260619a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1768,7 +1768,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710f/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710g/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
@@ -1788,8 +1788,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const FINISHED_PHOTO_REFRESH_DELAY_MS = 900;/);
   assert.match(webdesignActionScriptSource, /const AUTO_MOCKUP_IDLE_DELAY_MS = 350;/);
   assert.match(webdesignActionScriptSource, /function queueFinishedPhotoRefresh\(customerId\)/);
+  assert.match(webdesignActionScriptSource, /function pruneExpiredPendingJobs\(\)/);
+  assert.match(webdesignActionScriptSource, /if \(!isPendingJobFresh\(pendingJob\)\) return;/);
   assert.match(webdesignActionScriptSource, /setPendingJob\(pendingJob, \{ deferRender: true \}\); schedulePoll\(pendingJob\.jobId, \(restoredCount % 80\) \* BATCH_POLL_STAGGER_MS\);/);
-  assert.match(webdesignActionScriptSource, /if \(restoredCount && typeof renderPage === "function"\) renderPage\(\);/);
+  assert.match(webdesignActionScriptSource, /if \(\(restoredCount \|\| clearedCount\) && typeof renderPage === "function"\) renderPage\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /await refreshFinishedPhotos\(job\.customerId\)/);
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
@@ -3152,6 +3154,117 @@ test('premium database webdesign action silently drops restored jobs that disapp
   assert.deepEqual(messages.filter((item) => item.tone === 'error'), []);
   assert.equal(refreshed.length, 1);
   assert.equal(refreshed[0].customerId, 'customer-1');
+});
+
+test('premium database webdesign action ignores expired queued jobs instead of showing an endless spinner', async () => {
+  const timers = [];
+  const customer = {
+    id: 'customer-expired',
+    bedrijf: 'Verlopen webdesignjob',
+    website: 'https://softora.nl',
+    dom: 'softora.nl',
+    websitePhoto: '',
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        jobs: [{
+          id: 'expired-restored-job',
+          customerId: customer.id,
+          status: 'queued',
+          createdAt: Date.now() - (7 * 60 * 60 * 1000),
+        }],
+      }),
+    }),
+  });
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [customer] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  await controller.resumePendingJobs();
+  const html = controller.render(customer);
+
+  assert.doesNotMatch(html, /is-generating/);
+  assert.match(html, /data-can-generate="true"/);
+  assert.equal(timers.some((timer) => Number(timer.delay) === 0), false);
+});
+
+test('premium database webdesign action reconciles restored jobs with a later empty server list', async () => {
+  let listCalls = 0;
+  const timers = [];
+  const customer = {
+    id: 'customer-reconciled',
+    bedrijf: 'Afgeronde webdesignjob',
+    website: 'https://softora.nl',
+    dom: 'softora.nl',
+    websitePhoto: '',
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    fetch: async () => {
+      listCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobs: listCalls === 1 ? [{
+            id: 'recent-restored-job',
+            customerId: customer.id,
+            status: 'queued',
+            createdAt: Date.now() - 60_000,
+          }] : [],
+        }),
+      };
+    },
+  });
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [customer] },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: (value) => /^data:image\//.test(String(value || '')),
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  await controller.resumePendingJobs();
+  assert.match(controller.render(customer), /is-generating/);
+
+  await controller.resumePendingJobs();
+  const reconciledHtml = controller.render(customer);
+  assert.doesNotMatch(reconciledHtml, /is-generating/);
+  assert.match(reconciledHtml, /data-can-generate="true"/);
 });
 
 test('premium database webdesign action remembers failed photo slots as a quiet fallback', () => {

@@ -1253,6 +1253,54 @@ test('premium database webdesign jobs list running jobs for the current user', a
   assert.equal(res.body.jobs[0].customerId, 'customer-list');
 });
 
+test('premium database webdesign jobs hide expired persistent jobs and allow a fresh restart', async () => {
+  const nowMs = Date.parse('2026-07-10T15:00:00.000Z');
+  const store = createInMemoryWebdesignBatchStore();
+  store.jobs.set('expired-job-123456', {
+    id: 'expired-job-123456',
+    ownerKey: 'owner@softora.nl::owner',
+    websiteUrl: 'https://softora.nl/',
+    customer: { id: 'customer-expired', bedrijf: 'Verlopen job' },
+    status: 'queued',
+    error: null,
+    createdAt: nowMs - (7 * 60 * 60 * 1000),
+    startedAt: 0,
+    finishedAt: 0,
+  });
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    dataOpsStore: store,
+    processJobsInline: false,
+    now: () => nowMs,
+  });
+
+  const listRes = createResponseRecorder();
+  await coordinator.listJobsResponse(
+    { premiumAuth: { email: 'owner@softora.nl', userId: 'owner' } },
+    listRes
+  );
+  assert.equal(listRes.statusCode, 200);
+  assert.deepEqual(listRes.body.jobs, []);
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'fresh-job-12345678',
+        websiteUrl: 'https://softora.nl/',
+        customer: { id: 'customer-expired', bedrijf: 'Nieuwe job' },
+      },
+    },
+    startRes
+  );
+
+  assert.equal(startRes.statusCode, 202);
+  assert.equal(startRes.body.job.id, 'fresh-job-12345678');
+});
+
 test('premium database webdesign jobs keep thousands of queued jobs visible', async () => {
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
