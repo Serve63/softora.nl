@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const {
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('../server/services/webdesign-email-renderer');
 
@@ -32,10 +33,8 @@ const imagesHtml = renderWebdesignImageSection(
   }
 );
 
-const html = `<!doctype html>
-<html lang="nl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:24px;background:#ffffff;">
+const html = renderWebdesignEmailDocument(`
+  <div style="padding:24px;background:#ffffff;">
   <div class="softora-webdesign-email-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;width:100%;max-width:900px;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
     <div style="width:100%;max-width:600px;">
       <p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;">Goedendag,</p>
@@ -44,8 +43,7 @@ const html = `<!doctype html>
     </div>
     ${imagesHtml}
   </div>
-</body>
-</html>`;
+  </div>`);
 
 const outputPath = path.join(os.tmpdir(), 'softora-webdesign-email-preview.html');
 fs.writeFileSync(outputPath, html);

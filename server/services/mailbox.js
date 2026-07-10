@@ -19,6 +19,7 @@ const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
 
@@ -1677,7 +1678,9 @@ function createMailboxService(deps = {}) {
           COLDMAIL_OPT_OUT_LABEL
         )}</a></p>`
       : '';
-    return `<div class="softora-webdesign-email-body softora-mailbox-webdesign-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;max-width:900px;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;">${paragraphs}${imagesHtml}${optOutHtml}</div>`;
+    return renderWebdesignEmailDocument(
+      `<div class="softora-webdesign-email-body softora-mailbox-webdesign-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;max-width:900px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${paragraphs}${imagesHtml}${optOutHtml}</div>`
+    );
   }
 
   async function buildMailboxWebdesignSendParts({ accountEmail, to, subject, text }) {

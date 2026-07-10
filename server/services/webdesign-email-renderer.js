@@ -1,6 +1,6 @@
 'use strict';
 
-const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-10-v1';
+const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-10-v2';
 const WEBDESIGN_EMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -11,6 +11,27 @@ const DESKTOP_GAP_WIDTH = 16;
 const MOBILE_IMAGE_WIDTH = 640;
 const SINGLE_IMAGE_WIDTH = 480;
 const MOBILE_BREAKPOINT_PX = 980;
+
+function renderWebdesignEmailHeadStyles() {
+  return [
+    `html,body{margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
+    `.softora-webdesign-email-body{-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
+    `@media only screen and (max-width:${MOBILE_BREAKPOINT_PX}px), only screen and (max-device-width:${MOBILE_BREAKPOINT_PX}px){`,
+    `.softora-webdesign-email-body,.softora-webdesign-email-body p,.softora-webdesign-email-body a{font-size:15px!important;line-height:1.65!important;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
+    `.softora-desktop-image-pair,.softora-desktop-image-pair tr,.softora-desktop-image-pair td,.softora-desktop-image-pair img{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important;width:0!important;max-width:0!important;line-height:0!important;font-size:0!important}`,
+    `.softora-mobile-image-pair{display:block!important;max-height:none!important;overflow:visible!important;width:100%!important;max-width:100%!important;font-size:0!important;line-height:0!important}`,
+    `.softora-mobile-image-pair table,.softora-mobile-image-pair tbody,.softora-mobile-image-pair tr,.softora-mobile-image-pair td{display:block!important;width:100%!important;max-width:100%!important}`,
+    `.softora-mobile-image-pair img{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important}`,
+    `.softora-mobile-mockup-caption{display:block!important;margin:18px 0 12px 0!important;font-size:14px!important;line-height:1.4!important;color:#111827!important;font-weight:700!important}`,
+    `}`,
+  ].join('');
+}
+
+function renderWebdesignEmailDocument(content) {
+  return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><style type="text/css">${renderWebdesignEmailHeadStyles()}</style></head><body style="margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${String(
+    content || ''
+  )}</body></html>`;
+}
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -76,18 +97,7 @@ function renderResponsiveImagePair(mainImage, mockupImage, options = {}) {
   const caption = normalizeString(options.caption) || WEBDESIGN_EMAIL_MOCKUP_CAPTION;
   const pairWidth = DESKTOP_WEBDESIGN_WIDTH + DESKTOP_MOCKUP_WIDTH + DESKTOP_GAP_WIDTH;
   const margin = normalizeString(options.margin) || '24px 0 0 0';
-  const mobileCss = [
-    `@media only screen and (max-width:${MOBILE_BREAKPOINT_PX}px), only screen and (max-device-width:${MOBILE_BREAKPOINT_PX}px){`,
-    `.softora-webdesign-email-body,.softora-webdesign-email-body p,.softora-webdesign-email-body a{font-size:15px!important;line-height:1.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
-    `.softora-desktop-image-pair,.softora-desktop-image-pair tr,.softora-desktop-image-pair td,.softora-desktop-image-pair img{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important;width:0!important;max-width:0!important;line-height:0!important;font-size:0!important}`,
-    `.softora-mobile-image-pair{display:block!important;max-height:none!important;overflow:visible!important;width:100%!important;max-width:100%!important;font-size:0!important;line-height:0!important}`,
-    `.softora-mobile-image-pair table,.softora-mobile-image-pair tbody,.softora-mobile-image-pair tr,.softora-mobile-image-pair td{display:block!important;width:100%!important;max-width:100%!important}`,
-    `.softora-mobile-image-pair img{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important}`,
-    `.softora-mobile-mockup-caption{display:block!important;margin:18px 0 12px 0!important;font-size:14px!important;line-height:1.4!important;color:#111827!important;font-weight:700!important}`,
-    `}`,
-  ].join('');
-
-  return `\n<!-- ${WEBDESIGN_EMAIL_TEMPLATE_VERSION} --><style>${mobileCss}</style><table class="softora-desktop-image-pair" role="presentation" width="${pairWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${pairWidth}px;max-width:100%;margin:${margin};"><tr><td width="${DESKTOP_WEBDESIGN_WIDTH}" valign="top" style="padding:0;margin:0;width:${DESKTOP_WEBDESIGN_WIDTH}px;max-width:${DESKTOP_WEBDESIGN_WIDTH}px;font-size:0;line-height:0;overflow:hidden;vertical-align:top;">${desktopMainHtml}</td><td width="${DESKTOP_GAP_WIDTH}" style="padding:0;margin:0;width:${DESKTOP_GAP_WIDTH}px;min-width:${DESKTOP_GAP_WIDTH}px;font-size:0;line-height:0;">&nbsp;</td><td width="${DESKTOP_MOCKUP_WIDTH}" valign="top" style="padding:0;margin:0;width:${DESKTOP_MOCKUP_WIDTH}px;max-width:${DESKTOP_MOCKUP_WIDTH}px;font-size:0;line-height:0;overflow:hidden;vertical-align:top;">${desktopMockupHtml}</td></tr></table><div class="softora-mobile-image-pair" style="display:none;max-height:0;overflow:hidden;mso-hide:all;margin:${margin};padding:0;width:100%;max-width:100%;font-size:0;line-height:0;">${mobileMainHtml}<p class="softora-mobile-mockup-caption" style="display:block;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(
+  return `\n<!-- ${WEBDESIGN_EMAIL_TEMPLATE_VERSION} --><table class="softora-desktop-image-pair" role="presentation" width="${pairWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${pairWidth}px;max-width:100%;margin:${margin};"><tr><td width="${DESKTOP_WEBDESIGN_WIDTH}" valign="top" style="padding:0;margin:0;width:${DESKTOP_WEBDESIGN_WIDTH}px;max-width:${DESKTOP_WEBDESIGN_WIDTH}px;font-size:0;line-height:0;overflow:hidden;vertical-align:top;">${desktopMainHtml}</td><td width="${DESKTOP_GAP_WIDTH}" style="padding:0;margin:0;width:${DESKTOP_GAP_WIDTH}px;min-width:${DESKTOP_GAP_WIDTH}px;font-size:0;line-height:0;">&nbsp;</td><td width="${DESKTOP_MOCKUP_WIDTH}" valign="top" style="padding:0;margin:0;width:${DESKTOP_MOCKUP_WIDTH}px;max-width:${DESKTOP_MOCKUP_WIDTH}px;font-size:0;line-height:0;overflow:hidden;vertical-align:top;">${desktopMockupHtml}</td></tr></table><div class="softora-mobile-image-pair" style="display:none;max-height:0;overflow:hidden;mso-hide:all;margin:${margin};padding:0;width:100%;max-width:100%;font-size:0;line-height:0;">${mobileMainHtml}<p class="softora-mobile-mockup-caption" style="display:block;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;">${escapeHtml(
     caption
   )}</p>${mobileMockupHtml}</div>`;
 }
@@ -102,6 +112,8 @@ function renderWebdesignImageSection(mainImage, options = {}) {
 module.exports = {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignEmailDocument,
+  renderWebdesignEmailHeadStyles,
   renderResponsiveImagePair,
   renderSingleImage,
   renderWebdesignImageSection,

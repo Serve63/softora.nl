@@ -127,15 +127,17 @@ const COLDMAIL_MOCKUP_CAPTION_TEXT =
 
 function assertWebdesignImagePairLayout(html, options = {}) {
   const value = String(html || '');
-  assert.match(value, /softora-webdesign-email-2026-07-10-v1/);
+  assert.match(value, /softora-webdesign-email-2026-07-10-v2/);
+  assert.match(value, /^<!doctype html><html lang="nl"><head>/);
+  assert.match(value, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
   assert.match(value, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
   assert.match(
     value,
-    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-10-v1" style="font-family:Arial,sans-serif;font-size:15px;line-height:1\.65;color:#1a1a2e;max-width:600px;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;"/
+    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-10-v2" style="font-family:Arial,sans-serif;font-size:15px;line-height:1\.65;color:#1a1a2e;max-width:600px;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;"/
   );
   assert.match(
     value,
-    /\.softora-webdesign-email-body,\.softora-webdesign-email-body p,\.softora-webdesign-email-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
+    /\.softora-webdesign-email-body,\.softora-webdesign-email-body p,\.softora-webdesign-email-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
   );
   assert.match(
     value,
@@ -5112,7 +5114,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.equal(sentMessages.length, 1);
   assert.equal(
     sentMessages[0].headers['X-Softora-Template-Version'],
-    'softora-webdesign-email-2026-07-10-v1'
+    'softora-webdesign-email-2026-07-10-v2'
   );
   assert.match(sentMessages[0].text, /Servé Creusen/);
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
