@@ -41,7 +41,7 @@ function readActiveOrdersSources() {
     editDataScriptSource,
     openLeadsScriptSource,
     manualLeadsScriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${editDataScriptSource}\n${openLeadsScriptSource}\n${manualLeadsScriptSource}\n${assignmentPagesScriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${editDataScriptSource}\n${assignmentPagesScriptSource}`,
   };
 }
 
@@ -69,24 +69,14 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle \{[\s\S]*border:\s*1px solid rgba\(139, 34, 82, 0\.2\);[\s\S]*background:\s*rgba\(255, 255, 255, 0\.78\);/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\] \{[\s\S]*border:\s*1\.5px solid rgba\(139, 34, 82, 0\.36\);[\s\S]*background:\s*#fff;/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\]::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;[\s\S]*transform:\s*rotate\(45deg\) scale\(0\);/);
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260502a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260629a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-active-order-open-leads\.js\?v=20260518a"><\/script><script src="assets\/premium-active-order-manual-open-leads\.js\?v=20260519a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
-  assert.match(pageSource, /assets\/premium-active-order-open-leads\.js\?v=20260518a/);
-  assert.match(pageSource, /assets\/premium-active-order-manual-open-leads\.js\?v=20260519a/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
+  assert.doesNotMatch(pageSource, /assets\/premium-active-order-open-leads\.js/);
+  assert.doesNotMatch(pageSource, /assets\/premium-active-order-manual-open-leads\.js/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
   const createButtonHtml = pageSource.match(/<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?<\/button>/)?.[0] || '';
   assert.doesNotMatch(createButtonHtml, /<svg\b/);
   assert.doesNotMatch(createButtonHtml, /Aanmaken[\s\S]*Aanmaken/);
-  assert.match(manualLeadsScriptSource, /button\.replaceChildren\(document\.createTextNode\('Aanmaken'\)\);/);
-  assert.doesNotMatch(createButtonHtml, /Actieve Opdracht Aanmaken/);
-  assert.match(manualLeadsScriptSource, /overlay\.id = 'createChoiceModal';/);
-  assert.match(manualLeadsScriptSource, /'createOpenLeadChoiceBtn'/);
-  assert.match(manualLeadsScriptSource, /'createActiveOrderChoiceBtn'/);
-  assert.match(manualLeadsScriptSource, /overlay\.id = 'createOpenLeadModal';/);
-  assert.match(manualLeadsScriptSource, /form\.id = 'createOpenLeadForm';/);
-  assert.match(manualLeadsScriptSource, /Openstaande Lead Aanmaken/);
-  assert.match(manualLeadsScriptSource, /name: 'productLine', required: true/);
-  assert.match(manualLeadsScriptSource, /name: 'leadOwnerName'/);
-  assert.match(manualLeadsScriptSource, /Lead Aanmaken/);
+  assert.match(scriptSource, /document\.getElementById\('createOrderBtn'\)\?\.addEventListener\('click', openCreateOrderModal\);/);
   assert.doesNotMatch(pageSource, /const PREVIEW_HTML_PREFIX = /);
   assert.doesNotMatch(pageSource, /function normalizeOrderStatus\(value\) \{/);
   assert.doesNotMatch(pageSource, /function applyOrderUiStateToCard\(id\) \{/);
@@ -123,31 +113,13 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(scriptSource, /function loadCustomOrderCards\(\) \{/);
   assert.match(scriptSource, /function setCreateOrderMessage\(message, type\) \{/);
   assert.match(scriptSource, /function normalizeAgendaLeadOption\(item\) \{/);
-  assert.match(source, /function normalizeOpenLeadOption\(item\) \{/);
-  assert.match(source, /function isOpenLeadFollowUpTask\(item\) \{/);
-  assert.match(source, /function renderOpenLeadCards\(\) \{/);
-  assert.match(source, /function openOpenLeadActionModal\(lead\) \{/);
-  assert.match(source, /function submitOpenLeadConversion\(event\) \{/);
-  assert.match(source, /Uit systeem halen/);
-  assert.match(source, /Verplaatsen naar actieve opdrachten/);
-  assert.match(source, /Opname toevoegen/);
-  assert.match(source, /function revealConvertedOpenLeadOrder\(order\) \{/);
-  assert.match(source, /window\.appendCustomOrderCard/);
   assert.doesNotMatch(source, /sessionStorage/);
-  assert.match(source, /\/api\/agenda\/confirmation-tasks\/\$\{encodeURIComponent\(String\(lead\.id\)\)\}\/mark-cancelled/);
-  assert.match(source, /\/api\/agenda\/appointments\/\$\{encodeURIComponent\(String\(lead\.id\)\)\}\/add-active-order/);
-  assert.match(source, /status: 'actieve_opdracht'/);
-  assert.match(source, /\/api\/agenda\/confirmation-tasks\?limit=250&quick=1&fresh=1/);
-  assert.match(source, /data-order-filter="open_leads"/);
-  assert.match(source, /id="filterCountOpenLeads"/);
-  assert.match(source, /let activeOrderFilter = 'open_leads';/);
+  assert.doesNotMatch(source, /data-order-filter="open_leads"/);
+  assert.doesNotMatch(scriptSource, /SoftoraActiveOrderOpenLeads/);
+  assert.match(scriptSource, /let activeOrderFilter = 'in_progress';/);
   assert.match(scriptSource, /function syncOrderClaimsFromAgendaOwners\(\) \{/);
   assert.match(scriptSource, /const explicitGroup = String\(card\?\.dataset\?\.orderFilterGroup \|\| ''\)\.trim\(\)\.toLowerCase\(\);/);
   assert.match(scriptSource, /function renderCreateOrderAgendaLeadOptions\(selectedId\) \{/);
-  assert.match(manualLeadsScriptSource, /function openChoiceModal\(\) \{/);
-  assert.match(manualLeadsScriptSource, /function openCreateModal\(\) \{/);
-  assert.match(manualLeadsScriptSource, /button\.addEventListener\('click', \(event\) => \{/);
-  assert.match(manualLeadsScriptSource, /window\.SoftoraManualOpenLeads = \{/);
   assert.match(scriptSource, /function handleCreateOrderSubmit\(event\) \{/);
   assert.match(scriptSource, /function selectActiveOrderId\(explicitId\) \{/);
   assert.match(scriptSource, /function openOrderDossier\(id, options = \{\}\) \{/);
@@ -253,24 +225,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(customerDbScriptSource, /patch: buildStatePatch\(customerDbKey, serialized\),/);
   assert.match(customerDbScriptSource, /const currentOrders = Array\.isArray\(getCustomOrders\(\)\) \? getCustomOrders\(\) : \[\];/);
   assert.match(source, /let customerCleanupError = null;[\s\S]*await syncCustomerDatabaseAfterOrderRemoval\(record\);[\s\S]*customerCleanupError = error;[\s\S]*refreshOrderSummaryCards\(\);[\s\S]*closeModal\(\);[\s\S]*if \(customerCleanupError\) \{[\s\S]*Project is verwijderd\. Het gekoppelde klantrecord kon niet automatisch worden opgeschoond\./);
-  assert.match(openLeadsScriptSource, /function normalizeOpenLeadOption\(item\) \{/);
-  assert.match(manualLeadsScriptSource, /const MANUAL_KEY = 'softora_manual_open_leads_v1';/);
-  assert.match(manualLeadsScriptSource, /function normalizeRecord\(item\) \{/);
-  assert.match(manualLeadsScriptSource, /async function saveRecords\(records\) \{/);
-  assert.match(manualLeadsScriptSource, /async function handleCreateSubmit\(event\) \{/);
-  assert.match(openLeadsScriptSource, /lead\.isManualOpenLead && typeof window\.SoftoraManualOpenLeads\?\.remove === 'function'/);
-  assert.match(openLeadsScriptSource, /window\.SoftoraManualOpenLeads\.convertToOrder\(lead, \{/);
-  assert.match(manualLeadsScriptSource, /openCreateModal,/);
-  assert.match(openLeadsScriptSource, /function resolveOpenLeadProductLine\(item\) \{/);
-  assert.match(openLeadsScriptSource, /function createOpenLeadCardElement\(lead\) \{/);
-  assert.match(openLeadsScriptSource, /card\.dataset\.orderFilterGroup = 'open_leads';/);
-  assert.match(openLeadsScriptSource, /function getOpenLeadLineColor\(productLine\) \{/);
-  assert.match(openLeadsScriptSource, /if \(productLine === 'business'\) return '#3498db';/);
-  assert.match(openLeadsScriptSource, /if \(productLine === 'voice'\) return '#f39c12';/);
-  assert.match(openLeadsScriptSource, /return '#A62D65';/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-orders-leads-tab\.js/);
-  assert.doesNotMatch(openLeadsScriptSource, /href = '\/premium-leads';/);
-  assert.match(scriptSource, /open_leads: 'Geen openstaande leads\.'/);
   assert.match(scriptSource, /document\.querySelector\('\.orders-filter-bar'\)\?\.addEventListener\('click', \(e\) => \{[\s\S]*const btn = e\.target\.closest\('\[data-order-filter\]'\);[\s\S]*setOrderFilter\(btn\.getAttribute\('data-order-filter'\)\);/);
   assert.match(source, /const FILTER_STORAGE_PREFIX = 'softora_only_my_assignments_v1';/);
   assert.match(source, /const FILTER_SCOPE = 'premium_assignment_filters';/);
@@ -286,10 +241,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /function syncCreateOrderAgendaOptions\(\) \{/);
   assert.match(source, /filterApi\.subscribe\(syncState\);/);
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./);
-  assert.match(openLeadsScriptSource, /window\.SoftoraActiveOrderOpenLeads = \{ load: loadOpenLeadCards, normalizeOpenLeadOption, resolveOpenLeadProductLine \};/);
-  assert.match(manualLeadsScriptSource, /window\.SoftoraManualOpenLeads = \{[\s\S]*getOptions,[\s\S]*remove: removeManualLead,[\s\S]*convertToOrder,[\s\S]*openCreateModal,[\s\S]*closeCreateModal[\s\S]*\};/);
-  assert.match(openLeadsScriptSource, /window\.setTimeout\(\(\) => \{ void loadOpenLeadCards\(true\); \}, 450\);/);
-  assert.match(scriptSource, /window\.SoftoraActiveOrderOpenLeads\?\.load\?\.\(true\)/);
+  assert.doesNotMatch(scriptSource, /void fetchAgendaLeadOptions\(\)\.then/);
   assert.doesNotMatch(source, /SoftoraActiveOrdersLeadTab/);
 });
 
@@ -297,7 +249,7 @@ test('premium actieve opdrachten start snel met server-bootstrap en korte boot-l
   const { bootScriptSource, scriptSource } = readActiveOrdersSources();
 
   assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';/);
-  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 1000;/);
+  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 550;/);
   assert.match(bootScriptSource, /function readChunkedStateValue\(values, baseKey\) \{/);
   assert.match(bootScriptSource, /function hydrateRemoteUiStateFromBootstrap\(currentCache, setCache\) \{/);
   assert.match(bootScriptSource, /root\.SoftoraPremiumBoot\.setShellBooting\(false\)/);

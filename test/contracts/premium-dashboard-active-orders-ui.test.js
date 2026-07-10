@@ -6,6 +6,11 @@ const path = require('path');
 test('premium dashboard leest actieve opdrachten uit chunked Supabase state', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const loadOrdersSource = pageSource.slice(
+    pageSource.indexOf('async function loadPremiumDashboardOrders()'),
+    pageSource.indexOf('async function loadPremiumDashboardCustomers()')
+  );
+  const validationLine = loadOrdersSource.split('\n').find((line) => line.includes('Geen Supabase-opdrachtdata')) || '';
 
   assert.match(
     pageSource,
@@ -15,10 +20,8 @@ test('premium dashboard leest actieve opdrachten uit chunked Supabase state', ()
     pageSource,
     /readPremiumDashboardChunkedStateValue\(safeValues, PREMIUM_ACTIVE_RUNTIME_KEY\)/
   );
-  assert.match(
-    pageSource,
-    /getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY\)[\s\S]*getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_RUNTIME_KEY\)/
-  );
+  assert.match(validationLine, /getPremiumDashboardChunkMetaKey\(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY\)/);
+  assert.doesNotMatch(validationLine, /PREMIUM_ACTIVE_RUNTIME_KEY/);
   assert.match(pageSource, /safeValues\[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY\]/);
   assert.match(pageSource, /safeValues\[PREMIUM_ACTIVE_RUNTIME_KEY\]/);
   assert.match(pageSource, /const amount = Math\.round\(Number\(item\?\.amount\)\);/);

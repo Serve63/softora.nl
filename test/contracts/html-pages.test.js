@@ -373,7 +373,9 @@ test('html page coordinator serves login pages without seo config or bootstrap r
   assert.match(res.body, /Inloggen/);
 });
 
-test('html page coordinator timeboxes protected premium bootstrap reads without late error logs', async () => {
+test('html page coordinator caps dashboard bootstrap reads without late error logs', async () => {
+  const coordinatorSource = fs.readFileSync(path.join(__dirname, '../../server/services/html-pages.js'), 'utf8');
+  assert.match(coordinatorSource, /dashboardPageBootstrapWaitMs = 1500/);
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-protected-timeout-'));
   const loggerInfos = [];
   const loggerErrors = [];
@@ -392,7 +394,8 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
 
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
-    protectedPageBootstrapWaitMs: 5,
+    protectedPageBootstrapWaitMs: 2000,
+    dashboardPageBootstrapWaitMs: 250,
     logger: {
       info: (...args) => loggerInfos.push(args),
       error: (...args) => loggerErrors.push(args),
@@ -415,11 +418,12 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
     applySeoOverridesToHtml: (_fileName, html) => html,
     getPageBootstrapData: async () =>
       new Promise((_resolve, reject) => {
-        setTimeout(() => reject(new Error('late bootstrap failure')), 20);
+        setTimeout(() => reject(new Error('late bootstrap failure')), 300);
       }),
   });
 
   const res = createResponseRecorder();
+  const startedAt = Date.now();
 
   await coordinator.sendSeoManagedHtmlPageResponse(
     { originalUrl: '/premium-personeel-dashboard' },
@@ -427,9 +431,11 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
     () => {},
     'premium-personeel-dashboard.html'
   );
-  await new Promise((resolve) => setTimeout(resolve, 35));
+  const elapsedMs = Date.now() - startedAt;
+  await new Promise((resolve) => setTimeout(resolve, 75));
 
   assert.equal(res.statusCode, 200);
+  assert.ok(elapsedMs < 700, `dashboard bootstrap duurde ${elapsedMs}ms`);
   assert.match(res.body, /Dashboard/);
   assert.match(res.body, /id="kpiRevenueYear">--<\/div>/);
   assert.match(res.body, /id="kpiRecurringRevenue">--<\/div>/);

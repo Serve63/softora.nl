@@ -157,7 +157,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /function warmSidebarNavigationTarget\(url\) \{/);
   assert.match(themeJsSource, /link\.rel = "prefetch";/);
   assert.match(themeJsSource, /link\.setAttribute\("data-sidebar-prefetch", "1"\);/);
-  assert.match(themeJsSource, /function warmVisibleSidebarNavigationTargets\(\) \{/);
+  assert.doesNotMatch(themeJsSource, /warmVisibleSidebarNavigationTargets/);
+  assert.doesNotMatch(themeJsSource, /requestIdleCallback\(run, \{ timeout: 1800 \}\)/);
+  assert.match(themeJsSource, /anchor\.addEventListener\("pointerenter", function \(\) \{\s*warmSidebarNavigationTarget\(anchor\.dataset\.sidebarHref\);/s);
+  assert.match(themeJsSource, /anchor\.addEventListener\("focus", function \(\) \{\s*warmSidebarNavigationTarget\(anchor\.dataset\.sidebarHref\);/s);
   assert.match(stabilityJsSource, /NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1"/);
   assert.match(stabilityJsSource, /CONTENT_FRAME_PARAM = "softora_sidebar_content"/);
   assert.match(stabilityJsSource, /CONTENT_FRAME_ID = "softoraPremiumContentFrame"/);
@@ -293,7 +296,8 @@ test('premium dashboard keeps its first-paint boot overlay in the shell contract
   assert.match(pageSource, /softora-dossier-loader__orbit--outer/);
   assert.doesNotMatch(pageSource, /@keyframes softora-dashboard-boot-spin/);
   assert.match(pageSource, /data-dashboard-boot-loader="true"/);
-  assert.match(pageSource, /releasePremiumDashboardBootShellAfterMinimum\(bootStartedAt, 1000\);/);
+  assert.match(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/s);
+  assert.doesNotMatch(pageSource, /await refreshPremiumDashboard\(true\)/);
   assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 1000;/);
   assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);
   assert.match(coreSource, /getElementById\('dashboardHardBootLoader'\)/);

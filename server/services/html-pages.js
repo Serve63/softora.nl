@@ -134,6 +134,7 @@ function createHtmlPageCoordinator(options = {}) {
     getPageBootstrapData = async () => null,
     publicPageDependencyWaitMs = 350,
     protectedPageBootstrapWaitMs = 5500,
+    dashboardPageBootstrapWaitMs = 1500,
     isProduction = process.env.NODE_ENV === 'production',
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;
@@ -142,8 +143,11 @@ function createHtmlPageCoordinator(options = {}) {
     return Math.max(0, Math.min(10000, Number(publicPageDependencyWaitMs) || 0));
   }
 
-  function getSafeProtectedPageBootstrapWaitMs() {
-    return Math.max(0, Math.min(10000, Number(protectedPageBootstrapWaitMs) || 0));
+  function getSafeProtectedPageBootstrapWaitMs(fileName = '') {
+    const protectedWaitMs = Math.max(0, Math.min(10000, Number(protectedPageBootstrapWaitMs) || 0));
+    if (fileName !== 'premium-personeel-dashboard.html') return protectedWaitMs;
+    const dashboardWaitMs = Math.max(250, Math.min(2500, Number(dashboardPageBootstrapWaitMs) || 1500));
+    return Math.min(protectedWaitMs, dashboardWaitMs);
   }
 
   function escapeHtml(value) {
@@ -561,7 +565,7 @@ function createHtmlPageCoordinator(options = {}) {
       try {
         const shouldLoadBootstrapData = !isLoginPage;
         const bootstrapTimeoutMs =
-          publicDependencyWaitMs || (isProtectedPremiumPage ? getSafeProtectedPageBootstrapWaitMs() : 0);
+          publicDependencyWaitMs || (isProtectedPremiumPage ? getSafeProtectedPageBootstrapWaitMs(fileName) : 0);
         const bootstrapData = shouldLoadBootstrapData
           ? bootstrapTimeoutMs > 0
             ? await resolveWithSoftTimeout(() => getPageBootstrapData(req, fileName), {

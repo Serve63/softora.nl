@@ -2084,7 +2084,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260701a"></script><script src="assets/premium-dashboard-data-status.js?v=20260604d"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260710a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2092,8 +2092,6 @@
         const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
         const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
         const PREMIUM_ACTIVE_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
-        const PREMIUM_CUSTOMERS_SCOPE = 'premium_customers_database';
-        const PREMIUM_CUSTOMERS_KEY = 'softora_customers_premium_v1';
         const MONTH_LABELS_SHORT = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
         const MONTH_LABELS_LONG = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
         const premiumDashboardState = {
@@ -2157,7 +2155,7 @@
             ? window.SoftoraAiManagement.getMode()
             : document.documentElement.getAttribute('data-ai-management-mode');
         let aiManagementMode = initialAiManagementMode === 'software' ? 'software' : 'personnel';
-        let aiManagementConfig = normalizeAiManagementConfig(null);
+        let aiManagementConfig;
         const AI_MANAGEMENT_STATUS = {
             software: {
                 tone: 'red',
@@ -2175,12 +2173,12 @@
             normalizeDashboardTime,
             normalizeDashboardDate,
             getPremiumDashboardChunkMetaKey,
-            getPremiumDashboardChunkPrefix,
             readPremiumDashboardChunkedStateValue,
             formatMoneyEUR,
-            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShellAfterMinimum, readDashboardCustomersBootstrapPayload, hydratePremiumDashboardCustomersFromBootstrap, startPremiumDashboardBootWatchdog
+            formatProjectMeta, fetchPremiumDashboardJson, releasePremiumDashboardBootShell, readDashboardCustomersBootstrapPayload, hydratePremiumDashboardCustomersFromBootstrap, startPremiumDashboardBootWatchdog
         } = dashboardCore;
         const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload(); startPremiumDashboardBootWatchdog();
+        aiManagementConfig = normalizeAiManagementConfig(null);
 
         function normalizeDashboardPeriodFilter(value) {
             return value === 'month' || value === 'quarter' || value === 'year' ? value : 'all';
@@ -2762,12 +2760,14 @@
                     .map((item, index) => {
                         const legacyAmount = Number(item && item.bedrag);
                         const type = normalizeDashboardString(item && item.type) || 'Website';
-                        const websiteBedrag = Number.isFinite(Number(item && item.websiteBedrag))
+                        const hasWebsiteBedrag = item && item.websiteBedrag !== null && item.websiteBedrag !== undefined && item.websiteBedrag !== '';
+                        const hasOnderhoudPerMaand = item && item.onderhoudPerMaand !== null && item.onderhoudPerMaand !== undefined && item.onderhoudPerMaand !== '';
+                        const websiteBedrag = hasWebsiteBedrag && Number.isFinite(Number(item.websiteBedrag))
                             ? Math.max(0, Math.round(Number(item && item.websiteBedrag)))
                             : ((type === 'Website' || type === 'Website + onderhoud') && Number.isFinite(legacyAmount) && legacyAmount >= 0
                                 ? Math.round(legacyAmount)
                                 : null);
-                        const onderhoudPerMaand = Number.isFinite(Number(item && item.onderhoudPerMaand))
+                        const onderhoudPerMaand = hasOnderhoudPerMaand && Number.isFinite(Number(item.onderhoudPerMaand))
                             ? Math.max(0, Math.round(Number(item && item.onderhoudPerMaand)))
                             : (type === 'Onderhoud' && Number.isFinite(legacyAmount) && legacyAmount >= 0
                                 ? Math.round(legacyAmount)
@@ -2955,7 +2955,7 @@
         function renderPremiumDashboardOrders() {
             const orders = Array.isArray(premiumDashboardState.orders) ? premiumDashboardState.orders : [];
             const customers = Array.isArray(premiumDashboardState.customers) ? premiumDashboardState.customers : [];
-            if (!orders.length && !customers.length) { if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); return; }
+            if (!premiumDashboardState.customersHydrated) { showPremiumDashboardUnavailable(); return; }
             if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.clear();
             const currentYear = now.getFullYear(); const currentMonth = now.getMonth();
             const quarterStartMonth = getCurrentQuarterStartMonth(currentMonth); const quarterEndMonth = quarterStartMonth + 2;
@@ -2963,8 +2963,6 @@
             const rollingMonthRevenue = new Map();
             const paidOrders = orders.filter((order) => order?.ui?.isPaid);
             const activeOrders = orders.filter((order) => !order?.ui?.isBuilt);
-            const uniqueClients = new Set();
-            const hasCustomerDatabase = customers.length > 0;
             const revenueBreakdown = {
                 month: {
                     website: 0,
@@ -2988,13 +2986,7 @@
                 }
             };
 
-            orders.forEach((order) => {
-                const clientKey = String(order?.clientName || '').trim().toLowerCase();
-                if (clientKey) uniqueClients.add(clientKey);
-            });
-
-            if (hasCustomerDatabase) {
-                customers.forEach((customer) => {
+            customers.forEach((customer) => {
                     if (customer?.status !== 'Betaald') return;
                     const paidAt = typeof dashboardCore.getCustomerRevenueDate === 'function'
                         ? dashboardCore.getCustomerRevenueDate(customer, paidOrders, now)
@@ -3052,27 +3044,6 @@
                         }
                     }
                 });
-            } else {
-                paidOrders.forEach((order) => {
-                    const paidAt = getEffectiveRevenueDate(order?.ui?.paidAt);
-                    if (!paidAt || Number.isNaN(paidAt.getTime())) return;
-                    const amount = Number(order?.amount) || 0;
-                    const paidYear = paidAt.getFullYear();
-                    revenueBreakdown.all.website += amount;
-                    addRevenueToMonthMap(rollingMonthRevenue, paidAt, amount);
-
-                    if (paidYear === currentYear) {
-                        revenueBreakdown.year.website += amount;
-                        revenueByMonth[paidAt.getMonth()] += amount;
-                        if (paidAt.getMonth() === currentMonth) {
-                            revenueBreakdown.month.website += amount;
-                        }
-                        if (paidAt.getMonth() >= quarterStartMonth && paidAt.getMonth() <= quarterEndMonth) {
-                            revenueBreakdown.quarter.website += amount;
-                        }
-                    }
-                });
-            }
 
             revenueBreakdown.month.total = revenueBreakdown.month.website + revenueBreakdown.month.maintenance;
             revenueBreakdown.year.total = revenueBreakdown.year.website + revenueBreakdown.year.maintenance;
@@ -3089,8 +3060,8 @@
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(selectedRevenue.total);
             const recurringRevenueEl = document.getElementById('kpiRecurringRevenue'); if (recurringRevenueEl) recurringRevenueEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
-            if (totalClientsEl) totalClientsEl.textContent = String(hasCustomerDatabase ? customers.length : uniqueClients.size);
-            updateKpiActiveOrdersDisplay(activeOrders);
+            if (totalClientsEl) totalClientsEl.textContent = String(customers.length);
+            if (premiumDashboardState.ordersHydrated) updateKpiActiveOrdersDisplay(activeOrders);
 
             const periodPresentation = getDashboardPeriodPresentation(currentYear, currentMonth);
             const revenueTitleEl = document.getElementById('revenuePanelTitle');
@@ -3120,15 +3091,16 @@
 
         }
 
-        function clearPremiumDashboardRecoveryTimer() { if (premiumDashboardState.recoveryTimer) { window.clearTimeout(premiumDashboardState.recoveryTimer); premiumDashboardState.recoveryTimer = null; } premiumDashboardState.recoveryAttempts = 0; } function schedulePremiumDashboardRecovery() { if (premiumDashboardState.recoveryTimer || premiumDashboardState.recoveryAttempts >= 4) return; const delays = [1500, 4000, 9000, 15000]; const delay = delays[premiumDashboardState.recoveryAttempts] || 15000; premiumDashboardState.recoveryAttempts += 1; premiumDashboardState.recoveryTimer = window.setTimeout(() => { premiumDashboardState.recoveryTimer = null; void refreshPremiumDashboard(true); }, delay); }
-
+        function renderPremiumDashboardPending() { if (premiumDashboardState.ordersHydrated) updateKpiActiveOrdersDisplay(premiumDashboardState.orders.filter((order) => !order?.ui?.isBuilt)); }
+        function showPremiumDashboardUnavailable() { const hasOrders = premiumDashboardState.ordersHydrated === true; if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable({ preserveActiveOrders: hasOrders }); renderPremiumDashboardPending(); }
+        function clearPremiumDashboardRecoveryTimer() { if (premiumDashboardState.recoveryTimer) { window.clearTimeout(premiumDashboardState.recoveryTimer); premiumDashboardState.recoveryTimer = null; } premiumDashboardState.recoveryAttempts = 0; } function schedulePremiumDashboardRecovery() { if (premiumDashboardState.recoveryTimer || premiumDashboardState.recoveryAttempts >= 4) return; const delays = [1500, 4000, 9000, 15000]; const delay = delays[premiumDashboardState.recoveryAttempts] || 15000; premiumDashboardState.recoveryAttempts += 1; premiumDashboardState.recoveryTimer = window.setTimeout(() => { premiumDashboardState.recoveryTimer = null; void refreshPremiumDashboard(true, true); }, delay); }
         async function loadPremiumDashboardOrders() {
             if (premiumDashboardState.loading) return false;
             premiumDashboardState.loading = true;
             try {
                 const data = await fetchPremiumUiState(PREMIUM_ACTIVE_ORDERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
-                if (!Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY)) && !Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_RUNTIME_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_ACTIVE_RUNTIME_KEY))) throw new Error('Geen Supabase-opdrachtdata ontvangen.');
+                if (!Object.prototype.hasOwnProperty.call(values, PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY))) throw new Error('Geen Supabase-opdrachtdata ontvangen.');
                 premiumDashboardState.orders = parsePremiumOrdersFromState(values); premiumDashboardState.ordersHydrated = true;
                 return true;
             } catch (_) {
@@ -3140,12 +3112,10 @@
 
         async function loadPremiumDashboardCustomers() {
             try {
-                const data = await fetchPremiumUiState(PREMIUM_CUSTOMERS_SCOPE);
-                const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
-                const rawCustomers = readPremiumDashboardChunkedStateValue(values, PREMIUM_CUSTOMERS_KEY);
-                if (!rawCustomers && !Object.prototype.hasOwnProperty.call(values, PREMIUM_CUSTOMERS_KEY) && !Object.prototype.hasOwnProperty.call(values, getPremiumDashboardChunkMetaKey(PREMIUM_CUSTOMERS_KEY))) throw new Error('Geen Supabase-klantdata ontvangen.');
-                const customers = parsePremiumCustomers(rawCustomers);
-                if (customers.length) premiumDashboardState.customers = customers;
+                const response = await fetchPremiumDashboardJson('/api/dashboard/customers', { method: 'GET', cache: 'no-store' }, 2500);
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data?.ok !== true || !Array.isArray(data.customers)) throw new Error('Geen formele dashboardklanten ontvangen.');
+                premiumDashboardState.customers = parsePremiumCustomers(data.customers);
                 premiumDashboardState.customersHydrated = true;
                 return true;
             } catch (_) {
@@ -3153,7 +3123,7 @@
             }
         }
 
-        function refreshPremiumDashboard(force = false) {
+        function refreshPremiumDashboard(force = false, onlyMissing = false) {
             const nowTs = Date.now();
             if (premiumDashboardState.refreshPromise) return premiumDashboardState.refreshPromise;
             if (!force && premiumDashboardState.lastRefreshAt && (nowTs - premiumDashboardState.lastRefreshAt) < 1200) {
@@ -3161,9 +3131,14 @@
             }
 
             premiumDashboardState.refreshPromise = (async () => {
-                await Promise.all([loadPremiumDashboardCustomers(), loadPremiumDashboardOrders()]);
-                const loaded = premiumDashboardState.orders.length > 0 || premiumDashboardState.customers.length > 0;
-                if (loaded) { clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); } else { if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable(); schedulePremiumDashboardRecovery(); }
+                const shouldLoadCustomers = !onlyMissing || !premiumDashboardState.customersHydrated;
+                const shouldLoadOrders = !onlyMissing || !premiumDashboardState.ordersHydrated;
+                const ordersPromise = shouldLoadOrders ? loadPremiumDashboardOrders() : Promise.resolve(false);
+                void ordersPromise.then((ordersLoaded) => { if (!ordersLoaded) { if (!premiumDashboardState.ordersHydrated) schedulePremiumDashboardRecovery(); return; } if (premiumDashboardState.customersHydrated) { clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); } else renderPremiumDashboardPending(); });
+                const customersLoaded = shouldLoadCustomers ? await loadPremiumDashboardCustomers() : false;
+                const loaded = customersLoaded || premiumDashboardState.customersHydrated;
+                if (loaded) { if (premiumDashboardState.ordersHydrated || !shouldLoadOrders) clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); }
+                else { showPremiumDashboardUnavailable(); schedulePremiumDashboardRecovery(); }
                 premiumDashboardState.lastRefreshAt = Date.now();
                 return loaded;
             })().finally(() => {
@@ -3539,14 +3514,13 @@
             }
         }
 
-        const hadPremiumDashboardBootstrapData = [hydratePremiumDashboardCustomersFromBootstrap(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload), typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap === 'function' && dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(premiumDashboardState, parsePremiumOrdersFromState, dashboardCustomersBootstrapPayload)].some(Boolean);
+        const hadPremiumDashboardCustomers = hydratePremiumDashboardCustomersFromBootstrap(premiumDashboardState, parsePremiumCustomers, dashboardCustomersBootstrapPayload);
+        const hadPremiumDashboardOrders = typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap === 'function' && dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(premiumDashboardState, parsePremiumOrdersFromState, dashboardCustomersBootstrapPayload);
         renderConfirmationTasks();
-        if (hadPremiumDashboardBootstrapData) renderPremiumDashboardOrders(); else if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable();
-        void (async () => { const bootStartedAt = Date.now();
-            try {
-                await refreshPremiumDashboard(true);
-            } finally { releasePremiumDashboardBootShellAfterMinimum(bootStartedAt, 1000); }
-        })();
+        if (hadPremiumDashboardCustomers) renderPremiumDashboardOrders();
+        else renderPremiumDashboardPending();
+        releasePremiumDashboardBootShell();
+        if (!hadPremiumDashboardCustomers || !hadPremiumDashboardOrders) void refreshPremiumDashboard(true, true);
 
         premiumDashboardState.pollTimer = window.setInterval(() => {
             void refreshPremiumDashboard();

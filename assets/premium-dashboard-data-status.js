@@ -2,6 +2,7 @@
     "use strict";
 
     const unavailableMessage = "Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.";
+    let hasClearedUnavailable = false;
 
     function ensureStyle() {
         if (document.getElementById("dashboardDataStatusStyle")) return;
@@ -36,11 +37,12 @@
         element.classList.toggle("is-visible", Boolean(text));
     }
 
-    function setKpisUnavailable() {
+    function setKpisUnavailable(options = {}) {
         ["kpiRevenueYear", "kpiRecurringRevenue", "kpiTotalClients"].forEach(function (id) {
             const element = document.getElementById(id);
             if (element) element.textContent = "--";
         });
+        if (options.preserveActiveOrders === true) return;
         const activeOrdersEl = document.getElementById("kpiActiveOrders");
         if (!activeOrdersEl) return;
         activeOrdersEl.querySelectorAll("[data-kpi-active-website], [data-kpi-active-business], [data-kpi-active-voice], [data-kpi-active-chatbot]").forEach(function (element) {
@@ -51,37 +53,67 @@
 
     const api = Object.freeze({
         clear() {
+            hasClearedUnavailable = true;
             setStatus("");
         },
         setKpisUnavailable,
-        showUnavailable() {
+        showUnavailable(options = {}) {
             setStatus(unavailableMessage);
-            setKpisUnavailable();
+            setKpisUnavailable(options);
         },
         unavailableMessage,
     });
-    global.SoftoraDashboardDataStatus = api;
+    if (global && global.document) global.SoftoraDashboardDataStatus = api;
 
-    function shouldShowUnavailableForEmptyBootstrap() {
+    function readCustomersBootstrapPayload() {
         const element = document.getElementById("softoraCustomersBootstrap");
-        if (!element) return false;
+        if (!element) return null;
         try {
-            const payload = JSON.parse(String(element.textContent || "{}"));
-            const values = payload && payload.activeOrdersState && payload.activeOrdersState.values && typeof payload.activeOrdersState.values === "object" ? payload.activeOrdersState.values : {};
-            if (payload && (payload.ok === false || payload.source === "unavailable")) return true;
-            return payload && payload.ok === true && payload.source === "empty" && Array.isArray(payload.customers) && payload.customers.length === 0 && Object.keys(values).length === 0;
+            return JSON.parse(String(element.textContent || "{}"));
         } catch (_) {
-            return false;
+            return null;
         }
     }
 
-    function showUnavailableForEmptyBootstrap() {
-        if (shouldShowUnavailableForEmptyBootstrap()) api.showUnavailable();
+    function shouldShowUnavailableForEmptyBootstrap(payload) {
+        const values = payload && payload.activeOrdersState && payload.activeOrdersState.values && typeof payload.activeOrdersState.values === "object" ? payload.activeOrdersState.values : {};
+        if (payload && (payload.ok === false || payload.source === "unavailable")) return true;
+        return payload && payload.ok === true && payload.source === "empty" && Array.isArray(payload.customers) && payload.customers.length === 0 && Object.keys(values).length === 0;
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", showUnavailableForEmptyBootstrap, { once: true });
-    } else {
-        showUnavailableForEmptyBootstrap();
+    function hasLoadedActiveOrdersBootstrap(payload) {
+        const state = payload && payload.activeOrdersState && typeof payload.activeOrdersState === "object" ? payload.activeOrdersState : null;
+        const source = String(state && state.source || "").trim().toLowerCase();
+        const values = state && state.values && typeof state.values === "object" && !Array.isArray(state.values) ? state.values : null;
+        const orderKey = "softora_custom_orders_premium_v1";
+        const hasOrderList = Boolean(values && (
+            Object.prototype.hasOwnProperty.call(values, orderKey) ||
+            Object.prototype.hasOwnProperty.call(values, `${orderKey}_chunks_v1`)
+        ));
+        return Boolean(hasOrderList && source && source !== "unavailable" && source !== "bootstrap-timeout");
     }
-})(window);
+
+    function showUnavailableForEmptyBootstrap() {
+        if (hasClearedUnavailable) return;
+        const payload = readCustomersBootstrapPayload();
+        if (shouldShowUnavailableForEmptyBootstrap(payload)) {
+            api.showUnavailable({ preserveActiveOrders: hasLoadedActiveOrdersBootstrap(payload) });
+        }
+    }
+
+    function scheduleUnavailableForEmptyBootstrap() {
+        global.setTimeout(showUnavailableForEmptyBootstrap, 3200);
+    }
+
+    if (typeof module === "object" && module.exports) {
+        module.exports = Object.freeze({ ...api, hasLoadedActiveOrdersBootstrap, shouldShowUnavailableForEmptyBootstrap });
+    }
+
+    if (typeof document !== "undefined") {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", scheduleUnavailableForEmptyBootstrap, { once: true });
+        } else {
+            scheduleUnavailableForEmptyBootstrap();
+        }
+    }
+})(typeof window !== "undefined" ? window : globalThis);
