@@ -251,6 +251,47 @@ test('premium database mail-ready snapshot reuses a fresh durable snapshot witho
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), false);
 });
 
+test('premium database snapshot upgrades a legacy bootstrap cache with signed photo urls in the background', async () => {
+  const durableSnapshot = {
+    version: 1,
+    generatedAt: '2026-06-16T12:00:00.000Z',
+    total: 1,
+    customers: [{
+      id: 'ready-cached',
+      hasPhoto: true,
+      hasMockup: true,
+      websitePhotoAssetReady: true,
+      websiteMockupAssetReady: true,
+      mailReady: true,
+      mailReadySnapshot: true,
+    }],
+    availableTotal: 0,
+    availableCustomers: [],
+  };
+  const { service, calls } = createService({
+    durableSnapshot,
+    nowMs: () => Date.parse('2026-06-16T12:00:30.000Z'),
+    signedPhotos: [{
+      customerId: 'ready-cached',
+      websitePhotoUrl: 'https://storage.example.test/ready-cached-photo.png',
+      websiteMockupUrl: 'https://storage.example.test/ready-cached-mockup.jpg',
+    }],
+  });
+
+  const stale = await service.buildMailReadySnapshot({ limit: 10 });
+  assert.equal(stale.customers[0].websitePhoto, undefined);
+  await new Promise((resolve) => setImmediate(resolve));
+  const upgraded = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.equal(upgraded.customers[0].websitePhoto, 'https://storage.example.test/ready-cached-photo.png');
+  assert.equal(upgraded.customers[0].websiteMockup, 'https://storage.example.test/ready-cached-mockup.jpg');
+  const signedCall = calls.find((call) => Array.isArray(call) && call[0] === 'signed-photos');
+  assert.deepEqual(signedCall[1].customerIds, ['ready-cached']);
+  assert.equal(signedCall[1].bypassReadFailureCooldown, true);
+  const bootstrapWrite = calls.find((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE);
+  assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).version, 2);
+});
+
 test('premium database mail-ready snapshot serves an old durable snapshot without waiting for refresh', async () => {
   const durableSnapshot = {
     version: 1,

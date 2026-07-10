@@ -3809,7 +3809,8 @@ function createColdmailCampaignService(deps = {}) {
       const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
         provider: 'softora',
         channel: 'coldmail',
-        maxRows: 20_000,
+        keyType: 'email',
+        maxRows: 5_000,
       });
       return summarizeColdmailCentralGuardLiveStats(groups);
     } catch (error) {

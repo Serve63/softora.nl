@@ -327,6 +327,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     const maxRows = Math.max(1, Math.min(20_000, Number(options.maxRows) || 10_000));
     const provider = normalizeString(options.provider);
     const channel = normalizeString(options.channel);
+    const keyType = normalizeString(options.keyType);
     const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,created_at,updated_at,last_seen_at';
     const buildQuery = () => {
       let query = client
@@ -336,6 +337,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
         .eq('permanent', true);
       if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
       if (channel && query && typeof query.eq === 'function') query = query.eq('channel', channel);
+      if (keyType && query && typeof query.eq === 'function') query = query.eq('key_type', keyType);
       if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
       return query;
     };
