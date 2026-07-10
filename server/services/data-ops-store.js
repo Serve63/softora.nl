@@ -1552,11 +1552,24 @@ function createSoftoraDataOpsStore(deps = {}) {
         .map(normalizeString)
         .filter(Boolean)
     ));
-    const maxMatchLimit = identifiers.length ? 500 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
-    const defaultMaxMatches = identifiers.length ? 12 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const customerIds = Array.from(new Set(
+      (Array.isArray(options.customerIds) ? options.customerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    )).slice(0, 500);
+    const customerIdSet = new Set(customerIds.map((value) => value.toLowerCase()));
+    const hasTargetedLookup = identifiers.length > 0 || customerIds.length > 0;
+    const maxMatchLimit = hasTargetedLookup ? 500 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const defaultMaxMatches = customerIds.length
+      ? customerIds.length
+      : identifiers.length
+        ? 12
+        : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
     const maxMatches = Math.max(1, Math.min(maxMatchLimit, Number(options.maxMatches) || defaultMaxMatches));
-    const cacheKey = identifiers.length
-      ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
+    const cacheKey = customerIds.length
+      ? `design-photos-signed:customer-ids:${customerIds.join('|')}:${maxMatches}`
+      : identifiers.length
+        ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
       : `design-photos-signed:all:${maxMatches}`;
     const scanLimit = identifiers.length
       ? DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT
@@ -1603,7 +1616,16 @@ function createSoftoraDataOpsStore(deps = {}) {
     const structuredRows = await cachedRead(cacheKey, async () => {
       const buildQuery = (client) => selectDesignPhotoRows(client).order('updated_at', { ascending: false });
       let result = null;
-      if (identifiers.length) {
+      if (customerIds.length) {
+        result = await run('list-design-photos-signed-urls-by-customer-ids', (client) => {
+          let query = selectDesignPhotoRows(client);
+          if (!query || typeof query.in !== 'function') return null;
+          query = query.in('customer_id', customerIds);
+          if (typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+          if (typeof query.limit === 'function') query = query.limit(maxMatches);
+          return query;
+        }, buildQueryOptions);
+      } else if (identifiers.length) {
         const targetedRows = await readTargetedRows(buildQueryOptions);
         const targetedMatches = targetedRows.filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers));
         if (targetedMatches.length) return targetedMatches;
@@ -1627,7 +1649,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     if (!structuredRows) return null;
     const client = getClient(buildQueryOptions);
     const rows = structuredRows
-      .filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers))
+      .filter((row) => customerIds.length
+        ? customerIdSet.has(normalizeString(row && row.customer_id).toLowerCase())
+        : designPhotoRowMatchesIdentifiers(row, identifiers))
       .slice(0, maxMatches);
     const entries = [];
 
@@ -1822,7 +1846,11 @@ function createSoftoraDataOpsStore(deps = {}) {
       enumerable: false,
     });
     Object.defineProperty(entries, 'targetedIdentifiersApplied', {
-      value: identifiers.length > 0,
+      value: hasTargetedLookup,
+      enumerable: false,
+    });
+    Object.defineProperty(entries, 'targetedCustomerIdsApplied', {
+      value: customerIds.length > 0,
       enumerable: false,
     });
     return entries;

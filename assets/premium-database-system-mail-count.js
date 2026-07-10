@@ -2,7 +2,7 @@
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
     const COLDMAIL_STATS_URL = "/api/coldmailing/stats";
-    const TODAY_SENT_REFRESH_MS = 15000;
+    const TODAY_SENT_REFRESH_MS = 60000;
     let roiControlsBound = false;
     let roiSaveLifecycleBound = false;
     let todaySentRefreshBound = false;
@@ -15,6 +15,7 @@
     let roiStateLoadPromise = null;
     let roiDirtySinceLoad = false;
     let roiNeedsRemoteSync = false;
+    let bootstrapStateApplied = false;
 
     function fallbackNormalizeString(value) {
         return value === null || value === undefined ? "" : String(value).trim();
@@ -167,6 +168,32 @@
 
     function getRootDocument() {
         return window.document || (typeof document === "undefined" ? null : document);
+    }
+
+    function applyBootstrapState() {
+        if (bootstrapStateApplied) return;
+        bootstrapStateApplied = true;
+        const rootDocument = getRootDocument();
+        const element = rootDocument && rootDocument.getElementById("softoraCustomersBootstrap");
+        if (!element) return;
+        try {
+            const payload = JSON.parse(String(element.textContent || "{}"));
+            const mailStats = payload && payload.mailStats && typeof payload.mailStats === "object" ? payload.mailStats : {};
+            const roi = payload && payload.mailRoi && typeof payload.mailRoi === "object" ? payload.mailRoi : {};
+            const sentToday = readNonNegativeInteger(mailStats.sentToday);
+            const bounces = readNonNegativeInteger(mailStats.bounces);
+            const totalSent = readNonNegativeInteger(mailStats.totalSent);
+            const dealCount = readNonNegativeInteger(roi.dealCount);
+            if (sentToday !== null) lastTodaySentCount = sentToday;
+            if (bounces !== null) lastTodayBouncesCount = bounces;
+            if (totalSent !== null) {
+                lastStatsMailCount = totalSent;
+                lastRenderedMailCount = totalSent;
+            }
+            if (dealCount !== null && !roiDirtySinceLoad) roiDealsCount = dealCount;
+        } catch (_error) {
+            /* De live refresh blijft de veilige fallback. */
+        }
     }
 
     function getFetch() {
@@ -393,6 +420,8 @@
     }
 
     function refreshTodaySentCount() {
+        const rootDocument = getRootDocument();
+        if (rootDocument && rootDocument.hidden) return Promise.resolve(lastTodaySentCount);
         const fetchImpl = getFetch();
         if (!fetchImpl) {
             renderTodaySentCount(lastTodaySentCount, true);
@@ -402,7 +431,7 @@
         todaySentRefreshPromise = fetchImpl(COLDMAIL_STATS_URL, {
             credentials: "same-origin",
             headers: { Accept: "application/json" },
-            cache: "no-store"
+            cache: "default"
         }).then(function (response) {
             return response.json().then(function (payload) {
                 return { response: response, payload: payload };
@@ -436,13 +465,17 @@
     }
 
     function bindTodaySentRefresh() {
+        applyBootstrapState();
         renderTodaySentCount(lastTodaySentCount, true);
         renderTodayBouncesCount(lastTodayBouncesCount, true);
         if (todaySentRefreshBound) return;
         todaySentRefreshBound = true;
         void refreshTodaySentCount();
         const interval = getInterval();
-        if (interval) interval(refreshTodaySentCount, TODAY_SENT_REFRESH_MS);
+        if (interval) interval(function () {
+            const rootDocument = getRootDocument();
+            if (!rootDocument || !rootDocument.hidden) void refreshTodaySentCount();
+        }, TODAY_SENT_REFRESH_MS);
         addWindowListener("focus", refreshTodaySentCount);
         addWindowListener("pageshow", refreshTodaySentCount);
         const rootDocument = getRootDocument();
@@ -486,6 +519,7 @@
     }
 
     function render(customers, helpers) {
+        applyBootstrapState();
         bindRoiControls();
         bindTodaySentRefresh();
         const rootDocument = getRootDocument();

@@ -27,8 +27,9 @@ function createService(overrides = {}) {
       calls.push(['guard-keys', keys.slice()]);
       return Object.prototype.hasOwnProperty.call(overrides, 'centralGuardKeys') ? overrides.centralGuardKeys : [];
     },
-    async listDesignPhotosWithSignedUrls() {
-      throw new Error('signed URLs mogen niet in de snapshotroute worden gemaakt');
+    async listDesignPhotosWithSignedUrls(options) {
+      calls.push(['signed-photos', options]);
+      return overrides.signedPhotos || [];
     },
   };
   const getUiStateValues = async (scope) => {
@@ -168,6 +169,38 @@ test('premium database mail-ready snapshot honors limit and offset', async () =>
   assert.equal(payload.limit, 2);
   assert.equal(payload.offset, 2);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-3', 'ready-4']);
+});
+
+test('premium database snapshot deduplicates customer ids and embeds bootstrap photo URLs', async () => {
+  const duplicate = {
+    customer_id: 'ready-1',
+    company: 'Ready One',
+    email: 'info@ready-one.nl',
+    website: 'ready-one.nl',
+    database_status: 'prospect',
+    updated_at: '2026-07-10T12:00:00.000Z',
+  };
+  const { service, calls } = createService({
+    customers: [duplicate, { ...duplicate }],
+    photoFlags: [{ customerId: 'ready-1', hasPhoto: true, hasMockup: true }],
+    signedPhotos: [{
+      customerId: 'ready-1',
+      websitePhotoUrl: 'https://storage.example.test/ready-1-photo.png',
+      websiteMockupUrl: 'https://storage.example.test/ready-1-mockup.jpg',
+      fileName: 'ready-1-photo.png',
+      websiteMockupName: 'ready-1-mockup.jpg',
+      signedUrlExpiresAt: '2026-07-11T12:00:00.000Z',
+    }],
+  });
+
+  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.equal(payload.total, 1);
+  assert.equal(payload.customers[0].websitePhoto, 'https://storage.example.test/ready-1-photo.png');
+  assert.equal(payload.customers[0].websiteMockup, 'https://storage.example.test/ready-1-mockup.jpg');
+  const signedCall = calls.find((call) => Array.isArray(call) && call[0] === 'signed-photos');
+  assert.deepEqual(signedCall[1].customerIds, ['ready-1']);
+  assert.equal(signedCall[1].maxMatches, 1);
 });
 
 test('premium database mail-ready snapshot reuses one full calculation across pages', async () => {

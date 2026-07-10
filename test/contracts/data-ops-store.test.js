@@ -1422,6 +1422,71 @@ test('data ops store signs only matching design photo rows for targeted preview 
   assert.equal(entries.targetedIdentifiersApplied, true);
 });
 
+test('data ops store signs an exact bounded customer id set for database bootstrap photos', async () => {
+  const rows = [
+    {
+      customer_id: 'customer-1',
+      identity_key: 'bedrijf een||0611111111',
+      storage_bucket: 'softora-design-photos',
+      storage_path: 'customers/customer-1/webdesign.png',
+      mime_type: 'image/png',
+      file_name: 'bedrijf-een-webdesign.png',
+      legacy_meta: { mockup: { storageBucket: 'softora-design-photos', storagePath: 'customers/customer-1/mockup.jpg', fileName: 'bedrijf-een-mockup.jpg' } },
+      updated_at: '2026-07-10T12:00:00.000Z',
+    },
+  ];
+  let requestedIds = null;
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrls(paths) {
+            return { data: paths.map((path) => ({ path, signedUrl: `https://storage.example.test/${bucket}/${path}` })), error: null };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                in(column, ids) {
+                  assert.equal(column, 'customer_id');
+                  requestedIds = ids;
+                  return {
+                    order() {
+                      return { limit: async () => ({ data: rows, error: null }) };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    customerIds: ['customer-1'],
+    expiresInSeconds: 600,
+  });
+
+  assert.deepEqual(requestedIds, ['customer-1']);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].websitePhotoUrl, 'https://storage.example.test/softora-design-photos/customers/customer-1/webdesign.png');
+  assert.equal(entries[0].websiteMockupUrl, 'https://storage.example.test/softora-design-photos/customers/customer-1/mockup.jpg');
+  assert.equal(entries.targetedCustomerIdsApplied, true);
+});
+
 test('data ops store targets space-separated identity keys for dashed public preview slugs', async () => {
   const matchingRow = {
     customer_id: 'manual-import-riesenhorst-nl-0305',

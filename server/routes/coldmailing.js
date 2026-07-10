@@ -366,6 +366,9 @@ function registerColdmailingRoutes(app, deps = {}) {
         });
         return;
       }
+      if (typeof res.setHeader === 'function') {
+        res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
+      }
       res.json(await coldmailCampaignService.getColdmailLiveStats());
     } catch (error) {
       res.status(500).json({
