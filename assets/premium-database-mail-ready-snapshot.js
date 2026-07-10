@@ -56,10 +56,10 @@
         ].filter(Boolean);
     }
 
-    function buildSnapshotMap(snapshotCustomers) {
+    function buildSnapshotMap(snapshotCustomers, predicate) {
         const map = new Map();
         (Array.isArray(snapshotCustomers) ? snapshotCustomers : []).forEach(function (customer) {
-            if (!isSnapshotMailReadyCustomer(customer)) return;
+            if (typeof predicate === "function" && !predicate(customer)) return;
             getMatchKeys(customer).forEach(function (key) {
                 if (!map.has(key)) map.set(key, customer);
             });
@@ -67,18 +67,37 @@
         return map;
     }
 
-    function mergeAssetFlags(customers, snapshotCustomers) {
-        const snapshotMap = buildSnapshotMap(snapshotCustomers);
-        if (!snapshotMap.size) return customers || [];
+    function findSnapshotMatch(snapshotMap, customer) {
+        return getMatchKeys(customer).map(function (key) { return snapshotMap.get(key); }).find(Boolean);
+    }
+
+    function mergeAssetFlags(customers, snapshotCustomers, availableSnapshotCustomers) {
+        const snapshotMap = buildSnapshotMap(snapshotCustomers, isSnapshotMailReadyCustomer);
+        const availableMap = buildSnapshotMap(availableSnapshotCustomers, isSnapshotAvailableCustomer);
+        if (!snapshotMap.size && !availableMap.size) return customers || [];
         return (customers || []).map(function (customer) {
-            const match = getMatchKeys(customer).map(function (key) { return snapshotMap.get(key); }).find(Boolean);
-            if (!match) return customer;
-            return Object.assign({}, customer, {
+            const mailReadyMatch = findSnapshotMatch(snapshotMap, customer);
+            const availableMatch = findSnapshotMatch(availableMap, customer);
+            if (mailReadyMatch) return Object.assign({}, customer, {
                 hasPhoto: true,
                 hasMockup: true,
                 websitePhotoAssetReady: true,
-                websiteMockupAssetReady: true
+                websiteMockupAssetReady: true,
+                mailReady: true,
+                mailReadySnapshot: true,
+                availableSnapshot: false
             });
+            if (availableMatch) return Object.assign({}, customer, {
+                hasPhoto: availableMatch.hasPhoto === true,
+                hasMockup: availableMatch.hasMockup === true,
+                websitePhotoAssetReady: availableMatch.hasPhoto === true,
+                websiteMockupAssetReady: availableMatch.hasMockup === true,
+                mailReady: false,
+                mailReadySnapshot: false,
+                availableSnapshot: true
+            });
+            if (customer && (customer.mailReadySnapshot === true || customer.availableSnapshot === true)) return Object.assign({}, customer, { mailReady: false, mailReadySnapshot: false, availableSnapshot: false });
+            return customer;
         });
     }
 
@@ -150,7 +169,7 @@
             const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
             const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer); });
             const combinedSnapshotCustomers = snapshotCustomers.concat(availableCustomers);
-            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers) : combinedSnapshotCustomers, true);
+            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, true);
         }
     }
 

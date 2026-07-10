@@ -329,7 +329,7 @@ test('premium database has a compact company search without the old result count
   assert.doesNotMatch(pageSource, /result-count-stack/);
   assert.doesNotMatch(pageSource, /database-search-row/);
   assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
-  assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.activeStatus === "benaderbaar"[\s\S]*isColdmailReadyWebdesignLead\(customer\)[\s\S]*state\.activeStatus === "beschikbaar"[\s\S]*isAvailableColdmailCandidate\(customer\)/);
+  assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.mailReadySnapshotLoaded[\s\S]*isSnapshotMailReadyCustomer\(customer\)[\s\S]*state\.availableSnapshotLoaded[\s\S]*isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /if \(!matchesActiveDatabaseFilter\(customer\)\) return false;/);
   assert.match(pageSource, /return getCustomerSearchHaystack\(customer\)\.indexOf\(query\) !== -1;/);
   assert.match(
@@ -921,9 +921,18 @@ test('mail-ready snapshot client loads compact rows before full database restore
   state.activeStatus = 'beschikbaar';
   assert.equal(client.getDisplayCount(state, applied[0].customers.length), 1);
 
-  const merged = client.mergeAssetFlags([{ id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', website: 'https://demo.nl' }], state.mailReadySnapshotCustomers);
+  const merged = client.mergeAssetFlags([
+    { id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', website: 'https://demo.nl' },
+    { id: 'customer-available', bedrijf: 'Nieuw BV', email: 'info@nieuw.nl', website: 'https://nieuw.nl' },
+    { id: 'customer-other', bedrijf: 'Anders BV', email: 'info@anders.nl', website: 'https://anders.nl' },
+  ], state.mailReadySnapshotCustomers, state.availableSnapshotCustomers);
   assert.equal(merged[0].websitePhotoAssetReady, true);
   assert.equal(merged[0].websiteMockupAssetReady, true);
+  assert.equal(client.isSnapshotMailReadyCustomer(merged[0]), true);
+  assert.equal(client.isSnapshotAvailableCustomer(merged[1]), true);
+  assert.equal(merged[1].mailReady, false);
+  assert.equal(client.isSnapshotMailReadyCustomer(merged[2]), false);
+  assert.equal(client.isSnapshotAvailableCustomer(merged[2]), false);
 });
 
 test('premium database renders remote customers before guard and photo enrichment completes', () => {
@@ -931,7 +940,7 @@ test('premium database renders remote customers before guard and photo enrichmen
   assert.match(pageSource, /const remoteState = await remoteStatePromise;[\s\S]*const initialCustomers =/);
   assert.match(pageSource, /const initialCustomers = [\s\S]*applyCustomerList\(getSortedCustomers/);
   assert.match(pageSource, /enrichedCustomers = mergeCustomersWithResponsible\(remoteCustomers, orders\);[\s\S]*applyCustomerList\(getSortedCustomers/);
-  assert.match(pageSource, /const enrichedWithSnapshot = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(enrichedCustomers, state\.mailReadySnapshotCustomers\); applyCustomerList/);
+  assert.match(pageSource, /const enrichedWithSnapshot = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(enrichedCustomers, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\); applyCustomerList/);
   assert.doesNotMatch(pageSource, /await guardPromise; const remoteState = await remoteStatePromise;/);
 });
 
@@ -1017,7 +1026,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(snapshotSource, /fetchRemainingPages\(config, firstPage\.total, firstPage\.rows\)/);
   assert.match(snapshotSource, /global\.SoftoraDatabaseMailReadySnapshot =/);
   assert.match(snapshotSource, /state\.mailReadySnapshotCustomers = snapshotCustomers;/);
-  assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers\)/);
+  assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers, availableSnapshotCustomers\)/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{/);
   assert.match(pageSource, /state\.photoRestoreFailed && !state\.mailReadySnapshotLoaded/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotPending && !state\.mailReadySnapshotLoaded/);
@@ -1037,7 +1046,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
-  assert.match(pageSource, /customersWithPhotos = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(customersWithPhotos, state\.mailReadySnapshotCustomers\);/);
+  assert.match(pageSource, /customersWithPhotos = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\);/);
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); applyCustomerList\(sortedCustomers, false\);/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotLoaded = false; state\.mailReadySnapshotTotal = null; applyCustomerList/);
   assert.doesNotMatch(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
@@ -1053,7 +1062,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 12000, "Coldmail send-guard reageert niet op tijd\."\)/);
   assert.match(pageSource, /function hasLoadedColdmailGuard\(\)/);
   assert.match(pageSource, /if \(!hasLoadedColdmailGuard\(\)\) return false;/);
-  assert.match(pageSource, /if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) && !state\.remoteCustomersLoaded\) return true;/);
+  assert.match(pageSource, /if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) \|\| window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true;/);
   assert.match(pageSource, /Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd\./);
   assert.match(pageSource, /const mailReadySnapshotPromise = loadMailReadySnapshot\(\);/);
   assert.match(pageSource, /else \{ await mailReadySnapshotPromise; await bootstrapCustomers\(\); \}/);
@@ -1300,10 +1309,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
-  assert.match(pageSource, /function isAvailableColdmailCandidate\(customer\) \{ if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\) && !state\.remoteCustomersLoaded\) return true; return isColdmailBaseLeadEligible\(customer\) && !hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\) && !outreachController\.hasInstantlyOutreachSignal\(customer\) && !isColdmailReadyWebdesignLead\(customer\);/);
+  assert.match(pageSource, /function isAvailableColdmailCandidate\(customer\) \{ if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true; return isColdmailBaseLeadEligible\(customer\) && !hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\) && !outreachController\.hasInstantlyOutreachSignal\(customer\) && !isColdmailReadyWebdesignLead\(customer\);/);
   assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailCandidate\);/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
-  assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.activeStatus === "benaderbaar"[\s\S]*isColdmailReadyWebdesignLead\(customer\)[\s\S]*state\.activeStatus === "beschikbaar"[\s\S]*isAvailableColdmailCandidate\(customer\)/);
+  assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.mailReadySnapshotLoaded[\s\S]*isSnapshotMailReadyCustomer\(customer\)[\s\S]*state\.availableSnapshotLoaded[\s\S]*isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return customers \|\| \[\];/);
   assert.match(pageSource, /function getEmptyTableMessage\(\) \{[\s\S]*Geen mailklare bedrijven\.[\s\S]*Geen beschikbare bedrijven\.[\s\S]*Geen bedrijven in deze filter\./);
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
@@ -1774,10 +1783,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\)/);
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
   assert.match(pageSource, /state\.photoRestoreFailed = true; console\.warn\("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error\);/);
-  assert.match(pageSource, /state\.photoRestoreFailed = true; applyCustomerList\(window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(state\.klanten, state\.mailReadySnapshotCustomers\), false\); console\.warn\("Databasefoto's laden voor boot tijdelijk overgeslagen:", error\);/);
+  assert.match(pageSource, /state\.photoRestoreFailed = true; applyCustomerList\(window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(state\.klanten, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\), false\); console\.warn\("Databasefoto's laden voor boot tijdelijk overgeslagen:", error\);/);
   assert.doesNotMatch(pageSource, /Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden\./);
   assert.match(photoStorageScriptSource, /if \(loadOptions && loadOptions\.failOnError\) throw error;/);
-  assert.match(pageSource, /applyCustomerList\(window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\), state\.mailReadySnapshotCustomers\), false\);/);
+  assert.match(pageSource, /applyCustomerList\(window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(mergeCustomersWithPhotos\(state\.klanten, photoMap, state\.klanten\), state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\), false\);/);
   assert.match(pageSource, /else \{\s*await mailReadySnapshotPromise;\s*await bootstrapCustomers\(\);\s*\}/);
   assert.match(pageSource, /await webdesignActionController\.preloadPhotoImages\(getSortedCustomers\(getFilteredCustomers\(\)\), 16, 1200\);/);
   assert.match(pageSource, /const mailReadySnapshotPromise = loadMailReadySnapshot\(\); if \(databaseHadBootstrapCustomers && state\.klanten\.length && !databaseHasFastSnapshotBootstrap\) \{ await refreshColdmailGuardState\(\); await mailReadySnapshotPromise; try \{ const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
