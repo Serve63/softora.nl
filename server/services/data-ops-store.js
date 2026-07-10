@@ -1097,11 +1097,13 @@ function createSoftoraDataOpsStore(deps = {}) {
         .filter(Boolean)
     ));
     const maxRows = Math.max(1, Math.min(20000, Number(options.maxRows) || 5000));
+    const bounceCandidatesOnly = options.bounceCandidatesOnly === true;
     const cacheKey = [
       'mailbox-messages',
       accountEmails.join(','),
       folders.join(','),
       maxRows,
+      bounceCandidatesOnly ? 'bounce-candidates' : 'all',
     ].join('|');
 
     return cachedRead(cacheKey, async () => {
@@ -1112,6 +1114,17 @@ function createSoftoraDataOpsStore(deps = {}) {
           .is('deleted_at', null);
         if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
         if (folders.length && typeof query.in === 'function') query = query.in('folder', folders);
+        if (bounceCandidatesOnly && typeof query.or === 'function') {
+          query = query.or([
+            'sender_email.ilike.mailer-daemon@%',
+            'sender_email.ilike.postmaster@%',
+            'subject.ilike.%returned mail%',
+            'subject.ilike.%delivery status notification%',
+            'subject.ilike.%delivery failure%',
+            'subject.ilike.%could not send message%',
+            'subject.ilike.%undeliver%',
+          ].join(','));
+        }
         if (typeof query.order === 'function') query = query.order('date', { ascending: false });
         if (typeof query.limit === 'function') query = query.limit(maxRows);
         return query;

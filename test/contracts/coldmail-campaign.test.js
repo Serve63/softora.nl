@@ -966,6 +966,30 @@ test('coldmail live stats never overwrite reliable totals with a transient guard
   assert.equal(latestCache.stats.totalSent, 1);
 });
 
+test('coldmail live stats requests only targeted mailbox bounce candidates', async () => {
+  let mailboxOptions = null;
+  const { service } = createService({
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        return [];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages(options) {
+        mailboxOptions = options;
+        return [];
+      },
+    },
+  });
+
+  await service.getColdmailLiveStats();
+
+  assert.equal(mailboxOptions.maxRows, 1000);
+  assert.equal(mailboxOptions.bounceCandidatesOnly, true);
+  assert.equal(mailboxOptions.bypassReadFailureCooldown, true);
+  assert.equal(mailboxOptions.suppressReadFailureCooldown, true);
+});
+
 test('coldmail campaign uses standard SMTP transports with bounded timeouts', async () => {
   const { service, transportConfigs } = createService();
 

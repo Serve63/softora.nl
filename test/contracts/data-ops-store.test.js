@@ -51,6 +51,10 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
           calls.push(['in', column, values]);
           return query;
         },
+        or(filters) {
+          calls.push(['or', filters]);
+          return query;
+        },
         order(column, options) {
           calls.push(['order', column, options]);
           return query;
@@ -73,6 +77,7 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     accountEmails: ['Serve@Softora.nl'],
     folders: ['INBOX'],
     maxRows: 50,
+    bounceCandidatesOnly: true,
   });
 
   assert.deepEqual(rows, [row]);
@@ -93,6 +98,8 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     ['inbox'],
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'date', { ascending: false }]);
+  assert.match(calls.find((call) => call[0] === 'or')[1], /sender_email\.ilike\.mailer-daemon@%/);
+  assert.match(calls.find((call) => call[0] === 'or')[1], /subject\.ilike\.%delivery failure%/);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
 });
 
