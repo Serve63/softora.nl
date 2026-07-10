@@ -1106,25 +1106,31 @@ function createSoftoraDataOpsStore(deps = {}) {
       bounceCandidatesOnly ? 'bounce-candidates' : 'all',
     ].join('|');
 
+    function isBounceCandidate(row) {
+      const sender = normalizeString(row && row.sender_email).toLowerCase();
+      const subject = normalizeString(row && row.subject).toLowerCase();
+      const preview = normalizeString(row && row.preview).toLowerCase();
+      return /^(?:mailer-daemon|postmaster)@/.test(sender) ||
+        /(?:returned mail|delivery status notification|delivery failure|delivery failed|could not send message|undeliver)/.test(`${subject}\n${preview}`);
+    }
+
+    function mailboxMessageTime(row) {
+      const parsed = Date.parse(normalizeString(row && (row.date || row.internal_date)));
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
     return cachedRead(cacheKey, async () => {
-      const result = await run('list-mailbox-messages', (client) => {
+      const selectedColumns = bounceCandidatesOnly
+        ? 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,deleted_at'
+        : 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at';
+      const loadRows = (accountEmail = '') => run('list-mailbox-messages', (client) => {
         let query = client
           .from(TABLES.mailboxMessages)
-          .select('message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at')
+          .select(selectedColumns)
           .is('deleted_at', null);
-        if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
+        if (accountEmail && typeof query.eq === 'function') query = query.eq('account_email', accountEmail);
+        else if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
         if (folders.length && typeof query.in === 'function') query = query.in('folder', folders);
-        if (bounceCandidatesOnly && typeof query.or === 'function') {
-          query = query.or([
-            'sender_email.ilike.mailer-daemon@%',
-            'sender_email.ilike.postmaster@%',
-            'subject.ilike.%returned mail%',
-            'subject.ilike.%delivery status notification%',
-            'subject.ilike.%delivery failure%',
-            'subject.ilike.%could not send message%',
-            'subject.ilike.%undeliver%',
-          ].join(','));
-        }
         if (typeof query.order === 'function') query = query.order('date', { ascending: false });
         if (typeof query.limit === 'function') query = query.limit(maxRows);
         return query;
@@ -1134,6 +1140,29 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
+
+      if (bounceCandidatesOnly && accountEmails.length) {
+        // De gecombineerde ILIKE/OR-scan liep op productie over de hele mailbox-tabel
+        // en gaf na een timeout onterecht nul bounces. Account-queries gebruiken de
+        // bestaande mailbox-index en blijven klein; pas daarna filteren we lokaal.
+        const results = await Promise.all(accountEmails.map((accountEmail) => loadRows(accountEmail)));
+        if (results.some((result) => !result.ok)) return null;
+        const seen = new Set();
+        return results
+          .flatMap((result) => result.data || [])
+          .filter(isBounceCandidate)
+          .sort((left, right) => mailboxMessageTime(right) - mailboxMessageTime(left))
+          .filter((row) => {
+            const key = normalizeString(row && row.message_key) ||
+              `${normalizeString(row && row.account_email)}|${normalizeString(row && row.folder)}|${normalizeString(row && row.uid)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, maxRows);
+      }
+
+      const result = await loadRows();
       return result.ok ? result.data || [] : null;
     }, {
       bypassReadCache: options.bypassReadCache,

@@ -395,8 +395,13 @@
             element.textContent = "--";
             return;
         }
-        lastTodayBouncesCount = count;
-        element.textContent = count.toLocaleString("nl-NL");
+        // Bounces zijn een cumulatieve teller. Een tijdelijke lege/partiele
+        // backend-read mag een al bewezen totaal nooit zichtbaar verlagen.
+        const stableCount = lastTodayBouncesCount === null
+            ? count
+            : Math.max(lastTodayBouncesCount, count);
+        lastTodayBouncesCount = stableCount;
+        element.textContent = stableCount.toLocaleString("nl-NL");
     }
 
     function renderSystemMailCount(value, isLoading) {

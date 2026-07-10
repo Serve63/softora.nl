@@ -966,6 +966,47 @@ test('coldmail live stats never overwrite reliable totals with a transient guard
   assert.equal(latestCache.stats.totalSent, 1);
 });
 
+test('coldmail live stats preserve proven bounces when the targeted mailbox read temporarily fails', async () => {
+  let clockMs = Date.parse('2026-04-24T12:00:00.000Z');
+  let mailboxReadFails = false;
+  const { service } = createService({
+    now: () => new Date(clockMs),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        return [];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages() {
+        if (mailboxReadFails) return null;
+        return [{
+          message_key: 'serve@softora.nl|inbox|101',
+          account_email: 'serve@softora.nl',
+          folder: 'inbox',
+          sender_email: 'mailer-daemon@softora.nl',
+          subject: 'Returned Mail: Kleine vraag over jullie website',
+          date: '2026-04-23T09:00:00.000Z',
+        }];
+      },
+    },
+  });
+
+  const first = await service.getColdmailLiveStats();
+  assert.equal(first.stats.reliable, true);
+  assert.equal(first.stats.bounces, 1);
+
+  mailboxReadFails = true;
+  clockMs += 31 * 1000;
+  await service.getColdmailLiveStats();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const preserved = await service.getColdmailLiveStats();
+  assert.equal(preserved.stats.reliable, true);
+  assert.equal(preserved.stats.bounces, 1);
+  assert.equal(preserved.stats.mailboxBounceStatsAvailable, true);
+});
+
 test('coldmail live stats requests only targeted mailbox bounce candidates', async () => {
   let mailboxOptions = null;
   const { service } = createService({
