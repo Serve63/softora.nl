@@ -921,6 +921,14 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(merged[0].websiteMockupAssetReady, true);
 });
 
+test('premium database renders remote customers before guard and photo enrichment completes', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  assert.match(pageSource, /const remoteState = await remoteStatePromise;[\s\S]*const initialCustomers =/);
+  assert.match(pageSource, /const initialCustomers = [\s\S]*applyCustomerList\(getSortedCustomers/);
+  assert.match(pageSource, /enrichedCustomers = mergeCustomersWithResponsible\(remoteCustomers, orders\);[\s\S]*applyCustomerList\(getSortedCustomers/);
+  assert.doesNotMatch(pageSource, /await guardPromise; const remoteState = await remoteStatePromise;/);
+});
+
 test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -931,7 +939,8 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /const COLDMAIL_SEND_GUARD_KEY = "softora_coldmail_send_guard_v1";/);
   assert.match(pageSource, /function hasColdmailSendGuardSignal\(customer\)/);
   assert.match(pageSource, /if \(hasColdmailSendGuardSignal\(customer\)\) return false;/);
-  assert.match(pageSource, /const guardPromise = refreshColdmailGuardState\(\);[\s\S]*const remoteStatePromise = fetchUiStateGetWithFallback\(CUSTOMER_DB_SCOPE\);[\s\S]*await guardPromise; const remoteState = await remoteStatePromise;/);
+  assert.match(pageSource, /const guardPromise = refreshColdmailGuardState\(\);[\s\S]*const remoteStatePromise = fetchUiStateGetWithFallback\(CUSTOMER_DB_SCOPE\);[\s\S]*const remoteState = await remoteStatePromise;/);
+  assert.doesNotMatch(pageSource, /await guardPromise; const remoteState = await remoteStatePromise;/);
 
   const controller = guardClient.createController({
     scope: 'premium_coldmail_send_guard',
@@ -1023,7 +1032,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /status === 401 \|\| status === 403 \|\| status === 429 \|\| status >= 500/);
   assert.match(pageSource, /if \(stopFallback\) throw lastError \|\| new Error\("UI-state GET mislukt"\);/);
   assert.match(pageSource, /customersWithPhotos = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(customersWithPhotos, state\.mailReadySnapshotCustomers\);/);
-  assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; state\.remoteCustomersLoaded = true; applyCustomerList\(sortedCustomers, !hadBootstrapCustomers\);/);
+  assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\); applyCustomerList\(sortedCustomers, false\);/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotLoaded = false; state\.mailReadySnapshotTotal = null; applyCustomerList/);
   assert.doesNotMatch(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(pageSource, /if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
