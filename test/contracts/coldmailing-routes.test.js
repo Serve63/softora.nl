@@ -722,7 +722,7 @@ test('coldmailing preview image route serves linked webdesign photos inline', as
   assert.equal(res.headers['content-type'], 'image/png');
   assert.equal(res.headers['content-disposition'], 'inline; filename="Bakkerij-Zon-device-mockup.png"');
   assert.equal(res.headers['x-robots-tag'], 'noindex, nofollow');
-  assert.equal(res.headers['cache-control'], 'public, max-age=31536000, immutable');
+  assert.equal(res.headers['cache-control'], 'public, max-age=31536000, s-maxage=31536000, immutable');
   assert.equal(res.headers['access-control-allow-origin'], '*');
   assert.equal(res.headers['cross-origin-resource-policy'], 'cross-origin');
   assert.equal(Buffer.compare(res.body, Buffer.from('mockup-image')), 0);

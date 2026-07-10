@@ -11,7 +11,7 @@ const {
   renderWebdesignImageSection,
 } = require('../../server/services/webdesign-email-renderer');
 
-test('shared webdesign renderer keeps desktop paired and mobile explicitly stacked', () => {
+test('shared webdesign renderer is mobile-safe without CSS and progressively pairs desktop images', () => {
   const imageSection = renderWebdesignImageSection(
     { src: 'cid:design@softora', alt: 'Bedrijf webdesign' },
     {
@@ -30,31 +30,33 @@ test('shared webdesign renderer keeps desktop paired and mobile explicitly stack
   assert.ok(html.indexOf('<style type="text/css">') < html.indexOf('<body '));
   assert.equal((html.match(/<style type="text\/css">/g) || []).length, 1);
   assert.doesNotMatch(imageSection, /<style\b/i);
-  assert.match(
-    renderWebdesignEmailHeadStyles(),
-    /html,body\{margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
-  );
-  assert.match(html, /<table class="softora-desktop-image-pair"[^>]+width="900"/);
+  const styles = renderWebdesignEmailHeadStyles();
+  assert.match(styles, /html,body\{margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important\}/);
+  assert.match(styles, /@media only screen and \(min-width:981px\)/);
+  assert.match(styles, /\.softora-mobile-image-pair[^}]+display:none!important/);
+  assert.match(styles, /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important/);
+  assert.match(html, /class="softora-mobile-image-pair" style="display:block;[^\"]+width:100%;max-width:100%/);
+  assert.match(html, /class="softora-webdesign-image" width="100%" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;/);
+  assert.match(html, /<table class="softora-desktop-image-pair"[^>]+style="display:none;mso-hide:all;[^\"]+width:0;max-width:0;max-height:0;/);
+  assert.doesNotMatch(html, /<table class="softora-desktop-image-pair"[^>]+width="900"/);
   assert.match(html, /width="300" height="560"/);
   assert.match(html, /width="584" height="560"/);
-  assert.match(html, /class="softora-mobile-image-pair"[^>]+width:100%;max-width:100%/);
-  assert.match(
-    html,
-    /\.softora-mobile-image-pair table,\.softora-mobile-image-pair tbody,\.softora-mobile-image-pair tr,\.softora-mobile-image-pair td\{display:block!important;width:100%!important;max-width:100%!important\}/
-  );
-  assert.match(
-    html,
-    /\.softora-mobile-image-pair img\{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important\}/
-  );
 
   const mobileStart = html.indexOf('class="softora-mobile-image-pair"');
+  const desktopStart = html.indexOf('class="softora-desktop-image-pair"');
   const designIndex = html.indexOf('alt="Bedrijf webdesign"', mobileStart);
   const captionIndex = html.indexOf(WEBDESIGN_EMAIL_MOCKUP_CAPTION, mobileStart);
   const mockupIndex = html.indexOf('alt="Bedrijf device mockup"', captionIndex);
   assert.ok(designIndex > mobileStart);
   assert.ok(captionIndex > designIndex);
   assert.ok(mockupIndex > captionIndex);
+  assert.ok(desktopStart > mockupIndex);
   assert.equal(html.indexOf(WEBDESIGN_EMAIL_MOCKUP_CAPTION), html.lastIndexOf(WEBDESIGN_EMAIL_MOCKUP_CAPTION));
+
+  const withoutHeadCss = html.replace(/<style type="text\/css">[\s\S]*?<\/style>/, '');
+  assert.match(withoutHeadCss, /class="softora-mobile-image-pair" style="display:block;/);
+  assert.match(withoutHeadCss, /class="softora-desktop-image-pair"[^>]+style="display:none;/);
+  assert.doesNotMatch(withoutHeadCss, /class="softora-mobile-image-pair"[^>]+display:none/);
 });
 
 test('shared webdesign renderer escapes image metadata and supports one image', () => {
