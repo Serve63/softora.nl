@@ -425,8 +425,8 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op openstaande opdrachten te staan.');
-  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260710a" defer/, 'Opdrachten-assets horen parallel en niet-blokkerend te laden.');
-  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260710a" defer/, 'Opdrachten-script hoort cache-ververst en niet-blokkerend te laden.');
+  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260710a"><\/script>/, 'Bootstrap hoort direct te starten.');
+  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script>/, 'Opdrachten-script hoort direct te starten.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {
