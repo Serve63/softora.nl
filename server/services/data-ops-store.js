@@ -1876,8 +1876,16 @@ function createSoftoraDataOpsStore(deps = {}) {
     ));
     if (!keys.length) return [];
     const found = new Set();
+    const chunks = [];
     for (let index = 0; index < keys.length; index += OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE) {
-      const keyChunk = keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE);
+      chunks.push(keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE));
+    }
+    let cursor = 0;
+    let failed = false;
+    async function worker() {
+      while (!failed && cursor < chunks.length) {
+        const keyChunk = chunks[cursor];
+        cursor += 1;
       const result = await run('list-outbound-recipient-guard-keys', (client) =>
         client
           .from(TABLES.outboundRecipientGuards)
@@ -1891,12 +1899,18 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
-      if (!result.ok) return null;
+        if (!result.ok) {
+          failed = true;
+          return;
+        }
       (result.data || []).forEach((row) => {
         const key = normalizeString(row && row.guard_key);
         if (key) found.add(key);
       });
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(6, chunks.length) }, worker));
+    if (failed) return null;
     return Array.from(found);
   }
 

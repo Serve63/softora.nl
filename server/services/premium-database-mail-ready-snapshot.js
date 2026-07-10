@@ -9,6 +9,7 @@ const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_OFFSET = 10000;
+const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const EXCLUDED_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -350,6 +351,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     now = () => new Date(),
     logger = console,
   } = deps;
+  let snapshotDataCache = null;
+  let snapshotDataPromise = null;
 
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
@@ -390,21 +393,20 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     }
   }
 
-  async function buildMailReadySnapshot(options = {}) {
+  async function loadMailReadySnapshotData() {
     const startedAtMs = Date.now();
-    const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
-    const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
-
     const customerStartMs = Date.now();
-    const customerRows = await readCustomerRows();
-    const customersMs = Date.now() - customerStartMs;
+    const customerRowsPromise = readCustomerRows().then((rows) => ({ rows, ms: Date.now() - customerStartMs }));
+    const photosStartMs = Date.now();
+    const photoRowsPromise = readPhotoFlags().then((rows) => ({ rows, ms: Date.now() - photosStartMs }));
+    const [customerResult, photoResult] = await Promise.all([customerRowsPromise, photoRowsPromise]);
+    const customerRows = customerResult.rows;
+    const customersMs = customerResult.ms;
     if (!Array.isArray(customerRows)) {
       throw createUnavailableError('Mailklare snapshot kon klantdata niet laden.');
     }
-
-    const photosStartMs = Date.now();
-    const photoRows = await readPhotoFlags();
-    const photosMs = Date.now() - photosStartMs;
+    const photoRows = photoResult.rows;
+    const photosMs = photoResult.ms;
     if (!Array.isArray(photoRows)) {
       throw createUnavailableError('Mailklare snapshot kon foto- en mockupdata niet laden.');
     }
@@ -433,17 +435,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)))
       .map((item) => buildSnapshotCustomer(item.row, item.photoFlag));
     const computeMs = computeBeforeGuardsMs + (Date.now() - finalComputeStartMs);
-    const total = mailReadyRows.length;
-    const customers = mailReadyRows.slice(offset, offset + limit);
-
     return {
-      ok: true,
-      source: SNAPSHOT_SOURCE,
       generatedAt: now().toISOString(),
-      total,
-      limit,
-      offset,
-      customers,
+      customers: mailReadyRows,
       timings: {
         customersMs,
         photosMs,
@@ -451,6 +445,39 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         computeMs,
         totalMs: Date.now() - startedAtMs,
       },
+    };
+  }
+
+  async function getMailReadySnapshotData() {
+    const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
+    if (snapshotDataCache && Date.now() - cachedAtMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
+    if (!snapshotDataPromise) {
+      snapshotDataPromise = loadMailReadySnapshotData()
+        .then((data) => {
+          snapshotDataCache = { cachedAtMs: Date.now(), data };
+          return data;
+        })
+        .finally(() => {
+          snapshotDataPromise = null;
+        });
+    }
+    return snapshotDataPromise;
+  }
+
+  async function buildMailReadySnapshot(options = {}) {
+    const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
+    const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
+    const snapshotData = await getMailReadySnapshotData();
+    const allCustomers = Array.isArray(snapshotData.customers) ? snapshotData.customers : [];
+    return {
+      ok: true,
+      source: SNAPSHOT_SOURCE,
+      generatedAt: snapshotData.generatedAt,
+      total: allCustomers.length,
+      limit,
+      offset,
+      customers: allCustomers.slice(offset, offset + limit),
+      timings: snapshotData.timings,
     };
   }
 

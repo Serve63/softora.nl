@@ -144,6 +144,30 @@ test('premium database mail-ready snapshot honors limit and offset', async () =>
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-3', 'ready-4']);
 });
 
+test('premium database mail-ready snapshot reuses one full calculation across pages', async () => {
+  const customers = Array.from({ length: 3 }, (_, index) => ({
+    customer_id: `ready-${index + 1}`,
+    company: `Ready ${index + 1}`,
+    email: `info${index + 1}@ready.nl`,
+    website: `ready-${index + 1}.nl`,
+    database_status: 'prospect',
+  }));
+  const { service, calls } = createService({
+    customers,
+    photoFlags: customers.map((customer) => ({ customerId: customer.customer_id, hasPhoto: true, hasMockup: true })),
+  });
+
+  const first = await service.buildMailReadySnapshot({ limit: 2, offset: 0 });
+  const second = await service.buildMailReadySnapshot({ limit: 2, offset: 2 });
+
+  assert.deepEqual(first.customers.map((customer) => customer.id), ['ready-1', 'ready-2']);
+  assert.deepEqual(second.customers.map((customer) => customer.id), ['ready-3']);
+  assert.equal(calls.filter((call) => call === 'customers-snapshot').length, 1);
+  assert.equal(calls.filter((call) => call === 'photo-flags').length, 1);
+  assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'guard-keys').length, 1);
+  assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'legacy-guard').length, 1);
+});
+
 test('premium database mail-ready snapshot fails closed when legacy send guard cannot be read', async () => {
   const customers = [{
     customer_id: 'ready-1',

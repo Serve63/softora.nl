@@ -901,7 +901,7 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=100&offset=0');
   assert.equal(requests[0][1].method, 'GET');
   assert.equal(requests[0][1].cache, 'no-store');
-  assert.equal(requests[0][2], 2500);
+  assert.equal(requests[0][2], 6000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0', '100', '200', '300', '400']);
   assert.equal(state.mailReadySnapshotLoaded, true);
   assert.equal(state.mailReadySnapshotFailed, false);
@@ -926,6 +926,7 @@ test('premium database renders remote customers before guard and photo enrichmen
   assert.match(pageSource, /const remoteState = await remoteStatePromise;[\s\S]*const initialCustomers =/);
   assert.match(pageSource, /const initialCustomers = [\s\S]*applyCustomerList\(getSortedCustomers/);
   assert.match(pageSource, /enrichedCustomers = mergeCustomersWithResponsible\(remoteCustomers, orders\);[\s\S]*applyCustomerList\(getSortedCustomers/);
+  assert.match(pageSource, /const enrichedWithSnapshot = window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(enrichedCustomers, state\.mailReadySnapshotCustomers\); applyCustomerList/);
   assert.doesNotMatch(pageSource, /await guardPromise; const remoteState = await remoteStatePromise;/);
 });
 
