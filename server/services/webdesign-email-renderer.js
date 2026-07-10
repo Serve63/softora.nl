@@ -1,6 +1,6 @@
 'use strict';
 
-const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-10-v3';
+const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-11-v4';
 const WEBDESIGN_EMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 

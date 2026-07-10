@@ -126,35 +126,33 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
-const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'cid';
+const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'attachment';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
 const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
 const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   'Goedendag,',
   '',
-  'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+  'Afgelopen week kwam ik jullie website, {{website}}, tegen.',
   '',
-  'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+  'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
   '',
   'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
   '',
-  'Als je wilt, stuur ik je ook de online preview,',
-  'zodat je zelf door het ontwerp kunt scrollen.',
+  'Ik kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.',
   '',
-  'Laat me vooral weten of je dat zou willen.',
+  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wel lijkt het me tof om te horen wat je van het design vindt en wat er eventueel beter kan. Daar leer ik dan weer van!',
   '',
-  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
-  '',
-  'Webdesign niet zichtbaar? Check het hier 👈',
+  'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
   '',
   '📍 {{stad}}',
 ].join('\n');
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS =
+  'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?)/i;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?|lukt het niet om de bijlage te openen\?\s*dan kun je het webdesign ook via deze link bekijken\s*🎨)/i;
 const COLDMAIL_EMAIL_CONTENT_MAX_WIDTH = 600;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
@@ -4399,7 +4397,14 @@ function createColdmailCampaignService(deps = {}) {
 
   function normalizeColdmailWebdesignImageDeliveryOverride(value) {
     const normalized = normalizeString(value).toLowerCase();
-    if (normalized === 'cid' || normalized === 'remote' || normalized === 'link') return normalized;
+    if (
+      normalized === 'attachment' ||
+      normalized === 'cid' ||
+      normalized === 'remote' ||
+      normalized === 'link'
+    ) {
+      return normalized;
+    }
     return '';
   }
 
@@ -5861,8 +5866,8 @@ function createColdmailCampaignService(deps = {}) {
         database: state.config.database,
         senderEmail,
         specialAction: state.config.specialAction,
-        webdesignImageDelivery: 'remote',
-        imageDelivery: 'remote',
+        webdesignImageDelivery: 'attachment',
+        imageDelivery: 'attachment',
         durationDays: state.config.durationDays,
         radiusKm: state.config.radiusKm,
         mode: 'mail',
@@ -6950,7 +6955,8 @@ function createColdmailCampaignService(deps = {}) {
     const configured = normalizeString(env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY || env.WEBDESIGN_IMAGE_DELIVERY).toLowerCase();
     const value = explicit || configured || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
     if (['cid', 'inline', 'embedded'].includes(value)) return 'cid';
-    if (['remote', 'attachment', 'attachments'].includes(value)) return 'remote';
+    if (['attachment', 'attachments', 'attachment-only', 'attachment_only'].includes(value)) return 'attachment';
+    if (value === 'remote') return 'remote';
     if (['link', 'link-only', 'link_only', 'none', 'off', 'false', '0'].includes(value)) return 'link';
     return DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
   }
@@ -7149,7 +7155,9 @@ function createColdmailCampaignService(deps = {}) {
     };
     const attachments = [
       buildAttachment(webdesignImage, webdesignPhoto, 'webdesign'),
-      buildAttachment(mockupImage, webdesignPhoto.mockup, 'device-mockup'),
+      options.includeMockup === false
+        ? null
+        : buildAttachment(mockupImage, webdesignPhoto.mockup, 'device-mockup'),
     ].filter(Boolean);
     return attachments.length ? attachments : undefined;
   }
@@ -7185,9 +7193,9 @@ function createColdmailCampaignService(deps = {}) {
     if (!publicLink.href) {
       return escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS);
     }
-    return `Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
+    return `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${escapeHtmlAttribute(
       publicLink.href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link</a> bekijken 🎨`;
   }
 
   function renderColdmailDomainToken(rawValue) {
@@ -7258,6 +7266,24 @@ function createColdmailCampaignService(deps = {}) {
     if (!hasImageArtifact) return;
     const error = new Error('Link-only webdesignmail bevat nog beeldmateriaal of beeld-placeholderregels.');
     error.code = 'COLDMAIL_WEBDESIGN_LINK_ONLY_VIOLATION';
+    error.status = 500;
+    throw error;
+  }
+
+  function assertColdmailAttachmentOnlyMail(mail = {}) {
+    const html = String(mail.html || '');
+    const attachments = Array.isArray(mail.attachments) ? mail.attachments : [];
+    const attachment = attachments[0];
+    const invalid =
+      /<img\b/i.test(html) ||
+      /\bcid:/i.test(html) ||
+      /\/coldmailing\/webdesign-foto\?t=/i.test(html) ||
+      attachments.length !== 1 ||
+      normalizeString(attachment && attachment.contentDisposition).toLowerCase() !== 'attachment' ||
+      Boolean(attachment && attachment.cid);
+    if (!invalid) return;
+    const error = new Error('Attachment-only webdesignmail bevat inline beeld of geen enkele geldige designbijlage.');
+    error.code = 'COLDMAIL_WEBDESIGN_ATTACHMENT_ONLY_VIOLATION';
     error.status = 500;
     throw error;
   }
@@ -8881,7 +8907,11 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      if (shouldIncludeWebdesignPhoto && !webdesignPhoto.mockup) {
+      if (
+        shouldIncludeWebdesignPhoto &&
+        webdesignImageDelivery !== 'attachment' &&
+        !webdesignPhoto.mockup
+      ) {
         failed.push({
           id: item.id,
           bedrijf: getRowCompany(row),
@@ -8899,13 +8929,14 @@ function createColdmailCampaignService(deps = {}) {
       let remoteWebdesignAttachment = null;
       let remoteMockupAttachment = null;
       const shouldSendWebdesignImages = Boolean(webdesignPhoto && webdesignImageDelivery !== 'link');
+      const shouldPrepareMockup = shouldSendWebdesignImages && webdesignImageDelivery !== 'attachment';
       if (shouldSendWebdesignImages) {
         const preparedWebdesignImage = await preparePreviewImageForEmail(webdesignPhoto, 'webdesign');
-        const preparedMockupImage = webdesignPhoto.mockup
+        const preparedMockupImage = shouldPrepareMockup && webdesignPhoto.mockup
           ? await preparePreviewImageForEmail(webdesignPhoto.mockup, 'mockup')
           : null;
         preparedWebdesignAttachment = mergePreparedImage(webdesignPhoto, preparedWebdesignImage, 'webdesign');
-        preparedMockupAttachment = webdesignPhoto.mockup
+        preparedMockupAttachment = shouldPrepareMockup && webdesignPhoto.mockup
           ? mergePreparedImage(webdesignPhoto.mockup, preparedMockupImage, 'device-mockup')
           : null;
         webdesignPhotoForHtml = {
@@ -8957,7 +8988,9 @@ function createColdmailCampaignService(deps = {}) {
         }),
         reference
       );
-      const htmlWithContent = shouldSendWebdesignImages
+      const shouldRenderWebdesignImages =
+        shouldSendWebdesignImages && webdesignImageDelivery !== 'attachment';
+      const htmlWithContent = shouldRenderWebdesignImages
         ? appendWebdesignImageHtml(htmlBase, webdesignPhotoForHtml, {
             optOutText: '',
             optOutUrl: '',
@@ -8973,7 +9006,13 @@ function createColdmailCampaignService(deps = {}) {
               mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
             }
           )
-        : undefined;
+        : shouldSendWebdesignImages && webdesignImageDelivery === 'attachment'
+          ? buildWebdesignImageAttachments(webdesignPhoto, {
+              inline: false,
+              includeMockup: false,
+              webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
+            })
+          : undefined;
       try {
         const mail = {
           from: formatMailFromHeader(senderEmail, smtpAccount),
@@ -9001,6 +9040,9 @@ function createColdmailCampaignService(deps = {}) {
         }
         if (shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'link') {
           assertColdmailLinkOnlyMailIsImageFree(mail);
+        }
+        if (shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'attachment') {
+          assertColdmailAttachmentOnlyMail(mail);
         }
         if (!testMode) {
           await runColdmailBeforeSendGuard(input, {
