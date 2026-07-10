@@ -3992,13 +3992,71 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  function hasReliableColdmailLiveTotals(payload) {
+    const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
+    const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+    return stats.reliable === true &&
+      normalizeString(stats.dateKey) === expectedDateKey &&
+      Number.isFinite(Number(stats.systemTotalSent ?? stats.totalSent));
+  }
+
+  function preserveReliableColdmailLiveStats(payload, previousPayload) {
+    if (hasReliableColdmailLiveTotals(payload) || !hasReliableColdmailLiveTotals(previousPayload)) return payload;
+    const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
+    const previous = previousPayload.stats;
+    const mergedStats = { ...stats };
+    [
+      'sentToday',
+      'systemSentToday',
+      'centralGuardSentToday',
+      'systemTotalSent',
+      'centralGuardTotalSent',
+      'totalSent',
+      'webdesignTotalSent',
+      'webdesignSentToday',
+      'lastSuccessfulSendAt',
+      'lastSenderEmail',
+    ].forEach((field) => {
+      mergedStats[field] = previous[field];
+    });
+    mergedStats.reliable = true;
+    mergedStats.source = previous.source;
+    mergedStats.authoritativeSource = previous.authoritativeSource;
+    mergedStats.authoritativeStatsStale = true;
+    mergedStats.authoritativeStatsUpdatedAt = previous.authoritativeStatsUpdatedAt || previous.updatedAt || '';
+    if (stats.mailboxBounceStatsAvailable === false && previous.mailboxBounceStatsAvailable !== false) {
+      [
+        'bounces',
+        'totalBounces',
+        'bounceStatsSource',
+        'mailboxBounces',
+        'mailboxBouncesToday',
+        'mailboxBounceStatsAvailable',
+        'mailboxBounceStatsUnavailableReason',
+        'bounceTypes',
+        'bounceItems',
+        'bouncesToday',
+        'todayBounces',
+        'bounceTypesToday',
+        'bounceItemsToday',
+      ].forEach((field) => {
+        mergedStats[field] = previous[field];
+      });
+    }
+    return { ...payload, stats: mergedStats };
+  }
+
   function refreshColdmailLiveStats() {
     if (!coldmailLiveStatsPromise) {
       coldmailLiveStatsPromise = loadFreshColdmailLiveStats()
         .then(async (payload) => {
-          coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload };
-          await persistDurableColdmailLiveStats(payload);
-          return payload;
+          const stablePayload = preserveReliableColdmailLiveStats(
+            payload,
+            coldmailLiveStatsCache && coldmailLiveStatsCache.payload
+          );
+          coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload: stablePayload };
+          await persistDurableColdmailLiveStats(stablePayload);
+          return stablePayload;
         })
         .finally(() => {
           coldmailLiveStatsPromise = null;
