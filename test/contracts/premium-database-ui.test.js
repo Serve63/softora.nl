@@ -523,6 +523,42 @@ test('premium database mail ROI calculator toont vandaag verstuurd en totale bou
   assert.equal(requestedUrls[0], '/api/coldmailing/stats');
 });
 
+test('premium database verlaagt een bewezen cumulatieve bounceteller niet door een tijdelijke nulmeting', async () => {
+  let requestCount = 0;
+  const nodes = {
+    systemMailSentTodayCount: { textContent: '' },
+    systemMailBouncesTodayCount: { textContent: '' },
+    systemMailSentCount: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const systemMailCountClient = loadDatabaseSystemMailCountClient({
+    document: {
+      hidden: false,
+      getElementById: (id) => nodes[id] || null,
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+    },
+    fetch: async () => {
+      requestCount += 1;
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          stats: { sentToday: 0, bounces: requestCount === 1 ? 29 : 0, totalSent: 1393 },
+        }),
+      };
+    },
+    setInterval: () => 0,
+  });
+
+  systemMailCountClient.render([], { dataLoading: false });
+  await systemMailCountClient.refreshTodaySentCount();
+  await systemMailCountClient.refreshTodaySentCount();
+
+  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '29');
+});
+
 test('premium database autopilot toggle switches the real coldmail autopilot state only', async () => {
   let enabled = false;
   const requests = [];
@@ -1589,7 +1625,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617d/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260710b/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260710c/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260710b/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -1852,7 +1888,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710b"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260710b"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710c"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260710b"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);

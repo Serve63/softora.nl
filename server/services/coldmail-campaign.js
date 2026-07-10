@@ -3843,6 +3843,13 @@ function createColdmailCampaignService(deps = {}) {
         suppressReadFailureCooldown: true,
         suppressTransientReadFailureLog: true,
       });
+      if (!Array.isArray(messages)) {
+        return {
+          ...summarizeColdmailMailboxBounceStats([]),
+          available: false,
+          unavailableReason: 'mailbox_bounce_read_failed',
+        };
+      }
       return summarizeColdmailMailboxBounceStats(messages);
     } catch (error) {
       logger.warn('[ColdmailLiveStats][mailbox-bounces]', error && error.message ? error.message : error);
@@ -4005,29 +4012,33 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function preserveReliableColdmailLiveStats(payload, previousPayload) {
-    if (hasReliableColdmailLiveTotals(payload) || !hasReliableColdmailLiveTotals(previousPayload)) return payload;
+    if (!hasReliableColdmailLiveTotals(previousPayload)) return payload;
     const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
     const previous = previousPayload.stats;
     const mergedStats = { ...stats };
-    [
-      'sentToday',
-      'systemSentToday',
-      'centralGuardSentToday',
-      'systemTotalSent',
-      'centralGuardTotalSent',
-      'totalSent',
-      'webdesignTotalSent',
-      'webdesignSentToday',
-      'lastSuccessfulSendAt',
-      'lastSenderEmail',
-    ].forEach((field) => {
-      mergedStats[field] = previous[field];
-    });
-    mergedStats.reliable = true;
-    mergedStats.source = previous.source;
-    mergedStats.authoritativeSource = previous.authoritativeSource;
-    mergedStats.authoritativeStatsStale = true;
-    mergedStats.authoritativeStatsUpdatedAt = previous.authoritativeStatsUpdatedAt || previous.updatedAt || '';
+    let changed = false;
+    if (!hasReliableColdmailLiveTotals(payload)) {
+      [
+        'sentToday',
+        'systemSentToday',
+        'centralGuardSentToday',
+        'systemTotalSent',
+        'centralGuardTotalSent',
+        'totalSent',
+        'webdesignTotalSent',
+        'webdesignSentToday',
+        'lastSuccessfulSendAt',
+        'lastSenderEmail',
+      ].forEach((field) => {
+        mergedStats[field] = previous[field];
+      });
+      mergedStats.reliable = true;
+      mergedStats.source = previous.source;
+      mergedStats.authoritativeSource = previous.authoritativeSource;
+      mergedStats.authoritativeStatsStale = true;
+      mergedStats.authoritativeStatsUpdatedAt = previous.authoritativeStatsUpdatedAt || previous.updatedAt || '';
+      changed = true;
+    }
     if (stats.mailboxBounceStatsAvailable === false && previous.mailboxBounceStatsAvailable !== false) {
       [
         'bounces',
@@ -4046,8 +4057,9 @@ function createColdmailCampaignService(deps = {}) {
       ].forEach((field) => {
         mergedStats[field] = previous[field];
       });
+      changed = true;
     }
-    return { ...payload, stats: mergedStats };
+    return changed ? { ...payload, stats: mergedStats } : payload;
   }
 
   function refreshColdmailLiveStats() {

@@ -34,7 +34,7 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     message_key: 'serve@softora.nl|inbox|101',
     account_email: 'serve@softora.nl',
     folder: 'inbox',
-    subject: 'Returned Mail',
+    subject: 'Returned Mail: Kleine vraag over jullie website',
   };
   const client = {
     from(table) {
@@ -51,8 +51,8 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
           calls.push(['in', column, values]);
           return query;
         },
-        or(filters) {
-          calls.push(['or', filters]);
+        eq(column, value) {
+          calls.push(['eq', column, value]);
           return query;
         },
         order(column, options) {
@@ -84,13 +84,13 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
   assert.deepEqual(calls[0], [
     'select',
     'softora_mailbox_messages',
-    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at',
+    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,deleted_at',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'deleted_at', null]);
-  assert.deepEqual(calls.find((call) => call[0] === 'in' && call[1] === 'account_email'), [
-    'in',
+  assert.deepEqual(calls.find((call) => call[0] === 'eq' && call[1] === 'account_email'), [
+    'eq',
     'account_email',
-    ['serve@softora.nl'],
+    'serve@softora.nl',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'in' && call[1] === 'folder'), [
     'in',
@@ -98,9 +98,54 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     ['inbox'],
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'date', { ascending: false }]);
-  assert.match(calls.find((call) => call[0] === 'or')[1], /sender_email\.ilike\.mailer-daemon@%/);
-  assert.match(calls.find((call) => call[0] === 'or')[1], /subject\.ilike\.%delivery failure%/);
+  assert.equal(calls.some((call) => call[0] === 'or'), false);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
+});
+
+test('data ops store reads bounce candidates per mailbox and filters without a table-wide OR scan', async () => {
+  const accountQueries = [];
+  const rowsByAccount = {
+    'serve@softora.nl': [
+      { message_key: 'serve|1', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Returned Mail: test', date: '2026-07-10T10:00:00.000Z' },
+      { message_key: 'serve|2', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Gewone reactie', date: '2026-07-10T11:00:00.000Z' },
+    ],
+    'martijn@softora.nl': [
+      { message_key: 'martijn|1', account_email: 'martijn@softora.nl', folder: 'inbox', subject: 'Mail delivery failed: returning message to sender', date: '2026-07-10T12:00:00.000Z' },
+    ],
+  };
+  const client = {
+    from() {
+      let accountEmail = '';
+      const query = {
+        select() { return query; },
+        is() { return query; },
+        eq(column, value) {
+          if (column === 'account_email') accountEmail = value;
+          accountQueries.push(value);
+          return query;
+        },
+        in() { return query; },
+        order() { return query; },
+        limit() { return Promise.resolve({ data: rowsByAccount[accountEmail] || [], error: null }); },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const rows = await store.listMailboxMessages({
+    accountEmails: ['serve@softora.nl', 'martijn@softora.nl'],
+    folders: ['inbox'],
+    maxRows: 1000,
+    bounceCandidatesOnly: true,
+  });
+
+  assert.deepEqual(accountQueries.sort(), ['martijn@softora.nl', 'serve@softora.nl']);
+  assert.deepEqual(rows.map((row) => row.message_key), ['martijn|1', 'serve|1']);
 });
 
 test('data ops store saves cancelled webdesign batches with a table-compatible status', async () => {
