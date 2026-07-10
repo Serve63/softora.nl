@@ -2878,7 +2878,7 @@
                         const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
                         state.orders = Array.isArray(orders) ? orders : [];
                         enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, orders);
-                        applyCustomerList(getSortedCustomers(outreachController.applyAutomation(enrichedCustomers).customers), false);
+                        const enrichedWithSnapshot = window.SoftoraDatabaseMailReadySnapshot.mergeAssetFlags(enrichedCustomers, state.mailReadySnapshotCustomers); applyCustomerList(getSortedCustomers(outreachController.applyAutomation(enrichedWithSnapshot).customers), false);
                     } catch (error) {
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
