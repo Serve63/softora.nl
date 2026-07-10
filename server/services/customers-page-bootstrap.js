@@ -4,6 +4,13 @@ const {
   parseMailReadySnapshotCacheValue,
 } = require('./premium-database-mail-ready-snapshot');
 
+const DATABASE_MAIL_STATS_CACHE_SCOPE = 'premium_coldmail_stats_cache';
+const DATABASE_MAIL_STATS_CACHE_KEY = 'softora_coldmail_stats_cache_v1';
+const DATABASE_MAIL_ROI_SCOPE = 'premium_database_mail_roi';
+const DATABASE_MAIL_ROI_KEY = 'premium_database_mail_roi_v1';
+const DATABASE_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
+const DATABASE_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
+
 function createCustomersPageBootstrapService(deps = {}) {
   const {
     getUiStateValues = async () => null,
@@ -20,6 +27,54 @@ function createCustomersPageBootstrapService(deps = {}) {
     const raw = normalizeString(value);
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
     return match ? match[1] : '';
+  }
+
+  function parseJsonObject(value) {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value || '{}') : value;
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function readNonNegativeInteger(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null;
+  }
+
+  function pickNonNegativeInteger(source, keys) {
+    for (const key of keys) {
+      const value = readNonNegativeInteger(source && source[key]);
+      if (value !== null) return value;
+    }
+    return null;
+  }
+
+  function buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState) {
+    const statsValues = statsState && statsState.values && typeof statsState.values === 'object' ? statsState.values : {};
+    const cachedStatsPayload = parseJsonObject(statsValues[DATABASE_MAIL_STATS_CACHE_KEY]);
+    const stats = cachedStatsPayload.stats && typeof cachedStatsPayload.stats === 'object' ? cachedStatsPayload.stats : {};
+    const roiValues = roiState && roiState.values && typeof roiState.values === 'object' ? roiState.values : {};
+    const roi = parseJsonObject(roiValues[DATABASE_MAIL_ROI_KEY]);
+    const autopilotValues = autopilotState && autopilotState.values && typeof autopilotState.values === 'object' ? autopilotState.values : {};
+    const autopilot = parseJsonObject(autopilotValues[DATABASE_AUTOPILOT_KEY]);
+    const dealCount = pickNonNegativeInteger(roi, ['dealCount', 'dealsCount', 'count']);
+    return {
+      mailStats: {
+        sentToday: pickNonNegativeInteger(stats, ['systemSentToday', 'sentToday', 'webdesignSentToday']),
+        bounces: pickNonNegativeInteger(stats, ['bounces', 'totalBounces', 'bouncesTotal']),
+        totalSent: pickNonNegativeInteger(stats, ['systemTotalSent', 'totalSent', 'webdesignTotalSent', 'centralGuardTotalSent']),
+        updatedAt: normalizeString(stats.updatedAt) || null,
+      },
+      mailRoi: {
+        dealCount,
+      },
+      autopilot: Object.prototype.hasOwnProperty.call(autopilot, 'enabled')
+        ? { loaded: true, enabled: autopilot.enabled === true }
+        : { loaded: false, enabled: false },
+    };
   }
 
   function normalizeSearchValue(value) {
@@ -849,14 +904,21 @@ function createCustomersPageBootstrapService(deps = {}) {
       suppressSupabaseRestFailureCooldown: true,
       readFailureCooldownScope: MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
     };
-    const state = await resolveBootstrapReadWithTimeout(
-      readBootstrapUiState(MAIL_READY_BOOTSTRAP_CACHE_SCOPE, readOptions),
-      Math.max(150, Math.min(1500, Number(options.timeoutMs) || 750)),
-      buildUnavailableBootstrapState(new Error('Mailklare bootstrapcache timeout'))
-    );
+    const timeoutMs = Math.max(150, Math.min(1500, Number(options.timeoutMs) || 750));
+    const [state, statsState, roiState, autopilotState] = await Promise.all([
+      MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+      DATABASE_MAIL_STATS_CACHE_SCOPE,
+      DATABASE_MAIL_ROI_SCOPE,
+      DATABASE_AUTOPILOT_SCOPE,
+    ].map((scope) => resolveBootstrapReadWithTimeout(
+      readBootstrapUiState(scope, { ...readOptions, readFailureCooldownScope: scope }),
+      timeoutMs,
+      buildUnavailableBootstrapState(new Error(`${scope} bootstrapcache timeout`))
+    )));
+    const databaseBootstrapState = buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState);
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
-    if (!snapshot) return unavailable;
+    if (!snapshot) return { ...unavailable, ...databaseBootstrapState };
     return {
       ok: true,
       loadedAt: new Date().toISOString(),
@@ -866,6 +928,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       mailReadySnapshotTotal: snapshot.total,
       availableSnapshotTotal: snapshot.availableTotal,
       activeOrdersState: buildBootstrapStateSnapshot(null),
+      ...databaseBootstrapState,
     };
   }
 

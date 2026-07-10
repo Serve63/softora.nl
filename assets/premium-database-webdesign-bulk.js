@@ -409,7 +409,7 @@
                 const batches = Array.isArray(payload && payload.batches) ? payload.batches : [];
                 if (!response.ok) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
                 if (!batches.length) {
-                    scheduleRestoreRetry();
+                    hideStatus();
                     return null;
                 }
                 const batch = pickRestorableBatch(batches);

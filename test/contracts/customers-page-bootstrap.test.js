@@ -126,7 +126,7 @@ test('customers page bootstrap can defer heavy customer rows for the premium dat
   assert.equal(payload.activeOrdersState.source, '');
 });
 
-test('premium database bootstrap reads only the compact canonical snapshot cache', async () => {
+test('premium database bootstrap reads the compact snapshot and lightweight metric caches', async () => {
   const seenReads = [];
   const snapshot = {
     version: 1,
@@ -143,9 +143,10 @@ test('premium database bootstrap reads only the compact canonical snapshot cache
   const service = createCustomersPageBootstrapService({
     getUiStateValues: async (scope, options) => {
       seenReads.push({ scope, options });
-      if (scope !== MAIL_READY_BOOTSTRAP_CACHE_SCOPE) {
-        throw new Error('De zware customer-state mag niet in de HTML-bootstrap worden gelezen.');
-      }
+      if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { systemSentToday: 4, totalBounces: 29, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
+      if (scope === 'premium_database_mail_roi') return { source: 'supabase', values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 2 }) } };
+      if (scope === 'premium_coldmail_autopilot') return { source: 'supabase', values: { softora_coldmail_autopilot_v1: JSON.stringify({ enabled: false }) } };
+      assert.equal(scope, MAIL_READY_BOOTSTRAP_CACHE_SCOPE);
       return {
         source: 'supabase',
         values: { [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify(snapshot) },
@@ -160,8 +161,17 @@ test('premium database bootstrap reads only the compact canonical snapshot cache
   assert.equal(payload.mailReadySnapshotTotal, 1013);
   assert.equal(payload.availableSnapshotTotal, 113);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
-  assert.deepEqual(seenReads.map((read) => read.scope), [MAIL_READY_BOOTSTRAP_CACHE_SCOPE]);
-  assert.equal(seenReads[0].options.uiStateReadTimeoutMs, 650);
+  assert.deepEqual(payload.mailStats, { sentToday: 4, bounces: 29, totalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' });
+  assert.deepEqual(payload.mailRoi, { dealCount: 2 });
+  assert.deepEqual(payload.autopilot, { loaded: true, enabled: false });
+  assert.deepEqual(seenReads.map((read) => read.scope), [
+    MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+    'premium_coldmail_stats_cache',
+    'premium_database_mail_roi',
+    'premium_coldmail_autopilot',
+  ]);
+  assert.equal(seenReads.every((read) => read.options.uiStateReadTimeoutMs === 650), true);
+  assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
 });
 
 test('premium database bootstrap never turns a missing cache into fake zero totals', async () => {

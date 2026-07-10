@@ -119,6 +119,23 @@ function getRowUpdatedAt(row = {}) {
   return pickRowValue(row, ['updatedAt', 'updated', 'updated_at', 'datum', 'paidAt']);
 }
 
+function dedupeCustomerRows(rows = []) {
+  const byId = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const id = getRowId(row);
+    if (!id) return;
+    const current = byId.get(id);
+    if (!current) {
+      byId.set(id, row);
+      return;
+    }
+    const currentUpdatedAt = Date.parse(getRowUpdatedAt(current)) || 0;
+    const nextUpdatedAt = Date.parse(getRowUpdatedAt(row)) || 0;
+    if (nextUpdatedAt > currentUpdatedAt) byId.set(id, row);
+  });
+  return Array.from(byId.values());
+}
+
 function isColdmailTestCompany(row = {}) {
   return COLDMAIL_TEST_COMPANIES.has(normalizeCompanyKey(getRowCompany(row)));
 }
@@ -433,6 +450,28 @@ function buildAvailableSnapshotCustomer(row = {}, photoFlag = {}) {
   };
 }
 
+function enrichSnapshotCustomersWithSignedMedia(customers = [], signedRows = []) {
+  const signedByCustomerId = new Map();
+  (Array.isArray(signedRows) ? signedRows : []).forEach((row) => {
+    const customerId = normalizeString(row && row.customerId);
+    if (customerId && !signedByCustomerId.has(customerId)) signedByCustomerId.set(customerId, row);
+  });
+  return (Array.isArray(customers) ? customers : []).map((customer) => {
+    const signed = signedByCustomerId.get(normalizeString(customer && customer.id));
+    if (!signed) return customer;
+    const websitePhoto = normalizeString(signed.websitePhotoUrl || signed.websitePhoto || signed.photo);
+    const websiteMockup = normalizeString(signed.websiteMockupUrl || signed.websiteMockup || signed.mockup);
+    return {
+      ...customer,
+      websitePhoto,
+      websitePhotoName: normalizeString(signed.fileName),
+      websiteMockup,
+      websiteMockupName: normalizeString(signed.websiteMockupName),
+      signedUrlExpiresAt: normalizeString(signed.signedUrlExpiresAt),
+    };
+  });
+}
+
 function createUnavailableError(message) {
   const error = new Error(message);
   error.statusCode = 503;
@@ -475,6 +514,25 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     return [];
   }
 
+  async function readBootstrapSignedMedia(customerIds) {
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') return [];
+    try {
+      const rows = await dataOpsStore.listDesignPhotosWithSignedUrls({
+        customerIds,
+        maxMatches: customerIds.length,
+        expiresInSeconds: 24 * 60 * 60,
+        suppressTransientReadFailureLog: true,
+        suppressReadFailureCooldown: true,
+      });
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[PremiumDatabaseMailReadySnapshot][signed-media]', error?.message || error);
+      }
+      return [];
+    }
+  }
+
   async function readCentralGuardKeys(keys) {
     if (!dataOpsStore || typeof dataOpsStore.listOutboundRecipientGuardKeys !== 'function') return new Set();
     try {
@@ -498,11 +556,12 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const photosStartMs = Date.now();
     const photoRowsPromise = readPhotoFlags().then((rows) => ({ rows, ms: Date.now() - photosStartMs }));
     const [customerResult, photoResult] = await Promise.all([customerRowsPromise, photoRowsPromise]);
-    const customerRows = customerResult.rows;
+    const rawCustomerRows = customerResult.rows;
     const customersMs = customerResult.ms;
-    if (!Array.isArray(customerRows)) {
+    if (!Array.isArray(rawCustomerRows)) {
       throw createUnavailableError('Mailklare snapshot kon klantdata niet laden.');
     }
+    const customerRows = dedupeCustomerRows(rawCustomerRows);
     const photoRows = photoResult.rows;
     const photosMs = photoResult.ms;
     if (!Array.isArray(photoRows)) {
@@ -531,14 +590,25 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const finalComputeStartMs = Date.now();
     const unguardedCandidates = basicCandidates
       .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)));
-    const mailReadyRows = unguardedCandidates
+    let mailReadyRows = unguardedCandidates
       .filter((item) => isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildSnapshotCustomer(item.row, item.photoFlag));
-    const availableRows = unguardedCandidates
+    let availableRows = unguardedCandidates
       .filter((item) => !rowHasColdcallingSignal(item.row))
       .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag));
     const computeMs = computeBeforeGuardsMs + (Date.now() - finalComputeStartMs);
+    const mediaStartMs = Date.now();
+    const bootstrapCustomerIds = Array.from(new Set(
+      mailReadyRows.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT)
+        .concat(availableRows.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT))
+        .map((customer) => normalizeString(customer && customer.id))
+        .filter(Boolean)
+    ));
+    const signedMediaRows = await readBootstrapSignedMedia(bootstrapCustomerIds);
+    mailReadyRows = enrichSnapshotCustomersWithSignedMedia(mailReadyRows, signedMediaRows);
+    availableRows = enrichSnapshotCustomersWithSignedMedia(availableRows, signedMediaRows);
+    const mediaMs = Date.now() - mediaStartMs;
     return {
       generatedAt: now().toISOString(),
       customers: mailReadyRows,
@@ -547,6 +617,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         customersMs,
         photosMs,
         guardsMs,
+        mediaMs,
         computeMs,
         totalMs: Date.now() - startedAtMs,
       },

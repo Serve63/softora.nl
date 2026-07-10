@@ -37,6 +37,10 @@ const DEFAULT_COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const DEFAULT_COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const DEFAULT_COLDMAIL_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
 const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
+const DEFAULT_COLDMAIL_STATS_CACHE_SCOPE = 'premium_coldmail_stats_cache';
+const DEFAULT_COLDMAIL_STATS_CACHE_KEY = 'softora_coldmail_stats_cache_v1';
+const COLDMAIL_LIVE_STATS_MEMORY_TTL_MS = 30 * 1000;
+const COLDMAIL_LIVE_STATS_DURABLE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 81;
@@ -462,6 +466,9 @@ function createColdmailCampaignService(deps = {}) {
   let coldmailCampaignSendPromise = null;
   let webdesignPreparationCoordinator = initialWebdesignPreparationCoordinator;
   let coldmailPhotoMapCache = null;
+  let coldmailLiveStatsCache = null;
+  let coldmailLiveStatsPromise = null;
+  let coldmailLiveStatsDurableReadPromise = null;
   const mailboxAccountService = createMailboxService({
     mailConfig: {
       smtpHost,
@@ -3842,7 +3849,7 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  async function getColdmailLiveStats() {
+  async function loadFreshColdmailLiveStats() {
     const [sendGuardState, customerState, centralGuardStats, mailboxBounceStats] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
@@ -3937,6 +3944,97 @@ function createColdmailCampaignService(deps = {}) {
         updatedAt: now().toISOString(),
       },
     };
+  }
+
+  function parseColdmailLiveStatsCache(rawValue) {
+    try {
+      const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
+      if (!parsed || typeof parsed !== 'object' || parsed.ok !== true || !parsed.stats || typeof parsed.stats !== 'object') return null;
+      const updatedAtMs = Date.parse(normalizeString(parsed.stats.updatedAt));
+      const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+      if (!updatedAtMs || normalizeString(parsed.stats.dateKey) !== expectedDateKey) return null;
+      if (now().getTime() - updatedAtMs > COLDMAIL_LIVE_STATS_DURABLE_TTL_MS) return null;
+      return parsed;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function readDurableColdmailLiveStats() {
+    try {
+      const state = await getUiStateValues(DEFAULT_COLDMAIL_STATS_CACHE_SCOPE, {
+        uiStateReadTimeoutMs: 900,
+        suppressTransientReadFailureLog: true,
+        suppressReadFailureCooldown: true,
+        suppressReadFailureLog: true,
+        readFailureCooldownScope: DEFAULT_COLDMAIL_STATS_CACHE_SCOPE,
+      });
+      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+      return parseColdmailLiveStatsCache(values[DEFAULT_COLDMAIL_STATS_CACHE_KEY]);
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][durable-read]', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
+  async function persistDurableColdmailLiveStats(payload) {
+    try {
+      await setUiStateValues(
+        DEFAULT_COLDMAIL_STATS_CACHE_SCOPE,
+        { [DEFAULT_COLDMAIL_STATS_CACHE_KEY]: JSON.stringify(payload) },
+        { source: 'coldmail-live-stats-cache', actor: 'Coldmail statistieken' }
+      );
+      return true;
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][durable-write]', error && error.message ? error.message : error);
+      return false;
+    }
+  }
+
+  function refreshColdmailLiveStats() {
+    if (!coldmailLiveStatsPromise) {
+      coldmailLiveStatsPromise = loadFreshColdmailLiveStats()
+        .then(async (payload) => {
+          coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload };
+          await persistDurableColdmailLiveStats(payload);
+          return payload;
+        })
+        .finally(() => {
+          coldmailLiveStatsPromise = null;
+        });
+    }
+    return coldmailLiveStatsPromise;
+  }
+
+  async function getColdmailLiveStats() {
+    const cachedAtMs = Number(coldmailLiveStatsCache && coldmailLiveStatsCache.cachedAtMs) || 0;
+    const cacheAgeMs = cachedAtMs ? now().getTime() - cachedAtMs : Number.POSITIVE_INFINITY;
+    if (coldmailLiveStatsCache && cacheAgeMs < COLDMAIL_LIVE_STATS_MEMORY_TTL_MS) {
+      return coldmailLiveStatsCache.payload;
+    }
+    if (coldmailLiveStatsCache) {
+      refreshColdmailLiveStats().catch((error) => {
+        logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
+      });
+      return coldmailLiveStatsCache.payload;
+    }
+    if (!coldmailLiveStatsDurableReadPromise) {
+      coldmailLiveStatsDurableReadPromise = readDurableColdmailLiveStats().finally(() => {
+        coldmailLiveStatsDurableReadPromise = null;
+      });
+    }
+    const durablePayload = await coldmailLiveStatsDurableReadPromise;
+    if (durablePayload) {
+      coldmailLiveStatsCache = {
+        cachedAtMs: Date.parse(normalizeString(durablePayload.stats && durablePayload.stats.updatedAt)) || now().getTime(),
+        payload: durablePayload,
+      };
+      refreshColdmailLiveStats().catch((error) => {
+        logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
+      });
+      return durablePayload;
+    }
+    return refreshColdmailLiveStats();
   }
 
   function summarizeColdmailSenderQuota(quota = {}) {

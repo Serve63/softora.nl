@@ -46,6 +46,16 @@
         return String(value || "").trim().toLowerCase();
     }
 
+    function dedupeCustomers(customers) {
+        const seenIds = new Set();
+        return (Array.isArray(customers) ? customers : []).filter(function (customer) {
+            const id = normalizeMatchValue(customer && customer.id);
+            if (!id || seenIds.has(id)) return false;
+            seenIds.add(id);
+            return true;
+        });
+    }
+
     function getMatchKeys(customer) {
         const rawWebsite = normalizeMatchValue(customer && (customer.website || customer.dom)).replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
         return [
@@ -71,34 +81,57 @@
         return getMatchKeys(customer).map(function (key) { return snapshotMap.get(key); }).find(Boolean);
     }
 
+    function mergeSnapshotMedia(customer, snapshotMatch, isMailReady) {
+        const match = snapshotMatch || {};
+        const hasPhoto = isMailReady ? true : match.hasPhoto === true;
+        const hasMockup = isMailReady ? true : match.hasMockup === true;
+        return Object.assign({}, customer, {
+            websitePhoto: hasPhoto ? String(match.websitePhoto || customer.websitePhoto || "").trim() : "",
+            websitePhotoName: String(match.websitePhotoName || customer.websitePhotoName || "").trim(),
+            websiteMockup: hasMockup ? String(match.websiteMockup || customer.websiteMockup || "").trim() : "",
+            websiteMockupName: String(match.websiteMockupName || customer.websiteMockupName || "").trim(),
+            signedUrlExpiresAt: String(match.signedUrlExpiresAt || customer.signedUrlExpiresAt || "").trim(),
+            hasPhoto: hasPhoto,
+            hasMockup: hasMockup,
+            websitePhotoAssetReady: hasPhoto,
+            websiteMockupAssetReady: hasMockup,
+            mailReady: Boolean(isMailReady),
+            mailReadySnapshot: Boolean(isMailReady),
+            availableSnapshot: !isMailReady
+        });
+    }
+
     function mergeAssetFlags(customers, snapshotCustomers, availableSnapshotCustomers) {
         const snapshotMap = buildSnapshotMap(snapshotCustomers, isSnapshotMailReadyCustomer);
         const availableMap = buildSnapshotMap(availableSnapshotCustomers, isSnapshotAvailableCustomer);
-        if (!snapshotMap.size && !availableMap.size) return customers || [];
-        return (customers || []).map(function (customer) {
+        if (!snapshotMap.size && !availableMap.size) return dedupeCustomers(customers);
+        return dedupeCustomers(customers).map(function (customer) {
             const mailReadyMatch = findSnapshotMatch(snapshotMap, customer);
             const availableMatch = findSnapshotMatch(availableMap, customer);
-            if (mailReadyMatch) return Object.assign({}, customer, {
-                hasPhoto: true,
-                hasMockup: true,
-                websitePhotoAssetReady: true,
-                websiteMockupAssetReady: true,
-                mailReady: true,
-                mailReadySnapshot: true,
-                availableSnapshot: false
-            });
-            if (availableMatch) return Object.assign({}, customer, {
-                hasPhoto: availableMatch.hasPhoto === true,
-                hasMockup: availableMatch.hasMockup === true,
-                websitePhotoAssetReady: availableMatch.hasPhoto === true,
-                websiteMockupAssetReady: availableMatch.hasMockup === true,
-                mailReady: false,
-                mailReadySnapshot: false,
-                availableSnapshot: true
-            });
+            if (mailReadyMatch) return mergeSnapshotMedia(customer, mailReadyMatch, true);
+            if (availableMatch) return mergeSnapshotMedia(customer, availableMatch, false);
             if (customer && (customer.mailReadySnapshot === true || customer.availableSnapshot === true)) return Object.assign({}, customer, { mailReady: false, mailReadySnapshot: false, availableSnapshot: false });
             return customer;
         });
+    }
+
+    function mergeWithCanonicalSnapshots(customers, snapshotCustomers, availableSnapshotCustomers) {
+        const remoteCustomers = dedupeCustomers(customers);
+        const snapshotRows = dedupeCustomers(snapshotCustomers).filter(isSnapshotMailReadyCustomer);
+        const availableRows = dedupeCustomers(availableSnapshotCustomers).filter(isSnapshotAvailableCustomer);
+        if (!snapshotRows.length && !availableRows.length) return remoteCustomers;
+        const remoteMap = buildSnapshotMap(remoteCustomers);
+        const consumed = new Set();
+        const canonical = snapshotRows.map(function (snapshotCustomer) {
+            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            if (remoteMatch) consumed.add(remoteMatch);
+            return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, true);
+        }).concat(availableRows.map(function (snapshotCustomer) {
+            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            if (remoteMatch) consumed.add(remoteMatch);
+            return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);
+        }));
+        return canonical.concat(remoteCustomers.filter(function (customer) { return !consumed.has(customer); }));
     }
 
     function getDisplayCount(state, currentCount) {
@@ -148,9 +181,9 @@
     }
 
     function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
-        return (Array.isArray(rows) ? rows : []).map(function (row, index) {
+        return dedupeCustomers((Array.isArray(rows) ? rows : []).map(function (row, index) {
             return normalizeSnapshotCustomer(row, offset + index, normalizeCustomer);
-        }).filter(function (customer) { return customer && customer.id; });
+        }).filter(function (customer) { return customer && customer.id; }));
     }
 
     function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, pending) {
@@ -158,18 +191,18 @@
         state.mailReadySnapshotLoaded = true;
         state.mailReadySnapshotFailed = false;
         state.mailReadySnapshotPending = Boolean(pending);
-        state.mailReadySnapshotTotal = Math.max(snapshotCustomers.length, Number(total) || 0);
+        state.mailReadySnapshotTotal = pending ? Math.max(snapshotCustomers.length, Number(total) || 0) : snapshotCustomers.length;
         state.mailReadySnapshotCustomers = snapshotCustomers;
         state.availableSnapshotLoaded = true;
-        state.availableSnapshotTotal = Math.max(availableCustomers.length, Number(availableTotal) || 0);
+        state.availableSnapshotTotal = availableCustomers.length;
         state.availableSnapshotCustomers = availableCustomers;
         state.dataUnavailable = false;
         clearRetry(state);
         if (typeof config.applyCustomerList === "function") {
             const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
             const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer); });
-            const combinedSnapshotCustomers = snapshotCustomers.concat(availableCustomers);
-            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, true);
+            const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers));
+            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, false);
         }
     }
 
@@ -202,8 +235,9 @@
             const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
             let availableCustomers = normalizeAvailableSnapshotRows(firstPage.payload.availableCustomers, 0, config.normalizeCustomer);
-            publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.total > snapshotCustomers.length);
-            if (firstPage.total > snapshotCustomers.length && snapshotCustomers.length < MAX_SNAPSHOT_ROWS) {
+            const hasRemainingPages = firstPage.total > firstPage.rows.length;
+            publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, hasRemainingPages);
+            if (hasRemainingPages && firstPage.rows.length < MAX_SNAPSHOT_ROWS) {
                 try {
                     const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
                     snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
@@ -229,10 +263,10 @@
     }
 
     function normalizeAvailableSnapshotRows(rows, offset, normalizeCustomer) {
-        return (Array.isArray(rows) ? rows : []).map(function (row, index) {
+        return dedupeCustomers((Array.isArray(rows) ? rows : []).map(function (row, index) {
             return normalizeAvailableSnapshotCustomer(row, offset + index, normalizeCustomer);
-        }).filter(function (customer) { return customer && customer.id; });
+        }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, mergeAssetFlags: mergeAssetFlags, getDisplayCount: getDisplayCount, load: load };
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
 })(window);
