@@ -16,6 +16,11 @@ const {
 } = require('./data-ops-serialization');
 const { fitWebdesignPreviewForEmail } = require('./coldmail-image-frame');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
+const {
+  WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
+  WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignImageSection,
+} = require('./webdesign-email-renderer');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -60,17 +65,10 @@ const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
 const DEFAULT_MAILBOX_WEBDESIGN_IMAGE_DELIVERY = 'cid';
-const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
   /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?)/i;
-const MAILBOX_EMAIL_IMAGE_MAX_WIDTH = 480;
-const MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
-const MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH = 584;
-const MAILBOX_EMAIL_MOCKUP_IMAGE_MATCH_HEIGHT = 450;
-const MAILBOX_EMAIL_IMAGE_GAP_WIDTH = 16;
-const MAILBOX_EMAIL_MOBILE_BREAKPOINT_PX = 980;
 const MAX_STORED_BODY_IMAGE_BYTES = 5 * 1024 * 1024;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
@@ -1647,39 +1645,6 @@ function createMailboxService(deps = {}) {
     return DEFAULT_MAILBOX_WEBDESIGN_IMAGE_DELIVERY;
   }
 
-  function renderMailboxEmailImage(image, margin) {
-    if (!image || !image.src) return '';
-    return `\n<table role="presentation" width="${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}px;max-width:100%;margin:${margin};"><tr><td width="${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}" style="padding:0;margin:0;width:${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}px;max-width:100%;font-size:0;line-height:0;"><img src="${escapeHtmlAttribute(
-      image.src
-    )}" alt="${escapeHtmlAttribute(
-      image.alt
-    )}" width="${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}" style="display:block;width:${MAILBOX_EMAIL_IMAGE_MAX_WIDTH}px;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;" /></td></tr></table>`;
-  }
-
-  function renderMailboxEmailImageTag(image, width = MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH, options = {}) {
-    if (!image || !image.src) return '';
-    const isMockup = options && options.mockup;
-    const className = isMockup ? 'softora-webdesign-image softora-webdesign-image--mockup' : 'softora-webdesign-image';
-    const heightAttribute = isMockup ? ` height="${MAILBOX_EMAIL_MOCKUP_IMAGE_MATCH_HEIGHT}"` : '';
-    const imageStyle = isMockup
-      ? `display:block;width:100%;max-width:100%;height:${MAILBOX_EMAIL_MOCKUP_IMAGE_MATCH_HEIGHT}px;max-height:${MAILBOX_EMAIL_MOCKUP_IMAGE_MATCH_HEIGHT}px;object-fit:cover;object-position:center top;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;`
-      : `display:block;width:100%;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;`;
-    return `<img src="${escapeHtmlAttribute(
-      image.src
-    )}" alt="${escapeHtmlAttribute(
-      image.alt
-    )}" class="${className}" width="${width}"${heightAttribute} style="${imageStyle}" />`;
-  }
-
-  function renderMailboxEmailImagePair(mainImage, mockupImage) {
-    const mainHtml = renderMailboxEmailImageTag(mainImage, MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH);
-    const mockupHtml = renderMailboxEmailImageTag(mockupImage, MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH, { mockup: true });
-    if (!mainHtml || !mockupHtml) return '';
-    const pairTableWidth = MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH + MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH + MAILBOX_EMAIL_IMAGE_GAP_WIDTH;
-    const mobileCaptionHtml = `<p class="softora-mobile-mockup-caption" style="display:none;mso-hide:all;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;max-height:0;overflow:hidden;">${escapeHtml(COLDMAIL_MOCKUP_CAPTION)}</p>`;
-    return `\n<style>@media only screen and (max-width:${MAILBOX_EMAIL_MOBILE_BREAKPOINT_PX}px), only screen and (max-device-width:${MAILBOX_EMAIL_MOBILE_BREAKPOINT_PX}px){.softora-mailbox-webdesign-body,.softora-mailbox-webdesign-body p,.softora-mailbox-webdesign-body a{font-size:15px!important;line-height:1.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important}.softora-mobile-mockup-caption{display:block!important;mso-hide:none!important;max-height:none!important;overflow:visible!important}.softora-webdesign-image-table,.softora-webdesign-image-table tbody,.softora-webdesign-image-table tr{display:block!important;width:100%!important;max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;padding-right:0!important;padding-left:0!important}.softora-webdesign-image-gap{display:none!important;width:0!important;max-width:0!important;max-height:0!important;overflow:hidden!important;line-height:0!important;font-size:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}.softora-webdesign-image--mockup{height:auto!important;max-height:none!important;object-fit:contain!important}}</style><table class="softora-webdesign-image-table" role="presentation" width="${pairTableWidth}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${pairTableWidth}px;max-width:100%;margin:22px 0 0 0;"><tr><td class="softora-webdesign-image-cell" width="${MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH}" valign="bottom" style="padding:0;margin:0;width:${MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:${MAILBOX_EMAIL_WEBDESIGN_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;">${mainHtml}</td><td class="softora-webdesign-image-gap" width="${MAILBOX_EMAIL_IMAGE_GAP_WIDTH}" style="font-size:0;line-height:0;width:${MAILBOX_EMAIL_IMAGE_GAP_WIDTH}px;">&nbsp;</td><td class="softora-webdesign-image-cell" width="${MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH}" valign="bottom" style="padding:0;margin:0;width:${MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:${MAILBOX_EMAIL_MOCKUP_IMAGE_PAIR_WIDTH}px;font-size:0;line-height:0;">${mobileCaptionHtml}${mockupHtml}</td></tr></table>`;
-  }
-
   function renderMailboxWebdesignHtml(text, options = {}) {
     const bodyText = stripColdmailOptOutLines(text);
     const paragraphs = bodyText
@@ -1699,9 +1664,11 @@ function createMailboxService(deps = {}) {
     const inlineImages = Array.isArray(options.inlineImages) ? options.inlineImages : [];
     const mainImage = inlineImages.find((image) => image.type === 'webdesign');
     const mockupImage = inlineImages.find((image) => image.type === 'mockup');
-    const imagesHtml = mainImage && mockupImage
-      ? renderMailboxEmailImagePair(mainImage, mockupImage)
-      : renderMailboxEmailImage(mainImage, '22px 0 0 0');
+    const imagesHtml = renderWebdesignImageSection(mainImage, {
+      mockupImage,
+      caption: COLDMAIL_MOCKUP_CAPTION,
+      margin: '22px 0 0 0',
+    });
     const optOutUrl = normalizeString(options.optOutUrl);
     const optOutHtml = optOutUrl
       ? `\n<p style="margin:18px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
@@ -1710,7 +1677,7 @@ function createMailboxService(deps = {}) {
           COLDMAIL_OPT_OUT_LABEL
         )}</a></p>`
       : '';
-    return `<div class="softora-mailbox-webdesign-body" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${paragraphs}${imagesHtml}${optOutHtml}</div>`;
+    return `<div class="softora-webdesign-email-body softora-mailbox-webdesign-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;max-width:900px;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;">${paragraphs}${imagesHtml}${optOutHtml}</div>`;
   }
 
   async function buildMailboxWebdesignSendParts({ accountEmail, to, subject, text }) {
@@ -2414,6 +2381,11 @@ function createMailboxService(deps = {}) {
       text: webdesignParts?.text || normalizedText,
     };
     if (webdesignParts?.html) mail.html = webdesignParts.html;
+    if (webdesignParts) {
+      mail.headers = {
+        'X-Softora-Template-Version': WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+      };
+    }
     if (Array.isArray(webdesignParts?.attachments) && webdesignParts.attachments.length) {
       mail.attachments = webdesignParts.attachments;
     }

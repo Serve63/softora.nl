@@ -300,25 +300,25 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   );
   assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
-  assert.match(sent[0].message.html, /softora-webdesign-image-cell/);
-  assert.match(sent[0].message.html, /softora-webdesign-image-gap/);
-  assert.match(sent[0].message.html, /<table class="softora-webdesign-image-table" role="presentation" width="900"/);
-  assert.match(sent[0].message.html, /class="softora-mailbox-webdesign-body"/);
-  assert.match(sent[0].message.html, /\.softora-mailbox-webdesign-body,\.softora-mailbox-webdesign-body p,\.softora-mailbox-webdesign-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important\}/);
-  assert.match(sent[0].message.html, /\.softora-webdesign-image-table,\.softora-webdesign-image-table tbody,\.softora-webdesign-image-table tr\{display:block!important;width:100%!important;max-width:100%!important\}/);
-  assert.match(sent[0].message.html, /\.softora-webdesign-image-gap\{display:none!important;width:0!important;max-width:0!important;max-height:0!important;overflow:hidden!important;line-height:0!important;font-size:0!important\}/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="300" style="display:block;width:100%;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;"/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="584" height="450" style="display:block;width:100%;max-width:100%;height:450px;max-height:450px;object-fit:cover;object-position:center top;border:1px solid #dbe3f0;border-radius:14px;outline:none;text-decoration:none;"/);
-  assert.doesNotMatch(sent[0].message.html, /softora-webdesign-image" width="300" style="display:block;width:100%;max-width:300px/);
+  assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-10-v1');
+  assert.match(sent[0].message.html, /data-softora-template-version="softora-webdesign-email-2026-07-10-v1"/);
+  assert.match(sent[0].message.html, /<table class="softora-desktop-image-pair" role="presentation" width="900"/);
+  assert.match(sent[0].message.html, /class="softora-webdesign-email-body softora-mailbox-webdesign-body"/);
+  assert.match(sent[0].message.html, /\.softora-webdesign-email-body,\.softora-webdesign-email-body p,\.softora-webdesign-email-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important\}/);
+  assert.match(sent[0].message.html, /\.softora-mobile-image-pair table,\.softora-mobile-image-pair tbody,\.softora-mobile-image-pair tr,\.softora-mobile-image-pair td\{display:block!important;width:100%!important;max-width:100%!important\}/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-desktop-image" width="300" height="560"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-desktop-image" width="584" height="560"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="640"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="640"/);
+  assert.doesNotMatch(sent[0].message.html, /softora-webdesign-image-cell|softora-webdesign-image-gap|softora-webdesign-image-table/);
   assert.match(sent[0].message.html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
-  assert.ok(
-    sent[0].message.html.indexOf('alt="PCK B.V. webdesign"') <
-      sent[0].message.html.indexOf('class="softora-mobile-mockup-caption"')
-  );
-  assert.ok(
-    sent[0].message.html.indexOf('class="softora-mobile-mockup-caption"') <
-      sent[0].message.html.indexOf('alt="PCK B.V. device mockup"')
-  );
+  const mobilePairIndex = sent[0].message.html.indexOf('class="softora-mobile-image-pair"');
+  const mobileMainIndex = sent[0].message.html.indexOf('alt="PCK B.V. webdesign"', mobilePairIndex);
+  const mobileCaptionIndex = sent[0].message.html.indexOf('class="softora-mobile-mockup-caption"', mobilePairIndex);
+  const mobileMockupIndex = sent[0].message.html.indexOf('alt="PCK B.V. device mockup"', mobileCaptionIndex);
+  assert.ok(mobileMainIndex > mobilePairIndex);
+  assert.ok(mobileCaptionIndex > mobileMainIndex);
+  assert.ok(mobileMockupIndex > mobileCaptionIndex);
   assert.equal(sent[0].message.attachments.length, 2);
   assert.deepEqual(
     sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),
