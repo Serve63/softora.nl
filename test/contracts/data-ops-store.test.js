@@ -22,6 +22,10 @@ test('data ops store restores large premium database webdesign job queues', () =
   );
   assert.match(source, /function getWebdesignBatchTableStatus\(status\)[\s\S]*return normalized === 'cancelled' \? 'error' : normalized;/);
   assert.match(source, /status,\s*total: Math\.max/);
+  assert.match(
+    source,
+    /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)/
+  );
 });
 
 test('data ops store reads mailbox messages for coldmail bounce stats', async () => {

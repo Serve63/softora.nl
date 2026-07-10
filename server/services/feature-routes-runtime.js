@@ -86,6 +86,7 @@ function registerFeatureRoutes(app, deps = {}) {
   const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
     dataOpsStore: deps.dataOpsStore,
     getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
   });
   const premiumDatabaseMassResearchCoordinator = createPremiumDatabaseMassResearchCoordinator({
     dataOpsStore: deps.dataOpsStore,

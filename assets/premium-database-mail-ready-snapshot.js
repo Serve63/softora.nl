@@ -2,7 +2,7 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
-    const PAGE_LIMIT = 100;
+    const PAGE_LIMIT = 3000;
     const MAX_SNAPSHOT_ROWS = 3000;
     const FIRST_PAGE_TIMEOUT_MS = 6000;
     const NEXT_PAGE_TIMEOUT_MS = 4500;
@@ -11,6 +11,10 @@
 
     function isSnapshotMailReadyCustomer(customer) {
         return Boolean(customer && customer.mailReadySnapshot === true && customer.mailReady === true);
+    }
+
+    function isSnapshotAvailableCustomer(customer) {
+        return Boolean(customer && customer.availableSnapshot === true && customer.mailReady !== true);
     }
 
     function normalizeSnapshotCustomer(raw, index, normalizeCustomer) {
@@ -22,6 +26,19 @@
             websiteMockupAssetReady: raw && (raw.websiteMockupAssetReady === true || raw.hasMockup === true),
             mailReady: raw && raw.mailReady === true,
             mailReadySnapshot: true
+        });
+    }
+
+    function normalizeAvailableSnapshotCustomer(raw, index, normalizeCustomer) {
+        const normalized = typeof normalizeCustomer === "function" ? normalizeCustomer(raw, "available-snapshot-" + index) : Object.assign({}, raw || {});
+        return Object.assign({}, normalized, {
+            hasPhoto: raw && raw.hasPhoto === true,
+            hasMockup: raw && raw.hasMockup === true,
+            websitePhotoAssetReady: raw && raw.hasPhoto === true,
+            websiteMockupAssetReady: raw && raw.hasMockup === true,
+            mailReady: false,
+            mailReadySnapshot: false,
+            availableSnapshot: true
         });
     }
 
@@ -68,8 +85,10 @@
     function getDisplayCount(state, currentCount) {
         const count = Math.max(0, Number(currentCount) || 0);
         if (state && String(state.query || "").trim()) return count;
-        if (!state || !state.mailReadySnapshotLoaded || state.activeStatus !== "benaderbaar" || !Number.isFinite(Number(state.mailReadySnapshotTotal))) return count;
-        return Math.max(count, Number(state.mailReadySnapshotTotal));
+        if (!state) return count;
+        if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded && Number.isFinite(Number(state.mailReadySnapshotTotal))) return Math.max(0, Number(state.mailReadySnapshotTotal));
+        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && Number.isFinite(Number(state.availableSnapshotTotal))) return Math.max(0, Number(state.availableSnapshotTotal));
+        return count;
     }
 
     function clearRetry(state) {
@@ -115,19 +134,23 @@
         }).filter(function (customer) { return customer && customer.id; });
     }
 
-    function publishSnapshot(config, snapshotCustomers, total, pending) {
+    function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, pending) {
         const state = config.state;
         state.mailReadySnapshotLoaded = true;
         state.mailReadySnapshotFailed = false;
         state.mailReadySnapshotPending = Boolean(pending);
         state.mailReadySnapshotTotal = Math.max(snapshotCustomers.length, Number(total) || 0);
         state.mailReadySnapshotCustomers = snapshotCustomers;
+        state.availableSnapshotLoaded = true;
+        state.availableSnapshotTotal = Math.max(availableCustomers.length, Number(availableTotal) || 0);
+        state.availableSnapshotCustomers = availableCustomers;
         state.dataUnavailable = false;
         clearRetry(state);
         if (typeof config.applyCustomerList === "function") {
             const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
-            const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(isSnapshotMailReadyCustomer);
-            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers) : snapshotCustomers, true);
+            const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer); });
+            const combinedSnapshotCustomers = snapshotCustomers.concat(availableCustomers);
+            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers) : combinedSnapshotCustomers, true);
         }
     }
 
@@ -159,12 +182,13 @@
         try {
             const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
-            publishSnapshot(config, snapshotCustomers, firstPage.total, firstPage.total > snapshotCustomers.length);
+            let availableCustomers = normalizeAvailableSnapshotRows(firstPage.payload.availableCustomers, 0, config.normalizeCustomer);
+            publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.total > snapshotCustomers.length);
             if (firstPage.total > snapshotCustomers.length && snapshotCustomers.length < MAX_SNAPSHOT_ROWS) {
                 try {
                     const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
                     snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
-                    publishSnapshot(config, snapshotCustomers, firstPage.total, false);
+                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, false);
                 } catch (error) {
                     state.mailReadySnapshotFailed = true;
                     state.mailReadySnapshotPending = true;
@@ -185,5 +209,11 @@
         }
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, normalizeCustomer: normalizeSnapshotCustomer, mergeAssetFlags: mergeAssetFlags, getDisplayCount: getDisplayCount, load: load };
+    function normalizeAvailableSnapshotRows(rows, offset, normalizeCustomer) {
+        return (Array.isArray(rows) ? rows : []).map(function (row, index) {
+            return normalizeAvailableSnapshotCustomer(row, offset + index, normalizeCustomer);
+        }).filter(function (customer) { return customer && customer.id; });
+    }
+
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, mergeAssetFlags: mergeAssetFlags, getDisplayCount: getDisplayCount, load: load };
 })(window);

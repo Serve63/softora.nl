@@ -4,6 +4,10 @@ const assert = require('node:assert/strict');
 const {
   createCustomersPageBootstrapService,
 } = require('../../server/services/customers-page-bootstrap');
+const {
+  MAIL_READY_BOOTSTRAP_CACHE_KEY,
+  MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+} = require('../../server/services/premium-database-mail-ready-snapshot');
 
 test('customers page bootstrap prefers stored customer database rows', async () => {
   const service = createCustomersPageBootstrapService({
@@ -120,6 +124,59 @@ test('customers page bootstrap can defer heavy customer rows for the premium dat
   assert.deepEqual(payload.customers, []);
   assert.deepEqual(seenScopes, []);
   assert.equal(payload.activeOrdersState.source, '');
+});
+
+test('premium database bootstrap reads only the compact canonical snapshot cache', async () => {
+  const seenReads = [];
+  const snapshot = {
+    version: 1,
+    generatedAt: '2026-07-10T12:00:00.000Z',
+    total: 1013,
+    customers: [
+      { id: 'mail-ready-1', bedrijf: 'Mailklaar', mailReady: true, mailReadySnapshot: true },
+    ],
+    availableTotal: 113,
+    availableCustomers: [
+      { id: 'available-1', bedrijf: 'Beschikbaar', availableSnapshot: true },
+    ],
+  };
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope, options) => {
+      seenReads.push({ scope, options });
+      if (scope !== MAIL_READY_BOOTSTRAP_CACHE_SCOPE) {
+        throw new Error('De zware customer-state mag niet in de HTML-bootstrap worden gelezen.');
+      }
+      return {
+        source: 'supabase',
+        values: { [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify(snapshot) },
+      };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'mail-ready-snapshot-cache');
+  assert.equal(payload.mailReadySnapshotTotal, 1013);
+  assert.equal(payload.availableSnapshotTotal, 113);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
+  assert.deepEqual(seenReads.map((read) => read.scope), [MAIL_READY_BOOTSTRAP_CACHE_SCOPE]);
+  assert.equal(seenReads[0].options.uiStateReadTimeoutMs, 650);
+});
+
+test('premium database bootstrap never turns a missing cache into fake zero totals', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async () => ({ source: 'supabase', values: {} }),
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'deferred');
+  assert.equal(payload.deferred, true);
+  assert.deepEqual(payload.customers, []);
+  assert.equal(payload.mailReadySnapshotTotal, null);
+  assert.equal(payload.availableSnapshotTotal, null);
 });
 
 test('customers page bootstrap gebruikt compacte dashboardklanten zonder zware customer state', async () => {

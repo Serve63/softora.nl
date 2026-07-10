@@ -1069,7 +1069,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       const result = await collectPagedRows('list-customers-snapshot', (client) =>
         client
           .from(TABLES.customers)
-          .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at')
+          .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at')
           .is('deleted_at', null)
           .order('updated_at', { ascending: false }),
       {
