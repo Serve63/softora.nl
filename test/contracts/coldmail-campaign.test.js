@@ -127,14 +127,15 @@ const COLDMAIL_MOCKUP_CAPTION_TEXT =
 
 function assertWebdesignImagePairLayout(html, options = {}) {
   const value = String(html || '');
-  assert.match(value, /@media only screen and \(max-width:980px\)/);
+  assert.match(value, /softora-webdesign-email-2026-07-10-v1/);
+  assert.match(value, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
   assert.match(
     value,
-    /class="softora-coldmail-body" style="font-family:Arial,sans-serif;font-size:15px;line-height:1\.65;color:#1a1a2e;max-width:600px;width:100%;"/
+    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-10-v1" style="font-family:Arial,sans-serif;font-size:15px;line-height:1\.65;color:#1a1a2e;max-width:600px;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;"/
   );
   assert.match(
     value,
-    /\.softora-coldmail-body,\.softora-coldmail-body p,\.softora-coldmail-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
+    /\.softora-webdesign-email-body,\.softora-webdesign-email-body p,\.softora-webdesign-email-body a\{font-size:15px!important;line-height:1\.65!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
   );
   assert.match(
     value,
@@ -142,19 +143,11 @@ function assertWebdesignImagePairLayout(html, options = {}) {
   );
   assert.match(
     value,
-    /\.softora-mobile-image-pair\{display:block!important;max-height:none!important;overflow:visible!important;font-size:0!important;line-height:0!important\}/
+    /\.softora-mobile-image-pair\{display:block!important;max-height:none!important;overflow:visible!important;width:100%!important;max-width:100%!important;font-size:0!important;line-height:0!important\}/
   );
   assert.match(
     value,
-    /\.softora-mobile-image-pair table\{display:table!important;width:100%!important;max-width:100%!important\}/
-  );
-  assert.match(
-    value,
-    /\.softora-mobile-image-pair tr\{display:table-row!important\}/
-  );
-  assert.match(
-    value,
-    /\.softora-mobile-image-pair td\{display:table-cell!important;width:100%!important;max-width:100%!important\}/
+    /\.softora-mobile-image-pair table,\.softora-mobile-image-pair tbody,\.softora-mobile-image-pair tr,\.softora-mobile-image-pair td\{display:block!important;width:100%!important;max-width:100%!important\}/
   );
   assert.match(value, /\.softora-mobile-image-pair img\{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important\}/);
   assert.match(
@@ -176,7 +169,7 @@ function assertWebdesignImagePairLayout(html, options = {}) {
   );
   assert.match(
     value,
-    /class="softora-mobile-image-pair" style="display:none;max-height:0;overflow:hidden;mso-hide:all;margin:24px 0 0 0;padding:0;font-size:0;line-height:0;"/
+    /class="softora-mobile-image-pair" style="display:none;max-height:0;overflow:hidden;mso-hide:all;margin:24px 0 0 0;padding:0;width:100%;max-width:100%;font-size:0;line-height:0;"/
   );
   assert.match(
     value,
@@ -184,7 +177,7 @@ function assertWebdesignImagePairLayout(html, options = {}) {
   );
   assert.match(
     value,
-    /class="softora-webdesign-image" width="640" style="display:block;width:100%;max-width:100%;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/
+    /class="softora-webdesign-image" width="640" style="display:block;width:100%;max-width:100%;height:auto;max-height:960px;object-fit:contain;border:0;outline:none;text-decoration:none;"/
   );
   assert.match(
     value,
@@ -5004,6 +4997,10 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
+  assert.equal(
+    sentMessages[0].headers['X-Softora-Template-Version'],
+    'softora-webdesign-email-2026-07-10-v1'
+  );
   assert.match(sentMessages[0].text, /Servé Creusen/);
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
   assert.match(
@@ -6959,7 +6956,7 @@ test('coldmail campaign makes tall webdesign CID attachments mail-safe before se
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.match(sentMessages[0].html, /max-height:960px;height:auto;object-fit:contain/);
+  assert.match(sentMessages[0].html, /height:auto;max-height:960px;object-fit:contain/);
   assert.equal(sentMessages[0].attachments.length, 2);
   const webdesignAttachment = sentMessages[0].attachments[0];
   assert.equal(webdesignAttachment.contentType, 'image/jpeg');
