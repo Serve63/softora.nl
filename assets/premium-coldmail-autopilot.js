@@ -129,8 +129,8 @@
       service: String(payload.service || ""),
       database: String(payload.database || ""),
       specialAction: String(payload.specialAction || ""),
-      webdesignImageDelivery: "remote",
-      imageDelivery: "remote",
+      webdesignImageDelivery: "attachment",
+      imageDelivery: "attachment",
       durationDays: payload.durationDays,
       radiusKm: payload.radiusKm,
     };

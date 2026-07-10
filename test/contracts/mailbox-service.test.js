@@ -300,10 +300,10 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   );
   assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
-  assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-10-v3');
+  assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-11-v4');
   assert.match(sent[0].message.html, /^<!doctype html><html lang="nl"><head>/);
   assert.match(sent[0].message.html, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
-  assert.match(sent[0].message.html, /data-softora-template-version="softora-webdesign-email-2026-07-10-v3"/);
+  assert.match(sent[0].message.html, /data-softora-template-version="softora-webdesign-email-2026-07-11-v4"/);
   assert.match(sent[0].message.html, /<table class="softora-desktop-image-pair" role="presentation"[^>]+style="display:none;/);
   assert.match(sent[0].message.html, /class="softora-webdesign-email-body softora-mailbox-webdesign-body"/);
   assert.match(sent[0].message.html, /@media only screen and \(min-width:981px\)/);
