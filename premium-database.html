@@ -2866,11 +2866,11 @@
                 const guardPromise = refreshColdmailGuardState();
                 const remoteStatePromise = fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
                 const orderStatePromise = fetchUiStateGetWithFallback(ORDER_SCOPE).then(function (orderState) { return { orderState: orderState }; }, function (error) { return { error: error }; });
-                await guardPromise; const remoteState = await remoteStatePromise;
+                const remoteState = await remoteStatePromise;
                 const remoteValues = remoteState && remoteState.values && typeof remoteState.values === "object" ? remoteState.values : {}; if (!window.SoftoraDatabaseResilience.hasChunkedStateKey(remoteValues, CUSTOMER_DB_KEY)) throw new Error("Geen Supabase-klantdata ontvangen."); const remoteCustomersRaw = window.SoftoraDatabaseImport.readChunkedStateValue(remoteValues, CUSTOMER_DB_KEY), remoteCustomers = parseCustomers(remoteCustomersRaw); if (!remoteCustomers.length) throw new Error("Geen bruikbare Supabase-klantdata ontvangen.");
-
                 if (remoteCustomers.length) {
                     let enrichedCustomers = remoteCustomers;
+                    const initialCustomers = window.SoftoraDatabaseMailReadySnapshot.mergeAssetFlags(remoteCustomers, state.mailReadySnapshotCustomers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; applyCustomerList(getSortedCustomers(outreachController.applyAutomation(initialCustomers).customers), !hadBootstrapCustomers);
                     try {
                         const orderResult = await orderStatePromise;
                         if (orderResult && orderResult.error) throw orderResult.error;
@@ -2878,10 +2878,10 @@
                         const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
                         state.orders = Array.isArray(orders) ? orders : [];
                         enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, orders);
+                        applyCustomerList(getSortedCustomers(outreachController.applyAutomation(enrichedCustomers).customers), false);
                     } catch (error) {
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
-
                     const customersWithFallbackMedia = mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten);
                     let customersWithPhotos = customersWithFallbackMedia;
                     try {
@@ -2891,7 +2891,7 @@
                         state.photoRestoreFailed = true; console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error);
                     }
                     customersWithPhotos = window.SoftoraDatabaseMailReadySnapshot.mergeAssetFlags(customersWithPhotos, state.mailReadySnapshotCustomers); const outreachAutomation = outreachController.applyAutomation(customersWithPhotos);
-                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; applyCustomerList(sortedCustomers, !hadBootstrapCustomers); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
+                    const sortedCustomers = getSortedCustomers(outreachAutomation.customers); applyCustomerList(sortedCustomers, false); if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                     if (coldmailGuardLoadError && !coldmailGuardReady) setStatusMessage("Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd.", "error", true); else if (!coldmailGuardLoadError) setStatusMessage("");
                     return;
                 }
