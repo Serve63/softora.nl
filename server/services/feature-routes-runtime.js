@@ -78,16 +78,24 @@ function registerFeatureRoutes(app, deps = {}) {
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
   } = deps;
-  const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
-    getUiStateValues: deps.getUiStateValues,
-    setUiStateValues: deps.setUiStateValues,
-    dataOpsStore: deps.dataOpsStore,
-  });
   const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
     dataOpsStore: deps.dataOpsStore,
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
   });
+  const premiumDatabaseImportCoordinator = createPremiumDatabaseImportCoordinator({
+    getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
+    dataOpsStore: deps.dataOpsStore,
+    mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
+  });
+  if (
+    coldmailing &&
+    coldmailing.coldmailCampaignService &&
+    typeof coldmailing.coldmailCampaignService.setMailReadySnapshotService === 'function'
+  ) {
+    coldmailing.coldmailCampaignService.setMailReadySnapshotService(premiumDatabaseMailReadySnapshotService);
+  }
   const premiumDatabaseMassResearchCoordinator = createPremiumDatabaseMassResearchCoordinator({
     dataOpsStore: deps.dataOpsStore,
     getUiStateValues: deps.getUiStateValues,

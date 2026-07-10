@@ -361,6 +361,11 @@ test('premium database import sync route returns fetched spreadsheet rows', asyn
 test('premium database delete lead route removes one customer through data ops without reposting the full list', async () => {
   const calls = [];
   const coordinator = createPremiumDatabaseImportCoordinator({
+    mailReadySnapshotService: {
+      invalidate() {
+        calls.push({ type: 'snapshot-invalidate' });
+      },
+    },
     dataOpsStore: {
       deleteCustomers: async (customerIds, meta) => {
         calls.push({ type: 'customers', customerIds, meta });
@@ -389,6 +394,7 @@ test('premium database delete lead route removes one customer through data ops w
       customerIds: ['customer-413'],
       meta: { source: 'premium-database-delete-lead', actor: 'Premium database' },
     },
+    { type: 'snapshot-invalidate' },
   ]);
 });
 

@@ -2003,6 +2003,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     getUiStateValues,
     setUiStateValues,
     dataOpsStore = null,
+    mailReadySnapshotService = null,
   } = deps;
 
   function sendImportResponse(req, res) {
@@ -2165,6 +2166,9 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
           error: truncateText(normalizeString(photosDeleted && photosDeleted.error && photosDeleted.error.message) || 'Lead verwijderd, maar foto-opslag opruimen mislukte.', 500),
         });
       }
+    }
+    if (mailReadySnapshotService && typeof mailReadySnapshotService.invalidate === 'function') {
+      mailReadySnapshotService.invalidate();
     }
 
     return res.status(200).json({
