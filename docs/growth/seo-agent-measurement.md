@@ -5,12 +5,14 @@ Deze meting is niet bedoeld als dashboard voor gebruikers. Het is een agent-only
 ## Wat het meet
 
 - organische klikken, vertoningen, CTR en gemiddelde positie
+- branded en non-branded prestaties als aparte segmenten
 - huidige periode tegenover de vorige periode
 - beste zoekopdrachten en landingspagina's
 - zoekopdrachten met veel vertoningen maar lage CTR
 - zoekopdrachten rond positie 5 tot 20 waar content of interne links kunnen helpen
 - dalende pagina's die een refresh nodig hebben
 - sitemap- en robots.txt-signalen
+- een geprioriteerde queryqueue op basis van business fit, verwachte klikwinst, positiehefboom en dataconfidence
 
 ## Lokale run
 
@@ -64,6 +66,8 @@ Deze bestanden zijn lokaal agent-werkmateriaal en worden niet mee gecommit.
 
 1. Draai het rapport.
 2. Gebruik de actiequeue als prioriteitenlijst.
-3. Bouw SEO-aanpassingen in kleine PR's.
-4. Controleer na livegang opnieuw sitemap, robots en Search Console-data.
-5. Herhaal wekelijks of dagelijks zodra de Google-koppeling stabiel is.
+3. Controleer de keuze tegen [seo-machine-policy.md](seo-machine-policy.md), recente experimenten en intentmatch.
+4. Bouw SEO-aanpassingen in kleine PR's.
+5. Registreer de baseline, live-datum en reviews na 14, 28 en 56 dagen.
+6. Controleer na livegang opnieuw sitemap, robots en Search Console-data.
+7. Herhaal wekelijks of dagelijks zodra de Google-koppeling stabiel is.

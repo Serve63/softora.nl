@@ -3,6 +3,11 @@ const SEARCH_CONSOLE_API_BASE = 'https://www.googleapis.com/webmasters/v3';
 const SEARCH_CONSOLE_READONLY_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const DEFAULT_SITE_URL = 'sc-domain:softora.nl';
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
+const {
+  getBusinessFit,
+  isBrandedQuery,
+  rankSeoOpportunities,
+} = require('./seo-opportunity-scoring');
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -307,6 +312,8 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const pageQueryRows = normalizeSearchRows(snapshot.pageQueryCurrent || []);
   const currentTotals = aggregateRows(snapshot.queriesCurrent || []);
   const previousTotals = aggregateRows(snapshot.queriesPrevious || []);
+  const brandedQueryRows = queryRows.filter((row) => isBrandedQuery(rowKey(row, 0)));
+  const nonBrandedQueryRows = queryRows.filter((row) => !isBrandedQuery(rowKey(row, 0)));
   const sitemapIssues = (snapshot.sitemaps || []).filter(
     (sitemap) => sitemap.errors > 0 || sitemap.warnings > 0 || sitemap.isPending
   );
@@ -314,7 +321,8 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const lowCtrQueries = queryRows
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
     .filter((row) => row.position <= toFiniteNumber(options.maxLowCtrPosition, 20))
-    .filter((row) => row.ctr > 0 && row.ctr < toFiniteNumber(options.lowCtrThreshold, 0.025))
+    .filter((row) => !isBrandedQuery(rowKey(row, 0)))
+    .filter((row) => row.ctr < toFiniteNumber(options.lowCtrThreshold, 0.025))
     .sort(sortByNumberDesc('impressions'))
     .slice(0, 12)
     .map((row) => compactOpportunity(row, 'low_ctr', pageQueryRows));
@@ -322,9 +330,26 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const strikingDistanceQueries = queryRows
     .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
     .filter((row) => row.position > 5 && row.position <= toFiniteNumber(options.maxStrikingDistancePosition, 20))
+    .filter((row) => !isBrandedQuery(rowKey(row, 0)))
     .sort((a, b) => a.position - b.position || b.impressions - a.impressions)
     .slice(0, 12)
     .map((row) => compactOpportunity(row, 'striking_distance', pageQueryRows));
+
+  const emergingQueries = queryRows
+    .filter((row) => row.impressions >= toFiniteNumber(options.minOpportunityImpressions, 25))
+    .filter((row) => row.position > toFiniteNumber(options.maxStrikingDistancePosition, 20))
+    .filter((row) => row.position <= toFiniteNumber(options.maxEmergingPosition, 40))
+    .filter((row) => !isBrandedQuery(rowKey(row, 0)))
+    .filter((row) => getBusinessFit(rowKey(row, 0)) >= 4)
+    .sort(sortByNumberDesc('impressions'))
+    .slice(0, 12)
+    .map((row) => compactOpportunity(row, 'emerging', pageQueryRows));
+
+  const prioritizedQueries = rankSeoOpportunities([
+    ...lowCtrQueries,
+    ...strikingDistanceQueries,
+    ...emergingQueries,
+  ]);
 
   const decliningPages = pageRows
     .filter((row) => row.previousClicks >= 3 || row.previousImpressions >= 50)
@@ -347,22 +372,27 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
       action: 'Controleer sitemap errors, warnings of pending status in Search Console.',
     });
   }
-  lowCtrQueries.slice(0, 5).forEach((item) => {
+  prioritizedQueries.slice(0, 5).forEach((item) => {
+    const needsSnippet = item.types.includes('low_ctr');
+    const needsPageStrength = item.types.includes('striking_distance');
+    const action = needsSnippet && needsPageStrength
+      ? `Verbeter snippet, intentdekking en interne links voor zoekterm "${item.query}".`
+      : needsSnippet
+        ? `Verbeter titel/meta en intro voor zoekterm "${item.query}".`
+        : `Versterk content en interne links voor zoekterm "${item.query}".`;
     actionQueue.push({
-      priority: 'hoog',
-      type: 'rewrite_snippet',
-      action: `Verbeter titel/meta en intro voor zoekterm "${item.query}".`,
+      priority: item.businessFit >= 4 && item.opportunityScore >= 10 ? 'hoog' : 'middel',
+      type: needsSnippet && needsPageStrength
+        ? 'rewrite_snippet_and_strengthen_page'
+        : needsSnippet
+          ? 'rewrite_snippet'
+          : 'strengthen_page',
+      action,
       page: item.page,
       query: item.query,
-    });
-  });
-  strikingDistanceQueries.slice(0, 5).forEach((item) => {
-    actionQueue.push({
-      priority: 'middel',
-      type: 'strengthen_page',
-      action: `Versterk content en interne links voor zoekterm "${item.query}".`,
-      page: item.page,
-      query: item.query,
+      businessFit: item.businessFit,
+      expectedClickUplift: item.expectedClickUplift,
+      opportunityScore: item.opportunityScore,
     });
   });
   decliningPages.slice(0, 5).forEach((item) => {
@@ -388,10 +418,16 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
       ctrDelta: roundNumber(currentTotals.ctr - previousTotals.ctr, 4),
       positionDelta: roundNumber(currentTotals.position - previousTotals.position, 2),
     },
+    segments: {
+      branded: aggregateRows(brandedQueryRows),
+      nonBranded: aggregateRows(nonBrandedQueryRows),
+    },
     queries: {
-      top: queryRows.sort(sortByNumberDesc('clicks')).slice(0, 20),
+      top: [...queryRows].sort(sortByNumberDesc('clicks')).slice(0, 20),
       lowCtr: lowCtrQueries,
       strikingDistance: strikingDistanceQueries,
+      emerging: emergingQueries,
+      prioritized: prioritizedQueries,
     },
     pages: {
       top: pageRows.sort(sortByNumberDesc('clicks')).slice(0, 20),
@@ -590,6 +626,16 @@ function formatAgentMarkdown(report = {}) {
     );
   }
 
+  if (report.segments) {
+    lines.push(
+      '## Groei-segmenten',
+      '',
+      `Non-branded: ${report.segments.nonBranded?.clicks || 0} klikken, ${report.segments.nonBranded?.impressions || 0} vertoningen, CTR ${formatPercent(report.segments.nonBranded?.ctr || 0)}`,
+      `Branded: ${report.segments.branded?.clicks || 0} klikken, ${report.segments.branded?.impressions || 0} vertoningen, CTR ${formatPercent(report.segments.branded?.ctr || 0)}`,
+      ''
+    );
+  }
+
   if (report.technical) {
     lines.push(
       '## Techniek',
@@ -614,6 +660,15 @@ function formatAgentMarkdown(report = {}) {
     lines.push('', '## Lage CTR kansen', '');
     report.queries.lowCtr.slice(0, 8).forEach((item) => {
       lines.push(`- ${item.query}: ${item.impressions} vertoningen, CTR ${formatPercent(item.ctr)}, positie ${item.position}`);
+    });
+  }
+
+  if (Array.isArray(report.queries?.prioritized) && report.queries.prioritized.length > 0) {
+    lines.push('', '## Geprioriteerde kansen', '');
+    report.queries.prioritized.slice(0, 8).forEach((item) => {
+      lines.push(
+        `- ${item.query}: score ${item.opportunityScore}, business fit ${item.businessFit}/5, verwachte klikwinst ${item.expectedClickUplift}, positie ${item.position}`
+      );
     });
   }
 
