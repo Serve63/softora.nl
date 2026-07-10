@@ -4,13 +4,18 @@ const {
 } = require('./outbound-recipient-guard-store');
 
 const SNAPSHOT_SOURCE = 'structured-mail-ready-snapshot';
+const MAIL_READY_SNAPSHOT_CACHE_SCOPE = 'premium_database_mail_ready_snapshot_cache';
+const MAIL_READY_SNAPSHOT_CACHE_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
+const MAIL_READY_BOOTSTRAP_CACHE_SCOPE = 'premium_database_mail_ready_bootstrap_cache';
+const MAIL_READY_BOOTSTRAP_CACHE_KEY = 'softora_premium_database_mail_ready_bootstrap_v1';
+const MAIL_READY_BOOTSTRAP_ROW_LIMIT = 100;
 const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 100;
+const MAX_LIMIT = 3000;
 const MAX_OFFSET = 10000;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
-const SNAPSHOT_STALE_TTL_MS = 5 * 60 * 1000;
+const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 950000;
 const EXCLUDED_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -180,6 +185,34 @@ function rowHasColdmailSentSignal(row = {}) {
   });
 }
 
+function rowHasColdcallingSignal(row = {}) {
+  const payload = getRowPayload(row);
+  const status = getRowStatus(row);
+  if (status === 'gebeld') return true;
+  const directText = normalizeString([
+    row.coldcallingStatus,
+    row.callOutcome,
+    row.lastColdcallAt,
+    payload.coldcallingStatus,
+    payload.coldCallingStatus,
+    payload.callOutcome,
+    payload.lastCallOutcome,
+    payload.lastColdcallAt,
+    payload.lastColdCallAt,
+    payload.lastCallAt,
+  ].join(' ')).toLowerCase();
+  if (directText) return true;
+  const history = Array.isArray(payload.hist) ? payload.hist : [];
+  return history.some((entry) => /\b(gebeld|belpoging|coldcall|cold calling|coldcalling|call|retell|vapi|twilio|telefonisch)\b/.test(normalizeString([
+    entry && entry.type,
+    entry && entry.status,
+    entry && entry.label,
+    entry && entry.message,
+    entry && entry.title,
+    entry && entry.source,
+  ].join(' ')).toLowerCase()));
+}
+
 function hasExplicitMailBlock(row = {}) {
   const payload = getRowPayload(row);
   return (
@@ -248,6 +281,47 @@ function parseColdmailGuardPayload(raw) {
   }
 }
 
+function parseMailReadySnapshotCacheValue(raw) {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.customers)) return null;
+    const customers = parsed.customers
+      .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
+      .slice(0, MAX_LIMIT);
+    const availableCustomers = (Array.isArray(parsed.availableCustomers) ? parsed.availableCustomers : [])
+      .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
+      .slice(0, MAX_LIMIT);
+    if (!customers.length && !availableCustomers.length) return null;
+    return {
+      generatedAt: normalizeString(parsed.generatedAt),
+      total: Math.max(customers.length, Number(parsed.total) || 0),
+      customers,
+      availableTotal: Math.max(availableCustomers.length, Number(parsed.availableTotal) || 0),
+      availableCustomers,
+      timings: parsed.timings && typeof parsed.timings === 'object' ? parsed.timings : {},
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function serializeMailReadySnapshotCache(data = {}, rowLimit = MAX_LIMIT) {
+  const customers = (Array.isArray(data.customers) ? data.customers : [])
+    .slice(0, Math.max(1, Math.min(MAX_LIMIT, Number(rowLimit) || MAX_LIMIT)));
+  const availableCustomers = (Array.isArray(data.availableCustomers) ? data.availableCustomers : [])
+    .slice(0, Math.max(1, Math.min(MAX_LIMIT, Number(rowLimit) || MAX_LIMIT)));
+  if (!customers.length && !availableCustomers.length) return '';
+  return JSON.stringify({
+    version: 1,
+    generatedAt: normalizeString(data.generatedAt),
+    total: Math.max(customers.length, Number(data.total) || (Array.isArray(data.customers) ? data.customers.length : 0)),
+    customers,
+    availableTotal: Math.max(availableCustomers.length, Number(data.availableTotal) || (Array.isArray(data.availableCustomers) ? data.availableCustomers.length : 0)),
+    availableCustomers,
+    timings: data.timings && typeof data.timings === 'object' ? data.timings : {},
+  });
+}
+
 function normalizeLegacyGuardEntry(entry = {}) {
   if (!entry || typeof entry !== 'object') return null;
   const recipientEmail = normalizeEmailAddress(entry.recipientEmail);
@@ -301,6 +375,10 @@ async function readLegacyColdmailGuardKeys(getUiStateValues, logger) {
 }
 
 function isBasicMailReadyCandidate(row = {}, photoFlag = {}) {
+  return isBasicMailLeadEligible(row) && Boolean(photoFlag.hasPhoto && photoFlag.hasMockup);
+}
+
+function isBasicMailLeadEligible(row = {}) {
   const status = getRowStatus(row);
   if (EXCLUDED_STATUSES.has(status)) return false;
   if (isColdmailTestCompany(row)) return false;
@@ -308,7 +386,7 @@ function isBasicMailReadyCandidate(row = {}, photoFlag = {}) {
   if (hasExplicitMailBlock(row)) return false;
   if (rowHasInstantlySignal(row)) return false;
   if (rowHasColdmailSentSignal(row)) return false;
-  return Boolean(photoFlag.hasPhoto && photoFlag.hasMockup);
+  return true;
 }
 
 function buildSnapshotCustomer(row = {}, photoFlag = {}) {
@@ -339,6 +417,22 @@ function buildSnapshotCustomer(row = {}, photoFlag = {}) {
   };
 }
 
+function buildAvailableSnapshotCustomer(row = {}, photoFlag = {}) {
+  const customer = buildSnapshotCustomer(row, photoFlag);
+  const hasPhoto = photoFlag && photoFlag.hasPhoto === true;
+  const hasMockup = photoFlag && photoFlag.hasMockup === true;
+  return {
+    ...customer,
+    hasPhoto,
+    hasMockup,
+    websitePhotoAssetReady: hasPhoto,
+    websiteMockupAssetReady: hasMockup,
+    mailReady: false,
+    mailReadySnapshot: false,
+    availableSnapshot: true,
+  };
+}
+
 function createUnavailableError(message) {
   const error = new Error(message);
   error.statusCode = 503;
@@ -349,12 +443,14 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   const {
     dataOpsStore = null,
     getUiStateValues = null,
+    setUiStateValues = null,
     now = () => new Date(),
     nowMs = () => Date.now(),
     logger = console,
   } = deps;
   let snapshotDataCache = null;
   let snapshotDataPromise = null;
+  let durableSnapshotReadPromise = null;
 
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
@@ -417,7 +513,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const computeStartMs = Date.now();
     const basicCandidates = customerRows
       .map((row) => ({ row, photoFlag: getPhotoFlagForCustomer(row, photoMaps) }))
-      .filter((item) => isBasicMailReadyCandidate(item.row, item.photoFlag));
+      .filter((item) => isBasicMailLeadEligible(item.row));
     const guardKeys = Array.from(new Set(basicCandidates.flatMap((item) => buildGuardKeysForRow(item.row))));
     const computeBeforeGuardsMs = Date.now() - computeStartMs;
 
@@ -433,13 +529,20 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
     const blockedGuardKeys = new Set([...centralGuardKeys, ...legacyGuardKeys]);
     const finalComputeStartMs = Date.now();
-    const mailReadyRows = basicCandidates
-      .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)))
+    const unguardedCandidates = basicCandidates
+      .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)));
+    const mailReadyRows = unguardedCandidates
+      .filter((item) => isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildSnapshotCustomer(item.row, item.photoFlag));
+    const availableRows = unguardedCandidates
+      .filter((item) => !rowHasColdcallingSignal(item.row))
+      .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
+      .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag));
     const computeMs = computeBeforeGuardsMs + (Date.now() - finalComputeStartMs);
     return {
       generatedAt: now().toISOString(),
       customers: mailReadyRows,
+      availableCustomers: availableRows,
       timings: {
         customersMs,
         photosMs,
@@ -450,13 +553,70 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     };
   }
 
-  async function getMailReadySnapshotData() {
-    const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
-    const cacheAgeMs = snapshotDataCache ? nowMs() - cachedAtMs : Number.POSITIVE_INFINITY;
-    if (snapshotDataCache && cacheAgeMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
+  async function readDurableSnapshotData() {
+    if (typeof getUiStateValues !== 'function') return null;
+    try {
+      const state = await getUiStateValues(MAIL_READY_SNAPSHOT_CACHE_SCOPE, {
+        uiStateReadTimeoutMs: 1200,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressReadFailureLog: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+        readFailureCooldownScope: MAIL_READY_SNAPSHOT_CACHE_SCOPE,
+      });
+      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+      return parseMailReadySnapshotCacheValue(values[MAIL_READY_SNAPSHOT_CACHE_KEY]);
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[PremiumDatabaseMailReadySnapshot][durable-read]', error?.message || error);
+      }
+      return null;
+    }
+  }
+
+  async function persistDurableSnapshotData(data) {
+    if (typeof setUiStateValues !== 'function') return false;
+    const snapshotData = {
+      ...data,
+      total: Array.isArray(data && data.customers) ? data.customers.length : 0,
+      availableTotal: Array.isArray(data && data.availableCustomers) ? data.availableCustomers.length : 0,
+    };
+    const fullValue = serializeMailReadySnapshotCache(snapshotData, MAX_LIMIT);
+    const bootstrapValue = serializeMailReadySnapshotCache(snapshotData, MAIL_READY_BOOTSTRAP_ROW_LIMIT);
+    if (!fullValue || !bootstrapValue || fullValue.length > SNAPSHOT_CACHE_VALUE_MAX_LENGTH) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[PremiumDatabaseMailReadySnapshot][durable-write]', `Snapshotcache ongeldig of te groot (${fullValue.length} tekens).`);
+      }
+      return false;
+    }
+    try {
+      const [fullSaved, bootstrapSaved] = await Promise.all([
+        setUiStateValues(
+          MAIL_READY_SNAPSHOT_CACHE_SCOPE,
+          { [MAIL_READY_SNAPSHOT_CACHE_KEY]: fullValue },
+          { source: 'premium-database-mail-ready-snapshot', replaceMissing: true }
+        ),
+        setUiStateValues(
+          MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+          { [MAIL_READY_BOOTSTRAP_CACHE_KEY]: bootstrapValue },
+          { source: 'premium-database-mail-ready-snapshot', replaceMissing: true }
+        ),
+      ]);
+      return Boolean(fullSaved && bootstrapSaved);
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[PremiumDatabaseMailReadySnapshot][durable-write]', error?.message || error);
+      }
+      return false;
+    }
+  }
+
+  function startSnapshotRefresh() {
     if (!snapshotDataPromise) {
       snapshotDataPromise = loadMailReadySnapshotData()
-        .then((data) => {
+        .then(async (data) => {
+          await persistDurableSnapshotData(data);
           snapshotDataCache = { cachedAtMs: nowMs(), data };
           return data;
         })
@@ -464,13 +624,39 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
           snapshotDataPromise = null;
         });
     }
-    if (snapshotDataCache && cacheAgeMs < SNAPSHOT_STALE_TTL_MS) {
-      snapshotDataPromise.catch((error) => {
+    return snapshotDataPromise;
+  }
+
+  async function hydrateDurableSnapshotData() {
+    if (snapshotDataCache) return snapshotDataCache.data;
+    if (!durableSnapshotReadPromise) {
+      durableSnapshotReadPromise = readDurableSnapshotData().finally(() => {
+        durableSnapshotReadPromise = null;
+      });
+    }
+    const data = await durableSnapshotReadPromise;
+    if (!data) return null;
+    const generatedAtMs = Date.parse(normalizeString(data.generatedAt));
+    snapshotDataCache = {
+      cachedAtMs: Number.isFinite(generatedAtMs) ? generatedAtMs : nowMs(),
+      data,
+    };
+    return data;
+  }
+
+  async function getMailReadySnapshotData() {
+    if (!snapshotDataCache) await hydrateDurableSnapshotData();
+    const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
+    const cacheAgeMs = snapshotDataCache ? nowMs() - cachedAtMs : Number.POSITIVE_INFINITY;
+    if (snapshotDataCache && cacheAgeMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
+    const refreshPromise = startSnapshotRefresh();
+    if (snapshotDataCache) {
+      refreshPromise.catch((error) => {
         if (logger && typeof logger.warn === 'function') logger.warn('[PremiumDatabaseMailReadySnapshot][refresh]', error?.message || error);
       });
       return snapshotDataCache.data;
     }
-    return snapshotDataPromise;
+    return refreshPromise;
   }
 
   async function buildMailReadySnapshot(options = {}) {
@@ -478,6 +664,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
     const snapshotData = await getMailReadySnapshotData();
     const allCustomers = Array.isArray(snapshotData.customers) ? snapshotData.customers : [];
+    const allAvailableCustomers = Array.isArray(snapshotData.availableCustomers) ? snapshotData.availableCustomers : [];
     return {
       ok: true,
       source: SNAPSHOT_SOURCE,
@@ -486,6 +673,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       limit,
       offset,
       customers: allCustomers.slice(offset, offset + limit),
+      availableTotal: allAvailableCustomers.length,
+      availableCustomers: allAvailableCustomers.slice(offset, offset + limit),
       timings: snapshotData.timings,
     };
   }
@@ -521,9 +710,16 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 module.exports = {
   COLDMAIL_SEND_GUARD_KEY,
   COLDMAIL_SEND_GUARD_SCOPE,
+  MAIL_READY_BOOTSTRAP_CACHE_KEY,
+  MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  MAIL_READY_BOOTSTRAP_ROW_LIMIT,
+  MAIL_READY_SNAPSHOT_CACHE_KEY,
+  MAIL_READY_SNAPSHOT_CACHE_SCOPE,
   SNAPSHOT_SOURCE,
   buildGuardKeysForRow,
   createPremiumDatabaseMailReadySnapshotService,
   isBasicMailReadyCandidate,
+  isBasicMailLeadEligible,
   legacyGuardEntriesToKeySet,
+  parseMailReadySnapshotCacheValue,
 };

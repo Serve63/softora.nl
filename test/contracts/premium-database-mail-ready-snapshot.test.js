@@ -3,6 +3,11 @@ const assert = require('node:assert/strict');
 
 const {
   COLDMAIL_SEND_GUARD_KEY,
+  COLDMAIL_SEND_GUARD_SCOPE,
+  MAIL_READY_BOOTSTRAP_CACHE_KEY,
+  MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  MAIL_READY_SNAPSHOT_CACHE_KEY,
+  MAIL_READY_SNAPSHOT_CACHE_SCOPE,
   createPremiumDatabaseMailReadySnapshotService,
 } = require('../../server/services/premium-database-mail-ready-snapshot');
 
@@ -11,6 +16,7 @@ function createService(overrides = {}) {
   const dataOpsStore = {
     async listCustomerSnapshotRows() {
       calls.push('customers-snapshot');
+      if (overrides.customerRowsPromise) return overrides.customerRowsPromise;
       return overrides.customers || [];
     },
     async listDesignPhotoAssetFlags() {
@@ -26,8 +32,17 @@ function createService(overrides = {}) {
     },
   };
   const getUiStateValues = async (scope) => {
+    if (scope === MAIL_READY_SNAPSHOT_CACHE_SCOPE) {
+      calls.push(['durable-snapshot-read', scope]);
+      return {
+        source: 'supabase',
+        values: overrides.durableSnapshot
+          ? { [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify(overrides.durableSnapshot) }
+          : {},
+      };
+    }
     calls.push(['legacy-guard', scope]);
-    if (overrides.legacyGuardError) throw overrides.legacyGuardError;
+    if (scope === COLDMAIL_SEND_GUARD_SCOPE && overrides.legacyGuardError) throw overrides.legacyGuardError;
     return {
       source: 'supabase',
       values: {
@@ -35,11 +50,16 @@ function createService(overrides = {}) {
       },
     };
   };
+  const setUiStateValues = async (scope, values, options) => {
+    calls.push(['ui-state-write', scope, values, options]);
+    return { source: 'supabase', values };
+  };
   return {
     calls,
     service: createPremiumDatabaseMailReadySnapshotService({
       dataOpsStore,
       getUiStateValues,
+      setUiStateValues,
       now: () => new Date('2026-06-16T12:00:00.000Z'),
       nowMs: overrides.nowMs,
       logger: { warn() {} },
@@ -66,12 +86,13 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
     { customer_id: 'legacy-guard', company: 'Legacy Guard', email: 'info@legacyguard.nl', website: 'legacyguard.nl', database_status: 'prospect' },
     { customer_id: 'instantly-1', company: 'Instantly Lead', email: 'info@instant.nl', website: 'instant.nl', database_status: 'prospect', payload: { lastColdmailProvider: 'instantly' } },
     { customer_id: 'used-coldmail', company: 'Used Coldmail', email: 'info@used.nl', website: 'used.nl', database_status: 'prospect', payload: { lastColdmailSentAt: '2026-06-15T09:00:00.000Z' } },
+    { customer_id: 'used-coldcall', company: 'Used Coldcall', email: 'info@called.nl', website: 'called.nl', database_status: 'prospect', payload: { lastColdCallAt: '2026-06-15T09:00:00.000Z' } },
   ];
   const photoFlags = customers.map((customer) => ({
     customerId: customer.customer_id,
     identityKey: customer.identity_key,
     hasPhoto: true,
-    hasMockup: customer.customer_id !== 'no-mockup',
+    hasMockup: !['no-mockup', 'used-coldcall'].includes(customer.customer_id),
   }));
   const { service, calls } = createService({
     customers,
@@ -88,7 +109,9 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(payload.source, 'structured-mail-ready-snapshot');
   assert.equal(payload.generatedAt, '2026-06-16T12:00:00.000Z');
   assert.equal(payload.total, 1);
+  assert.equal(payload.availableTotal, 1);
   assert.equal(payload.customers.length, 1);
+  assert.deepEqual(payload.availableCustomers.map((customer) => customer.id), ['no-mockup']);
   assert.deepEqual(payload.customers[0], {
     id: 'ready-1',
     bedrijf: 'Ready One',
@@ -118,6 +141,8 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.includes('photo-flags'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'guard-keys'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), true);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE), true);
 });
 
 test('premium database mail-ready snapshot honors limit and offset', async () => {
@@ -167,6 +192,79 @@ test('premium database mail-ready snapshot reuses one full calculation across pa
   assert.equal(calls.filter((call) => call === 'photo-flags').length, 1);
   assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'guard-keys').length, 1);
   assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'legacy-guard').length, 1);
+});
+
+test('premium database mail-ready snapshot reuses a fresh durable snapshot without heavy reads', async () => {
+  const durableSnapshot = {
+    version: 1,
+    generatedAt: '2026-06-16T12:00:00.000Z',
+    total: 1,
+    customers: [{ id: 'ready-cached', mailReady: true, mailReadySnapshot: true }],
+    availableTotal: 1,
+    availableCustomers: [{ id: 'available-cached', availableSnapshot: true }],
+  };
+  const { service, calls } = createService({
+    durableSnapshot,
+    nowMs: () => Date.parse('2026-06-16T12:00:30.000Z'),
+  });
+
+  const payload = await service.buildMailReadySnapshot({ limit: 3000 });
+
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-cached']);
+  assert.deepEqual(payload.availableCustomers.map((customer) => customer.id), ['available-cached']);
+  assert.equal(calls.includes('customers-snapshot'), false);
+  assert.equal(calls.includes('photo-flags'), false);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'guard-keys'), false);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), false);
+});
+
+test('premium database mail-ready snapshot serves an old durable snapshot without waiting for refresh', async () => {
+  const durableSnapshot = {
+    version: 1,
+    generatedAt: '2026-06-16T10:00:00.000Z',
+    total: 1,
+    customers: [{ id: 'ready-cached', mailReady: true, mailReadySnapshot: true }],
+    availableTotal: 1,
+    availableCustomers: [{ id: 'available-cached', availableSnapshot: true }],
+  };
+  const { service, calls } = createService({
+    durableSnapshot,
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+    customerRowsPromise: new Promise(() => {}),
+  });
+
+  const payload = await Promise.race([
+    service.buildMailReadySnapshot({ limit: 3000 }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('stale snapshot response timeout')), 50)),
+  ]);
+
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-cached']);
+  assert.deepEqual(payload.availableCustomers.map((customer) => customer.id), ['available-cached']);
+  assert.equal(calls.includes('customers-snapshot'), true);
+});
+
+test('premium database mail-ready snapshot persists compact full and bootstrap caches', async () => {
+  const customers = Array.from({ length: 120 }, (_, index) => ({
+    customer_id: `ready-${index + 1}`,
+    company: `Ready ${index + 1}`,
+    email: `info${index + 1}@ready.nl`,
+    website: `ready-${index + 1}.nl`,
+    database_status: 'prospect',
+  }));
+  const { service, calls } = createService({
+    customers,
+    photoFlags: customers.map((customer) => ({ customerId: customer.customer_id, hasPhoto: true, hasMockup: true })),
+  });
+
+  await service.buildMailReadySnapshot({ limit: 3000 });
+
+  const fullWrite = calls.find((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE);
+  const bootstrapWrite = calls.find((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE);
+  assert.ok(fullWrite);
+  assert.ok(bootstrapWrite);
+  assert.equal(JSON.parse(fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY]).customers.length, 120);
+  assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).customers.length, 100);
+  assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).total, 120);
 });
 
 test('premium database mail-ready snapshot serves stale data while refreshing centrally', async () => {

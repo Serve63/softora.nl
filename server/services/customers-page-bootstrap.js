@@ -1,3 +1,9 @@
+const {
+  MAIL_READY_BOOTSTRAP_CACHE_KEY,
+  MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  parseMailReadySnapshotCacheValue,
+} = require('./premium-database-mail-ready-snapshot');
+
 function createCustomersPageBootstrapService(deps = {}) {
   const {
     getUiStateValues = async () => null,
@@ -823,6 +829,46 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
   }
 
+  async function buildMailReadySnapshotBootstrapPayload(options = {}) {
+    const unavailable = {
+      ok: true,
+      loadedAt: new Date().toISOString(),
+      source: 'deferred',
+      deferred: true,
+      customers: [],
+      mailReadySnapshotTotal: null,
+      availableSnapshotTotal: null,
+      activeOrdersState: buildBootstrapStateSnapshot(null),
+    };
+    const readOptions = {
+      uiStateReadTimeoutMs: Math.max(100, Math.min(1200, Number(options.readTimeoutMs) || 650)),
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressReadFailureLog: true,
+      ignoreSupabaseRestFailureCooldown: true,
+      suppressSupabaseRestFailureCooldown: true,
+      readFailureCooldownScope: MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+    };
+    const state = await resolveBootstrapReadWithTimeout(
+      readBootstrapUiState(MAIL_READY_BOOTSTRAP_CACHE_SCOPE, readOptions),
+      Math.max(150, Math.min(1500, Number(options.timeoutMs) || 750)),
+      buildUnavailableBootstrapState(new Error('Mailklare bootstrapcache timeout'))
+    );
+    const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+    const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
+    if (!snapshot) return unavailable;
+    return {
+      ok: true,
+      loadedAt: new Date().toISOString(),
+      source: 'mail-ready-snapshot-cache',
+      generatedAt: snapshot.generatedAt || null,
+      customers: snapshot.customers.concat(snapshot.availableCustomers),
+      mailReadySnapshotTotal: snapshot.total,
+      availableSnapshotTotal: snapshot.availableTotal,
+      activeOrdersState: buildBootstrapStateSnapshot(null),
+    };
+  }
+
   async function buildActiveOrdersPageBootstrapPayload() {
     const activeOrdersState = await getUiStateValues(orderScope);
     const values =
@@ -844,6 +890,7 @@ function createCustomersPageBootstrapService(deps = {}) {
   return {
     buildActiveOrdersPageBootstrapPayload,
     buildCustomersBootstrapPayload,
+    buildMailReadySnapshotBootstrapPayload,
     buildDashboardHtmlReplacements,
   };
 }
