@@ -251,6 +251,29 @@ test('premium database mail-ready snapshot reuses a fresh durable snapshot witho
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), false);
 });
 
+test('invalidating the snapshot bypasses durable stale rows after a lead delete', async () => {
+  const { service, calls } = createService({
+    customers: [{ customer_id: 'live-1', company: 'Live BV', email: 'info@live.nl', website: 'live.nl', database_status: 'prospect' }],
+    photoFlags: [{ customerId: 'live-1', hasPhoto: true, hasMockup: true }],
+    durableSnapshot: {
+      generatedAt: '2026-06-16T12:00:00.000Z',
+      total: 1,
+      customers: [{ id: 'deleted-1', bedrijf: 'Deleted BV', email: 'info@deleted.nl', mailReady: true, mailReadySnapshot: true }],
+      availableCustomers: [],
+    },
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+  });
+
+  const cached = await service.buildMailReadySnapshot({ limit: 10 });
+  assert.equal(cached.customers[0].id, 'deleted-1');
+
+  service.invalidate();
+  const refreshed = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.equal(refreshed.customers[0].id, 'live-1');
+  assert.equal(calls.filter((call) => call === 'customers-snapshot').length, 1);
+});
+
 test('premium database snapshot upgrades a legacy bootstrap cache with signed photo urls in the background', async () => {
   const durableSnapshot = {
     version: 1,

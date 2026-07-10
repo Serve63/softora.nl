@@ -493,6 +493,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   let snapshotDataPromise = null;
   let snapshotMediaRefreshPromise = null;
   let durableSnapshotReadPromise = null;
+  let snapshotInvalidated = false;
 
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
@@ -748,6 +749,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         .then(async (data) => {
           await persistDurableSnapshotData(data);
           snapshotDataCache = { cachedAtMs: nowMs(), data };
+          snapshotInvalidated = false;
           return data;
         })
         .finally(() => {
@@ -775,6 +777,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   }
 
   async function getMailReadySnapshotData() {
+    if (snapshotInvalidated) return startSnapshotRefresh();
     if (!snapshotDataCache) await hydrateDurableSnapshotData();
     if (snapshotDataCache && snapshotNeedsBootstrapSignedMedia(snapshotDataCache.data)) {
       startSnapshotMediaRefresh(snapshotDataCache.data).catch((error) => {
@@ -792,6 +795,12 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       return snapshotDataCache.data;
     }
     return refreshPromise;
+  }
+
+  function invalidate() {
+    snapshotInvalidated = true;
+    snapshotDataCache = null;
+    durableSnapshotReadPromise = null;
   }
 
   async function buildMailReadySnapshot(options = {}) {
@@ -838,6 +847,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   return {
     buildMailReadySnapshot,
+    invalidate,
     sendMailReadySnapshotResponse,
   };
 }

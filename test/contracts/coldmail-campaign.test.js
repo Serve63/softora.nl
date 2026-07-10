@@ -532,6 +532,7 @@ function createService(overrides = {}) {
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     webdesignPreparationCoordinator: overrides.webdesignPreparationCoordinator,
+    mailReadySnapshotService: overrides.mailReadySnapshotService,
   });
 
   return {
@@ -547,6 +548,26 @@ function createService(overrides = {}) {
     getAutopilotState: () => autopilotState,
   };
 }
+
+test('coldmail recipients come from the canonical Mailklaar snapshot', async () => {
+  const legacyRows = [{ id: 'legacy-1', bedrijf: 'Legacy BV', email: 'info@legacy.nl', status: 'prospect' }];
+  const mailReadyRows = [{ id: 'ready-1', bedrijf: 'Mailklaar BV', email: 'info@mailklaar.nl', status: 'prospect' }];
+  const { service } = createService({
+    rows: legacyRows,
+    mailReadySnapshotService: {
+      async buildMailReadySnapshot(options) {
+        assert.deepEqual(options, { limit: 3000, offset: 0 });
+        return { ok: true, customers: mailReadyRows };
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 10, service: 'crm' });
+
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].id, 'ready-1');
+  assert.equal(result.recipients[0].email, 'info@mailklaar.nl');
+});
 
 test('coldmail campaign sends only eligible database rows and marks them as mailed', async () => {
   const { service, sentMessages, getSavedState } = createService();

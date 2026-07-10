@@ -425,6 +425,7 @@ function createColdmailCampaignService(deps = {}) {
     now = () => new Date(),
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     webdesignPreparationCoordinator: initialWebdesignPreparationCoordinator = null,
+    mailReadySnapshotService: initialMailReadySnapshotService = null,
     loadPreviewImageSharp = loadColdmailPreviewSharpModule,
   } = deps;
 
@@ -464,6 +465,7 @@ function createColdmailCampaignService(deps = {}) {
   const senderSmtpTransporters = new Map();
   let coldmailCampaignSendPromise = null;
   let webdesignPreparationCoordinator = initialWebdesignPreparationCoordinator;
+  let mailReadySnapshotService = initialMailReadySnapshotService;
   let coldmailPhotoMapCache = null;
   let coldmailLiveStatsCache = null;
   let coldmailLiveStatsPromise = null;
@@ -6269,7 +6271,14 @@ function createColdmailCampaignService(deps = {}) {
       mode === 'call' ? await getUiStateValues(customerDbScope) : state;
     const customerValues =
       customerState && typeof customerState.values === 'object' ? customerState.values : {};
-    const customerRows = parseDatabaseRows(customerValues);
+    let customerRows = parseDatabaseRows(customerValues);
+    if (mode === 'mail' && mailReadySnapshotService && typeof mailReadySnapshotService.buildMailReadySnapshot === 'function') {
+      const snapshot = await mailReadySnapshotService.buildMailReadySnapshot({ limit: 3000, offset: 0 });
+      if (!snapshot || snapshot.ok !== true || !Array.isArray(snapshot.customers)) {
+        throw new Error('Mailklare voorraad kon niet veilig worden geladen; verzenden is gestopt.');
+      }
+      customerRows = snapshot.customers;
+    }
     let rows = [];
     if (mode === 'call') {
       rows = mergeColdcallingRowsWithCustomerRows(
@@ -9634,6 +9643,10 @@ function createColdmailCampaignService(deps = {}) {
     setWebdesignPreparationCoordinator: (coordinator) => {
       webdesignPreparationCoordinator = coordinator || null;
       return webdesignPreparationCoordinator;
+    },
+    setMailReadySnapshotService: (service) => {
+      mailReadySnapshotService = service || null;
+      return mailReadySnapshotService;
     },
     syncInboundColdmailRepliesFromImap,
     unsubscribeColdmailRecipient,
