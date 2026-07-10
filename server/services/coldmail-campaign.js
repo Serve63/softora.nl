@@ -3837,7 +3837,11 @@ function createColdmailCampaignService(deps = {}) {
       const messages = await dataOpsStore.listMailboxMessages({
         accountEmails,
         folders: ['inbox'],
-        maxRows: 10000,
+        maxRows: 1000,
+        bounceCandidatesOnly: true,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
       });
       return summarizeColdmailMailboxBounceStats(messages);
     } catch (error) {
