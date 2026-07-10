@@ -919,6 +919,53 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.lastSenderEmail, 'martijn@softora.nl');
 });
 
+test('coldmail live stats never overwrite reliable totals with a transient guard failure', async () => {
+  let clockMs = Date.parse('2026-04-24T12:00:00.000Z');
+  let centralGuardFails = false;
+  const { service, getSavedStates } = createService({
+    now: () => new Date(clockMs),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        if (centralGuardFails) throw new Error('temporary central guard timeout');
+        return [{
+          reservation_id: 'sent-1',
+          recipient_email: 'lead@example.test',
+          provider: 'softora',
+          channel: 'coldmail',
+          sender_email: 'serve@softora.nl',
+          updated_at: '2026-04-24T09:00:00.000Z',
+        }];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages() {
+        return [];
+      },
+    },
+  });
+
+  const first = await service.getColdmailLiveStats();
+  assert.equal(first.stats.reliable, true);
+  assert.equal(first.stats.totalSent, 1);
+
+  centralGuardFails = true;
+  clockMs += 31 * 1000;
+  const stale = await service.getColdmailLiveStats();
+  assert.equal(stale.stats.totalSent, 1);
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const preserved = await service.getColdmailLiveStats();
+  assert.equal(preserved.stats.reliable, true);
+  assert.equal(preserved.stats.totalSent, 1);
+  assert.equal(preserved.stats.authoritativeStatsStale, true);
+  assert.equal(preserved.stats.centralGuardUnavailableReason, 'central_guard_read_failed');
+  const cacheWrites = getSavedStates().filter((state) => state.scope === 'premium_coldmail_stats_cache');
+  const latestCache = JSON.parse(cacheWrites.at(-1).values.softora_coldmail_stats_cache_v1);
+  assert.equal(latestCache.stats.reliable, true);
+  assert.equal(latestCache.stats.totalSent, 1);
+});
+
 test('coldmail campaign uses standard SMTP transports with bounded timeouts', async () => {
   const { service, transportConfigs } = createService();
 
