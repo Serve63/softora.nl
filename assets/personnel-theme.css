@@ -1420,15 +1420,16 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
     }
 }
 
-/* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als terugkerende kosten) */
+/* Premium shell */
 main.is-premium-boot-host {
     position: relative;
     min-height: 100vh;
     box-sizing: border-box;
 }
-
-/* Fixed i.p.v. absolute: anders centreert de spinner in de volle hoogte van <main>
-   (lange pagina's zoals lead generator) en staat die visueel te laag t.o.v. het dashboard. */
+.premium-boot-loader,
+#dashboardHardBootLoader {
+    display: none !important;
+}
 .premium-boot-loader {
     position: fixed;
     top: 0;
@@ -1442,31 +1443,30 @@ main.is-premium-boot-host {
     pointer-events: none;
     transition: opacity 0.22s ease, visibility 0.22s ease;
 }
-
 @media (max-width: 900px) {
     .premium-boot-loader {
         left: 0;
     }
 }
-
 .premium-boot-loader.is-hidden {
     opacity: 0;
     visibility: hidden;
 }
-
 .premium-boot-shell {
     transition: opacity 0.16s ease;
 }
 
-/* main met display:flex (o.a. kladblok): anders krimpt deze wrapper tot contentbreedte en blijft ~25% wit. */
 main.is-premium-boot-host > .premium-boot-shell {
     flex: 1 1 auto;
     min-width: 0;
     width: 100%;
 }
+html[data-dashboard-boot-loading="true"] body::before {
+    display: none !important;
+}
 
 .premium-boot-shell.is-booting {
-    opacity: 0;
-    pointer-events: none;
-    user-select: none;
+    opacity: 1;
+    pointer-events: auto;
+    user-select: auto;
 }

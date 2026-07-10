@@ -102,6 +102,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     themeSource,
     /\.dashboard-layout\[data-sidebar-shell="canonical"\] > \.main-content/
   );
+  assert.match(themeSource, /\.premium-boot-loader,[\s\S]*#dashboardHardBootLoader\s*\{[\s\S]*display:\s*none\s*!important/);
+  assert.match(themeSource, /\.premium-boot-shell\.is-booting\s*\{[\s\S]*opacity:\s*1[\s\S]*pointer-events:\s*auto/);
   assert.doesNotMatch(
     themeSource,
     /\.dashboard-layout > \.main-content,\s*\.dashboard-layout > main\.main-content/s

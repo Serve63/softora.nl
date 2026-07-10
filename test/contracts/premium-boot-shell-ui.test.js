@@ -27,6 +27,8 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
   assert.match(themeSource, /@import url\('softora-dossier-loader\.css'\)/);
   assert.match(themeSource, /\.premium-boot-loader\s*\{/);
   assert.match(themeSource, /\.premium-boot-shell\.is-booting\s*\{/);
+  assert.match(themeSource, /\.premium-boot-loader,[\s\S]*#dashboardHardBootLoader\s*\{[\s\S]*display:\s*none\s*!important/);
+  assert.match(themeSource, /\.premium-boot-shell\.is-booting\s*\{[\s\S]*opacity:\s*1[\s\S]*pointer-events:\s*auto/);
   const loaderPath = path.join(__dirname, '../../assets/softora-dossier-loader.css');
   const loaderSource = fs.readFileSync(loaderPath, 'utf8');
   assert.match(loaderSource, /softora-dossier-loader__orbit--outer/);
