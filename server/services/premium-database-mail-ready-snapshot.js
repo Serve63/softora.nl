@@ -10,6 +10,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_OFFSET = 10000;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
+const SNAPSHOT_STALE_TTL_MS = 5 * 60 * 1000;
 const EXCLUDED_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -349,6 +350,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     dataOpsStore = null,
     getUiStateValues = null,
     now = () => new Date(),
+    nowMs = () => Date.now(),
     logger = console,
   } = deps;
   let snapshotDataCache = null;
@@ -450,16 +452,23 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   async function getMailReadySnapshotData() {
     const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
-    if (snapshotDataCache && Date.now() - cachedAtMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
+    const cacheAgeMs = snapshotDataCache ? nowMs() - cachedAtMs : Number.POSITIVE_INFINITY;
+    if (snapshotDataCache && cacheAgeMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
     if (!snapshotDataPromise) {
       snapshotDataPromise = loadMailReadySnapshotData()
         .then((data) => {
-          snapshotDataCache = { cachedAtMs: Date.now(), data };
+          snapshotDataCache = { cachedAtMs: nowMs(), data };
           return data;
         })
         .finally(() => {
           snapshotDataPromise = null;
         });
+    }
+    if (snapshotDataCache && cacheAgeMs < SNAPSHOT_STALE_TTL_MS) {
+      snapshotDataPromise.catch((error) => {
+        if (logger && typeof logger.warn === 'function') logger.warn('[PremiumDatabaseMailReadySnapshot][refresh]', error?.message || error);
+      });
+      return snapshotDataCache.data;
     }
     return snapshotDataPromise;
   }
@@ -487,6 +496,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         limit: req && req.query ? req.query.limit : undefined,
         offset: req && req.query ? req.query.offset : undefined,
       });
+      res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
       return res.status(200).json(payload);
     } catch (error) {
       const statusCode = Number(error && error.statusCode) || 500;

@@ -41,6 +41,7 @@ function createService(overrides = {}) {
       dataOpsStore,
       getUiStateValues,
       now: () => new Date('2026-06-16T12:00:00.000Z'),
+      nowMs: overrides.nowMs,
       logger: { warn() {} },
     }),
   };
@@ -166,6 +167,44 @@ test('premium database mail-ready snapshot reuses one full calculation across pa
   assert.equal(calls.filter((call) => call === 'photo-flags').length, 1);
   assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'guard-keys').length, 1);
   assert.equal(calls.filter((call) => Array.isArray(call) && call[0] === 'legacy-guard').length, 1);
+});
+
+test('premium database mail-ready snapshot serves stale data while refreshing centrally', async () => {
+  let clockMs = 1000;
+  const customers = [{ customer_id: 'ready-1', company: 'Ready One', email: 'info@ready.nl', website: 'ready.nl', database_status: 'prospect' }];
+  const { service, calls } = createService({
+    customers,
+    photoFlags: [{ customerId: 'ready-1', hasPhoto: true, hasMockup: true }],
+    nowMs: () => clockMs,
+  });
+
+  await service.buildMailReadySnapshot({ limit: 10 });
+  clockMs += 61 * 1000;
+  const stale = await service.buildMailReadySnapshot({ limit: 10 });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(stale.total, 1);
+  assert.equal(calls.filter((call) => call === 'customers-snapshot').length, 2);
+});
+
+test('premium database mail-ready snapshot response is privately browser-cacheable', async () => {
+  const customers = [{ customer_id: 'ready-1', company: 'Ready One', email: 'info@ready.nl', website: 'ready.nl', database_status: 'prospect' }];
+  const { service } = createService({
+    customers,
+    photoFlags: [{ customerId: 'ready-1', hasPhoto: true, hasMockup: true }],
+  });
+  const headers = {};
+  const res = {
+    setHeader: (name, value) => { headers[name] = value; },
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.payload = payload; return payload; },
+  };
+
+  await service.sendMailReadySnapshotResponse({ query: { limit: '10', offset: '0' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(headers['Cache-Control'], 'private, max-age=30, stale-while-revalidate=120');
+  assert.equal(res.payload.total, 1);
 });
 
 test('premium database mail-ready snapshot fails closed when legacy send guard cannot be read', async () => {

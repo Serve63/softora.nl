@@ -1464,7 +1464,7 @@
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-mass-research.js?v=20260629a"></script><script src="assets/premium-database-distance.js?v=20260616a"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260617a"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260710b"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -2174,7 +2174,7 @@
 
             nodes.topSub.innerHTML = "De AI koppelt alle data slim aan elkaar.";
             window.SoftoraDatabaseSystemMailCount.render(state.klanten, { dataLoading: state.dataLoading || !state.remoteCustomersLoaded || state.photoRestorePending || state.photoRestoreFailed, normalizeString: normalizeString, isColdmailTestCompany: isColdmailTestCompany, outreachController: outreachController, databaseContactStatus: databaseContactStatus });
-            if (blockForMailReadyPending) { const resultCountText = "-- resultaten"; document.getElementById("databaseTable").classList.toggle("outreach-action-mode", false); document.getElementById("statusHeader").hidden = false; document.getElementById("outreachActionHeader").hidden = true; document.getElementById("photoHeader").hidden = false; document.getElementById("daysHeader").hidden = true; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoBatchHeader([], true, undefined, resultCountText); nodes.photoHeaderCount.textContent = "(--)"; updateLoadMoreControl(0, 0); nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + (state.activeStatus === "beschikbaar" ? "Beschikbare data laden..." : "Mailklare data laden...") + "</div></td></tr>"; return; }
+            if (blockForMailReadyPending) { const resultCountText = "-- resultaten"; document.getElementById("databaseTable").classList.toggle("outreach-action-mode", false); document.getElementById("statusHeader").hidden = false; document.getElementById("outreachActionHeader").hidden = true; document.getElementById("photoHeader").hidden = false; document.getElementById("daysHeader").hidden = true; if (nodes.photoHeaderLabel) nodes.photoHeaderLabel.textContent = state.activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's"; renderPhotoBatchHeader([], true, undefined, resultCountText); nodes.photoHeaderCount.textContent = "(--)"; updateLoadMoreControl(0, 0); nodes.tbody.innerHTML = ""; return; }
             const filtered = databaseTableHelpers.getVisibleRows(visibleCustomers, state.visibleLimit, TABLE_PAGE_SIZE);
             const photoHeaderCount = getPhotoHeaderCount(visibleCustomers, showPhotoColumn);
             const visibleResultCount = window.SoftoraDatabaseMailReadySnapshot.getDisplayCount(state, visibleCustomers.length);
@@ -2183,7 +2183,7 @@
             logDatabaseMediaDebug("render-table", { activeStatus: state.activeStatus, databaseCount: state.klanten.length, filteredCount: visibleCustomers.length, renderedCount: filtered.length, photoHeaderCount: photoHeaderCount, photoRestorePending: Boolean(state.photoRestorePending), photoRestoreFailed: Boolean(state.photoRestoreFailed), items: buildDatabaseMediaDebugItems(filtered) });
 
             updateLoadMoreControl(visibleCustomers.length, filtered.length);
-            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">Database laden...</div></td></tr>"; updateLoadMoreControl(0, 0); return; } if (!visibleCustomers.length) {
+            if ((state.dataLoading || state.dataUnavailable) && !state.klanten.length) { nodes.tbody.innerHTML = ""; updateLoadMoreControl(0, 0); return; } if (!visibleCustomers.length) {
                 nodes.tbody.innerHTML = "<tr><td colspan=\"7\"><div class=\"tbl-empty\">" + getEmptyTableMessage() + "</div></td></tr>";
                 updateLoadMoreControl(0, 0);
                 return;
