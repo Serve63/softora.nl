@@ -413,12 +413,9 @@
             }, 2200);
         }
 
-        function readPendingJobs() {
-            const cutoff = now() - PENDING_TTL_MS;
-            return Array.from(pendingJobs.values()).filter(function (item) {
-                return item.customerId && item.jobId && item.startedAt >= cutoff;
-            });
-        }
+        function isPendingJobFresh(job) { return Boolean(job && job.customerId && job.jobId && Number(job.startedAt) >= (now() - PENDING_TTL_MS)); }
+        function pruneExpiredPendingJobs() { let removed = 0; Array.from(pendingJobs.values()).forEach(function (job) { if (isPendingJobFresh(job)) return; clearPollTimer(job && job.jobId); removePendingJob(job && job.customerId); removed += 1; }); return removed; }
+        function readPendingJobs() { pruneExpiredPendingJobs(); return Array.from(pendingJobs.values()); }
 
         function upsertPendingJob(job) {
             pendingJobs.set(job.customerId, job);
@@ -530,7 +527,7 @@
             const storedJob = readPendingJobs().find(function (item) {
                 return item.jobId === jobId;
             });
-            if (!storedJob) return;
+            if (!storedJob) { if (typeof renderPage === "function") renderPage(); return; }
 
             try {
                 const response = await fetch(JOB_ENDPOINT + "/" + encodeURIComponent(jobId), {
@@ -584,14 +581,19 @@
                 });
                 const jobs = Array.isArray(payload && payload.jobs) ? payload.jobs : [];
                 if (!response.ok) return;
-                let restoredCount = 0;
+                const activeRestoredJobIds = new Set();
+                let restoredCount = 0, clearedCount = pruneExpiredPendingJobs();
                 jobs.forEach(function (job) {
                     if (!job || (job.status !== "queued" && job.status !== "running")) return;
                     const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
-                    if (!pendingJob.customerId || !pendingJob.jobId) return;
-                    setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
+                    if (!isPendingJobFresh(pendingJob)) return;
+                    activeRestoredJobIds.add(pendingJob.jobId); setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
                 });
-                if (restoredCount && typeof renderPage === "function") renderPage();
+                readPendingJobs().forEach(function (pendingJob) {
+                    if (!isRestoredPendingJob(pendingJob) || activeRestoredJobIds.has(pendingJob.jobId)) return;
+                    clearPollTimer(pendingJob.jobId); removePendingJob(pendingJob.customerId); clearedCount += 1;
+                });
+                if ((restoredCount || clearedCount) && typeof renderPage === "function") renderPage();
             } catch (error) {
                 /* The next page load or poll will pick up running server jobs again. */
             }

@@ -590,7 +590,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function pruneJobs() {
     const currentTime = now();
     for (const [id, job] of jobs.entries()) {
-      if (currentTime - job.createdAt > JOB_TTL_MS) jobs.delete(id);
+      if (isExpiredJob(job, currentTime)) jobs.delete(id);
     }
     while (jobs.size > MAX_JOBS) {
       let oldestId = null;
@@ -604,6 +604,11 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       if (!oldestId) break;
       jobs.delete(oldestId);
     }
+  }
+
+  function isExpiredJob(job, currentTime = now()) {
+    const createdAt = Number(job && job.createdAt) || 0;
+    return !createdAt || currentTime - createdAt > JOB_TTL_MS;
   }
 
   function ownerKeyFromReq(req) {
@@ -1015,7 +1020,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function findRunningJobForCustomer(ownerKey, customerId) {
     if (dataOpsStore && typeof dataOpsStore.findRunningWebdesignJob === 'function') {
       const persistent = await dataOpsStore.findRunningWebdesignJob(ownerKey, customerId);
-      if (persistent) {
+      if (persistent && !isExpiredJob(persistent)) {
         jobs.set(persistent.id, persistent);
         return persistent;
       }
@@ -1023,6 +1028,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     for (const job of jobs.values()) {
       if (job.ownerKey !== ownerKey) continue;
       if (job.customer.id !== customerId) continue;
+      if (isExpiredJob(job)) continue;
       if (job.status === 'queued' || job.status === 'running') return job;
     }
     return null;
@@ -1061,7 +1067,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (dataOpsStore && typeof dataOpsStore.listVisibleWebdesignJobs === 'function') {
       const persistentJobs = await dataOpsStore.listVisibleWebdesignJobs(ownerKey);
       (Array.isArray(persistentJobs) ? persistentJobs : []).forEach((job) => {
-        if (job && job.id) {
+        if (job && job.id && !isExpiredJob(job)) {
           jobs.set(job.id, job);
           byId.set(job.id, job);
         }
@@ -1069,6 +1075,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
     Array.from(jobs.values())
       .filter((job) => job.ownerKey === ownerKey)
+      .filter((job) => !isExpiredJob(job))
       .filter((job) => job.status === 'queued' || job.status === 'running')
       .forEach((job) => byId.set(job.id, job));
     const visible = [];
