@@ -2084,7 +2084,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260710a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710a"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260710a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -3091,9 +3091,9 @@
 
         }
 
-        function showPremiumDashboardUnavailable() { const hasOrders = premiumDashboardState.ordersHydrated === true; if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable({ preserveActiveOrders: hasOrders }); if (hasOrders) updateKpiActiveOrdersDisplay(premiumDashboardState.orders.filter((order) => !order?.ui?.isBuilt)); }
+        function renderPremiumDashboardPending() { if (premiumDashboardState.ordersHydrated) updateKpiActiveOrdersDisplay(premiumDashboardState.orders.filter((order) => !order?.ui?.isBuilt)); }
+        function showPremiumDashboardUnavailable() { const hasOrders = premiumDashboardState.ordersHydrated === true; if (window.SoftoraDashboardDataStatus) window.SoftoraDashboardDataStatus.showUnavailable({ preserveActiveOrders: hasOrders }); renderPremiumDashboardPending(); }
         function clearPremiumDashboardRecoveryTimer() { if (premiumDashboardState.recoveryTimer) { window.clearTimeout(premiumDashboardState.recoveryTimer); premiumDashboardState.recoveryTimer = null; } premiumDashboardState.recoveryAttempts = 0; } function schedulePremiumDashboardRecovery() { if (premiumDashboardState.recoveryTimer || premiumDashboardState.recoveryAttempts >= 4) return; const delays = [1500, 4000, 9000, 15000]; const delay = delays[premiumDashboardState.recoveryAttempts] || 15000; premiumDashboardState.recoveryAttempts += 1; premiumDashboardState.recoveryTimer = window.setTimeout(() => { premiumDashboardState.recoveryTimer = null; void refreshPremiumDashboard(true, true); }, delay); }
-
         async function loadPremiumDashboardOrders() {
             if (premiumDashboardState.loading) return false;
             premiumDashboardState.loading = true;
@@ -3134,7 +3134,7 @@
                 const shouldLoadCustomers = !onlyMissing || !premiumDashboardState.customersHydrated;
                 const shouldLoadOrders = !onlyMissing || !premiumDashboardState.ordersHydrated;
                 const ordersPromise = shouldLoadOrders ? loadPremiumDashboardOrders() : Promise.resolve(false);
-                void ordersPromise.then((ordersLoaded) => { if (!ordersLoaded) { if (!premiumDashboardState.ordersHydrated) schedulePremiumDashboardRecovery(); return; } if (premiumDashboardState.customersHydrated) { clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); } else showPremiumDashboardUnavailable(); });
+                void ordersPromise.then((ordersLoaded) => { if (!ordersLoaded) { if (!premiumDashboardState.ordersHydrated) schedulePremiumDashboardRecovery(); return; } if (premiumDashboardState.customersHydrated) { clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); } else renderPremiumDashboardPending(); });
                 const customersLoaded = shouldLoadCustomers ? await loadPremiumDashboardCustomers() : false;
                 const loaded = customersLoaded || premiumDashboardState.customersHydrated;
                 if (loaded) { if (premiumDashboardState.ordersHydrated || !shouldLoadOrders) clearPremiumDashboardRecoveryTimer(); renderPremiumDashboardOrders(); }
@@ -3518,7 +3518,7 @@
         const hadPremiumDashboardOrders = typeof dashboardCore.hydratePremiumDashboardOrdersFromBootstrap === 'function' && dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(premiumDashboardState, parsePremiumOrdersFromState, dashboardCustomersBootstrapPayload);
         renderConfirmationTasks();
         if (hadPremiumDashboardCustomers) renderPremiumDashboardOrders();
-        else showPremiumDashboardUnavailable();
+        else renderPremiumDashboardPending();
         releasePremiumDashboardBootShell();
         if (!hadPremiumDashboardCustomers || !hadPremiumDashboardOrders) void refreshPremiumDashboard(true, true);
 

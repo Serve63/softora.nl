@@ -176,8 +176,10 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
-  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260710a/);
+  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260710b/);
   assert.match(dataStatusSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
+  assert.match(dataStatusSource, /let hasClearedUnavailable = false;/);
+  assert.match(dataStatusSource, /clear\(\) \{\s*hasClearedUnavailable = true;\s*setStatus\(""\);/);
   assert.match(dataStatusSource, /function setKpisUnavailable\(options = \{\}\) \{/);
   assert.match(dataStatusSource, /if \(options\.preserveActiveOrders === true\) return;/);
   assert.match(dataStatusSource, /activeOrdersEl\.setAttribute\("aria-label", "Actieve opdrachten tijdelijk niet geladen"\);/);
@@ -186,7 +188,9 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(dataStatusSource, /api\.showUnavailable\(\{ preserveActiveOrders: hasLoadedActiveOrdersBootstrap\(payload\) \}\);/);
   assert.match(dataStatusSource, /payload\.ok === false \|\| payload\.source === "unavailable"/);
   assert.match(dataStatusSource, /payload\.source === "empty"/);
-  assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap, \{ once: true \}\);/);
+  assert.match(dataStatusSource, /function scheduleUnavailableForEmptyBootstrap\(\) \{\s*global\.setTimeout\(showUnavailableForEmptyBootstrap, 3200\);/);
+  assert.match(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", scheduleUnavailableForEmptyBootstrap, \{ once: true \}\);/);
+  assert.doesNotMatch(dataStatusSource, /document\.addEventListener\("DOMContentLoaded", showUnavailableForEmptyBootstrap/);
   assert.match(pageSource, /const loaded = customersLoaded \|\| premiumDashboardState\.customersHydrated;/);
   assert.match(coreSource, /function shouldStopUiStateFallback\(error\) \{/);
   assert.match(coreSource, /status === 401 \|\| status === 403 \|\| status === 429/);
@@ -205,8 +209,11 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(pageSource, /const ordersPromise = shouldLoadOrders \? loadPremiumDashboardOrders\(\) : Promise\.resolve\(false\);/);
   assert.match(pageSource, /const customersLoaded = shouldLoadCustomers \? await loadPremiumDashboardCustomers\(\) : false;/);
   assert.match(pageSource, /if \(!ordersLoaded\) \{ if \(!premiumDashboardState\.ordersHydrated\) schedulePremiumDashboardRecovery\(\); return; \}/);
+  assert.match(pageSource, /else renderPremiumDashboardPending\(\); \}\);/);
   assert.doesNotMatch(pageSource, /Promise\.all\(\[loadPremiumDashboardCustomers\(\), loadPremiumDashboardOrders\(\)\]\)/);
   assert.match(pageSource, /if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/);
+  assert.match(pageSource, /if \(hadPremiumDashboardCustomers\) renderPremiumDashboardOrders\(\);\s*else renderPremiumDashboardPending\(\);/);
+  assert.doesNotMatch(pageSource, /if \(hadPremiumDashboardCustomers\) renderPremiumDashboardOrders\(\);\s*else showPremiumDashboardUnavailable\(\);/);
   assert.doesNotMatch(pageSource, /else if \(!premiumDashboardState\.ordersHydrated && !premiumDashboardState\.customersHydrated && window\.SoftoraDashboardDataStatus\)/);
   assert.doesNotMatch(pageSource, /premiumDashboardState\.(orders|customers) = \[\];/);
 });
