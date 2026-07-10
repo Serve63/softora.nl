@@ -20,6 +20,7 @@ const {
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
 
@@ -8961,7 +8962,7 @@ function createColdmailCampaignService(deps = {}) {
             optOutUrl: '',
           })
         : htmlBase;
-      const html = htmlWithContent;
+      const html = renderWebdesignEmailDocument(htmlWithContent);
       const attachments = shouldSendWebdesignImages
         ? buildWebdesignImageAttachments(
             webdesignPhoto,

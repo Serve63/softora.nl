@@ -6,18 +6,34 @@ const path = require('node:path');
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignEmailDocument,
+  renderWebdesignEmailHeadStyles,
   renderWebdesignImageSection,
 } = require('../../server/services/webdesign-email-renderer');
 
 test('shared webdesign renderer keeps desktop paired and mobile explicitly stacked', () => {
-  const html = renderWebdesignImageSection(
+  const imageSection = renderWebdesignImageSection(
     { src: 'cid:design@softora', alt: 'Bedrijf webdesign' },
     {
       mockupImage: { src: 'cid:mockup@softora', alt: 'Bedrijf device mockup' },
     }
   );
+  const html = renderWebdesignEmailDocument(
+    `<div class="softora-webdesign-email-body">${imageSection}</div>`
+  );
 
   assert.match(html, new RegExp(WEBDESIGN_EMAIL_TEMPLATE_VERSION));
+  assert.match(html, /^<!doctype html><html lang="nl"><head>/);
+  assert.match(html, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
+  assert.match(html, /<meta name="x-apple-disable-message-reformatting">/);
+  assert.match(html, /<style type="text\/css">/);
+  assert.ok(html.indexOf('<style type="text/css">') < html.indexOf('<body '));
+  assert.equal((html.match(/<style type="text\/css">/g) || []).length, 1);
+  assert.doesNotMatch(imageSection, /<style\b/i);
+  assert.match(
+    renderWebdesignEmailHeadStyles(),
+    /html,body\{margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important\}/
+  );
   assert.match(html, /<table class="softora-desktop-image-pair"[^>]+width="900"/);
   assert.match(html, /width="300" height="560"/);
   assert.match(html, /width="584" height="560"/);
