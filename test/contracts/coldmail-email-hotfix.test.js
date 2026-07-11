@@ -16,13 +16,16 @@ function read(filePath) {
 test('coldmail hotfix bewaakt de afgesproken mailweergave', () => {
   const source = read(hotfixPath);
 
-  assert.match(source, /website \{\{website\}\}, tegen/);
+  assert.match(source, /website \{\{website\}\} tegen/);
+  assert.doesNotMatch(source, /website \{\{website\}\}, tegen/);
   assert.match(source, /font-weight:400/);
   assert.match(source, /return escapeHtml\(cleanLine\)/);
   assert.match(source, /softora-desktop-nowrap/);
   assert.match(source, /min-width:601px/);
   assert.match(source, /includeMockup: true/);
   assert.match(source, /attachments\.length !== 2/);
+  assert.match(source, /'Mockup'/);
+  assert.match(source, /'Webdesign'/);
 });
 
 test('beide Vercel-entrypoints laden de coldmailfix vóór de app-handler', () => {
