@@ -6,7 +6,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const hotfixPath = path.join(__dirname, '../../server/services/coldmail-email-hotfix.js');
-const packagePath = path.join(__dirname, '../../package.json');
+const apiIndexPath = path.join(__dirname, '../../api/index.js');
+const apiCatchAllPath = path.join(__dirname, '../../api/[...path].js');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -24,10 +25,14 @@ test('coldmail hotfix bewaakt de afgesproken mailweergave', () => {
   assert.match(source, /attachments\.length !== 2/);
 });
 
-test('productiestart laadt de coldmailfix vóór de server', () => {
-  const packageJson = JSON.parse(read(packagePath));
-  assert.equal(
-    packageJson.scripts.start,
-    'node -r ./server/services/coldmail-email-hotfix.js server.js'
-  );
+test('beide Vercel-entrypoints laden de coldmailfix vóór de app-handler', () => {
+  for (const filePath of [apiIndexPath, apiCatchAllPath]) {
+    const source = read(filePath);
+    assert.match(source, /require\('\.\.\/server\/services\/coldmail-email-hotfix'\)/);
+    assert.match(source, /module\.exports = require\('\.\/_app-handler'\)/);
+    assert.ok(
+      source.indexOf("require('../server/services/coldmail-email-hotfix')") <
+        source.indexOf("module.exports = require('./_app-handler')")
+    );
+  }
 });
