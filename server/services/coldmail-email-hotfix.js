@@ -24,8 +24,8 @@ Module._extensions['.js'] = function softoraColdmailHotfix(module, filename) {
   source = replaceRequired(
     source,
     "'Afgelopen week kwam ik jullie website, {{website}}, tegen.',",
-    "'Afgelopen week kwam ik jullie website {{website}}, tegen.',",
-    'komma voor websitevariabele'
+    "'Afgelopen week kwam ik jullie website {{website}} tegen.',",
+    'komma rond websitevariabele verwijderen'
   );
 
   source = replaceRequired(
@@ -82,6 +82,13 @@ Module._extensions['.js'] = function softoraColdmailHotfix(module, filename) {
     '              includeMockup: false,',
     '              includeMockup: true,',
     'mockup als tweede bijlage'
+  );
+
+  source = replaceRequired(
+    source,
+    '        filename: image.filename || filenameForImage(fallbackName, image.contentType, fallbackName),',
+    "        filename: filenameForImage(fallbackName === 'device-mockup' ? 'Mockup' : 'Webdesign', image.contentType, fallbackName),",
+    'vaste duidelijke bijlagenamen'
   );
 
   source = replaceRequired(
