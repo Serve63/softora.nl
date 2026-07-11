@@ -72,6 +72,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'Bedrijfssoftware op maat laten maken voor MKB',
     description:
       'Bedrijfssoftware op maat laten maken voor CRM, dashboards, klantportaal of offerteflow? Softora helpt met scope, koppelingen, rechten en veilige doorgroei.',
+    lastmod: '2026-07-06',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
@@ -89,6 +90,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'CRM op maat laten bouwen voor MKB',
     description:
       'Laat een maatwerk CRM bouwen voor sales pipeline, offertebeheer, klantportaal, dashboards en AI-opvolging. Voor MKB-teams die CRM willen laten maken.',
+    lastmod: '2026-07-04',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [

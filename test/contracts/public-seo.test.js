@@ -127,8 +127,14 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/pakketten<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>/);
+  assert.match(
+    sitemap,
+    /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>\s*<lastmod>2026-07-06<\/lastmod>/
+  );
+  assert.match(
+    sitemap,
+    /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>\s*<lastmod>2026-07-04<\/lastmod>/
+  );
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/over-softora<\/loc>/);
