@@ -5,8 +5,8 @@
   "description": "Express backend voor Retell outbound coldcalling vanuit het Softora dashboard.",
   "main": "server.js",
   "scripts": {
-    "start": "node -r ./server/services/coldmail-email-hotfix.js server.js",
-    "dev": "node -r ./server/services/coldmail-email-hotfix.js server.js",
+    "start": "node server.js",
+    "dev": "node server.js",
     "test:contracts": "node --test test/contracts/*.test.js",
     "test:smoke": "node --test test/smoke/*.test.js",
     "check:secrets": "node scripts/check-tracked-secrets.js",
