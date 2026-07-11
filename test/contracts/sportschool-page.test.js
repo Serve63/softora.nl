@@ -23,6 +23,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
+  const migrationSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-program-migration.js'), 'utf8');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const prettyPages = createKnownPrettyPageSlugToFile(new Set(['sportschool.html']));
 
@@ -55,6 +56,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260701a/);
+  assert.match(pageSource, /assets\/sportschool-program-migration\.js\?v=20260711a/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
   assert.match(pageSource, /data-exercise-list/);
@@ -130,4 +132,13 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(stylesSource, /\.exercise-notes\s*\{[\s\S]*?font-size: 11px;/);
   assert.match(stylesSource, /:focus-within/);
   assert.doesNotMatch(stylesSource, /\.day-trigger::after/);
+
+  assert.match(migrationSource, /monday:[\s\S]*Overhead Tricep[\s\S]*Tricep Dip/);
+  assert.match(migrationSource, /tuesday:[\s\S]*Leg Press[\s\S]*Hammer Curls/);
+  assert.match(migrationSource, /wednesday:[\s\S]*Cable Pushdown[\s\S]*Overhead Tricep/);
+  assert.match(migrationSource, /thursday:[\s\S]*Leg Press[\s\S]*Sitting Bicep/);
+  assert.match(migrationSource, /programAlreadyInstalled/);
+  assert.match(migrationSource, /collectExistingSources/);
+  assert.match(migrationSource, /Prefer: 'resolution=merge-duplicates'/);
+  assert.match(migrationSource, /if \(writeResponse\.ok\) window\.location\.reload\(\)/);
 });
