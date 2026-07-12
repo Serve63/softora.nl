@@ -19,7 +19,8 @@ test('coldmail hotfix bewaakt de afgesproken mailweergave', () => {
   assert.match(source, /website \{\{website\}\} tegen/);
   assert.doesNotMatch(source, /website \{\{website\}\}, tegen/);
   assert.match(source, /font-weight:400/);
-  assert.match(source, /return escapeHtml\(cleanLine\)/);
+  assert.match(source, /white-space:nowrap!important;display:inline-block/);
+  assert.match(source, /escapeHtml\(cleanLine\)/);
   assert.match(source, /softora-desktop-nowrap/);
   assert.match(source, /min-width:601px/);
   assert.match(source, /includeMockup: true/);
