@@ -38,8 +38,8 @@ Module._extensions['.js'] = function softoraColdmailHotfix(module, filename) {
   source = replaceRequired(
     source,
     '    return renderColdmailHtmlText(cleanLine);',
-    '    return escapeHtml(cleanLine);',
-    'website als niet-klikbare gewone tekst'
+    '    return `<span style="white-space:nowrap!important;display:inline-block;">${escapeHtml(cleanLine)}</span>`;',
+    'website als niet-klikbare tekst zonder regelafbreking'
   );
 
   source = replaceRequired(
