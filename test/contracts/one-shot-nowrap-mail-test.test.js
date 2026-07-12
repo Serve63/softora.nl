@@ -13,7 +13,8 @@ test('temporary nowrap mail trigger is token protected and forces only the exist
 
   assert.match(source, /ONE_SHOT_TOKEN/);
   assert.match(source, /process\.env\.CRON_SECRET/);
+  assert.match(source, /require\('\.\/_app-handler'\)/);
   assert.match(source, /\/api\/coldmailing\/autopilot\/run/);
-  assert.match(source, /JSON\.stringify\(\{ force: true \}\)/);
+  assert.match(source, /req\.body = \{ force: true \}/);
   assert.match(source, /Cache-Control', 'no-store/);
 });
