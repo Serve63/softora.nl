@@ -267,6 +267,11 @@ select {
   color: #30263b;
 }
 
+.status.is-today-end {
+  border-bottom: 2px solid var(--green-line);
+  border-radius: 0 0 8px 8px;
+}
+
 .habit-name {
   display: flex;
   align-items: center;
