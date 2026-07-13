@@ -13,8 +13,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713m"/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260713b" defer><\/script>/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713n"/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260713d" defer><\/script>/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Jouw voortgang van de laatste 30 dagen/);
   assert.match(html, /<strong>100%<\/strong>/);
@@ -27,11 +27,12 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.equal((html.match(/class="habit-label"/g) || []).length, 4);
   assert.equal((html.match(/is-today-end/g) || []).length, 1);
   assert.match(html, /<div class="habit-spacer" role="columnheader">Doelen:<\/div>/);
+  assert.match(html, /<button class="add-goal" type="button" aria-label="Doel toevoegen">\+<\/button>/);
+  assert.equal((html.match(/class="habit-add-cell"/g) || []).length, 30);
   assert.doesNotMatch(html, /chart-legend|legend-dot|Legenda/);
   assert.doesNotMatch(html, /Groen|Oranje|Rood/);
   assert.doesNotMatch(html, /Afgerond/);
   assert.doesNotMatch(html, /Dag 1 toevoegen/);
-  assert.doesNotMatch(html, /<button\b/i);
   assert.doesNotMatch(html, /Discipline vandaag/);
   assert.doesNotMatch(html, /Focus\. Consistentie\. Groei\./);
   assert.doesNotMatch(html, /motivation-strip/);
@@ -58,9 +59,11 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.bar\.is-warning\s*\{[\s\S]*var\(--warning\)/);
   assert.match(css, /\.bar\.is-danger\s*\{[\s\S]*var\(--danger\)/);
   assert.match(css, /\.status\.is-today-end\s*\{[\s\S]*border-bottom:\s*2px solid var\(--good-line\);/);
+  assert.match(css, /\.status\.is-untracked::before\s*\{[\s\S]*background:\s*#d4d9df;/);
   assert.match(css, /\.status\.is-missed::before\s*\{[\s\S]*background-color:\s*var\(--danger\);/);
   assert.match(css, /\.habit-label:focus\s*\{[\s\S]*box-shadow:\s*0 0 0 2px rgba\(86, 196, 134, \.34\);/);
-  assert.doesNotMatch(css, /\.habit-grid button/);
+  assert.match(css, /\.add-goal\s*\{[\s\S]*border-radius:\s*999px;/);
+  assert.match(css, /\.habit-add-cell\s*\{[\s\S]*min-height:\s*38px;/);
   assert.doesNotMatch(css, /\.habit-name-empty/);
   assert.match(css, /\.habit-spacer\s*\{[\s\S]*font-weight:\s*900;/);
   assert.doesNotMatch(css, /\.motivation-strip/);
@@ -78,6 +81,12 @@ test('live momentum script wires habit toggles to chart and score state', () => 
   assert.match(js, /function toggleCell\(cell\)/);
   assert.match(js, /function updateChart\(\)/);
   assert.match(js, /function getDayScore\(day\)/);
+  assert.match(js, /function createGoalRow\(\)/);
+  assert.match(js, /function refreshCellData\(\)/);
+  assert.match(js, /function updateTodayColumnEnd/);
+  assert.match(js, /closest\('\.add-goal'\)/);
+  assert.match(js, /is-untracked/);
+  assert.match(js, /day < TODAY/);
   assert.match(js, /is-missed/);
   assert.match(js, /is-warning/);
   assert.match(js, /is-danger/);
