@@ -13,7 +13,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713l"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713m"/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260713b" defer><\/script>/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Jouw voortgang van de laatste 30 dagen/);
@@ -27,9 +27,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.equal((html.match(/class="habit-label"/g) || []).length, 4);
   assert.equal((html.match(/is-today-end/g) || []).length, 1);
   assert.match(html, /<div class="habit-spacer" role="columnheader">Doelen:<\/div>/);
-  assert.match(html, /legend-dot is-good/);
-  assert.match(html, /legend-dot is-warning/);
-  assert.match(html, /legend-dot is-danger/);
+  assert.doesNotMatch(html, /chart-legend|legend-dot|Legenda/);
+  assert.doesNotMatch(html, /Groen|Oranje|Rood/);
   assert.doesNotMatch(html, /Afgerond/);
   assert.doesNotMatch(html, /Dag 1 toevoegen/);
   assert.doesNotMatch(html, /<button\b/i);
@@ -55,8 +54,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(css, /width:\s*min\(1320px, 100%\);/);
   assert.doesNotMatch(css, /\.momentum-hero,\s*\.habit-board,\s*\.closing-quote/);
   assert.match(css, /\.chart-card\s*\{[\s\S]*border-top:\s*1px solid var\(--soft-line\);/);
-  assert.match(css, /\.chart-legend\s*\{[\s\S]*justify-content:\s*flex-start;/);
-  assert.doesNotMatch(css, /\.legend-dot\.is-open/);
+  assert.doesNotMatch(css, /\.chart-legend|\.legend-dot/);
   assert.match(css, /\.bar\.is-warning\s*\{[\s\S]*var\(--warning\)/);
   assert.match(css, /\.bar\.is-danger\s*\{[\s\S]*var\(--danger\)/);
   assert.match(css, /\.status\.is-today-end\s*\{[\s\S]*border-bottom:\s*2px solid var\(--good-line\);/);
