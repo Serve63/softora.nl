@@ -13,7 +13,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713e"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713f"/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Jouw voortgang van de laatste 30 dagen/);
   assert.match(html, /<strong>80%<\/strong>/);
@@ -22,6 +22,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /90 min deep work/);
   assert.match(html, /Dagdoel behalen/);
   assert.match(html, /Gezonde voeding/);
+  assert.equal((html.match(/contenteditable="plaintext-only"/g) || []).length, 4);
+  assert.equal((html.match(/class="habit-label"/g) || []).length, 4);
   assert.match(html, /Discipline vandaag/);
   assert.match(html, /Focus\. Consistentie\. Groei\./);
   assert.doesNotMatch(html, /<script\b/i);
@@ -37,6 +39,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(css, /width:\s*min\(1320px, 100%\);/);
   assert.doesNotMatch(css, /\.momentum-hero,\s*\.habit-board,\s*\.closing-quote/);
   assert.match(css, /\.chart-card\s*\{[\s\S]*border-top:\s*1px solid var\(--soft-line\);/);
+  assert.match(css, /\.habit-label:focus\s*\{[\s\S]*box-shadow:\s*0 0 0 2px rgba\(86, 196, 134, \.34\);/);
   assert.match(css, /\.closing-quote p\s*\{[\s\S]*font-size:\s*clamp\(12px, \.72vw, 14px\);/);
   assert.match(css, /\.closing-quote span\s*\{[\s\S]*width:\s*24px;/);
   assert.match(css, /photo-1500530855697-b586d89ba3ee/);
