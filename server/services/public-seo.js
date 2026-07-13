@@ -1,6 +1,6 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
-const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
+const DEFAULT_LOGO_PATH = '/assets/softora-touch-icon.png';
 const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
 const SOFTORA_PUBLIC_PHONE = '+31643262792';
 const MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
@@ -69,9 +69,10 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     fileName: 'premium-bedrijfssoftware.html',
     path: '/bedrijfssoftware-op-maat',
     legacyPaths: ['/premium-bedrijfssoftware'],
-    title: 'Bedrijfssoftware laten maken voor CRM en dashboards',
+    title: 'Bedrijfssoftware op maat laten maken voor MKB',
     description:
-      'Laat bedrijfssoftware of een bedrijfsapplicatie maken voor CRM, dashboard, klantportaal, offerteflow, planning en AI automatisering.',
+      'Bedrijfssoftware op maat laten maken voor CRM, dashboards, klantportaal of offerteflow? Softora helpt met scope, koppelingen, rechten en veilige doorgroei.',
+    lastmod: '2026-07-06',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
@@ -79,6 +80,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/maatwerk-platform',
       '/kennisbank/wat-is-bedrijfssoftware-op-maat',
       '/ai-automatisering',
+      '/kennisbank/wat-is-offerte-automatisering',
       '/vergelijkingen/maatwerk-software-vs-standaard-software',
     ],
   },
@@ -88,6 +90,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     title: 'CRM op maat laten bouwen voor MKB',
     description:
       'Laat een maatwerk CRM bouwen voor sales pipeline, offertebeheer, klantportaal, dashboards en AI-opvolging. Voor MKB-teams die CRM willen laten maken.',
+    lastmod: '2026-07-04',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [

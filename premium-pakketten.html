@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+<link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
 <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Pakketten</title>
@@ -306,7 +306,7 @@ body {
 
   .tabs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     margin-bottom: 32px;
     border-bottom: 2px solid var(--border);
@@ -333,6 +333,10 @@ body {
     line-height: 1.1;
   }
 
+  .tab.is-locked { display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-light); cursor: not-allowed; opacity: 0.62; }
+  .tab.is-locked:hover { color: var(--text-light); }
+  .tab-lock svg { width: 12px; height: 12px; display: block; }
+
   .tab:hover {
     color: var(--tab-accent);
   }
@@ -351,19 +355,10 @@ body {
     background: var(--tab-accent);
   }
 
-  .tab.theme-website {
-    --tab-accent: #8b2252;
-  }
-  .tab.theme-routes { --tab-accent: #8b2252; }
-  .tab.theme-business {
-    --tab-accent: #2563eb;
-  }
-  .tab.theme-voice {
-    --tab-accent: #1f9b5a;
-  }
-  .tab.theme-chatbot {
-    --tab-accent: #f39c12;
-  }
+  .tab.theme-website { --tab-accent: #8b2252; }
+  .tab.theme-business { --tab-accent: #2563eb; }
+  .tab.theme-voice { --tab-accent: #1f9b5a; }
+  .tab.theme-chatbot { --tab-accent: #f39c12; }
 
   .section-title {
     font-family: 'Oswald', sans-serif;
@@ -375,32 +370,19 @@ body {
     margin-bottom: 20px;
   }
 
-  .cards-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: 32px;
-  }
+  .cards-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; align-items: stretch; }
 
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 22px 20px;
-    position: relative;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-    box-shadow: var(--shadow);
-  }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 22px 20px; position: relative; display: flex; flex-direction: column; height: 100%; transition: box-shadow 0.2s ease, transform 0.2s ease; box-shadow: var(--shadow); }
 
   .card:hover {
     box-shadow: 0 14px 36px rgba(26, 26, 46, 0.08);
     transform: translateY(-2px);
   }
-  .card.is-locked { opacity: 0.78; }
-  .card.is-locked:hover { box-shadow: var(--shadow); transform: none; }
   .card-cta svg { width: 13px; height: 13px; flex-shrink: 0; }
-  .routes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
-  .route-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 28px 26px; position: relative; box-shadow: var(--shadow); } .route-card.featured { border-color: var(--crimson); border-width: 2px; } .route-title { font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 800; text-transform: uppercase; color: var(--text-dark); margin-bottom: 12px; } .route-desc { color: var(--text-mid); font-size: 13px; line-height: 1.5; min-height: 42px; margin-bottom: 20px; }
+  .routes-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; align-items: stretch; }
+  .route-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 28px 26px; position: relative; display: flex; flex-direction: column; height: 100%; box-shadow: var(--shadow); } .route-card.featured { border-color: var(--crimson); border-width: 2px; } .route-title { font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 800; text-transform: uppercase; color: var(--text-dark); margin-bottom: 12px; line-height: 1.15; } .route-desc { color: var(--text-mid); font-size: 13px; line-height: 1.5; min-height: 42px; margin-bottom: 20px; }
+  #tab-bouwen .card-name { font-size: 19px; line-height: 1.16; min-height: 44px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #tab-bouwen .card-price { border-bottom: 0; padding-bottom: 0; }
   .card.featured {
     border-color: var(--crimson);
     border-width: 2px;
@@ -454,6 +436,7 @@ body {
   .price-note { font-size: 11px; color: var(--text-light); margin-top: 4px; }
   .onderhoud-card .features-list::before { content: "Realistische taken"; display: block; margin: 18px 0 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--crimson); }
   .features-list { list-style: none; margin-bottom: 16px; }
+  .card > .features-list, .onderhoud-card > .features-list { margin-bottom: 22px; }
   .features-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--text-mid); padding: 5px 0; line-height: 1.4; }
 
   .check {
@@ -473,21 +456,8 @@ body {
     height: 9px;
   }
 
-  .card-cta {
-    width: 100%;
-    padding: 11px;
-    border-radius: 4px;
-    font-family: 'Oswald', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
+  .card-cta { width: 100%; min-height: 46px; padding: 11px; border-radius: 4px; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-top: auto; transition: all 0.15s ease; }
   .card-cta[disabled], .card-cta[aria-disabled="true"] { cursor: not-allowed; opacity: 0.62; }
-  .card-cta.is-locked { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: rgba(139, 34, 82, 0.05); border-color: rgba(139, 34, 82, 0.16); color: var(--text-light); }
-
   .card-cta.outline {
     background: transparent;
     border: 1px solid var(--border);
@@ -698,20 +668,12 @@ body {
 
   .onderhoud-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 32px;
   }
 
-  .onderhoud-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 22px 20px;
-    position: relative;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-    box-shadow: var(--shadow);
-  }
+  .onderhoud-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 22px 20px; position: relative; display: flex; flex-direction: column; height: 100%; transition: box-shadow 0.2s ease, transform 0.2s ease; box-shadow: var(--shadow); }
 
   .onderhoud-card:hover {
     box-shadow: 0 10px 28px rgba(26, 26, 46, 0.07);
@@ -727,7 +689,7 @@ body {
   .onderhoud-card .card-name { font-size: 22px; margin-bottom: 4px; }
   .onderhoud-card .price-amount { font-size: 32px; }
   .onderhoud-card .card-desc { font-size: 12px; min-height: 36px; margin-bottom: 14px; }
-  .onderhoud-card .features-list { margin-bottom: 16px; }
+  .onderhoud-card .features-list { margin-bottom: 22px; }
   .onderhoud-card .features-list li { font-size: 12px; }
 
   .tab-panel { display: none; }
@@ -1434,158 +1396,77 @@ body {
   </div>
 
   <div class="tabs">
-    <button class="tab theme-routes active" type="button" data-package-tab="routes">Routes</button>
-    <button class="tab theme-website" type="button" data-package-tab="website">Website</button>
-    <button class="tab theme-business" type="button" data-package-tab="bedrijfssoftware">Bedrijfssoftware</button>
-    <button class="tab theme-voice" type="button" data-package-tab="voicesoftware">Voicesoftware</button>
-    <button class="tab theme-chatbot" type="button" data-package-tab="chatbots">Chatbot</button>
+    <button class="tab theme-website active" type="button" data-package-tab="website">Website</button>
+    <button class="tab theme-business is-locked" type="button" data-package-tab="bedrijfssoftware" data-package-tab-locked="true" disabled aria-disabled="true" aria-label="Bedrijfssoftware vergrendeld" title="Vergrendeld"><span>Bedrijfssoftware</span><span class="tab-lock" aria-hidden="true"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/></svg></span></button>
+    <button class="tab theme-voice is-locked" type="button" data-package-tab="voicesoftware" data-package-tab-locked="true" disabled aria-disabled="true" aria-label="Voicesoftware vergrendeld" title="Vergrendeld"><span>Voicesoftware</span><span class="tab-lock" aria-hidden="true"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/></svg></span></button>
+    <button class="tab theme-chatbot is-locked" type="button" data-package-tab="chatbots" data-package-tab-locked="true" disabled aria-disabled="true" aria-label="Chatbot vergrendeld" title="Vergrendeld"><span>Chatbot</span><span class="tab-lock" aria-hidden="true"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/></svg></span></button>
   </div>
 
-  <div id="tab-routes" class="tab-panel theme-routes active"><div class="section-title">Website routes</div><div class="routes-grid">
-      <div class="route-card"><div class="card-tier">Route 01</div><div class="route-title">Losse oplevering</div><div class="route-desc">Softora ontwikkelt en levert de website volledig gebruiksklaar op. Na oplevering is het project afgerond en zijn wijzigingen uitgesloten, tenzij er aantoonbare gebreken vanuit Softora zijn.</div><ul class="features-list"><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Wij bouwen en leveren de website op</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Klant kan de site daarna niet zelf aanpassen</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Aanpassingen lopen na oplevering niet via ons</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Hosting en domein zijn voor de klant zelf</li></ul></div>
-      <div class="route-card"><div class="card-tier">Route 02</div><div class="route-title">Losse oplevering mét CMS</div><div class="route-desc">Softora ontwikkelt de website met een eigen CMS-/beheersysteem. Minimaal €200 extra voor tekst- en fotobeheer. Extra wijzigingsopties zijn mogelijk maar verhogen de prijs.</div><ul class="features-list"><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Klant beheert zelf tekst en foto's</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>CMS-prijs groeit mee met wat beheerd moet worden</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Softora verzorgt hosting en Supabase</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Domein mag bij ons in beheer, maar hoeft niet</li></ul></div>
-      <div class="route-card featured"><div class="card-badge">Aanbevolen</div><div class="card-tier">Route 03</div><div class="route-title">Softora Volledig beheer</div><div class="route-desc">Softora ontwikkelt en beheert de website, inclusief monitoring, updates en beveiliging. Wijzigingen voert Softora op aanvraag uit binnen het onderhoudspakket, zodat de klant technisch volledig wordt ontzorgd.</div><ul class="features-list"><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Softora blijft verantwoordelijk voor beheer</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Wij passen de site continu aan op verzoek</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Cybersecurity zit in het beheer inbegrepen</li><li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onderhoud wordt afgestemd op de klantbehoefte</li></ul></div>
-      <div class="database-hosting-note"><strong>Let op:</strong> databaseopslag draait via Softora.nl/Supabase; klanten met databasehosting betalen hiervoor €15 per maand aan ons als Supabase-vergoeding, vergelijkbaar met Shopify-platformkosten.</div>
-    </div></div>
-  <div id="tab-bouwen" class="tab-panel theme-website">
-    <div class="section-title">Website Bouw Pakketten</div>
+  <div id="tab-bouwen" class="tab-panel theme-website active">
+    <div class="section-title">Website Richtlijnen</div>
 
     <div class="cards-grid">
-      <div class="card is-locked" aria-disabled="true">
-        <div class="card-tier">Pakket 01</div>
-        <div class="card-name">Starter</div>
-        <div class="card-desc">Voor starters die snel online willen.</div>
-        <div class="card-price">
-          <div class="price-amount">€749,-<span class="price-suffix">eenmalig</span></div>
-          <div class="price-note">Excl. BTW · Oplevering binnen 2 weken</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tot 5 pagina's</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Mobielvriendelijk design</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Contactformulier</li>
-        </ul>
-        <button class="card-cta outline is-locked" type="button" disabled aria-disabled="true" title="Tijdelijk vergrendeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>Tijdelijk vergrendeld</button>
-      </div>
-
-      <div class="card featured is-locked" aria-disabled="true">
-        <div class="card-badge">Meest gekozen</div>
-        <div class="card-tier">Pakket 02</div>
-        <div class="card-name">Business</div>
-        <div class="card-desc">Voor groeiende bedrijven met sterk design.</div>
-        <div class="card-price">
-          <div class="price-amount">€1.350,-<span class="price-suffix">eenmalig</span></div>
-          <div class="price-note">Excl. BTW · Oplevering binnen 3 weken</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tot 10 pagina's</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Design in huisstijl</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Geavanceerde SEO + sitemap</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Chat/WhatsApp knop</li>
-        </ul>
-        <button class="card-cta filled is-locked" type="button" disabled aria-disabled="true" title="Tijdelijk vergrendeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>Tijdelijk vergrendeld</button>
-      </div>
-
-      <div class="card is-locked" aria-disabled="true">
-        <div class="card-tier">Pakket 03</div>
-        <div class="card-name">Premium</div>
-        <div class="card-desc">Volledig maatwerk voor ambitieuze bedrijven.</div>
-        <div class="card-price">
-          <div class="price-amount">€2.495<span class="price-suffix">eenmalig</span></div>
-          <div class="price-note">Excl. BTW · Op aanvraag gepland</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onbeperkt pagina's</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Maatwerk design</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Webshop/reserveringen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Meertalig (NL/EN)</li>
-        </ul>
-        <button class="card-cta outline is-locked" type="button" disabled aria-disabled="true" title="Tijdelijk vergrendeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg>Tijdelijk vergrendeld</button>
-      </div>
-
-      <div class="card">
-        <div class="card-tier">Pakket 04</div>
-        <div class="card-name">Enterprise</div>
-        <div class="card-desc">Complexe maatwerktrajecten met integraties.</div>
-        <div class="card-price">
-          <div class="price-amount">Op<span class="price-suffix"> aanvraag</span></div>
-          <div class="price-note">Excl. BTW · Planning in overleg</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Intake + scope</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>API/CMS koppelingen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Schaalbare beveiliging</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Projectmanager + SLA</li>
-        </ul>
-        <button class="card-cta outline" type="button">Softora</button>
-      </div>
+      <div class="card"><div class="card-tier">Richtlijn 1</div><div class="card-name">One Page Website</div><div class="card-price"><div class="price-amount">€850,-</div><div class="price-note">Richtprijs excl. BTW</div></div><button class="card-cta outline" type="button">Softora</button></div>
+      <div class="card featured"><div class="card-badge">Meest gekozen</div><div class="card-tier">Richtlijn 2</div><div class="card-name">Website met pagina's &amp; tooltjes</div><div class="card-price"><div class="price-amount">€1.350,-</div><div class="price-note">Richtprijs excl. BTW</div></div><button class="card-cta filled" type="button">Softora</button></div>
+      <div class="card"><div class="card-tier">Richtlijn 3</div><div class="card-name">Website met veel pagina's</div><div class="card-price"><div class="price-amount">€2.250,-</div><div class="price-note">Richtprijs excl. BTW</div></div><button class="card-cta outline" type="button">Softora</button></div>
+      <div class="card"><div class="card-tier">Richtlijn 4</div><div class="card-name">Bedrijfssoftware op maat</div><div class="card-price"><div class="price-amount">€3.500,-</div><div class="price-note">Richtprijs excl. BTW</div></div><button class="card-cta outline" type="button">Softora</button></div>
     </div>
-
   </div>
 
-  <div id="tab-onderhoud" class="tab-panel theme-website">
-    <div class="section-title">Website Onderhoud Abonnementen</div>
+  <div id="tab-onderhoud" class="tab-panel theme-website active">
+    <div class="section-title">Website Onderhoud Pakketten</div>
     <div class="onderhoud-grid">
       <div class="onderhoud-card">
-        <div class="card-tier">Abonnement 01</div>
-        <div class="card-name">Basis</div>
+        <div class="card-tier">Pakket 01</div>
+        <div class="card-name">Onderhoud</div>
+        <div class="card-desc">Voor een stabiele, veilige website</div>
         <div class="card-price">
-          <div class="price-line"><div class="price-amount">€89<span class="price-suffix">/mnd</span></div><span class="price-hours">· 1 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
+          <div class="price-line"><div class="price-amount">€37,95<span class="price-suffix">/mnd</span></div></div>
+          <div class="price-note">Per maand excl. BTW</div>
         </div>
         <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>1 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Updates, backups en monitoring</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Kleine tekst- en fotowijzigingen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Korte technische controles</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Technisch onderhoud van de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Updates en controle van de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Basiscontrole op veiligheid en werking</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Monitoring zodat alles goed blijft draaien</li>
         </ul>
         <button class="card-cta outline" type="button">Softora</button>
       </div>
 
       <div class="onderhoud-card featured">
-        <div class="card-badge">Meest gekozen</div>
-        <div class="card-tier">Abonnement 02</div>
-        <div class="card-name">Plus</div>
+        <div class="card-badge">Aanbevolen</div>
+        <div class="card-tier">Pakket 02</div>
+        <div class="card-name">Onderhoud + Wijzigingen</div>
+        <div class="card-desc">Voor actief bijhouden en aanpassen</div>
         <div class="card-price">
-          <div class="price-line"><div class="price-amount">€199<span class="price-suffix">/mnd</span></div><span class="price-hours">· 3 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
+          <div class="price-line"><div class="price-amount">€74,95<span class="price-suffix">/mnd</span></div></div>
+          <div class="price-note">Per maand excl. BTW</div>
         </div>
         <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>3 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Basis</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Nieuwe secties, acties of pagina-updates</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Maandelijkse rapportage en advies</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit pakket 1 inbegrepen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tekstwijzigingen op de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Afbeeldingen vervangen of toevoegen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Aanpassingen aan bestaande pagina's</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Extra support bij vragen of verbeteringen</li>
         </ul>
         <button class="card-cta filled" type="button">Softora</button>
       </div>
 
       <div class="onderhoud-card">
-        <div class="card-tier">Abonnement 03</div>
-        <div class="card-name">Premium</div>
+        <div class="card-tier">Pakket 03</div>
+        <div class="card-name">Continue Aanpassingen</div>
+        <div class="card-desc">Voor maximale flexibiliteit en onbeperkte aanpassingen</div>
         <div class="card-price">
-          <div class="price-line"><div class="price-amount">€329<span class="price-suffix">/mnd</span></div><span class="price-hours">· 5 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Jaarlijks opzegbaar</div>
+          <div class="price-line"><div class="price-amount">€497,-<span class="price-suffix">/mnd</span></div></div>
+          <div class="price-note">Per maand excl. BTW</div>
         </div>
         <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>5 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Plus</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>SEO, snelheid en conversie verbeteren</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prioriteit bij wijzigingen en bugfixes</li>
-        </ul>
-        <button class="card-cta outline" type="button">Softora</button>
-      </div>
-
-      <div class="onderhoud-card">
-        <div class="card-tier">Abonnement 04</div>
-        <div class="card-name">Enterprise</div>
-        <div class="card-price">
-          <div class="price-line"><div class="price-amount">€649<span class="price-suffix">/mnd</span></div><span class="price-hours">· 10 uur/mnd</span></div>
-          <div class="price-note">Excl. BTW · Aangepast contract</div>
-        </div>
-        <ul class="features-list">
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>10 uur werk per maand</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Premium</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Campagnepagina's, funnels en grotere uitbreidingen</li>
-          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Roadmap, advies en vaste contactpersoon</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit pakket 2 inbegrepen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onbeperkte tekstwijzigingen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Onbeperkte aanpassingen op de website</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Nieuwe pagina's toevoegen</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prioriteit en snelle doorlooptijd</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Proactieve optimalisaties en verbeteringen</li>
         </ul>
         <button class="card-cta outline" type="button">Softora</button>
       </div>
@@ -2040,6 +1921,6 @@ body {
   </div>
 </main>
 
-<script src="assets/premium-packages.js?v=20260427a"></script>
+<script src="assets/premium-packages.js?v=20260701a"></script>
 </body>
 </html>

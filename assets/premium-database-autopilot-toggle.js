@@ -63,6 +63,23 @@
         notifyStatus();
     }
 
+    function applyBootstrapStatus() {
+        const rootDocument = getDocument();
+        const element = rootDocument && rootDocument.getElementById("softoraCustomersBootstrap");
+        if (!element) return false;
+        try {
+            const payload = JSON.parse(String(element.textContent || "{}"));
+            const autopilot = payload && payload.autopilot && typeof payload.autopilot === "object" ? payload.autopilot : null;
+            if (!autopilot || autopilot.loaded !== true) return false;
+            state = { enabled: autopilot.enabled === true };
+            statusLoaded = true;
+            statusUnavailable = false;
+            return true;
+        } catch (_error) {
+            return false;
+        }
+    }
+
     function render() {
         const loading = !statusLoaded && !statusUnavailable;
         const unavailable = statusUnavailable && !statusLoaded;
@@ -105,7 +122,7 @@
         const requestOptions = Object.assign({
             credentials: "same-origin",
             headers: { Accept: "application/json" },
-            cache: "no-store",
+            cache: "default",
         }, options || {});
         const response = await fetchImpl(url, requestOptions);
         const payload = await response.json().catch(function () { return null; });
@@ -116,6 +133,8 @@
     }
 
     function refresh() {
+        const rootDocument = getDocument();
+        if (rootDocument && rootDocument.hidden) return Promise.resolve(state);
         if (refreshPromise) return refreshPromise;
         refreshPromise = requestJson(STATUS_URL)
             .then(applyStatusPayload)
@@ -158,7 +177,10 @@
 
     function bindRefreshEvents() {
         const interval = getSetInterval();
-        if (interval) interval(refresh, REFRESH_MS);
+        if (interval) interval(function () {
+            const rootDocument = getDocument();
+            if (!rootDocument || !rootDocument.hidden) void refresh();
+        }, REFRESH_MS);
         if (typeof global.addEventListener === "function") {
             global.addEventListener("focus", refresh);
             global.addEventListener("pageshow", refresh);
@@ -178,6 +200,7 @@
             event.preventDefault();
             void toggle();
         });
+        applyBootstrapStatus();
         render();
         void refresh();
         bindRefreshEvents();

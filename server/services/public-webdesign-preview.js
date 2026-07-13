@@ -16,7 +16,7 @@ const STRUCTURED_PREVIEW_SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
 const STRUCTURED_PREVIEW_MAX_SIGNED_MATCHES = 12;
 const STRUCTURED_PREVIEW_READ_ATTEMPTS = 3;
 const PUBLIC_PREVIEW_READ_ATTEMPT_TIMEOUT_MS = 10000;
-const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 900;
+const PUBLIC_PREVIEW_PROFILE_CONTEXT_TIMEOUT_MS = 2500;
 const PUBLIC_PREVIEW_IMAGE_FETCH_TIMEOUT_MS = 5000;
 const PUBLIC_PREVIEW_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const PUBLIC_PREVIEW_IMAGE_LIMIT_INPUT_PIXELS = 45_000_000;
@@ -69,6 +69,10 @@ const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
   'martijnvandeven@websoftora.com': 'martijn',
 });
 const PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS = Object.freeze([
+  'instantlySenderEmail',
+  'instantly_sender_email',
+  'instantlyActualSenderEmail',
+  'instantly_actual_sender_email',
   'lastColdmailSenderEmail',
   'senderEmail',
   'sender_email',
@@ -86,6 +90,10 @@ const PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS = Object.freeze([
   'mail_from',
 ]);
 const PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS = Object.freeze([
+  'instantlySenderProfileKey',
+  'instantly_sender_profile_key',
+  'instantlySenderProfile',
+  'instantly_sender_profile',
   'senderProfileKey',
   'senderKey',
   'profileKey',
@@ -119,6 +127,21 @@ const PUBLIC_PREVIEW_PROFILE_NESTED_FIELDS = Object.freeze([
   'owner',
   'responsibleUser',
   'assignedUser',
+]);
+const PUBLIC_PREVIEW_PROFILE_QUERY_FIELDS = Object.freeze([
+  'sender',
+  'from',
+  'profile',
+  'senderProfile',
+  'sender_profile',
+  'senderProfileKey',
+  'sender_profile_key',
+  'owner',
+  'ownerKey',
+  'mailbox',
+  'senderEmail',
+  'sender_email',
+  'email',
 ]);
 
 const {
@@ -346,6 +369,13 @@ function hasPublicPreviewProfileFieldSignal(objects, fields) {
   );
 }
 
+function hasConfirmedPublicPreviewSenderProfileSignal(objects) {
+  return Boolean(
+    inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS) ||
+      inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_EXPLICIT_FIELDS)
+  );
+}
+
 function inferPublicPreviewProfileKey(objects) {
   const sentKey = inferPublicPreviewProfileKeyFromFields(objects, PUBLIC_PREVIEW_PROFILE_SENT_EMAIL_FIELDS);
   if (sentKey) return sentKey;
@@ -379,6 +409,43 @@ function resolvePublicPreviewProfile(record = null, customer = null, outboundCon
   };
 }
 
+function resolvePublicPreviewProfileOverride(value) {
+  const key = inferPublicPreviewProfileKeyFromText(value);
+  const profile = PUBLIC_PREVIEW_PROFILES[key];
+  if (!profile || (key !== 'serve' && key !== 'martijn')) return null;
+  return {
+    key: profile.key,
+    name: profile.name,
+    role: profile.role,
+    photoSource: profile.photoSource,
+    source: 'explicit',
+  };
+}
+
+function resolvePublicPreviewProfileOverrideFromRequest(req) {
+  const query = req && req.query && typeof req.query === 'object' ? req.query : {};
+  const params = req && req.params && typeof req.params === 'object' ? req.params : {};
+  const candidates = [
+    params.senderProfile,
+    params.sender,
+    ...PUBLIC_PREVIEW_PROFILE_QUERY_FIELDS.map((field) => query[field]),
+  ];
+  for (const candidate of candidates) {
+    const profile = resolvePublicPreviewProfileOverride(candidate);
+    if (profile) return profile;
+  }
+  return null;
+}
+
+function applyPublicPreviewProfileOverride(preview, profile) {
+  if (!preview || !profile) return preview;
+  return {
+    ...preview,
+    profile,
+    profileContextPending: false,
+  };
+}
+
 function hasExplicitPublicPreviewProfile(preview) {
   return Boolean(preview && preview.profile && preview.profile.source === 'explicit');
 }
@@ -398,6 +465,15 @@ function markPublicPreviewProfileContextPending(preview) {
 
 function hasPendingPublicPreviewProfileContext(preview) {
   return Boolean(preview && preview.profileContextPending && !hasExplicitPublicPreviewProfile(preview));
+}
+
+function clearPendingPublicPreviewProfileContext(preview) {
+  return preview && typeof preview === 'object'
+    ? {
+        ...preview,
+        profileContextPending: false,
+      }
+    : preview;
 }
 
 function readChunkedDataUrl(values, photoKey, chunkCount) {
@@ -1492,35 +1568,63 @@ function createPublicWebdesignPreviewService(options = {}) {
       return preview;
     }
 
-    async function enrichDirectPreview() {
-      let outboundContexts = await loadOutboundContexts(
-        collectPublicPreviewContextIdentifiers(id, directRecords, [])
-      );
-      preview = resolvePreviewFromMaps(id, {}, directPhotoMap, [], outboundContexts) || preview;
-      if (preview && hasExplicitPublicPreviewProfile(preview) && normalizeString(preview.title)) {
-        return preview;
-      }
-
-      let customers = [];
+    async function loadCustomersForPreview(source) {
       const loadedCustomers = await retryPublicPreviewRead(
         () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
         STRUCTURED_PREVIEW_READ_ATTEMPTS,
         diagnostics,
-        'customers-direct'
+        source
       );
-      try {
-        customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
-      } catch (_error) {
-        customers = [];
-      }
+      return Array.isArray(loadedCustomers) ? loadedCustomers : [];
+    }
+
+    async function enrichDirectPreview() {
+      const customers = await loadCustomersForPreview('customers-direct');
       const matchedCustomers = directRecords
         .map((record) => findCustomerForPreviewRecord(customers, id, record))
         .filter(Boolean);
-      outboundContexts = await loadOutboundContexts(
-        collectPublicPreviewContextIdentifiers(id, directRecords, matchedCustomers)
+      const candidateCustomers = findCustomerCandidates(customers, id);
+      const profileCustomers = Array.from(new Set([
+        ...matchedCustomers,
+        ...candidateCustomers,
+      ].filter(Boolean)));
+      const customerPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, []) || preview;
+      if (
+        customerPreview &&
+        hasExplicitPublicPreviewProfile(customerPreview) &&
+        normalizeString(customerPreview.title) &&
+        hasConfirmedPublicPreviewSenderProfileSignal([].concat(directRecords, profileCustomers))
+      ) {
+        return customerPreview;
+      }
+
+      const profileCustomer = profileCustomers.find((customer) =>
+        hasConfirmedPublicPreviewSenderProfileSignal([customer])
+      );
+      if (profileCustomer) {
+        const profileRecord =
+          directRecords.find((record) => findCustomerForPreviewRecord([profileCustomer], id, record)) ||
+          directRecords[0] ||
+          null;
+        const profilePreview = buildPreviewFromRecord(
+          normalizeString(profileRecord && (profileRecord.id || profileRecord.customerId)) ||
+            normalizeString(profileCustomer && (profileCustomer.id || profileCustomer.customerId || profileCustomer.databaseId)) ||
+            id,
+          {},
+          profileRecord,
+          profileCustomer,
+          null
+        );
+        if (profilePreview && hasExplicitPublicPreviewProfile(profilePreview)) {
+          return profilePreview;
+        }
+      }
+
+      const outboundContexts = await loadOutboundContexts(
+        collectPublicPreviewContextIdentifiers(id, directRecords, profileCustomers)
       );
       const enrichedPreview = resolvePreviewFromMaps(id, {}, directPhotoMap, customers, outboundContexts);
-      return enrichedPreview || preview || null;
+      return enrichedPreview || customerPreview || preview || null;
     }
 
     if (preview) {
@@ -1534,18 +1638,7 @@ function createPublicWebdesignPreviewService(options = {}) {
     let outboundContexts = await loadOutboundContexts(
       collectPublicPreviewContextIdentifiers(id, directRecords, [])
     );
-    let customers = [];
-    const loadedCustomers = await retryPublicPreviewRead(
-      () => dataOpsStore.listCustomers(PUBLIC_PREVIEW_DATA_OPS_READ_OPTIONS),
-      STRUCTURED_PREVIEW_READ_ATTEMPTS,
-      diagnostics,
-      'customers-candidates'
-    );
-    try {
-      customers = Array.isArray(loadedCustomers) ? loadedCustomers : [];
-    } catch (_error) {
-      customers = [];
-    }
+    const customers = await loadCustomersForPreview('customers-candidates');
     const candidates = findCustomerCandidates(customers, id);
     const identifiers = Array.from(new Set([
       id,
@@ -1656,10 +1749,12 @@ function createPublicWebdesignPreviewService(options = {}) {
     const queryIdentifier = query.cid || query.customerId || query.id;
     const assetIdentifier = queryIdentifier || routeIdentifier;
     const diagnostics = createPublicPreviewDiagnostics();
-    const preview = await resolveFirstPreview([
+    const profileOverride = resolvePublicPreviewProfileOverrideFromRequest(req);
+    const resolvedPreview = await resolveFirstPreview([
       queryIdentifier,
       routeIdentifier,
     ], { includeProfileContext: true, diagnostics });
+    const preview = applyPublicPreviewProfileOverride(resolvedPreview, profileOverride);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (!preview) {
@@ -1672,8 +1767,9 @@ function createPublicWebdesignPreviewService(options = {}) {
     }
     if (hasPendingPublicPreviewProfileContext(preview)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
-      res.setHeader('Retry-After', '2');
-      return res.status(503).send(buildTemporarilyUnavailableHtml());
+      return res.status(200).send(
+        buildConceptHtml(clearPendingPublicPreviewProfileContext(preview), routeIdentifier, assetIdentifier)
+      );
     }
     if (hasUnresolvedPublicPreviewProfile(preview)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');

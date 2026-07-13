@@ -28,6 +28,22 @@ create index if not exists softora_customers_deleted_at_idx
 create index if not exists softora_customers_identity_key_idx
   on public.softora_customers (identity_key);
 
+create table if not exists public.softora_customer_identity_keys (
+  key_type text not null,
+  key_value text not null,
+  customer_id text not null,
+  source text not null default 'unknown',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  primary key (key_type, key_value)
+);
+
+create index if not exists softora_customer_identity_keys_customer_id_idx
+  on public.softora_customer_identity_keys (customer_id);
+create index if not exists softora_customer_identity_keys_deleted_at_idx
+  on public.softora_customer_identity_keys (deleted_at);
+
 create table if not exists public.softora_active_orders (
   order_id text primary key,
   customer_id text,
@@ -216,6 +232,7 @@ set
   allowed_mime_types = excluded.allowed_mime_types;
 
 alter table public.softora_customers enable row level security;
+alter table public.softora_customer_identity_keys enable row level security;
 alter table public.softora_active_orders enable row level security;
 alter table public.softora_order_runtime enable row level security;
 alter table public.softora_design_photos enable row level security;
@@ -228,6 +245,7 @@ revoke all on table public.softora_outbound_recipient_guards from public;
 revoke all on table public.softora_outbound_recipient_guards from anon;
 revoke all on table public.softora_outbound_recipient_guards from authenticated;
 
+grant select, insert, update, delete on public.softora_customer_identity_keys to service_role;
 grant select, insert, update, delete on public.softora_mailbox_messages to service_role;
 grant select, insert, update, delete on public.softora_mailbox_sync_state to service_role;
 grant select, insert, update, delete on public.softora_outbound_recipient_guards to service_role;

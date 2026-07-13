@@ -69,6 +69,9 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
       refreshExistingOnly: true,
       reconcileOnly: true,
       cleanupOnly: true,
+      campaignId: 'campaign-martijn',
+      senderProfile: 'martijn',
+      senderEmail: 'martijn@websoftora.com',
     },
   };
   syncRoute[2][0](request, response, () => {});
@@ -83,6 +86,9 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(syncInput.refreshExistingOnly, true);
   assert.equal(syncInput.reconcileOnly, true);
   assert.equal(syncInput.cleanupOnly, true);
+  assert.equal(syncInput.campaignId, 'campaign-martijn');
+  assert.equal(syncInput.senderProfile, 'martijn');
+  assert.equal(syncInput.senderEmail, 'martijn@websoftora.com');
   assert.equal(syncInput.actor, 'serve@softora.nl');
 
   const uploadResponse = createResponseRecorder();
@@ -91,6 +97,8 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
       limit: 100,
       campaignId: 'campaign-1',
       uploadId: 'upload-1',
+      senderProfile: 'martijn',
+      senderEmail: 'martijn@websoftora.com',
     },
   };
   uploadRoute[2][0](uploadRequest, uploadResponse, () => {});
@@ -101,5 +109,7 @@ test('instantly routes expose adblock-safe admin aliases for database actions', 
   assert.equal(uploadInput.limit, 100);
   assert.equal(uploadInput.campaignId, 'campaign-1');
   assert.equal(uploadInput.uploadId, 'upload-1');
+  assert.equal(uploadInput.senderProfile, 'martijn');
+  assert.equal(uploadInput.senderEmail, 'martijn@websoftora.com');
   assert.equal(uploadInput.actor, 'serve@softora.nl');
 });

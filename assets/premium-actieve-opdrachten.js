@@ -64,7 +64,7 @@ const premiumBuildSteps = [
 let currentModalId = null;
 let currentClaimOrderId = null;
 let buildMode = 'premium';
-let activeOrderFilter = 'open_leads';
+let activeOrderFilter = 'in_progress';
 const activeProgressAnimations = {};
 const apiCostEstimateRequests = {};
 const progressSimulationPlans = {
@@ -692,7 +692,7 @@ function renderOrdersEmptyState() {
 
     if (!visibleCards.length) {
         const emptyTextByFilter = {
-            completed: 'Geen voltooide opdrachten.', open_leads: 'Geen openstaande leads.',
+            completed: 'Geen voltooide opdrachten.',
             in_progress: 'Geen openstaande opdrachten.'
         };
         if (!empty) {
@@ -736,7 +736,7 @@ function updateOrderFilterButtonState() {
 }
 
 function updateOrderFilterCounts(cards) {
-    const counts = { completed: 0, open_leads: 0, in_progress: 0 };
+    const counts = { completed: 0, in_progress: 0 };
 
     cards.forEach((card) => {
         const group = getOrderFilterGroupForCard(card);
@@ -744,7 +744,6 @@ function updateOrderFilterCounts(cards) {
     });
 
     const completedEl = document.getElementById('filterCountCompleted'); if (completedEl) completedEl.textContent = String(counts.completed);
-    const leadsEl = document.getElementById('filterCountOpenLeads'); if (leadsEl) leadsEl.textContent = String(counts.open_leads);
     const progressEl = document.getElementById('filterCountProgress'); if (progressEl) progressEl.textContent = String(counts.in_progress);
 }
 
@@ -761,7 +760,7 @@ function applyOrderFilter() {
 
 function setOrderFilter(nextFilter) {
     const normalized = String(nextFilter || '').trim().toLowerCase();
-    activeOrderFilter = normalized === 'open' ? 'in_progress' : normalized || 'open_leads';
+    activeOrderFilter = normalized === 'open' ? 'in_progress' : normalized || 'in_progress';
     applyOrderFilter();
 }
 
@@ -2740,7 +2739,6 @@ function openModal(id) {
             deleteBtn.style.display = 'none';
         }
     }
-
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
 }
@@ -2919,7 +2917,6 @@ async function initializeActiveOrdersPageState(options = {}) {
     loadCustomOrderCards();
     restoreOrdersRuntimeFromState();
     refreshOrderSummaryCards();
-    void fetchAgendaLeadOptions().then(() => window.SoftoraActiveOrderOpenLeads?.load?.(true)).catch(() => {});
 }
 
 async function bootActiveOrdersPage() {

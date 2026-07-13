@@ -42,14 +42,23 @@ const COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me wet
 const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const COLDMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'PS: Wordt het webdesign niet zichtbaar?\nOpen het via hier 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS = 'Webdesign niet zichtbaar? Check het hier 👈';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?)/i;
+  /(?:PS:\s*)?(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*open het via hier\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?)/i;
 const INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE = 'instantly-safe-manual-upload';
 const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid';
-const COLDMAIL_EMAIL_IMAGE_WIDTH = 640;
-const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 580;
-const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN = /je\s+kunt\s+je\s+webdesign\s+hier\s+bekijken\s*👈?/i;
+const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
+const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.txt';
+const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
+const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
+const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 600;
+const INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
+const INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH = 584;
+const INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT = 450;
+const INSTANTLY_IMAGE_PAIR_GAP_WIDTH = 16;
+const INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX = 980;
+const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
+  /(?:je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken|webdesign\s+niet\s+zichtbaar\?\s*check\s+het\s+hier)\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT = 1536;
 const INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH = 1600;
@@ -90,7 +99,7 @@ const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
   '',
   'Mocht je er niks mee willen doen, lijkt het me alsnog tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van!',
   '',
-  'Je kunt je webdesign hier bekijken 👈',
+  'Webdesign niet zichtbaar? Check het hier 👈',
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
@@ -104,6 +113,18 @@ const INSTANTLY_SENDER_PROFILE_ALIASES = Object.freeze({
   'martijn@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
   'martijnven@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
   'martijnvandeven@websoftora.com': ['martijn@softora.nl', 'martijnven123@gmail.com'],
+});
+const INSTANTLY_SENDER_PROFILES = Object.freeze({
+  serve: Object.freeze({
+    key: 'serve',
+    name: 'Servé Creusen',
+    defaultEmail: 'serve@websoftora.com',
+  }),
+  martijn: Object.freeze({
+    key: 'martijn',
+    name: 'Martijn van de Ven',
+    defaultEmail: 'martijn@websoftora.com',
+  }),
 });
 const STARTUP_SYNC_DELAY_MS = 10_000;
 const EXCLUDED_DATABASE_STATUSES = new Set([
@@ -164,6 +185,9 @@ const REQUIRED_INSTANTLY_CUSTOM_VARIABLES = Object.freeze([
   'softora_customer_id',
   'softora_source',
   'softora_company',
+  'softora_sender_profile',
+  'softora_sender_name',
+  'softora_sender_email',
   'softora_subject',
   'softora_mail_body',
   'softora_instantly_email_html',
@@ -190,6 +214,9 @@ const INSTANTLY_SAFE_UPLOAD_CSV_HEADERS = Object.freeze([
   'softora_company',
   'softora_status',
   'softora_contact_name',
+  'softora_sender_profile',
+  'softora_sender_name',
+  'softora_sender_email',
   'softora_city',
   'softora_city_with_pin',
   'softora_subject',
@@ -291,6 +318,131 @@ function getInstantlySenderProfileEmailCandidateList(values = [], normalizeStrin
   return candidates;
 }
 
+function getInstantlySenderProfileKey(value, normalizeString = defaultNormalizeString) {
+  const normalized = normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9@.]+/g, ' ')
+    .trim();
+  if (!normalized) return '';
+  const email = normalizeEmailAddress(normalized, normalizeString);
+  const source = email || normalized;
+  if (/\bmartijn\b/.test(source) || source.includes('martijn@') || source.includes('martijnven@')) return 'martijn';
+  if (/\bserve\b/.test(source) || source.includes('serve@') || source.includes('servec321@')) return 'serve';
+  return '';
+}
+
+function getInstantlySenderProfile(key) {
+  return INSTANTLY_SENDER_PROFILES[key] || null;
+}
+
+function resolveInstantlySenderProfile(input = {}, config = {}, normalizeString = defaultNormalizeString) {
+  const nestedSender = input.sender && typeof input.sender === 'object' ? input.sender : {};
+  const explicitProfileKey = getInstantlySenderProfileKey(
+    nestedSender.key ||
+      nestedSender.senderProfileKey ||
+      nestedSender.senderProfile ||
+      nestedSender.name ||
+      input.senderProfileKey ||
+      input.senderProfile ||
+      input.profileKey ||
+      input.senderKey,
+    normalizeString
+  );
+  const explicitSenderEmail = normalizeEmailAddress(
+    nestedSender.email ||
+      nestedSender.senderEmail ||
+      input.senderEmail ||
+      input.sentFromEmail ||
+      input.fromEmail ||
+      input.mailboxAccount ||
+      input.replyMailboxAccount,
+    normalizeString
+  );
+  const defaultSenderEmail = normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL, normalizeString);
+  const explicitEmailProfileKey = getInstantlySenderProfileKey(explicitSenderEmail, normalizeString);
+  if (explicitProfileKey && explicitEmailProfileKey && explicitProfileKey !== explicitEmailProfileKey) {
+    throw createInstantlyError(
+      'Instantly senderProfile en senderEmail spreken elkaar tegen. Kies één Servé- of Martijn-combinatie.',
+      'INSTANTLY_SENDER_PROFILE_MISMATCH',
+      400
+    );
+  }
+
+  const defaultEmailProfileKey = getInstantlySenderProfileKey(defaultSenderEmail, normalizeString);
+  const key = explicitProfileKey || explicitEmailProfileKey || defaultEmailProfileKey || 'serve';
+  const profile = getInstantlySenderProfile(key) || INSTANTLY_SENDER_PROFILES.serve;
+  const email =
+    explicitSenderEmail ||
+    (defaultEmailProfileKey === key ? defaultSenderEmail : '') ||
+    profile.defaultEmail ||
+    defaultSenderEmail;
+
+  return {
+    key: profile.key,
+    name: profile.name,
+    email: normalizeEmailAddress(email, normalizeString),
+  };
+}
+
+function hasInstantlySenderOverride(input = {}) {
+  if (input.sender && typeof input.sender === 'object') return true;
+  return Boolean(
+    input.senderProfileKey ||
+      input.senderProfile ||
+      input.profileKey ||
+      input.senderKey ||
+      input.senderEmail ||
+      input.sentFromEmail ||
+      input.fromEmail ||
+      input.mailboxAccount ||
+      input.replyMailboxAccount
+  );
+}
+
+function inferInstantlySenderProfileFromMailProfile(mailProfile = {}, config = {}, normalizeString = defaultNormalizeString) {
+  const defaultSenderEmail = normalizeEmailAddress(config.defaultSenderEmail || DEFAULT_INSTANTLY_SENDER_EMAIL, normalizeString);
+  const inferredName = inferInstantlySenderName(mailProfile && mailProfile.body, defaultSenderEmail, normalizeString);
+  const key =
+    getInstantlySenderProfileKey(inferredName, normalizeString) ||
+    getInstantlySenderProfileKey(defaultSenderEmail, normalizeString) ||
+    'serve';
+  const profile = getInstantlySenderProfile(key) || INSTANTLY_SENDER_PROFILES.serve;
+  const defaultKey = getInstantlySenderProfileKey(defaultSenderEmail, normalizeString);
+  return {
+    key: profile.key,
+    name: profile.name,
+    email: defaultKey === profile.key ? defaultSenderEmail : profile.defaultEmail,
+  };
+}
+
+function buildInstantlySenderRowFields(senderEmail, normalizeString = defaultNormalizeString) {
+  const email = normalizeEmailAddress(senderEmail, normalizeString);
+  if (!email) return {};
+  const key = getInstantlySenderProfileKey(email, normalizeString);
+  const profile = getInstantlySenderProfile(key);
+  if (!profile) {
+    return {
+      instantlyActualSenderEmail: email,
+    };
+  }
+  return {
+    instantlyActualSenderEmail: email,
+    instantlySenderProfileKey: profile.key,
+    instantlySenderName: profile.name,
+    instantlySenderEmail: email,
+    senderProfileKey: profile.key,
+    senderEmail: email,
+    lastColdmailSenderEmail: email,
+    sentFromEmail: email,
+    sent_from_email: email,
+    outreachSentFromEmail: email,
+    outreach_sent_from_email: email,
+    replyMailboxAccount: email,
+  };
+}
+
 function isLikelyValidEmail(value, normalizeString = defaultNormalizeString) {
   const email = normalizeEmailAddress(value, normalizeString);
   return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
@@ -366,23 +518,45 @@ function slugifyWebdesignCompany(value, fallback = 'uw-bedrijf', normalizeString
   return slug || fallback;
 }
 
-function buildPublicWebdesignPreviewPath(row, id, normalizeString = defaultNormalizeString) {
+function buildPublicWebdesignPreviewPath(row, id, options = {}, normalizeString = defaultNormalizeString) {
+  const effectiveNormalizeString = typeof options === 'function' ? options : normalizeString;
+  const pathOptions = typeof options === 'function' ? {} : (options && typeof options === 'object' ? options : {});
   const slug = slugifyWebdesignCompany(
-    getRowCompany(row, normalizeString),
-    slugifyWebdesignCompany(id, 'uw-bedrijf', normalizeString),
-    normalizeString
+    getRowCompany(row, effectiveNormalizeString),
+    slugifyWebdesignCompany(id, 'uw-bedrijf', effectiveNormalizeString),
+    effectiveNormalizeString
   );
-  const directIdentifier = normalizeString(id);
-  const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
-  return `/webdesign/${slug}${directQuery}`;
+  const directIdentifier = effectiveNormalizeString(id);
+  const senderProfileKey = getInstantlySenderProfileKey(
+    pathOptions.senderProfileKey ||
+      pathOptions.senderProfile ||
+      pathOptions.senderKey ||
+      pathOptions.profileKey ||
+      pathOptions.senderEmail,
+    effectiveNormalizeString
+  );
+  const query = new URLSearchParams();
+  if (directIdentifier) query.set('cid', directIdentifier);
+  if (senderProfileKey) query.set('sender', senderProfileKey);
+  const queryString = query.toString();
+  return `/webdesign/${slug}${queryString ? `?${queryString}` : ''}`;
 }
 
 function buildPublicWebdesignPreviewUrl(row, id, config, normalizeString = defaultNormalizeString) {
   const baseUrl = normalizePublicBaseUrl(config && config.webdesignPublicBaseUrl) || DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+  const pathOptions = config && typeof config === 'object'
+    ? {
+        senderProfileKey: config.senderProfileKey,
+        senderProfile: config.senderProfile,
+        senderKey: config.senderKey,
+        profileKey: config.profileKey,
+        senderEmail: config.senderEmail,
+      }
+    : {};
   try {
-    return new URL(buildPublicWebdesignPreviewPath(row, id, normalizeString), baseUrl).toString();
+    return new URL(buildPublicWebdesignPreviewPath(row, id, pathOptions, normalizeString), baseUrl).toString();
   } catch (_error) {
-    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, normalizeString)}`;
+    return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id, pathOptions, normalizeString)}`;
   }
 }
 
@@ -941,13 +1115,14 @@ async function removeDecorativeWebdesignFrameForInstantly(image) {
   }
 }
 
-function scaleEmailImageDimensions(dimensions) {
+function scaleEmailImageDimensions(dimensions, targetWidth = COLDMAIL_EMAIL_IMAGE_WIDTH) {
   const sourceWidth = Number(dimensions && dimensions.width) || 0;
   const sourceHeight = Number(dimensions && dimensions.height) || 0;
   if (sourceWidth <= 0 || sourceHeight <= 0) return null;
-  const height = Math.max(1, Math.round((sourceHeight / sourceWidth) * COLDMAIL_EMAIL_IMAGE_WIDTH));
+  const width = Math.max(1, Number(targetWidth) || COLDMAIL_EMAIL_IMAGE_WIDTH);
+  const height = Math.max(1, Math.round((sourceHeight / sourceWidth) * width));
   return {
-    width: COLDMAIL_EMAIL_IMAGE_WIDTH,
+    width,
     height,
   };
 }
@@ -1517,8 +1692,8 @@ function buildColdmailPreviewImageUrl(row, id, reference, config, type, normaliz
   return buildColdmailPreviewImageLink(row, id, reference, config, type, normalizeString, now).url;
 }
 
-function buildInstantlyBodyWithWebdesignLinks({ baseText, unsubscribeUrl }, normalizeString = defaultNormalizeString) {
-  return appendColdmailOptOutText(normalizeString(baseText), unsubscribeUrl, normalizeString);
+function buildInstantlyBodyWithWebdesignLinks({ baseText }, normalizeString = defaultNormalizeString) {
+  return normalizeString(baseText);
 }
 
 function escapeHtml(value, normalizeString = defaultNormalizeString) {
@@ -1564,7 +1739,7 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
   if (!publicLink.href) {
     return `<em style="font-style:italic;">${escapeHtml(cleanLine, normalizeString).replace(/\n/g, '<br>')}</em>`;
   }
-  return `<em style="font-style:italic;">PS: Wordt het webdesign niet zichtbaar?<br>Open het via <a href="${escapeHtmlAttribute(
+  return `<em style="font-style:italic;">Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
     publicLink.href,
     normalizeString
   )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈</em>`;
@@ -1573,10 +1748,10 @@ function renderImageVisibilityPsHtmlLine(line, normalizeString = defaultNormaliz
 function renderInstantlyWebdesignPreviewCtaHtmlLine(line, normalizeString = defaultNormalizeString, options = {}) {
   const href = normalizeString(options.webdesignPreviewUrl);
   if (!href) return escapeHtml(line, normalizeString);
-  return `Je kunt je webdesign <a href="${escapeHtmlAttribute(
+  return `Webdesign niet zichtbaar? Check het <a href="${escapeHtmlAttribute(
     href,
     normalizeString
-  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+  )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> 👈`;
 }
 
 function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, options = {}) {
@@ -1632,6 +1807,84 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
 }
 
+function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeString, dimensions = null, desktopWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH, options = {}) {
+  const cleanSrc = normalizeString(src);
+  if (!cleanSrc) return '';
+  const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
+  const isWebdesign = cleanAlt === 'Webdesign';
+  const fallbackDimensions = {
+    width: isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH,
+    height: isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT,
+  };
+  const scaledDimensions =
+    scaleEmailImageDimensions(dimensions, desktopWidth) ||
+    scaleEmailImageDimensions(fallbackDimensions, desktopWidth);
+  const imageHeight = scaledDimensions ? scaledDimensions.height : desktopWidth;
+  const isMockup = options && options.mockup;
+  const className = isMockup ? 'softora-webdesign-image softora-webdesign-image--mockup' : 'softora-webdesign-image';
+  const outputHeight = isMockup ? INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT : imageHeight;
+  const imageStyle = isMockup
+    ? `display:block;width:100%;max-width:100%;height:${INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT}px;max-height:${INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT}px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;border-radius:6px;`
+    : `display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;`;
+  return `<img src="${escapeHtmlAttribute(
+    cleanSrc,
+    normalizeString
+  )}" alt="${escapeHtmlAttribute(
+    cleanAlt,
+    normalizeString
+  )}" class="${className}" width="${desktopWidth}" height="${outputHeight}" loading="eager" decoding="async" fetchpriority="high" style="${imageStyle}" />`;
+}
+
+function renderMobileMockupCaptionHtml(caption, normalizeString = defaultNormalizeString) {
+  const cleanCaption = normalizeString(caption || COLDMAIL_MOCKUP_CAPTION);
+  if (!cleanCaption) return '';
+  return `\n<p class="softora-mobile-mockup-caption" style="display:none;mso-hide:all;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;max-height:0;overflow:hidden;">${escapeHtml(
+    cleanCaption,
+    normalizeString
+  )}</p>`;
+}
+
+function renderInstantlyImagePairHtml(
+  {
+    webdesignImageUrl,
+    webdesignMockupUrl,
+    webdesignImageDimensions,
+    webdesignMockupDimensions,
+    caption = COLDMAIL_MOCKUP_CAPTION,
+  },
+  normalizeString = defaultNormalizeString
+) {
+  const cleanWebdesignUrl = normalizeString(webdesignImageUrl);
+  const cleanMockupUrl = normalizeString(webdesignMockupUrl);
+  if (!cleanWebdesignUrl || !cleanMockupUrl) {
+    const webdesignImageHtml = cleanWebdesignUrl
+      ? renderImageHtml(cleanWebdesignUrl, 'Webdesign', '24px 0 0 0', normalizeString, webdesignImageDimensions)
+      : '';
+    const mockupImageHtml = cleanMockupUrl
+      ? `${renderMobileMockupCaptionHtml(caption, normalizeString)}${renderImageHtml(cleanMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
+      : '';
+    return `${webdesignImageHtml}${mockupImageHtml}`;
+  }
+
+  const pairWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH + INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH + INSTANTLY_IMAGE_PAIR_GAP_WIDTH;
+  const webdesignImageHtml = renderInlinePairImageHtml(
+    cleanWebdesignUrl,
+    'Webdesign',
+    normalizeString,
+    webdesignImageDimensions,
+    INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH
+  );
+  const mockupImageHtml = renderInlinePairImageHtml(
+    cleanMockupUrl,
+    'Mockup',
+    normalizeString,
+    webdesignMockupDimensions,
+    INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH,
+    { mockup: true }
+  );
+  return `${renderMobileMockupCaptionHtml(caption, normalizeString)}\n<style>@media only screen and (max-width:${INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX}px), only screen and (max-device-width:${INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX}px){.softora-mobile-mockup-caption{display:block!important;mso-hide:none!important;max-height:none!important;overflow:visible!important}.softora-webdesign-image-pair{max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}.softora-webdesign-image--mockup{height:auto!important;max-height:none!important;object-fit:contain!important}}</style><div class="softora-webdesign-image-pair" style="max-width:${pairWidth}px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:bottom;margin:0 ${INSTANTLY_IMAGE_PAIR_GAP_WIDTH}px 16px 0;padding:0;font-size:16px;line-height:1.4;">${webdesignImageHtml}</div><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:16px;line-height:1.4;">${mockupImageHtml}</div></div>`;
+}
+
 function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeString) {
   const html = typeof content === 'string' ? content.trim() : normalizeString(content);
   if (!html) return '';
@@ -1647,23 +1900,62 @@ function buildInstantlyEmailHtml(
     webdesignImageDimensions,
     webdesignMockupDimensions,
     webdesignPublicUrl,
-    unsubscribeUrl,
   },
   normalizeString = defaultNormalizeString
 ) {
-  const optOut = normalizeString(unsubscribeUrl)
-    ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;"><a href="${escapeHtmlAttribute(
-        unsubscribeUrl,
-        normalizeString
-      )}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(
-        COLDMAIL_OPT_OUT_LABEL,
-        normalizeString
-      )}</a></p>`
-    : '';
-  const content = `${renderMailTextAsHtml(baseText, normalizeString, {
+  const bodyHtml = renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
-  })}${optOut}`;
+  });
+  const imageHtml = renderInstantlyImagePairHtml(
+    {
+      webdesignImageUrl,
+      webdesignMockupUrl,
+      webdesignImageDimensions,
+      webdesignMockupDimensions,
+    },
+    normalizeString
+  );
+  const content = `${bodyHtml}${imageHtml}`;
   return wrapInstantlyEmailHtml(content, normalizeString);
+}
+
+function buildInstantlyCampaignTemplateText() {
+  return DEFAULT_INSTANTLY_WEBDESIGN_BODY.replace(
+    /\{\{\s*website\s*\}\}/gi,
+    '{{softora_website_domain}}'
+  )
+    .replace(/\{\{\s*(afzender|sender|senderName)\s*\}\}/gi, '{{softora_sender_name}}')
+    .replace(/\{\{\s*(afzenderPlaats|senderPlace|senderLocation)\s*\}\}/gi, '{{softora_city}}')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeString) {
+  const bodyHtml = renderMailTextAsHtml(buildInstantlyCampaignTemplateText(), normalizeString, {
+    webdesignPreviewUrl: '{{softora_webdesign_public_url}}',
+  });
+  const imageHtml = renderInstantlyImagePairHtml(
+    {
+      webdesignImageUrl: '{{softora_webdesign_image_url}}',
+      webdesignMockupUrl: '{{softora_webdesign_mockup_url}}',
+      caption: '{{softora_mockup_caption}}',
+    },
+    normalizeString
+  );
+  return wrapInstantlyEmailHtml(`${bodyHtml}${imageHtml}`, normalizeString);
+}
+
+function buildInstantlyCampaignTemplateInstructions() {
+  return [
+    'Softora Instantly template',
+    '',
+    `1. Gebruik in Instantly als onderwerp: ${INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE}`,
+    `2. Plak de HTML uit ${INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME} in de HTML/source editor van de Instantly-campaign.`,
+    '3. Upload daarna de CSV. De CSV levert per lead de juiste foto-URLs, previewlink en tekstvariabelen.',
+    '',
+    'Belangrijk: gebruik niet alleen de CSV als e-mailtekst. De campagnebody moet deze template gebruiken, anders toont Instantly de fotos/preview mogelijk niet.',
+  ].join('\n');
 }
 
 async function warmInstantlyPreviewImageCache(
@@ -2111,7 +2403,7 @@ function createInstantlyOutreachService(deps = {}) {
     return parseCustomerPhotoMap(values[customerPhotoKey], values, rows, normalizeString);
   }
 
-  async function loadColdmailProfile() {
+  async function loadColdmailProfile(senderEmail = '') {
     const [settingsState, autopilotState] = await Promise.all([
       getUiStateValues(coldmailingSettingsScope),
       getUiStateValues(coldmailAutopilotScope),
@@ -2135,13 +2427,13 @@ function createInstantlyOutreachService(deps = {}) {
     return (
       extractColdmailProfileFromAutopilotState(
         autopilot,
-        config.defaultSenderEmail,
+        senderEmail || config.defaultSenderEmail,
         normalizeString,
         truncateText
       ) ||
       extractColdmailProfileFromSettings(
         settings,
-        config.defaultSenderEmail,
+        senderEmail || config.defaultSenderEmail,
         normalizeString,
         truncateText
       ) ||
@@ -2326,11 +2618,13 @@ function createInstantlyOutreachService(deps = {}) {
       );
     }
     const identities = (Array.isArray(items) ? items : []).map(buildOutboundRecipientGuardIdentity);
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const reservation = await outboundRecipientGuardStore.reserveRecipients(identities, {
       provider: 'instantly',
       channel: 'instantly',
       source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
       actor: options.actor,
+      senderEmail: sender.email,
       campaignId: options.campaignId,
       uploadId: options.uploadId,
       status: 'queued',
@@ -2338,6 +2632,9 @@ function createInstantlyOutreachService(deps = {}) {
       payload: {
         campaignId: options.campaignId,
         uploadId: options.uploadId,
+        senderProfileKey: sender.key,
+        senderName: sender.name,
+        senderEmail: sender.email,
         source: normalizeString(options.source) || INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
       },
     });
@@ -2357,16 +2654,21 @@ function createInstantlyOutreachService(deps = {}) {
     return reservation;
   }
 
-  async function loadPersonalizationContext(rows = []) {
+  async function loadPersonalizationContext(rows = [], options = {}) {
+    const explicitSender = hasInstantlySenderOverride(options)
+      ? resolveInstantlySenderProfile(options, config, normalizeString)
+      : null;
     const [photoMap, mailProfile, coldmailSendGuardIndex] = await Promise.all([
       loadCustomerPhotoMap(rows),
-      loadColdmailProfile(),
+      loadColdmailProfile(explicitSender ? explicitSender.email : ''),
       loadColdmailSendGuardIndex(),
     ]);
+    const sender = explicitSender || inferInstantlySenderProfileFromMailProfile(mailProfile, config, normalizeString);
     return {
       photoMap,
       photosByIdentity: buildPhotosByIdentity(photoMap, normalizeString),
       mailProfile,
+      sender,
       coldmailSendGuardIndex,
     };
   }
@@ -2467,15 +2769,21 @@ function createInstantlyOutreachService(deps = {}) {
     );
     const reference = buildColdmailReference(row, item.id, now, normalizeString);
     const unsubscribeUrl = buildColdmailUnsubscribeUrl(row, item.id, reference, config, normalizeString, now);
-    const webdesignPublicPath = buildPublicWebdesignPreviewPath(row, item.id, normalizeString);
-    const webdesignPublicUrl = buildPublicWebdesignPreviewUrl(row, item.id, config, normalizeString);
     const subjectTemplate =
       normalizeString(context.mailProfile && context.mailProfile.subject) || DEFAULT_WEBDESIGN_SUBJECT;
     const bodyTemplate =
       normalizeString(context.mailProfile && context.mailProfile.body) || DEFAULT_WEBDESIGN_BODY;
     const city = getRowCity(row, normalizeString) || 'uw regio';
     const subject = personalizeTemplate(subjectTemplate, row, normalizeString);
-    const senderName = inferInstantlySenderName(bodyTemplate, config.defaultSenderEmail, normalizeString);
+    const sender = context.sender || resolveInstantlySenderProfile({}, config, normalizeString);
+    const webdesignPublicPath = buildPublicWebdesignPreviewPath(row, item.id, {
+      senderProfileKey: sender.key,
+    }, normalizeString);
+    const webdesignPublicUrl = buildPublicWebdesignPreviewUrl(row, item.id, {
+      ...config,
+      senderProfileKey: sender.key,
+    }, normalizeString);
+    const senderName = normalizeString(sender.name) || inferInstantlySenderName(bodyTemplate, sender.email, normalizeString);
     const baseMailBody = buildInstantlyWebdesignMailText(row, city, senderName, normalizeString);
     const assets = getReadyWebdesignAssets(item, context);
     const webdesignLink = assets.ready
@@ -2533,11 +2841,14 @@ function createInstantlyOutreachService(deps = {}) {
       softora_company: company,
       softora_status: normalizeContactStatus(row.databaseStatus || row.status, row) || 'prospect',
       softora_contact_name: contact,
+      softora_sender_profile: normalizeString(sender.key),
+      softora_sender_name: senderName,
+      softora_sender_email: normalizeEmailAddress(sender.email, normalizeString),
       softora_city: city,
       softora_city_with_pin: formatPinnedCity(city, normalizeString),
       softora_subject: subject,
       softora_mail_body: baseMailBody,
-      softora_mail_body_with_optout: appendColdmailOptOutText(baseMailBody, unsubscribeUrl, normalizeString),
+      softora_mail_body_with_optout: baseMailBody,
       softora_instantly_email_text: instantlyEmailBody,
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,
@@ -2679,8 +2990,12 @@ function createInstantlyOutreachService(deps = {}) {
     return data;
   }
 
-  async function listInstantlyCampaignLeads(limit = DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT) {
+  async function listInstantlyCampaignLeads(
+    limit = DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT,
+    campaignId = config.defaultCampaignId
+  ) {
     const safeLimit = clampNumber(limit, DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, 1, 5000);
+    const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
     const items = [];
     let startingAfter = '';
 
@@ -2688,7 +3003,7 @@ function createInstantlyOutreachService(deps = {}) {
       const remaining = safeLimit - items.length;
       if (remaining <= 0) break;
       const body = {
-        campaign: config.defaultCampaignId,
+        campaign: cleanCampaignId,
         limit: Math.min(100, remaining),
       };
       if (startingAfter) body.starting_after = startingAfter;
@@ -2731,13 +3046,13 @@ function createInstantlyOutreachService(deps = {}) {
     return {};
   }
 
-  function normalizeRemoteInstantlyLead(lead) {
+  function normalizeRemoteInstantlyLead(lead, fallbackCampaignId = config.defaultCampaignId) {
     const payload = getRemoteLeadPayload(lead);
     const leadId = normalizeString(lead && (lead.id || lead.lead_id || lead.instantly_lead_id));
     return {
       raw: lead,
       leadId,
-      campaignId: normalizeString(lead && (lead.campaign || lead.campaign_id)) || config.defaultCampaignId,
+      campaignId: normalizeString(lead && (lead.campaign || lead.campaign_id)) || normalizeString(fallbackCampaignId) || config.defaultCampaignId,
       customerId: normalizeString(
         payload.softora_customer_id ||
           payload.softoraCustomerId ||
@@ -2903,7 +3218,7 @@ function createInstantlyOutreachService(deps = {}) {
   }
 
   async function reconcileRemoteInstantlyCampaignRows(rows, actor) {
-    const remoteLeads = await listInstantlyCampaignLeads();
+    const remoteLeads = await listInstantlyCampaignLeads(DEFAULT_REMOTE_CAMPAIGN_LEAD_RECONCILE_LIMIT, config.defaultCampaignId);
     const plan = getRemoteInstantlyReconcilePlan(rows, remoteLeads);
     let nextRows = rows;
     let deletedCount = 0;
@@ -2988,7 +3303,96 @@ function createInstantlyOutreachService(deps = {}) {
       .slice(0, safeLimit);
   }
 
-  async function refreshExistingInstantlyLeadVariables(rows, context, limit) {
+  function buildInstantlyRowPatchFromRemoteCampaign(row, item, sender, markedAt) {
+    const remote = item && item.remote ? item.remote : {};
+    const syncedAt = normalizeString(row && row.instantlySyncedAt) || remote.timestampCreated || markedAt;
+    const lastEventAt = remote.timestampLastContact || remote.timestampUpdated || syncedAt;
+    const nextStatus = chooseInstantlyStatus(row && row.instantlyStatus, remote.status || 'synced') || 'synced';
+    return {
+      ...(row && typeof row === 'object' ? row : {}),
+      instantlyLeadId: item.leadId,
+      instantlyCampaignId: item.campaignId || config.defaultCampaignId,
+      instantlyStatus: nextStatus,
+      instantlySyncedAt: syncedAt,
+      instantlyLastEventAt: lastEventAt,
+      lastColdmailProvider: 'instantly',
+      lastColdmailProviderStatus: nextStatus,
+      ...buildInstantlySenderRowFields(sender && sender.email, normalizeString),
+      updatedAt: markedAt,
+    };
+  }
+
+  function getRemoteInstantlyRowsForVariableRefresh(rows, remoteLeads, campaignId, limit) {
+    const safeLimit = clampNumber(limit, config.batchSize, 1, 5000);
+    const lookup = buildCustomerRowLookup(rows);
+    const seenIndexes = new Set();
+    return (Array.isArray(remoteLeads) ? remoteLeads : [])
+      .map((rawLead) => normalizeRemoteInstantlyLead(rawLead, campaignId))
+      .map((remote) => {
+        const match = getLocalMatchForRemoteInstantlyLead(remote, lookup);
+        if (!remote.leadId || !match || seenIndexes.has(match.index)) return null;
+        seenIndexes.add(match.index);
+        return {
+          ...match,
+          leadId: remote.leadId,
+          campaignId: remote.campaignId || campaignId || config.defaultCampaignId,
+          remote,
+        };
+      })
+      .filter(Boolean)
+      .slice(0, safeLimit);
+  }
+
+  async function refreshRemoteInstantlyCampaignLeadVariables(rows, context, limit, campaignId) {
+    const cleanCampaignId = normalizeString(campaignId) || config.defaultCampaignId;
+    const remoteLeads = await listInstantlyCampaignLeads(limit, cleanCampaignId);
+    const candidates = getRemoteInstantlyRowsForVariableRefresh(rows, remoteLeads, cleanCampaignId, limit);
+    const sender = context && context.sender
+      ? context.sender
+      : resolveInstantlySenderProfile({}, config, normalizeString);
+    const markedAt = now().toISOString();
+    let refreshed = 0;
+    const failed = [];
+    const refreshedItems = [];
+
+    for (const item of candidates) {
+      const patchedRow = buildInstantlyRowPatchFromRemoteCampaign(item.row, item, sender, markedAt);
+      try {
+        const lead = await buildInstantlyLead({ ...item, row: patchedRow }, context);
+        await patchInstantlyLeadById(item.leadId, lead);
+        refreshed += 1;
+        refreshedItems.push({ ...item, row: patchedRow });
+      } catch (error) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row, normalizeString),
+          email: getRowEmail(item.row, normalizeString),
+          error:
+            normalizeString(error && error.message) ||
+            'Instantly-lead mist verplichte Softora-variabelen.',
+          missing: Array.isArray(error && error.missing) ? error.missing : undefined,
+        });
+      }
+    }
+
+    const rowsByIndex = new Map(refreshedItems.map((item) => [item.index, item.row]));
+    return {
+      refreshed,
+      attempted: candidates.length,
+      failed,
+      remoteLeadCount: remoteLeads.length,
+      rowUpdates: rowsByIndex.size,
+      rows: rowsByIndex.size
+        ? rows.map((row, index) => rowsByIndex.get(index) || row)
+        : rows,
+    };
+  }
+
+  async function refreshExistingInstantlyLeadVariables(rows, context, limit, options = {}) {
+    const campaignId = normalizeString(options.campaignId);
+    if (campaignId) {
+      return refreshRemoteInstantlyCampaignLeadVariables(rows, context, limit, campaignId);
+    }
     const candidates = getExistingInstantlyRowsForVariableRefresh(rows, limit);
     let refreshed = 0;
     const failed = [];
@@ -3013,6 +3417,8 @@ function createInstantlyOutreachService(deps = {}) {
       refreshed,
       attempted: candidates.length,
       failed,
+      rowUpdates: 0,
+      rows,
     };
   }
 
@@ -3061,12 +3467,15 @@ function createInstantlyOutreachService(deps = {}) {
     const row = item && item.row;
     const email = getRowEmail(row, normalizeString);
     if (!email) return null;
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const id = getRowId(row, item.index, normalizeString);
     const company = getRowCompany(row, normalizeString);
     const domain = getRowDomain(row, normalizeString) || getEmailDomain(email);
     return {
       at: normalizeString(options.at) || now().toISOString(),
-      senderEmail: '',
+      senderEmail: sender.email,
+      senderProfileKey: sender.key,
+      senderName: sender.name,
       recipientKey: `email:${email}`,
       recipientEmail: email,
       recipientDomain: normalizeColdmailGuardKeyPart(domain, normalizeString),
@@ -3145,6 +3554,7 @@ function createInstantlyOutreachService(deps = {}) {
     const preparedAt = normalizeString(options.at) || now().toISOString();
     const campaignId = normalizeString(options.campaignId);
     const uploadId = normalizeString(options.uploadId);
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const selectedByIndex = new Map((Array.isArray(selectedRows) ? selectedRows : []).map((item) => [item.index, item]));
     return (Array.isArray(rows) ? rows : []).map((row, index) => {
       const item = selectedByIndex.get(index);
@@ -3171,6 +3581,17 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyLastEventAt: preparedAt,
         instantlyManualUploadId: uploadId,
         instantlyManualUploadPreparedAt: preparedAt,
+        instantlySenderProfileKey: sender.key,
+        instantlySenderName: sender.name,
+        instantlySenderEmail: sender.email,
+        senderProfileKey: sender.key,
+        senderEmail: sender.email,
+        lastColdmailSenderEmail: sender.email,
+        sentFromEmail: sender.email,
+        sent_from_email: sender.email,
+        outreachSentFromEmail: sender.email,
+        outreach_sent_from_email: sender.email,
+        replyMailboxAccount: sender.email,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'queued',
         ...buildInstantlyApproachedFields(row, preparedAt),
@@ -3192,11 +3613,12 @@ function createInstantlyOutreachService(deps = {}) {
     }
     const limit = clampNumber(input.limit, DEFAULT_MANUAL_UPLOAD_LIMIT, 1, MAX_MANUAL_UPLOAD_LIMIT);
     const uploadId = normalizeString(input.uploadId) || buildSafeUploadId();
+    const sender = resolveInstantlySenderProfile(input, config, normalizeString);
     const preparedAt = now().toISOString();
     const state = await getUiStateValues(customerDbScope);
     const values = state && typeof state.values === 'object' ? state.values : {};
     const rows = parseDatabaseRows(values, customerDbKey, normalizeString);
-    const personalizationContext = await loadPersonalizationContext(rows);
+    const personalizationContext = await loadPersonalizationContext(rows, { sender });
     const { selectedRows, failed } = await collectEligibleRows(rows, limit, personalizationContext);
     let leads = [];
     let sendableRows = [];
@@ -3246,6 +3668,7 @@ function createInstantlyOutreachService(deps = {}) {
         actor,
         campaignId,
         uploadId,
+        sender,
       });
       if (outboundReservation && outboundReservation.conflict) {
         const stillSafeRows = [];
@@ -3286,6 +3709,7 @@ function createInstantlyOutreachService(deps = {}) {
       actor,
       campaignId,
       uploadId,
+      sender,
       source: INSTANTLY_SAFE_MANUAL_UPLOAD_SOURCE,
     });
     const nextRows = markRowsAsPreparedForInstantlyUpload(rows, sendableRows, {
@@ -3293,6 +3717,7 @@ function createInstantlyOutreachService(deps = {}) {
       actor,
       campaignId,
       uploadId,
+      sender,
     });
     const customerWrite = await setUiStateValues(
       customerDbScope,
@@ -3319,9 +3744,17 @@ function createInstantlyOutreachService(deps = {}) {
       failed,
       campaignId,
       uploadId,
+      senderProfileKey: sender.key,
+      senderName: sender.name,
+      senderEmail: sender.email,
       fileName: buildSafeUploadFileName(sendableRows.length, uploadId),
       csvHeaders: INSTANTLY_SAFE_UPLOAD_CSV_HEADERS,
       csv: buildInstantlyUploadCsv(leads),
+      campaignTemplateFileName: INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME,
+      campaignInstructionsFileName: INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME,
+      campaignSubjectTemplate: INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE,
+      campaignHtmlTemplate: buildInstantlyCampaignHtmlTemplate(normalizeString),
+      campaignTemplateInstructions: buildInstantlyCampaignTemplateInstructions(),
       leads: sendableRows.map((item) => ({
         id: item.id,
         bedrijf: getRowCompany(item.row, normalizeString),
@@ -3332,9 +3765,10 @@ function createInstantlyOutreachService(deps = {}) {
     return lastSyncResult;
   }
 
-  function markRowsAsSynced(rows, selectedRows, data, actor) {
+  function markRowsAsSynced(rows, selectedRows, data, actor, options = {}) {
     const syncedAt = now().toISOString();
     const leadIdByEmail = buildLeadIdByEmail(data);
+    const sender = options.sender || resolveInstantlySenderProfile(options, config, normalizeString);
     const selectedByIndex = new Map(selectedRows.map((item) => [item.index, item]));
     return rows.map((row, index) => {
       const item = selectedByIndex.get(index);
@@ -3360,6 +3794,17 @@ function createInstantlyOutreachService(deps = {}) {
         instantlyStatus: chooseInstantlyStatus(row.instantlyStatus, 'synced'),
         instantlySyncedAt: normalizeString(row.instantlySyncedAt) || syncedAt,
         instantlyLastEventAt: syncedAt,
+        instantlySenderProfileKey: sender.key,
+        instantlySenderName: sender.name,
+        instantlySenderEmail: sender.email,
+        senderProfileKey: sender.key,
+        senderEmail: sender.email,
+        lastColdmailSenderEmail: sender.email,
+        sentFromEmail: sender.email,
+        sent_from_email: sender.email,
+        outreachSentFromEmail: sender.email,
+        outreach_sent_from_email: sender.email,
+        replyMailboxAccount: sender.email,
         lastColdmailProvider: 'instantly',
         lastColdmailProviderStatus: 'synced',
         ...buildInstantlyApproachedFields(row, syncedAt),
@@ -3545,12 +3990,24 @@ function createInstantlyOutreachService(deps = {}) {
     const values = state && typeof state.values === 'object' ? state.values : {};
     let rows = parseDatabaseRows(values, customerDbKey, normalizeString);
     if (readBool(input.refreshExistingOnly, false)) {
-      const personalizationContext = await loadPersonalizationContext(rows);
+      const personalizationContext = await loadPersonalizationContext(rows, input);
       const existingVariableRefresh = await refreshExistingInstantlyLeadVariables(
         rows,
         personalizationContext,
-        input.refreshExistingLimit || config.batchSize
+        input.refreshExistingLimit || config.batchSize,
+        { campaignId: input.campaignId || input.campaign || input.defaultCampaignId }
       );
+      rows = existingVariableRefresh.rows || rows;
+      if (existingVariableRefresh.rowUpdates) {
+        await setUiStateValues(
+          customerDbScope,
+          buildCustomerRowsStateValues(values, rows, customerDbKey),
+          {
+            source: 'instantly-existing-variable-refresh',
+            actor,
+          }
+        );
+      }
       lastSyncResult = {
         ok: true,
         skipped: true,
@@ -3559,8 +4016,11 @@ function createInstantlyOutreachService(deps = {}) {
         markedBenaderd: 0,
         refreshedExistingVariables: existingVariableRefresh.refreshed,
         attemptedExistingVariableRefresh: existingVariableRefresh.attempted,
+        updatedExistingRows: existingVariableRefresh.rowUpdates || 0,
+        remoteInstantlyLeadCount: existingVariableRefresh.remoteLeadCount,
         failed: existingVariableRefresh.failed || [],
-        campaignId: config.defaultCampaignId,
+        campaignId: normalizeString(input.campaignId || input.campaign || input.defaultCampaignId || config.defaultCampaignId),
+        senderProfileKey: personalizationContext.sender && personalizationContext.sender.key,
         finishedAt: now().toISOString(),
       };
       return lastSyncResult;
@@ -3643,9 +4103,11 @@ function createInstantlyOutreachService(deps = {}) {
       ? await refreshExistingInstantlyLeadVariables(
           rows,
           personalizationContext,
-          input.refreshExistingLimit || config.batchSize
+          input.refreshExistingLimit || config.batchSize,
+          { campaignId: input.campaignId || input.campaign || input.defaultCampaignId }
         )
       : { refreshed: 0, attempted: 0 };
+    rows = existingVariableRefresh.rows || rows;
 
     if (limit <= 0) {
       if (existingApproached.marked) {
@@ -3753,6 +4215,7 @@ function createInstantlyOutreachService(deps = {}) {
       actor,
       campaignId: config.defaultCampaignId,
       source: 'instantly-sync',
+      sender: personalizationContext.sender,
     });
     if (outboundReservation && outboundReservation.conflict) {
       for (const item of sendableRows) {
@@ -3782,8 +4245,11 @@ function createInstantlyOutreachService(deps = {}) {
       campaignId: config.defaultCampaignId,
       leadIdByEmail,
       source: 'instantly-sync',
+      sender: personalizationContext.sender,
     });
-    const nextRows = markRowsAsSynced(rows, sendableRows, data, actor);
+    const nextRows = markRowsAsSynced(rows, sendableRows, data, actor, {
+      sender: personalizationContext.sender,
+    });
     await setUiStateValues(
       customerDbScope,
       buildCustomerRowsStateValues(values, nextRows, customerDbKey),
@@ -3900,6 +4366,25 @@ function createInstantlyOutreachService(deps = {}) {
     const timestamp = normalizeString(
       body.timestamp || body.created_at || body.createdAt || data.timestamp || data.created_at || data.createdAt
     );
+    const senderEmail = normalizeEmailAddress(
+      data.from_address_email ||
+        data.from_email ||
+        data.sender_email ||
+        data.senderEmail ||
+        data.eaccount ||
+        data.email_account ||
+        data.emailAccount ||
+        data.account_email ||
+        data.accountEmail ||
+        body.from_address_email ||
+        body.from_email ||
+        body.sender_email ||
+        body.senderEmail ||
+        body.eaccount ||
+        body.email_account ||
+        lead.last_contacted_from,
+      normalizeString
+    );
 
     return {
       eventType,
@@ -3910,6 +4395,7 @@ function createInstantlyOutreachService(deps = {}) {
       customerId,
       eventId,
       timestamp,
+      senderEmail,
       customVariables,
       data,
     };
@@ -3965,6 +4451,7 @@ function createInstantlyOutreachService(deps = {}) {
       instantlyLastEventAt: date,
       lastColdmailProvider: 'instantly',
       lastColdmailProviderStatus: event.eventStatus || event.eventType,
+      ...buildInstantlySenderRowFields(event.senderEmail, normalizeString),
       updatedAt: date,
     };
     const history = (type, label, preview) =>

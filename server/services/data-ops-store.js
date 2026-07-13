@@ -17,6 +17,7 @@ const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 
 const TABLES = Object.freeze({
   customers: 'softora_customers',
+  customerIdentityKeys: 'softora_customer_identity_keys',
   activeOrders: 'softora_active_orders',
   orderRuntime: 'softora_order_runtime',
   designPhotos: 'softora_design_photos',
@@ -1013,12 +1014,62 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
+  async function listDashboardCustomers(options = {}) {
+    return cachedRead('dashboard-customers', async () => {
+      const result = await collectPagedRows('list-dashboard-customers', (client) => {
+        let query = client
+          .from(TABLES.customers)
+          .select('customer_id,payload,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at')
+          .is('deleted_at', null);
+        if (query && typeof query.or === 'function') {
+          query = query.or('database_status.eq.klant,lifecycle_status.eq.klant');
+        }
+        if (query && typeof query.order === 'function') {
+          query = query.order('updated_at', { ascending: false });
+        }
+        return query;
+      }, {
+        timeoutMs: dataOpsReadQueryTimeoutMs,
+        maxRows: Math.max(1, Math.min(5000, Number(options.maxRows) || 5000)),
+        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+      });
+      if (!result.ok) return null;
+      return (result.data || [])
+        .map((row) => {
+          const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+          return {
+            ...payload,
+            id: normalizeString(payload.id || row.customer_id),
+            naam: normalizeString(payload.naam || payload.contactName || row.contact_name),
+            bedrijf: normalizeString(payload.bedrijf || payload.companyName || row.company),
+            telefoon: normalizeString(payload.telefoon || payload.tel || payload.phone || row.phone),
+            tel: normalizeString(payload.tel || payload.telefoon || payload.phone || row.phone),
+            email: normalizeString(payload.email || payload.contactEmail || row.email),
+            website: normalizeString(payload.website || payload.dom || payload.domain || row.website),
+            databaseStatus: normalizeString(payload.databaseStatus || row.database_status || row.lifecycle_status),
+            status: normalizeString(payload.status || row.lifecycle_status || row.database_status),
+            verantwoordelijk: normalizeString(payload.verantwoordelijk || payload.responsible || row.responsible),
+            updatedAt: normalizeString(payload.updatedAt || row.updated_at),
+          };
+        })
+        .filter((customer) => {
+          const status = normalizeString(customer.databaseStatus || customer.status).toLowerCase();
+          return status === 'klant' || status === 'betaald';
+        });
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
   async function listCustomerSnapshotRows(options = {}) {
     return cachedRead('customers-snapshot', async () => {
       const result = await collectPagedRows('list-customers-snapshot', (client) =>
         client
           .from(TABLES.customers)
-          .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at')
+          .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at')
           .is('deleted_at', null)
           .order('updated_at', { ascending: false }),
       {
@@ -1046,20 +1097,39 @@ function createSoftoraDataOpsStore(deps = {}) {
         .filter(Boolean)
     ));
     const maxRows = Math.max(1, Math.min(20000, Number(options.maxRows) || 5000));
+    const bounceCandidatesOnly = options.bounceCandidatesOnly === true;
     const cacheKey = [
       'mailbox-messages',
       accountEmails.join(','),
       folders.join(','),
       maxRows,
+      bounceCandidatesOnly ? 'bounce-candidates' : 'all',
     ].join('|');
 
+    function isBounceCandidate(row) {
+      const sender = normalizeString(row && row.sender_email).toLowerCase();
+      const subject = normalizeString(row && row.subject).toLowerCase();
+      const preview = normalizeString(row && row.preview).toLowerCase();
+      return /^(?:mailer-daemon|postmaster)@/.test(sender) ||
+        /(?:returned mail|delivery status notification|delivery failure|delivery failed|could not send message|undeliver)/.test(`${subject}\n${preview}`);
+    }
+
+    function mailboxMessageTime(row) {
+      const parsed = Date.parse(normalizeString(row && (row.date || row.internal_date)));
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
     return cachedRead(cacheKey, async () => {
-      const result = await run('list-mailbox-messages', (client) => {
+      const selectedColumns = bounceCandidatesOnly
+        ? 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,deleted_at'
+        : 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at';
+      const loadRows = (accountEmail = '') => run('list-mailbox-messages', (client) => {
         let query = client
           .from(TABLES.mailboxMessages)
-          .select('message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at')
+          .select(selectedColumns)
           .is('deleted_at', null);
-        if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
+        if (accountEmail && typeof query.eq === 'function') query = query.eq('account_email', accountEmail);
+        else if (accountEmails.length && typeof query.in === 'function') query = query.in('account_email', accountEmails);
         if (folders.length && typeof query.in === 'function') query = query.in('folder', folders);
         if (typeof query.order === 'function') query = query.order('date', { ascending: false });
         if (typeof query.limit === 'function') query = query.limit(maxRows);
@@ -1070,6 +1140,29 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
+
+      if (bounceCandidatesOnly && accountEmails.length) {
+        // De gecombineerde ILIKE/OR-scan liep op productie over de hele mailbox-tabel
+        // en gaf na een timeout onterecht nul bounces. Account-queries gebruiken de
+        // bestaande mailbox-index en blijven klein; pas daarna filteren we lokaal.
+        const results = await Promise.all(accountEmails.map((accountEmail) => loadRows(accountEmail)));
+        if (results.some((result) => !result.ok)) return null;
+        const seen = new Set();
+        return results
+          .flatMap((result) => result.data || [])
+          .filter(isBounceCandidate)
+          .sort((left, right) => mailboxMessageTime(right) - mailboxMessageTime(left))
+          .filter((row) => {
+            const key = normalizeString(row && row.message_key) ||
+              `${normalizeString(row && row.account_email)}|${normalizeString(row && row.folder)}|${normalizeString(row && row.uid)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, maxRows);
+      }
+
+      const result = await loadRows();
       return result.ok ? result.data || [] : null;
     }, {
       bypassReadCache: options.bypassReadCache,
@@ -1099,7 +1192,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
-    forgetReads('customers');
+    forgetReads('customers', 'dashboard-customers');
     return deleteMissingCustomerIds(missingDeletePlan.data, meta.source);
   }
 
@@ -1118,7 +1211,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
       getWriteOperationOptions()
     );
-    if (upsert.ok) forgetReads('customers');
+    if (upsert.ok) forgetReads('customers', 'dashboard-customers');
     return upsert.ok ? { ...upsert, upserted: rows.length } : upsert;
   }
 
@@ -1138,8 +1231,55 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('customer_id', ids),
       getWriteOperationOptions()
     );
-    if (result.ok) forgetReads('customers');
+    if (result.ok) forgetReads('customers', 'dashboard-customers');
     return result;
+  }
+
+  function normalizeCustomerIdentityKeyRow(raw, source) {
+    const keyType = normalizeString(raw?.key_type || raw?.type).toLowerCase().slice(0, 80);
+    const keyValue = normalizeString(raw?.key_value || raw?.value).toLowerCase().slice(0, 320);
+    const customerId = normalizeString(raw?.customer_id || raw?.customerId).slice(0, 160);
+    if (!keyType || !keyValue || !customerId) return null;
+    return { key_type: keyType, key_value: keyValue, customer_id: customerId, source: normalizeString(source || raw.source || 'data-ops').slice(0, 120), updated_at: isoNow() };
+  }
+
+  async function listCustomerIdentityKeys(keys = []) {
+    const grouped = new Map();
+    (Array.isArray(keys) ? keys : []).forEach((key) => {
+      const row = normalizeCustomerIdentityKeyRow({ ...key, customer_id: key.customer_id || key.customerId || 'lookup' }, 'lookup');
+      if (!row) return;
+      const values = grouped.get(row.key_type) || new Set();
+      values.add(row.key_value);
+      grouped.set(row.key_type, values);
+    });
+    const output = [];
+    for (const [keyType, values] of grouped.entries()) {
+      const result = await run('list-customer-identity-keys', (client) => client
+        .from(TABLES.customerIdentityKeys)
+        .select('key_type,key_value,customer_id,updated_at')
+        .eq('key_type', keyType)
+        .in('key_value', Array.from(values))
+        .is('deleted_at', null));
+      if (!result.ok) return result;
+      output.push(...(Array.isArray(result.data) ? result.data : []));
+    }
+    return { ok: true, data: output };
+  }
+
+  async function upsertCustomerIdentityKeys(entries = [], meta = {}) {
+    const seen = new Set();
+    const rows = [];
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const row = normalizeCustomerIdentityKeyRow(entry, meta.source);
+      if (!row) return;
+      const key = `${row.key_type}:${row.key_value}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(row);
+    });
+    return rows.length
+      ? run('upsert-customer-identity-keys', (client) => client.from(TABLES.customerIdentityKeys).upsert(rows, { onConflict: 'key_type,key_value', ignoreDuplicates: true }))
+      : { ok: true, data: [] };
   }
 
   function buildOrderRow(raw, index, source) {
@@ -1454,11 +1594,24 @@ function createSoftoraDataOpsStore(deps = {}) {
         .map(normalizeString)
         .filter(Boolean)
     ));
-    const maxMatchLimit = identifiers.length ? 500 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
-    const defaultMaxMatches = identifiers.length ? 12 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const customerIds = Array.from(new Set(
+      (Array.isArray(options.customerIds) ? options.customerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    )).slice(0, 500);
+    const customerIdSet = new Set(customerIds.map((value) => value.toLowerCase()));
+    const hasTargetedLookup = identifiers.length > 0 || customerIds.length > 0;
+    const maxMatchLimit = hasTargetedLookup ? 500 : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
+    const defaultMaxMatches = customerIds.length
+      ? customerIds.length
+      : identifiers.length
+        ? 12
+        : DESIGN_PHOTO_SIGNED_URL_DEFAULT_SCAN_LIMIT;
     const maxMatches = Math.max(1, Math.min(maxMatchLimit, Number(options.maxMatches) || defaultMaxMatches));
-    const cacheKey = identifiers.length
-      ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
+    const cacheKey = customerIds.length
+      ? `design-photos-signed:customer-ids:${customerIds.join('|')}:${maxMatches}`
+      : identifiers.length
+        ? `design-photos-signed:${identifiers.join('|')}:${maxMatches}`
       : `design-photos-signed:all:${maxMatches}`;
     const scanLimit = identifiers.length
       ? DESIGN_PHOTO_SIGNED_URL_TARGETED_SCAN_LIMIT
@@ -1505,7 +1658,16 @@ function createSoftoraDataOpsStore(deps = {}) {
     const structuredRows = await cachedRead(cacheKey, async () => {
       const buildQuery = (client) => selectDesignPhotoRows(client).order('updated_at', { ascending: false });
       let result = null;
-      if (identifiers.length) {
+      if (customerIds.length) {
+        result = await run('list-design-photos-signed-urls-by-customer-ids', (client) => {
+          let query = selectDesignPhotoRows(client);
+          if (!query || typeof query.in !== 'function') return null;
+          query = query.in('customer_id', customerIds);
+          if (typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
+          if (typeof query.limit === 'function') query = query.limit(maxMatches);
+          return query;
+        }, buildQueryOptions);
+      } else if (identifiers.length) {
         const targetedRows = await readTargetedRows(buildQueryOptions);
         const targetedMatches = targetedRows.filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers));
         if (targetedMatches.length) return targetedMatches;
@@ -1529,7 +1691,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     if (!structuredRows) return null;
     const client = getClient(buildQueryOptions);
     const rows = structuredRows
-      .filter((row) => designPhotoRowMatchesIdentifiers(row, identifiers))
+      .filter((row) => customerIds.length
+        ? customerIdSet.has(normalizeString(row && row.customer_id).toLowerCase())
+        : designPhotoRowMatchesIdentifiers(row, identifiers))
       .slice(0, maxMatches);
     const entries = [];
 
@@ -1724,7 +1888,11 @@ function createSoftoraDataOpsStore(deps = {}) {
       enumerable: false,
     });
     Object.defineProperty(entries, 'targetedIdentifiersApplied', {
-      value: identifiers.length > 0,
+      value: hasTargetedLookup,
+      enumerable: false,
+    });
+    Object.defineProperty(entries, 'targetedCustomerIdsApplied', {
+      value: customerIds.length > 0,
       enumerable: false,
     });
     return entries;
@@ -1778,8 +1946,16 @@ function createSoftoraDataOpsStore(deps = {}) {
     ));
     if (!keys.length) return [];
     const found = new Set();
+    const chunks = [];
     for (let index = 0; index < keys.length; index += OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE) {
-      const keyChunk = keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE);
+      chunks.push(keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE));
+    }
+    let cursor = 0;
+    let failed = false;
+    async function worker() {
+      while (!failed && cursor < chunks.length) {
+        const keyChunk = chunks[cursor];
+        cursor += 1;
       const result = await run('list-outbound-recipient-guard-keys', (client) =>
         client
           .from(TABLES.outboundRecipientGuards)
@@ -1793,12 +1969,18 @@ function createSoftoraDataOpsStore(deps = {}) {
         suppressReadFailureCooldown: options.suppressReadFailureCooldown,
         suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
       });
-      if (!result.ok) return null;
+        if (!result.ok) {
+          failed = true;
+          return;
+        }
       (result.data || []).forEach((row) => {
         const key = normalizeString(row && row.guard_key);
         if (key) found.add(key);
       });
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(6, chunks.length) }, worker));
+    if (failed) return null;
     return Array.from(found);
   }
 
@@ -2278,9 +2460,11 @@ function createSoftoraDataOpsStore(deps = {}) {
     listRunnableWebdesignBatches,
     deleteDesignPhotos,
     listCustomerSnapshotRows,
+    listDashboardCustomers,
     listDesignPhotoAssetFlags,
     listActiveOrders,
     listCustomers,
+    listCustomerIdentityKeys,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,
     listMailboxMessages,
@@ -2298,6 +2482,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     replaceOrderRuntime,
     upsertCustomers,
     uploadDesignPhoto,
+    upsertCustomerIdentityKeys,
     upsertDesignPhotos,
     upsertWebdesignBatch,
     upsertWebdesignBatchChunk,

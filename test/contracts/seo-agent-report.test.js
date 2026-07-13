@@ -13,6 +13,11 @@ const {
   getMissingSearchConsoleConfig,
   resolveDateWindows,
 } = require('../../scripts/lib/search-console-agent-report');
+const {
+  getBusinessFit,
+  isBrandedQuery,
+  rankSeoOpportunities,
+} = require('../../scripts/lib/seo-opportunity-scoring');
 
 function jsonResponse(body, status = 200) {
   return {
@@ -127,6 +132,75 @@ test('seo agent report ranks low CTR, striking distance and declining page actio
   assert.equal(report.queries.strikingDistance[0].query, 'website laten maken');
   assert.equal(report.pages.declining[0].page, 'https://www.softora.nl/');
   assert.match(formatAgentMarkdown(report), /Lage CTR kansen/);
+});
+
+test('seo agent prioritizes non-branded buyer intent and includes zero CTR opportunities once', () => {
+  const report = buildSearchConsoleAgentReport({
+    queriesCurrent: [
+      { keys: ['softora'], clicks: 10, impressions: 100, ctr: 0.1, position: 1 },
+      { keys: ['crm op maat'], clicks: 0, impressions: 80, ctr: 0, position: 8 },
+      { keys: ['algemene uitleg'], clicks: 0, impressions: 200, ctr: 0, position: 8 },
+    ],
+    queriesPrevious: [],
+    pagesCurrent: [],
+    pagesPrevious: [],
+    pageQueryCurrent: [
+      {
+        keys: ['https://www.softora.nl/crm-op-maat', 'crm op maat'],
+        clicks: 0,
+        impressions: 80,
+        ctr: 0,
+        position: 8,
+      },
+    ],
+    sitemaps: [],
+  });
+
+  assert.equal(report.queries.lowCtr[0].query, 'algemene uitleg');
+  assert.equal(report.queries.prioritized[0].query, 'crm op maat');
+  assert.equal(report.queries.prioritized[0].businessFit, 5);
+  assert.deepEqual(report.queries.prioritized[0].types, ['low_ctr', 'striking_distance']);
+  assert.equal(report.segments.branded.clicks, 10);
+  assert.equal(report.segments.nonBranded.impressions, 280);
+  assert.equal(
+    report.actionQueue.filter((item) => item.query === 'crm op maat').length,
+    1
+  );
+  assert.match(formatAgentMarkdown(report), /Geprioriteerde kansen/);
+  assert.match(formatAgentMarkdown(report), /Non-branded: 0 klikken, 280 vertoningen/);
+});
+
+test('seo opportunity scoring exposes deterministic business-fit inputs', () => {
+  assert.equal(isBrandedQuery('Softora Oisterwijk'), true);
+  assert.equal(getBusinessFit('crm op maat laten maken'), 5);
+  assert.equal(getBusinessFit('software uitleg'), 3);
+
+  const ranked = rankSeoOpportunities([
+    { type: 'low_ctr', query: 'algemene uitleg', impressions: 200, ctr: 0, position: 8 },
+    { type: 'low_ctr', query: 'crm op maat', impressions: 80, ctr: 0, position: 8 },
+  ]);
+  assert.equal(ranked[0].query, 'crm op maat');
+  assert.ok(ranked[0].opportunityScore > ranked[1].opportunityScore);
+});
+
+test('seo agent keeps high-intent position 20-40 queries as lower-leverage emerging opportunities', () => {
+  const report = buildSearchConsoleAgentReport({
+    queriesCurrent: [
+      { keys: ['bedrijfssoftware laten maken'], clicks: 0, impressions: 130, ctr: 0, position: 29 },
+      { keys: ['breed informatief onderwerp'], clicks: 0, impressions: 400, ctr: 0, position: 29 },
+      { keys: ['crm op maat'], clicks: 0, impressions: 200, ctr: 0, position: 55 },
+    ],
+    queriesPrevious: [],
+    pagesCurrent: [],
+    pagesPrevious: [],
+    pageQueryCurrent: [],
+    sitemaps: [],
+  });
+
+  assert.deepEqual(report.queries.emerging.map((item) => item.query), ['bedrijfssoftware laten maken']);
+  assert.equal(report.queries.prioritized[0].types[0], 'emerging');
+  assert.equal(report.actionQueue[0].type, 'strengthen_page');
+  assert.equal(report.actionQueue.some((item) => item.query === 'crm op maat'), false);
 });
 
 test('seo agent technical report works without GSC secrets and keeps output local-only', async () => {

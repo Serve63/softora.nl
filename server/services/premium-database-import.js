@@ -20,6 +20,7 @@ const MAX_DEEP_SEARCH_ESTIMATE_ROWS = 500;
 const MAX_DEEP_SEARCH_EXCLUDE_ITEMS = 5000;
 const MAX_DEEP_SEARCH_PROMPT_EXCLUDE_ITEMS = 500;
 const GOOGLE_PLACES_TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
+const DEFAULT_OPENAI_API_BASE_URL = 'https://api.openai.com/v1';
 const GOOGLE_PLACES_FIELD_MASK = [
   'places.id',
   'places.displayName',
@@ -987,10 +988,17 @@ function getOpenAiApiKey(deps = {}) {
 
 function getOpenAiApiBaseUrl(deps = {}) {
   const env = deps.env || process.env || {};
-  return normalizeString(deps.openAiApiBaseUrl || env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(
-    /\/+$/,
-    ''
-  );
+  const configured = normalizeString(deps.openAiApiBaseUrl || env.OPENAI_API_BASE_URL || DEFAULT_OPENAI_API_BASE_URL)
+    .replace(/\/+$/, '');
+  try {
+    const parsed = new URL(configured);
+    if (parsed.protocol === 'https:' && parsed.hostname === 'api.openai.com' && parsed.pathname === '/v1') {
+      return DEFAULT_OPENAI_API_BASE_URL;
+    }
+  } catch (_error) {
+    return DEFAULT_OPENAI_API_BASE_URL;
+  }
+  return DEFAULT_OPENAI_API_BASE_URL;
 }
 
 function getOpenAiDatabaseSearchModel(deps = {}) {
@@ -1025,15 +1033,7 @@ function getOpenAiDatabaseSearchPromptVersion(deps = {}) {
 }
 
 function getOpenAiDatabaseSearchTimeoutMs(deps = {}) {
-  const env = deps.env || process.env || {};
-  const explicitDepsTimeout = Number(deps.openAiTimeoutMs);
-  if (Number.isFinite(explicitDepsTimeout) && explicitDepsTimeout > 0) {
-    return Math.min(explicitDepsTimeout, MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS);
-  }
-  const explicitEnvTimeout = Number(env.OPENAI_DATABASE_SEARCH_TIMEOUT_MS);
-  if (Number.isFinite(explicitEnvTimeout) && explicitEnvTimeout > 0) {
-    return Math.max(30000, Math.min(explicitEnvTimeout, MAX_OPENAI_DATABASE_SEARCH_TIMEOUT_MS));
-  }
+  void deps;
   return DEFAULT_OPENAI_DATABASE_SEARCH_TIMEOUT_MS;
 }
 
@@ -2003,6 +2003,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     getUiStateValues,
     setUiStateValues,
     dataOpsStore = null,
+    mailReadySnapshotService = null,
   } = deps;
 
   function sendImportResponse(req, res) {
@@ -2165,6 +2166,9 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
           error: truncateText(normalizeString(photosDeleted && photosDeleted.error && photosDeleted.error.message) || 'Lead verwijderd, maar foto-opslag opruimen mislukte.', 500),
         });
       }
+    }
+    if (mailReadySnapshotService && typeof mailReadySnapshotService.invalidate === 'function') {
+      mailReadySnapshotService.invalidate();
     }
 
     return res.status(200).json({

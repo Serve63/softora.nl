@@ -78,10 +78,18 @@ test('premium dashboard core formats money and project metadata', () => {
   );
 });
 
+test('premium dashboard core probeert fallbackroutes bij tijdelijke ui-state fouten', () => {
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('UI-state GET mislukt (503)')), false);
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('Dashboard data timeout na 6s')), false);
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('UI-state GET mislukt (401)')), true);
+  assert.equal(dashboardCore.shouldStopUiStateFallback(new Error('UI-state GET mislukt (429)')), true);
+});
+
 test('premium dashboard core hydrates active orders from server bootstrap values', () => {
   const state = { orders: [], ordersHydrated: false };
   const payload = {
     activeOrdersState: {
+      source: 'supabase:data_ops',
       values: {
         softora_custom_orders_premium_v1: JSON.stringify([{ id: 11, title: 'Website opdracht' }]),
       },
@@ -95,6 +103,57 @@ test('premium dashboard core hydrates active orders from server bootstrap values
   assert.equal(hydrated, true);
   assert.equal(state.ordersHydrated, true);
   assert.equal(state.orders[0].id, 11);
+});
+
+test('premium dashboard core behandelt een formele lege opdrachtstate als geladen', () => {
+  const state = { orders: [{ id: 99 }], ordersHydrated: false };
+  const parseOrders = (values) => JSON.parse(values.softora_custom_orders_premium_v1 || '[]');
+
+  assert.equal(dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(state, parseOrders, {
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_custom_orders_premium_v1: '[]' },
+    },
+  }), true);
+  assert.equal(state.ordersHydrated, true);
+  assert.deepEqual(state.orders, []);
+
+  assert.equal(dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(state, parseOrders, {
+    activeOrdersState: { source: 'bootstrap-timeout', values: {} },
+  }), false);
+
+  assert.equal(dashboardCore.hydratePremiumDashboardOrdersFromBootstrap(state, parseOrders, {
+    activeOrdersState: {
+      source: 'supabase:data_ops',
+      values: { softora_order_runtime_premium_v1: '{"7":{"statusKey":"running"}}' },
+    },
+  }), false);
+});
+
+test('premium dashboard core hydrateert alleen klanten uit een formele klantenbron', () => {
+  const state = { customers: [], customersHydrated: false };
+  const parseCustomers = (rows) => rows.map((row) => ({ ...row }));
+
+  assert.equal(
+    dashboardCore.hydratePremiumDashboardCustomersFromBootstrap(state, parseCustomers, {
+      ok: true,
+      source: 'orders',
+      customers: [{ id: 'seed-1', websiteBedrag: 0 }],
+    }),
+    false
+  );
+  assert.equal(state.customersHydrated, false);
+
+  assert.equal(
+    dashboardCore.hydratePremiumDashboardCustomersFromBootstrap(state, parseCustomers, {
+      ok: true,
+      source: 'dashboard-customers',
+      customers: [],
+    }),
+    true
+  );
+  assert.equal(state.customersHydrated, true);
+  assert.deepEqual(state.customers, []);
 });
 
 test('premium dashboard core can force-release the boot shell without theme helpers', () => {

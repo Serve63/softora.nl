@@ -7,6 +7,11 @@ function createResponseRecorder() {
   return {
     statusCode: null,
     body: null,
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+      return this;
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -67,6 +72,7 @@ function createFixture(overrides = {}) {
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
+    dataOpsStore: overrides.dataOpsStore || null,
     sportschoolLogbookStore: overrides.sportschoolLogbookStore || null,
     dataOpsUiStateReadTimeoutMs: overrides.dataOpsUiStateReadTimeoutMs,
     dataOpsUiStateReadTimeoutMsByScope: overrides.dataOpsUiStateReadTimeoutMsByScope,
@@ -86,6 +92,10 @@ function createFixture(overrides = {}) {
   };
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test('runtime ops coordinator lists dashboard activity and audit events with stable payloads', () => {
   const { coordinator } = createFixture();
   const dashboardRes = createResponseRecorder();
@@ -103,6 +113,70 @@ test('runtime ops coordinator lists dashboard activity and audit events with sta
   assert.equal(auditRes.body.ok, true);
   assert.equal(auditRes.body.count, 1);
   assert.equal(auditRes.body.events.length, 1);
+});
+
+test('runtime ops coordinator levert compacte formele dashboardklanten', async () => {
+  const calls = [];
+  const { coordinator } = createFixture({
+    dataOpsStore: {
+      listDashboardCustomers: async (options) => {
+        calls.push(options);
+        return [
+          {
+            id: 'klant-1',
+            databaseStatus: 'klant',
+            status: 'Betaald',
+            type: 'Website',
+            bedrag: 300,
+            datum: '2026-03-23',
+            interneNotities: 'mag nooit naar het dashboard',
+            history: 'x'.repeat(100_000),
+          },
+        ];
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendDashboardCustomersResponse({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.source, 'dashboard-customers');
+  assert.equal(res.body.customers.length, 1);
+  assert.equal(res.body.customers[0].websiteBedrag, 300);
+  assert.equal(res.body.customers[0].interneNotities, undefined);
+  assert.equal(res.body.customers[0].history, undefined);
+  assert.deepEqual(Object.keys(res.body.customers[0]).sort(), [
+    'bedrag',
+    'bedrijf',
+    'databaseStatus',
+    'datum',
+    'id',
+    'naam',
+    'onderhoudPerMaand',
+    'status',
+    'type',
+    'websiteBedrag',
+  ]);
+  assert.equal(res.headers['Cache-Control'], 'no-store, private');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].bypassReadFailureCooldown, true);
+});
+
+test('runtime ops coordinator faalt veilig als formele dashboardklanten niet laden', async () => {
+  const { coordinator } = createFixture({
+    dataOpsStore: {
+      listDashboardCustomers: async () => null,
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendDashboardCustomersResponse({}, res);
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /dashboardklanten/i);
 });
 
 test('runtime ops coordinator returns 400 or 503 for invalid or unavailable ui-state reads', async () => {
@@ -587,6 +661,204 @@ test('runtime ops coordinator weigert stale v1 sportschool writes bovenop formel
   assert.equal(JSON.parse(res.body.values.sportschool_logboek_v1).exerciseSources['name:CHEST PRESS'].kg, '68');
   assert.equal(formalWrites, 0);
   assert.equal(legacyWrites, 0);
+});
+
+test('runtime ops coordinator weigert oudere v2 sportschool snapshots met stale updatedAt', async () => {
+  const writes = [];
+  const currentSnapshot = {
+    version: 2,
+    updatedAt: '2026-07-01T10:00:02.000Z',
+    exerciseSources: {
+      'name:LEG EXTENSIONS': {
+        title: 'LEG EXTENSIONS',
+        sets: '3',
+        reps: '8',
+        kg: '104',
+        notes: '',
+      },
+    },
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: {
+          1: {
+            exerciseKey: 'name:LEG EXTENSIONS',
+            title: 'LEG EXTENSIONS',
+            sets: '3',
+            reps: '8',
+            kg: '104',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const staleSnapshot = {
+    ...currentSnapshot,
+    updatedAt: '2026-07-01T10:00:01.000Z',
+    exerciseSources: {
+      'name:LEG EXTENSIONS': {
+        title: 'LEG EXTENSIONS',
+        sets: '3',
+        reps: '8',
+        kg: '100',
+        notes: '',
+      },
+    },
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: {
+          1: {
+            exerciseKey: 'name:LEG EXTENSIONS',
+            title: 'LEG EXTENSIONS',
+            sets: '3',
+            reps: '8',
+            kg: '100',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: {
+        sportschool_logboek_v1: JSON.stringify(currentSnapshot),
+      },
+      source: 'supabase',
+      updatedAt: '2026-07-01T10:00:03.000Z',
+    }),
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return { values, source: 'supabase', updatedAt: '2026-07-01T10:00:04.000Z' };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot: staleSnapshot,
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.error, /Verouderde sportschool logboekdata geweigerd/);
+  assert.equal(JSON.parse(res.body.values.sportschool_logboek_v1).exerciseSources['name:LEG EXTENSIONS'].kg, '104');
+  assert.equal(writes.length, 0);
+});
+
+test('runtime ops coordinator serialiseert sportschool writes zodat laatste snapshot wint', async () => {
+  const writes = [];
+  let currentState = null;
+  const olderSnapshot = {
+    version: 2,
+    updatedAt: '2026-07-01T10:00:01.000Z',
+    exerciseSources: {
+      'name:LEG EXTENSIONS': {
+        title: 'LEG EXTENSIONS',
+        sets: '3',
+        reps: '8',
+        kg: '100',
+        notes: '',
+      },
+    },
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: {
+          1: {
+            exerciseKey: 'name:LEG EXTENSIONS',
+            title: 'LEG EXTENSIONS',
+            sets: '3',
+            reps: '8',
+            kg: '100',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const newerSnapshot = {
+    version: 2,
+    updatedAt: '2026-07-01T10:00:02.000Z',
+    exerciseSources: {
+      'name:LEG EXTENSIONS': {
+        title: 'LEG EXTENSIONS',
+        sets: '3',
+        reps: '8',
+        kg: '104',
+        notes: '',
+      },
+    },
+    days: {
+      tuesday: {
+        orders: [1],
+        exercises: {
+          1: {
+            exerciseKey: 'name:LEG EXTENSIONS',
+            title: 'LEG EXTENSIONS',
+            sets: '3',
+            reps: '8',
+            kg: '104',
+            notes: '',
+          },
+        },
+      },
+    },
+  };
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => currentState,
+    setUiStateValues: async (scope, values, meta) => {
+      const snapshot = JSON.parse(values.sportschool_logboek_v1);
+      writes.push({ scope, snapshot, meta });
+      if (snapshot.updatedAt === olderSnapshot.updatedAt) await delay(25);
+      currentState = {
+        values,
+        source: 'supabase',
+        updatedAt: snapshot.updatedAt,
+      };
+      return currentState;
+    },
+  });
+  const olderRes = createResponseRecorder();
+  const newerRes = createResponseRecorder();
+
+  await Promise.all([
+    coordinator.sendSportschoolLogbookSetResponse(
+      {
+        body: {
+          snapshot: olderSnapshot,
+          source: 'sportschool-logboek',
+          actor: 'serve',
+        },
+      },
+      olderRes
+    ),
+    coordinator.sendSportschoolLogbookSetResponse(
+      {
+        body: {
+          snapshot: newerSnapshot,
+          source: 'sportschool-logboek',
+          actor: 'serve',
+        },
+      },
+      newerRes
+    ),
+  ]);
+
+  assert.equal(olderRes.statusCode, 200);
+  assert.equal(newerRes.statusCode, 200);
+  assert.deepEqual(writes.map((write) => write.snapshot.updatedAt), [
+    '2026-07-01T10:00:01.000Z',
+    '2026-07-01T10:00:02.000Z',
+  ]);
+  assert.equal(JSON.parse(currentState.values.sportschool_logboek_v1).exerciseSources['name:LEG EXTENSIONS'].kg, '104');
 });
 
 test('runtime ops coordinator schrijft sportschool logboek via data-ops brug wanneer legacy opslag ontbreekt', async () => {

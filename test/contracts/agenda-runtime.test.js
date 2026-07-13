@@ -49,7 +49,11 @@ test('agenda runtime injecteert klanten-bootstrap ook op het premium dashboard',
   assert.match(source, /fileName === 'premium-personeel-dashboard\.html'/);
   assert.match(source, /const isPremiumDatabase = fileName === 'premium-database\.html';/);
   assert.doesNotMatch(source, /isPremiumDashboard \? getUiStateValues\(premiumActiveOrdersScope\) : Promise\.resolve\(null\)/);
-  assert.match(source, /buildCustomersBootstrapPayload\(\{\s*includeCustomers: !isPremiumDatabase,\s*\}\)/);
+  assert.match(source, /isPremiumDatabase\s*\? await customersPageBootstrapService\.buildMailReadySnapshotBootstrapPayload\(\)/);
+  assert.match(
+    source,
+    /buildCustomersBootstrapPayload\(\{\s*includeCustomers: true,\s*preferDashboardCustomers: isPremiumDashboard,\s*\}\)/
+  );
   assert.match(source, /marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP'/);
   assert.match(source, /scriptId: 'softoraCustomersBootstrap'/);
   assert.match(source, /buildDashboardHtmlReplacements\(dashboardPayload\)/);

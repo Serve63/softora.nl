@@ -537,8 +537,8 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
   assert.match(senderSettingsSource, /"martijnven123@gmail\.com": DEFAULT_WEBDESIGN_BODY/);
   assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": DEFAULT_WEBDESIGN_BODY/);
-  assert.match(senderSettingsSource, /Afgelopen week kwam ik jullie website \(\{\{website\}\}\) tegen\./);
-  assert.match(senderSettingsSource, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(senderSettingsSource, /Afgelopen week kwam ik jullie website, \{\{website\}\}, tegen\./);
+  assert.match(senderSettingsSource, /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze link bekijken 🎨/);
   assert.match(senderSettingsSource, /\{\{afzender\}\}/);
   assert.match(senderSettingsSource, /📍 \{\{stad\}\}/);
   assert.doesNotMatch(senderSettingsSource, /📍 \{\{afzenderPlaats\}\}/);
@@ -779,7 +779,9 @@ test('premium bevestigingsmails exposes a coldmail autopilot toggle with safe ba
   assert.match(autopilotSource, /const storedProfile = storedProfiles\[email\]/);
   assert.match(autopilotSource, /if \(enabled\) \{/);
   assert.match(autopilotSource, /startHour: 7/);
-  assert.match(autopilotSource, /endHour: 17/);
+  assert.match(autopilotSource, /startMinute: 0/);
+  assert.match(autopilotSource, /endHour: 23/);
+  assert.match(autopilotSource, /endMinute: 30/);
   assert.match(autopilotSource, /minIntervalMinutes: 5/);
   assert.match(autopilotSource, /senderMinIntervalMinutes: 60/);
   assert.match(autopilotSource, /senderMaxIntervalMinutes: 74/);

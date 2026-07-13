@@ -2,8 +2,9 @@
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
     const COLDMAIL_STATS_URL = "/api/coldmailing/stats";
-    const TODAY_SENT_REFRESH_MS = 15000;
+    const TODAY_SENT_REFRESH_MS = 60000;
     let roiControlsBound = false;
+    let roiSaveLifecycleBound = false;
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
@@ -13,6 +14,8 @@
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
     let roiDirtySinceLoad = false;
+    let roiNeedsRemoteSync = false;
+    let bootstrapStateApplied = false;
 
     function fallbackNormalizeString(value) {
         return value === null || value === undefined ? "" : String(value).trim();
@@ -167,6 +170,32 @@
         return window.document || (typeof document === "undefined" ? null : document);
     }
 
+    function applyBootstrapState() {
+        if (bootstrapStateApplied) return;
+        bootstrapStateApplied = true;
+        const rootDocument = getRootDocument();
+        const element = rootDocument && rootDocument.getElementById("softoraCustomersBootstrap");
+        if (!element) return;
+        try {
+            const payload = JSON.parse(String(element.textContent || "{}"));
+            const mailStats = payload && payload.mailStats && typeof payload.mailStats === "object" ? payload.mailStats : {};
+            const roi = payload && payload.mailRoi && typeof payload.mailRoi === "object" ? payload.mailRoi : {};
+            const sentToday = readNonNegativeInteger(mailStats.sentToday);
+            const bounces = readNonNegativeInteger(mailStats.bounces);
+            const totalSent = readNonNegativeInteger(mailStats.totalSent);
+            const dealCount = readNonNegativeInteger(roi.dealCount);
+            if (sentToday !== null) lastTodaySentCount = sentToday;
+            if (bounces !== null) lastTodayBouncesCount = bounces;
+            if (totalSent !== null) {
+                lastStatsMailCount = totalSent;
+                lastRenderedMailCount = totalSent;
+            }
+            if (dealCount !== null && !roiDirtySinceLoad) roiDealsCount = dealCount;
+        } catch (_error) {
+            /* De live refresh blijft de veilige fallback. */
+        }
+    }
+
     function getFetch() {
         if (typeof window.fetch === "function") return window.fetch.bind(window);
         if (typeof fetch === "function") return fetch;
@@ -231,19 +260,35 @@
         return roiStateLoadPromise;
     }
 
-    function persistDealCount() {
+    function persistDealCount(options) {
+        const persistOptions = options || {};
+        const countSnapshot = roiDealsCount;
         const client = getUiStateClient();
-        if (!client) return Promise.resolve(null);
+        if (!client) {
+            roiNeedsRemoteSync = true;
+            return Promise.resolve(null);
+        }
+        roiNeedsRemoteSync = true;
         return client.set(ROI_STATE_SCOPE, {
             patch: {
                 [ROI_STATE_KEY]: JSON.stringify({
-                    dealCount: roiDealsCount,
+                    dealCount: countSnapshot,
                     updatedAt: new Date().toISOString()
                 })
             },
             source: "premium-database-mail-roi",
             actor: "Premium database"
+        }, {
+            keepalive: persistOptions.keepalive !== false,
+            timeoutMs: 10000
+        }).then(function (result) {
+            if (countSnapshot === roiDealsCount) {
+                roiNeedsRemoteSync = false;
+                roiDirtySinceLoad = false;
+            }
+            return result;
         }).catch(function (error) {
+            roiNeedsRemoteSync = true;
             if (typeof console !== "undefined" && typeof console.error === "function") console.error("Mail ROI opslaan mislukt:", error);
             return { ok: false, error: error };
         });
@@ -254,6 +299,23 @@
         if (!options || options.persist !== false) {
             roiDirtySinceLoad = true;
             void persistDealCount();
+        }
+    }
+
+    function flushPendingRoiSave() {
+        if (roiNeedsRemoteSync || roiDirtySinceLoad) void persistDealCount({ keepalive: true });
+    }
+
+    function bindRoiSaveLifecycle() {
+        if (roiSaveLifecycleBound) return;
+        roiSaveLifecycleBound = true;
+        addWindowListener("pagehide", flushPendingRoiSave);
+        addWindowListener("beforeunload", flushPendingRoiSave);
+        const rootDocument = getRootDocument();
+        if (rootDocument && typeof rootDocument.addEventListener === "function") {
+            rootDocument.addEventListener("visibilitychange", function () {
+                if (rootDocument.hidden) flushPendingRoiSave();
+            });
         }
     }
 
@@ -333,8 +395,13 @@
             element.textContent = "--";
             return;
         }
-        lastTodayBouncesCount = count;
-        element.textContent = count.toLocaleString("nl-NL");
+        // Bounces zijn een cumulatieve teller. Een tijdelijke lege/partiele
+        // backend-read mag een al bewezen totaal nooit zichtbaar verlagen.
+        const stableCount = lastTodayBouncesCount === null
+            ? count
+            : Math.max(lastTodayBouncesCount, count);
+        lastTodayBouncesCount = stableCount;
+        element.textContent = stableCount.toLocaleString("nl-NL");
     }
 
     function renderSystemMailCount(value, isLoading) {
@@ -358,6 +425,8 @@
     }
 
     function refreshTodaySentCount() {
+        const rootDocument = getRootDocument();
+        if (rootDocument && rootDocument.hidden) return Promise.resolve(lastTodaySentCount);
         const fetchImpl = getFetch();
         if (!fetchImpl) {
             renderTodaySentCount(lastTodaySentCount, true);
@@ -367,7 +436,7 @@
         todaySentRefreshPromise = fetchImpl(COLDMAIL_STATS_URL, {
             credentials: "same-origin",
             headers: { Accept: "application/json" },
-            cache: "no-store"
+            cache: "default"
         }).then(function (response) {
             return response.json().then(function (payload) {
                 return { response: response, payload: payload };
@@ -401,13 +470,17 @@
     }
 
     function bindTodaySentRefresh() {
+        applyBootstrapState();
         renderTodaySentCount(lastTodaySentCount, true);
         renderTodayBouncesCount(lastTodayBouncesCount, true);
         if (todaySentRefreshBound) return;
         todaySentRefreshBound = true;
         void refreshTodaySentCount();
         const interval = getInterval();
-        if (interval) interval(refreshTodaySentCount, TODAY_SENT_REFRESH_MS);
+        if (interval) interval(function () {
+            const rootDocument = getRootDocument();
+            if (!rootDocument || !rootDocument.hidden) void refreshTodaySentCount();
+        }, TODAY_SENT_REFRESH_MS);
         addWindowListener("focus", refreshTodaySentCount);
         addWindowListener("pageshow", refreshTodaySentCount);
         const rootDocument = getRootDocument();
@@ -435,6 +508,7 @@
 
     function bindRoiControls() {
         void loadPersistedDealCount();
+        bindRoiSaveLifecycle();
         if (roiControlsBound) return;
         const rootDocument = getRootDocument();
         if (!rootDocument || typeof rootDocument.querySelectorAll !== "function") return;
@@ -450,6 +524,7 @@
     }
 
     function render(customers, helpers) {
+        applyBootstrapState();
         bindRoiControls();
         bindTodaySentRefresh();
         const rootDocument = getRootDocument();

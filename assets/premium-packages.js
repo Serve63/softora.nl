@@ -2,12 +2,28 @@
     "use strict";
 
     var packageTabGroups = {
-        routes: ["routes"],
         website: ["bouwen", "onderhoud"],
         bedrijfssoftware: ["bedrijfssoftware", "bedrijfssoftware-onderhoud"],
         voicesoftware: ["voice-software", "voice-software-onderhoud"],
         chatbots: ["chatbots", "chatbots-onderhoud"]
     };
+
+    var lockedPackageTabs = {
+        bedrijfssoftware: true,
+        voicesoftware: true,
+        chatbots: true
+    };
+
+    function isLockedPackageTab(name, tabEl) {
+        return Boolean(
+            lockedPackageTabs[name] ||
+            (tabEl && (
+                tabEl.disabled ||
+                tabEl.getAttribute("aria-disabled") === "true" ||
+                tabEl.getAttribute("data-package-tab-locked") === "true"
+            ))
+        );
+    }
 
     function setActivePanels(name) {
         var panelIds = Array.isArray(packageTabGroups[name]) ? packageTabGroups[name] : [name];
@@ -27,8 +43,10 @@
     }
 
     function switchTab(name, tabEl) {
+        if (isLockedPackageTab(name, tabEl)) return false;
         setActivePanels(name);
         if (tabEl) setActiveTab(tabEl);
+        return true;
     }
 
     function bindPackageTabs() {
@@ -37,7 +55,9 @@
                 ? event.target.closest("[data-package-tab]")
                 : null;
             if (!tabEl) return;
-            switchTab(tabEl.getAttribute("data-package-tab"), tabEl);
+            if (!switchTab(tabEl.getAttribute("data-package-tab"), tabEl)) {
+                event.preventDefault();
+            }
         });
     }
 

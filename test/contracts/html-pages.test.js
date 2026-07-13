@@ -373,18 +373,29 @@ test('html page coordinator serves login pages without seo config or bootstrap r
   assert.match(res.body, /Inloggen/);
 });
 
-test('html page coordinator timeboxes protected premium bootstrap reads without late error logs', async () => {
+test('html page coordinator caps dashboard bootstrap reads without late error logs', async () => {
+  const coordinatorSource = fs.readFileSync(path.join(__dirname, '../../server/services/html-pages.js'), 'utf8');
+  assert.match(coordinatorSource, /dashboardPageBootstrapWaitMs = 1500/);
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-protected-timeout-'));
   const loggerInfos = [];
   const loggerErrors = [];
   fs.writeFileSync(
     path.join(pagesDir, 'premium-personeel-dashboard.html'),
-    '<!DOCTYPE html><html><head><title>Dashboard</title></head><body><main>Dashboard</main></body></html>'
+    [
+      '<!DOCTYPE html><html><head><title>Dashboard</title></head><body><main>Dashboard</main>',
+      '<div id="kpiRevenueYear"><!-- SOFTORA_DASHBOARD_TOTAL_REVENUE --></div>',
+      '<div id="kpiRecurringRevenue"><!-- SOFTORA_DASHBOARD_RECURRING_REVENUE --></div>',
+      '<div id="kpiTotalClients"><!-- SOFTORA_DASHBOARD_TOTAL_CLIENTS --></div>',
+      '<div id="revenueChart"><!-- SOFTORA_DASHBOARD_REVENUE_CHART --></div>',
+      '<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->',
+      '</body></html>',
+    ].join('')
   );
 
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
-    protectedPageBootstrapWaitMs: 5,
+    protectedPageBootstrapWaitMs: 2000,
+    dashboardPageBootstrapWaitMs: 250,
     logger: {
       info: (...args) => loggerInfos.push(args),
       error: (...args) => loggerErrors.push(args),
@@ -407,11 +418,12 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
     applySeoOverridesToHtml: (_fileName, html) => html,
     getPageBootstrapData: async () =>
       new Promise((_resolve, reject) => {
-        setTimeout(() => reject(new Error('late bootstrap failure')), 20);
+        setTimeout(() => reject(new Error('late bootstrap failure')), 300);
       }),
   });
 
   const res = createResponseRecorder();
+  const startedAt = Date.now();
 
   await coordinator.sendSeoManagedHtmlPageResponse(
     { originalUrl: '/premium-personeel-dashboard' },
@@ -419,10 +431,20 @@ test('html page coordinator timeboxes protected premium bootstrap reads without 
     () => {},
     'premium-personeel-dashboard.html'
   );
-  await new Promise((resolve) => setTimeout(resolve, 35));
+  const elapsedMs = Date.now() - startedAt;
+  await new Promise((resolve) => setTimeout(resolve, 75));
 
   assert.equal(res.statusCode, 200);
+  assert.ok(elapsedMs < 700, `dashboard bootstrap duurde ${elapsedMs}ms`);
   assert.match(res.body, /Dashboard/);
+  assert.match(res.body, /id="kpiRevenueYear">--<\/div>/);
+  assert.match(res.body, /id="kpiRecurringRevenue">--<\/div>/);
+  assert.match(res.body, /id="kpiTotalClients">--<script>/);
+  assert.match(res.body, /Actieve opdrachten tijdelijk niet geladen/);
+  assert.match(res.body, /id="softoraCustomersBootstrap" type="application\/json">/);
+  assert.match(res.body, /"source":"unavailable"/);
+  assert.match(res.body, /<span class="chart-label">Jan<\/span>/);
+  assert.doesNotMatch(res.body, /SOFTORA_DASHBOARD_TOTAL_REVENUE/);
   assert.equal(
     loggerInfos.some(
       (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'

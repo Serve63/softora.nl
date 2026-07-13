@@ -108,6 +108,41 @@ function createWebsiteGenerationHelpers(deps = {}) {
     };
   }
 
+  function normalizeWebsitePreviewOutreachProfile(value = {}) {
+    const raw = value && typeof value === 'object' ? value : {};
+    const name = truncateText(
+      normalizeString(raw.name || raw.senderName || raw.displayName || raw.fullName || ''),
+      100
+    );
+    const roleLabel = truncateText(
+      normalizeString(raw.roleLabel || raw.role || raw.title || raw.eyebrow || ''),
+      140
+    );
+    const source = truncateText(normalizeString(raw.source || ''), 100);
+    if (!name && !roleLabel) return null;
+    return {
+      name,
+      roleLabel,
+      source,
+    };
+  }
+
+  function formatWebsitePreviewOutreachProfileLock(profile) {
+    if (!profile || (!profile.name && !profile.roleLabel)) return '';
+    return [
+      'SOFTORA OUTREACH PROFILE LOCK (verplicht boven alle andere context):',
+      profile.name
+        ? `- Als de output een auteur-, profiel-, uitleg-, avatar- of afzenderblok toont, gebruik als zichtbare persoonsnaam exact: ${profile.name}.`
+        : '',
+      profile.roleLabel ? `- Gebruik als zichtbare rolregel/eyebrow exact: ${profile.roleLabel}.` : '',
+      '- Gebruik nooit "Softora", "Softora.nl", "Webdesign en software", de prospectnaam of een domeinnaam als persoonsnaam, auteur of profielnaam.',
+      '- Schrijf begeleidende uitleg in de ik-vorm vanuit deze persoon: "ik heb", "ik ben begonnen" en "ik heb meegenomen". Vermijd "we zijn begonnen" in dit blok.',
+      '- Deze lock wint van URL-scan, merknaam, prompttekst en fallback-context. Softora mag alleen als bedrijfsmerk voorkomen, nooit als persoonlijke afzendernaam.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
   function formatWebsitePreviewDesignDnaLock(scan = {}) {
     const dna = buildWebsitePreviewDesignDnaFromScan(scan);
     return [
@@ -172,12 +207,16 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const layoutHints = Array.isArray(scan.layoutHints) ? scan.layoutHints.filter(Boolean).slice(0, 8) : [];
     const referenceImageCount = Math.max(0, Number(scan.referenceImageCount || 0) || 0);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
+    const outreachProfile = normalizeWebsitePreviewOutreachProfile(
+      scan.softoraOutreachProfile || scan.outreachProfile
+    );
 
     return [
       'Bekijk eerst de website grondig op basis van de URL-scan hieronder: begrijp merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep. Gebruik deze scan en eventuele referentiebeelden alleen als moodboard/context, niet als layout-template.',
       referenceImageCount
         ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; behandel die uitsluitend als moodboard voor merkidentiteit, kleuren, sfeer en doelgroep.`
         : '',
+      formatWebsitePreviewOutreachProfileLock(outreachProfile),
       'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot alleen dient als moodboard voor merkidentiteit, branche, contentbasis, kleuren, sfeer en doelgroep, maar ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
       'NIEUW-DESIGN REGEL: maak nooit een letterlijke screenshot, crop, browserweergave of bijna-kopie van de huidige website. De output moet zichtbaar een nieuw ontworpen homepage zijn met eigen compositie, nieuwe sectie-opbouw, vernieuwde visuele hiërarchie en herkenbare maar opnieuw geïnterpreteerde merkstijl.',
       'FULL-PAGE FRAME REGEL: de volledige homepage moet binnen één afbeelding zichtbaar zijn van bovenste navigatie/hero tot en met de laatste footer/onderkant. De footer is verplicht en moet volledig zichtbaar onderaan in beeld staan met merk/contactinformatie. Snijd de onderkant nooit af, maak geen partial scrollshot of viewport-crop, en schaal of schrap tussenliggende content wanneer nodig zodat de footer en laatste CTA volledig in beeld blijven.',
@@ -584,6 +623,7 @@ ${text}
     buildWebsitePreviewBriefFromScan,
     buildWebsitePreviewDownloadFileName,
     buildWebsitePreviewPromptFromScan,
+    formatWebsitePreviewOutreachProfileLock,
     formatWebsitePreviewDesignDnaLock,
     ensureHtmlDocument,
     ensureStrictAnthropicHtml,

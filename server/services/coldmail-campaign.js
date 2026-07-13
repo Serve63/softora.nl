@@ -17,6 +17,12 @@ const {
   fitWebdesignPreviewForEmail,
   removeDecorativeWebdesignFrameForEmail,
 } = require('./coldmail-image-frame');
+const {
+  WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
+  WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  renderWebdesignEmailDocument,
+  renderWebdesignImageSection,
+} = require('./webdesign-email-renderer');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -32,6 +38,10 @@ const DEFAULT_COLDMAILING_SETTINGS_SCOPE = 'premium_coldmailing_settings';
 const DEFAULT_COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const DEFAULT_COLDMAIL_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
 const DEFAULT_COLDMAIL_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
+const DEFAULT_COLDMAIL_STATS_CACHE_SCOPE = 'premium_coldmail_stats_cache';
+const DEFAULT_COLDMAIL_STATS_CACHE_KEY = 'softora_coldmail_stats_cache_v1';
+const COLDMAIL_LIVE_STATS_MEMORY_TTL_MS = 30 * 1000;
+const COLDMAIL_LIVE_STATS_DURABLE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_COLDMAIL_CAMPAIGN_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_DAILY_SEND_LIMIT = 9;
 const DEFAULT_COLDMAIL_PACKAGE_DAILY_SEND_LIMIT = 81;
@@ -116,37 +126,34 @@ const COLDMAIL_OPT_OUT_TEXT_PREFIX = 'Geen webdesign willen ontvangen? Laat het 
 const COLDMAIL_UNSUBSCRIBE_PATH = '/afmelden';
 const COLDMAIL_PREVIEW_IMAGE_PATH = '/coldmailing/webdesign-foto';
 const DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL = 'https://www.softora.nl';
-const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'link';
+const DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY = 'attachment';
 const DEFAULT_COLDMAIL_PREVIEW_IMAGE_SECRET = 'softora-coldmail-preview-image-v2';
-const COLDMAIL_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
 const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   'Goedendag,',
   '',
-  'Afgelopen week kwam ik jullie website ({{website}}) tegen.',
+  'Afgelopen week kwam ik jullie website, {{website}}, tegen.',
   '',
-  'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+  'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
   '',
   'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
   '',
-  'Als je wilt, stuur ik je ook de online preview,',
-  'zodat je zelf door het ontwerp kunt scrollen.',
+  'Ik kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.',
   '',
-  'Laat me vooral weten of je dat zou willen.',
+  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wel lijkt het me tof om te horen wat je van het design vindt en wat er eventueel beter kan. Daar leer ik dan weer van!',
   '',
-  'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wél lijkt het me tof om te horen wat je van het design vindt en wat eventueel beter kan. Daar leer ik dan weer van.',
-  '',
-  'Je kunt het webdesign hier bekijken 👈',
+  'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
   '',
   '📍 {{stad}}',
 ].join('\n');
-const COLDMAIL_IMAGE_VISIBILITY_PS = 'Je kunt het webdesign hier bekijken 👈';
+const COLDMAIL_IMAGE_VISIBILITY_PS =
+  'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨';
 const COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN =
-  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?)/i;
-const COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH = 760;
+  /(?:PS:\s*(?:als het webdesign niet zichtbaar is,\s*klik op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in het scherm\.?|zie je het webdesign niet\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm\s*😊?|wordt het webdesign niet zichtbaar\?\s*klik dan even op ['"‘’“”]?afbeeldingen tonen['"‘’“”]? ergens in je scherm,?\s*of open het via deze link:\s*(?:https?:\/\/[^\s]+\/)?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s]+)?(?:\s*👈)?|wordt het webdesign niet zichtbaar\?\s*(?:open|bekijk) het via hier\s*👈?)|je kunt het webdesign hier bekijken\s*👈?|webdesign niet zichtbaar\?\s*check het hier\s*👈?|is het design niet zichtbaar\?\s*bekijk het hier\s*👈?|lukt het niet om de bijlage te openen\?\s*dan kun je het webdesign ook via deze link bekijken\s*🎨)/i;
+const COLDMAIL_EMAIL_CONTENT_MAX_WIDTH = 600;
 const COLDMAIL_TEST_RECIPIENT_EMAILS = Object.freeze([
   'servec321@gmail.com',
   'serve@softora.nl',
@@ -313,7 +320,19 @@ const BLOCKING_INSTANTLY_COLDMAIL_STATUSES = new Set(['bounced', 'unsubscribed',
 function isExpectedDnsMiss(error) {
   return Boolean(
     error &&
-      ['EBADNAME', 'ENODATA', 'ENODOMAIN', 'ENONAME', 'ENOTFOUND'].includes(String(error.code || '').toUpperCase())
+      [
+        'EBADNAME',
+        'ECONNREFUSED',
+        'EAI_AGAIN',
+        'ENODATA',
+        'ENODOMAIN',
+        'ENONAME',
+        'ENOTFOUND',
+        'EREFUSED',
+        'ESERVFAIL',
+        'ETIMEOUT',
+        'ETIMEDOUT',
+      ].includes(String(error.code || '').toUpperCase())
   );
 }
 
@@ -406,6 +425,7 @@ function createColdmailCampaignService(deps = {}) {
     now = () => new Date(),
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     webdesignPreparationCoordinator: initialWebdesignPreparationCoordinator = null,
+    mailReadySnapshotService: initialMailReadySnapshotService = null,
     loadPreviewImageSharp = loadColdmailPreviewSharpModule,
   } = deps;
 
@@ -445,7 +465,11 @@ function createColdmailCampaignService(deps = {}) {
   const senderSmtpTransporters = new Map();
   let coldmailCampaignSendPromise = null;
   let webdesignPreparationCoordinator = initialWebdesignPreparationCoordinator;
+  let mailReadySnapshotService = initialMailReadySnapshotService;
   let coldmailPhotoMapCache = null;
+  let coldmailLiveStatsCache = null;
+  let coldmailLiveStatsPromise = null;
+  let coldmailLiveStatsDurableReadPromise = null;
   const mailboxAccountService = createMailboxService({
     mailConfig: {
       smtpHost,
@@ -1165,18 +1189,83 @@ function createColdmailCampaignService(deps = {}) {
   function buildPublicWebdesignPreviewPath(row, id) {
     const slug = slugifyWebdesignCompany(getRowCompany(row), slugifyWebdesignCompany(id, 'uw-bedrijf'));
     const directIdentifier = normalizeString(id);
-    const directQuery = directIdentifier ? `?cid=${encodeURIComponent(directIdentifier)}` : '';
-    return `/webdesign/${slug}${directQuery}`;
+    const query = new URLSearchParams();
+    if (directIdentifier) query.set('cid', directIdentifier);
+    const queryString = query.toString();
+    return `/webdesign/${slug}${queryString ? `?${queryString}` : ''}`;
+  }
+
+  function inferPublicWebdesignPreviewSenderKey(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    const normalized = raw
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const compact = normalized.replace(/[^a-z0-9]+/g, '');
+    if (
+      normalized.includes('martijn') ||
+      compact.includes('martijnvandeven') ||
+      normalizeEmailAddress(raw) === 'contact.venvisuals@gmail.com'
+    ) {
+      return 'martijn';
+    }
+    if (
+      normalized.includes('serve') ||
+      normalized.includes('creusen') ||
+      compact.includes('servecreusen')
+    ) {
+      return 'serve';
+    }
+    return '';
+  }
+
+  function getPublicWebdesignPreviewSenderKey(row, input = {}) {
+    const candidates = [
+      input.senderProfileKey,
+      input.senderProfile,
+      input.profileKey,
+      input.senderKey,
+      input.senderEmail,
+      input.senderDisplayName,
+      input.senderName,
+      input.fromName,
+      input.mailboxAccount,
+      input.accountEmail,
+      input.fromEmail,
+      input.body,
+      input.text,
+      input.renderedBody,
+      SENDER_DISPLAY_NAMES[normalizeEmailAddress(input.senderEmail)],
+      SENDER_DISPLAY_NAMES[normalizeEmailAddress(input.accountEmail)],
+      SENDER_DISPLAY_NAMES[normalizeEmailAddress(input.fromEmail)],
+      row && row.senderProfileKey,
+      row && row.instantlySenderProfileKey,
+      row && row.senderEmail,
+      row && row.lastColdmailSenderEmail,
+      row && row.sentFromEmail,
+      row && row.mailboxAccount,
+      row && row.fromEmail,
+    ];
+    for (const candidate of candidates) {
+      const key = inferPublicWebdesignPreviewSenderKey(candidate);
+      if (key) return key;
+    }
+    return '';
   }
 
   function buildPublicWebdesignPreviewUrl(row, id, input = {}) {
     const baseUrl =
       normalizePublicBaseUrl(input.webdesignPublicBaseUrl) ||
       DEFAULT_PUBLIC_WEBDESIGN_PREVIEW_BASE_URL;
+    const path = buildPublicWebdesignPreviewPath(row, id);
+    const senderKey = getPublicWebdesignPreviewSenderKey(row, input);
     try {
-      return new URL(buildPublicWebdesignPreviewPath(row, id), baseUrl).toString();
+      const url = new URL(path, baseUrl);
+      if (senderKey) url.searchParams.set('sender', senderKey);
+      return url.toString();
     } catch (_error) {
-      return `${baseUrl}${buildPublicWebdesignPreviewPath(row, id)}`;
+      return `${baseUrl}${path}${senderKey ? `${path.includes('?') ? '&' : '?'}sender=${encodeURIComponent(senderKey)}` : ''}`;
     }
   }
 
@@ -3644,6 +3733,14 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
+  function isSoftoraColdmailCentralGuardGroup(group) {
+    const provider = normalizeString(group && group.provider).toLowerCase();
+    const channel = normalizeString(group && group.channel).toLowerCase();
+    if (provider && provider !== 'softora') return false;
+    if (channel && channel !== 'coldmail') return false;
+    return true;
+  }
+
   function summarizeColdmailCentralGuardLiveStats(groups, options = {}) {
     const recipientCounts = {};
     const todayRecipientCounts = {};
@@ -3655,6 +3752,7 @@ function createColdmailCampaignService(deps = {}) {
     let lastSenderEmail = '';
 
     (Array.isArray(groups) ? groups : []).forEach((group) => {
+      if (!isSoftoraColdmailCentralGuardGroup(group)) return;
       const source = normalizeString(group && group.source).toLowerCase();
       const actor = normalizeString(group && group.actor).toLowerCase();
       if (
@@ -3712,7 +3810,8 @@ function createColdmailCampaignService(deps = {}) {
       const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
         provider: 'softora',
         channel: 'coldmail',
-        maxRows: 20_000,
+        keyType: 'email',
+        maxRows: 5_000,
       });
       return summarizeColdmailCentralGuardLiveStats(groups);
     } catch (error) {
@@ -3739,8 +3838,19 @@ function createColdmailCampaignService(deps = {}) {
       const messages = await dataOpsStore.listMailboxMessages({
         accountEmails,
         folders: ['inbox'],
-        maxRows: 10000,
+        maxRows: 1000,
+        bounceCandidatesOnly: true,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
       });
+      if (!Array.isArray(messages)) {
+        return {
+          ...summarizeColdmailMailboxBounceStats([]),
+          available: false,
+          unavailableReason: 'mailbox_bounce_read_failed',
+        };
+      }
       return summarizeColdmailMailboxBounceStats(messages);
     } catch (error) {
       logger.warn('[ColdmailLiveStats][mailbox-bounces]', error && error.message ? error.message : error);
@@ -3752,7 +3862,7 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  async function getColdmailLiveStats() {
+  async function loadFreshColdmailLiveStats() {
     const [sendGuardState, customerState, centralGuardStats, mailboxBounceStats] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
@@ -3847,6 +3957,160 @@ function createColdmailCampaignService(deps = {}) {
         updatedAt: now().toISOString(),
       },
     };
+  }
+
+  function parseColdmailLiveStatsCache(rawValue) {
+    try {
+      const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
+      if (!parsed || typeof parsed !== 'object' || parsed.ok !== true || !parsed.stats || typeof parsed.stats !== 'object') return null;
+      const updatedAtMs = Date.parse(normalizeString(parsed.stats.updatedAt));
+      const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+      if (!updatedAtMs || normalizeString(parsed.stats.dateKey) !== expectedDateKey) return null;
+      if (now().getTime() - updatedAtMs > COLDMAIL_LIVE_STATS_DURABLE_TTL_MS) return null;
+      return parsed;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function readDurableColdmailLiveStats() {
+    try {
+      const state = await getUiStateValues(DEFAULT_COLDMAIL_STATS_CACHE_SCOPE, {
+        uiStateReadTimeoutMs: 900,
+        suppressTransientReadFailureLog: true,
+        suppressReadFailureCooldown: true,
+        suppressReadFailureLog: true,
+        readFailureCooldownScope: DEFAULT_COLDMAIL_STATS_CACHE_SCOPE,
+      });
+      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+      return parseColdmailLiveStatsCache(values[DEFAULT_COLDMAIL_STATS_CACHE_KEY]);
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][durable-read]', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
+  async function persistDurableColdmailLiveStats(payload) {
+    try {
+      await setUiStateValues(
+        DEFAULT_COLDMAIL_STATS_CACHE_SCOPE,
+        { [DEFAULT_COLDMAIL_STATS_CACHE_KEY]: JSON.stringify(payload) },
+        { source: 'coldmail-live-stats-cache', actor: 'Coldmail statistieken' }
+      );
+      return true;
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][durable-write]', error && error.message ? error.message : error);
+      return false;
+    }
+  }
+
+  function hasReliableColdmailLiveTotals(payload) {
+    const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
+    const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+    return stats.reliable === true &&
+      normalizeString(stats.dateKey) === expectedDateKey &&
+      Number.isFinite(Number(stats.systemTotalSent ?? stats.totalSent));
+  }
+
+  function preserveReliableColdmailLiveStats(payload, previousPayload) {
+    if (!hasReliableColdmailLiveTotals(previousPayload)) return payload;
+    const stats = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : {};
+    const previous = previousPayload.stats;
+    const mergedStats = { ...stats };
+    let changed = false;
+    if (!hasReliableColdmailLiveTotals(payload)) {
+      [
+        'sentToday',
+        'systemSentToday',
+        'centralGuardSentToday',
+        'systemTotalSent',
+        'centralGuardTotalSent',
+        'totalSent',
+        'webdesignTotalSent',
+        'webdesignSentToday',
+        'lastSuccessfulSendAt',
+        'lastSenderEmail',
+      ].forEach((field) => {
+        mergedStats[field] = previous[field];
+      });
+      mergedStats.reliable = true;
+      mergedStats.source = previous.source;
+      mergedStats.authoritativeSource = previous.authoritativeSource;
+      mergedStats.authoritativeStatsStale = true;
+      mergedStats.authoritativeStatsUpdatedAt = previous.authoritativeStatsUpdatedAt || previous.updatedAt || '';
+      changed = true;
+    }
+    if (stats.mailboxBounceStatsAvailable === false && previous.mailboxBounceStatsAvailable !== false) {
+      [
+        'bounces',
+        'totalBounces',
+        'bounceStatsSource',
+        'mailboxBounces',
+        'mailboxBouncesToday',
+        'mailboxBounceStatsAvailable',
+        'mailboxBounceStatsUnavailableReason',
+        'bounceTypes',
+        'bounceItems',
+        'bouncesToday',
+        'todayBounces',
+        'bounceTypesToday',
+        'bounceItemsToday',
+      ].forEach((field) => {
+        mergedStats[field] = previous[field];
+      });
+      changed = true;
+    }
+    return changed ? { ...payload, stats: mergedStats } : payload;
+  }
+
+  function refreshColdmailLiveStats() {
+    if (!coldmailLiveStatsPromise) {
+      coldmailLiveStatsPromise = loadFreshColdmailLiveStats()
+        .then(async (payload) => {
+          const stablePayload = preserveReliableColdmailLiveStats(
+            payload,
+            coldmailLiveStatsCache && coldmailLiveStatsCache.payload
+          );
+          coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload: stablePayload };
+          await persistDurableColdmailLiveStats(stablePayload);
+          return stablePayload;
+        })
+        .finally(() => {
+          coldmailLiveStatsPromise = null;
+        });
+    }
+    return coldmailLiveStatsPromise;
+  }
+
+  async function getColdmailLiveStats() {
+    const cachedAtMs = Number(coldmailLiveStatsCache && coldmailLiveStatsCache.cachedAtMs) || 0;
+    const cacheAgeMs = cachedAtMs ? now().getTime() - cachedAtMs : Number.POSITIVE_INFINITY;
+    if (coldmailLiveStatsCache && cacheAgeMs < COLDMAIL_LIVE_STATS_MEMORY_TTL_MS) {
+      return coldmailLiveStatsCache.payload;
+    }
+    if (coldmailLiveStatsCache) {
+      refreshColdmailLiveStats().catch((error) => {
+        logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
+      });
+      return coldmailLiveStatsCache.payload;
+    }
+    if (!coldmailLiveStatsDurableReadPromise) {
+      coldmailLiveStatsDurableReadPromise = readDurableColdmailLiveStats().finally(() => {
+        coldmailLiveStatsDurableReadPromise = null;
+      });
+    }
+    const durablePayload = await coldmailLiveStatsDurableReadPromise;
+    if (durablePayload) {
+      coldmailLiveStatsCache = {
+        cachedAtMs: Date.parse(normalizeString(durablePayload.stats && durablePayload.stats.updatedAt)) || now().getTime(),
+        payload: durablePayload,
+      };
+      refreshColdmailLiveStats().catch((error) => {
+        logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
+      });
+      return durablePayload;
+    }
+    return refreshColdmailLiveStats();
   }
 
   function summarizeColdmailSenderQuota(quota = {}) {
@@ -4135,7 +4399,14 @@ function createColdmailCampaignService(deps = {}) {
 
   function normalizeColdmailWebdesignImageDeliveryOverride(value) {
     const normalized = normalizeString(value).toLowerCase();
-    if (normalized === 'cid' || normalized === 'remote' || normalized === 'link') return normalized;
+    if (
+      normalized === 'attachment' ||
+      normalized === 'cid' ||
+      normalized === 'remote' ||
+      normalized === 'link'
+    ) {
+      return normalized;
+    }
     return '';
   }
 
@@ -5597,12 +5868,10 @@ function createColdmailCampaignService(deps = {}) {
         database: state.config.database,
         senderEmail,
         specialAction: state.config.specialAction,
+        webdesignImageDelivery: 'attachment',
+        imageDelivery: 'attachment',
         durationDays: state.config.durationDays,
         radiusKm: state.config.radiusKm,
-        webdesignImageDelivery:
-          normalizeColdmailWebdesignImageDeliveryOverride(state.config.webdesignImageDelivery) ||
-          normalizeColdmailWebdesignImageDeliveryOverride(settings.webdesignImageDelivery) ||
-          undefined,
         mode: 'mail',
         testMode: false,
         publicBaseUrl: input.publicBaseUrl,
@@ -5886,7 +6155,12 @@ function createColdmailCampaignService(deps = {}) {
   async function isDeliverableEmailDomain(email) {
     const domain = getEmailDomain(email);
     if (!domain) return false;
-    return Boolean(await resolveEmailDomain(domain));
+    try {
+      return Boolean(await resolveEmailDomain(domain));
+    } catch (error) {
+      if (isExpectedDnsMiss(error)) return false;
+      throw error;
+    }
   }
 
   function isPersonalMailboxDomain(email) {
@@ -5997,7 +6271,14 @@ function createColdmailCampaignService(deps = {}) {
       mode === 'call' ? await getUiStateValues(customerDbScope) : state;
     const customerValues =
       customerState && typeof customerState.values === 'object' ? customerState.values : {};
-    const customerRows = parseDatabaseRows(customerValues);
+    let customerRows = parseDatabaseRows(customerValues);
+    if (mode === 'mail' && mailReadySnapshotService && typeof mailReadySnapshotService.buildMailReadySnapshot === 'function') {
+      const snapshot = await mailReadySnapshotService.buildMailReadySnapshot({ limit: 3000, offset: 0 });
+      if (!snapshot || snapshot.ok !== true || !Array.isArray(snapshot.customers)) {
+        throw new Error('Mailklare voorraad kon niet veilig worden geladen; verzenden is gestopt.');
+      }
+      customerRows = snapshot.customers;
+    }
     let rows = [];
     if (mode === 'call') {
       rows = mergeColdcallingRowsWithCustomerRows(
@@ -6683,7 +6964,8 @@ function createColdmailCampaignService(deps = {}) {
     const configured = normalizeString(env.COLDMAIL_WEBDESIGN_IMAGE_DELIVERY || env.WEBDESIGN_IMAGE_DELIVERY).toLowerCase();
     const value = explicit || configured || DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
     if (['cid', 'inline', 'embedded'].includes(value)) return 'cid';
-    if (['remote', 'attachment', 'attachments'].includes(value)) return 'remote';
+    if (['attachment', 'attachments', 'attachment-only', 'attachment_only'].includes(value)) return 'attachment';
+    if (value === 'remote') return 'remote';
     if (['link', 'link-only', 'link_only', 'none', 'off', 'false', '0'].includes(value)) return 'link';
     return DEFAULT_COLDMAIL_WEBDESIGN_IMAGE_DELIVERY;
   }
@@ -6882,7 +7164,9 @@ function createColdmailCampaignService(deps = {}) {
     };
     const attachments = [
       buildAttachment(webdesignImage, webdesignPhoto, 'webdesign'),
-      buildAttachment(mockupImage, webdesignPhoto.mockup, 'device-mockup'),
+      options.includeMockup === false
+        ? null
+        : buildAttachment(mockupImage, webdesignPhoto.mockup, 'device-mockup'),
     ].filter(Boolean);
     return attachments.length ? attachments : undefined;
   }
@@ -6918,9 +7202,35 @@ function createColdmailCampaignService(deps = {}) {
     if (!publicLink.href) {
       return escapeHtml(COLDMAIL_IMAGE_VISIBILITY_PS);
     }
-    return `Je kunt het webdesign <a href="${escapeHtmlAttribute(
+    return `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${escapeHtmlAttribute(
       publicLink.href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier</a> bekijken 👈`;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link</a> bekijken 🎨`;
+  }
+
+  function renderColdmailDomainToken(rawValue) {
+    const value = normalizeString(rawValue).replace(/[.,;:!?]+$/g, '');
+    if (!value || !/\.[a-z]{2,}(?:\/|$)/i.test(value)) return escapeHtml(rawValue);
+    const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    return `<a href="${escapeHtmlAttribute(href)}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">${escapeHtml(value.replace(/^https?:\/\//i, ''))}</a>${escapeHtml(String(rawValue || '').slice(value.length))}`;
+  }
+
+  function renderColdmailHtmlText(line) {
+    const source = String(line || '');
+    const domainPattern = /(^|[\s(])((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})(?:\/[^\s<>()]*)?)/gi;
+    let html = '';
+    let lastIndex = 0;
+    for (const match of source.matchAll(domainPattern)) {
+      const prefix = match[1] || '';
+      const token = match[2] || '';
+      const tokenStart = (match.index || 0) + prefix.length;
+      const previousChar = tokenStart > 0 ? source[tokenStart - 1] : '';
+      if (previousChar === '@') continue;
+      html += escapeHtml(source.slice(lastIndex, tokenStart));
+      html += renderColdmailDomainToken(token);
+      lastIndex = tokenStart + token.length;
+    }
+    html += escapeHtml(source.slice(lastIndex));
+    return html;
   }
 
   function renderColdmailHtmlLine(line, options = {}) {
@@ -6928,7 +7238,7 @@ function createColdmailCampaignService(deps = {}) {
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(cleanLine, options);
     }
-    return escapeHtml(cleanLine);
+    return renderColdmailHtmlText(cleanLine);
   }
 
   function isColdmailLinkOnlyImageArtifactLine(line) {
@@ -6969,21 +7279,40 @@ function createColdmailCampaignService(deps = {}) {
     throw error;
   }
 
+  function assertColdmailAttachmentOnlyMail(mail = {}) {
+    const html = String(mail.html || '');
+    const attachments = Array.isArray(mail.attachments) ? mail.attachments : [];
+    const attachment = attachments[0];
+    const invalid =
+      /<img\b/i.test(html) ||
+      /\bcid:/i.test(html) ||
+      /\/coldmailing\/webdesign-foto\?t=/i.test(html) ||
+      attachments.length !== 1 ||
+      normalizeString(attachment && attachment.contentDisposition).toLowerCase() !== 'attachment' ||
+      Boolean(attachment && attachment.cid);
+    if (!invalid) return;
+    const error = new Error('Attachment-only webdesignmail bevat inline beeld of geen enkele geldige designbijlage.');
+    error.code = 'COLDMAIL_WEBDESIGN_ATTACHMENT_ONLY_VIOLATION';
+    error.status = 500;
+    throw error;
+  }
+
   function toHtml(text, options = {}) {
+    const paragraphStyle = 'margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;';
     const body = normalizeString(text)
       .split(/\n{2,}/)
       .map((paragraph) => {
         const cleanParagraph = normalizeString(paragraph);
         if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanParagraph)) {
-          return `<p>${renderImageVisibilityPsHtmlLine(cleanParagraph, options)}</p>`;
+          return `<p style="${paragraphStyle}">${renderImageVisibilityPsHtmlLine(cleanParagraph, options)}</p>`;
         }
-        return `<p>${paragraph
+        return `<p style="${paragraphStyle}">${paragraph
             .split('\n')
             .map((line) => renderColdmailHtmlLine(line, options))
             .join('<br>')}</p>`;
       })
       .join('\n');
-    return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
+    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
   }
 
   function getWebdesignPhotoSource(photo) {
@@ -7010,13 +7339,174 @@ function createColdmailCampaignService(deps = {}) {
   function isApprovedWebdesignMockupRecord(photo) {
     return isResolvableWebsitePhotoValue(getWebdesignMockupSource(photo));
   }
+  function collectPreviewImageDataOpsIdentifiers(payload = {}, row = null, photo = null) {
+    const values = [
+      payload.id,
+      payload.email,
+      row && (row.id || row.customerId || row.databaseId),
+      row && (row.identityKey || row.identity_key),
+      row && getRowCompany(row),
+      row && getRowDomain(row),
+      photo && (photo.id || photo.customerId || photo.customer_id),
+      photo && photo.identityKey,
+      photo && (photo.websitePhotoName || photo.photoName || photo.fileName),
+      photo && (photo.websiteMockupName || photo.mockupName),
+    ];
+    if (row) values.push(...buildRowIdentityKeys(row));
+    return Array.from(new Set(values.map(normalizeString).filter(Boolean)));
+  }
+
+  function getDomainFromEmail(value) {
+    const email = normalizeEmailAddress(value);
+    const domain = email.includes('@') ? email.split('@').pop() : '';
+    return normalizeString(domain).replace(/^www\./i, '');
+  }
+
+  function collectPreviewImageCustomerIdentityLookupKeys(payload = {}, row = null) {
+    const keys = [];
+    const seen = new Set();
+    const add = (type, value) => {
+      const keyType = normalizeString(type).toLowerCase();
+      const keyValue = normalizeString(value).toLowerCase();
+      const id = `${keyType}:${keyValue}`;
+      if (!keyType || !keyValue || seen.has(id)) return;
+      seen.add(id);
+      keys.push({ type: keyType, value: keyValue });
+    };
+    const email = normalizeEmailAddress(
+      payload.email ||
+        (row && (row.email || row.contactEmail || row.mail))
+    );
+    add('email', email);
+    add('domain', getDomainFromEmail(email));
+    add('domain', getRowDomain(row || {}));
+    return keys;
+  }
+
+  function collectPreviewImageCustomerMatchTerms(payload = {}, row = null, photo = null) {
+    const values = [
+      payload.id,
+      payload.email,
+      getDomainFromEmail(payload.email),
+      row && (row.id || row.customerId || row.databaseId),
+      row && getRowEmail(row),
+      row && getRowDomain(row),
+      row && getRowCompany(row),
+      photo && (photo.id || photo.customerId || photo.customer_id),
+      photo && photo.identityKey,
+    ];
+    return new Set(values.map(normalizeString).map((value) => value.toLowerCase()).filter(Boolean));
+  }
+
+  function customerMatchesPreviewImageTerms(customer, terms) {
+    if (!customer || !terms || !terms.size) return false;
+    const values = [
+      customer.id,
+      customer.customerId,
+      customer.databaseId,
+      getRowEmail(customer),
+      getRowDomain(customer),
+      getDomainFromEmail(getRowEmail(customer)),
+      getRowCompany(customer),
+      customer.identityKey,
+    ].map(normalizeString).map((value) => value.toLowerCase()).filter(Boolean);
+    return values.some((value) => terms.has(value));
+  }
+
+  async function collectPreviewImageExpandedDataOpsIdentifiers(payload = {}, row = null, photo = null) {
+    const identifiers = new Set(collectPreviewImageDataOpsIdentifiers(payload, row, photo));
+    if (!dataOpsStore) return Array.from(identifiers);
+
+    if (typeof dataOpsStore.listCustomerIdentityKeys === 'function') {
+      const keys = collectPreviewImageCustomerIdentityLookupKeys(payload, row);
+      if (keys.length) {
+        try {
+          const result = await dataOpsStore.listCustomerIdentityKeys(keys);
+          if (result && result.ok && Array.isArray(result.data)) {
+            result.data.forEach((item) => {
+              const customerId = normalizeString(item && (item.customer_id || item.customerId));
+              if (customerId) identifiers.add(customerId);
+            });
+          }
+        } catch (error) {
+          if (logger && typeof logger.warn === 'function') {
+            logger.warn('[Coldmail][preview-image-identity-fallback]', error?.message || error);
+          }
+        }
+      }
+    }
+
+    if (typeof dataOpsStore.listCustomers === 'function') {
+      const terms = collectPreviewImageCustomerMatchTerms(payload, row, photo);
+      try {
+        const customers = await dataOpsStore.listCustomers({
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+          suppressStaleReadCacheLog: true,
+        });
+        (Array.isArray(customers) ? customers : []).forEach((customer) => {
+          if (!customerMatchesPreviewImageTerms(customer, terms)) return;
+          const customerId = normalizeString(customer && (customer.id || customer.customerId || customer.databaseId));
+          if (customerId) identifiers.add(customerId);
+          buildRowIdentityKeys(customer).forEach((identityKey) => {
+            if (identityKey) identifiers.add(identityKey);
+          });
+          const domain = getRowDomain(customer);
+          if (domain) identifiers.add(domain);
+          const company = getRowCompany(customer);
+          if (company) identifiers.add(company);
+        });
+      } catch (error) {
+        if (logger && typeof logger.warn === 'function') {
+          logger.warn('[Coldmail][preview-image-customer-fallback]', error?.message || error);
+        }
+      }
+    }
+
+    return Array.from(identifiers).map(normalizeString).filter(Boolean);
+  }
+
+  async function resolvePreviewImageFromDataOps(payload = {}, row = null, photo = null) {
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') return null;
+    const identifiers = await collectPreviewImageExpandedDataOpsIdentifiers(payload, row, photo);
+    if (!identifiers.length) return null;
+    let entries = null;
+    try {
+      entries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+        identifiers,
+        maxMatches: 12,
+        expiresInSeconds: 24 * 60 * 60,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
+        suppressStaleReadCacheLog: true,
+      });
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[Coldmail][preview-image-dataops-fallback]', error?.message || error);
+      }
+      return null;
+    }
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) return null;
+    const expectedIds = new Set(identifiers.map((value) => value.toLowerCase()));
+    const preferred =
+      list.find((entry) => expectedIds.has(normalizeString(entry && entry.customerId).toLowerCase())) ||
+      list.find((entry) => expectedIds.has(normalizeString(entry && entry.identityKey).toLowerCase())) ||
+      list[0];
+    const source = payload.type === 'mockup'
+      ? normalizeString(preferred && preferred.websiteMockupUrl)
+      : normalizeString(preferred && preferred.websitePhotoUrl);
+    if (!source) return null;
+    return resolveImageAttachment(source);
+  }
+
 
   function appendWebdesignImageHtml(html, attachment, options = {}) {
     const imageSrc = normalizeString(attachment && (attachment.src || (attachment.cid ? `cid:${attachment.cid}` : '')));
     if (!attachment || !imageSrc) return html;
     const optOutText = normalizeString(options.optOutText || '');
     const optOutUrl = normalizeString(options.optOutUrl || '');
-    const mockupCaption = normalizeString(options.mockupCaption || COLDMAIL_MOCKUP_CAPTION);
     const optOutHtml = optOutText
       ? `\n<p style="margin:7px 0 0 0;font-size:11px;line-height:1.35;color:#9ca3af;">${
           optOutUrl
@@ -7024,25 +7514,11 @@ function createColdmailCampaignService(deps = {}) {
             : escapeHtml(optOutText)
         }</p>`
       : '';
-    const emailImageMaxWidth = Math.min(COLDMAIL_DESKTOP_IMAGE_MAX_WIDTH, 640);
-    const renderEmailImageTable = (image, alt, margin) => {
-      const src = normalizeString(image && (image.src || (image.cid ? `cid:${image.cid}` : '')));
-      if (!src) return '';
-      return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td style="padding:0;margin:0;width:100%;font-size:0;line-height:0;overflow:visible;"><img src="${escapeHtml(
-        src
-      )}" alt="${escapeHtml(
-        alt
-      )}" width="${emailImageMaxWidth}" style="display:block;width:100%;max-width:${emailImageMaxWidth}px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
-    };
-    const previewBlockHtml = renderEmailImageTable(attachment, attachment.alt || 'Webdesign', '24px 0 0 0');
-    const mockupHtml = attachment.mockup && normalizeString(attachment.mockup.src || (attachment.mockup.cid ? `cid:${attachment.mockup.cid}` : ''))
-      ? `\n<p style="margin:20px 0 7px 0;font-size:16px;line-height:1.45;color:#1a1a2e;font-weight:700;">${escapeHtml(mockupCaption)}</p>${renderEmailImageTable(
-          attachment.mockup,
-          attachment.mockup.alt || 'Device mockup',
-          '0'
-        )}`
-      : '';
-    const imageBlockHtml = `${previewBlockHtml}${mockupHtml}`;
+    const imageBlockHtml = renderWebdesignImageSection(attachment, {
+      mockupImage: attachment.mockup,
+      caption: COLDMAIL_MOCKUP_CAPTION,
+      margin: '24px 0 0 0',
+    });
     return `${html}${imageBlockHtml}${optOutHtml}`;
   }
 
@@ -8161,7 +8637,9 @@ function createColdmailCampaignService(deps = {}) {
     const source = payload.type === 'mockup'
       ? (isApprovedWebdesignMockupRecord(photo) ? getWebdesignMockupSource(photo) : '')
       : getWebdesignPhotoSource(photo);
-    const image = await resolveImageAttachment(source);
+    const image =
+      await resolveImageAttachment(source) ||
+      await resolvePreviewImageFromDataOps(payload, row, photo);
     if (!image) {
       const error = new Error('Deze foto is niet meer beschikbaar.');
       error.code = 'PREVIEW_IMAGE_NOT_FOUND';
@@ -8438,7 +8916,11 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      if (shouldIncludeWebdesignPhoto && !webdesignPhoto.mockup) {
+      if (
+        shouldIncludeWebdesignPhoto &&
+        webdesignImageDelivery !== 'attachment' &&
+        !webdesignPhoto.mockup
+      ) {
         failed.push({
           id: item.id,
           bedrijf: getRowCompany(row),
@@ -8456,13 +8938,14 @@ function createColdmailCampaignService(deps = {}) {
       let remoteWebdesignAttachment = null;
       let remoteMockupAttachment = null;
       const shouldSendWebdesignImages = Boolean(webdesignPhoto && webdesignImageDelivery !== 'link');
+      const shouldPrepareMockup = shouldSendWebdesignImages && webdesignImageDelivery !== 'attachment';
       if (shouldSendWebdesignImages) {
         const preparedWebdesignImage = await preparePreviewImageForEmail(webdesignPhoto, 'webdesign');
-        const preparedMockupImage = webdesignPhoto.mockup
+        const preparedMockupImage = shouldPrepareMockup && webdesignPhoto.mockup
           ? await preparePreviewImageForEmail(webdesignPhoto.mockup, 'mockup')
           : null;
         preparedWebdesignAttachment = mergePreparedImage(webdesignPhoto, preparedWebdesignImage, 'webdesign');
-        preparedMockupAttachment = webdesignPhoto.mockup
+        preparedMockupAttachment = shouldPrepareMockup && webdesignPhoto.mockup
           ? mergePreparedImage(webdesignPhoto.mockup, preparedMockupImage, 'device-mockup')
           : null;
         webdesignPhotoForHtml = {
@@ -8504,33 +8987,41 @@ function createColdmailCampaignService(deps = {}) {
       const htmlBase = appendHiddenColdmailReferenceHtml(
         toHtml(baseText, {
           senderEmail,
-          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, publicWebdesignPreviewId, input),
+          webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, publicWebdesignPreviewId, {
+            ...input,
+            senderEmail,
+            senderDisplayName: getSenderDisplayName(senderEmail, smtpAccount),
+            text,
+            renderedBody: text,
+          }),
         }),
         reference
       );
-      const htmlWithContent = shouldSendWebdesignImages
+      const shouldRenderWebdesignImages =
+        shouldSendWebdesignImages && webdesignImageDelivery !== 'attachment';
+      const htmlWithContent = shouldRenderWebdesignImages
         ? appendWebdesignImageHtml(htmlBase, webdesignPhotoForHtml, {
             optOutText: '',
             optOutUrl: '',
           })
         : htmlBase;
-      const html = htmlWithContent;
-      const attachments = shouldSendWebdesignImages
+      const html = renderWebdesignEmailDocument(htmlWithContent);
+      const attachments = shouldSendWebdesignImages && webdesignImageDelivery === 'cid'
         ? buildWebdesignImageAttachments(
             webdesignPhoto,
-            webdesignImageDelivery === 'cid'
-              ? {
-                  inline: true,
-                  webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
-                  mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
-                }
-              : {
-                  inline: false,
-                  webdesignImage: remoteWebdesignAttachment || webdesignPhoto,
-                  mockupImage: remoteMockupAttachment || webdesignPhoto.mockup,
-                }
+            {
+              inline: true,
+              webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
+              mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
+            }
           )
-        : undefined;
+        : shouldSendWebdesignImages && webdesignImageDelivery === 'attachment'
+          ? buildWebdesignImageAttachments(webdesignPhoto, {
+              inline: false,
+              includeMockup: false,
+              webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
+            })
+          : undefined;
       try {
         const mail = {
           from: formatMailFromHeader(senderEmail, smtpAccount),
@@ -8541,11 +9032,15 @@ function createColdmailCampaignService(deps = {}) {
           html,
           attachments,
         };
+        if (shouldIncludeWebdesignPhoto) {
+          mail.headers = {
+            'X-Softora-Template-Version': WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+          };
+        }
         const listUnsubscribe = getColdmailListUnsubscribeHeader(senderEmail, row, item.id, reference, input);
         if (listUnsubscribe) {
-          mail.headers = {
-            'List-Unsubscribe': listUnsubscribe,
-          };
+          mail.headers = mail.headers || {};
+          mail.headers['List-Unsubscribe'] = listUnsubscribe;
           const listUnsubscribePost = getColdmailListUnsubscribePostHeader(row, item.id, reference, input);
           if (listUnsubscribePost) mail.headers['List-Unsubscribe-Post'] = listUnsubscribePost;
         }
@@ -8554,6 +9049,9 @@ function createColdmailCampaignService(deps = {}) {
         }
         if (shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'link') {
           assertColdmailLinkOnlyMailIsImageFree(mail);
+        }
+        if (shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'attachment') {
+          assertColdmailAttachmentOnlyMail(mail);
         }
         if (!testMode) {
           await runColdmailBeforeSendGuard(input, {
@@ -9145,6 +9643,10 @@ function createColdmailCampaignService(deps = {}) {
     setWebdesignPreparationCoordinator: (coordinator) => {
       webdesignPreparationCoordinator = coordinator || null;
       return webdesignPreparationCoordinator;
+    },
+    setMailReadySnapshotService: (service) => {
+      mailReadySnapshotService = service || null;
+      return mailReadySnapshotService;
     },
     syncInboundColdmailRepliesFromImap,
     unsubscribeColdmailRecipient,

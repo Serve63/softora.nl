@@ -122,6 +122,80 @@ function extractPreviewImageTokens(html) {
   return matches.map((match) => decodeURIComponent(match[1]));
 }
 
+const COLDMAIL_MOCKUP_CAPTION_TEXT =
+  'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
+
+function assertWebdesignImagePairLayout(html, options = {}) {
+  const value = String(html || '');
+  assert.match(value, /softora-webdesign-email-2026-07-11-v4/);
+  assert.match(value, /^<!doctype html><html lang="nl"><head>/);
+  assert.match(value, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
+  assert.match(value, /@media only screen and \(min-width:981px\)/);
+  assert.match(
+    value,
+    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-11-v4" style="font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;max-width:600px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;"/
+  );
+  assert.match(
+    value,
+    /\.softora-mobile-image-pair[^}]+display:none!important/
+  );
+  assert.match(
+    value,
+    /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important;max-height:none!important;overflow:visible!important\}/
+  );
+  assert.match(value, /<p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">/);
+  assert.match(value, /class="softora-mobile-image-pair" style="display:block;[^\"]+width:100%;max-width:100%;max-height:none;overflow:visible;/);
+  assert.match(value, /class="softora-desktop-image-pair"[^>]+style="display:none;mso-hide:all;[^\"]+width:0;max-width:0;max-height:0;/);
+  assert.doesNotMatch(value, /class="softora-desktop-image-pair" role="presentation" width="900"/);
+  assert.match(value, /<td width="300" valign="top" style="[^"]*width:300px;max-width:300px;[^"]*">/);
+  assert.match(value, /<td width="16" style="[^"]*width:16px;min-width:16px;[^"]*">/);
+  assert.match(value, /<td width="584" valign="top" style="[^"]*width:584px;max-width:584px;[^"]*">/);
+  assert.match(
+    value,
+    /class="softora-webdesign-desktop-image" width="300" height="560" style="display:block;width:300px;max-width:300px;height:560px;max-height:560px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/
+  );
+  assert.match(
+    value,
+    /class="softora-webdesign-desktop-image" width="584" height="560" style="display:block;width:584px;max-width:584px;height:560px;max-height:560px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/
+  );
+  assert.match(
+    value,
+    /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/
+  );
+  assert.match(
+    value,
+    /class="softora-webdesign-image" width="100%" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;[^\"]*font-size:0;line-height:0;"/
+  );
+  assert.match(
+    value,
+    /class="softora-webdesign-image softora-webdesign-image--mockup" width="100%" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;object-position:center top;[^\"]*font-size:0;line-height:0;"/
+  );
+
+  const desktopIndex = value.indexOf('class="softora-desktop-image-pair"');
+  const mobileIndex = value.indexOf('class="softora-mobile-image-pair"');
+  const captionIndex = value.indexOf(COLDMAIL_MOCKUP_CAPTION_TEXT);
+  assert.ok(desktopIndex > 0, 'desktop image table is present');
+  assert.ok(mobileIndex < desktopIndex, 'mobile-safe image block precedes the progressive desktop table');
+  assert.equal(value.indexOf(COLDMAIL_MOCKUP_CAPTION_TEXT), value.lastIndexOf(COLDMAIL_MOCKUP_CAPTION_TEXT));
+  assert.ok(captionIndex > mobileIndex, 'caption only appears inside the mobile image block');
+
+  if (options.mobileMainAlt && options.mobileMockupAlt) {
+    const mobileMainIndex = value.indexOf(`alt="${options.mobileMainAlt}"`, mobileIndex);
+    const mobileMockupIndex = value.indexOf(`alt="${options.mobileMockupAlt}"`, captionIndex);
+    assert.ok(mobileMainIndex > mobileIndex, 'mobile design image appears before the mobile caption');
+    assert.ok(captionIndex > mobileMainIndex, 'mobile caption appears after the design image');
+    assert.ok(mobileMockupIndex > captionIndex, 'mobile mockup appears after the mobile caption');
+  }
+
+  assert.doesNotMatch(value, /softora-webdesign-image-pair|softora-webdesign-image-cell|display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table/);
+  assert.doesNotMatch(value, /height="360"/);
+  assert.doesNotMatch(value, /background-image/i);
+
+  const withoutHeadCss = value.replace(/<style type="text\/css">[\s\S]*?<\/style>/, '');
+  assert.match(withoutHeadCss, /class="softora-mobile-image-pair" style="display:block;/);
+  assert.match(withoutHeadCss, /class="softora-desktop-image-pair"[^>]+style="display:none;/);
+}
+
 function buildColdmailOpenTrackingToken(input = {}, secret = 'tracking-secret') {
   const encodedPayload = encodeBase64Url(JSON.stringify({
     v: 1,
@@ -420,6 +494,7 @@ function createService(overrides = {}) {
         },
       };
     },
+    dataOpsStore: overrides.dataOpsStore,
     mailboxAccountsRaw: overrides.mailboxAccountsRaw || '',
     createImapClient:
       overrides.createImapClient ||
@@ -438,6 +513,12 @@ function createService(overrides = {}) {
     coldmailAutoReplyModel: 'gpt-5.5-pro',
     coldmailAutoReplyEnabled: Boolean(overrides.coldmailAutoReplyEnabled),
     resolveEmailDomain: async (domain) => {
+      const dnsErrorCode = overrides.dnsErrorDomains && overrides.dnsErrorDomains[domain];
+      if (dnsErrorCode) {
+        const error = new Error(`queryMx ${dnsErrorCode} ${domain}`);
+        error.code = dnsErrorCode;
+        throw error;
+      }
       if (overrides.invalidDomains && overrides.invalidDomains.includes(domain)) return false;
       return true;
     },
@@ -451,6 +532,7 @@ function createService(overrides = {}) {
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     webdesignPreparationCoordinator: overrides.webdesignPreparationCoordinator,
+    mailReadySnapshotService: overrides.mailReadySnapshotService,
   });
 
   return {
@@ -466,6 +548,26 @@ function createService(overrides = {}) {
     getAutopilotState: () => autopilotState,
   };
 }
+
+test('coldmail recipients come from the canonical Mailklaar snapshot', async () => {
+  const legacyRows = [{ id: 'legacy-1', bedrijf: 'Legacy BV', email: 'info@legacy.nl', status: 'prospect' }];
+  const mailReadyRows = [{ id: 'ready-1', bedrijf: 'Mailklaar BV', email: 'info@mailklaar.nl', status: 'prospect' }];
+  const { service } = createService({
+    rows: legacyRows,
+    mailReadySnapshotService: {
+      async buildMailReadySnapshot(options) {
+        assert.deepEqual(options, { limit: 3000, offset: 0 });
+        return { ok: true, customers: mailReadyRows };
+      },
+    },
+  });
+
+  const result = await service.getColdmailCampaignRecipients({ count: 10, service: 'crm' });
+
+  assert.equal(result.selected, 1);
+  assert.equal(result.recipients[0].id, 'ready-1');
+  assert.equal(result.recipients[0].email, 'info@mailklaar.nl');
+});
 
 test('coldmail campaign sends only eligible database rows and marks them as mailed', async () => {
   const { service, sentMessages, getSavedState } = createService();
@@ -492,7 +594,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
-  assert.match(sentMessages[0].html, /<p>Goedemorgen Ruben,<\/p>/);
+  assert.match(sentMessages[0].html, /<p style="[^"]*font-size:15px;line-height:24px[^"]*">Goedemorgen Ruben,<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif\?/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
   assert.doesNotMatch(sentMessages[0].html, />Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/);
@@ -513,6 +615,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
 });
 
 test('coldmail live stats count real sends from the guard and Softora/Gmail database signals', async () => {
+  let centralGuardStatsOptions = null;
   const { service } = createService({
     sendGuardState: {
       entries: [
@@ -550,70 +653,97 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
       recipientEntries: [],
     },
     outboundRecipientGuardStore: {
-      listSentRecipientGroups: async () => [
-        {
-          reservation_id: 'guard-only-reservation',
-          recipient_email: 'guard-only@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'guard-only-bv',
-          recipient_id: 'guard-only',
-          sender_email: 'serve@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'mailbox-sent-webdesign-backfill-2026-06-08',
-          updated_at: '2026-04-24T07:00:00.000Z',
-        },
-        {
-          reservation_id: 'guard-only-customer-backfill',
-          recipient_email: 'guard-only@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'guard-only-bv',
-          recipient_id: 'guard-only',
-          sender_email: 'serve@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'customer-status-backfill',
-          updated_at: '2026-04-24T07:10:00.000Z',
-        },
-        {
-          reservation_id: 'softora-sent-reservation',
-          recipient_email: 'ruben@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'bakkerij-zon',
-          recipient_id: 'softora-sent',
-          sender_email: 'martijn@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'softora-coldmail-pre-send',
-          updated_at: '2026-04-24T08:00:00.000Z',
-        },
-        {
-          reservation_id: 'invalid-domain-not-a-send',
-          recipient_email: 'invalid@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'invalid-domain',
-          recipient_id: 'invalid-domain',
-          sender_email: '',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'data-ops-customers-sent-guard',
-          actor: 'coldmail-invalid-email-domain',
-          updated_at: '2026-04-24T08:30:00.000Z',
-        },
-        {
-          reservation_id: 'data-ops-marker-not-a-send',
-          recipient_email: 'marker@example.test',
-          recipient_domain: 'example.test',
-          recipient_company_key: 'data-ops-marker',
-          recipient_id: 'data-ops-marker',
-          sender_email: 'serve@softora.nl',
-          provider: 'softora',
-          channel: 'coldmail',
-          source: 'data-ops-customers-sent-guard',
-          actor: 'coldmail-campaign',
-          updated_at: '2026-04-24T08:40:00.000Z',
-        },
-      ],
+      listSentRecipientGroups: async (options) => {
+        centralGuardStatsOptions = options;
+        return [
+          {
+            reservation_id: 'guard-only-reservation',
+            recipient_email: 'guard-only@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'guard-only-bv',
+            recipient_id: 'guard-only',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'mailbox-sent-webdesign-backfill-2026-06-08',
+            updated_at: '2026-04-24T07:00:00.000Z',
+          },
+          {
+            reservation_id: 'guard-only-customer-backfill',
+            recipient_email: 'guard-only@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'guard-only-bv',
+            recipient_id: 'guard-only',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'customer-status-backfill',
+            updated_at: '2026-04-24T07:10:00.000Z',
+          },
+          {
+            reservation_id: 'softora-sent-reservation',
+            recipient_email: 'ruben@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'bakkerij-zon',
+            recipient_id: 'softora-sent',
+            sender_email: 'martijn@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'softora-coldmail-pre-send',
+            updated_at: '2026-04-24T08:00:00.000Z',
+          },
+          {
+            reservation_id: 'instantly-upload-reservation',
+            recipient_email: 'instantly-guard@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'instantly-guard',
+            recipient_id: 'instantly-guard',
+            sender_email: 'serve@softora.nl',
+            provider: 'instantly',
+            channel: 'coldmail',
+            source: 'instantly-safe-upload',
+            updated_at: '2026-04-24T08:05:00.000Z',
+          },
+          {
+            reservation_id: 'sender-cooldown-reservation',
+            recipient_email: '',
+            recipient_domain: '',
+            recipient_company_key: 'serve-softora-nl',
+            recipient_id: 'sender-cooldown',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail-sender-cooldown',
+            source: 'softora-coldmail-sender-cooldown',
+            updated_at: '2026-04-24T08:06:00.000Z',
+          },
+          {
+            reservation_id: 'invalid-domain-not-a-send',
+            recipient_email: 'invalid@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'invalid-domain',
+            recipient_id: 'invalid-domain',
+            sender_email: '',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'data-ops-customers-sent-guard',
+            actor: 'coldmail-invalid-email-domain',
+            updated_at: '2026-04-24T08:30:00.000Z',
+          },
+          {
+            reservation_id: 'data-ops-marker-not-a-send',
+            recipient_email: 'marker@example.test',
+            recipient_domain: 'example.test',
+            recipient_company_key: 'data-ops-marker',
+            recipient_id: 'data-ops-marker',
+            sender_email: 'serve@softora.nl',
+            provider: 'softora',
+            channel: 'coldmail',
+            source: 'data-ops-customers-sent-guard',
+            actor: 'coldmail-campaign',
+            updated_at: '2026-04-24T08:40:00.000Z',
+          },
+        ];
+      },
     },
     dataOpsStore: {
       listMailboxMessages: async () => [
@@ -753,6 +883,12 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.dateKey, '2026-04-24');
   assert.equal(result.stats.source, 'central-outbound-recipient-guard');
   assert.equal(result.stats.reliable, true);
+  assert.deepEqual(centralGuardStatsOptions, {
+    provider: 'softora',
+    channel: 'coldmail',
+    keyType: 'email',
+    maxRows: 5_000,
+  });
   assert.equal(result.stats.sentToday, 2);
   assert.equal(result.stats.systemSentToday, 2);
   assert.equal(result.stats.centralGuardSentToday, 2);
@@ -793,6 +929,118 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.conversionRate, 33);
   assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:00:00.000Z');
   assert.equal(result.stats.lastSenderEmail, 'martijn@softora.nl');
+});
+
+test('coldmail live stats never overwrite reliable totals with a transient guard failure', async () => {
+  let clockMs = Date.parse('2026-04-24T12:00:00.000Z');
+  let centralGuardFails = false;
+  const { service, getSavedStates } = createService({
+    now: () => new Date(clockMs),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        if (centralGuardFails) throw new Error('temporary central guard timeout');
+        return [{
+          reservation_id: 'sent-1',
+          recipient_email: 'lead@example.test',
+          provider: 'softora',
+          channel: 'coldmail',
+          sender_email: 'serve@softora.nl',
+          updated_at: '2026-04-24T09:00:00.000Z',
+        }];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages() {
+        return [];
+      },
+    },
+  });
+
+  const first = await service.getColdmailLiveStats();
+  assert.equal(first.stats.reliable, true);
+  assert.equal(first.stats.totalSent, 1);
+
+  centralGuardFails = true;
+  clockMs += 31 * 1000;
+  const stale = await service.getColdmailLiveStats();
+  assert.equal(stale.stats.totalSent, 1);
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const preserved = await service.getColdmailLiveStats();
+  assert.equal(preserved.stats.reliable, true);
+  assert.equal(preserved.stats.totalSent, 1);
+  assert.equal(preserved.stats.authoritativeStatsStale, true);
+  assert.equal(preserved.stats.centralGuardUnavailableReason, 'central_guard_read_failed');
+  const cacheWrites = getSavedStates().filter((state) => state.scope === 'premium_coldmail_stats_cache');
+  const latestCache = JSON.parse(cacheWrites.at(-1).values.softora_coldmail_stats_cache_v1);
+  assert.equal(latestCache.stats.reliable, true);
+  assert.equal(latestCache.stats.totalSent, 1);
+});
+
+test('coldmail live stats preserve proven bounces when the targeted mailbox read temporarily fails', async () => {
+  let clockMs = Date.parse('2026-04-24T12:00:00.000Z');
+  let mailboxReadFails = false;
+  const { service } = createService({
+    now: () => new Date(clockMs),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        return [];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages() {
+        if (mailboxReadFails) return null;
+        return [{
+          message_key: 'serve@softora.nl|inbox|101',
+          account_email: 'serve@softora.nl',
+          folder: 'inbox',
+          sender_email: 'mailer-daemon@softora.nl',
+          subject: 'Returned Mail: Kleine vraag over jullie website',
+          date: '2026-04-23T09:00:00.000Z',
+        }];
+      },
+    },
+  });
+
+  const first = await service.getColdmailLiveStats();
+  assert.equal(first.stats.reliable, true);
+  assert.equal(first.stats.bounces, 1);
+
+  mailboxReadFails = true;
+  clockMs += 31 * 1000;
+  await service.getColdmailLiveStats();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const preserved = await service.getColdmailLiveStats();
+  assert.equal(preserved.stats.reliable, true);
+  assert.equal(preserved.stats.bounces, 1);
+  assert.equal(preserved.stats.mailboxBounceStatsAvailable, true);
+});
+
+test('coldmail live stats requests only targeted mailbox bounce candidates', async () => {
+  let mailboxOptions = null;
+  const { service } = createService({
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        return [];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages(options) {
+        mailboxOptions = options;
+        return [];
+      },
+    },
+  });
+
+  await service.getColdmailLiveStats();
+
+  assert.equal(mailboxOptions.maxRows, 1000);
+  assert.equal(mailboxOptions.bounceCandidatesOnly, true);
+  assert.equal(mailboxOptions.bypassReadFailureCooldown, true);
+  assert.equal(mailboxOptions.suppressReadFailureCooldown, true);
 });
 
 test('coldmail campaign uses standard SMTP transports with bounded timeouts', async () => {
@@ -1830,6 +2078,83 @@ test('coldmail autopilot blocks invalid domains without extending the send coold
   assert.equal(savedRows[0].canMail, false);
   assert.equal(savedRows[0].doNotMail, true);
   assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
+});
+
+test('coldmail autopilot skips DNS timeout domains and still sends the next safe recipient', async () => {
+  const { service, sentMessages, getAutopilotState, getSavedStates } = createService({
+    rows: [
+      {
+        id: 'dns-timeout-domain',
+        bedrijf: 'VVV Oisterwijk',
+        naam: 'VVV Oisterwijk',
+        email: 'info@vvvoisterwijk.nl',
+        status: 'benaderbaar',
+        stad: 'Oisterwijk',
+        mail: true,
+      },
+      {
+        id: 'good-domain',
+        bedrijf: 'Bakkerij Zon',
+        naam: 'Ruben',
+        email: 'ruben@example.test',
+        status: 'benaderbaar',
+        stad: 'Tilburg',
+        mail: true,
+      },
+    ],
+    dnsErrorDomains: {
+      'vvvoisterwijk.nl': 'ETIMEOUT',
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        smtpHost: 'smtp.strato.com',
+        smtpUser: 'serve@softora.nl',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['serve@softora.nl'],
+        senderProfiles: {
+          'serve@softora.nl': {
+            subject: 'Korte vraag voor {{bedrijf}}',
+            body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+          },
+        },
+        radiusKm: 250,
+      },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 9,
+        endHour: 17,
+        minIntervalMinutes: 12,
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'sent');
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, 'ruben@example.test');
+
+  const customerSaves = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  const savedRows = customerSaves.flatMap((state) => JSON.parse(state.values.softora_customers_premium_v1));
+  const blockedRow = savedRows.find((row) => row.id === 'dns-timeout-domain');
+  assert.equal(blockedRow.status, 'geblokkeerd');
+  assert.equal(blockedRow.mail, false);
+  assert.equal(blockedRow.canMail, false);
+  assert.equal(blockedRow.doNotMail, true);
+  assert.equal(blockedRow.coldmailInvalidEmailDomain, 'vvvoisterwijk.nl');
 });
 
 test('coldmail autopilot respects a per-sender cooldown without extending the global send clock', async () => {
@@ -3661,7 +3986,7 @@ test('coldmail autopilot refuses legacy config without saved sender profiles', a
   assert.equal(sentMessages.length, 0);
 });
 
-test('coldmail autopilot uses the saved dashboard profile and includes the webdesign mockup when available', async () => {
+test('coldmail autopilot uses the saved dashboard profile and attaches only the webdesign', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     env: {
       COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
@@ -3744,8 +4069,12 @@ test('coldmail autopilot uses the saved dashboard profile and includes the webde
   assert.match(sentMessages[0].text, /actuele dashboardtekst/);
   assert.doesNotMatch(sentMessages[0].text, /actuele variant/);
   assert.doesNotMatch(sentMessages[0].text, /oudere tekst/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-prospect-1@softora');
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
+  assert.equal(sentMessages[0].attachments[0].cid, undefined);
+  assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
+  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
+  assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.equal(getAutopilotState().config.senderProfiles['martijn@softora.nl'].bodyVariants.length, 1);
 });
 
@@ -3816,22 +4145,20 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   assert.equal(result.sent, 1);
   assert.equal(result.senderEmail, 'servec321@gmail.com');
   assert.equal(sentMessages.length, 1);
-  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(sentMessages[0].text, /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze link bekijken 🎨/);
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(
     sentMessages[0].html,
-    /href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3"/
+    /href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3&amp;sender=serve"/
   );
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link<\/a> bekijken 🎨/
   );
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-import-5-db-mpfntuzo-cifdr3@softora"/);
-  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-import-5-db-mpfntuzo-cifdr3@softora"/);
-  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
-  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
+  assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
+  assert.doesNotMatch(sentMessages[0].html, /cid:/);
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
 
   const customerSave = getSavedStates().find((entry) => entry.scope === 'premium_customers_database');
   const savedRows = JSON.parse(customerSave.values.softora_customers_premium_v1);
@@ -3906,7 +4233,7 @@ test('coldmail autopilot does not send fris webdesign mail when no design assets
   assert.equal(preparedJobs[0].customer.id, 'import-5-db-mpfntuzo-cifdr3');
 });
 
-test('coldmail autopilot skips leads without a complete webdesign mockup', async () => {
+test('coldmail autopilot requires a design image but not a device mockup', async () => {
   const { service, sentMessages } = createService({
     env: {
       COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
@@ -4003,11 +4330,11 @@ test('coldmail autopilot skips leads without a complete webdesign mockup', async
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].to, 'mockup@example.test');
   assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Mockup Klaar BV');
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].cid, 'webdesign-mockup-ready@softora');
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
-  assert.equal(sentMessages[0].attachments[1].cid, 'webdesign-mockup-mockup-ready@softora');
-  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
+  assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
+  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
+  assert.doesNotMatch(sentMessages[0].html, /cid:/);
 });
 
 test('coldmail autopilot does not extend cooldown when no webdesign-ready lead exists', async () => {
@@ -4769,7 +5096,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
       },
     },
     onSendMail: async ({ message }) => {
-      const tokens = extractPreviewImageTokens(message.html);
+      const tokens = [...new Set(extractPreviewImageTokens(message.html))];
       assert.equal(tokens.length, 2);
       clearPreviewImageCache();
       overrides.customerValues = {
@@ -4797,46 +5124,40 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
+  assert.equal(
+    sentMessages[0].headers['X-Softora-Template-Version'],
+    'softora-webdesign-email-2026-07-11-v4'
+  );
   assert.match(sentMessages[0].text, /Servé Creusen/);
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
   assert.match(
     sentMessages[0].text,
-    /📍 Alphen\n\nJe kunt het webdesign hier bekijken 👈/
+    /📍 Alphen\n\nLukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze link bekijken 🎨/
   );
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(sentMessages[0].html, /📍 Alphen/);
+  assert.match(sentMessages[0].html, /max-width:600px;width:100%;/);
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link<\/a> bekijken 🎨/
   );
-  assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
-  assert.match(sentMessages[0].html, /<table role="presentation" width="100%"/);
-  assert.match(sentMessages[0].html, /<td style="[^"]*overflow:visible;"/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.match(
     sentMessages[0].html,
-    /margin:24px 0 0 0;"><tr><td style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
+    /softora-desktop-image-pair[\s\S]*<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon webdesign" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
-  assert.match(sentMessages[0].html, /alt="Bakkerij Zon device mockup" width="640" style="display:block;width:100%;max-width:640px;max-height:960px;height:auto;object-fit:contain;border:0;outline:none;text-decoration:none;"/);
-  assert.doesNotMatch(sentMessages[0].html, /height="360"/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
-  assert.doesNotMatch(sentMessages[0].html, /background-image/i);
-  assert.match(
-    sentMessages[0].html,
-    /margin:0;"><tr><td style="[^"]*"><img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
-  );
-  const tokens = extractPreviewImageTokens(sentMessages[0].html);
+  const tokens = [...new Set(extractPreviewImageTokens(sentMessages[0].html))];
   assert.equal(tokens.length, 2);
   const payloads = tokens.map((token) => decodeBase64UrlJson(token.split('.')[0]));
   assert.deepEqual(payloads.map((payload) => payload.type), ['webdesign', 'mockup']);
   assert.notEqual(tokens[0], tokens[1]);
   assert.ok(
     sentMessages[0].html.indexOf('/coldmailing/webdesign-foto?t=') <
-      sentMessages[0].html.indexOf('Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.')
-  );
-  assert.ok(
-    sentMessages[0].html.indexOf('Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.') <
       sentMessages[0].html.lastIndexOf('/coldmailing/webdesign-foto?t=')
   );
   assert.doesNotMatch(sentMessages[0].html, /target="_blank"[^>]*><img/);
@@ -4846,13 +5167,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.doesNotMatch(sentMessages[0].html, /<p>Geen interesse\? Reageer met/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
   assert.doesNotMatch(sentMessages[0].html, />Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/);
-  assert.equal(sentMessages[0].attachments.length, 2);
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
-  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'attachment');
-  assert.equal(sentMessages[0].attachments[0].cid, undefined);
-  assert.equal(sentMessages[0].attachments[1].cid, undefined);
-  assert.match(sentMessages[0].attachments[0].filename, /Bakkerij-Zon-webdesign\.(?:png|jpg)$/);
-  assert.match(sentMessages[0].attachments[1].filename, /Bakkerij-Zon-device-mockup\.(?:png|jpg)$/);
+  assert.equal(sentMessages[0].attachments, undefined);
   const savedRows = JSON.parse(getSavedState().values.softora_customers_premium_v1);
   assert.equal(savedRows[0].campaignType, 'webdesign');
   assert.equal(savedRows[0].outreachStatus, 'benaderd');
@@ -4965,6 +5280,133 @@ test('coldmail preview image route accepts portable v2 image tokens across hosts
   assert.equal(image.filename, 'Bakkerij-Zon-webdesign.png');
 });
 
+test('coldmail preview image route refreshes stored webdesign URLs via data ops fallback', async () => {
+  clearPreviewImageCache();
+  const calls = [];
+  const webdesignToken = buildColdmailPreviewImageV2Token({
+    id: 'prospect-1',
+    email: 'ruben@example.test',
+    reference: 'SF-20260424-TEST',
+    type: 'webdesign',
+  });
+  const mockupToken = buildColdmailPreviewImageV2Token({
+    id: 'prospect-1',
+    email: 'ruben@example.test',
+    reference: 'SF-20260424-TEST',
+    type: 'mockup',
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'prospect-1',
+        bedrijf: 'Bakkerij Zon',
+        email: 'ruben@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'prospect-1': {
+        id: 'prospect-1',
+        customerId: 'prospect-1',
+        websitePhotoName: 'Bakkerij Zon webdesign',
+        websiteMockupName: 'Bakkerij Zon device mockup',
+      },
+    },
+    dataOpsStore: {
+      listDesignPhotosWithSignedUrls: async (options) => {
+        calls.push(options);
+        return [
+          {
+            customerId: 'prospect-1',
+            identityKey: 'bakkerij zon|ruben@example.test',
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+            websiteMockupUrl: TINY_PNG_DATA_URL,
+          },
+        ];
+      },
+    },
+  });
+
+  const webdesignImage = await service.getColdmailPreviewImage({ token: webdesignToken });
+  const mockupImage = await service.getColdmailPreviewImage({ token: mockupToken });
+
+  assert.equal(webdesignImage.type, 'webdesign');
+  assert.equal(mockupImage.type, 'mockup');
+  assert.equal(webdesignImage.contentType, 'image/png');
+  assert.equal(mockupImage.contentType, 'image/png');
+  assert.equal(webdesignImage.content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(mockupImage.content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => call.identifiers.includes('prospect-1')));
+  assert.ok(calls.every((call) => call.expiresInSeconds === 24 * 60 * 60));
+});
+
+test('coldmail preview image route resolves old Instantly tokens through customer identity keys', async () => {
+  clearPreviewImageCache();
+  const identityLookups = [];
+  const photoLookups = [];
+  const token = buildColdmailPreviewImageV2Token({
+    id: 'safe-dedupe-20260615-row-1520-aff51f7be4',
+    email: 'info@louwersmetaal.nl',
+    reference: 'SF-20260626-SAFEDEDUP',
+    type: 'webdesign',
+  });
+  const { service } = createService({
+    rows: [
+      {
+        id: 'safe-dedupe-20260615-row-1520-aff51f7be4',
+        bedrijf: 'Louwers Metaal',
+        email: 'info@louwersmetaal.nl',
+        website: 'louwersmetaal.nl',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    photoMap: {
+      'safe-dedupe-20260615-row-1520-aff51f7be4': {
+        id: 'safe-dedupe-20260615-row-1520-aff51f7be4',
+        websitePhotoName: 'verlopen oude webdesign-link',
+      },
+    },
+    dataOpsStore: {
+      listCustomerIdentityKeys: async (keys) => {
+        identityLookups.push(keys);
+        return {
+          ok: true,
+          data: [
+            {
+              key_type: 'email',
+              key_value: 'info@louwersmetaal.nl',
+              customer_id: 'louwers-constructiebedrijf-b-v',
+            },
+          ],
+        };
+      },
+      listDesignPhotosWithSignedUrls: async (options) => {
+        photoLookups.push(options);
+        return [
+          {
+            customerId: 'louwers-constructiebedrijf-b-v',
+            identityKey: 'louwers constructiebedrijf b v||',
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+          },
+        ];
+      },
+    },
+  });
+
+  const image = await service.getColdmailPreviewImage({ token });
+
+  assert.equal(image.type, 'webdesign');
+  assert.equal(image.contentType, 'image/png');
+  assert.equal(image.content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
+  assert.equal(identityLookups.length, 1);
+  assert.ok(identityLookups[0].some((key) => key.type === 'email' && key.value === 'info@louwersmetaal.nl'));
+  assert.equal(photoLookups.length, 1);
+  assert.ok(photoLookups[0].identifiers.includes('louwers-constructiebedrijf-b-v'));
+});
+
 test('coldmail preview image route strips decorative webdesign frames for existing email tokens', async () => {
   const framedWebdesign = await createFramedWebdesignDataUrl();
   const token = buildColdmailPreviewImageToken({
@@ -5001,7 +5443,7 @@ test('coldmail preview image route strips decorative webdesign frames for existi
   assert.equal(metadata.height, 244);
 });
 
-test('coldmail campaign sends webdesign mails link-only by default for owned mailbox sends', async () => {
+test('coldmail campaign can send webdesign mails with explicit CID images', async () => {
   const { service, sentMessages } = createService({
     rows: [
       {
@@ -5031,6 +5473,8 @@ test('coldmail campaign sends webdesign mails link-only by default for owned mai
     body: 'Goedemorgen {{naam}}',
     senderEmail: 'info@softora.nl',
     specialAction: 'webdesign',
+    webdesignImageDelivery: 'cid',
+    webdesignImageDelivery: 'cid',
   });
 
   assert.equal(result.sent, 1);
@@ -5038,10 +5482,16 @@ test('coldmail campaign sends webdesign mails link-only by default for owned mai
     sentMessages[0].html,
     /href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1"/
   );
-  assert.doesNotMatch(sentMessages[0].html, /<img src=/);
-  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
-  assert.equal(sentMessages[0].attachments, undefined);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
 });
 
 test('coldmail campaign strips legacy webdesign image placeholders before link-only send', async () => {
@@ -5090,13 +5540,14 @@ test('coldmail campaign strips legacy webdesign image placeholders before link-o
     ].join('\n'),
     senderEmail: 'info@softora.nl',
     specialAction: 'webdesign',
+    webdesignImageDelivery: 'cid',
     webdesignImageDelivery: 'link',
   });
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /^Goedendag,/);
-  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(sentMessages[0].text, /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze link bekijken 🎨/);
   assert.doesNotMatch(sentMessages[0].text, /\[image:/i);
   assert.doesNotMatch(sentMessages[0].text, /korte indruk van de eerste versie/i);
   assert.doesNotMatch(sentMessages[0].html, /\[image:/i);
@@ -5205,7 +5656,7 @@ test('coldmail autopilot stores a compact failure reason summary after a partial
   assert.equal(summary[0].sample.email, 'info@geenfoto.test');
 });
 
-test('coldmail autopilot lets dashboard link delivery override legacy image env', async () => {
+test('coldmail autopilot uses one regular attachment and no inline images', async () => {
   const { service, sentMessages } = createService({
     env: {
       COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
@@ -5279,15 +5730,20 @@ test('coldmail autopilot lets dashboard link delivery override legacy image env'
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0].text, /^Goedendag,/);
-  assert.match(sentMessages[0].text, /Je kunt het webdesign hier bekijken 👈/);
+  assert.match(sentMessages[0].text, /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze link bekijken 🎨/);
   assert.match(
     sentMessages[0].html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link<\/a> bekijken 🎨/
   );
-  assert.doesNotMatch(sentMessages[0].html, /<img src=/);
-  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
-  assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
-  assert.equal(sentMessages[0].attachments, undefined);
+  assert.match(
+    sentMessages[0].html,
+    /<a href="https:\/\/bakkerijzon\.nl" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">bakkerijzon\.nl<\/a>/
+  );
+  assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
+  assert.doesNotMatch(sentMessages[0].html, /cid:/);
+  assert.equal(sentMessages[0].attachments.length, 1);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
+  assert.equal(sentMessages[0].attachments[0].cid, undefined);
 });
 
 test('coldmail campaign replaces sender name but keeps recipient city in the signature', async () => {
@@ -5423,12 +5879,16 @@ test('coldmail campaign accepts a webdesign mockup without quality approval meta
     body: 'Goedemorgen {{naam}}',
     senderEmail: 'info@softora.nl',
     specialAction: 'webdesign',
+    webdesignImageDelivery: 'cid',
   });
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
-  assert.equal(sentMessages[0].attachments, undefined);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
 });
 
 test('coldmail campaign accepts a legacy webdesign mockup renderer when a mockup image exists', async () => {
@@ -5464,12 +5924,16 @@ test('coldmail campaign accepts a legacy webdesign mockup renderer when a mockup
     body: 'Goedemorgen {{naam}}',
     senderEmail: 'info@softora.nl',
     specialAction: 'webdesign',
+    webdesignImageDelivery: 'cid',
   });
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.doesNotMatch(sentMessages[0].html, /cid:webdesign/);
-  assert.equal(sentMessages[0].attachments, undefined);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-prospect-1@softora"/);
+  assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-prospect-1@softora"/);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'inline');
+  assert.equal(sentMessages[0].attachments[1].contentDisposition, 'inline');
 });
 
 test('coldmail campaign keeps the closing signature before webdesign photos', async () => {
@@ -5511,13 +5975,15 @@ test('coldmail campaign keeps the closing signature before webdesign photos', as
   const closingIndex = html.indexOf('Met vriendelijke groeten');
   const phoneIndex = html.indexOf('0629917185');
   const imageIndex = html.indexOf('<img src="cid:webdesign-prospect-1@softora"');
-  const captionIndex = html.indexOf('Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.');
   const mockupIndex = html.indexOf('<img src="cid:webdesign-mockup-prospect-1@softora"');
   assert.ok(closingIndex > 0);
   assert.ok(phoneIndex > closingIndex);
   assert.ok(imageIndex > phoneIndex);
-  assert.ok(captionIndex > imageIndex);
-  assert.ok(mockupIndex > captionIndex);
+  assert.ok(mockupIndex > imageIndex);
+  assertWebdesignImagePairLayout(html, {
+    mobileMainAlt: 'Bakkerij Zon webdesign',
+    mobileMockupAlt: 'Bakkerij Zon device mockup',
+  });
   assert.doesNotMatch(html, /href="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
 });
 
@@ -6481,8 +6947,11 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.doesNotMatch(sentMessages[0].subject, /\(test \d{8}T\d{6}Z\)/);
   assert.match(sentMessages[0].text, /website softora\.nl tegen/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
-  assert.match(sentMessages[0].html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
+  assertWebdesignImagePairLayout(sentMessages[0].html, {
+    mobileMainAlt: 'Softora Testmodus webdesign',
+    mobileMockupAlt: 'Softora Testmodus device mockup',
+  });
   assert.doesNotMatch(sentMessages[0].html, /border-top\s*:\s*1px\s+dashed/i);
   assert.doesNotMatch(sentMessages[0].html, /detail-mail-section-signature/);
   assert.equal(sentMessages[0].attachments.length, 2);
@@ -6608,7 +7077,7 @@ test('coldmail campaign makes tall webdesign CID attachments mail-safe before se
 
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
-  assert.match(sentMessages[0].html, /max-height:960px;height:auto;object-fit:contain/);
+  assert.match(sentMessages[0].html, /height:auto;max-height:none;object-fit:contain/);
   assert.equal(sentMessages[0].attachments.length, 2);
   const webdesignAttachment = sentMessages[0].attachments[0];
   assert.equal(webdesignAttachment.contentType, 'image/jpeg');
@@ -9569,10 +10038,80 @@ test('coldmail campaign saves sent copies into the selected sender sent folder',
   assert.equal(result.sentItems[0].sentCopySaved, true);
   assert.equal(appendedMessages.length, 1);
   assert.equal(appendedMessages[0].mailboxName, 'INBOX/Verstuurd');
+  const rawSentCopy = String(appendedMessages[0].raw);
   const parsedSentCopy = await simpleParser(appendedMessages[0].raw);
   assert.doesNotMatch(sentMessages[0].html, /\/api\/coldmailing\/open\.gif\?/);
   assert.doesNotMatch(String(parsedSentCopy.html || ''), /\/api\/coldmailing\/open\.gif\?/);
-  assert.match(String(appendedMessages[0].raw), /Subject: Nieuwe website voor Bakkerij Zon/);
+  assert.match(rawSentCopy, /\r\n\r\n/);
+  assert.doesNotMatch(rawSentCopy, /(^|[^\r])\n/);
+  assert.match(rawSentCopy, /Subject: Nieuwe website voor Bakkerij Zon/);
+});
+
+test('remote webdesign sent copy contains responsive HTML and no image attachment parts', async () => {
+  const appendedMessages = [];
+  const client = {
+    usable: true,
+    async connect() {},
+    async list() {
+      return [{ path: 'INBOX' }, { path: 'INBOX/Verstuurd' }];
+    },
+    async append(mailboxName, raw, flags) {
+      appendedMessages.push({ mailboxName, raw, flags });
+      return { path: mailboxName };
+    },
+    async logout() {
+      this.usable = false;
+    },
+  };
+  const { service, sentMessages } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'serve@softora.nl',
+    imapPass: 'secret',
+    createImapClient: () => client,
+    rows: [{
+      id: 'remote-layout-1',
+      bedrijf: 'Responsive Voorbeeld B.V.',
+      website: 'responsive-voorbeeld.nl',
+      email: 'info@responsive-voorbeeld.test',
+      stad: 'Tilburg',
+      status: 'prospect',
+      mail: true,
+    }],
+    photoMap: {
+      'remote-layout-1': {
+        id: 'remote-layout-1',
+        websitePhoto: TINY_PNG_DATA_URL,
+        websitePhotoName: 'Responsive Voorbeeld webdesign',
+        websiteMockup: TINY_PNG_DATA_URL,
+        websiteMockupName: 'Responsive Voorbeeld device mockup',
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website ({{website}}) tegen.\n\nMet vriendelijke groet,\nServé Creusen',
+    senderEmail: 'serve@softora.nl',
+    specialAction: 'webdesign',
+    webdesignImageDelivery: 'remote',
+    publicBaseUrl: 'https://www.softora.nl',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages[0].attachments, undefined);
+  assert.equal(appendedMessages.length, 1);
+  const rawSentCopy = String(appendedMessages[0].raw);
+  const parsedSentCopy = await simpleParser(appendedMessages[0].raw);
+  assert.doesNotMatch(rawSentCopy, /Content-Disposition:\s*(?:attachment|inline)/i);
+  assert.doesNotMatch(rawSentCopy, /Content-ID:/i);
+  assert.equal(parsedSentCopy.attachments.length, 0);
+  assert.match(String(parsedSentCopy.html || ''), /softora-webdesign-email-2026-07-11-v4/);
+  assert.match(String(parsedSentCopy.html || ''), /https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
+  assertWebdesignImagePairLayout(String(parsedSentCopy.html || ''), {
+    mobileMainAlt: 'Responsive Voorbeeld B.V. webdesign',
+    mobileMockupAlt: 'Responsive Voorbeeld B.V. device mockup',
+  });
 });
 
 test('coldmail campaign saves sent copies with the selected mailbox account imap settings', async () => {

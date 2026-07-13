@@ -187,7 +187,7 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
-test('mailbox service enriches normal webdesign sends with public link and no inline images by default', async () => {
+test('mailbox service enriches normal webdesign sends with public link and inline images by default', async () => {
   const sent = [];
   const guardCalls = [];
   const customerId = 'manual-import-pckbv-eu-privacy-0583';
@@ -279,7 +279,7 @@ test('mailbox service enriches normal webdesign sends with public link and no in
   assert.equal(guardCalls[2].options.status, 'sent');
   assert.match(
     sent[0].message.text,
-    /Je kunt het webdesign hier bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het hier 👈/
   );
   assert.match(sent[0].message.text, /Met vriendelijke groet,\nServé Creusen\n\n📍 Chaam/);
   assert.doesNotMatch(sent[0].message.text, /Martijn van de Ven/);
@@ -292,12 +292,43 @@ test('mailbox service enriches normal webdesign sends with public link and no in
   assert.doesNotMatch(sent[0].message.text, /afbeeldingen tonen/i);
   assert.match(
     sent[0].message.html,
-    /Je kunt het webdesign <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> bekijken 👈/
+    /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
-  assert.doesNotMatch(sent[0].message.html, /<img src=/);
-  assert.doesNotMatch(sent[0].message.html, /cid:webdesign|cid:mockup/);
-  assert.doesNotMatch(sent[0].message.html, /Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\./);
-  assert.equal(sent[0].message.attachments, undefined);
+  assert.match(
+    sent[0].message.html,
+    /<span style="white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">pckbv\.eu<\/span>/
+  );
+  assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
+  assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
+  assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-11-v4');
+  assert.match(sent[0].message.html, /^<!doctype html><html lang="nl"><head>/);
+  assert.match(sent[0].message.html, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
+  assert.match(sent[0].message.html, /data-softora-template-version="softora-webdesign-email-2026-07-11-v4"/);
+  assert.match(sent[0].message.html, /<table class="softora-desktop-image-pair" role="presentation"[^>]+style="display:none;/);
+  assert.match(sent[0].message.html, /class="softora-webdesign-email-body softora-mailbox-webdesign-body"/);
+  assert.match(sent[0].message.html, /@media only screen and \(min-width:981px\)/);
+  assert.match(sent[0].message.html, /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-desktop-image" width="300" height="560"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-desktop-image" width="584" height="560"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="100%"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="100%"/);
+  assert.doesNotMatch(sent[0].message.html, /softora-webdesign-image-cell|softora-webdesign-image-gap|softora-webdesign-image-table/);
+  assert.match(sent[0].message.html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  const mobilePairIndex = sent[0].message.html.indexOf('class="softora-mobile-image-pair"');
+  const mobileMainIndex = sent[0].message.html.indexOf('alt="PCK B.V. webdesign"', mobilePairIndex);
+  const mobileCaptionIndex = sent[0].message.html.indexOf('class="softora-mobile-mockup-caption"', mobilePairIndex);
+  const mobileMockupIndex = sent[0].message.html.indexOf('alt="PCK B.V. device mockup"', mobileCaptionIndex);
+  assert.ok(mobileMainIndex > mobilePairIndex);
+  assert.ok(mobileCaptionIndex > mobileMainIndex);
+  assert.ok(mobileMockupIndex > mobileCaptionIndex);
+  assert.equal(sent[0].message.attachments.length, 2);
+  assert.deepEqual(
+    sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),
+    [
+      ['webdesign-manual-import-pckbv-eu-privacy-0583-1@softora', 'inline'],
+      ['mockup-manual-import-pckbv-eu-privacy-0583-2@softora', 'inline'],
+    ]
+  );
 });
 
 test('mailbox service enriches webdesign sends from stored photo metadata when customer row is unavailable', async () => {
@@ -370,7 +401,7 @@ test('mailbox service enriches webdesign sends from stored photo metadata when c
   assert.equal(guardCalls[0].items[0].recipientId, customerId);
   assert.match(
     sent[0].message.html,
-    /href="https:\/\/www\.softora\.nl\/webdesign\/podotherapi3-vissers\?cid=import-309-db-mohsau65-wp5f4v"/
+    /href="https:\/\/www\.softora\.nl\/webdesign\/podotherapi3-vissers\?cid=import-309-db-mohsau65-wp5f4v&amp;sender=serve"/
   );
   assert.match(sent[0].message.html, /<img src="cid:webdesign-import-309-db-mohsau65-wp5f4v-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-import-309-db-mohsau65-wp5f4v-2@softora"/);

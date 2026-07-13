@@ -118,6 +118,29 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.equal(fileName, 'softora.nl-preview.png');
 });
 
+test('website generation preview prompt locks the Softora outreach profile identity', () => {
+  const helpers = createHelpers();
+  const prompt = helpers.buildWebsitePreviewPromptFromScan({
+    host: 'kboheikant.test',
+    title: 'KBO Heikant Quirijnstok',
+    metaDescription: 'Vereniging voor senioren in Tilburg.',
+    h1: 'Welkom bij KBO Heikant Quirijnstok',
+    paragraphs: ['Activiteiten, ontmoeten en nieuws voor leden.'],
+    softoraOutreachProfile: {
+      name: 'Servé Creusen',
+      roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+    },
+  });
+
+  assert.match(prompt, /SOFTORA OUTREACH PROFILE LOCK/);
+  assert.match(prompt, /zichtbare persoonsnaam exact: Servé Creusen/);
+  assert.match(prompt, /zichtbare rolregel\/eyebrow exact: WEBDESIGN & SOFTWARE ONTWIKKELING/);
+  assert.match(prompt, /Gebruik nooit "Softora", "Softora.nl", "Webdesign en software"/);
+  assert.match(prompt, /"ik heb", "ik ben begonnen" en "ik heb meegenomen"/);
+  assert.match(prompt, /Vermijd "we zijn begonnen"/);
+  assert.match(prompt, /Softora mag alleen als bedrijfsmerk voorkomen, nooit als persoonlijke afzendernaam/);
+});
+
 test('website generation helpers normalize html documents and detect unusable strict html', () => {
   const helpers = createHelpers();
 

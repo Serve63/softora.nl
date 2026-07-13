@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+    <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
     <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Actieve Opdrachten — Premium</title>
@@ -27,7 +27,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
+    <script src="assets/personnel-theme.js?v=20260519b" defer></script>
     <script src="assets/custom-selects.js?v=20260511a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -484,9 +484,8 @@
             position: relative;
         }
 
-        .orders-filter-btn[data-order-filter="open_leads"] { order: 0; }
-        .orders-filter-btn[data-order-filter="in_progress"] { order: 1; }
-        .orders-filter-btn[data-order-filter="completed"] { order: 2; }
+        .orders-filter-btn[data-order-filter="in_progress"] { order: 0; }
+        .orders-filter-btn[data-order-filter="completed"] { order: 1; }
 
         .orders-filter-btn:hover {
             color: var(--accent-light);
@@ -1460,7 +1459,7 @@
                     </div>
                     <div class="create-order-field">
                         <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
-                        <input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="100" placeholder="2800" required>
+                        <input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="1" placeholder="2800" required>
                     </div>
                 </div>
                 <div class="create-order-meta">
@@ -1567,14 +1566,7 @@
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 
         <main class="main-content is-premium-boot-host">
-            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-                <div class="premium-boot-spinner" aria-hidden="true">
-                    <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
-                    <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
-                    <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
-                </div>
-            </div>
-            <div class="premium-boot-shell is-booting" aria-busy="true">
+            <div class="premium-boot-shell" aria-busy="false">
             <div class="topbar">
                 <div class="topbar-left">
                     <h1>Actieve Opdrachten</h1>
@@ -1627,7 +1619,6 @@
             </div>
 
             <div class="orders-filter-bar" aria-label="Opdrachten filter">
-                <button class="orders-filter-btn magnetic" type="button" data-order-filter="open_leads" aria-pressed="false"><span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande leads</span><span class="orders-filter-count" id="filterCountOpenLeads">0</span></button>
                 <button class="orders-filter-btn magnetic" type="button" data-order-filter="in_progress" aria-pressed="false"><span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande opdrachten</span><span class="orders-filter-count" id="filterCountProgress">0</span></button>
                 <button class="orders-filter-btn magnetic" type="button" data-order-filter="completed" aria-pressed="false"><span class="orders-filter-label"><span class="orders-filter-dot"></span>Voltooide opdrachten</span><span class="orders-filter-count" id="filterCountCompleted">0</span></button>
             </div>
@@ -1636,6 +1627,6 @@
             </div>
         </main>
     </div>
-    <!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets/premium-active-orders-boot.js?v=20260502a"></script><script src="assets/premium-active-orders-assignee.js?v=20260505a"></script><script src="assets/premium-personal-assignment-filter.js?v=20260510a"></script><script src="assets/premium-active-orders-customer-db.js?v=20260510a"></script><script src="assets/premium-actieve-opdrachten.js?v=20260526a"></script><script src="assets/premium-active-order-open-leads.js?v=20260518a"></script><script src="assets/premium-active-order-manual-open-leads.js?v=20260519a"></script><script src="assets/premium-personal-assignment-pages.js?v=20260510a"></script>
+    <!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets/premium-active-orders-boot.js?v=20260710a"></script><script src="assets/premium-active-orders-assignee.js?v=20260505a"></script><script src="assets/premium-personal-assignment-filter.js?v=20260510a"></script><script src="assets/premium-active-orders-customer-db.js?v=20260510a"></script><script src="assets/premium-actieve-opdrachten.js?v=20260710a"></script><script src="assets/premium-active-orders-edit-data.js?v=20260629a"></script><script src="assets/premium-personal-assignment-pages.js?v=20260510a"></script>
 </body>
 </html>

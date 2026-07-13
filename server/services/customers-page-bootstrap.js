@@ -1,3 +1,16 @@
+const {
+  MAIL_READY_BOOTSTRAP_CACHE_KEY,
+  MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  parseMailReadySnapshotCacheValue,
+} = require('./premium-database-mail-ready-snapshot');
+
+const DATABASE_MAIL_STATS_CACHE_SCOPE = 'premium_coldmail_stats_cache';
+const DATABASE_MAIL_STATS_CACHE_KEY = 'softora_coldmail_stats_cache_v1';
+const DATABASE_MAIL_ROI_SCOPE = 'premium_database_mail_roi';
+const DATABASE_MAIL_ROI_KEY = 'premium_database_mail_roi_v1';
+const DATABASE_AUTOPILOT_SCOPE = 'premium_coldmail_autopilot';
+const DATABASE_AUTOPILOT_KEY = 'softora_coldmail_autopilot_v1';
+
 function createCustomersPageBootstrapService(deps = {}) {
   const {
     getUiStateValues = async () => null,
@@ -7,12 +20,61 @@ function createCustomersPageBootstrapService(deps = {}) {
     orderScope = 'premium_active_orders',
     orderKey = 'softora_custom_orders_premium_v1',
     orderRuntimeKey = 'softora_order_runtime_premium_v1',
+    listDashboardCustomers = null,
   } = deps;
 
   function normalizeDate(value) {
     const raw = normalizeString(value);
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
     return match ? match[1] : '';
+  }
+
+  function parseJsonObject(value) {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value || '{}') : value;
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function readNonNegativeInteger(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null;
+  }
+
+  function pickNonNegativeInteger(source, keys) {
+    for (const key of keys) {
+      const value = readNonNegativeInteger(source && source[key]);
+      if (value !== null) return value;
+    }
+    return null;
+  }
+
+  function buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState) {
+    const statsValues = statsState && statsState.values && typeof statsState.values === 'object' ? statsState.values : {};
+    const cachedStatsPayload = parseJsonObject(statsValues[DATABASE_MAIL_STATS_CACHE_KEY]);
+    const stats = cachedStatsPayload.stats && typeof cachedStatsPayload.stats === 'object' ? cachedStatsPayload.stats : {};
+    const roiValues = roiState && roiState.values && typeof roiState.values === 'object' ? roiState.values : {};
+    const roi = parseJsonObject(roiValues[DATABASE_MAIL_ROI_KEY]);
+    const autopilotValues = autopilotState && autopilotState.values && typeof autopilotState.values === 'object' ? autopilotState.values : {};
+    const autopilot = parseJsonObject(autopilotValues[DATABASE_AUTOPILOT_KEY]);
+    const dealCount = pickNonNegativeInteger(roi, ['dealCount', 'dealsCount', 'count']);
+    return {
+      mailStats: {
+        sentToday: pickNonNegativeInteger(stats, ['systemSentToday', 'sentToday', 'webdesignSentToday']),
+        bounces: pickNonNegativeInteger(stats, ['bounces', 'totalBounces', 'bouncesTotal']),
+        totalSent: pickNonNegativeInteger(stats, ['systemTotalSent', 'totalSent', 'webdesignTotalSent', 'centralGuardTotalSent']),
+        updatedAt: normalizeString(stats.updatedAt) || null,
+      },
+      mailRoi: {
+        dealCount,
+      },
+      autopilot: Object.prototype.hasOwnProperty.call(autopilot, 'enabled')
+        ? { loaded: true, enabled: autopilot.enabled === true }
+        : { loaded: false, enabled: false },
+    };
   }
 
   function normalizeSearchValue(value) {
@@ -591,6 +653,28 @@ function createCustomersPageBootstrapService(deps = {}) {
     }).join('');
   }
 
+  function buildDashboardUnavailableRevenueChartHtml() {
+    return DASHBOARD_MONTH_LABELS_SHORT.map((label, index) => [
+      '<div class="chart-bar-group">',
+      `<div class="chart-bar" data-chart-index="${index}" style="height: 0px;" title="--"></div>`,
+      `<span class="chart-label">${label}</span>`,
+      '</div>',
+    ].join('')).join('');
+  }
+
+  function isDashboardActiveOrdersStateUnavailable(activeOrdersState) {
+    if (!activeOrdersState || typeof activeOrdersState !== 'object') return true;
+    const source = normalizeString(activeOrdersState && activeOrdersState.source).toLowerCase();
+    const values = activeOrdersState.values && typeof activeOrdersState.values === 'object'
+      ? activeOrdersState.values
+      : null;
+    const hasOrderList = Boolean(values && (
+      Object.prototype.hasOwnProperty.call(values, orderKey) ||
+      Object.prototype.hasOwnProperty.call(values, getChunkMetaKey(orderKey))
+    ));
+    return !source || source === 'unavailable' || source === 'bootstrap-timeout' || !hasOrderList;
+  }
+
   function buildDashboardHtmlReplacements(payload = {}) {
     const payloadUnavailable =
       !payload ||
@@ -602,18 +686,21 @@ function createCustomersPageBootstrapService(deps = {}) {
           !payload.activeOrdersState.values ||
           Object.keys(payload.activeOrdersState.values || {}).length === 0));
 
+    const activeOrdersBreakdown = isDashboardActiveOrdersStateUnavailable(payload?.activeOrdersState)
+      ? null
+      : buildActiveOrdersBreakdown(payload?.activeOrdersState);
+
     if (payloadUnavailable) {
       return {
         SOFTORA_DASHBOARD_TOTAL_REVENUE: '--',
         SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: '--',
         SOFTORA_DASHBOARD_RECURRING_REVENUE: '--',
-        SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml([]),
-        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(null)}`,
+        SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardUnavailableRevenueChartHtml(),
+        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown)}`,
       };
     }
 
     const summary = buildDashboardMetricSummary(payload.customers);
-    const activeOrdersBreakdown = buildActiveOrdersBreakdown(payload.activeOrdersState);
     return {
       SOFTORA_DASHBOARD_TOTAL_REVENUE: formatDashboardMoney(summary.totalRevenue),
       SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: formatDashboardMoney(summary.maintenanceRevenue),
@@ -624,15 +711,68 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
   }
 
-  async function readBootstrapUiState(scope) {
+  function buildUnavailableBootstrapState(error) {
+    return {
+      values: {},
+      source: 'unavailable',
+      error: normalizeString(error?.message || error),
+    };
+  }
+
+  async function resolveBootstrapReadWithTimeout(readPromise, timeoutMs, fallbackValue) {
+    const safeTimeoutMs = Math.max(50, Math.min(10000, Number(timeoutMs) || 0));
+    if (!safeTimeoutMs) return readPromise;
+    let timeout = null;
     try {
-      return await getUiStateValues(scope);
+      return await Promise.race([
+        Promise.resolve(readPromise),
+        new Promise((resolve) => {
+          timeout = setTimeout(() => resolve(fallbackValue), safeTimeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  function getDashboardBootstrapReadOptions(scope) {
+    return {
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressReadFailureLog: true,
+      suppressTransientReadFailureLog: true,
+      readFailureCooldownScope: `premium_dashboard_bootstrap_${normalizeString(scope)}`,
+    };
+  }
+
+  async function readBootstrapUiState(scope, options = {}) {
+    try {
+      return await getUiStateValues(scope, options);
     } catch (error) {
-      return {
-        values: {},
-        source: 'unavailable',
-        error: normalizeString(error?.message || error),
-      };
+      return buildUnavailableBootstrapState(error);
+    }
+  }
+
+  async function readDashboardCustomers() {
+    if (typeof listDashboardCustomers !== 'function') return null;
+    try {
+      const rows = await listDashboardCustomers({
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
+        maxRows: 5000,
+      });
+      if (!Array.isArray(rows)) return null;
+      return sortCustomers(
+        rows.map((item, index) =>
+          setExplicitResponsibleMetadata(
+            normalizeCustomer(item, `dashboard-klant-${index}`),
+            getResponsibleSourceValue(item)
+          )
+        )
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -666,10 +806,51 @@ function createCustomersPageBootstrapService(deps = {}) {
       };
     }
 
-    const remoteState = await readBootstrapUiState(customerScope);
+    const shouldPreferDashboardCustomers = options.preferDashboardCustomers === true;
+
+    if (shouldPreferDashboardCustomers) {
+      const orderStatePromise = resolveBootstrapReadWithTimeout(
+        readBootstrapUiState(orderScope, getDashboardBootstrapReadOptions(orderScope)),
+        options.dashboardOrderStateTimeoutMs || 900,
+        buildUnavailableBootstrapState(new Error('Dashboard opdrachtstate timeout'))
+      );
+      const dashboardCustomersPromise = resolveBootstrapReadWithTimeout(
+        readDashboardCustomers(),
+        options.dashboardCustomersTimeoutMs || 1200,
+        null
+      );
+
+      const [orderState, dashboardCustomers] = await Promise.all([
+        orderStatePromise,
+        dashboardCustomersPromise,
+      ]);
+      const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
+
+      if (Array.isArray(dashboardCustomers)) {
+        return {
+          ok: true,
+          loadedAt: new Date().toISOString(),
+          source: 'dashboard-customers',
+          customers: mergeCustomersWithResponsible(dashboardCustomers, orders),
+          activeOrdersState: buildBootstrapStateSnapshot(orderState),
+        };
+      }
+
+      return {
+        ok: false,
+        loadedAt: new Date().toISOString(),
+        source: 'unavailable',
+        message: 'Supabase-data tijdelijk niet geladen. Je data is niet verwijderd; probeer zo opnieuw.',
+        customers: [],
+        activeOrdersState: buildBootstrapStateSnapshot(orderState),
+      };
+    }
+
     const orderState = await readBootstrapUiState(orderScope);
-    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
     const orders = parseOrders(readChunkedStateValue(orderState?.values, orderKey));
+
+    const remoteState = await readBootstrapUiState(customerScope);
+    const remoteCustomers = parseCustomers(readChunkedStateValue(remoteState?.values, customerKey));
 
     if (remoteCustomers.length) {
       return {
@@ -703,6 +884,54 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
   }
 
+  async function buildMailReadySnapshotBootstrapPayload(options = {}) {
+    const unavailable = {
+      ok: true,
+      loadedAt: new Date().toISOString(),
+      source: 'deferred',
+      deferred: true,
+      customers: [],
+      mailReadySnapshotTotal: null,
+      availableSnapshotTotal: null,
+      activeOrdersState: buildBootstrapStateSnapshot(null),
+    };
+    const readOptions = {
+      uiStateReadTimeoutMs: Math.max(100, Math.min(1200, Number(options.readTimeoutMs) || 650)),
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressReadFailureLog: true,
+      ignoreSupabaseRestFailureCooldown: true,
+      suppressSupabaseRestFailureCooldown: true,
+      readFailureCooldownScope: MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+    };
+    const timeoutMs = Math.max(150, Math.min(1500, Number(options.timeoutMs) || 750));
+    const [state, statsState, roiState, autopilotState] = await Promise.all([
+      MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+      DATABASE_MAIL_STATS_CACHE_SCOPE,
+      DATABASE_MAIL_ROI_SCOPE,
+      DATABASE_AUTOPILOT_SCOPE,
+    ].map((scope) => resolveBootstrapReadWithTimeout(
+      readBootstrapUiState(scope, { ...readOptions, readFailureCooldownScope: scope }),
+      timeoutMs,
+      buildUnavailableBootstrapState(new Error(`${scope} bootstrapcache timeout`))
+    )));
+    const databaseBootstrapState = buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState);
+    const values = state && state.values && typeof state.values === 'object' ? state.values : {};
+    const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
+    if (!snapshot) return { ...unavailable, ...databaseBootstrapState };
+    return {
+      ok: true,
+      loadedAt: new Date().toISOString(),
+      source: 'mail-ready-snapshot-cache',
+      generatedAt: snapshot.generatedAt || null,
+      customers: snapshot.customers.concat(snapshot.availableCustomers),
+      mailReadySnapshotTotal: snapshot.total,
+      availableSnapshotTotal: snapshot.availableTotal,
+      activeOrdersState: buildBootstrapStateSnapshot(null),
+      ...databaseBootstrapState,
+    };
+  }
+
   async function buildActiveOrdersPageBootstrapPayload() {
     const activeOrdersState = await getUiStateValues(orderScope);
     const values =
@@ -724,6 +953,7 @@ function createCustomersPageBootstrapService(deps = {}) {
   return {
     buildActiveOrdersPageBootstrapPayload,
     buildCustomersBootstrapPayload,
+    buildMailReadySnapshotBootstrapPayload,
     buildDashboardHtmlReplacements,
   };
 }

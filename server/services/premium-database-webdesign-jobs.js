@@ -18,6 +18,36 @@ const WEBDESIGN_GUTTER_CROP_MIN_PAD = 12;
 const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
 const WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE = 'WEBPREVIEW_SAFETY_BLOCKED';
 const WEBDESIGN_JOB_CANCELLED_ERROR = 'Geannuleerd door gebruiker.';
+const WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE =
+  'De OpenAI-websitegenerator had tijdelijk moeite met dit webdesign. Probeer deze lead later opnieuw.';
+const WEBDESIGN_TRANSIENT_STORAGE_ERROR_MESSAGE =
+  'De webdesignfoto kon tijdelijk niet veilig worden opgeslagen. Probeer deze lead later opnieuw.';
+const WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE = 'Webdesign maken is mislukt. Probeer deze lead later opnieuw.';
+const SOFTORA_WEBDESIGN_OUTREACH_ROLE = 'WEBDESIGN & SOFTWARE ONTWIKKELING';
+const DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
+  name: 'Servé Creusen',
+  roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
+});
+const SOFTORA_WEBDESIGN_OUTREACH_PROFILES_BY_EMAIL = Object.freeze({
+  'serve@softora.nl': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
+  'servecreusen@softora.nl': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
+  'servec321@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
+  'serve290@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
+  'servecreusen7@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
+  'contact.venvisuals@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
+  'martijn@softora.nl': {
+    name: 'Martijn van de Ven',
+    roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
+  },
+  'martijnvandeven@softora.nl': {
+    name: 'Martijn van de Ven',
+    roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
+  },
+  'martijnven123@gmail.com': {
+    name: 'Martijn van de Ven',
+    roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
+  },
+});
 let cachedSharp = null;
 
 function loadSharpModule() {
@@ -560,7 +590,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function pruneJobs() {
     const currentTime = now();
     for (const [id, job] of jobs.entries()) {
-      if (currentTime - job.createdAt > JOB_TTL_MS) jobs.delete(id);
+      if (isExpiredJob(job, currentTime)) jobs.delete(id);
     }
     while (jobs.size > MAX_JOBS) {
       let oldestId = null;
@@ -576,10 +606,30 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
+  function isExpiredJob(job, currentTime = now()) {
+    const createdAt = Number(job && job.createdAt) || 0;
+    return !createdAt || currentTime - createdAt > JOB_TTL_MS;
+  }
+
   function ownerKeyFromReq(req) {
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
     const uid = normalizeString(req?.premiumAuth?.userId || '');
     return email || uid ? `${email}::${uid}` : '';
+  }
+
+  function ownerEmailFromOwnerKey(ownerKey) {
+    return normalizeString(ownerKey).split('::')[0].toLowerCase();
+  }
+
+  function resolveWebdesignOutreachProfile(ownerKey) {
+    const ownerEmail = ownerEmailFromOwnerKey(ownerKey);
+    const profile =
+      SOFTORA_WEBDESIGN_OUTREACH_PROFILES_BY_EMAIL[ownerEmail] ||
+      DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE;
+    return {
+      ...profile,
+      source: 'premium-database-webdesign-jobs',
+    };
   }
 
   function normalizeJobId(value) {
@@ -766,9 +816,79 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return /abort|timeout|timed out|duurde te lang|fetch failed|terminated|econnreset|socket|netwerkfout/i.test(combined);
   }
 
+  function collectWebdesignErrorDetails(error) {
+    return [
+      typeof error === 'string' ? error : '',
+      error && error.message,
+      error?.data?.error?.message,
+      error?.data?.error?.detail,
+      error?.data?.error?.code,
+      error?.data?.error,
+      error?.data?.detail,
+      error?.data?.safety_violations,
+      error?.data?.safetyViolations,
+    ].map(normalizeString).filter(Boolean).join(' ');
+  }
+
+  function isHardOpenAiWebdesignErrorText(value) {
+    return /openai_api_key ontbreekt|image-model ongeldig|organization must be verified|not verified|billing|quota|credits|monthly usage|maximum monthly spend|invalid authentication|incorrect api key/i.test(
+      normalizeString(value)
+    );
+  }
+
+  function isTransientOpenAiWebdesignErrorText(value) {
+    const text = normalizeString(value);
+    if (!text || isHardOpenAiWebdesignErrorText(text)) return false;
+    return /OpenAI websitegenerator mislukt \((?:408|429|5\d\d)\)|The server had an error while processing your request|Rate limit reached|Please try again|temporarily unavailable|overloaded|timeout|timed out|duurde te lang/i.test(
+      text
+    );
+  }
+
+  function stripOpenAiOperationalBoilerplate(value) {
+    let text = normalizeString(value);
+    if (!text) return '';
+    text = text
+      .replace(/\s*\(?Please include the request ID\b[^)]*\)?\.?/gi, ' ')
+      .replace(/\breq_[a-z0-9]+\b/gi, ' ')
+      .replace(/\s*Sorry about that!\s*/gi, ' ')
+      .replace(/\s*You can retry your request, or contact us through our help center at help\.openai\.com if the error persists\.?/gi, ' ')
+      .replace(/\(\s*\)/g, ' ')
+      .replace(/\s+([.,;:!?])/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return text;
+  }
+
+  function getUserFacingWebdesignErrorFromError(error) {
+    if (isOpenAiSafetyBlockedError(error)) return WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE;
+    if (error && error.retryableWebdesignStorage === true) return WEBDESIGN_TRANSIENT_STORAGE_ERROR_MESSAGE;
+    if (isRetryableWebdesignError(error)) return WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE;
+    const clean = stripOpenAiOperationalBoilerplate(collectWebdesignErrorDetails(error));
+    return truncateText(clean || WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE, 500);
+  }
+
+  function sanitizeWebdesignJobErrorForUser(error) {
+    if (!error || error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE || isOpenAiSafetyBlockedError(error)) return null;
+    const detail = collectWebdesignErrorDetails(error);
+    if (isTransientOpenAiWebdesignErrorText(detail)) return WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE;
+    const clean = stripOpenAiOperationalBoilerplate(detail || error);
+    return truncateText(clean || WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE, 500);
+  }
+
+  function getBatchTargetErrorForJob(job) {
+    if (!job || !job.error) return WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE;
+    if (job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE || isOpenAiSafetyBlockedError(job.error)) return 'OpenAI safety block';
+    return sanitizeWebdesignJobErrorForUser(job.error) || WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE;
+  }
+
+  function sanitizeBatchUserError(value) {
+    return sanitizeWebdesignJobErrorForUser(value) || '';
+  }
+
   function isOpenAiSafetyBlockedError(error) {
     if (error && error.openAiSafetyBlocked === true) return true;
     const detail = [
+      typeof error === 'string' ? error : '',
       error && error.message,
       error?.data?.error?.message,
       error?.data?.error?.detail,
@@ -830,13 +950,13 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function serializeJob(job) {
     const retry = getRetryState(job);
-    const safetyBlocked = job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE;
+    const safetyBlocked = job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE || isOpenAiSafetyBlockedError(job.error);
     return {
       id: job.id,
       status: job.status,
       customerId: job.customer.id,
       company: job.customer.bedrijf,
-      error: safetyBlocked ? null : job.error || null,
+      error: safetyBlocked ? null : sanitizeWebdesignJobErrorForUser(job.error),
       safetyBlocked,
       createdAt: job.createdAt,
       startedAt: job.startedAt || null,
@@ -900,7 +1020,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   async function findRunningJobForCustomer(ownerKey, customerId) {
     if (dataOpsStore && typeof dataOpsStore.findRunningWebdesignJob === 'function') {
       const persistent = await dataOpsStore.findRunningWebdesignJob(ownerKey, customerId);
-      if (persistent) {
+      if (persistent && !isExpiredJob(persistent)) {
         jobs.set(persistent.id, persistent);
         return persistent;
       }
@@ -908,6 +1028,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     for (const job of jobs.values()) {
       if (job.ownerKey !== ownerKey) continue;
       if (job.customer.id !== customerId) continue;
+      if (isExpiredJob(job)) continue;
       if (job.status === 'queued' || job.status === 'running') return job;
     }
     return null;
@@ -946,7 +1067,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (dataOpsStore && typeof dataOpsStore.listVisibleWebdesignJobs === 'function') {
       const persistentJobs = await dataOpsStore.listVisibleWebdesignJobs(ownerKey);
       (Array.isArray(persistentJobs) ? persistentJobs : []).forEach((job) => {
-        if (job && job.id) {
+        if (job && job.id && !isExpiredJob(job)) {
           jobs.set(job.id, job);
           byId.set(job.id, job);
         }
@@ -954,6 +1075,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
     Array.from(jobs.values())
       .filter((job) => job.ownerKey === ownerKey)
+      .filter((job) => !isExpiredJob(job))
       .filter((job) => job.status === 'queued' || job.status === 'running')
       .forEach((job) => byId.set(job.id, job));
     const visible = [];
@@ -1139,6 +1261,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         action: 'webdesign',
         company: job.customer.bedrijf,
         domain: job.customer.dom,
+        softoraOutreachProfile: resolveWebdesignOutreachProfile(job.ownerKey),
       },
     });
 
@@ -1205,7 +1328,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
             attempts: failedAttemptCount,
             nextAttemptAt: now() + retryDelayMs,
             lastRetryAt: now(),
-            lastRetryReason: truncateText(normalizeString(error && error.message) || 'Tijdelijke OpenAI-limiet.', 500),
+            lastRetryReason: getUserFacingWebdesignErrorFromError(error),
           };
           if (typeof logger.warn === 'function') {
             logger.warn(
@@ -1217,9 +1340,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         }
       }
       job.status = 'error';
-      job.error = isOpenAiSafetyBlockedError(error)
-        ? WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE
-        : truncateText(normalizeString(error && error.message) || 'Webdesign maken is mislukt.', 500);
+      job.error = getUserFacingWebdesignErrorFromError(error);
       job.finishedAt = now();
       const retry = getRetryState(job);
       job.retry = {
@@ -1764,7 +1885,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       nextAttemptAt: summary.nextAttemptAt,
       activeJobIds,
       activeJobCount: activeJobIds.length,
-      lastError: truncateText(normalizeString(batch.lastError || batch.error || ''), 500),
+      lastError: sanitizeBatchUserError(batch.lastError || batch.error || ''),
       createdAt: batch.createdAt || null,
       startedAt: batch.startedAt || null,
       finishedAt: batch.finishedAt || null,
@@ -1797,7 +1918,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       markTarget(target, 'done', { error: '' });
     } else if (job.status === 'error') {
       markTarget(target, 'error', {
-        error: job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE ? 'OpenAI safety block' : truncateText(job.error || 'Webdesign maken is mislukt.', 500),
+        error: getBatchTargetErrorForJob(job),
       });
     } else if (job.status === 'running') {
       markTarget(target, 'running', { error: '' });
@@ -1851,7 +1972,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           changed.add(chunk.index);
         } else if (job.status === 'error') {
           markTarget(target, 'error', {
-            error: job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE ? 'OpenAI safety block' : truncateText(job.error || 'Webdesign maken is mislukt.', 500),
+            error: getBatchTargetErrorForJob(job),
           });
           changed.add(chunk.index);
         } else if (target.status !== job.status) {
@@ -1885,7 +2006,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         if (result.ok && result.job && result.job.id) {
           const job = result.job;
           if (job.status === 'done') markTarget(target, 'done', { jobId: job.id, error: '' });
-          else if (job.status === 'error') markTarget(target, 'error', { jobId: job.id, error: job.error || 'Webdesign maken is mislukt.' });
+          else if (job.status === 'error') markTarget(target, 'error', { jobId: job.id, error: getBatchTargetErrorForJob(job) });
           else {
             markTarget(target, job.status === 'running' ? 'running' : 'queued', { jobId: job.id, error: '' });
             summary.active += 1;
@@ -1894,7 +2015,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           changed.add(chunk.index);
           continue;
         }
-        const message = truncateText(normalizeString(result.detail || result.error || 'Webdesign starten is tijdelijk mislukt.'), 500);
+        const message =
+          sanitizeWebdesignJobErrorForUser(result.detail || result.error) || 'Webdesign starten is tijdelijk mislukt.';
         if (isRetryableStartFailure(result)) {
           const attempts = Math.max(0, Number(target.attempts) || 0) + 1;
           target.attempts = attempts;

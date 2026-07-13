@@ -2,15 +2,19 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
-    const PAGE_LIMIT = 100;
+    const PAGE_LIMIT = 3000;
     const MAX_SNAPSHOT_ROWS = 3000;
-    const FIRST_PAGE_TIMEOUT_MS = 2500;
+    const FIRST_PAGE_TIMEOUT_MS = 6000;
     const NEXT_PAGE_TIMEOUT_MS = 4500;
     const PAGE_CONCURRENCY = 3;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
 
     function isSnapshotMailReadyCustomer(customer) {
         return Boolean(customer && customer.mailReadySnapshot === true && customer.mailReady === true);
+    }
+
+    function isSnapshotAvailableCustomer(customer) {
+        return Boolean(customer && customer.availableSnapshot === true && customer.mailReady !== true);
     }
 
     function normalizeSnapshotCustomer(raw, index, normalizeCustomer) {
@@ -25,8 +29,31 @@
         });
     }
 
+    function normalizeAvailableSnapshotCustomer(raw, index, normalizeCustomer) {
+        const normalized = typeof normalizeCustomer === "function" ? normalizeCustomer(raw, "available-snapshot-" + index) : Object.assign({}, raw || {});
+        return Object.assign({}, normalized, {
+            hasPhoto: raw && raw.hasPhoto === true,
+            hasMockup: raw && raw.hasMockup === true,
+            websitePhotoAssetReady: raw && raw.hasPhoto === true,
+            websiteMockupAssetReady: raw && raw.hasMockup === true,
+            mailReady: false,
+            mailReadySnapshot: false,
+            availableSnapshot: true
+        });
+    }
+
     function normalizeMatchValue(value) {
         return String(value || "").trim().toLowerCase();
+    }
+
+    function dedupeCustomers(customers) {
+        const seenIds = new Set();
+        return (Array.isArray(customers) ? customers : []).filter(function (customer) {
+            const id = normalizeMatchValue(customer && customer.id);
+            if (!id || seenIds.has(id)) return false;
+            seenIds.add(id);
+            return true;
+        });
     }
 
     function getMatchKeys(customer) {
@@ -39,10 +66,10 @@
         ].filter(Boolean);
     }
 
-    function buildSnapshotMap(snapshotCustomers) {
+    function buildSnapshotMap(snapshotCustomers, predicate) {
         const map = new Map();
         (Array.isArray(snapshotCustomers) ? snapshotCustomers : []).forEach(function (customer) {
-            if (!isSnapshotMailReadyCustomer(customer)) return;
+            if (typeof predicate === "function" && !predicate(customer)) return;
             getMatchKeys(customer).forEach(function (key) {
                 if (!map.has(key)) map.set(key, customer);
             });
@@ -50,26 +77,70 @@
         return map;
     }
 
-    function mergeAssetFlags(customers, snapshotCustomers) {
-        const snapshotMap = buildSnapshotMap(snapshotCustomers);
-        if (!snapshotMap.size) return customers || [];
-        return (customers || []).map(function (customer) {
-            const match = getMatchKeys(customer).map(function (key) { return snapshotMap.get(key); }).find(Boolean);
-            if (!match) return customer;
-            return Object.assign({}, customer, {
-                hasPhoto: true,
-                hasMockup: true,
-                websitePhotoAssetReady: true,
-                websiteMockupAssetReady: true
-            });
+    function findSnapshotMatch(snapshotMap, customer) {
+        return getMatchKeys(customer).map(function (key) { return snapshotMap.get(key); }).find(Boolean);
+    }
+
+    function mergeSnapshotMedia(customer, snapshotMatch, isMailReady) {
+        const match = snapshotMatch || {};
+        const hasPhoto = isMailReady ? true : match.hasPhoto === true;
+        const hasMockup = isMailReady ? true : match.hasMockup === true;
+        return Object.assign({}, customer, {
+            websitePhoto: hasPhoto ? String(match.websitePhoto || customer.websitePhoto || "").trim() : "",
+            websitePhotoName: String(match.websitePhotoName || customer.websitePhotoName || "").trim(),
+            websiteMockup: hasMockup ? String(match.websiteMockup || customer.websiteMockup || "").trim() : "",
+            websiteMockupName: String(match.websiteMockupName || customer.websiteMockupName || "").trim(),
+            signedUrlExpiresAt: String(match.signedUrlExpiresAt || customer.signedUrlExpiresAt || "").trim(),
+            hasPhoto: hasPhoto,
+            hasMockup: hasMockup,
+            websitePhotoAssetReady: hasPhoto,
+            websiteMockupAssetReady: hasMockup,
+            mailReady: Boolean(isMailReady),
+            mailReadySnapshot: Boolean(isMailReady),
+            availableSnapshot: !isMailReady
         });
+    }
+
+    function mergeAssetFlags(customers, snapshotCustomers, availableSnapshotCustomers) {
+        const snapshotMap = buildSnapshotMap(snapshotCustomers, isSnapshotMailReadyCustomer);
+        const availableMap = buildSnapshotMap(availableSnapshotCustomers, isSnapshotAvailableCustomer);
+        if (!snapshotMap.size && !availableMap.size) return dedupeCustomers(customers);
+        return dedupeCustomers(customers).map(function (customer) {
+            const mailReadyMatch = findSnapshotMatch(snapshotMap, customer);
+            const availableMatch = findSnapshotMatch(availableMap, customer);
+            if (mailReadyMatch) return mergeSnapshotMedia(customer, mailReadyMatch, true);
+            if (availableMatch) return mergeSnapshotMedia(customer, availableMatch, false);
+            if (customer && (customer.mailReadySnapshot === true || customer.availableSnapshot === true)) return Object.assign({}, customer, { mailReady: false, mailReadySnapshot: false, availableSnapshot: false });
+            return customer;
+        });
+    }
+
+    function mergeWithCanonicalSnapshots(customers, snapshotCustomers, availableSnapshotCustomers) {
+        const remoteCustomers = dedupeCustomers(customers);
+        const snapshotRows = dedupeCustomers(snapshotCustomers).filter(isSnapshotMailReadyCustomer);
+        const availableRows = dedupeCustomers(availableSnapshotCustomers).filter(isSnapshotAvailableCustomer);
+        if (!snapshotRows.length && !availableRows.length) return remoteCustomers;
+        const remoteMap = buildSnapshotMap(remoteCustomers);
+        const consumed = new Set();
+        const canonical = snapshotRows.map(function (snapshotCustomer) {
+            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            if (remoteMatch) consumed.add(remoteMatch);
+            return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, true);
+        }).concat(availableRows.map(function (snapshotCustomer) {
+            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            if (remoteMatch) consumed.add(remoteMatch);
+            return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);
+        }));
+        return canonical.concat(remoteCustomers.filter(function (customer) { return !consumed.has(customer); }));
     }
 
     function getDisplayCount(state, currentCount) {
         const count = Math.max(0, Number(currentCount) || 0);
         if (state && String(state.query || "").trim()) return count;
-        if (!state || !state.mailReadySnapshotLoaded || state.activeStatus !== "benaderbaar" || !Number.isFinite(Number(state.mailReadySnapshotTotal))) return count;
-        return Math.max(count, Number(state.mailReadySnapshotTotal));
+        if (!state) return count;
+        if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded && Number.isFinite(Number(state.mailReadySnapshotTotal))) return Math.max(0, Number(state.mailReadySnapshotTotal));
+        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && Number.isFinite(Number(state.availableSnapshotTotal))) return Math.max(0, Number(state.availableSnapshotTotal));
+        return count;
     }
 
     function clearRetry(state) {
@@ -100,7 +171,7 @@
     }
 
     async function fetchSnapshotPage(config, limit, offset, timeoutMs) {
-        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "no-store" }, timeoutMs);
+        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "default" }, timeoutMs);
         if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
         const payload = await response.json().catch(function () { return {}; });
         if (!payload || payload.ok !== true) throw new Error(String(payload && (payload.detail || payload.error) || "Mailklare snapshot gaf geen geldige data terug."));
@@ -110,24 +181,28 @@
     }
 
     function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
-        return (Array.isArray(rows) ? rows : []).map(function (row, index) {
+        return dedupeCustomers((Array.isArray(rows) ? rows : []).map(function (row, index) {
             return normalizeSnapshotCustomer(row, offset + index, normalizeCustomer);
-        }).filter(function (customer) { return customer && customer.id; });
+        }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    function publishSnapshot(config, snapshotCustomers, total, pending) {
+    function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, pending) {
         const state = config.state;
         state.mailReadySnapshotLoaded = true;
         state.mailReadySnapshotFailed = false;
         state.mailReadySnapshotPending = Boolean(pending);
-        state.mailReadySnapshotTotal = Math.max(snapshotCustomers.length, Number(total) || 0);
+        state.mailReadySnapshotTotal = pending ? Math.max(snapshotCustomers.length, Number(total) || 0) : snapshotCustomers.length;
         state.mailReadySnapshotCustomers = snapshotCustomers;
+        state.availableSnapshotLoaded = true;
+        state.availableSnapshotTotal = availableCustomers.length;
+        state.availableSnapshotCustomers = availableCustomers;
         state.dataUnavailable = false;
         clearRetry(state);
         if (typeof config.applyCustomerList === "function") {
             const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
-            const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(isSnapshotMailReadyCustomer);
-            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeAssetFlags(currentCustomers, snapshotCustomers) : snapshotCustomers, true);
+            const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer); });
+            const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers));
+            config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, false);
         }
     }
 
@@ -159,12 +234,14 @@
         try {
             const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
-            publishSnapshot(config, snapshotCustomers, firstPage.total, firstPage.total > snapshotCustomers.length);
-            if (firstPage.total > snapshotCustomers.length && snapshotCustomers.length < MAX_SNAPSHOT_ROWS) {
+            let availableCustomers = normalizeAvailableSnapshotRows(firstPage.payload.availableCustomers, 0, config.normalizeCustomer);
+            const hasRemainingPages = firstPage.total > firstPage.rows.length;
+            publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, hasRemainingPages);
+            if (hasRemainingPages && firstPage.rows.length < MAX_SNAPSHOT_ROWS) {
                 try {
                     const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
                     snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
-                    publishSnapshot(config, snapshotCustomers, firstPage.total, false);
+                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, false);
                 } catch (error) {
                     state.mailReadySnapshotFailed = true;
                     state.mailReadySnapshotPending = true;
@@ -185,5 +262,11 @@
         }
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, normalizeCustomer: normalizeSnapshotCustomer, mergeAssetFlags: mergeAssetFlags, getDisplayCount: getDisplayCount, load: load };
+    function normalizeAvailableSnapshotRows(rows, offset, normalizeCustomer) {
+        return dedupeCustomers((Array.isArray(rows) ? rows : []).map(function (row, index) {
+            return normalizeAvailableSnapshotCustomer(row, offset + index, normalizeCustomer);
+        }).filter(function (customer) { return customer && customer.id; }));
+    }
+
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
 })(window);

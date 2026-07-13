@@ -4,6 +4,10 @@ const assert = require('node:assert/strict');
 const {
   createCustomersPageBootstrapService,
 } = require('../../server/services/customers-page-bootstrap');
+const {
+  MAIL_READY_BOOTSTRAP_CACHE_KEY,
+  MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+} = require('../../server/services/premium-database-mail-ready-snapshot');
 
 test('customers page bootstrap prefers stored customer database rows', async () => {
   const service = createCustomersPageBootstrapService({
@@ -122,6 +126,249 @@ test('customers page bootstrap can defer heavy customer rows for the premium dat
   assert.equal(payload.activeOrdersState.source, '');
 });
 
+test('premium database bootstrap reads the compact snapshot and lightweight metric caches', async () => {
+  const seenReads = [];
+  const snapshot = {
+    version: 1,
+    generatedAt: '2026-07-10T12:00:00.000Z',
+    total: 1013,
+    customers: [
+      { id: 'mail-ready-1', bedrijf: 'Mailklaar', mailReady: true, mailReadySnapshot: true },
+    ],
+    availableTotal: 113,
+    availableCustomers: [
+      { id: 'available-1', bedrijf: 'Beschikbaar', availableSnapshot: true },
+    ],
+  };
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope, options) => {
+      seenReads.push({ scope, options });
+      if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { systemSentToday: 4, totalBounces: 29, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
+      if (scope === 'premium_database_mail_roi') return { source: 'supabase', values: { premium_database_mail_roi_v1: JSON.stringify({ dealCount: 2 }) } };
+      if (scope === 'premium_coldmail_autopilot') return { source: 'supabase', values: { softora_coldmail_autopilot_v1: JSON.stringify({ enabled: false }) } };
+      assert.equal(scope, MAIL_READY_BOOTSTRAP_CACHE_SCOPE);
+      return {
+        source: 'supabase',
+        values: { [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify(snapshot) },
+      };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'mail-ready-snapshot-cache');
+  assert.equal(payload.mailReadySnapshotTotal, 1013);
+  assert.equal(payload.availableSnapshotTotal, 113);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
+  assert.deepEqual(payload.mailStats, { sentToday: 4, bounces: 29, totalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' });
+  assert.deepEqual(payload.mailRoi, { dealCount: 2 });
+  assert.deepEqual(payload.autopilot, { loaded: true, enabled: false });
+  assert.deepEqual(seenReads.map((read) => read.scope), [
+    MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+    'premium_coldmail_stats_cache',
+    'premium_database_mail_roi',
+    'premium_coldmail_autopilot',
+  ]);
+  assert.equal(seenReads.every((read) => read.options.uiStateReadTimeoutMs === 650), true);
+  assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
+});
+
+test('premium database bootstrap never turns a missing cache into fake zero totals', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async () => ({ source: 'supabase', values: {} }),
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'deferred');
+  assert.equal(payload.deferred, true);
+  assert.deepEqual(payload.customers, []);
+  assert.equal(payload.mailReadySnapshotTotal, null);
+  assert.equal(payload.availableSnapshotTotal, null);
+});
+
+test('customers page bootstrap gebruikt compacte dashboardklanten zonder zware customer state', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      if (scope === 'premium_customers_database') {
+        throw new Error('Dashboard bootstrap mag de zware klantstate niet lezen.');
+      }
+      if (scope === 'premium_active_orders') {
+        return {
+          source: 'supabase:data_ops',
+          values: {
+            softora_custom_orders_premium_v1: JSON.stringify([]),
+          },
+        };
+      }
+      return null;
+    },
+    listDashboardCustomers: async () => [
+      {
+        id: 'klant-compact-1',
+        naam: 'Linsey Klaus',
+        bedrijf: 'Linszorgt.nl',
+        websiteBedrag: 300,
+        status: 'Betaald',
+        databaseStatus: 'klant',
+        datum: '2026-03-23',
+      },
+    ],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'dashboard-customers');
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.customers[0].bedrijf, 'Linszorgt.nl');
+  assert.equal(payload.customers[0].websiteBedrag, 300);
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac300');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^1<script>/);
+});
+
+test('dashboard bootstrap toont geen nep-nullen wanneer alleen opdrachten geladen zijn', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      if (scope !== 'premium_active_orders') {
+        throw new Error('Dashboard mag niet terugvallen op de zware customer-state.');
+      }
+      return {
+        source: 'supabase:data_ops',
+        values: {
+          softora_custom_orders_premium_v1: JSON.stringify([
+            { id: 1, clientName: 'Klant A', title: 'Website opdracht', status: 'wacht' },
+            { id: 2, clientName: 'Klant B', title: 'Website opdracht', status: 'wacht' },
+          ]),
+          softora_order_runtime_premium_v1: '{}',
+        },
+      };
+    },
+    listDashboardCustomers: async () => null,
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+    dashboardCustomersTimeoutMs: 25,
+    dashboardOrderStateTimeoutMs: 25,
+  });
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.source, 'unavailable');
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
+  assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^--<script>/);
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /"website":2/);
+});
+
+test('dashboard bootstrap behandelt een lege formele klantenlijst als geldige nul', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      return {
+        source: 'supabase:data_ops',
+        values: {
+          softora_custom_orders_premium_v1: '[]',
+          softora_order_runtime_premium_v1: '{}',
+        },
+      };
+    },
+    listDashboardCustomers: async () => [],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'dashboard-customers');
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(service.buildDashboardHtmlReplacements(payload).SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac0');
+});
+
+test('dashboard bootstrap behandelt runtime zonder opdrachtenlijst als onvolledig', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async () => ({
+      source: 'supabase:data_ops',
+      values: {
+        softora_order_runtime_premium_v1: JSON.stringify({ 7: { statusKey: 'running' } }),
+      },
+    }),
+    listDashboardCustomers: async () => [
+      {
+        id: 'klant-1',
+        databaseStatus: 'klant',
+        status: 'Betaald',
+        websiteBedrag: 300,
+        datum: '2026-03-23',
+      },
+    ],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({ preferDashboardCustomers: true });
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+
+  assert.equal(payload.ok, true);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac300');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
+  assert.doesNotMatch(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /"website":0/);
+});
+
+test('customers page bootstrap laat trage actieve opdrachten dashboardklanten niet blokkeren', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      if (scope === 'premium_active_orders') return new Promise(() => {});
+      throw new Error('Zware klantstate mag niet nodig zijn wanneer dashboardklanten geladen zijn.');
+    },
+    listDashboardCustomers: async () => [
+      {
+        id: 'klant-compact-1',
+        naam: 'Linsey Klaus',
+        bedrijf: 'Linszorgt.nl',
+        websiteBedrag: 300,
+        status: 'Betaald',
+        databaseStatus: 'klant',
+        datum: '2026-03-23',
+      },
+    ],
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload({
+    preferDashboardCustomers: true,
+    dashboardOrderStateTimeoutMs: 5,
+    dashboardCustomersTimeoutMs: 50,
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'dashboard-customers');
+  assert.deepEqual(seenScopes, ['premium_active_orders']);
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.activeOrdersState.source, 'unavailable');
+
+  const replacements = service.buildDashboardHtmlReplacements(payload);
+  assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '\u20ac300');
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^1<script>/);
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
+});
+
 test('customers page bootstrap vult dashboard actieve-opdrachten teller server-side', () => {
   const orders = JSON.stringify([
     {
@@ -170,6 +417,7 @@ test('customers page bootstrap vult dashboard actieve-opdrachten teller server-s
   const replacements = service.buildDashboardHtmlReplacements({
     customers: [],
     activeOrdersState: {
+      source: 'supabase:data_ops',
       values: {
         softora_custom_orders_premium_v1: '',
         softora_custom_orders_premium_v1_chunks_v1: JSON.stringify({ count: 2 }),
@@ -209,6 +457,8 @@ test('customers page bootstrap toont dashboard data als tijdelijk niet geladen i
   assert.equal(payload.source, 'unavailable');
   assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
   assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
+  assert.doesNotMatch(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /title="€0"/);
+  assert.match(replacements.SOFTORA_DASHBOARD_REVENUE_CHART, /title="--"/);
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^--<script>/);
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /markActiveOrdersUnavailable/);
 });

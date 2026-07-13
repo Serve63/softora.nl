@@ -201,7 +201,7 @@ function registerColdmailingRoutes(app, deps = {}) {
   }
 
   app.get('/coldmailing/webdesign-foto', async (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, s-maxage=31536000, immutable');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -365,6 +365,9 @@ function registerColdmailingRoutes(app, deps = {}) {
           message: 'Coldmail statistieken zijn niet beschikbaar.',
         });
         return;
+      }
+      if (typeof res.setHeader === 'function') {
+        res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
       }
       res.json(await coldmailCampaignService.getColdmailLiveStats());
     } catch (error) {

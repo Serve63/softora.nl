@@ -52,6 +52,15 @@ function wait(ms = 0) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createRetryableOpenAi500Error() {
+  const error = new Error(
+    'OpenAI websitegenerator mislukt (500): The server had an error while processing your request. Sorry about that! You can retry your request, or contact us through our help center at help.openai.com if the error persists. (Please include the request ID req_7d9c53460a9f4c5a8ec43e369fb1caa7 in your message.)'
+  );
+  error.status = 500;
+  error.retryableOpenAiImage = true;
+  return error;
+}
+
 async function createSideGutterWebdesignDataUrl(options = {}) {
   const sharp = require('sharp');
   const width = Number(options.width) || 1024;
@@ -437,6 +446,11 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
   assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
   assert.equal(pipelineCalls[0].options.body.source, 'premium-database');
+  assert.deepEqual(pipelineCalls[0].options.body.softoraOutreachProfile, {
+    name: 'Servé Creusen',
+    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+    source: 'premium-database-webdesign-jobs',
+  });
 });
 
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {
@@ -1239,6 +1253,54 @@ test('premium database webdesign jobs list running jobs for the current user', a
   assert.equal(res.body.jobs[0].customerId, 'customer-list');
 });
 
+test('premium database webdesign jobs hide expired persistent jobs and allow a fresh restart', async () => {
+  const nowMs = Date.parse('2026-07-10T15:00:00.000Z');
+  const store = createInMemoryWebdesignBatchStore();
+  store.jobs.set('expired-job-123456', {
+    id: 'expired-job-123456',
+    ownerKey: 'owner@softora.nl::owner',
+    websiteUrl: 'https://softora.nl/',
+    customer: { id: 'customer-expired', bedrijf: 'Verlopen job' },
+    status: 'queued',
+    error: null,
+    createdAt: nowMs - (7 * 60 * 60 * 1000),
+    startedAt: 0,
+    finishedAt: 0,
+  });
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    dataOpsStore: store,
+    processJobsInline: false,
+    now: () => nowMs,
+  });
+
+  const listRes = createResponseRecorder();
+  await coordinator.listJobsResponse(
+    { premiumAuth: { email: 'owner@softora.nl', userId: 'owner' } },
+    listRes
+  );
+  assert.equal(listRes.statusCode, 200);
+  assert.deepEqual(listRes.body.jobs, []);
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'fresh-job-12345678',
+        websiteUrl: 'https://softora.nl/',
+        customer: { id: 'customer-expired', bedrijf: 'Nieuwe job' },
+      },
+    },
+    startRes
+  );
+
+  assert.equal(startRes.statusCode, 202);
+  assert.equal(startRes.body.job.id, 'fresh-job-12345678');
+});
+
 test('premium database webdesign jobs keep thousands of queued jobs visible', async () => {
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
@@ -1453,6 +1515,136 @@ test('premium database webdesign jobs requeue transient photo storage failures i
   assert.equal(pipelineCalls, 2);
   assert.equal(uploadedPhotos.length, 1);
   assert.equal(uploadedPhotos[0].customerId, 'customer-storage-retry');
+});
+
+test('premium database webdesign jobs show a safe message after exhausted OpenAI 500 retries', async () => {
+  let nowMs = 1760000000000;
+  let pipelineCalls = 0;
+  let persistedJob = null;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    now: () => nowMs,
+    retryJitter: false,
+    dataOpsStore: {
+      upsertWebdesignJob: async (job) => {
+        persistedJob = cloneJson(job);
+        return { ok: true };
+      },
+      getWebdesignJob: async (jobId) => (persistedJob && persistedJob.id === jobId ? cloneJson(persistedJob) : null),
+      uploadDesignPhoto: async () => ({ ok: true }),
+    },
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        throw createRetryableOpenAi500Error();
+      },
+    },
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_openai500safe',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-openai-500', bedrijf: 'Softora' },
+      },
+    },
+    createResponseRecorder()
+  );
+
+  let latest = null;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const statusRes = createResponseRecorder();
+    await coordinator.getJobResponse(
+      {
+        premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+        params: { jobId: 'job_openai500safe' },
+      },
+      statusRes
+    );
+    assert.equal(statusRes.statusCode, 200);
+    latest = statusRes.body.job;
+    if (latest.status === 'error') break;
+    if (latest.status === 'queued' && latest.nextAttemptAt) nowMs = latest.nextAttemptAt + 1;
+  }
+
+  assert.equal(latest.status, 'error');
+  assert.match(latest.error, /OpenAI-websitegenerator had tijdelijk moeite/i);
+  assert.doesNotMatch(JSON.stringify(latest), /req_7d9c|help\.openai\.com|server had an error|Please include/i);
+  assert.equal(pipelineCalls, 6);
+  assert.equal(persistedJob.error, latest.error);
+  assert.doesNotMatch(JSON.stringify({ error: persistedJob.error, retry: persistedJob.retry }), /req_7d9c|help\.openai\.com|server had an error|Please include/i);
+});
+
+test('premium database webdesign bulk stores safe target errors after exhausted OpenAI 500 retries', async () => {
+  const store = createInMemoryWebdesignBatchStore();
+  let nowMs = 1760000000000;
+  let pipelineCalls = 0;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    now: () => nowMs,
+    retryJitter: false,
+    bulkActiveJobLimit: 1,
+    bulkStartLimit: 1,
+    dataOpsStore: store,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        throw createRetryableOpenAi500Error();
+      },
+    },
+  });
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+
+  const startRes = createResponseRecorder();
+  await coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 1 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  await coordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        targets: [
+          {
+            websiteUrl: 'https://openai-500-bulk.test',
+            customer: { id: 'customer-openai-500-bulk', bedrijf: 'OpenAI 500 Bulk', dom: 'openai-500-bulk.test' },
+          },
+        ],
+      },
+    },
+    createResponseRecorder()
+  );
+  await coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 1, expectedChunks: 1 } }, createResponseRecorder());
+
+  let latest = null;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const run = await coordinator.runBatchWorker({ batchLimit: 1, jobLimit: 1, concurrency: 1 });
+    assert.equal(run.ok, true);
+    latest = run.batches[0] || latest;
+    if (latest.failed === 1) break;
+    if (latest.nextAttemptAt) nowMs = latest.nextAttemptAt + 1;
+  }
+
+  const statusRes = createResponseRecorder();
+  await coordinator.getBatchResponse({ premiumAuth: auth, params: { batchId } }, statusRes);
+  assert.equal(statusRes.statusCode, 200);
+  latest = statusRes.body.batch;
+  const chunk = Array.from(store.chunks.values())[0];
+  const target = chunk.targets[0];
+  assert.equal(latest.failed, 1);
+  assert.equal(latest.remaining, 0);
+  assert.equal(target.status, 'error');
+  assert.match(target.error, /OpenAI-websitegenerator had tijdelijk moeite/i);
+  assert.equal(pipelineCalls, 6);
+  assert.doesNotMatch(JSON.stringify({ batch: latest, target }), /req_7d9c|help\.openai\.com|server had an error|Please include/i);
 });
 
 test('premium database webdesign jobs keep non-retryable OpenAI errors as hard errors', async () => {

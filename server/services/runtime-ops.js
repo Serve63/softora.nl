@@ -9,6 +9,44 @@ const SPORTSCHOOL_LOGBOOK_SCOPE = 'sportschool_logboek';
 const SPORTSCHOOL_LOGBOOK_KEY = 'sportschool_logboek_v1';
 const SPORTSCHOOL_LOGBOOK_MAX_LENGTH = 180000;
 
+function normalizeDashboardCustomerAmount(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : null;
+}
+
+function projectDashboardCustomer(raw, index, normalizeString) {
+  const customer = raw && typeof raw === 'object' ? raw : {};
+  const clean = (value, maxLength) => normalizeString(value).slice(0, maxLength);
+  const rawType = clean(customer.type, 80);
+  const type = rawType === 'Onderhoud' || rawType === 'Website + onderhoud' ? rawType : 'Website';
+  const legacyAmount = normalizeDashboardCustomerAmount(customer.bedrag);
+  const websiteAmount = normalizeDashboardCustomerAmount(customer.websiteBedrag);
+  const maintenanceAmount = normalizeDashboardCustomerAmount(customer.onderhoudPerMaand);
+  const websiteBedrag = websiteAmount !== null
+    ? websiteAmount
+    : type === 'Website' || type === 'Website + onderhoud'
+      ? legacyAmount
+      : null;
+  const onderhoudPerMaand = maintenanceAmount !== null
+    ? maintenanceAmount
+    : type === 'Onderhoud'
+      ? legacyAmount
+      : null;
+  return {
+    id: clean(customer.id, 160) || `dashboard-customer-${index}`,
+    naam: clean(customer.naam, 180),
+    bedrijf: clean(customer.bedrijf, 180),
+    type,
+    websiteBedrag,
+    onderhoudPerMaand,
+    bedrag: legacyAmount !== null ? legacyAmount : websiteBedrag ?? onderhoudPerMaand ?? 0,
+    status: clean(customer.status, 40),
+    databaseStatus: clean(customer.databaseStatus, 40),
+    datum: clean(customer.datum, 40),
+  };
+}
+
 function normalizeSportschoolLogbookSnapshot(rawSnapshot) {
   let snapshot = rawSnapshot;
   if (typeof snapshot === 'string') {
@@ -123,6 +161,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
     dataOpsUiStateBridge = null,
+    dataOpsStore = null,
     sportschoolLogbookStore = null,
     dataOpsUiStateReadTimeoutMs = 2500,
     dataOpsUiStateReadTimeoutMsByScope = {},
@@ -131,6 +170,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     appendSecurityAuditEvent = () => {},
     logger = console,
   } = deps;
+  let sportschoolLogbookWriteQueue = Promise.resolve();
 
   function normalizeListLimit(value, fallback = 100) {
     return Math.max(1, Math.min(500, parseIntSafe(value, fallback)));
@@ -152,6 +192,56 @@ function createRuntimeOpsCoordinator(deps = {}) {
       count: Math.min(limit, recentSecurityAuditEvents.length),
       events: recentSecurityAuditEvents.slice(0, limit),
     });
+  }
+
+  async function sendDashboardCustomersResponse(_req, res) {
+    if (typeof res.setHeader === 'function') {
+      res.setHeader('Cache-Control', 'no-store, private');
+    }
+    if (!dataOpsStore || typeof dataOpsStore.listDashboardCustomers !== 'function') {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon formele dashboardklanten niet laden.',
+      });
+    }
+
+    try {
+      const customers = await awaitWithTimeout(
+        dataOpsStore.listDashboardCustomers({
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+          maxRows: 5000,
+        }),
+        1800,
+        'Dashboardklanten read timeout na 2s'
+      );
+      if (!Array.isArray(customers)) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Kon formele dashboardklanten niet laden.',
+        });
+      }
+
+      const dashboardCustomers = customers.map((customer, index) =>
+        projectDashboardCustomer(customer, index, normalizeString)
+      );
+      return res.status(200).json({
+        ok: true,
+        loadedAt: new Date().toISOString(),
+        source: 'dashboard-customers',
+        customers: dashboardCustomers,
+      });
+    } catch (error) {
+      const log = logger && (typeof logger.warn === 'function' ? logger.warn : logger.error);
+      if (typeof log === 'function') {
+        log.call(logger, '[RuntimeOps][dashboard-customers]', error?.message || error);
+      }
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon formele dashboardklanten niet laden.',
+      });
+    }
   }
 
   function requiresAdminUiStateAccess(scope) {
@@ -454,12 +544,23 @@ function createRuntimeOpsCoordinator(deps = {}) {
       rank: version * 10 + (hasExerciseSources ? 1 : 0),
       version,
       hasExerciseSources,
+      freshnessMs: getSportschoolLogbookStateFreshnessMs(state),
     };
   }
 
   function parseStateUpdatedAtMs(state) {
     const parsed = Date.parse(normalizeString(state && state.updatedAt));
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function parseSnapshotUpdatedAtMs(snapshot) {
+    const parsed = Date.parse(normalizeString(snapshot && snapshot.updatedAt));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function getSportschoolLogbookStateFreshnessMs(state) {
+    const snapshotUpdatedAtMs = parseSnapshotUpdatedAtMs(parseSportschoolLogbookStateSnapshot(state));
+    return snapshotUpdatedAtMs || parseStateUpdatedAtMs(state);
   }
 
   function shouldPreferLegacySportschoolLogbook(fallbackState, sportschoolState) {
@@ -470,7 +571,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     if (fallbackQuality.rank !== sportschoolQuality.rank) {
       return fallbackQuality.rank > sportschoolQuality.rank;
     }
-    return parseStateUpdatedAtMs(fallbackState) > parseStateUpdatedAtMs(sportschoolState);
+    return fallbackQuality.freshnessMs > sportschoolQuality.freshnessMs;
   }
 
   function getPreferredSportschoolLogbookState(leftState, rightState) {
@@ -481,13 +582,21 @@ function createRuntimeOpsCoordinator(deps = {}) {
     if (leftQuality.rank !== rightQuality.rank) {
       return leftQuality.rank > rightQuality.rank ? leftState : rightState;
     }
-    return parseStateUpdatedAtMs(leftState) >= parseStateUpdatedAtMs(rightState) ? leftState : rightState;
+    return leftQuality.freshnessMs >= rightQuality.freshnessMs ? leftState : rightState;
   }
 
   function isOlderSportschoolLogbookWrite(incomingState, existingState) {
     const incomingQuality = getSportschoolLogbookStateQuality(incomingState);
     const existingQuality = getSportschoolLogbookStateQuality(existingState);
-    return existingQuality.usable && incomingQuality.usable && incomingQuality.rank < existingQuality.rank;
+    if (!existingQuality.usable || !incomingQuality.usable) return false;
+    if (incomingQuality.rank !== existingQuality.rank) return incomingQuality.rank < existingQuality.rank;
+    return existingQuality.freshnessMs > 0 && incomingQuality.freshnessMs < existingQuality.freshnessMs;
+  }
+
+  function enqueueSportschoolLogbookWrite(operation) {
+    const run = sportschoolLogbookWriteQueue.then(operation, operation);
+    sportschoolLogbookWriteQueue = run.catch(() => {});
+    return run;
   }
 
   async function sendSportschoolLogbookGetResponse(_req, res) {
@@ -509,12 +618,15 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
     const selectedState = shouldRecoverLegacy ? fallbackState : sportschoolState || fallbackState;
+    const selectedSportschoolQuality = getSportschoolLogbookStateQuality(sportschoolState);
+    const fallbackSportschoolQuality = getSportschoolLogbookStateQuality(fallbackState);
     if (
       selectedState === sportschoolState &&
-      hasSportschoolLogbookValue(sportschoolState) &&
-      (!hasSportschoolLogbookValue(fallbackState) ||
-        getSportschoolLogbookStateQuality(sportschoolState).rank >
-          getSportschoolLogbookStateQuality(fallbackState).rank)
+      selectedSportschoolQuality.usable &&
+      (!fallbackSportschoolQuality.usable ||
+        selectedSportschoolQuality.rank > fallbackSportschoolQuality.rank ||
+        (selectedSportschoolQuality.rank === fallbackSportschoolQuality.rank &&
+          selectedSportschoolQuality.freshnessMs > fallbackSportschoolQuality.freshnessMs))
     ) {
       await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, sportschoolState.values, {
         source: 'sportschool-logboek-canonical-sync',
@@ -543,62 +655,75 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
-    const valuesToSave = { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson };
-    const meta = {
-      source: normalizeString(body.source || 'sportschool-logboek'),
-      actor: normalizeString(body.actor || 'serve'),
-    };
-    const currentSportschoolState =
-      sportschoolLogbookStore &&
-      typeof sportschoolLogbookStore.readLogbookState === 'function'
-        ? await sportschoolLogbookStore.readLogbookState()
-        : null;
-    const currentFallbackState = await getUiStateValuesForScope(SPORTSCHOOL_LOGBOOK_SCOPE);
-    const currentState = getPreferredSportschoolLogbookState(currentSportschoolState, currentFallbackState);
-    const incomingState = {
-      values: valuesToSave,
-      source: 'request',
-      updatedAt: new Date().toISOString(),
-    };
+    const result = await enqueueSportschoolLogbookWrite(async () => {
+      const valuesToSave = { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson };
+      const meta = {
+        source: normalizeString(body.source || 'sportschool-logboek'),
+        actor: normalizeString(body.actor || 'serve'),
+      };
+      const currentSportschoolState =
+        sportschoolLogbookStore &&
+        typeof sportschoolLogbookStore.readLogbookState === 'function'
+          ? await sportschoolLogbookStore.readLogbookState()
+          : null;
+      const currentFallbackState = await getUiStateValuesForScope(SPORTSCHOOL_LOGBOOK_SCOPE);
+      const currentState = getPreferredSportschoolLogbookState(currentSportschoolState, currentFallbackState);
+      const incomingState = {
+        values: valuesToSave,
+        source: 'request',
+        updatedAt: new Date().toISOString(),
+      };
 
-    if (isOlderSportschoolLogbookWrite(incomingState, currentState)) {
-      return res.status(409).json({
-        ok: false,
-        scope: SPORTSCHOOL_LOGBOOK_SCOPE,
-        error: 'Verouderde sportschool logboekdata geweigerd.',
-        values: (currentState && currentState.values) || {},
-        source: (currentState && currentState.source) || 'supabase',
-        updatedAt: (currentState && currentState.updatedAt) || null,
-      });
-    }
+      if (isOlderSportschoolLogbookWrite(incomingState, currentState)) {
+        return {
+          statusCode: 409,
+          payload: {
+            ok: false,
+            scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+            error: 'Verouderde sportschool logboekdata geweigerd.',
+            values: (currentState && currentState.values) || {},
+            source: (currentState && currentState.source) || 'supabase',
+            updatedAt: (currentState && currentState.updatedAt) || null,
+          },
+        };
+      }
 
-    const sportschoolState =
-      sportschoolLogbookStore &&
-      typeof sportschoolLogbookStore.writeLogbookSnapshot === 'function'
-        ? await sportschoolLogbookStore.writeLogbookSnapshot(snapshotJson, meta)
-        : null;
-    if (sportschoolState) {
-      await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta);
-    }
-    const state =
-      sportschoolState ||
-      (await mirrorUiStateValuesToDataOps(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta)) ||
-      (await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta));
+      const sportschoolState =
+        sportschoolLogbookStore &&
+        typeof sportschoolLogbookStore.writeLogbookSnapshot === 'function'
+          ? await sportschoolLogbookStore.writeLogbookSnapshot(snapshotJson, meta)
+          : null;
+      if (sportschoolState) {
+        await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta);
+      }
+      const state =
+        sportschoolState ||
+        (await mirrorUiStateValuesToDataOps(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta)) ||
+        (await setUiStateValues(SPORTSCHOOL_LOGBOOK_SCOPE, valuesToSave, meta));
 
-    if (!state) {
-      return res.status(503).json({
-        ok: false,
-        error: 'Kon sportschool logboek niet opslaan zonder geldige Supabase-opslag.',
-      });
-    }
+      if (!state) {
+        return {
+          statusCode: 503,
+          payload: {
+            ok: false,
+            error: 'Kon sportschool logboek niet opslaan zonder geldige Supabase-opslag.',
+          },
+        };
+      }
 
-    return res.status(200).json({
-      ok: true,
-      scope: SPORTSCHOOL_LOGBOOK_SCOPE,
-      values: state.values || { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson },
-      source: state.source || 'supabase',
-      updatedAt: state.updatedAt || null,
+      return {
+        statusCode: 200,
+        payload: {
+          ok: true,
+          scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+          values: state.values || { [SPORTSCHOOL_LOGBOOK_KEY]: snapshotJson },
+          source: state.source || 'supabase',
+          updatedAt: state.updatedAt || null,
+        },
+      };
     });
+
+    return res.status(result.statusCode).json(result.payload);
   }
 
   function sendDashboardActivityCreateResponse(req, res) {
@@ -622,6 +747,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     requiresAdminUiStateAccess,
     sendDashboardActivityCreateResponse,
     sendDashboardActivityResponse,
+    sendDashboardCustomersResponse,
     sendSecurityAuditLogResponse,
     sendSportschoolLogbookGetResponse,
     sendSportschoolLogbookSetResponse,

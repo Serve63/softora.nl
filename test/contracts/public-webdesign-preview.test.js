@@ -299,6 +299,119 @@ test('public webdesign preview concept route switches the profile by sender cont
   assert.doesNotMatch(response.body, /Piggy’s Kadoshop/);
 });
 
+test('public webdesign preview concept route enriches slug-only photo matches with customer sender context', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'safe-dedupe-20260615-row-1181-8d61e8ac53',
+          bedrijf: 'Autobedrijf Stef Spierings',
+          website: 'https://stefspierings.com/',
+          lastColdmailSenderEmail: 'martijn@websoftora.com',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'photo-only-stefspierings',
+          fileName: 'autobedrijf-stef-spierings-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/stefspierings-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/stefspierings-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({ params: { companySlug: 'autobedrijf-stef-spierings' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<h1 class="hero-title">Autobedrijf Stef Spierings<\/h1>/);
+  assert.match(response.body, /<img src="\/assets\/martijn-van-de-ven-profile\.png\?v=20260609a" alt="Martijn van de Ven"/);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.doesNotMatch(response.body, /<strong>Softora<\/strong>/);
+});
+
+test('public webdesign preview concept route lets Instantly sender query override missing profile context', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-zonnestraaltje-nl-0001',
+          bedrijf: 'Kindercentrum T Zonnestraaltje',
+          website: 'https://www.t-zonnestraaltje.nl',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-zonnestraaltje-nl-0001',
+          fileName: 't-zonnestraaltje.nl-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/zonnestraaltje-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/zonnestraaltje-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'kindercentrum-t-zonnestraaltje' },
+    query: { cid: 'manual-import-zonnestraaltje-nl-0001', sender: 'martijn' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<h1 class="hero-title">Kindercentrum T Zonnestraaltje<\/h1>/);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(response.body, /martijn-van-de-ven-profile\.png/);
+  assert.match(response.body, /Zó heb ik het webdesign gebouwd/);
+  assert.doesNotMatch(response.body, /<strong>Softora<\/strong>/);
+  assert.doesNotMatch(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+});
+
+test('public webdesign preview concept route lets Instantly sender query beat stale customer sender fields', async () => {
+  const service = createPublicWebdesignPreviewService({
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'manual-import-stale-profile-nl-0001',
+          bedrijf: 'Stale Profile BV',
+          lastColdmailSenderEmail: 'serve@websoftora.com',
+          sentFromEmail: 'serve@websoftora.com',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'manual-import-stale-profile-nl-0001',
+          fileName: 'stale-profile-webdesign.png',
+          websitePhotoUrl: 'https://signed.softora.test/stale-profile-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/stale-profile-mockup.jpg?token=test',
+        }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'stale-profile-bv' },
+    query: { cid: 'manual-import-stale-profile-nl-0001', sender: 'martijn' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.match(response.body, /martijn-van-de-ven-profile\.png/);
+  assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+});
+
 test('public webdesign preview asset route optimizes signed image URLs before falling back to redirect', async () => {
   const originalFetch = global.fetch;
   let fetchedUrl = '';
@@ -1140,7 +1253,7 @@ test('public webdesign preview reads structured data ops storage before ui-state
   assert.equal(preview.mockupSource, 'https://signed.softora.test/aagje-mockup.jpg?token=test');
 });
 
-test('public webdesign preview does not render a personal profile when profile enrichment times out', async () => {
+test('public webdesign preview renders the neutral profile when profile enrichment times out', async () => {
   let customerReads = 0;
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
@@ -1173,14 +1286,66 @@ test('public webdesign preview does not render a personal profile when profile e
   await service.getConceptPageResponse({ params: { companySlug: 'snel-laden' } }, response);
   const elapsedMs = Date.now() - startedAt;
 
-  assert.equal(response.statusCode, 503);
+  assert.equal(response.statusCode, 200);
   assert.equal(response.headers['Cache-Control'], 'no-store, max-age=0, must-revalidate');
-  assert.equal(response.headers['Retry-After'], '2');
+  assert.equal(response.headers['Retry-After'], undefined);
   assert.ok(elapsedMs < 110, `expected slow profile context to return a temporary response, took ${elapsedMs}ms`);
   assert.equal(customerReads, 1);
-  assert.match(response.body, /Preview wordt geladen/);
+  assert.match(response.body, /<strong>Softora<\/strong>/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /Preview wordt geladen/);
   assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+});
+
+test('public webdesign preview uses customer sender before slow outbound guard lookup', async () => {
+  let guardReads = 0;
+  const service = createPublicWebdesignPreviewService({
+    profileContextTimeoutMs: 50,
+    async getUiStateValues() {
+      return { values: {} };
+    },
+    dataOpsStore: {
+      async listCustomers() {
+        return [{
+          id: 'safe-dedupe-20260615-row-2541-21644e60a0',
+          bedrijf: 'Kindercentrum T Zonnestraaltje',
+          website: 'https://www.t-zonnestraaltje.nl',
+          instantlySenderProfileKey: 'serve',
+          instantlySenderEmail: 'serve@websoftora.com',
+          lastColdmailSenderEmail: 'serve@websoftora.com',
+        }];
+      },
+      async listDesignPhotosWithSignedUrls() {
+        return [{
+          customerId: 'safe-dedupe-20260615-row-2541-21644e60a0',
+          identityKey: 'kindercentrum t zonnestraaltje|kindercentrum t zonnestraaltje|www.t-zonnestraaltje.nl',
+          fileName: 'www.t-zonnestraaltje.nl-preview.png',
+          websitePhotoUrl: 'https://signed.softora.test/zonnestraaltje-webdesign.png?token=test',
+          websiteMockupUrl: 'https://signed.softora.test/zonnestraaltje-mockup.jpg?token=test',
+        }];
+      },
+      async listOutboundRecipientGuardsForPreview() {
+        guardReads += 1;
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return [];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getConceptPageResponse({
+    params: { companySlug: 'kindercentrum-t-zonnestraaltje' },
+    query: { cid: 'safe-dedupe-20260615-row-2541-21644e60a0' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(guardReads, 0);
+  assert.match(response.body, /<h1 class="hero-title">Kindercentrum T Zonnestraaltje<\/h1>/);
+  assert.match(response.body, /<strong>Servé Creusen<\/strong>/);
+  assert.match(response.body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Softora<\/strong>/);
+  assert.doesNotMatch(response.body, /softora-strategy-meeting\.jpg/);
 });
 
 test('public webdesign preview keeps neutral concept pages without sender context uncached', async () => {
@@ -1220,7 +1385,7 @@ test('public webdesign preview keeps neutral concept pages without sender contex
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
 });
 
-test('public webdesign preview refuses a temporary personal fallback when outbound guard lookup is slow', async () => {
+test('public webdesign preview renders the neutral profile when outbound guard lookup is slow', async () => {
   const service = createPublicWebdesignPreviewService({
     profileContextTimeoutMs: 50,
     async getUiStateValues() {
@@ -1255,10 +1420,14 @@ test('public webdesign preview refuses a temporary personal fallback when outbou
 
   await service.getConceptPageResponse({ params: { companySlug: 'trage-guard' } }, response);
 
-  assert.equal(response.statusCode, 503);
-  assert.match(response.body, /Preview wordt geladen/);
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<strong>Softora<\/strong>/);
+  assert.match(response.body, /softora-strategy-meeting\.jpg/);
+  assert.doesNotMatch(response.body, /Preview wordt geladen/);
   assert.doesNotMatch(response.body, /<strong>Servé Creusen<\/strong>/);
   assert.doesNotMatch(response.body, /serve-creusen-profile\.jpg/);
+  assert.doesNotMatch(response.body, /<strong>Martijn van de Ven<\/strong>/);
+  assert.doesNotMatch(response.body, /martijn-van-de-ven-profile\.png/);
 });
 
 test('public webdesign preview reuses resolved preview data for follow-up asset requests', async () => {

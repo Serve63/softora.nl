@@ -1,6 +1,6 @@
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
-const DEFAULT_LOGO_PATH = '/assets/61C2BCF5-70E9-4789-AFDE-FA18C862D58A.PNG';
+const DEFAULT_LOGO_PATH = '/assets/softora-touch-icon.png';
 const SOFTORA_PUBLIC_EMAIL = 'info@softora.nl';
 const SOFTORA_PUBLIC_PHONE = '+31643262792';
 const MARTIJN_WHATSAPP_URL = 'https://wa.me/31643262792';
@@ -958,7 +958,8 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Money pages hebben ondersteunende pagina’s nodig',
         paragraphs: Object.freeze([
-          'Een dienstpagina zoals website laten maken of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
+          'Een dienstpagina zoals website laten maken, bedrijfssoftware op maat of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
+          'Voor bedrijfssoftware werkt dat bijvoorbeeld met uitleg over CRM, dashboards, klantportalen en offerteflows. Die ondersteunende pagina’s geven context, terwijl de dienstpagina bedrijfssoftware op maat de commerciële keuze en contactstap scherp houdt.',
           'Zo blijft de commerciële pagina scherp, terwijl de site toch veel nuttige uitleg biedt.',
         ]),
       }),
@@ -972,10 +973,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'Blog', href: '/blog' }),
       Object.freeze({ label: 'Diensten', href: '/diensten' }),
       Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
-      Object.freeze({ label: 'Conversiegerichte website', href: '/kennisbank/wat-is-een-conversiegerichte-website' }),
     ]),
   }),
   Object.freeze({
@@ -2917,6 +2919,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<meta name="description" content="${escapeHtml(description)}">`,
     '<meta name="robots" content="index, follow">',
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
+    '<link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">',
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">',
     '<link rel="stylesheet" href="/assets/fonts.css?v=20260409a">',
     '<link rel="stylesheet" href="/assets/seo-content.css?v=20260608a">',

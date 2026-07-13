@@ -242,12 +242,12 @@ test('page smoke: public regio article is crawlable service HTML', async () => {
   assert.match(html, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
 });
 
-test('page smoke: /favicon.ico serves the Softora favicon', async () => {
+test('page smoke: /favicon.ico serves the stable Softora search favicon', async () => {
   const response = await fetch(`${serverRef.baseUrl}/favicon.ico`, { cache: 'no-store' });
   const bytes = Buffer.from(await response.arrayBuffer());
 
   assert.equal(response.status, 200, '/favicon.ico');
-  assert.ok(response.url.endsWith('/assets/softora-favicon-round.png?v=20260616a'));
+  assert.ok(response.url.endsWith('/assets/softora-search-favicon.png'));
   assert.match(response.headers.get('content-type') || '', /^image\/png\b/);
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
 });
@@ -339,12 +339,17 @@ test('page smoke: premium-website.html handles missing cursor elements safely', 
   );
 });
 
-test('page smoke: premium-pakketten.html shows the current Premium package price', () => {
+test('page smoke: premium-pakketten.html shows the current website guideline prices', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-pakketten.html'), 'utf8');
   assert.match(
     html,
-    /<div class="card-name">Premium<\/div>[^]*?<div class="price-amount">€2\.495/,
-    'Premium websitepakket hoort op €2.495 te staan.'
+    /<div class="card-tier">Richtlijn 3<\/div>[^]*?<div class="price-amount">€2\.250,-<\/div>/,
+    'Richtlijn 3 hoort op €2.250,- te staan.'
+  );
+  assert.match(
+    html,
+    /<div class="card-tier">Richtlijn 4<\/div>[^]*?<div class="price-amount">€3\.500,-<\/div>/,
+    'Richtlijn 4 hoort op €3.500,- te staan.'
   );
   assert.match(
     html,
@@ -397,40 +402,38 @@ test('page smoke: premium-ai-coldmailing.html keeps personal assignment filter o
   assert.doesNotMatch(html, /assets\/premium-personal-assignment-pages\.js/, 'Leads pagina-asset voor persoonlijke toewijzingen hoort weg te zijn.');
 });
 
-test('page smoke: premium-actieve-opdrachten.html shows openstaande leads as the primary tab label', () => {
+test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande opdrachten', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
   const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
   const assignmentFilterScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-filter.js'), 'utf8');
   const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
-  const openLeadsScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-order-open-leads.js'), 'utf8');
-  const manualLeadsScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-active-order-manual-open-leads.js'), 'utf8');
-  const source = `${html}\n${assignmentFilterScript}\n${script}\n${openLeadsScript}\n${manualLeadsScript}\n${assignmentPagesScript}`;
+  const source = `${html}\n${assignmentFilterScript}\n${script}\n${assignmentPagesScript}`;
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
-  assert.match(html, /data-order-filter="open_leads"/, 'Openstaande leads-tab hoort zichtbaar te zijn.');
+  assert.doesNotMatch(html, /data-order-filter="open_leads"/, 'Openstaande leads-tab hoort niet meer zichtbaar te zijn.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
-  assert.match(html, /assets\/premium-active-order-open-leads\.js\?v=20260518a/, 'Openstaande leads asset ontbreekt.');
-  assert.match(html, /assets\/premium-active-order-manual-open-leads\.js\?v=20260519a/, 'Handmatige openstaande leads asset ontbreekt.');
+  assert.doesNotMatch(html, /assets\/premium-active-order-open-leads\.js/, 'Openstaande leads asset mag niet in de eerste laadroute staan.');
+  assert.doesNotMatch(html, /assets\/premium-active-order-manual-open-leads\.js/, 'Handmatige openstaande leads asset mag niet in de eerste laadroute staan.');
   assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260510a/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
-  assert.match(manualLeadsScript, /overlay\.id = 'createChoiceModal';/, 'Keuzemodal voor aanmaken ontbreekt.');
-  assert.match(manualLeadsScript, /form\.id = 'createOpenLeadForm';/, 'Handmatige openstaande-lead form ontbreekt.');
   assert.match(html, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/, 'Aanmaken-knop hoort neutraal te zijn.');
   const createButtonHtml = html.match(/<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?<\/button>/)?.[0] || '';
   assert.doesNotMatch(createButtonHtml, /<svg\b/, 'Aanmaken-knop hoort geen plus-icoon meer te tonen.');
   assert.doesNotMatch(createButtonHtml, /Aanmaken[\s\S]*Aanmaken/, 'Aanmaken-knop mag het label niet dubbel tonen.');
-  assert.match(manualLeadsScript, /button\.replaceChildren\(document\.createTextNode\('Aanmaken'\)\);/, 'Script moet het label naar één enkele tekst resetten.');
-  assert.doesNotMatch(createButtonHtml, /Actieve Opdracht Aanmaken/, 'Topknop mag niet meer alleen actieve opdracht noemen.');
-  assert.match(html, />Openstaande leads<\/span>/, 'Primaire tab hoort Openstaande leads te tonen.');
-  assert.doesNotMatch(source, /href = '\/premium-leads';/, 'Openstaande leads mag niet naar de leads-pagina linken.');
+  assert.doesNotMatch(html, />Openstaande leads<\/span>/, 'Openstaande leads mag niet meer zichtbaar zijn.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
-  assert.match(source, /Geen openstaande leads\./, 'Lege-state hoort bij de openstaande leads-tab te passen.');
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
-  assert.match(source, /let activeOrderFilter = 'open_leads';/, 'Standaardfilter hoort op openstaande leads te staan.');
-  assert.match(source, /card\.dataset\.orderFilterGroup = 'open_leads';/, 'Openstaande lead-kaarten horen onder de open-leads filter te vallen.');
-  assert.match(manualLeadsScript, /softora_manual_open_leads_v1/, 'Handmatige openstaande leads moeten persistent zijn.');
-  assert.match(manualLeadsScript, /openCreateModal,/, 'Openstaande lead aanmaken moet vanaf de keuzeknop open kunnen.');
+  assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op openstaande opdrachten te staan.');
+  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260710a"><\/script>/, 'Bootstrap hoort direct te starten.');
+  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script>/, 'Opdrachten-script hoort direct te starten.');
+});
+
+test('page smoke: premium-actieve-opdrachten.html renders without a blocking boot loader', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
+  assert.doesNotMatch(html, /premium-boot-loader|premium-boot-one-second\.js/, 'De actieve opdrachtenpagina mag geen laadscherm meer tonen.');
+  assert.doesNotMatch(html, /premium-boot-shell is-booting/, 'De pagina-inhoud mag niet verborgen starten.');
+  assert.match(html, /<div class="premium-boot-shell" aria-busy="false">/, 'De pagina moet direct als niet-busy renderen.');
 });
 
 test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {

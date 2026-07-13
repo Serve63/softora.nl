@@ -22,6 +22,10 @@ test('data ops store restores large premium database webdesign job queues', () =
   );
   assert.match(source, /function getWebdesignBatchTableStatus\(status\)[\s\S]*return normalized === 'cancelled' \? 'error' : normalized;/);
   assert.match(source, /status,\s*total: Math\.max/);
+  assert.match(
+    source,
+    /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)/
+  );
 });
 
 test('data ops store reads mailbox messages for coldmail bounce stats', async () => {
@@ -30,7 +34,7 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     message_key: 'serve@softora.nl|inbox|101',
     account_email: 'serve@softora.nl',
     folder: 'inbox',
-    subject: 'Returned Mail',
+    subject: 'Returned Mail: Kleine vraag over jullie website',
   };
   const client = {
     from(table) {
@@ -45,6 +49,10 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
         },
         in(column, values) {
           calls.push(['in', column, values]);
+          return query;
+        },
+        eq(column, value) {
+          calls.push(['eq', column, value]);
           return query;
         },
         order(column, options) {
@@ -69,19 +77,20 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     accountEmails: ['Serve@Softora.nl'],
     folders: ['INBOX'],
     maxRows: 50,
+    bounceCandidatesOnly: true,
   });
 
   assert.deepEqual(rows, [row]);
   assert.deepEqual(calls[0], [
     'select',
     'softora_mailbox_messages',
-    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at',
+    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,deleted_at',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'deleted_at', null]);
-  assert.deepEqual(calls.find((call) => call[0] === 'in' && call[1] === 'account_email'), [
-    'in',
+  assert.deepEqual(calls.find((call) => call[0] === 'eq' && call[1] === 'account_email'), [
+    'eq',
     'account_email',
-    ['serve@softora.nl'],
+    'serve@softora.nl',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'in' && call[1] === 'folder'), [
     'in',
@@ -89,7 +98,54 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
     ['inbox'],
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'date', { ascending: false }]);
+  assert.equal(calls.some((call) => call[0] === 'or'), false);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
+});
+
+test('data ops store reads bounce candidates per mailbox and filters without a table-wide OR scan', async () => {
+  const accountQueries = [];
+  const rowsByAccount = {
+    'serve@softora.nl': [
+      { message_key: 'serve|1', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Returned Mail: test', date: '2026-07-10T10:00:00.000Z' },
+      { message_key: 'serve|2', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Gewone reactie', date: '2026-07-10T11:00:00.000Z' },
+    ],
+    'martijn@softora.nl': [
+      { message_key: 'martijn|1', account_email: 'martijn@softora.nl', folder: 'inbox', subject: 'Mail delivery failed: returning message to sender', date: '2026-07-10T12:00:00.000Z' },
+    ],
+  };
+  const client = {
+    from() {
+      let accountEmail = '';
+      const query = {
+        select() { return query; },
+        is() { return query; },
+        eq(column, value) {
+          if (column === 'account_email') accountEmail = value;
+          accountQueries.push(value);
+          return query;
+        },
+        in() { return query; },
+        order() { return query; },
+        limit() { return Promise.resolve({ data: rowsByAccount[accountEmail] || [], error: null }); },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const rows = await store.listMailboxMessages({
+    accountEmails: ['serve@softora.nl', 'martijn@softora.nl'],
+    folders: ['inbox'],
+    maxRows: 1000,
+    bounceCandidatesOnly: true,
+  });
+
+  assert.deepEqual(accountQueries.sort(), ['martijn@softora.nl', 'serve@softora.nl']);
+  assert.deepEqual(rows.map((row) => row.message_key), ['martijn|1', 'serve|1']);
 });
 
 test('data ops store saves cancelled webdesign batches with a table-compatible status', async () => {
@@ -600,6 +656,185 @@ test('data ops store paginates customer reads beyond Supabase default page size'
     [0, 999],
     [1000, 1999],
   ]);
+});
+
+test('data ops store reads compact dashboard customers from structured rows', async () => {
+  const calls = [];
+  const rows = [
+    {
+      customer_id: 'cust-1',
+      payload: {
+        websiteBedrag: 450,
+        status: 'Betaald',
+        datum: '2026-03-23',
+      },
+      company: 'Linszorgt.nl',
+      contact_name: 'Linsey Klaus',
+      phone: '+31 6 13 18 38 44',
+      email: 'linsey@example.nl',
+      website: 'linszorgt.nl',
+      database_status: 'klant',
+      lifecycle_status: 'klant',
+      responsible: 'Serve',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+    {
+      customer_id: 'lead-1',
+      payload: { status: 'gemaild', databaseStatus: 'gemaild' },
+      database_status: 'gemaild',
+      lifecycle_status: 'gemaild',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+  ];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      const query = {
+        select(columns) {
+          calls.push(['select', columns]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        or(value) {
+          calls.push(['or', value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        range(from, to) {
+          calls.push(['range', from, to]);
+          return Promise.resolve({
+            data: rows.slice(from, to + 1),
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error: () => {}, warn: () => {} },
+  });
+
+  const customers = await store.listDashboardCustomers();
+
+  assert.deepEqual(calls[0], [
+    'select',
+    'customer_id,payload,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,updated_at',
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'deleted_at', null]);
+  assert.deepEqual(calls.find((call) => call[0] === 'or'), [
+    'or',
+    'database_status.eq.klant,lifecycle_status.eq.klant',
+  ]);
+  assert.equal(customers.length, 1);
+  assert.equal(customers[0].id, 'cust-1');
+  assert.equal(customers[0].naam, 'Linsey Klaus');
+  assert.equal(customers[0].bedrijf, 'Linszorgt.nl');
+  assert.equal(customers[0].websiteBedrag, 450);
+  assert.equal(customers[0].databaseStatus, 'klant');
+});
+
+test('data ops store reads and claims customer identity keys through the dedicated registry table', async () => {
+  const calls = {
+    selects: [],
+    upserts: [],
+  };
+  const identityRows = [
+    {
+      key_type: 'domain',
+      key_value: 'softora.test',
+      customer_id: 'customer-1',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+    {
+      key_type: 'email',
+      key_value: 'info@softora.test',
+      customer_id: 'customer-1',
+      updated_at: '2026-06-29T12:00:00.000Z',
+    },
+  ];
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customer_identity_keys');
+      return {
+        select(columns) {
+          const query = { columns, keyType: '', keyValues: [] };
+          calls.selects.push(query);
+          const chain = {
+            eq(column, value) {
+              assert.equal(column, 'key_type');
+              query.keyType = value;
+              return chain;
+            },
+            in(column, values) {
+              assert.equal(column, 'key_value');
+              query.keyValues = values;
+              return chain;
+            },
+            is(column, value) {
+              assert.equal(column, 'deleted_at');
+              assert.equal(value, null);
+              return Promise.resolve({
+                data: identityRows.filter((row) => (
+                  row.key_type === query.keyType && query.keyValues.includes(row.key_value)
+                )),
+                error: null,
+              });
+            },
+          };
+          return chain;
+        },
+        upsert(rows, options) {
+          calls.upserts.push({ rows, options });
+          return Promise.resolve({ data: rows, error: null });
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    now: () => new Date('2026-06-29T12:00:00.000Z'),
+    logger: { error() {} },
+  });
+
+  const listed = await store.listCustomerIdentityKeys([
+    { type: 'domain', value: 'Softora.Test' },
+    { type: 'email', value: 'INFO@SOFTORA.TEST' },
+  ]);
+  const claimed = await store.upsertCustomerIdentityKeys([
+    { key_type: 'domain', key_value: 'Softora.Test', customer_id: 'customer-1' },
+    { key_type: 'domain', key_value: 'softora.test', customer_id: 'customer-1' },
+    { key_type: 'phone', key_value: '+31 13 123 4567', customer_id: 'customer-1' },
+  ], { source: 'premium-database-mass-research' });
+
+  assert.equal(listed.ok, true);
+  assert.deepEqual(
+    listed.data.map((row) => `${row.key_type}:${row.key_value}:${row.customer_id}`),
+    ['domain:softora.test:customer-1', 'email:info@softora.test:customer-1']
+  );
+  assert.equal(calls.selects.length, 2);
+  assert.equal(claimed.ok, true);
+  assert.equal(calls.upserts.length, 1);
+  assert.deepEqual(calls.upserts[0].options, {
+    onConflict: 'key_type,key_value',
+    ignoreDuplicates: true,
+  });
+  assert.deepEqual(
+    calls.upserts[0].rows.map((row) => `${row.key_type}:${row.key_value}:${row.customer_id}:${row.source}`),
+    [
+      'domain:softora.test:customer-1:premium-database-mass-research',
+      'phone:+31 13 123 4567:customer-1:premium-database-mass-research',
+    ]
+  );
 });
 
 test('data ops store returns quickly when customer reads hang', async () => {
@@ -1237,6 +1472,71 @@ test('data ops store signs only matching design photo rows for targeted preview 
     ['customers/manual-import-rvh/webdesign.png', 'customers/manual-import-rvh/mockup.jpg']
   );
   assert.equal(entries.targetedIdentifiersApplied, true);
+});
+
+test('data ops store signs an exact bounded customer id set for database bootstrap photos', async () => {
+  const rows = [
+    {
+      customer_id: 'customer-1',
+      identity_key: 'bedrijf een||0611111111',
+      storage_bucket: 'softora-design-photos',
+      storage_path: 'customers/customer-1/webdesign.png',
+      mime_type: 'image/png',
+      file_name: 'bedrijf-een-webdesign.png',
+      legacy_meta: { mockup: { storageBucket: 'softora-design-photos', storagePath: 'customers/customer-1/mockup.jpg', fileName: 'bedrijf-een-mockup.jpg' } },
+      updated_at: '2026-07-10T12:00:00.000Z',
+    },
+  ];
+  let requestedIds = null;
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrls(paths) {
+            return { data: paths.map((path) => ({ path, signedUrl: `https://storage.example.test/${bucket}/${path}` })), error: null };
+          },
+        };
+      },
+    },
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      return {
+        select() {
+          return {
+            is() {
+              return {
+                in(column, ids) {
+                  assert.equal(column, 'customer_id');
+                  requestedIds = ids;
+                  return {
+                    order() {
+                      return { limit: async () => ({ data: rows, error: null }) };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const entries = await store.listDesignPhotosWithSignedUrls({
+    customerIds: ['customer-1'],
+    expiresInSeconds: 600,
+  });
+
+  assert.deepEqual(requestedIds, ['customer-1']);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].websitePhotoUrl, 'https://storage.example.test/softora-design-photos/customers/customer-1/webdesign.png');
+  assert.equal(entries[0].websiteMockupUrl, 'https://storage.example.test/softora-design-photos/customers/customer-1/mockup.jpg');
+  assert.equal(entries.targetedCustomerIdsApplied, true);
 });
 
 test('data ops store targets space-separated identity keys for dashed public preview slugs', async () => {

@@ -20,7 +20,7 @@
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
-    const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\">!</span>";
+    const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\"></span>";
     const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
 
     function normalizeString(value) {
@@ -35,7 +35,7 @@
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
         const style = global.document.createElement("style");
         style.id = STYLE_ID;
-        style.textContent = ".photo-cell{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:72px;min-width:72px;line-height:0}.photo-drop{position:relative;flex:0 0 34px;aspect-ratio:1/1;overflow:hidden;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:default}.photo-drop[data-photo-error=\"true\"] .photo-drop-image,.photo-drop[data-photo-error=\"true\"] .photo-drop-loader{display:none}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-fallback-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:rgba(155,35,85,.1);color:var(--crimson);font:800 12px/1 Inter,sans-serif}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
+        style.textContent = ".photo-cell{display:grid;grid-template-columns:34px 34px 22px 22px 18px;align-items:center;justify-content:start;gap:4px;width:146px;min-width:146px;line-height:0}.photo-cell>.photo-drop:not(.photo-drop--mockup){grid-column:1}.photo-cell>.photo-drop--mockup{grid-column:2}.photo-cell>.photo-compare-link{grid-column:3}.photo-cell>.photo-diamond-badge{grid-column:4}.photo-cell>.lead-delete-button{grid-column:5}.photo-drop{position:relative;flex:0 0 34px;aspect-ratio:1/1;overflow:hidden;contain:layout paint}.photo-drop[data-has-photo=\"false\"]{overflow:visible}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"true\"]{background:rgba(155,35,85,.08)}.photo-drop[data-has-photo=\"false\"][data-can-generate=\"false\"]{opacity:.55;cursor:not-allowed}.photo-drop.is-generating,.photo-drop.is-restoring,.photo-drop[data-has-photo=\"true\"][data-photo-loaded=\"false\"]{cursor:wait}.photo-drop[data-photo-error=\"true\"]{background:rgba(155,35,85,.06);cursor:default}.photo-drop[data-photo-error=\"true\"] .photo-drop-image,.photo-drop[data-photo-error=\"true\"] .photo-drop-loader{display:none}.photo-drop--mockup{border-style:solid;background:rgba(20,24,45,.04)}.photo-drop-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.84);opacity:1;pointer-events:none;transition:opacity .16s ease;z-index:1}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-loader{opacity:0}.photo-drop-image{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.photo-drop[data-photo-loaded=\"true\"] .photo-drop-image{opacity:1}.photo-fallback-icon{display:none}.photo-generate-icon,.photo-mockup-icon{width:18px;height:18px;color:var(--crimson);transition:transform .16s ease,color .16s ease}.photo-drop:hover .photo-generate-icon,.photo-drop:focus-visible .photo-generate-icon,.photo-drop:hover .photo-mockup-icon,.photo-drop:focus-visible .photo-mockup-icon{color:var(--crimson-light);transform:scale(1.08)}.photo-generate-charge-label{position:fixed;right:18px;bottom:18px;z-index:12000;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#c0392b;color:#fff;box-shadow:0 12px 28px rgba(192,57,43,.24);padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;line-height:1;opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease,bottom .16s ease}.photo-generate-charge-label.is-visible{opacity:1;transform:translateY(0) scale(1)}.photo-generate-spinner{width:18px;height:18px;border:2px solid rgba(155,35,85,.18);border-top-color:var(--crimson);border-radius:999px;animation:photoGenerateSpin .8s linear infinite}@keyframes photoGenerateSpin{to{transform:rotate(360deg)}}";
         global.document.head.appendChild(style);
     }
 
@@ -413,12 +413,9 @@
             }, 2200);
         }
 
-        function readPendingJobs() {
-            const cutoff = now() - PENDING_TTL_MS;
-            return Array.from(pendingJobs.values()).filter(function (item) {
-                return item.customerId && item.jobId && item.startedAt >= cutoff;
-            });
-        }
+        function isPendingJobFresh(job) { return Boolean(job && job.customerId && job.jobId && Number(job.startedAt) >= (now() - PENDING_TTL_MS)); }
+        function pruneExpiredPendingJobs() { let removed = 0; Array.from(pendingJobs.values()).forEach(function (job) { if (isPendingJobFresh(job)) return; clearPollTimer(job && job.jobId); removePendingJob(job && job.customerId); removed += 1; }); return removed; }
+        function readPendingJobs() { pruneExpiredPendingJobs(); return Array.from(pendingJobs.values()); }
 
         function upsertPendingJob(job) {
             pendingJobs.set(job.customerId, job);
@@ -530,7 +527,7 @@
             const storedJob = readPendingJobs().find(function (item) {
                 return item.jobId === jobId;
             });
-            if (!storedJob) return;
+            if (!storedJob) { if (typeof renderPage === "function") renderPage(); return; }
 
             try {
                 const response = await fetch(JOB_ENDPOINT + "/" + encodeURIComponent(jobId), {
@@ -584,14 +581,19 @@
                 });
                 const jobs = Array.isArray(payload && payload.jobs) ? payload.jobs : [];
                 if (!response.ok) return;
-                let restoredCount = 0;
+                const activeRestoredJobIds = new Set();
+                let restoredCount = 0, clearedCount = pruneExpiredPendingJobs();
                 jobs.forEach(function (job) {
                     if (!job || (job.status !== "queued" && job.status !== "running")) return;
                     const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
-                    if (!pendingJob.customerId || !pendingJob.jobId) return;
-                    setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
+                    if (!isPendingJobFresh(pendingJob)) return;
+                    activeRestoredJobIds.add(pendingJob.jobId); setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
                 });
-                if (restoredCount && typeof renderPage === "function") renderPage();
+                readPendingJobs().forEach(function (pendingJob) {
+                    if (!isRestoredPendingJob(pendingJob) || activeRestoredJobIds.has(pendingJob.jobId)) return;
+                    clearPollTimer(pendingJob.jobId); removePendingJob(pendingJob.customerId); clearedCount += 1;
+                });
+                if ((restoredCount || clearedCount) && typeof renderPage === "function") renderPage();
             } catch (error) {
                 /* The next page load or poll will pick up running server jobs again. */
             }
@@ -600,8 +602,6 @@
         function resumePendingJobs() {
             const firstLoad = loadRunningJobs();
             void resumeBulkBatch();
-            global.setTimeout(function () { void loadRunningJobs(); }, 2000);
-            global.setTimeout(resumeBulkBatch, 2500); global.setTimeout(resumeBulkBatch, 7000); global.setTimeout(resumeBulkBatch, 15000);
             return firstLoad;
         }
 

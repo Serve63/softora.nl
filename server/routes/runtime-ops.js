@@ -2,6 +2,9 @@ function registerRuntimeOpsRoutes(app, deps) {
   app.get('/api/dashboard/activity', (req, res) =>
     deps.coordinator.sendDashboardActivityResponse(req, res)
   );
+  app.get('/api/dashboard/customers', (req, res) =>
+    deps.coordinator.sendDashboardCustomersResponse(req, res)
+  );
   app.get('/api/security/audit-log', deps.requireRuntimeDebugAccess, (req, res) =>
     deps.coordinator.sendSecurityAuditLogResponse(req, res)
   );
