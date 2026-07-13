@@ -294,6 +294,31 @@ select {
   flex: 0 0 auto;
 }
 
+.habit-label {
+  display: inline-block;
+  min-width: 42px;
+  max-width: 100%;
+  padding: 2px 3px;
+  margin-left: -3px;
+  overflow: hidden;
+  border-radius: 4px;
+  outline: none;
+  caret-color: var(--purple);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.habit-label:focus {
+  color: #2f2738;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 0 0 2px rgba(86, 196, 134, .34);
+}
+
+.habit-label:empty::before {
+  content: attr(data-placeholder);
+  color: #aaa8b3;
+}
+
 .habit-name-empty {
   min-height: 34px;
 }
