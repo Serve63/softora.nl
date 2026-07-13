@@ -13,7 +13,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713c"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713d"/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Jouw voortgang van de laatste 30 dagen/);
   assert.match(html, /<strong>80%<\/strong>/);
@@ -32,8 +32,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
 
   assert.match(css, /--purple:\s*#88366b;/);
   assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(30,/);
-  assert.match(css, /\.habit-grid\s*\{[\s\S]*grid-template-columns:\s*190px repeat\(30,/);
-  assert.match(css, /width:\s*min\(1320px, 100%\);/);
+  assert.match(css, /\.habit-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(190px, 12vw\) repeat\(30, minmax\(32px, 1fr\)\);/);
+  assert.match(css, /width:\s*100%;/);
+  assert.doesNotMatch(css, /width:\s*min\(1320px, 100%\);/);
   assert.doesNotMatch(css, /\.momentum-hero,\s*\.habit-board,\s*\.closing-quote/);
   assert.match(css, /\.chart-card\s*\{[\s\S]*border-top:\s*1px solid var\(--soft-line\);/);
   assert.match(css, /photo-1500530855697-b586d89ba3ee/);
