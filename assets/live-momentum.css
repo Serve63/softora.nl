@@ -319,10 +319,6 @@ select {
   color: #aaa8b3;
 }
 
-.habit-name-empty {
-  min-height: 34px;
-}
-
 .status {
   display: grid;
   place-items: center;
@@ -353,31 +349,6 @@ select {
 .status.is-soft::before {
   background-color: #c9c8ce;
   box-shadow: none;
-}
-
-.habit-grid button {
-  display: grid;
-  place-items: center;
-  appearance: none;
-  border-top: 0;
-  border-left: 0;
-  border-right: 1px solid var(--soft-line);
-  border-bottom: 1px solid var(--soft-line);
-  color: var(--purple);
-  background: transparent;
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.habit-grid button:hover {
-  background: #fbf7fa;
-}
-
-.habit-grid button.is-today {
-  border-bottom: 2px solid var(--green-line);
-  border-radius: 0 0 8px 8px;
 }
 
 .motivation-strip {
