@@ -205,42 +205,6 @@ select {
   font-weight: 700;
 }
 
-.chart-legend {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 28px;
-  margin-top: 9px;
-  color: #6f7680;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.chart-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.legend-dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-}
-
-.legend-dot.is-good {
-  background: var(--good);
-}
-
-.legend-dot.is-warning {
-  background: var(--warning);
-}
-
-.legend-dot.is-danger {
-  background: var(--danger);
-}
-
 .habit-board {
   margin-top: 12px;
   overflow-x: auto;
@@ -466,11 +430,6 @@ select {
 
   .bar-chart {
     min-width: 820px;
-  }
-
-  .chart-legend {
-    justify-content: flex-start;
-    gap: 20px;
   }
 
 }
