@@ -181,8 +181,8 @@ select {
 .chart-legend {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 34px;
+  justify-content: flex-start;
+  gap: 28px;
   margin-top: 9px;
   color: #747382;
   font-size: 13px;
@@ -208,10 +208,6 @@ select {
 
 .legend-dot.is-today {
   background: var(--green);
-}
-
-.legend-dot.is-open {
-  background: #f0f1f5;
 }
 
 .habit-board {
@@ -526,7 +522,6 @@ select {
   }
 
   .chart-legend {
-    min-width: 430px;
     justify-content: flex-start;
     gap: 20px;
   }
