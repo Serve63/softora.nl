@@ -2,7 +2,6 @@
   const TOTAL_DAYS = 30;
   const TODAY = 11;
   const CHART_MAX_HEIGHT = 164;
-  const STORAGE_KEY = 'softora.liveMomentum.v1';
 
   const grid = document.querySelector('.habit-grid');
   const chartBars = Array.from(document.querySelectorAll('.bar-chart .bar-wrap'));
@@ -22,51 +21,25 @@
   const getLabelText = (index) => labels[index]?.textContent.trim() || `Taak ${index + 1}`;
   const isChecked = (cell) => cell.classList.contains('is-done') || cell.classList.contains('is-soft');
 
-  function readStoredState() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    } catch {
-      return {};
-    }
-  }
-
-  function writeStoredState() {
-    const state = {
-      labels: labels.map((label) => label.textContent.trim()),
-      checked: statusCells.map((cell) => isChecked(cell)),
-    };
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Local storage can be blocked in private modes; the page should still work live.
-    }
-  }
-
-  function applyStoredState() {
-    const state = readStoredState();
-
-    if (Array.isArray(state.labels)) {
-      labels.forEach((label, index) => {
-        if (typeof state.labels[index] === 'string' && state.labels[index].trim()) {
-          label.textContent = state.labels[index].trim();
-        }
-      });
+  function getScoreBand(score) {
+    if (score >= 75) {
+      return 'is-good';
     }
 
-    if (Array.isArray(state.checked) && state.checked.length === statusCells.length) {
-      statusCells.forEach((cell, index) => {
-        cell.classList.toggle('is-done', Boolean(state.checked[index]));
-        cell.classList.remove('is-soft');
-      });
+    if (score >= 50) {
+      return 'is-warning';
     }
+
+    return 'is-danger';
   }
 
   function syncCellA11y(cell) {
     const taskIndex = Number(cell.dataset.task || 0);
     const day = getDay(cell);
     const checked = isChecked(cell);
+    const missed = !checked && day > 0 && day <= TODAY;
 
+    cell.classList.toggle('is-missed', missed);
     cell.setAttribute('role', 'checkbox');
     cell.setAttribute('tabindex', '0');
     cell.setAttribute('aria-checked', checked ? 'true' : 'false');
@@ -108,11 +81,20 @@
     const shouldShowScore = score > 0 || day <= TODAY;
     const isToday = day === TODAY;
     const isOpen = !isToday && score === 0 && day > TODAY;
+    const scoreBand = getScoreBand(score);
     const barHeight = Math.round((Math.max(0, Math.min(score, 100)) / 100) * CHART_MAX_HEIGHT);
 
+    wrap.classList.remove('is-good', 'is-warning', 'is-danger');
+    bar.classList.remove('is-good', 'is-warning', 'is-danger');
     bar.classList.toggle('is-today', isToday);
     bar.classList.toggle('is-open', isOpen);
     bar.classList.toggle('is-done', !isToday && !isOpen);
+
+    if (!isOpen) {
+      wrap.classList.add(scoreBand);
+      bar.classList.add(scoreBand);
+    }
+
     wrap.style.setProperty('--bar-height', `${barHeight}px`);
     bar.style.setProperty('--bar-height', `${barHeight}px`);
 
@@ -127,9 +109,12 @@
 
   function updateScore() {
     const score = getDayScore(TODAY);
+    const scoreBand = getScoreBand(score);
 
     scoreValue.textContent = `${score}%`;
     scorePoints.replaceChildren(document.createTextNode(`${score} / 100`), document.createElement('br'), document.createTextNode('punten'));
+    todayScore?.classList.remove('is-good', 'is-warning', 'is-danger');
+    todayScore?.classList.add(scoreBand);
     todayScore?.setAttribute('aria-label', `Score vandaag: ${score} van 100 punten`);
 
     if (srSummary) {
@@ -153,7 +138,6 @@
 
   function toggleCell(cell) {
     setChecked(cell, !isChecked(cell));
-    writeStoredState();
     updateChart();
   }
 
@@ -165,8 +149,6 @@
     cell.dataset.day = String(day);
     cell.dataset.task = String(task);
   });
-
-  applyStoredState();
 
   statusCells.forEach(syncCellA11y);
   updateChart();
@@ -202,7 +184,6 @@
 
     label.addEventListener('input', () => {
       statusCells.forEach(syncCellA11y);
-      writeStoredState();
     });
   });
 })();
