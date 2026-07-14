@@ -294,6 +294,7 @@ function mountExtraSettingsCategory() {
     'Ruben’s Company',
     'Ruben’s Trading System',
     'Winnen',
+    'Database',
   ];
 
   if (!document.getElementById('settings-extra-style')) {
@@ -365,7 +366,7 @@ function mountExtraSettingsCategory() {
     'tegel-desc',
     'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
   );
-  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '8 onderdelen');
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
   extraTile.addEventListener('click', function () {
     goTo('screen-extra');
   });
