@@ -15,6 +15,7 @@ const {
 } = require('../../server/repositories/company-website-video');
 const {
   buildFfmpegArgs,
+  calculateScrollFrame,
 } = require('../../server/services/company-website-video-renderer');
 const {
   createCompanyWebsiteVideoCoordinator,
@@ -106,7 +107,7 @@ test('videoreuse, statusovergangen, opslagpad en FFmpeg-contract zijn strikt', (
   assert.equal(canTransitionStatus('processing', 'failed'), true);
   assert.equal(canTransitionStatus('ready', 'processing'), false);
   assert.equal(buildVideoStoragePath('company/unsafe id'), 'companies/company_unsafe_id/homepage.mp4');
-  const args = buildFfmpegArgs('raw.webm', 'overlay.png', 'final.mp4');
+  const args = buildFfmpegArgs('frame-%06d.jpg', 'overlay.png', 'final.mp4');
   assert.ok(args.includes('libx264'));
   assert.ok(args.includes('yuv420p'));
   assert.ok(args.includes('+faststart'));
@@ -114,8 +115,21 @@ test('videoreuse, statusovergangen, opslagpad en FFmpeg-contract zijn strikt', (
   assert.match(args.join(' '), /scale=1280:720/);
   assert.match(args.join(' '), /overlay=20:20/);
   assert.match(args.join(' '), /trim=duration=20/);
-  const offsetArgs = buildFfmpegArgs('raw.webm', 'overlay.png', 'final.mp4', { startOffsetSeconds: 4.125 });
-  assert.deepEqual(offsetArgs.slice(0, 4), ['-y', '-ss', '4.125', '-i']);
+  assert.deepEqual(args.slice(0, 7), ['-y', '-framerate', '30', '-start_number', '0', '-i', 'frame-%06d.jpg']);
+});
+
+test('scrollframes zijn monotoon, vloeiend en bevatten echte 30-fps-beweging', () => {
+  const totalFrames = 600;
+  const positions = Array.from({ length: totalFrames }, (_, index) => (
+    calculateScrollFrame(index, totalFrames, 12_000, 720)
+  ));
+  assert.equal(positions[0], 0);
+  assert.ok(positions[599] > 4_500);
+  assert.ok(positions.every((position, index) => index === 0 || position >= positions[index - 1]));
+  const movingFrames = positions.filter((position, index) => index > 0 && position !== positions[index - 1]);
+  assert.ok(movingFrames.length > 480, `te weinig unieke scrollframes: ${movingFrames.length}`);
+  const largestStep = Math.max(...positions.slice(1).map((position, index) => position - positions[index]));
+  assert.ok(largestStep < 20, `scrollsprong te groot: ${largestStep}`);
 });
 
 test('film-icoon navigeert uitsluitend intern in hetzelfde tabblad', () => {

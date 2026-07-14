@@ -15,6 +15,7 @@ const {
 const VIDEO_WIDTH = 1280;
 const VIDEO_HEIGHT = 720;
 const VIDEO_DURATION_SECONDS = 20;
+const VIDEO_FPS = 30;
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -43,27 +44,66 @@ function runFfprobe(args) {
   return runBundledProcess(bundledFfprobePath, args);
 }
 
-function buildFfmpegArgs(rawVideoPath, overlayPath, outputPath, options = {}) {
+function buildFfmpegArgs(framePattern, overlayPath, outputPath, options = {}) {
   const duration = Number(options.durationSeconds) || VIDEO_DURATION_SECONDS;
-  const startOffsetSeconds = Math.max(0, Number(options.startOffsetSeconds) || 0);
   return [
     '-y',
-    ...(startOffsetSeconds > 0 ? ['-ss', startOffsetSeconds.toFixed(3)] : []),
-    '-i', rawVideoPath,
+    '-framerate', String(VIDEO_FPS),
+    '-start_number', '0',
+    '-i', framePattern,
     '-loop', '1', '-i', overlayPath,
     '-filter_complex',
-    `[0:v]scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase,crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},fps=30,tpad=stop_mode=clone:stop_duration=${duration},trim=duration=${duration},setpts=PTS-STARTPTS[site];[1:v]format=rgba[card];[site][card]overlay=20:20:shortest=1[outv]`,
+    `[0:v]scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase,crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},setsar=1,trim=duration=${duration},setpts=PTS-STARTPTS[site];[1:v]format=rgba[card];[site][card]overlay=20:20:shortest=1[outv]`,
     '-map', '[outv]',
     '-an',
     '-c:v', 'libx264',
     '-preset', 'medium',
     '-crf', '21',
     '-pix_fmt', 'yuv420p',
-    '-r', '30',
+    '-r', String(VIDEO_FPS),
     '-t', String(duration),
     '-movflags', '+faststart',
     outputPath,
   ];
+}
+
+function easeInOut(value) {
+  const bounded = Math.max(0, Math.min(1, value));
+  return bounded < 0.5
+    ? 2 * bounded * bounded
+    : 1 - (Math.pow(-2 * bounded + 2, 2) / 2);
+}
+
+function calculateScrollFrame(
+  frameIndex,
+  totalFrames,
+  availableHeight,
+  viewportHeight = VIDEO_HEIGHT,
+  durationSeconds = VIDEO_DURATION_SECONDS
+) {
+  const available = Math.max(0, Number(availableHeight) || 0);
+  if (available < 1 || totalFrames < 2) return 0;
+  const target = Math.min(
+    available,
+    Math.max(viewportHeight * 2.8, Math.min(available * 0.76, viewportHeight * 6.5))
+  );
+  const seconds = (Math.max(0, frameIndex) / Math.max(1, totalFrames - 1)) * durationSeconds;
+  const segments = [
+    { start: 0.8, end: 6.7, from: 0, to: 0.34 },
+    { start: 7.0, end: 12.9, from: 0.34, to: 0.68 },
+    { start: 13.2, end: 19.3, from: 0.68, to: 1 },
+  ];
+  if (seconds < segments[0].start) return 0;
+  for (const segment of segments) {
+    if (seconds <= segment.end) {
+      const progress = (seconds - segment.start) / (segment.end - segment.start);
+      return Math.min(available, target * (segment.from + ((segment.to - segment.from) * easeInOut(progress))));
+    }
+    const nextIndex = segments.indexOf(segment) + 1;
+    const next = segments[nextIndex];
+    if (next && seconds < next.start) return Math.min(available, target * segment.to);
+  }
+  return Math.min(available, target);
 }
 
 function buildOverlaySvg() {
@@ -114,50 +154,10 @@ async function dismissObstructions(page) {
   `}).catch(() => undefined);
 }
 
-async function performSmoothScroll(page, durationMs = VIDEO_DURATION_SECONDS * 1000) {
-  await page.evaluate(async ({ duration }) => {
-    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const viewportHeight = window.innerHeight || 720;
-    const fullHeight = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
-    const available = Math.max(0, fullHeight - viewportHeight);
-    const target = Math.min(available, Math.max(viewportHeight * 2.8, available * 0.72));
-    const startPause = 2000;
-    const endPause = 1300;
-    const pauseOne = target > 120 ? 950 : 0;
-    const pauseTwo = target > viewportHeight * 1.4 ? 850 : 0;
-    const movingDuration = Math.max(1000, duration - startPause - endPause - pauseOne - pauseTwo);
-    const segments = pauseTwo ? 3 : pauseOne ? 2 : 1;
-    const segmentDuration = movingDuration / segments;
-    const ease = (value) => value < 0.5 ? 2 * value * value : 1 - Math.pow(-2 * value + 2, 2) / 2;
-    const animate = (from, to, ms) => new Promise((resolve) => {
-      const started = performance.now();
-      const frame = (now) => {
-        const progress = Math.min(1, (now - started) / ms);
-        window.scrollTo(0, Math.min(available, from + ((to - from) * ease(progress))));
-        if (progress < 1) requestAnimationFrame(frame); else resolve();
-      };
-      requestAnimationFrame(frame);
-    });
-    window.scrollTo(0, 0);
-    await wait(startPause);
-    if (target > 1) {
-      const points = Array.from({ length: segments }, (_, index) => target * ((index + 1) / segments));
-      let from = 0;
-      for (let index = 0; index < points.length; index += 1) {
-        await animate(from, points[index], segmentDuration);
-        from = points[index];
-        if (index === 0 && pauseOne) await wait(pauseOne);
-        if (index === 1 && pauseTwo) await wait(pauseTwo);
-      }
-    } else {
-      await wait(movingDuration + pauseOne + pauseTwo);
-    }
-    await wait(endPause);
-  }, { duration: durationMs });
-}
-
 async function captureHomepage(options) {
   const temporaryDirectory = options.temporaryDirectory;
+  const framesDirectory = path.join(temporaryDirectory, 'frames');
+  const framePattern = path.join(framesDirectory, 'frame-%06d.jpg');
   const browserType = options.browserType || chromium;
   const validatedUrl = options.allowUnsafeTestUrl
     ? options.websiteUrl
@@ -168,12 +168,10 @@ async function captureHomepage(options) {
     context = await browser.newContext({
       viewport: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
       screen: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
-      recordVideo: { dir: temporaryDirectory, size: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT } },
       deviceScaleFactor: 1,
       reducedMotion: 'reduce',
     });
     const page = await context.newPage();
-    const recordingStartedAtMs = Date.now();
     if (!options.allowUnsafeTestUrl) {
       await page.route('**/*', createSafeNavigationGuard({
         maxRedirects: options.maxRedirects || 5,
@@ -185,18 +183,42 @@ async function captureHomepage(options) {
     await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => undefined);
     await page.waitForTimeout(1200);
     await dismissObstructions(page);
-    const scrollStartedAtMs = Date.now();
-    await performSmoothScroll(page, (options.durationSeconds || VIDEO_DURATION_SECONDS) * 1000);
-    const video = page.video();
+    await fsp.mkdir(framesDirectory, { recursive: true });
+    const durationSeconds = Number(options.durationSeconds) || VIDEO_DURATION_SECONDS;
+    const totalFrames = Math.round(durationSeconds * VIDEO_FPS);
+    const availableHeight = await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      const fullHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body ? document.body.scrollHeight : 0
+      );
+      return Math.max(0, fullHeight - (window.innerHeight || 720));
+    });
+    for (let frameIndex = 0; frameIndex < totalFrames; frameIndex += 1) {
+      const scrollTop = calculateScrollFrame(
+        frameIndex,
+        totalFrames,
+        availableHeight,
+        VIDEO_HEIGHT,
+        durationSeconds
+      );
+      await page.evaluate((top) => window.scrollTo(0, top), scrollTop);
+      await page.screenshot({
+        path: path.join(framesDirectory, `frame-${String(frameIndex).padStart(6, '0')}.jpg`),
+        type: 'jpeg',
+        quality: 82,
+        animations: 'disabled',
+      });
+    }
+    const finalUrl = page.url();
     await context.close();
     context = null;
-    if (!video) throw new Error('Playwright heeft geen ruwe video gemaakt.');
-    const rawVideoPath = await video.path();
-    await fsp.access(rawVideoPath, fs.constants.R_OK);
+    await fsp.access(path.join(framesDirectory, 'frame-000000.jpg'), fs.constants.R_OK);
+    await fsp.access(path.join(framesDirectory, `frame-${String(totalFrames - 1).padStart(6, '0')}.jpg`), fs.constants.R_OK);
     return {
-      rawVideoPath,
-      finalUrl: page.url(),
-      startOffsetSeconds: Math.max(0, (scrollStartedAtMs - recordingStartedAtMs) / 1000),
+      framePattern,
+      finalUrl,
+      totalFrames,
     };
   } finally {
     if (context) await context.close().catch(() => undefined);
@@ -237,13 +259,9 @@ async function renderCompanyWebsiteVideo(options = {}) {
     await fsp.mkdir(path.dirname(outputPath), { recursive: true });
     await createOverlayPng(overlayPath);
     const capture = await captureHomepage({ ...options, temporaryDirectory });
-    await runFfmpeg(buildFfmpegArgs(capture.rawVideoPath, overlayPath, renderedPath, {
-      ...options,
-      startOffsetSeconds: capture.startOffsetSeconds,
-    }));
+    await runFfmpeg(buildFfmpegArgs(capture.framePattern, overlayPath, renderedPath, options));
     const probe = await probeVideo(renderedPath);
     await fsp.copyFile(renderedPath, outputPath);
-    await fsp.rm(capture.rawVideoPath, { force: true });
     return { outputPath, finalUrl: capture.finalUrl, probe };
   } catch (error) {
     await fsp.rm(outputPath, { force: true }).catch(() => undefined);
@@ -255,12 +273,13 @@ async function renderCompanyWebsiteVideo(options = {}) {
 
 module.exports = {
   VIDEO_DURATION_SECONDS,
+  VIDEO_FPS,
   VIDEO_HEIGHT,
   VIDEO_WIDTH,
   buildFfmpegArgs,
+  calculateScrollFrame,
   captureHomepage,
   createOverlayPng,
-  performSmoothScroll,
   probeVideo,
   renderCompanyWebsiteVideo,
 };
