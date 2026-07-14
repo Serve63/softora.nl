@@ -809,6 +809,33 @@ test('ui-state store can isolate critical reads through REST-first scoped option
   });
 });
 
+test('ui-state store treats a missing REST-first row as valid empty Supabase state', async () => {
+  const { store } = createFixture({
+    uiStateReadTimeoutMsByScope: {
+      premium_live_momentum: 12000,
+    },
+    uiStateReadOptionsByScope: {
+      premium_live_momentum: {
+        preferSupabaseRestRead: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      },
+    },
+    fetchResult: {
+      ok: true,
+      body: [],
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_live_momentum');
+
+  assert.deepEqual(state, {
+    values: {},
+    updatedAt: null,
+    source: 'supabase',
+  });
+});
+
 test('ui-seo runtime keeps durable state reads critical and isolated by default', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../server/services/ui-seo-runtime.js'), 'utf8');
 
