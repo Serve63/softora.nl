@@ -14,7 +14,7 @@ const {
 
 const VIDEO_WIDTH = 1280;
 const VIDEO_HEIGHT = 720;
-const VIDEO_DURATION_SECONDS = 20;
+const VIDEO_DURATION_SECONDS = 63;
 const VIDEO_FPS = 30;
 
 function normalizeString(value) {
@@ -85,13 +85,13 @@ function calculateScrollFrame(
   if (available < 1 || totalFrames < 2) return 0;
   const target = Math.min(
     available,
-    Math.max(viewportHeight * 2.8, Math.min(available * 0.76, viewportHeight * 6.5))
+    Math.max(viewportHeight * 3.5, Math.min(available * 0.85, viewportHeight * 7.5))
   );
   const seconds = (Math.max(0, frameIndex) / Math.max(1, totalFrames - 1)) * durationSeconds;
   const segments = [
-    { start: 0.8, end: 6.7, from: 0, to: 0.34 },
-    { start: 7.0, end: 12.9, from: 0.34, to: 0.68 },
-    { start: 13.2, end: 19.3, from: 0.68, to: 1 },
+    { start: 2, end: 17, from: 0, to: 0.32 },
+    { start: 18.5, end: 33, from: 0.32, to: 0.65 },
+    { start: 34.5, end: 49.5, from: 0.65, to: 1 },
   ];
   if (seconds < segments[0].start) return 0;
   for (const segment of segments) {
@@ -103,7 +103,9 @@ function calculateScrollFrame(
     const next = segments[nextIndex];
     if (next && seconds < next.start) return Math.min(available, target * segment.to);
   }
-  return Math.min(available, target);
+  if (seconds < 51) return Math.min(available, target);
+  const returnProgress = (seconds - 51) / Math.max(0.001, durationSeconds - 51);
+  return Math.min(available, target * (1 - easeInOut(returnProgress)));
 }
 
 function buildOverlaySvg() {
@@ -242,11 +244,11 @@ async function probeVideo(filePath) {
     stream.width === VIDEO_WIDTH &&
     stream.height === VIDEO_HEIGHT &&
     stream.pix_fmt === 'yuv420p' &&
-    duration >= 18 &&
-    duration <= 22 &&
+    duration >= 62.5 &&
+    duration <= 63.5 &&
     /mp4/.test(normalizeString(result.format && result.format.format_name))
   );
-  if (!valid) throw new Error('De MP4 heeft niet het vereiste H.264/1280x720/yuv420p/20s-formaat.');
+  if (!valid) throw new Error('De MP4 heeft niet het vereiste H.264/1280x720/yuv420p/63s-formaat.');
   return { duration, stream, format: result.format };
 }
 

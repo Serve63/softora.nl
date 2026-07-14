@@ -64,11 +64,12 @@ async function pixelDifference(firstPath, secondPath, region) {
   return total / first.length;
 }
 
-test('echte homepage scrollt vloeiend op 30 fps, wordt H.264 MP4 en houdt het lege videovak vast', { timeout: 180_000 }, async () => {
+test('echte homepage scrollt 63 seconden vloeiend omlaag en terug naar boven met een vast videovak', { timeout: 300_000 }, async () => {
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'softora-video-e2e-'));
   const outputPath = path.join(directory, 'websitevideo.mp4');
   const frameEarly = path.join(directory, 'early.png');
   const frameLate = path.join(directory, 'late.png');
+  const frameEnd = path.join(directory, 'end.png');
   const server = http.createServer(async (req, res) => {
     if (req.url === '/fixture') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -95,15 +96,18 @@ test('echte homepage scrollt vloeiend op 30 fps, wordt H.264 MP4 en houdt het le
     assert.equal(probe.stream.width, 1280);
     assert.equal(probe.stream.height, 720);
     assert.equal(probe.stream.pix_fmt, 'yuv420p');
-    assert.ok(probe.duration >= 19.8 && probe.duration <= 20.2);
+    assert.ok(probe.duration >= 62.8 && probe.duration <= 63.2);
     const movingFrames = await countMovingFrames(outputPath);
-    assert.ok(movingFrames > 400, `opname bevat te weinig werkelijk bewegende frames (${movingFrames})`);
+    assert.ok(movingFrames > 1_500, `opname bevat te weinig werkelijk bewegende frames (${movingFrames})`);
 
-    await extractFrame(outputPath, 3, frameEarly);
-    await extractFrame(outputPath, 16, frameLate);
+    await extractFrame(outputPath, 1, frameEarly);
+    await extractFrame(outputPath, 49, frameLate);
+    await extractFrame(outputPath, 62.9, frameEnd);
     const websiteMovement = await pixelDifference(frameEarly, frameLate, { left: 380, top: 80, width: 800, height: 560 });
+    const returnedToTop = await pixelDifference(frameEarly, frameEnd, { left: 380, top: 80, width: 800, height: 560 });
     const fixedOverlay = await pixelDifference(frameEarly, frameLate, { left: 35, top: 35, width: 250, height: 120 });
     assert.ok(websiteMovement > 18, `websitebeeld bewoog onvoldoende (${websiteMovement})`);
+    assert.ok(returnedToTop < 12, `video eindigde niet bovenaan (${returnedToTop})`);
     assert.ok(fixedOverlay < 2.5, `videovak verschoof of veranderde (${fixedOverlay})`);
 
     const browser = await chromium.launch({ headless: true });
@@ -123,6 +127,7 @@ test('echte homepage scrollt vloeiend op 30 fps, wordt H.264 MP4 en houdt het le
         fsp.copyFile(outputPath, path.join(artifactDirectory, 'websitevideo.mp4')),
         fsp.copyFile(frameEarly, path.join(artifactDirectory, 'frame-early.png')),
         fsp.copyFile(frameLate, path.join(artifactDirectory, 'frame-late.png')),
+        fsp.copyFile(frameEnd, path.join(artifactDirectory, 'frame-end.png')),
       ]);
     }
   } finally {
