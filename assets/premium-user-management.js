@@ -275,6 +275,11 @@ function backToInstellingenOverzicht() {
   goTo('screen-overzicht');
 }
 
+function navigateToSettingsModule(moduleHref) {
+  var targetWindow = window.top && window.top !== window ? window.top : window;
+  targetWindow.location.href = moduleHref;
+}
+
 function mountExtraSettingsCategory() {
   var overviewScreen = document.getElementById('screen-overzicht');
   var personnelTile = overviewScreen && overviewScreen.querySelector('.tegel[data-settings-action="open-pin"]');
@@ -418,7 +423,7 @@ function mountExtraSettingsCategory() {
       card.type = 'button';
       card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
-        window.location.href = moduleHref;
+        navigateToSettingsModule(moduleHref);
       });
     }
     var moduleArrow = createUserManagementSvgElement('svg', {
