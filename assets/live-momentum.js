@@ -1,30 +1,40 @@
 (() => {
+  const STATE_SCOPE = 'premium_live_momentum';
+  const STATE_KEY = 'softora_live_momentum_state_v1';
+  const STATE_VERSION = 1;
+  const PERIOD_KEY = '2026-07';
+  const MAX_GOALS = 24;
+  const MAX_LABEL_LENGTH = 80;
+  const SAVE_DEBOUNCE_MS = 250;
   const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', startDay: 13, today: 13, lastDay: 31 };
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
   const TODAY = PERIOD.today;
   const CHART_MAX_HEIGHT = 164;
   const DEFAULT_GOALS = [
-    { label: 'Workout', icon: '<path d="M5 8v8M19 8v8M3 10v4M21 10v4M7 12h10" />', doneDays: [TODAY] },
-    { label: '90 min deep work', icon: '<path d="M4 5.5c2.5-1 4.5-.7 7 1v12c-2.5-1.7-5-1.9-7-1V5.5Zm16 0c-2.5-1-4.5-.7-7 1v12c2.5-1.7 5-1.9 7-1V5.5Z" />', doneDays: [TODAY] },
-    { label: 'Dagdoel behalen', icon: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m15 9 4-4M19 5h-4v4" />', doneDays: [TODAY] },
-    { label: 'Gezonde voeding', icon: '<path d="M20.4 5.9a5.1 5.1 0 0 0-7.2 0L12 7.1l-1.2-1.2a5.1 5.1 0 0 0-7.2 7.2L12 21l8.4-7.9a5.1 5.1 0 0 0 0-7.2Z" />', doneDays: [TODAY] }
+    { id: 'workout', label: 'Workout', icon: '<path d="M5 8v8M19 8v8M3 10v4M21 10v4M7 12h10" />', doneDays: [TODAY] },
+    { id: 'deep-work', label: '90 min deep work', icon: '<path d="M4 5.5c2.5-1 4.5-.7 7 1v12c-2.5-1.7-5-1.9-7-1V5.5Zm16 0c-2.5-1-4.5-.7-7 1v12c2.5-1.7 5-1.9 7-1V5.5Z" />', doneDays: [TODAY] },
+    { id: 'daily-goal', label: 'Dagdoel behalen', icon: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m15 9 4-4M19 5h-4v4" />', doneDays: [TODAY] },
+    { id: 'healthy-food', label: 'Gezonde voeding', icon: '<path d="M20.4 5.9a5.1 5.1 0 0 0-7.2 0L12 7.1l-1.2-1.2a5.1 5.1 0 0 0-7.2 7.2L12 21l8.4-7.9a5.1 5.1 0 0 0 0-7.2Z" />', doneDays: [TODAY] }
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
   const scoreValue = document.querySelector('.today-score strong');
-  const scorePoints = document.querySelector('.score-points');
   const todayScore = document.querySelector('.today-score');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const chartSwitches = Array.from(document.querySelectorAll('.chart-switch'));
   let chartMode = 'bars';
-  if (!grid || !chart || !scoreValue || !scorePoints || !chartSwitches.length) {
+  let stateReady = false;
+  let stateDirty = false;
+  let saveTimer = null;
+  let writeInFlight = false;
+  if (!grid || !chart || !scoreValue || !chartSwitches.length) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
   chart.style.setProperty('--day-count', String(TOTAL_DAYS));
   const getChartBars = () => Array.from(chart.querySelectorAll('.bar-wrap'));
-  const getAddRowAnchor = () => grid.querySelector('.habit-add');
+  const getGoalRows = () => Array.from(grid.querySelectorAll('.habit-name'));
   const getLabels = () => Array.from(grid.querySelectorAll('.habit-label'));
   const getStatusCells = () => Array.from(grid.querySelectorAll('.status'));
   const getDay = (cell) => Number(cell.dataset.day || 0);
@@ -32,6 +42,145 @@
   const isChecked = (cell) => cell.classList.contains('is-done');
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
   const formatDay = (day) => `${day} juli`;
+  const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
+  const getDefaultTrackedDays = () => DAYS.filter((day) => day >= PERIOD.startDay);
+  function sanitizeDayList(value) {
+    return Array.from(new Set((Array.isArray(value) ? value : [])
+      .map((day) => Number(day))
+      .filter((day) => Number.isInteger(day) && day >= 1 && day <= PERIOD.lastDay)))
+      .sort((left, right) => left - right);
+  }
+  function normalizeGoal(goal, index) {
+    const fallback = DEFAULT_GOALS[index] || {};
+    const rawId = String(goal?.id || fallback.id || `goal-${index + 1}`).trim();
+    const id = rawId.replace(/[^a-z0-9_-]/gi, '').slice(0, 64) || `goal-${index + 1}`;
+    const label = String(goal?.label || fallback.label || `Doel ${index + 1}`).trim().slice(0, MAX_LABEL_LENGTH) || `Doel ${index + 1}`;
+    const defaultGoal = getDefaultGoal(id);
+    const trackedDays = sanitizeDayList(goal?.trackedDays);
+    const normalizedTrackedDays = trackedDays.length
+      ? trackedDays
+      : defaultGoal
+        ? getDefaultTrackedDays()
+        : DAYS.filter((day) => day >= TODAY);
+    return {
+      id,
+      label,
+      icon: defaultGoal?.icon || '<path d="M12 5v14M5 12h14" />',
+      doneDays: sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day)),
+      trackedDays: normalizedTrackedDays
+    };
+  }
+  function getDefaultGoals() {
+    return DEFAULT_GOALS.map((goal, index) => normalizeGoal({
+      ...goal,
+      trackedDays: getDefaultTrackedDays()
+    }, index));
+  }
+  function createGoalId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return `goal-${window.crypto.randomUUID()}`;
+    }
+    return `goal-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+  function getCurrentGoals() {
+    const statusCells = getStatusCells();
+    return getGoalRows().slice(0, MAX_GOALS).map((row, index) => {
+      const cells = statusCells.slice(index * TOTAL_DAYS, (index + 1) * TOTAL_DAYS);
+      const defaultGoal = getDefaultGoal(row.dataset.goalId);
+      return normalizeGoal({
+        id: row.dataset.goalId,
+        label: row.querySelector('.habit-label')?.textContent || '',
+        icon: defaultGoal?.icon,
+        doneDays: cells.filter(isChecked).map(getDay),
+        trackedDays: cells.filter(isTracked).map(getDay)
+      }, index);
+    });
+  }
+  function buildStateSnapshot() {
+    return {
+      version: STATE_VERSION,
+      period: PERIOD_KEY,
+      chartMode,
+      goals: getCurrentGoals().map((goal) => ({
+        id: goal.id,
+        label: goal.label,
+        doneDays: goal.doneDays,
+        trackedDays: goal.trackedDays
+      })),
+      updatedAt: new Date().toISOString()
+    };
+  }
+  function parseStoredState(rawValue) {
+    if (!rawValue) {
+      return null;
+    }
+    try {
+      const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+      if (!parsed || parsed.version !== STATE_VERSION || parsed.period !== PERIOD_KEY || !Array.isArray(parsed.goals)) {
+        return null;
+      }
+      const goals = parsed.goals.slice(0, MAX_GOALS).map(normalizeGoal);
+      if (!goals.length) {
+        return null;
+      }
+      return {
+        chartMode: ['bars', 'line'].includes(parsed.chartMode) ? parsed.chartMode : 'bars',
+        goals
+      };
+    } catch (error) {
+      console.warn('[LiveMomentum][state-parse]', error?.message || error);
+      return null;
+    }
+  }
+  function setPersistenceState(state) {
+    document.body.dataset.momentumPersistence = state;
+  }
+  async function writeState(options = {}) {
+    const uiStateClient = window.SoftoraUiStateClient;
+    if (!stateReady || !stateDirty || writeInFlight || !uiStateClient || typeof uiStateClient.set !== 'function') {
+      return;
+    }
+    stateDirty = false;
+    writeInFlight = true;
+    let writeSucceeded = false;
+    setPersistenceState('saving');
+    const snapshot = buildStateSnapshot();
+    try {
+      const response = await uiStateClient.set(STATE_SCOPE, {
+        replace: true,
+        source: 'live-momentum',
+        values: { [STATE_KEY]: JSON.stringify(snapshot) }
+      }, options);
+      if (!response?.ok || response.source !== 'supabase') {
+        throw new Error('Supabase bevestigde de Live Momentum-opslag niet.');
+      }
+      writeSucceeded = true;
+      setPersistenceState('saved');
+    } catch (error) {
+      stateDirty = true;
+      setPersistenceState('error');
+      console.error('[LiveMomentum][state-save]', error?.message || error);
+    } finally {
+      writeInFlight = false;
+      if (writeSucceeded && stateDirty && !options.keepalive) {
+        scheduleStateWrite();
+      }
+    }
+  }
+  function scheduleStateWrite() {
+    if (!stateReady) {
+      return;
+    }
+    stateDirty = true;
+    setPersistenceState('pending');
+    if (saveTimer) {
+      window.clearTimeout(saveTimer);
+    }
+    saveTimer = window.setTimeout(() => {
+      saveTimer = null;
+      void writeState();
+    }, SAVE_DEBOUNCE_MS);
+  }
   function getScoreBand(score) {
     if (score >= 75) {
       return 'is-good';
@@ -114,7 +263,6 @@
     const safeScore = Number.isFinite(score) ? score : 0;
     const scoreBand = getScoreBand(safeScore);
     scoreValue.textContent = `${safeScore}%`;
-    scorePoints.replaceChildren(document.createTextNode(`${safeScore} / 100`), document.createElement('br'), document.createTextNode('punten'));
     todayScore?.classList.remove('is-good', 'is-warning', 'is-danger');
     todayScore?.classList.add(scoreBand);
     todayScore?.setAttribute('aria-label', `Score vandaag: ${safeScore} van 100 punten`);
@@ -141,6 +289,7 @@
   function toggleCell(cell) {
     setChecked(cell, !isChecked(cell));
     updateChart();
+    scheduleStateWrite();
   }
   function updateTodayColumnEnd(statusCells = getStatusCells()) {
     statusCells.forEach((cell) => cell.classList.remove('is-today-end'));
@@ -197,21 +346,32 @@
     label.textContent = text;
     return label;
   }
-  function createStatus(day, doneDays = []) {
+  function createStatus(day, goal) {
     const cell = document.createElement('span');
     cell.className = 'status';
-    if (day < PERIOD.startDay) {
+    if (!goal.trackedDays.includes(day)) {
       cell.classList.add('is-untracked');
-    } else if (doneDays.includes(day)) {
+    } else if (goal.doneDays.includes(day)) {
       cell.classList.add('is-done');
     }
     return cell;
   }
-  function createGoalHeader(goal) {
+  function createGoalHeader(goal, isLastGoal) {
     const rowHeader = document.createElement('div');
     rowHeader.className = 'habit-name';
     rowHeader.setAttribute('role', 'rowheader');
-    rowHeader.append(goal.icon ? createIcon(goal.icon) : createGoalIcon(), createLabel(goal.label));
+    rowHeader.dataset.goalId = goal.id;
+    if (isLastGoal) {
+      const addButton = document.createElement('button');
+      addButton.className = 'add-goal';
+      addButton.type = 'button';
+      addButton.setAttribute('aria-label', 'Doel toevoegen na laatste opdracht');
+      addButton.textContent = '+';
+      rowHeader.append(addButton);
+    } else {
+      rowHeader.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
+    }
+    rowHeader.append(createLabel(goal.label));
     return rowHeader;
   }
   function renderChartShell() {
@@ -285,7 +445,7 @@
     });
     chart.replaceChildren(stage, dayAxis);
   }
-  function setChartMode(mode) {
+  function setChartMode(mode, persist = true) {
     if (!['bars', 'line'].includes(mode) || mode === chartMode) {
       return;
     }
@@ -300,8 +460,11 @@
       renderChartShell();
     }
     updateChart();
+    if (persist) {
+      scheduleStateWrite();
+    }
   }
-  function renderGridShell() {
+  function renderGridShell(goals) {
     const fragment = document.createDocumentFragment();
     const spacer = document.createElement('div');
     spacer.className = 'habit-spacer';
@@ -317,25 +480,9 @@
       header.innerHTML = `<span>${PERIOD.shortLabel}</span><b>${day}</b>`;
       fragment.append(header);
     });
-    DEFAULT_GOALS.forEach((goal) => {
-      fragment.append(createGoalHeader(goal));
-      DAYS.forEach((day) => fragment.append(createStatus(day, goal.doneDays)));
-    });
-    const add = document.createElement('div');
-    const button = document.createElement('button');
-    add.className = 'habit-add';
-    add.setAttribute('role', 'rowheader');
-    button.className = 'add-goal';
-    button.type = 'button';
-    button.setAttribute('aria-label', 'Doel toevoegen');
-    button.textContent = '+';
-    add.append(button);
-    fragment.append(add);
-    DAYS.forEach(() => {
-      const cell = document.createElement('span');
-      cell.className = 'habit-add-cell';
-      cell.setAttribute('aria-hidden', 'true');
-      fragment.append(cell);
+    goals.forEach((goal, index) => {
+      fragment.append(createGoalHeader(goal, index === goals.length - 1));
+      DAYS.forEach((day) => fragment.append(createStatus(day, goal)));
     });
     grid.replaceChildren(fragment);
   }
@@ -348,30 +495,62 @@
     selection?.addRange(range);
   }
   function createGoalRow() {
-    const addRowAnchor = getAddRowAnchor();
-    if (!addRowAnchor) {
+    const goals = getCurrentGoals();
+    if (!stateReady || !goals.length || goals.length >= MAX_GOALS) {
       return;
     }
-    const rowHeader = createGoalHeader({ label: 'Nieuw doel' });
-    const label = rowHeader.querySelector('.habit-label');
-    grid.insertBefore(rowHeader, addRowAnchor);
-    DAYS.forEach((day) => {
-      const cell = createStatus(day);
-      if (day < TODAY) {
-        cell.classList.add('is-untracked');
-      }
-      grid.insertBefore(cell, addRowAnchor);
-    });
-    bindLabel(label);
+    goals.push(normalizeGoal({
+      id: createGoalId(),
+      label: 'Nieuw doel',
+      doneDays: [],
+      trackedDays: DAYS.filter((day) => day >= TODAY)
+    }, goals.length));
+    renderGridShell(goals);
     refreshCellData();
+    getLabels().forEach(bindLabel);
     updateChart();
-    focusLabel(label);
+    focusLabel(getLabels()[getLabels().length - 1]);
+    scheduleStateWrite();
+  }
+  async function hydrateState() {
+    const uiStateClient = window.SoftoraUiStateClient;
+    if (!uiStateClient || typeof uiStateClient.get !== 'function' || typeof uiStateClient.set !== 'function') {
+      setPersistenceState('error');
+      return;
+    }
+    setPersistenceState('loading');
+    try {
+      const response = await uiStateClient.get(STATE_SCOPE);
+      if (!response?.ok || response.source !== 'supabase') {
+        throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
+      }
+      const storedState = parseStoredState(response.values?.[STATE_KEY]);
+      if (storedState) {
+        renderGridShell(storedState.goals);
+        refreshCellData();
+        getLabels().forEach(bindLabel);
+        if (storedState.chartMode !== chartMode) {
+          setChartMode(storedState.chartMode, false);
+        } else {
+          updateChart();
+        }
+      }
+      stateReady = true;
+      setPersistenceState('saved');
+      if (!storedState) {
+        scheduleStateWrite();
+      }
+    } catch (error) {
+      setPersistenceState('error');
+      console.error('[LiveMomentum][state-load]', error?.message || error);
+    }
   }
   renderChartShell();
-  renderGridShell();
+  renderGridShell(getDefaultGoals());
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
+  void hydrateState();
   chartSwitches.forEach((button) => {
     button.addEventListener('click', () => setChartMode(button.dataset.chartMode));
   });
@@ -381,6 +560,9 @@
     }
   });
   grid.addEventListener('click', (event) => {
+    if (!stateReady) {
+      return;
+    }
     const addButton = event.target.closest('.add-goal');
     if (addButton && grid.contains(addButton)) {
       createGoalRow();
@@ -393,6 +575,9 @@
     toggleCell(cell);
   });
   grid.addEventListener('keydown', (event) => {
+    if (!stateReady) {
+      return;
+    }
     const cell = event.target.closest('.status');
     if (!cell || !grid.contains(cell) || ![' ', 'Enter'].includes(event.key)) {
       return;
@@ -402,10 +587,22 @@
   });
   grid.addEventListener('focusout', (event) => {
     const label = event.target.closest('.habit-label');
-    if (!label || label.textContent.trim()) {
+    if (!label) {
       return;
     }
-    label.textContent = 'Nieuw doel';
+    if (!label.textContent.trim()) {
+      label.textContent = 'Nieuw doel';
+    }
     getStatusCells().forEach(syncCellA11y);
+    scheduleStateWrite();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && stateDirty) {
+      if (saveTimer) {
+        window.clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      void writeState({ keepalive: true, timeoutMs: 5000 });
+    }
   });
 })();
