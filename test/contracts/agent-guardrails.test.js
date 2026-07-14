@@ -36,6 +36,16 @@ test('protocol docs point agents at structured data ops storage', () => {
   assert.match(dataOps, /node scripts\/migrate-data-ops\.js --write/);
 });
 
+test('websitevideo tooling blijft lokaal en expliciet startbaar', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  assert.equal(packageJson.scripts['worker:website-video'], 'node scripts/company-website-video-worker.js');
+  assert.equal(packageJson.scripts['worker:website-video:once'], 'node scripts/company-website-video-worker.js --once');
+  assert.equal(packageJson.scripts['test:e2e:website-video'], 'node --test test/e2e/company-website-video.e2e.test.js');
+  assert.ok(packageJson.dependencies.playwright);
+  assert.ok(packageJson.dependencies['ffmpeg-static']);
+  assert.ok(packageJson.dependencies['ffprobe-static']);
+});
+
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],
