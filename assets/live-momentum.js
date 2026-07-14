@@ -1,23 +1,35 @@
 (() => {
-  const TOTAL_DAYS = 30;
-  const TODAY = 11;
+  const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', startDay: 13, today: 13, lastDay: 31 };
+  const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
+  const TOTAL_DAYS = DAYS.length;
+  const TODAY = PERIOD.today;
   const CHART_MAX_HEIGHT = 164;
+  const DEFAULT_GOALS = [
+    { label: 'Workout', icon: '<path d="M5 8v8M19 8v8M3 10v4M21 10v4M7 12h10" />', doneDays: [TODAY] },
+    { label: '90 min deep work', icon: '<path d="M4 5.5c2.5-1 4.5-.7 7 1v12c-2.5-1.7-5-1.9-7-1V5.5Zm16 0c-2.5-1-4.5-.7-7 1v12c2.5-1.7 5-1.9 7-1V5.5Z" />', doneDays: [TODAY] },
+    { label: 'Dagdoel behalen', icon: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m15 9 4-4M19 5h-4v4" />', doneDays: [TODAY] },
+    { label: 'Gezonde voeding', icon: '<path d="M20.4 5.9a5.1 5.1 0 0 0-7.2 0L12 7.1l-1.2-1.2a5.1 5.1 0 0 0-7.2 7.2L12 21l8.4-7.9a5.1 5.1 0 0 0 0-7.2Z" />', doneDays: [TODAY] }
+  ];
   const grid = document.querySelector('.habit-grid');
-  const chartBars = Array.from(document.querySelectorAll('.bar-chart .bar-wrap'));
+  const chart = document.querySelector('.bar-chart');
   const scoreValue = document.querySelector('.today-score strong');
   const scorePoints = document.querySelector('.score-points');
   const todayScore = document.querySelector('.today-score');
   const srSummary = document.querySelector('.chart-card .sr-only');
-  if (!grid || chartBars.length !== TOTAL_DAYS || !scoreValue || !scorePoints) {
+  if (!grid || !chart || !scoreValue || !scorePoints) {
     return;
   }
-  const addRowAnchor = grid.querySelector('.habit-add');
+  grid.style.setProperty('--day-count', String(TOTAL_DAYS));
+  chart.style.setProperty('--day-count', String(TOTAL_DAYS));
+  const getChartBars = () => Array.from(chart.querySelectorAll('.bar-wrap'));
+  const getAddRowAnchor = () => grid.querySelector('.habit-add');
   const getLabels = () => Array.from(grid.querySelectorAll('.habit-label'));
   const getStatusCells = () => Array.from(grid.querySelectorAll('.status'));
   const getDay = (cell) => Number(cell.dataset.day || 0);
   const getLabelText = (index) => getLabels()[index]?.textContent.trim() || `Taak ${index + 1}`;
   const isChecked = (cell) => cell.classList.contains('is-done') || cell.classList.contains('is-soft');
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
+  const formatDay = (day) => `${day} juli`;
   function getScoreBand(score) {
     if (score >= 75) {
       return 'is-good';
@@ -37,14 +49,14 @@
     cell.setAttribute('role', 'checkbox');
     cell.setAttribute('tabindex', '0');
     cell.setAttribute('aria-checked', checked ? 'true' : 'false');
-    cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, dag ${day}${tracked ? '' : ', nog niet bijgehouden'}`);
+    cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${tracked ? '' : ', nog niet bijgehouden'}`);
   }
   function getDayScore(day) {
     const statusCells = getStatusCells();
     const cellsForDay = statusCells.filter((cell) => getDay(cell) === day && isTracked(cell));
     const checkedCount = cellsForDay.filter(isChecked).length;
     if (!cellsForDay.length) {
-      return 0;
+      return null;
     }
     return Math.round((checkedCount / cellsForDay.length) * 100);
   }
@@ -59,16 +71,17 @@
     return label;
   }
   function updateBar(day, score) {
-    const wrap = chartBars[day - 1];
+    const wrap = getChartBars()[day - 1];
     const bar = wrap?.querySelector('.bar');
     if (!wrap || !bar) {
       return;
     }
-    const shouldShowScore = score > 0 || day <= TODAY;
+    const hasScore = Number.isFinite(score);
+    const shouldShowScore = hasScore && (score > 0 || day <= TODAY);
     const isToday = day === TODAY;
-    const isOpen = !isToday && score === 0 && day > TODAY;
-    const scoreBand = getScoreBand(score);
-    const barHeight = Math.round((Math.max(0, Math.min(score, 100)) / 100) * CHART_MAX_HEIGHT);
+    const isOpen = !hasScore || (!isToday && score === 0 && day > TODAY);
+    const scoreBand = hasScore ? getScoreBand(score) : '';
+    const barHeight = hasScore ? Math.round((Math.max(0, Math.min(score, 100)) / 100) * CHART_MAX_HEIGHT) : 0;
     wrap.classList.remove('is-good', 'is-warning', 'is-danger');
     bar.classList.remove('is-good', 'is-warning', 'is-danger');
     bar.classList.toggle('is-today', isToday);
@@ -89,20 +102,21 @@
   }
   function updateScore() {
     const score = getDayScore(TODAY);
-    const scoreBand = getScoreBand(score);
-    scoreValue.textContent = `${score}%`;
-    scorePoints.replaceChildren(document.createTextNode(`${score} / 100`), document.createElement('br'), document.createTextNode('punten'));
+    const safeScore = Number.isFinite(score) ? score : 0;
+    const scoreBand = getScoreBand(safeScore);
+    scoreValue.textContent = `${safeScore}%`;
+    scorePoints.replaceChildren(document.createTextNode(`${safeScore} / 100`), document.createElement('br'), document.createTextNode('punten'));
     todayScore?.classList.remove('is-good', 'is-warning', 'is-danger');
     todayScore?.classList.add(scoreBand);
-    todayScore?.setAttribute('aria-label', `Score vandaag: ${score} van 100 punten`);
+    todayScore?.setAttribute('aria-label', `Score vandaag: ${safeScore} van 100 punten`);
     if (srSummary) {
-      srSummary.textContent = `Dag ${TODAY} is vandaag met een momentumscore van ${score} procent.`;
+      srSummary.textContent = `${formatDay(TODAY)} is vandaag met een momentumscore van ${safeScore} procent.`;
     }
   }
   function updateChart() {
-    for (let day = 1; day <= TOTAL_DAYS; day += 1) {
+    DAYS.forEach((day) => {
       updateBar(day, getDayScore(day));
-    }
+    });
     updateScore();
   }
   function setChecked(cell, checked) {
@@ -126,7 +140,7 @@
   function refreshCellData() {
     const statusCells = getStatusCells();
     statusCells.forEach((cell, index) => {
-      const day = (index % TOTAL_DAYS) + 1;
+      const day = DAYS[index % TOTAL_DAYS];
       const task = Math.floor(index / TOTAL_DAYS);
       cell.dataset.cellIndex = String(index);
       cell.dataset.day = String(day);
@@ -152,13 +166,94 @@
     });
   }
   function createGoalIcon() {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('aria-hidden', 'true');
-    path.setAttribute('d', 'M12 5v14M5 12h14');
-    svg.append(path);
-    return svg;
+    return createIcon('<path d="M12 5v14M5 12h14" />');
+  }
+  function createIcon(markup) {
+    const template = document.createElement('template');
+    template.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${markup}</svg>`;
+    return template.content.firstElementChild;
+  }
+  function createLabel(text) {
+    const label = document.createElement('span');
+    label.className = 'habit-label';
+    label.contentEditable = 'plaintext-only';
+    label.setAttribute('role', 'textbox');
+    label.setAttribute('aria-label', `Taaknaam ${text}`);
+    label.setAttribute('spellcheck', 'false');
+    label.dataset.placeholder = 'Nieuwe taak';
+    label.textContent = text;
+    return label;
+  }
+  function createStatus(day, doneDays = []) {
+    const cell = document.createElement('span');
+    cell.className = 'status';
+    if (day < PERIOD.startDay) {
+      cell.classList.add('is-untracked');
+    } else if (doneDays.includes(day)) {
+      cell.classList.add('is-done');
+    }
+    return cell;
+  }
+  function createGoalHeader(goal) {
+    const rowHeader = document.createElement('div');
+    rowHeader.className = 'habit-name';
+    rowHeader.setAttribute('role', 'rowheader');
+    rowHeader.append(goal.icon ? createIcon(goal.icon) : createGoalIcon(), createLabel(goal.label));
+    return rowHeader;
+  }
+  function renderChartShell() {
+    const fragment = document.createDocumentFragment();
+    DAYS.forEach((day) => {
+      const wrap = document.createElement('div');
+      const bar = document.createElement('span');
+      const dayLabel = document.createElement('span');
+      wrap.className = 'bar-wrap';
+      wrap.dataset.day = String(day);
+      bar.className = 'bar is-open';
+      dayLabel.className = 'day-label';
+      dayLabel.textContent = String(day);
+      wrap.append(bar, dayLabel);
+      fragment.append(wrap);
+    });
+    chart.replaceChildren(fragment);
+  }
+  function renderGridShell() {
+    const fragment = document.createDocumentFragment();
+    const spacer = document.createElement('div');
+    spacer.className = 'habit-spacer';
+    spacer.setAttribute('role', 'columnheader');
+    spacer.textContent = 'Doelen:';
+    fragment.append(spacer);
+    DAYS.forEach((day) => {
+      const header = document.createElement('div');
+      header.className = 'habit-day';
+      header.setAttribute('role', 'columnheader');
+      header.classList.toggle('is-muted', day < PERIOD.startDay);
+      header.classList.toggle('is-today', day === TODAY);
+      header.innerHTML = `<span>${PERIOD.shortLabel}</span><b>${day}</b>`;
+      fragment.append(header);
+    });
+    DEFAULT_GOALS.forEach((goal) => {
+      fragment.append(createGoalHeader(goal));
+      DAYS.forEach((day) => fragment.append(createStatus(day, goal.doneDays)));
+    });
+    const add = document.createElement('div');
+    const button = document.createElement('button');
+    add.className = 'habit-add';
+    add.setAttribute('role', 'rowheader');
+    button.className = 'add-goal';
+    button.type = 'button';
+    button.setAttribute('aria-label', 'Doel toevoegen');
+    button.textContent = '+';
+    add.append(button);
+    fragment.append(add);
+    DAYS.forEach(() => {
+      const cell = document.createElement('span');
+      cell.className = 'habit-add-cell';
+      cell.setAttribute('aria-hidden', 'true');
+      fragment.append(cell);
+    });
+    grid.replaceChildren(fragment);
   }
   function focusLabel(label) {
     label.focus();
@@ -169,36 +264,27 @@
     selection?.addRange(range);
   }
   function createGoalRow() {
+    const addRowAnchor = getAddRowAnchor();
     if (!addRowAnchor) {
       return;
     }
-    const rowHeader = document.createElement('div');
-    const label = document.createElement('span');
-    rowHeader.className = 'habit-name';
-    rowHeader.setAttribute('role', 'rowheader');
-    rowHeader.append(createGoalIcon());
-    label.className = 'habit-label';
-    label.contentEditable = 'plaintext-only';
-    label.setAttribute('role', 'textbox');
-    label.setAttribute('aria-label', 'Taaknaam Nieuw doel');
-    label.setAttribute('spellcheck', 'false');
-    label.dataset.placeholder = 'Nieuwe taak';
-    label.textContent = 'Nieuw doel';
-    rowHeader.append(label);
+    const rowHeader = createGoalHeader({ label: 'Nieuw doel' });
+    const label = rowHeader.querySelector('.habit-label');
     grid.insertBefore(rowHeader, addRowAnchor);
-    for (let day = 1; day <= TOTAL_DAYS; day += 1) {
-      const cell = document.createElement('span');
-      cell.className = 'status';
+    DAYS.forEach((day) => {
+      const cell = createStatus(day);
       if (day < TODAY) {
         cell.classList.add('is-untracked');
       }
       grid.insertBefore(cell, addRowAnchor);
-    }
+    });
     bindLabel(label);
     refreshCellData();
     updateChart();
     focusLabel(label);
   }
+  renderChartShell();
+  renderGridShell();
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
