@@ -81,7 +81,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260714b/);
+  assert.match(source, /premium-user-management\.js\?v=20260714c/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-count', 'Extra ' \+ number\);/);
@@ -93,7 +93,8 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /Ruben’s Company/);
   assert.match(userManagementSource, /Ruben’s Trading System/);
   assert.match(userManagementSource, /Winnen/);
-  assert.match(userManagementSource, /'8 onderdelen'/);
+  assert.match(userManagementSource, /Database/);
+  assert.match(userManagementSource, /'9 onderdelen'/);
   assert.doesNotMatch(userManagementSource, /Net Worth Index/);
   assert.doesNotMatch(userManagementSource, /Pulse/);
   assert.match(userManagementSource, /mountExtraSettingsCategory\(\);/);
