@@ -14,8 +14,8 @@ const {
 const projectRootDir = path.resolve(__dirname, '..');
 loadSoftoraLocalEnv({ projectRootDir, cwd: process.cwd() });
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function waitForNextPoll() {
+  return new Promise((resolve) => setTimeout(resolve, 2500));
 }
 
 function createWorker(options = {}) {
@@ -32,15 +32,12 @@ function createWorker(options = {}) {
     const lockToken = crypto.randomUUID();
     const record = await repository.claimNext(lockToken, Number(process.env.WEBSITE_VIDEO_LOCK_TIMEOUT_SECONDS) || 300);
     if (!record) return false;
-    const localOutputPath = path.join(os.tmpdir(), `softora-company-video-${record.companyId}-${lockToken}.mp4`);
+    const localOutputPath = path.join(os.tmpdir(), `softora-company-video-${lockToken}.mp4`);
     logger.log(`[WebsiteVideoWorker] Render gestart voor ${record.companyId}.`);
     try {
       await renderer({
         websiteUrl: record.normalizedWebsiteUrl,
         outputPath: localOutputPath,
-        chromiumPath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
-        ffmpegPath: process.env.FFMPEG_PATH || undefined,
-        ffprobePath: process.env.FFPROBE_PATH || undefined,
         loadTimeoutMs: Number(process.env.WEBSITE_VIDEO_LOAD_TIMEOUT_MS) || 30_000,
         maxRedirects: Number(process.env.WEBSITE_VIDEO_MAX_REDIRECTS) || 5,
       });
@@ -65,7 +62,7 @@ async function main() {
   do {
     const processed = await worker.runOne();
     if (once) break;
-    if (!processed) await wait(Math.max(750, Number(process.env.WEBSITE_VIDEO_WORKER_POLL_MS) || 2500));
+    if (!processed) await waitForNextPoll();
   } while (true);
 }
 

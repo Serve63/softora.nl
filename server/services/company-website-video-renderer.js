@@ -2,7 +2,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { execFile } = require('child_process');
 const sharp = require('sharp');
 const { chromium } = require('playwright');
 const bundledFfmpegPath = require('ffmpeg-static');
@@ -20,29 +20,27 @@ function normalizeString(value) {
   return String(value || '').trim();
 }
 
-function resolveExecutable(explicitPath, bundledPath, fallbackName) {
-  return normalizeString(explicitPath) || normalizeString(bundledPath) || fallbackName;
-}
-
-function runProcess(executable, args, options = {}) {
+function runBundledProcess(executable, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, {
-      cwd: options.cwd,
-      env: options.env || process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) return resolve({ stdout, stderr });
-      const error = new Error(`${path.basename(executable)} stopte met code ${code}: ${stderr.slice(-1600)}`);
-      error.exitCode = code;
-      return reject(error);
+    execFile(executable, args, {
+      shell: false,
+      windowsHide: true,
+      maxBuffer: 16 * 1024 * 1024,
+    }, (error, stdout, stderr) => {
+      if (!error) return resolve({ stdout, stderr });
+      const processError = new Error(`${path.basename(executable)} stopte met code ${error.code}: ${String(stderr || '').slice(-1600)}`);
+      processError.exitCode = error.code;
+      return reject(processError);
     });
   });
+}
+
+function runFfmpeg(args) {
+  return runBundledProcess(bundledFfmpegPath, args);
+}
+
+function runFfprobe(args) {
+  return runBundledProcess(bundledFfprobePath, args);
 }
 
 function buildFfmpegArgs(rawVideoPath, overlayPath, outputPath, options = {}) {
@@ -164,7 +162,7 @@ async function captureHomepage(options) {
   const validatedUrl = options.allowUnsafeTestUrl
     ? options.websiteUrl
     : await validatePublicWebsiteUrl(options.websiteUrl, { lookup: options.lookup });
-  const browser = await browserType.launch({ headless: true, executablePath: options.chromiumPath || undefined });
+  const browser = await browserType.launch({ headless: true });
   let context;
   try {
     context = await browser.newContext({
@@ -206,9 +204,8 @@ async function captureHomepage(options) {
   }
 }
 
-async function probeVideo(filePath, options = {}) {
-  const ffprobePath = resolveExecutable(options.ffprobePath || process.env.FFPROBE_PATH, bundledFfprobePath, 'ffprobe');
-  const { stdout } = await runProcess(ffprobePath, [
+async function probeVideo(filePath) {
+  const { stdout } = await runFfprobe([
     '-v', 'error',
     '-show_entries', 'format=duration,format_name:stream=codec_name,width,height,pix_fmt,codec_type',
     '-of', 'json',
@@ -235,16 +232,17 @@ async function renderCompanyWebsiteVideo(options = {}) {
   const outputPath = path.resolve(options.outputPath);
   const temporaryDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), 'softora-website-video-'));
   const overlayPath = path.join(temporaryDirectory, 'overlay.png');
+  const renderedPath = path.join(temporaryDirectory, 'websitevideo.mp4');
   try {
     await fsp.mkdir(path.dirname(outputPath), { recursive: true });
     await createOverlayPng(overlayPath);
     const capture = await captureHomepage({ ...options, temporaryDirectory });
-    const ffmpegPath = resolveExecutable(options.ffmpegPath || process.env.FFMPEG_PATH, bundledFfmpegPath, 'ffmpeg');
-    await runProcess(ffmpegPath, buildFfmpegArgs(capture.rawVideoPath, overlayPath, outputPath, {
+    await runFfmpeg(buildFfmpegArgs(capture.rawVideoPath, overlayPath, renderedPath, {
       ...options,
       startOffsetSeconds: capture.startOffsetSeconds,
     }));
-    const probe = await probeVideo(outputPath, options);
+    const probe = await probeVideo(renderedPath);
+    await fsp.copyFile(renderedPath, outputPath);
     await fsp.rm(capture.rawVideoPath, { force: true });
     return { outputPath, finalUrl: capture.finalUrl, probe };
   } catch (error) {
@@ -265,5 +263,4 @@ module.exports = {
   performSmoothScroll,
   probeVideo,
   renderCompanyWebsiteVideo,
-  runProcess,
 };

@@ -13,7 +13,7 @@ npm ci
 npx playwright install chromium
 ```
 
-`ffmpeg-static` en `ffprobe-static` worden met `npm ci` lokaal geïnstalleerd. Eigen systeembinaries kunnen optioneel worden gekozen met `FFMPEG_PATH`, `FFPROBE_PATH` en `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+`ffmpeg-static` en `ffprobe-static` worden met `npm ci` lokaal geïnstalleerd. De worker gebruikt uitsluitend deze vaste lokale binaries en Playwrights lokaal geïnstalleerde Chromium, zonder shell of extern renderpad.
 
 Voer de nieuwe onderdelen van `supabase/data-ops-schema.sql` eenmalig uit op dezelfde Softora-Supabase-database als `softora_customers`. Dit maakt:
 
@@ -41,12 +41,9 @@ De worker gebruikt dezelfde bestaande `SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_K
 ## Configuratie
 
 - `WEBSITE_VIDEO_STORAGE_BUCKET`: standaard `softora-company-website-videos`.
-- `WEBSITE_VIDEO_WORKER_POLL_MS`: standaard `2500`.
 - `WEBSITE_VIDEO_LOCK_TIMEOUT_SECONDS`: standaard `300`, begrensd op 60–1800.
 - `WEBSITE_VIDEO_LOAD_TIMEOUT_MS`: standaard `30000`.
 - `WEBSITE_VIDEO_MAX_REDIRECTS`: standaard `5`.
-- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`: optioneel pad naar eigen Chromium.
-- `FFMPEG_PATH` en `FFPROBE_PATH`: optionele paden naar eigen binaries.
 
 ## Verificatie
 
