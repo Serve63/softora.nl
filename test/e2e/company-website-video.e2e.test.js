@@ -34,6 +34,20 @@ function extractFrame(inputPath, seconds, outputPath) {
   });
 }
 
+function countMovingFrames(inputPath) {
+  return new Promise((resolve, reject) => {
+    execFile(ffmpegPath, ['-i', inputPath, '-vf', 'crop=800:560:380:80,mpdecimate', '-an', '-f', 'null', '-'], {
+      shell: false,
+      windowsHide: true,
+      maxBuffer: 8 * 1024 * 1024,
+    }, (error, _stdout, stderr) => {
+      if (error) return reject(error);
+      const matches = [...String(stderr || '').matchAll(/frame=\s*(\d+)/g)];
+      return resolve(matches.length ? Number(matches[matches.length - 1][1]) : 0);
+    });
+  });
+}
+
 function testHomepage() {
   const sections = Array.from({ length: 8 }, (_, index) => `
     <section style="height:720px;display:grid;place-items:center;background:hsl(${index * 42} 52% ${index % 2 ? 34 : 82}%);color:${index % 2 ? '#fff' : '#151515'}">
@@ -50,7 +64,7 @@ async function pixelDifference(firstPath, secondPath, region) {
   return total / first.length;
 }
 
-test('echte homepage scrollt, wordt H.264 MP4 en houdt het lege videovak vast', { timeout: 90_000 }, async () => {
+test('echte homepage scrollt vloeiend op 30 fps, wordt H.264 MP4 en houdt het lege videovak vast', { timeout: 180_000 }, async () => {
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'softora-video-e2e-'));
   const outputPath = path.join(directory, 'websitevideo.mp4');
   const frameEarly = path.join(directory, 'early.png');
@@ -82,6 +96,8 @@ test('echte homepage scrollt, wordt H.264 MP4 en houdt het lege videovak vast', 
     assert.equal(probe.stream.height, 720);
     assert.equal(probe.stream.pix_fmt, 'yuv420p');
     assert.ok(probe.duration >= 19.8 && probe.duration <= 20.2);
+    const movingFrames = await countMovingFrames(outputPath);
+    assert.ok(movingFrames > 400, `opname bevat te weinig werkelijk bewegende frames (${movingFrames})`);
 
     await extractFrame(outputPath, 3, frameEarly);
     await extractFrame(outputPath, 16, frameLate);
