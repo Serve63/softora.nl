@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const TABLE_NAME = 'softora_company_website_videos';
 const STORAGE_BUCKET = 'softora-company-website-videos';
+const VIDEO_STORAGE_VERSION = '63s-v1';
 const ACTIVE_STATUSES = new Set(['pending', 'processing']);
 const VALID_STATUSES = new Set(['pending', 'processing', 'ready', 'failed']);
 
@@ -14,7 +15,7 @@ function normalizeString(value) {
 function buildVideoStoragePath(companyId) {
   const safeId = normalizeString(companyId).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 160);
   if (!safeId) throw new Error('Ongeldig bedrijfs-ID voor videopad.');
-  return `companies/${safeId}/homepage.mp4`;
+  return `companies/${safeId}/homepage-${VIDEO_STORAGE_VERSION}.mp4`;
 }
 
 function normalizeRecord(row) {
@@ -40,7 +41,9 @@ function canReuseVideo(record, normalizedWebsiteUrl, fileExists) {
   return Boolean(
     record &&
     record.status === 'ready' &&
+    record.companyId &&
     record.videoPath &&
+    record.videoPath === buildVideoStoragePath(record.companyId) &&
     record.normalizedWebsiteUrl === normalizeString(normalizedWebsiteUrl) &&
     fileExists
   );
@@ -219,6 +222,7 @@ module.exports = {
   ACTIVE_STATUSES,
   STORAGE_BUCKET,
   TABLE_NAME,
+  VIDEO_STORAGE_VERSION,
   buildVideoStoragePath,
   canReuseVideo,
   canTransitionStatus,

@@ -100,15 +100,16 @@ test('redirectguard blokkeert een hoofdnavigatie naar een privéadres', async ()
 });
 
 test('videoreuse, statusovergangen, opslagpad en FFmpeg-contract zijn strikt', () => {
-  const record = { status: 'ready', videoPath: 'companies/c1/homepage.mp4', normalizedWebsiteUrl: 'https://example.com/' };
+  const record = { companyId: 'c1', status: 'ready', videoPath: 'companies/c1/homepage-63s-v1.mp4', normalizedWebsiteUrl: 'https://example.com/' };
   assert.equal(canReuseVideo(record, 'https://example.com/', true), true);
   assert.equal(canReuseVideo(record, 'https://changed.example/', true), false);
   assert.equal(canReuseVideo(record, 'https://example.com/', false), false);
+  assert.equal(canReuseVideo({ ...record, videoPath: 'companies/c1/homepage.mp4' }, 'https://example.com/', true), false);
   assert.equal(canTransitionStatus('pending', 'processing'), true);
   assert.equal(canTransitionStatus('processing', 'ready'), true);
   assert.equal(canTransitionStatus('processing', 'failed'), true);
   assert.equal(canTransitionStatus('ready', 'processing'), false);
-  assert.equal(buildVideoStoragePath('company/unsafe id'), 'companies/company_unsafe_id/homepage.mp4');
+  assert.equal(buildVideoStoragePath('company/unsafe id'), 'companies/company_unsafe_id/homepage-63s-v1.mp4');
   const args = buildFfmpegArgs('frame-%06d.jpg', 'overlay.png', 'final.mp4');
   assert.ok(args.includes('libx264'));
   assert.ok(args.includes('yuv420p'));
@@ -116,22 +117,27 @@ test('videoreuse, statusovergangen, opslagpad en FFmpeg-contract zijn strikt', (
   assert.ok(args.includes('-an'));
   assert.match(args.join(' '), /scale=1280:720/);
   assert.match(args.join(' '), /overlay=20:20/);
-  assert.match(args.join(' '), /trim=duration=20/);
+  assert.match(args.join(' '), /trim=duration=63/);
   assert.deepEqual(args.slice(0, 7), ['-y', '-framerate', '30', '-start_number', '0', '-i', 'frame-%06d.jpg']);
 });
 
-test('scrollframes zijn monotoon, vloeiend en bevatten echte 30-fps-beweging', () => {
-  const totalFrames = 600;
+test('scrollframes bewegen vloeiend omlaag en eindigen met één doorlopende terugscroll', () => {
+  const totalFrames = 1_890;
   const positions = Array.from({ length: totalFrames }, (_, index) => (
     calculateScrollFrame(index, totalFrames, 12_000, 720)
   ));
   assert.equal(positions[0], 0);
-  assert.ok(positions[599] > 4_500);
-  assert.ok(positions.every((position, index) => index === 0 || position >= positions[index - 1]));
+  assert.ok(positions[1_500] > 5_300);
+  assert.ok(positions[1_889] < 0.01);
+  assert.ok(positions.slice(0, 1_530).every((position, index, values) => index === 0 || position >= values[index - 1]));
+  assert.ok(positions.slice(1_530).every((position, index, values) => index === 0 || position <= values[index - 1]));
   const movingFrames = positions.filter((position, index) => index > 0 && position !== positions[index - 1]);
-  assert.ok(movingFrames.length > 480, `te weinig unieke scrollframes: ${movingFrames.length}`);
-  const largestStep = Math.max(...positions.slice(1).map((position, index) => position - positions[index]));
-  assert.ok(largestStep < 20, `scrollsprong te groot: ${largestStep}`);
+  assert.ok(movingFrames.length > 1_600, `te weinig unieke scrollframes: ${movingFrames.length}`);
+  const deltas = positions.slice(1).map((position, index) => position - positions[index]);
+  const directionChanges = deltas.filter((delta, index) => delta !== 0 && index > 0 && deltas.slice(0, index).reverse().find((value) => value !== 0) * delta < 0);
+  assert.equal(directionChanges.length, 1);
+  const largestStep = Math.max(...deltas.map(Math.abs));
+  assert.ok(largestStep < 31, `scrollsprong te groot: ${largestStep}`);
 });
 
 test('film-icoon navigeert uitsluitend intern in hetzelfde tabblad', () => {
@@ -188,7 +194,7 @@ test('bedrijf zonder website toont no_website en onbekend ID lekt niets', async 
 test('geldige bestaande video wordt direct hergebruikt zonder nieuwe queue', async () => {
   let queueCalls = 0;
   const repository = createRepository({
-    get: async () => ({ companyId: 'c1', status: 'ready', videoPath: 'companies/c1/homepage.mp4', normalizedWebsiteUrl: 'https://reuse.example/', updatedAt: 'now' }),
+    get: async () => ({ companyId: 'c1', status: 'ready', videoPath: 'companies/c1/homepage-63s-v1.mp4', normalizedWebsiteUrl: 'https://reuse.example/', updatedAt: 'now' }),
     exists: async () => true,
     queue: async () => { queueCalls += 1; },
   });
@@ -231,7 +237,7 @@ test('twee gelijktijdige workerclaims starten exact één render', async () => {
       available = false;
       return { companyId: 'c1', normalizedWebsiteUrl: 'https://example.com/' };
     },
-    upload: async () => 'companies/c1/homepage.mp4',
+    upload: async () => 'companies/c1/homepage-63s-v1.mp4',
     markReady: async () => { readyCalls += 1; },
     markFailed: async () => {},
   };
@@ -270,13 +276,13 @@ test('tijdelijke Supabase Storage-fout wordt veilig opnieuw geprobeerd met dezel
   const filePath = path.join(directory, 'video.mp4');
   try {
     await fs.promises.writeFile(filePath, 'mp4-data');
-    assert.equal(await repository.upload('company-1', filePath), 'companies/company-1/homepage.mp4');
+    assert.equal(await repository.upload('company-1', filePath), 'companies/company-1/homepage-63s-v1.mp4');
   } finally {
     await fs.promises.rm(directory, { recursive: true, force: true });
   }
   assert.equal(attempts, 3);
   assert.ok(uploads.every((upload) => upload.options.upsert === true));
-  assert.ok(uploads.every((upload) => upload.storagePath === 'companies/company-1/homepage.mp4'));
+  assert.ok(uploads.every((upload) => upload.storagePath === 'companies/company-1/homepage-63s-v1.mp4'));
 });
 
 test('mislukte render wordt server-side als failed opgeslagen', async () => {
