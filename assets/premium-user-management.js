@@ -421,7 +421,7 @@ function mountExtraSettingsCategory() {
   var localDatabaseFrame = document.createElement('iframe');
   localDatabaseFrame.id = 'settings-local-database-frame';
   localDatabaseFrame.className = 'settings-local-database-frame';
-  localDatabaseFrame.src = 'http://127.0.0.1:8000/';
+  localDatabaseFrame.src = '/kvk-database';
   localDatabaseFrame.title = 'Softora Database Bedrijven Scraper';
   localDatabaseFrame.hidden = true;
   extraItems.forEach(function (label, index) {
@@ -434,7 +434,7 @@ function mountExtraSettingsCategory() {
         ? '/premium-flynow'
         : isWinning
           ? '/live-momentum'
-          : 'http://127.0.0.1:8000/';
+          : '/kvk-database';
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {

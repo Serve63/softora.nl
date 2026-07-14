@@ -77,8 +77,8 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /var isDatabase = label === 'Database';/);
   assert.match(userManagementSource, /var isLinkedModule = isFlynow \|\| isWinning \|\| isDatabase;/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
-  assert.match(userManagementSource, /\? '\/premium-flynow'[\s\S]*\? '\/live-momentum'[\s\S]*: 'http:\/\/127\.0\.0\.1:8000\/';/);
-  assert.match(userManagementSource, /localDatabaseFrame\.src = 'http:\/\/127\.0\.0\.1:8000\/';/);
+  assert.match(userManagementSource, /\? '\/premium-flynow'[\s\S]*\? '\/live-momentum'[\s\S]*: '\/kvk-database';/);
+  assert.match(userManagementSource, /localDatabaseFrame\.src = '\/kvk-database';/);
   assert.match(userManagementSource, /localDatabaseFrame\.title = 'Softora Database Bedrijven Scraper';/);
   assert.match(userManagementSource, /if \(isDatabase\) \{[\s\S]*localDatabaseFrame\.hidden = false;/);
   assert.match(userManagementSource, /extraGrid\.hidden = true;/);
