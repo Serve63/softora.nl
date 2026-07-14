@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const {
   createSafeNavigationGuard,
   isPrivateAddress,
@@ -15,7 +16,43 @@ const {
 const {
   buildFfmpegArgs,
 } = require('../../server/services/company-website-video-renderer');
+const {
+  createCompanyWebsiteVideoCoordinator,
+} = require('../../server/services/company-website-video');
+const {
+  registerCompanyWebsiteVideoRoutes,
+} = require('../../server/routes/company-website-video');
 const { createWorker } = require('../../scripts/company-website-video-worker');
+
+const repoRoot = path.resolve(__dirname, '../..');
+
+function createResponse() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: null,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+    send(body) { this.body = body; return this; },
+    sendFile(filePath) { this.filePath = filePath; return this; },
+    setHeader(name, value) { this.headers[name] = value; },
+  };
+}
+
+function createDataOpsStore(customers) {
+  return { listCustomers: async () => customers };
+}
+
+function createRepository(overrides = {}) {
+  return {
+    configured: true,
+    get: async () => null,
+    exists: async () => false,
+    queue: async (input) => ({ ...input, status: 'pending' }),
+    download: async () => Buffer.from('video'),
+    ...overrides,
+  };
+}
 
 test('website-URL normalisatie accepteert alleen http(s)', () => {
   assert.equal(normalizeWebsiteUrl('example.com'), 'https://example.com/');
@@ -81,6 +118,91 @@ test('videoreuse, statusovergangen, opslagpad en FFmpeg-contract zijn strikt', (
   assert.deepEqual(offsetArgs.slice(0, 4), ['-y', '-ss', '4.125', '-i']);
 });
 
+test('film-icoon navigeert uitsluitend intern in hetzelfde tabblad', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-database-webdesign-preview.js'), 'utf8');
+  assert.match(source, /return "\/bedrijven\/" \+ encodeURIComponent\(normalizeString\(id\)\) \+ "\/video"/);
+  assert.match(source, /aria-label=\\"Bekijk websitevideo\\" title=\\"Bekijk websitevideo\\"/);
+  assert.doesNotMatch(source, /photo-video-link[^\n]+target=\\"_blank\\"/);
+  assert.doesNotMatch(source, /photo-cinematic-video-link/);
+  assert.match(source, /if \(link\) event\.stopPropagation\(\)/);
+});
+
+test('websitevideoroutes bieden vaste pagina, status, start en bestand', () => {
+  const routes = [];
+  const app = {
+    get(pathname) { routes.push(['GET', pathname]); },
+    post(pathname) { routes.push(['POST', pathname]); },
+  };
+  registerCompanyWebsiteVideoRoutes(app, { coordinator: {} });
+  assert.deepEqual(routes, [
+    ['GET', '/bedrijven/:companyId/video'],
+    ['GET', '/api/bedrijven/:companyId/website-video'],
+    ['POST', '/api/bedrijven/:companyId/website-video'],
+    ['GET', '/api/bedrijven/:companyId/website-video/file'],
+  ]);
+});
+
+test('coordinator haalt exact het bedrijf en de website uit de centrale database', async () => {
+  const coordinator = createCompanyWebsiteVideoCoordinator({
+    dataOpsStore: createDataOpsStore([
+      { id: 'c1', bedrijf: 'Eerste', website: 'https://first.example' },
+      { id: 'c2', bedrijf: 'Tweede', dom: 'second.example' },
+    ]),
+    repository: createRepository(),
+  });
+  const status = await coordinator.buildStatus('c2');
+  assert.equal(status.companyId, 'c2');
+  assert.equal(status.companyName, 'Tweede');
+  assert.equal(status.websiteUrl, 'second.example');
+  assert.equal(status.normalizedWebsiteUrl, 'https://second.example/');
+});
+
+test('bedrijf zonder website toont no_website en onbekend ID lekt niets', async () => {
+  const coordinator = createCompanyWebsiteVideoCoordinator({
+    dataOpsStore: createDataOpsStore([{ id: 'c1', bedrijf: 'Zonder website' }]),
+    repository: createRepository(),
+  });
+  assert.equal((await coordinator.buildStatus('c1')).status, 'no_website');
+  const response = createResponse();
+  await coordinator.statusResponse({ params: { companyId: 'secret-does-not-exist' } }, response);
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.body, { ok: false, error: 'Niet gevonden.' });
+});
+
+test('geldige bestaande video wordt direct hergebruikt zonder nieuwe queue', async () => {
+  let queueCalls = 0;
+  const repository = createRepository({
+    get: async () => ({ companyId: 'c1', status: 'ready', videoPath: 'companies/c1/homepage.mp4', normalizedWebsiteUrl: 'https://reuse.example/', updatedAt: 'now' }),
+    exists: async () => true,
+    queue: async () => { queueCalls += 1; },
+  });
+  const coordinator = createCompanyWebsiteVideoCoordinator({
+    dataOpsStore: createDataOpsStore([{ id: 'c1', bedrijf: 'Reuse', website: 'https://reuse.example' }]),
+    repository,
+  });
+  const status = await coordinator.buildStatus('c1');
+  assert.equal(status.status, 'ready');
+  assert.equal(status.videoUrl, '/api/bedrijven/c1/website-video/file');
+  assert.equal(queueCalls, 0);
+});
+
+test('ontbrekende of gewijzigde websitevideo wordt opnieuw ingepland', async () => {
+  const queued = [];
+  const repository = createRepository({
+    get: async () => ({ companyId: 'c1', status: 'ready', videoPath: 'old.mp4', normalizedWebsiteUrl: 'https://old.example/' }),
+    queue: async (input, options) => { queued.push({ input, options }); return { ...input, status: 'pending' }; },
+  });
+  const coordinator = createCompanyWebsiteVideoCoordinator({
+    dataOpsStore: createDataOpsStore([{ id: 'c1', bedrijf: 'Gewijzigd', website: 'https://new.example' }]),
+    repository,
+  });
+  const response = createResponse();
+  await coordinator.startResponse({ params: { companyId: 'c1' }, body: {} }, response);
+  assert.equal(response.statusCode, 202);
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].input.normalizedWebsiteUrl, 'https://new.example/');
+  assert.equal(queued[0].options.forceRetry, true);
+});
 
 test('twee gelijktijdige workerclaims starten exact één render', async () => {
   let available = true;
@@ -120,4 +242,17 @@ test('mislukte render wordt server-side als failed opgeslagen', async () => {
   });
   assert.equal(await worker.runOne(), true);
   assert.equal(failedMessage, 'technische renderfout');
+});
+
+test('videopagina bevat alleen speler, status, terugknop en retry', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-company-website-video.html'), 'utf8');
+  const client = fs.readFileSync(path.join(repoRoot, 'assets/premium-company-website-video.js'), 'utf8');
+  assert.match(html, /Terug naar database/);
+  assert.match(html, /Websitevideo wordt gemaakt\.\.\./);
+  assert.match(html, /<video[^>]+controls[^>]+preload="metadata"/);
+  assert.match(html, /Opnieuw proberen/);
+  assert.doesNotMatch(html, /autoplay|upload|webcam|microfoon/i);
+  assert.match(client, /POLL_INTERVAL_MS = 2500/);
+  assert.match(client, /Voor dit bedrijf is geen geldige website gevonden\./);
+  assert.match(client, /De websitevideo kon niet worden gemaakt\./);
 });

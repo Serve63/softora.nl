@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
+  <title>Websitevideo - Softora</title>
+  <link rel="stylesheet" href="/assets/premium-company-website-video.css?v=20260714a">
+  <script src="/assets/premium-company-website-video.js?v=20260714a" defer></script>
+</head>
+<body>
+  <main class="website-video-page">
+    <header class="website-video-header">
+      <a class="back-link" href="/premium-database" aria-label="Terug naar de bedrijvendatabase">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Terug naar database
+      </a>
+      <div class="softora-mark" aria-label="Softora">
+        <span class="softora-mark-dot"></span>
+        Softora
+      </div>
+    </header>
+
+    <section class="website-video-card" aria-labelledby="pageTitle">
+      <div class="website-video-copy">
+        <p class="eyebrow">Bedrijfsvideo</p>
+        <h1 id="pageTitle">Websitevideo</h1>
+        <p class="website-url" id="websiteUrl" hidden></p>
+      </div>
+
+      <div class="video-stage" id="videoStage" aria-live="polite" aria-busy="true">
+        <div class="status-panel" id="statusPanel">
+          <div class="calm-loader" id="calmLoader" aria-hidden="true"></div>
+          <p class="status-title" id="statusTitle">Websitevideo wordt gemaakt...</p>
+          <button class="retry-button" id="retryButton" type="button" hidden>Opnieuw proberen</button>
+        </div>
+        <video id="videoPlayer" controls preload="metadata" playsinline hidden></video>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
