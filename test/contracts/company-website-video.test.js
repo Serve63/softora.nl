@@ -262,11 +262,12 @@ test('videopagina bevat alleen speler, status, terugknop en retry', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-company-website-video.html'), 'utf8');
   const client = fs.readFileSync(path.join(repoRoot, 'assets/premium-company-website-video.js'), 'utf8');
   assert.match(html, /Terug naar database/);
-  assert.match(html, /Websitevideo wordt gemaakt\.\.\./);
+  assert.match(html, /Video wordt geladen\.\.\./);
   assert.match(html, /<video[^>]+controls[^>]+preload="metadata"/);
   assert.match(html, /Opnieuw proberen/);
   assert.doesNotMatch(html, /autoplay|upload|webcam|microfoon/i);
   assert.match(client, /POLL_INTERVAL_MS = 2500/);
   assert.match(client, /Voor dit bedrijf is geen geldige website gevonden\./);
-  assert.match(client, /De websitevideo kon niet worden gemaakt\./);
+  assert.match(client, /De video kon niet worden geladen\./);
+  assert.doesNotMatch(`${html}\n${client}`, /video wordt gemaakt|video kon niet worden gemaakt/i);
 });
