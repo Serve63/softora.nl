@@ -16,7 +16,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260714e"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260715a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -88,7 +88,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /width:\s*100%;/);
   assert.doesNotMatch(css, /width:\s*min\(1320px, 100%\);/);
   assert.doesNotMatch(css, /\.momentum-hero,\s*\.habit-board,\s*\.closing-quote/);
-  assert.match(css, /\.chart-card\s*\{[\s\S]*border-top:\s*1px solid var\(--line\);/);
+  assert.doesNotMatch(css, /\.chart-card\s*\{[^}]*border-top:/);
+  assert.match(css, /\.chart-card\s*\{[^}]*border-bottom:\s*1px solid var\(--line\);/);
   assert.doesNotMatch(css, /\.chart-legend|\.legend-dot/);
   assert.match(css, /\.bar\.is-warning\s*\{[\s\S]*var\(--warning\)/);
   assert.match(css, /\.bar\.is-danger\s*\{[\s\S]*var\(--danger\)/);
