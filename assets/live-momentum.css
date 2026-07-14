@@ -1,17 +1,22 @@
 :root {
-  --ink: #20242b;
-  --muted: #6f7580;
-  --line: #ebeaf0;
-  --soft-line: #f3f2f6;
+  color-scheme: light;
+  --ink: #1a1a2e;
+  --muted: #606272;
+  --muted-soft: #9599a8;
+  --line: rgba(0, 0, 0, .08);
+  --soft-line: rgba(0, 0, 0, .06);
   --panel: #ffffff;
-  --good: #2fbf71;
-  --good-dark: #1f9758;
-  --good-line: #7ed7a7;
-  --warning: #f0a22e;
+  --page-bg: #f8f7f4;
+  --good: #2ecc71;
+  --good-dark: #239f58;
+  --good-line: rgba(46, 204, 113, .54);
+  --warning: #f39c12;
   --warning-dark: #c97814;
-  --danger: #e45148;
+  --danger: #e74c3c;
   --danger-dark: #bb332f;
-  --empty: #eceef2;
+  --empty: #e7e5df;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Oswald", "Inter", system-ui, sans-serif;
 }
 * {
   box-sizing: border-box;
@@ -20,8 +25,11 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--ink);
-  background: #fbfbfd;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--page-bg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: hidden;
 }
 button,
 input,
@@ -35,7 +43,7 @@ button {
 .momentum-page {
   width: 100%;
   margin: 0;
-  padding: 32px clamp(22px, 3vw, 56px) 28px;
+  padding: 3rem 3rem 1.8rem;
 }
 .momentum-hero {
   padding-bottom: 4px;
@@ -45,38 +53,48 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 0 0 18px;
+  padding: 0 0 2.35rem;
 }
 .momentum-head h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  line-height: 1.05;
+  margin: 0 0 .3rem;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
   letter-spacing: 0;
+  text-transform: uppercase;
 }
 .momentum-head p {
   margin: 0;
-  color: #7b818a;
-  font-size: 14px;
-  font-weight: 650;
+  color: var(--muted-soft);
+  font-size: .9rem;
+  font-weight: 300;
 }
 .today-score {
   display: grid;
   grid-template-columns: auto auto;
-  column-gap: 28px;
+  column-gap: 1.55rem;
   row-gap: 2px;
-  min-width: 208px;
-  padding: 2px 0 2px 24px;
-  border-left: 1px solid #e4e7eb;
+  min-width: 192px;
+  padding: .05rem 0 .05rem 1.25rem;
+  border-left: 1px solid var(--line);
 }
 .score-label {
-  color: #707782;
-  font-size: 13px;
-  font-weight: 800;
+  color: var(--muted-soft);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
 .today-score strong {
   grid-row: 2;
   color: var(--good-dark);
-  font-size: 30px;
+  font-family: var(--font-display);
+  font-size: 2.35rem;
+  font-weight: 700;
   line-height: .95;
 }
 .today-score.is-warning strong {
@@ -89,30 +107,35 @@ button {
   grid-row: 1 / span 2;
   grid-column: 2;
   align-self: center;
-  color: #5f6670;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.45;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .8rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.35;
   text-align: right;
+  text-transform: uppercase;
 }
 .chart-card {
   position: relative;
-  padding: 18px 0 16px 62px;
-  border-top: 1px solid var(--soft-line);
-  border-bottom: 1px solid var(--soft-line);
+  padding: 1.2rem 0 1rem 3.7rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .chart-scale {
   position: absolute;
   left: 0;
-  top: 19px;
-  bottom: 77px;
+  top: 1.3rem;
+  bottom: 4.75rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  width: 42px;
-  color: #737a84;
-  font-size: 13px;
-  font-weight: 700;
+  width: 2.55rem;
+  color: var(--muted-soft);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 .bar-chart {
   display: grid;
@@ -133,7 +156,7 @@ button {
   display: block;
   width: min(28px, 100%);
   height: var(--bar-height, 84px);
-  border-radius: 4px 4px 2px 2px;
+  border-radius: 3px 3px 1px 1px;
   background: linear-gradient(180deg, var(--good) 0%, var(--good-dark) 100%);
   box-shadow: inset 0 1px 5px rgba(255, 255, 255, .22), 0 7px 12px rgba(31, 151, 88, .12);
   transition: height .18s ease, background .18s ease, box-shadow .18s ease;
@@ -153,7 +176,7 @@ button {
 .bar.is-open {
   height: var(--bar-height, 84px);
   min-height: 84px;
-  background: linear-gradient(180deg, #eef0f4 0%, #e7e9ed 100%);
+  background: linear-gradient(180deg, #efeee9 0%, #e7e5df 100%);
   box-shadow: inset 0 1px 4px rgba(255, 255, 255, .9);
 }
 .bar-label {
@@ -162,8 +185,10 @@ button {
   left: 50%;
   transform: translateX(-50%);
   color: var(--good-dark);
-  font-size: clamp(10px, .75vw, 12px);
-  font-weight: 900;
+  font-family: var(--font-display);
+  font-size: clamp(.62rem, .68vw, .75rem);
+  font-weight: 600;
+  letter-spacing: 0;
   white-space: nowrap;
   transition: bottom .18s ease;
 }
@@ -176,12 +201,14 @@ button {
 .day-label {
   display: block;
   align-self: end;
-  color: #747b85;
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--muted-soft);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 .habit-board {
-  margin-top: 12px;
+  margin-top: 1.2rem;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -189,7 +216,7 @@ button {
   display: grid;
   grid-template-columns: minmax(190px, 12vw) repeat(var(--day-count, 31), minmax(32px, 1fr));
   min-width: 1320px;
-  border-top: 1px solid var(--soft-line);
+  border-top: 1px solid var(--line);
   border-left: 0;
 }
 .habit-grid > * {
@@ -205,30 +232,38 @@ button {
 .habit-spacer {
   display: flex;
   align-items: end;
-  padding: 0 14px 13px;
-  color: #68717a;
-  font-size: 12px;
-  font-weight: 900;
+  padding: 0 1rem .8rem;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 .habit-day {
   display: grid;
   place-items: center;
   align-content: center;
-  color: #46505a;
-  font-size: 11px;
-  font-weight: 800;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .66rem;
+  font-weight: 500;
+  letter-spacing: 0;
   line-height: 1.38;
   text-align: center;
+  text-transform: uppercase;
 }
 .habit-day b {
-  font-size: 12px;
+  color: var(--ink);
+  font-size: .78rem;
+  font-weight: 600;
 }
 .habit-day span {
-  font-size: 10px;
+  font-size: .62rem;
   text-transform: uppercase;
 }
 .habit-day.is-muted {
-  color: #cbc7d0;
+  color: #b5b4bc;
 }
 .habit-day.is-today,
 .habit-grid .is-today {
@@ -237,29 +272,29 @@ button {
 }
 .habit-day.is-today {
   border-top: 2px solid var(--good-line);
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px 6px 0 0;
   color: var(--ink);
 }
 .status.is-today-end {
   border-bottom: 2px solid var(--good-line);
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 6px 6px;
 }
 .habit-name {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: .62rem;
   min-height: 38px;
-  padding: 0 14px;
-  color: #656d76;
-  font-size: 12px;
-  font-weight: 800;
+  padding: 0 1rem;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 500;
   white-space: nowrap;
 }
 .habit-add {
   display: flex;
   align-items: center;
   min-height: 38px;
-  padding: 0 14px;
+  padding: 0 1rem;
 }
 .habit-add-cell {
   min-height: 38px;
@@ -269,13 +304,14 @@ button {
   place-items: center;
   width: 24px;
   height: 24px;
-  border: 1px solid #d8dde3;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
+  background: var(--panel);
   color: var(--good-dark);
   cursor: pointer;
-  font-size: 18px;
-  font-weight: 850;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 600;
   line-height: 1;
   transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
 }
@@ -292,7 +328,7 @@ button {
   width: 18px;
   height: 18px;
   fill: none;
-  stroke: #5f6670;
+  stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -313,12 +349,12 @@ button {
 }
 .habit-label:focus {
   color: var(--ink);
-  background: rgba(255, 255, 255, .9);
+  background: rgba(255, 255, 255, .72);
   box-shadow: 0 0 0 2px rgba(86, 196, 134, .34);
 }
 .habit-label:empty::before {
   content: attr(data-placeholder);
-  color: #aaa8b3;
+  color: var(--muted-soft);
 }
 .status {
   display: grid;
