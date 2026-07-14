@@ -1507,8 +1507,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignPreviewScriptSource, /data-cinematic-customer-id=\\"/);
   assert.match(webdesignPreviewScriptSource, /aria-label=\\"Start cinematic websiteflow\\"/);
   assert.match(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(videoHref\) \+ "\\"/);
-  assert.match(webdesignPreviewScriptSource, /data-cinematic-video-customer-id=\\"/);
-  assert.match(webdesignPreviewScriptSource, /aria-label=\\"Start cinematic videoflow\\"/);
+  assert.match(webdesignPreviewScriptSource, /data-company-website-video-id=\\"/);
+  assert.match(webdesignPreviewScriptSource, /aria-label=\\"Bekijk websitevideo\\"/);
+  assert.ok(webdesignPreviewScriptSource.includes('return "/bedrijven/" + encodeURIComponent(normalizeString(id)) + "/video";'));
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
@@ -1622,7 +1623,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
@@ -2278,15 +2279,15 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-cinematic-customer-id="customer-1"/);
   assert.match(html, /aria-label="Start cinematic websiteflow"/);
-  assert.match(html, /class="photo-video-link photo-cinematic-video-link"/);
-  assert.match(html, /href="\/premium-cinematic-website\?customerId=customer-1&company=Aagje%20van%20Os&intent=video"/);
-  assert.match(html, /data-cinematic-video-customer-id="customer-1"/);
-  assert.match(html, /aria-label="Start cinematic videoflow"/);
+  assert.match(html, /class="photo-video-link"/);
+  assert.match(html, /href="\/bedrijven\/customer-1\/video"/);
+  assert.match(html, /data-company-website-video-id="customer-1"/);
+  assert.match(html, /aria-label="Bekijk websitevideo"/);
   assert.match(html, /class="lead-delete-button"/);
   assert.match(html, /data-delete-lead-id="customer-1"/);
   assert.ok(html.indexOf('class="photo-diamond-badge photo-cinematic-link"') > html.indexOf('class="photo-compare-link"'));
-  assert.ok(html.indexOf('class="photo-video-link photo-cinematic-video-link"') > html.indexOf('class="photo-diamond-badge photo-cinematic-link"'));
-  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-video-link photo-cinematic-video-link"'));
+  assert.ok(html.indexOf('class="photo-video-link"') > html.indexOf('class="photo-diamond-badge photo-cinematic-link"'));
+  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-video-link"'));
   assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
 });
 
