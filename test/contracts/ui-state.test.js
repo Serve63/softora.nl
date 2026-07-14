@@ -809,9 +809,10 @@ test('ui-state store can isolate critical reads through REST-first scoped option
   });
 });
 
-test('ui-seo runtime keeps coldmail state reads critical and isolated by default', () => {
+test('ui-seo runtime keeps durable state reads critical and isolated by default', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../server/services/ui-seo-runtime.js'), 'utf8');
 
+  assert.match(source, /premium_live_momentum:\s*12000/);
   assert.match(source, /premium_coldmail_autopilot:\s*12000/);
   assert.match(source, /premium_coldmail_send_guard:\s*25000/);
   assert.match(source, /premium_coldmailing_settings:\s*12000/);
