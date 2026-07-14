@@ -13,8 +13,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260713p"/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260713e" defer><\/script>/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260714a"/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260714a" defer><\/script>/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Juli 2026 .* gestart op 13 juli/);
   assert.match(html, /<strong>100%<\/strong>/);
@@ -55,6 +55,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.status\.is-today-end\s*\{[\s\S]*border-bottom:\s*2px solid var\(--good-line\);/);
   assert.match(css, /\.status\.is-untracked::before\s*\{[\s\S]*background:\s*#d4d9df;/);
   assert.match(css, /\.status\.is-missed::before\s*\{[\s\S]*background-color:\s*var\(--danger\);/);
+  assert.doesNotMatch(css, /\.status\.is-soft|is-soft::before/);
   assert.match(css, /\.habit-label:focus\s*\{[\s\S]*box-shadow:\s*0 0 0 2px rgba\(86, 196, 134, \.34\);/);
   assert.match(css, /\.add-goal\s*\{[\s\S]*border-radius:\s*999px;/);
   assert.match(css, /\.habit-add-cell\s*\{[\s\S]*min-height:\s*38px;/);
@@ -100,5 +101,6 @@ test('live momentum script wires habit toggles to chart and score state', () => 
   assert.match(js, /is-danger/);
   assert.match(js, /aria-checked/);
   assert.match(js, /scorePoints\.replaceChildren/);
+  assert.doesNotMatch(js, /is-soft/);
   assert.doesNotMatch(js, /localStorage|sessionStorage/);
 });
