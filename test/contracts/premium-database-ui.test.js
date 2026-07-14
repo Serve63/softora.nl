@@ -1377,7 +1377,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710g/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
   assert.match(webdesignActionScriptSource, /const FALLBACK_ICON = "<span class=\\"photo-fallback-icon\\" aria-hidden=\\"true\\"><\/span>";/);
   assert.match(webdesignActionScriptSource, /\.photo-fallback-icon\{display:none\}/);
   assert.doesNotMatch(webdesignActionScriptSource, /photo-fallback-icon[^\n]*>!<\/span>/);
@@ -1496,15 +1496,19 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /\.photo-drop\[data-photo-error=\\"true\\"\] \.photo-drop-image,\.photo-drop\[data-photo-error=\\"true\\"\] \.photo-drop-loader\{display:none\}/);
   assert.match(webdesignActionScriptSource, /photo-drop-loader\{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;/);
   assert.match(webdesignActionScriptSource, /photo-drop-image\{width:100%;height:100%;object-fit:cover;display:block;opacity:0;/);
-  assert.match(webdesignActionScriptSource, /\.photo-cell\{display:grid;grid-template-columns:34px 34px 22px 22px 18px;align-items:center;justify-content:start;gap:4px;width:146px;min-width:146px;line-height:0\}/);
-  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:146px;min-width:146px\}/);
+  assert.match(webdesignActionScriptSource, /\.photo-cell\{display:grid;grid-template-columns:34px 34px 22px 22px 22px 18px;align-items:center;justify-content:start;gap:4px;width:172px;min-width:172px;line-height:0\}/);
+  assert.match(webdesignPreviewScriptSource, /\.photo-cell\{width:172px;min-width:172px\}/);
   assert.match(webdesignPreviewScriptSource, /const COMPARE_ICON = "<svg class=\\"photo-compare-icon\\"/);
   assert.match(webdesignPreviewScriptSource, /const DIAMOND_ICON = "<svg class=\\"photo-diamond-icon\\"/);
+  assert.match(webdesignPreviewScriptSource, /const VIDEO_ICON = "<svg class=\\"photo-video-icon\\"/);
   assert.match(webdesignPreviewScriptSource, /href=\\"https:\/\/www\.softora\.nl\/webdesign\/" \+ escapeHtml\(slug\) \+ "\\"/);
   assert.match(webdesignPreviewScriptSource, /data-public-preview-id=\\"/);
   assert.match(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(cinematicHref\) \+ "\\"/);
   assert.match(webdesignPreviewScriptSource, /data-cinematic-customer-id=\\"/);
   assert.match(webdesignPreviewScriptSource, /aria-label=\\"Start cinematic websiteflow\\"/);
+  assert.match(webdesignPreviewScriptSource, /href=\\"" \+ escapeHtml\(videoHref\) \+ "\\"/);
+  assert.match(webdesignPreviewScriptSource, /data-cinematic-video-customer-id=\\"/);
+  assert.match(webdesignPreviewScriptSource, /aria-label=\\"Start cinematic videoflow\\"/);
   assert.match(webdesignPreviewScriptSource, /nodes\.photoPreviewMeta\.hidden = true/);
   assert.doesNotMatch(webdesignPreviewScriptSource, /customer\.bedrijf \+ " · naast elkaar"/);
   assert.match(webdesignActionScriptSource, /\.photo-drop\{position:relative;flex:0 0 34px;aspect-ratio:1\/1;overflow:hidden;contain:layout paint\}/);
@@ -1617,8 +1621,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710g/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260619a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714a/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
@@ -1768,7 +1772,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260710g/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
@@ -2274,10 +2278,15 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.match(html, /target="_blank"/);
   assert.match(html, /data-cinematic-customer-id="customer-1"/);
   assert.match(html, /aria-label="Start cinematic websiteflow"/);
+  assert.match(html, /class="photo-video-link photo-cinematic-video-link"/);
+  assert.match(html, /href="\/premium-cinematic-website\?customerId=customer-1&company=Aagje%20van%20Os&intent=video"/);
+  assert.match(html, /data-cinematic-video-customer-id="customer-1"/);
+  assert.match(html, /aria-label="Start cinematic videoflow"/);
   assert.match(html, /class="lead-delete-button"/);
   assert.match(html, /data-delete-lead-id="customer-1"/);
   assert.ok(html.indexOf('class="photo-diamond-badge photo-cinematic-link"') > html.indexOf('class="photo-compare-link"'));
-  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-diamond-badge photo-cinematic-link"'));
+  assert.ok(html.indexOf('class="photo-video-link photo-cinematic-video-link"') > html.indexOf('class="photo-diamond-badge photo-cinematic-link"'));
+  assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-video-link photo-cinematic-video-link"'));
   assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
 });
 
