@@ -32,7 +32,10 @@ function createPremiumHtmlPageAccessController(options = {}) {
   function isPremiumProtectedHtmlFile(fileNameRaw) {
     const fileName = normalizeFileName(fileNameRaw);
     if (!fileName) return false;
-    return /^premium-/i.test(fileName) && !premiumPublicHtmlFiles.has(fileName);
+    return (
+      (/^premium-/i.test(fileName) && !premiumPublicHtmlFiles.has(fileName)) ||
+      premiumAdminOnlyHtmlFiles.has(fileName)
+    );
   }
 
   function isPremiumAdminOnlyHtmlFile(fileNameRaw) {
