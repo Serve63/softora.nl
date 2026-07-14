@@ -418,7 +418,7 @@ function mountExtraSettingsCategory() {
       card.type = 'button';
       card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
-        window.location.href = this.getAttribute('data-settings-extra-href');
+        window.location.href = moduleHref;
       });
     }
     var moduleArrow = createUserManagementSvgElement('svg', {
