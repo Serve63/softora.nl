@@ -14,8 +14,15 @@ test('live momentum page renders the requested dashboard surface', () => {
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
+  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
+  assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260714d"/);
+  assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260519b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260714c" defer><\/script>/);
+  assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
+  assert.match(html, /<aside class="sidebar" data-live-momentum-sidebar-host="1" aria-label="Premium navigatie"><\/aside>/);
+  assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Juli 2026 .* gestart op 13 juli/);
   assert.match(html, /<strong>100%<\/strong>/);

@@ -111,6 +111,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
   assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
   assert.match(themeJsSource, /function isSidebarNavigationCurrentTarget\(href\) \{/);
+  assert.match(themeJsSource, /pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);
   assert.match(themeJsSource, /anchor\.dataset\.sidebarHref = normalizeSidebarNavigationTarget\(href\);[\s\S]*anchor\.setAttribute\("href", anchor\.dataset\.sidebarHref\);/);
   assert.doesNotMatch(themeJsSource, /window\.location\.assign\(href\);/);
   assert.doesNotMatch(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);

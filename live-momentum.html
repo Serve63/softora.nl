@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl" data-personnel-loading="true" data-theme-mode="light" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,10 +10,17 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
+  <link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=20260611a">
   <link rel="stylesheet" href="/assets/live-momentum.css?v=20260714d">
+  <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
+  <script src="/assets/premium-sidebar-autopilot.js?v=20260611a" defer></script>
 </head>
-<body>
-  <main class="momentum-page" aria-labelledby="momentum-title">
+<body data-live-momentum-page>
+  <div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">
+    <aside class="sidebar" data-live-momentum-sidebar-host="1" aria-label="Premium navigatie"></aside>
+
+    <main class="main-content momentum-page" aria-labelledby="momentum-title">
     <section class="momentum-hero" aria-label="Live momentum dashboard">
       <header class="momentum-head">
         <div>
@@ -57,7 +64,8 @@
     <section class="habit-board" aria-label="Dagelijkse taken">
       <div class="habit-grid" role="table" aria-label="Momentum taken in juli"></div>
     </section>
-  </main>
+    </main>
+  </div>
   <script src="/assets/live-momentum.js?v=20260714c" defer></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 (function () {
     const pathname = (window.location.pathname || "").toLowerCase();
-    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1;
+    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/live-momentum" || pathname === "/live-momentum.html";
     const personnelStorageKey = isPremiumPersonnelContext
         ? "softora_premium_personnel_theme_mode"
         : "softora_software_personnel_theme_mode";

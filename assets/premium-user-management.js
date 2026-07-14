@@ -288,6 +288,7 @@ function mountExtraSettingsCategory() {
     'Transfermarkt',
     'Ruben’s Company',
     'Ruben’s Trading System',
+    'Winnen',
   ];
 
   if (!document.getElementById('settings-extra-style')) {
@@ -359,7 +360,7 @@ function mountExtraSettingsCategory() {
     'tegel-desc',
     'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
   );
-  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '7 onderdelen');
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '8 onderdelen');
   extraTile.addEventListener('click', function () {
     goTo('screen-extra');
   });
@@ -408,13 +409,16 @@ function mountExtraSettingsCategory() {
   extraItems.forEach(function (label, index) {
     var number = String(index + 1).padStart(2, '0');
     var isFlynow = label === 'Flynow';
-    var card = document.createElement(isFlynow ? 'button' : 'div');
+    var isWinning = label === 'Winnen';
+    var isLinkedModule = isFlynow || isWinning;
+    var moduleHref = isFlynow ? '/premium-flynow' : '/live-momentum';
+    var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
-    if (isFlynow) {
+    if (isLinkedModule) {
       card.type = 'button';
-      card.setAttribute('data-settings-extra-href', '/premium-flynow');
+      card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
-        window.location.href = '/premium-flynow';
+        window.location.href = this.getAttribute('data-settings-extra-href');
       });
     }
     var moduleArrow = createUserManagementSvgElement('svg', {
@@ -459,7 +463,11 @@ function mountExtraSettingsCategory() {
       card,
       'div',
       'tegel-desc',
-      isFlynow ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.' : 'Interne template-module die later verder ingevuld kan worden.'
+      isFlynow
+        ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
+        : isWinning
+          ? 'Live momentum voor dagelijkse doelen, discipline en voortgang.'
+          : 'Interne template-module die later verder ingevuld kan worden.'
     );
     appendUserManagementTextElement(card, 'div', 'tegel-count', 'Extra ' + number);
     extraGrid.appendChild(card);
