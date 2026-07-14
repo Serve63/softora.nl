@@ -116,7 +116,7 @@ button {
 }
 .bar-chart {
   display: grid;
-  grid-template-columns: repeat(30, minmax(18px, 1fr));
+  grid-template-columns: repeat(var(--day-count, 31), minmax(18px, 1fr));
   align-items: end;
   gap: clamp(5px, .55vw, 10px);
   min-height: 218px;
@@ -187,8 +187,8 @@ button {
 }
 .habit-grid {
   display: grid;
-  grid-template-columns: minmax(190px, 12vw) repeat(30, minmax(32px, 1fr));
-  min-width: 1270px;
+  grid-template-columns: minmax(190px, 12vw) repeat(var(--day-count, 31), minmax(32px, 1fr));
+  min-width: 1320px;
   border-top: 1px solid var(--soft-line);
   border-left: 0;
 }
@@ -222,6 +222,10 @@ button {
 }
 .habit-day b {
   font-size: 12px;
+}
+.habit-day span {
+  font-size: 10px;
+  text-transform: uppercase;
 }
 .habit-day.is-muted {
   color: #cbc7d0;
@@ -384,7 +388,7 @@ button {
     padding: 24px 18px;
   }
   .habit-grid {
-    grid-template-columns: 190px repeat(30, 36px);
+    grid-template-columns: 190px repeat(var(--day-count, 31), 36px);
   }
   .bar-chart {
     min-width: 900px;
