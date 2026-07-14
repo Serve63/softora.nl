@@ -6,7 +6,8 @@
     var activeFrameNavigationUrl = "";
 
     function isPremiumPath() {
-        return String(window.location.pathname || "").toLowerCase().indexOf("/premium-") === 0;
+        var path = String(window.location.pathname || "").toLowerCase();
+        return path.indexOf("/premium-") === 0 || path === "/live-momentum" || path === "/live-momentum.html";
     }
 
     function getSidebar() {
@@ -77,6 +78,7 @@
 
     function resolveActiveSidebarKeyForPath(pathname, hash) {
         var p = String(pathname || "").toLowerCase();
+        if (p === "/live-momentum" || p === "/live-momentum.html") return "live_momentum";
         var h = String(hash || "").replace(/^#/, "").toLowerCase();
         if (p.indexOf("/premium-advertenties") === 0) {
             if (h === "google") return "ads_google";
