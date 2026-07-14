@@ -16,7 +16,9 @@
   const scorePoints = document.querySelector('.score-points');
   const todayScore = document.querySelector('.today-score');
   const srSummary = document.querySelector('.chart-card .sr-only');
-  if (!grid || !chart || !scoreValue || !scorePoints) {
+  const chartSwitches = Array.from(document.querySelectorAll('.chart-switch'));
+  let chartMode = 'bars';
+  if (!grid || !chart || !scoreValue || !scorePoints || !chartSwitches.length) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -59,6 +61,13 @@
       return null;
     }
     return Math.round((checkedCount / cellsForDay.length) * 100);
+  }
+  function getVisibleScore(day) {
+    const score = getDayScore(day);
+    if (!Number.isFinite(score) || (day > TODAY && score === 0)) {
+      return null;
+    }
+    return score;
   }
   function ensureBarLabel(wrap) {
     let label = wrap.querySelector('.bar-label');
@@ -114,6 +123,11 @@
     }
   }
   function updateChart() {
+    if (chartMode === 'line') {
+      renderLineChart();
+      updateScore();
+      return;
+    }
     DAYS.forEach((day) => {
       updateBar(day, getDayScore(day));
     });
@@ -216,6 +230,77 @@
     });
     chart.replaceChildren(fragment);
   }
+  function renderLineChart() {
+    const plotHeight = 164;
+    const viewWidth = Math.max(chart.clientWidth, 620);
+    const columnWidth = viewWidth / TOTAL_DAYS;
+    const scoredDays = DAYS
+      .map((day) => ({ day, score: getVisibleScore(day) }))
+      .filter(({ score }) => Number.isFinite(score));
+    const stage = document.createElement('div');
+    stage.className = 'line-stage';
+    [0, 25, 50, 75, 100].forEach((score) => {
+      const y = plotHeight - ((score / 100) * (plotHeight - 8)) - 4;
+      const gridLine = document.createElement('span');
+      gridLine.className = 'line-grid';
+      gridLine.style.top = `${y}px`;
+      stage.append(gridLine);
+    });
+    scoredDays.forEach((point, index) => {
+      if (!index) {
+        return;
+      }
+      const previous = scoredDays[index - 1];
+      const x1 = (previous.day - .5) * columnWidth;
+      const y1 = plotHeight - ((previous.score / 100) * (plotHeight - 8)) - 4;
+      const x2 = (point.day - .5) * columnWidth;
+      const y2 = plotHeight - ((point.score / 100) * (plotHeight - 8)) - 4;
+      const segment = document.createElement('span');
+      segment.className = `line-segment ${getScoreBand(point.score)}`;
+      segment.style.left = `${x1}px`;
+      segment.style.top = `${y1}px`;
+      segment.style.width = `${Math.hypot(x2 - x1, y2 - y1)}px`;
+      segment.style.transform = `rotate(${Math.atan2(y2 - y1, x2 - x1)}rad)`;
+      stage.append(segment);
+    });
+    scoredDays.forEach(({ day, score }) => {
+      const x = (day - .5) * columnWidth;
+      const y = plotHeight - ((score / 100) * (plotHeight - 8)) - 4;
+      const point = document.createElement('span');
+      const label = document.createElement('span');
+      point.className = `line-point ${getScoreBand(score)}${score >= 90 ? ' is-top' : ''}`;
+      point.style.left = `${x}px`;
+      point.style.top = `${y}px`;
+      label.className = 'line-point-label';
+      label.textContent = `${score}%`;
+      point.append(label);
+      stage.append(point);
+    });
+    const dayAxis = document.createElement('div');
+    dayAxis.className = 'line-day-axis';
+    DAYS.forEach((day) => {
+      const dayLabel = document.createElement('span');
+      dayLabel.textContent = String(day);
+      dayAxis.append(dayLabel);
+    });
+    chart.replaceChildren(stage, dayAxis);
+  }
+  function setChartMode(mode) {
+    if (!['bars', 'line'].includes(mode) || mode === chartMode) {
+      return;
+    }
+    chartMode = mode;
+    chart.classList.toggle('is-line-mode', chartMode === 'line');
+    chartSwitches.forEach((button) => {
+      const isActive = button.dataset.chartMode === chartMode;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+    if (chartMode === 'bars') {
+      renderChartShell();
+    }
+    updateChart();
+  }
   function renderGridShell() {
     const fragment = document.createDocumentFragment();
     const spacer = document.createElement('div');
@@ -287,6 +372,14 @@
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
+  chartSwitches.forEach((button) => {
+    button.addEventListener('click', () => setChartMode(button.dataset.chartMode));
+  });
+  window.addEventListener('resize', () => {
+    if (chartMode === 'line') {
+      renderLineChart();
+    }
+  });
   grid.addEventListener('click', (event) => {
     const addButton = event.target.closest('.add-goal');
     if (addButton && grid.contains(addButton)) {

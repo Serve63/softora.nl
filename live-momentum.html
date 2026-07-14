@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
-  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260714b">
+  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260714d">
 </head>
 <body>
   <main class="momentum-page" aria-labelledby="momentum-title">
@@ -20,11 +20,23 @@
           <h1 id="momentum-title">Live momentum</h1>
           <p>Juli 2026 · gestart op 13 juli</p>
         </div>
-        <aside class="today-score" aria-label="Score vandaag">
-          <span class="score-label">Vandaag</span>
-          <strong>100%</strong>
-          <span class="score-points">100 / 100<br>punten</span>
-        </aside>
+        <div class="momentum-actions">
+          <div class="chart-switcher" role="group" aria-label="Grafiekweergave">
+            <button class="chart-switch is-active" type="button" data-chart-mode="bars" aria-pressed="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10H5Zm6 0V4h3v16h-3Zm6 0v-7h3v7h-3Z" /></svg>
+              <span>Staven</span>
+            </button>
+            <button class="chart-switch" type="button" data-chart-mode="line" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 5-5 4 3 7-8" /></svg>
+              <span>Lijn</span>
+            </button>
+          </div>
+          <aside class="today-score" aria-label="Score vandaag">
+            <span class="score-label">Vandaag</span>
+            <strong>100%</strong>
+            <span class="score-points">100 / 100<br>punten</span>
+          </aside>
+        </div>
       </header>
 
       <div class="chart-card">
@@ -46,6 +58,6 @@
       <div class="habit-grid" role="table" aria-label="Momentum taken in juli"></div>
     </section>
   </main>
-  <script src="/assets/live-momentum.js?v=20260714a" defer></script>
+  <script src="/assets/live-momentum.js?v=20260714c" defer></script>
 </body>
 </html>
