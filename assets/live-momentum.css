@@ -125,11 +125,10 @@ button {
   box-shadow: 0 0 0 3px rgba(46, 204, 113, .24);
 }
 .today-score {
-  display: grid;
-  grid-template-columns: auto auto;
-  column-gap: 1.55rem;
-  row-gap: 2px;
-  min-width: 192px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 82px;
   padding: .05rem 0 .05rem 1.25rem;
   border-left: 1px solid var(--line);
 }
@@ -143,7 +142,6 @@ button {
   text-transform: uppercase;
 }
 .today-score strong {
-  grid-row: 2;
   color: var(--good-dark);
   font-family: var(--font-display);
   font-size: 2.35rem;
@@ -155,19 +153,6 @@ button {
 }
 .today-score.is-danger strong {
   color: var(--danger-dark);
-}
-.score-points {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-  align-self: center;
-  color: var(--muted);
-  font-family: var(--font-display);
-  font-size: .8rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1.35;
-  text-align: right;
-  text-transform: uppercase;
 }
 .chart-card {
   position: relative;
@@ -430,39 +415,29 @@ button {
   font-weight: 500;
   white-space: nowrap;
 }
-.habit-add {
-  display: flex;
-  align-items: center;
-  min-height: 38px;
-  padding: 0 1rem;
-}
-.habit-add-cell {
-  min-height: 38px;
-}
 .add-goal {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel);
-  color: var(--good-dark);
+  display: inline-block;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
   font-family: var(--font-display);
-  font-size: 1.08rem;
-  font-weight: 600;
+  font-size: 1.3rem;
+  font-weight: 500;
   line-height: 1;
-  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+  transition: color .16s ease;
 }
 .add-goal:hover {
-  border-color: var(--good-line);
-  transform: translateY(-1px);
-  box-shadow: 0 5px 12px rgba(31, 151, 88, .12);
+  color: var(--ink);
 }
 .add-goal:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(86, 196, 134, .3);
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }
 .habit-name svg {
   width: 18px;
