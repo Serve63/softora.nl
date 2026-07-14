@@ -27,7 +27,7 @@
   const getStatusCells = () => Array.from(grid.querySelectorAll('.status'));
   const getDay = (cell) => Number(cell.dataset.day || 0);
   const getLabelText = (index) => getLabels()[index]?.textContent.trim() || `Taak ${index + 1}`;
-  const isChecked = (cell) => cell.classList.contains('is-done') || cell.classList.contains('is-soft');
+  const isChecked = (cell) => cell.classList.contains('is-done');
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
   const formatDay = (day) => `${day} juli`;
   function getScoreBand(score) {
@@ -122,7 +122,6 @@
   function setChecked(cell, checked) {
     cell.classList.remove('is-untracked');
     cell.classList.toggle('is-done', checked);
-    cell.classList.remove('is-soft');
     syncCellA11y(cell);
   }
   function toggleCell(cell) {

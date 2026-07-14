@@ -342,7 +342,6 @@ button {
   background: #d4d9df;
 }
 .status.is-done::before,
-.status.is-soft::before,
 .status.is-missed::before {
   content: "";
   display: block;
@@ -352,10 +351,6 @@ button {
   background-color: var(--good);
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6.5 12.3 3.2 3.1 7.8-7.8' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   box-shadow: 0 4px 10px rgba(31, 151, 88, .16);
-}
-.status.is-soft::before {
-  background-color: var(--warning);
-  box-shadow: 0 4px 10px rgba(201, 120, 20, .14);
 }
 .status.is-missed::before {
   background-color: var(--danger);
