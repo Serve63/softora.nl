@@ -16,6 +16,9 @@ const {
   registerPremiumDatabaseCinematicJobRoutes,
 } = require('../routes/premium-database-cinematic-jobs');
 const {
+  registerCompanyWebsiteVideoRoutes,
+} = require('../routes/company-website-video');
+const {
   registerPublicWebdesignPreviewRoutes,
 } = require('../routes/public-webdesign-preview');
 const { registerOpenAiCostRoutes } = require('../routes/openai-costs');
@@ -47,6 +50,9 @@ const {
   createPublicWebdesignPreviewService,
 } = require('./public-webdesign-preview');
 const { createPremiumRouteRuntime } = require('./premium-route-runtime');
+const {
+  createCompanyWebsiteVideoCoordinator,
+} = require('./company-website-video');
 
 function registerFeatureRoutes(app, deps = {}) {
   const {
@@ -109,6 +115,10 @@ function registerFeatureRoutes(app, deps = {}) {
     ...(kvkDatabaseSnapshot || {}),
     fallbackSyncToken: mailboxCronSecret,
   });
+  const companyWebsiteVideoCoordinator = createCompanyWebsiteVideoCoordinator({
+    dataOpsStore: deps.dataOpsStore,
+    logger: deps.logger || console,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -152,6 +162,10 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerPremiumDatabaseCinematicJobRoutes(app, {
     coordinator: premiumDatabaseCinematicJobsCoordinator,
+    requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
+  });
+  registerCompanyWebsiteVideoRoutes(app, {
+    coordinator: companyWebsiteVideoCoordinator,
     requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
   });
   registerPublicWebdesignPreviewRoutes(app, {
