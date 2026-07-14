@@ -134,33 +134,17 @@
         return "/premium-cinematic-website" + (parts.length ? "?" + parts.join("&") : "");
     }
 
-    function buildWebsiteVideoHref(id) {
-        return "/bedrijven/" + encodeURIComponent(normalizeString(id)) + "/video";
-    }
-
-    function ensureWebsiteVideoNavigationGuard() {
-        if (!global.document || !global.document.documentElement || typeof global.document.addEventListener !== "function") return;
-        var rootDataset = global.document.documentElement.dataset || {};
-        if (rootDataset.websiteVideoNavigationBound === "true") return;
-        rootDataset.websiteVideoNavigationBound = "true";
-        global.document.addEventListener("click", function (event) {
-            var link = event.target && event.target.closest ? event.target.closest(".photo-video-link") : null;
-            if (link) event.stopPropagation();
-        });
-    }
-
     function renderLink(customer, options) {
         const escapeHtml = options && typeof options.escapeHtml === "function" ? options.escapeHtml : function (value) { return String(value || ""); };
         const id = normalizeString(customer && customer.id);
         if (!options || !options.show || !id) return "";
         const slug = slugifyPublicPreview(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam), encodeURIComponent(id));
         const cinematicHref = buildCinematicHref(customer, id, "");
-        const videoHref = buildWebsiteVideoHref(id);
-        return "<a class=\"photo-compare-link\" href=\"https://www.softora.nl/webdesign/" + escapeHtml(slug) + "\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a><a class=\"photo-diamond-badge photo-cinematic-link\" href=\"" + escapeHtml(cinematicHref) + "\" target=\"_blank\" rel=\"noopener\" data-cinematic-customer-id=\"" + escapeHtml(id) + "\" aria-label=\"Start cinematic websiteflow\" title=\"Start cinematic websiteflow\">" + DIAMOND_ICON + "</a><a class=\"photo-video-link\" href=\"" + escapeHtml(videoHref) + "\" data-company-website-video-id=\"" + escapeHtml(id) + "\" aria-label=\"Bekijk websitevideo\" title=\"Bekijk websitevideo\">" + VIDEO_ICON + "</a>";
+        const videoHref = buildCinematicHref(customer, id, "video");
+        return "<a class=\"photo-compare-link\" href=\"https://www.softora.nl/webdesign/" + escapeHtml(slug) + "\" target=\"_blank\" rel=\"noopener\" data-public-preview-id=\"" + escapeHtml(id) + "\" aria-label=\"Open openbare previewpagina\" title=\"Open openbare pagina\">" + COMPARE_ICON + "</a><a class=\"photo-diamond-badge photo-cinematic-link\" href=\"" + escapeHtml(cinematicHref) + "\" target=\"_blank\" rel=\"noopener\" data-cinematic-customer-id=\"" + escapeHtml(id) + "\" aria-label=\"Start cinematic websiteflow\" title=\"Start cinematic websiteflow\">" + DIAMOND_ICON + "</a><a class=\"photo-video-link photo-cinematic-video-link\" href=\"" + escapeHtml(videoHref) + "\" target=\"_blank\" rel=\"noopener\" data-cinematic-video-customer-id=\"" + escapeHtml(id) + "\" aria-label=\"Start cinematic videoflow\" title=\"Start cinematic videoflow\">" + VIDEO_ICON + "</a>";
     }
 
     ensureStyles();
-    ensureWebsiteVideoNavigationGuard();
     global.SoftoraDatabaseWebdesignPreview = {
         openComparison: openComparison,
         renderLink: renderLink,
