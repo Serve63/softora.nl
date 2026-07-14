@@ -7,8 +7,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "worker:website-video": "node scripts/company-website-video-worker.js",
+    "worker:website-video:once": "node scripts/company-website-video-worker.js --once",
     "test:contracts": "node --test test/contracts/*.test.js",
     "test:smoke": "node --test test/smoke/*.test.js",
+    "test:e2e:website-video": "node --test test/e2e/company-website-video.e2e.test.js",
     "check:secrets": "node scripts/check-tracked-secrets.js",
     "check:guardrails": "node scripts/check-agent-guardrails.js",
     "check:repo-hygiene": "bash scripts/check-repo-hygiene.sh",
@@ -34,10 +37,13 @@
     "dotenv": "^16.4.5",
     "express": "^4.22.1",
     "express-rate-limit": "^7.5.1",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
     "helmet": "^8.0.0",
     "imapflow": "^1.2.18",
     "mailparser": "^3.9.6",
     "nodemailer": "^9.0.1",
+    "playwright": "^1.61.1",
     "sharp": "^0.34.5"
   },
   "overrides": {
