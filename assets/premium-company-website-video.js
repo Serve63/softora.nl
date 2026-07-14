@@ -86,30 +86,30 @@
       }
       if (video.status === "failed") {
         clearPoll();
-        return setStatus("De websitevideo kon niet worden gemaakt.", { loading: false, retry: true });
+        return setStatus("De video kon niet worden geladen.", { loading: false, retry: true });
       }
       if ((video.status === "missing" || video.needsRender) && allowStart) {
         video = await startRender(companyId, false);
         applyCompany(video);
       }
-      setStatus("Websitevideo wordt gemaakt...", { loading: true });
+      setStatus("Video wordt geladen...", { loading: true });
       schedulePoll(companyId);
     } catch (_error) {
       clearPoll();
-      setStatus("De websitevideo kon niet worden gemaakt.", { loading: false, retry: true });
+      setStatus("De video kon niet worden geladen.", { loading: false, retry: true });
     }
   }
 
   function init() {
     var companyId = companyIdFromPath();
-    if (!companyId) return setStatus("De websitevideo kon niet worden gemaakt.", { loading: false });
+    if (!companyId) return setStatus("De video kon niet worden geladen.", { loading: false });
     node("retryButton").addEventListener("click", async function () {
-      setStatus("Websitevideo wordt gemaakt...", { loading: true });
+      setStatus("Video wordt geladen...", { loading: true });
       try {
         await startRender(companyId, true);
         schedulePoll(companyId);
       } catch (_error) {
-        setStatus("De websitevideo kon niet worden gemaakt.", { loading: false, retry: true });
+        setStatus("De video kon niet worden geladen.", { loading: false, retry: true });
       }
     });
     refresh(companyId, true);

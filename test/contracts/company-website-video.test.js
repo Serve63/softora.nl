@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const {
   createSafeNavigationGuard,
@@ -12,6 +13,7 @@ const {
   buildVideoStoragePath,
   canReuseVideo,
   canTransitionStatus,
+  createCompanyWebsiteVideoRepository,
 } = require('../../server/repositories/company-website-video');
 const {
   buildFfmpegArgs,
@@ -243,6 +245,40 @@ test('twee gelijktijdige workerclaims starten exact één render', async () => {
   assert.equal(readyCalls, 1);
 });
 
+test('tijdelijke Supabase Storage-fout wordt veilig opnieuw geprobeerd met dezelfde upsert', async () => {
+  let attempts = 0;
+  const uploads = [];
+  const client = {
+    storage: {
+      from(bucket) {
+        return {
+          async upload(storagePath, body, options) {
+            attempts += 1;
+            uploads.push({ bucket, storagePath, body: body.toString(), options });
+            if (attempts < 3) return { error: { message: 'fetch failed' } };
+            return { data: { path: storagePath }, error: null };
+          },
+        };
+      },
+    },
+  };
+  const repository = createCompanyWebsiteVideoRepository({
+    client,
+    uploadRetryDelayMs: 0,
+  });
+  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'softora-upload-retry-'));
+  const filePath = path.join(directory, 'video.mp4');
+  try {
+    await fs.promises.writeFile(filePath, 'mp4-data');
+    assert.equal(await repository.upload('company-1', filePath), 'companies/company-1/homepage.mp4');
+  } finally {
+    await fs.promises.rm(directory, { recursive: true, force: true });
+  }
+  assert.equal(attempts, 3);
+  assert.ok(uploads.every((upload) => upload.options.upsert === true));
+  assert.ok(uploads.every((upload) => upload.storagePath === 'companies/company-1/homepage.mp4'));
+});
+
 test('mislukte render wordt server-side als failed opgeslagen', async () => {
   let failedMessage = '';
   const worker = createWorker({
@@ -262,11 +298,12 @@ test('videopagina bevat alleen speler, status, terugknop en retry', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-company-website-video.html'), 'utf8');
   const client = fs.readFileSync(path.join(repoRoot, 'assets/premium-company-website-video.js'), 'utf8');
   assert.match(html, /Terug naar database/);
-  assert.match(html, /Websitevideo wordt gemaakt\.\.\./);
+  assert.match(html, /Video wordt geladen\.\.\./);
   assert.match(html, /<video[^>]+controls[^>]+preload="metadata"/);
   assert.match(html, /Opnieuw proberen/);
   assert.doesNotMatch(html, /autoplay|upload|webcam|microfoon/i);
   assert.match(client, /POLL_INTERVAL_MS = 2500/);
   assert.match(client, /Voor dit bedrijf is geen geldige website gevonden\./);
-  assert.match(client, /De websitevideo kon niet worden gemaakt\./);
+  assert.match(client, /De video kon niet worden geladen\./);
+  assert.doesNotMatch(`${html}\n${client}`, /video wordt gemaakt|video kon niet worden gemaakt/i);
 });
