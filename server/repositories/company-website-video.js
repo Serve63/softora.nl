@@ -64,6 +64,14 @@ function assertSupabaseResult(result, operation) {
   throw error;
 }
 
+function isRetryableStorageError(error) {
+  const cause = error && error.cause;
+  const status = Number(cause && (cause.statusCode || cause.status));
+  if (status === 408 || status === 425 || status === 429 || status >= 500) return true;
+  const message = `${normalizeString(error && error.message)} ${normalizeString(cause && cause.message)}`.toLowerCase();
+  return /fetch failed|failed to fetch|network|econnreset|etimedout|timeout|socket|load failed/.test(message);
+}
+
 function createCompanyWebsiteVideoRepository(options = {}) {
   const client = options.client || (
     options.supabaseUrl && options.supabaseServiceRoleKey
@@ -73,6 +81,12 @@ function createCompanyWebsiteVideoRepository(options = {}) {
       : null
   );
   const bucket = normalizeString(options.storageBucket) || STORAGE_BUCKET;
+  const uploadMaxAttempts = Math.max(1, Math.min(5, Number(options.uploadMaxAttempts) || 3));
+  const configuredRetryDelay = Number(options.uploadRetryDelayMs);
+  const uploadRetryDelayMs = Number.isFinite(configuredRetryDelay)
+    ? Math.max(0, configuredRetryDelay)
+    : 600;
+  const wait = options.wait || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   if (!client) {
     return {
       configured: false,
@@ -152,12 +166,20 @@ function createCompanyWebsiteVideoRepository(options = {}) {
   async function upload(companyId, filePath) {
     const storagePath = buildVideoStoragePath(companyId);
     const body = await fs.promises.readFile(filePath);
-    assertSupabaseResult(await client.storage.from(bucket).upload(storagePath, body, {
-      contentType: 'video/mp4',
-      upsert: true,
-      cacheControl: '3600',
-    }), 'Websitevideo opslaan');
-    return storagePath;
+    for (let attempt = 1; attempt <= uploadMaxAttempts; attempt += 1) {
+      try {
+        assertSupabaseResult(await client.storage.from(bucket).upload(storagePath, body, {
+          contentType: 'video/mp4',
+          upsert: true,
+          cacheControl: '3600',
+        }), 'Websitevideo opslaan');
+        return storagePath;
+      } catch (error) {
+        if (attempt >= uploadMaxAttempts || !isRetryableStorageError(error)) throw error;
+        await wait(uploadRetryDelayMs * attempt);
+      }
+    }
+    throw new Error('Websitevideo opslaan is onverwacht afgebroken.');
   }
 
   async function exists(record) {
