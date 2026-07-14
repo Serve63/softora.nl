@@ -76,7 +76,12 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /var isWinning = label === 'Winnen';/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
   assert.match(userManagementSource, /var moduleHref = isFlynow \? '\/premium-flynow' : '\/live-momentum';/);
-  assert.match(userManagementSource, /window\.location\.href = moduleHref;/);
+  assert.match(userManagementSource, /function navigateToSettingsModule\(moduleHref\)/);
+  assert.match(userManagementSource, /var targetWindow = window\.top && window\.top !== window \? window\.top : window;/);
+  assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
+  assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
+  assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
+  assert.match(source, /premium-user-management\.js\?v=20260714b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-count', 'Extra ' \+ number\);/);
