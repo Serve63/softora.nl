@@ -13,7 +13,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260714a"/);
+  assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260714b"/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260714a" defer><\/script>/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Juli 2026 .* gestart op 13 juli/);
@@ -38,9 +39,24 @@ test('live momentum page renders the requested dashboard surface', () => {
 test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const css = read('assets/live-momentum.css');
 
-  assert.match(css, /--good:\s*#2fbf71;/);
-  assert.match(css, /--warning:\s*#f0a22e;/);
-  assert.match(css, /--danger:\s*#e45148;/);
+  assert.match(css, /--page-bg:\s*#f8f7f4;/);
+  assert.match(css, /--ink:\s*#1a1a2e;/);
+  assert.match(css, /--muted:\s*#606272;/);
+  assert.match(css, /--muted-soft:\s*#9599a8;/);
+  assert.match(css, /--font-sans:\s*"Inter"/);
+  assert.match(css, /--font-display:\s*"Oswald"/);
+  assert.match(css, /--good:\s*#2ecc71;/);
+  assert.match(css, /--warning:\s*#f39c12;/);
+  assert.match(css, /--danger:\s*#e74c3c;/);
+  assert.match(css, /body\s*\{[\s\S]*background:\s*var\(--page-bg\);/);
+  assert.match(css, /body\s*\{[\s\S]*font-family:\s*var\(--font-sans\);/);
+  assert.match(css, /\.momentum-page\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/);
+  assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-family:\s*var\(--font-display\);/);
+  assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-size:\s*2rem;/);
+  assert.match(css, /\.momentum-head h1\s*\{[\s\S]*text-transform:\s*uppercase;/);
+  const letterSpacingValues = Array.from(css.matchAll(/letter-spacing:\s*([^;]+);/g), (match) => match[1].trim());
+  assert.ok(letterSpacingValues.length > 0);
+  assert.deepEqual([...new Set(letterSpacingValues)], ['0']);
   assert.doesNotMatch(css, /purple/i);
   assert.doesNotMatch(css, /88366b|74265c|91436f|7f426b/i);
   assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--day-count, 31\),/);
@@ -48,7 +64,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /width:\s*100%;/);
   assert.doesNotMatch(css, /width:\s*min\(1320px, 100%\);/);
   assert.doesNotMatch(css, /\.momentum-hero,\s*\.habit-board,\s*\.closing-quote/);
-  assert.match(css, /\.chart-card\s*\{[\s\S]*border-top:\s*1px solid var\(--soft-line\);/);
+  assert.match(css, /\.chart-card\s*\{[\s\S]*border-top:\s*1px solid var\(--line\);/);
   assert.doesNotMatch(css, /\.chart-legend|\.legend-dot/);
   assert.match(css, /\.bar\.is-warning\s*\{[\s\S]*var\(--warning\)/);
   assert.match(css, /\.bar\.is-danger\s*\{[\s\S]*var\(--danger\)/);
@@ -60,7 +76,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.add-goal\s*\{[\s\S]*border-radius:\s*999px;/);
   assert.match(css, /\.habit-add-cell\s*\{[\s\S]*min-height:\s*38px;/);
   assert.doesNotMatch(css, /\.habit-name-empty/);
-  assert.match(css, /\.habit-spacer\s*\{[\s\S]*font-weight:\s*900;/);
+  assert.match(css, /\.habit-spacer\s*\{[\s\S]*font-family:\s*var\(--font-display\);/);
+  assert.match(css, /\.habit-spacer\s*\{[\s\S]*font-weight:\s*500;/);
   assert.doesNotMatch(css, /\.motivation-strip/);
   assert.doesNotMatch(css, /\.quote-card/);
   assert.doesNotMatch(css, /\.closing-quote/);
