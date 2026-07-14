@@ -540,7 +540,7 @@
             return "monthly_costs";
         }
         if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
-        return "dashboard";
+        return p === "/live-momentum" || p === "/live-momentum.html" ? "live_momentum" : "dashboard";
     }
 
     function renderSidebarLink(link, activeKey) {
