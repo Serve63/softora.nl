@@ -416,8 +416,13 @@ function mountExtraSettingsCategory() {
     var number = String(index + 1).padStart(2, '0');
     var isFlynow = label === 'Flynow';
     var isWinning = label === 'Winnen';
-    var isLinkedModule = isFlynow || isWinning;
-    var moduleHref = isFlynow ? '/premium-flynow' : '/live-momentum';
+    var isDatabase = label === 'Database';
+    var isLinkedModule = isFlynow || isWinning || isDatabase;
+    var moduleHref = isFlynow
+      ? '/premium-flynow'
+      : isWinning
+        ? '/live-momentum'
+        : '/premium-database';
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {
