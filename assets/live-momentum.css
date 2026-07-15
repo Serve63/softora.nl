@@ -186,6 +186,7 @@ button {
 }
 .line-point {
   position: absolute;
+  z-index: 2;
   width: 12px;
   height: 12px;
   border: 2px solid var(--page-bg);
@@ -201,8 +202,13 @@ button {
 }
 .line-point-label {
   position: absolute;
+  z-index: 3;
   left: 50%;
   bottom: calc(100% + 5px);
+  padding: 2px 3px;
+  border-radius: 2px;
+  background: var(--page-bg);
+  box-shadow: 0 0 0 2px var(--page-bg);
   color: var(--good-dark);
   font-family: var(--font-display);
   font-size: .7rem;
