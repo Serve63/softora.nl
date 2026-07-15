@@ -19,8 +19,6 @@
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
-  const scoreValue = document.querySelector('.today-score strong');
-  const todayScore = document.querySelector('.today-score');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const chartSwitches = Array.from(document.querySelectorAll('.chart-switch'));
   let chartMode = 'bars';
@@ -28,7 +26,7 @@
   let stateDirty = false;
   let saveTimer = null;
   let writeInFlight = false;
-  if (!grid || !chart || !scoreValue || !chartSwitches.length) {
+  if (!grid || !chart || !chartSwitches.length) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -261,11 +259,6 @@
   function updateScore() {
     const score = getDayScore(TODAY);
     const safeScore = Number.isFinite(score) ? score : 0;
-    const scoreBand = getScoreBand(safeScore);
-    scoreValue.textContent = `${safeScore}%`;
-    todayScore?.classList.remove('is-good', 'is-warning', 'is-danger');
-    todayScore?.classList.add(scoreBand);
-    todayScore?.setAttribute('aria-label', `Score vandaag: ${safeScore} van 100 punten`);
     if (srSummary) {
       srSummary.textContent = `${formatDay(TODAY)} is vandaag met een momentumscore van ${safeScore} procent.`;
     }
