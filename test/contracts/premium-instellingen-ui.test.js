@@ -78,12 +78,9 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /var isLinkedModule = isFlynow \|\| isWinning \|\| isDatabase;/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
   assert.match(userManagementSource, /\? '\/premium-flynow'[\s\S]*\? '\/live-momentum'[\s\S]*: '\/kvk-database';/);
-  assert.match(userManagementSource, /localDatabaseFrame\.src = '\/kvk-database\?softora_sidebar_content=1';/);
-  assert.match(userManagementSource, /localDatabaseFrame\.title = 'Softora Database Bedrijven Scraper';/);
-  assert.match(userManagementSource, /if \(isDatabase\) \{[\s\S]*localDatabaseFrame\.hidden = false;/);
-  assert.match(userManagementSource, /extraGrid\.hidden = true;/);
-  assert.match(userManagementSource, /headerSubtitle\.textContent = 'Bedrijven Scraper';/);
-  assert.match(userManagementSource, /extraScreen\.appendChild\(localDatabaseFrame\);/);
+  assert.doesNotMatch(userManagementSource, /document\.createElement\('iframe'\)/);
+  assert.doesNotMatch(userManagementSource, /settings-local-database-frame/);
+  assert.doesNotMatch(userManagementSource, /localDatabaseFrame/);
   assert.doesNotMatch(userManagementSource, /: '\/premium-database';/);
   assert.match(userManagementSource, /function navigateToSettingsModule\(moduleHref\)/);
   assert.match(userManagementSource, /var targetWindow = window\.top && window\.top !== window \? window\.top : window;/);
