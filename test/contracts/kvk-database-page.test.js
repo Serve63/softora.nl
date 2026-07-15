@@ -52,6 +52,12 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(pageSource, /"usable":263/);
   assert.match(pageSource, /"bedrijfsnaam":"Scouting St\. Joris Haaren"/);
   assert.match(pageSource, /id="planning-search-input"/);
+  assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
+  assert.match(pageSource, /id="latest-treated-table-frame"/);
+  assert.ok(
+    pageSource.indexOf('<h2>Laatste 10 Behandeld</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
+    'Laatste 10 Behandeld hoort boven Planning te staan'
+  );
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260618b/);
@@ -63,6 +69,18 @@ test('kvk database collapse state survives a refresh', () => {
   assert.match(scriptSource, /kvkCollapsedPanels/);
   assert.match(scriptSource, /history\.replaceState/);
   assert.doesNotMatch(scriptSource, /function saveCollapsedPanels\(\)\{\}/);
+});
+
+test('kvk database renders latest treated snapshot rows in the restored panel', () => {
+  const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
+  const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
+
+  assert.match(scriptSource, /latestTreated:Array\.isArray\(embeddedSnapshot\.latestTreated\)/);
+  assert.match(scriptSource, /state\.latestTreated=Array\.isArray\(e\.latestTreated\)/);
+  assert.match(scriptSource, /function renderLatestTreatedRows\(\)/);
+  assert.match(scriptSource, /\[e\.woonplaats,e\.provincie\]\.filter\(Boolean\)\.join\(", "\)/);
+  assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
+  assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 });
 
 test('kvk database page loads a live snapshot before using embedded fallback data', () => {
