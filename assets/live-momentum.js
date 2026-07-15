@@ -653,18 +653,22 @@
       segment.style.transform = `rotate(${Math.atan2(y2 - y1, x2 - x1)}rad)`;
       stage.append(segment);
     });
-    scoredDays.forEach(({ day, score }) => {
+    scoredDays.forEach(({ day, score }, index) => {
       const x = (day - .5) * columnWidth;
       const y = plotHeight - ((score / 100) * (plotHeight - 8)) - 4;
       const point = document.createElement('span');
       const label = document.createElement('span');
-      point.className = `line-point ${getScoreBand(score)}${score >= 90 ? ' is-top' : ''}`;
+      const labelPosition = score >= 90 ? 'is-below' : 'is-above';
+      const safeLabelX = Math.min(Math.max(x, 30), viewWidth - 30);
+      point.className = `line-point ${getScoreBand(score)}`;
       point.style.left = `${x}px`;
       point.style.top = `${y}px`;
-      label.className = 'line-point-label';
+      label.className = `line-point-label ${getScoreBand(score)} ${labelPosition}`;
+      label.style.left = `${safeLabelX}px`;
+      label.style.top = `${y}px`;
+      label.style.setProperty('--line-label-offset', `${16 + ((index % 2) * 16)}px`);
       label.textContent = `${score}%`;
-      point.append(label);
-      stage.append(point);
+      stage.append(point, label);
     });
     const dayAxis = document.createElement('div');
     dayAxis.className = 'line-day-axis';

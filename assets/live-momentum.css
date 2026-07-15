@@ -160,12 +160,14 @@ button {
 }
 .line-stage {
   position: relative;
+  isolation: isolate;
   width: 100%;
   height: 174px;
   overflow: visible;
 }
 .line-grid {
   position: absolute;
+  z-index: 0;
   left: 0;
   right: 0;
   height: 1px;
@@ -173,6 +175,7 @@ button {
 }
 .line-segment {
   position: absolute;
+  z-index: 1;
   height: 2px;
   border-radius: 999px;
   background: var(--good);
@@ -186,7 +189,7 @@ button {
 }
 .line-point {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   width: 12px;
   height: 12px;
   border: 2px solid var(--page-bg);
@@ -202,30 +205,30 @@ button {
 }
 .line-point-label {
   position: absolute;
-  z-index: 3;
-  left: 50%;
-  bottom: calc(100% + 5px);
-  padding: 2px 3px;
-  border-radius: 2px;
+  z-index: 4;
+  padding: 3px 6px;
+  border-radius: 4px;
   background: var(--page-bg);
-  box-shadow: 0 0 0 2px var(--page-bg);
+  box-shadow: 0 0 0 6px var(--page-bg);
   color: var(--good-dark);
   font-family: var(--font-display);
   font-size: .7rem;
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
-  transform: translateX(-50%);
+  pointer-events: none;
   white-space: nowrap;
 }
-.line-point.is-top .line-point-label {
-  top: calc(100% + 5px);
-  bottom: auto;
+.line-point-label.is-above {
+  transform: translate(-50%, calc(-100% - var(--line-label-offset, 16px)));
 }
-.line-point.is-warning .line-point-label {
+.line-point-label.is-below {
+  transform: translate(-50%, var(--line-label-offset, 16px));
+}
+.line-point-label.is-warning {
   color: var(--warning-dark);
 }
-.line-point.is-danger .line-point-label {
+.line-point-label.is-danger {
   color: var(--danger-dark);
 }
 .line-day-axis {
