@@ -35,12 +35,11 @@ const imagesHtml = renderWebdesignImageSection(
 
 const html = renderWebdesignEmailDocument(`
   <div style="padding:24px;background:#ffffff;">
-  <div class="softora-webdesign-email-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;width:100%;max-width:900px;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
-    <div style="width:100%;max-width:600px;">
-      <p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;">Goedendag,</p>
-      <p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;">Afgelopen week kwam ik jullie website (<span style="white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">voorbeeldbedrijf.nl</span>) tegen.</p>
-      <p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;">Met vriendelijke groet,<br>Servé Creusen</p>
-    </div>
+  <div class="softora-webdesign-email-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:600px;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
+      <p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;max-width:100%;overflow-wrap:anywhere;word-break:normal;">Goedendag,</p>
+      <p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;max-width:100%;overflow-wrap:anywhere;word-break:normal;">Afgelopen week kwam ik jullie website voorbeeldbedrijf-met-een-lange-domeinnaam.nl tegen.</p>
+      <p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;max-width:100%;overflow-wrap:anywhere;word-break:normal;">Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.</p>
+      <p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;max-width:100%;overflow-wrap:anywhere;word-break:normal;">Met vriendelijke groet,<br>Servé Creusen</p>
     ${imagesHtml}
   </div>
   </div>`);

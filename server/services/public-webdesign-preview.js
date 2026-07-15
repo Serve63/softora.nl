@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { OUTBOUND_SENDER_PROFILE_KEYS } = require('./outbound-sender-identity');
 
 const PHOTO_SCOPE = 'premium_database_photos';
 const PHOTO_KEY = 'softora_database_photos_v1';
@@ -53,17 +54,9 @@ let sharpModule = null;
 const publicPreviewResolutionCache = new Map();
 const publicPreviewAssetCache = new Map();
 const PUBLIC_PREVIEW_PROFILE_EMAIL_ALIASES = Object.freeze({
-  'serve@softora.nl': 'serve',
-  'servecreusen@softora.nl': 'serve',
-  'servec321@gmail.com': 'serve',
-  'serve290@gmail.com': 'serve',
-  'servecreusen7@gmail.com': 'serve',
-  'contact.venvisuals@gmail.com': 'martijn',
+  ...OUTBOUND_SENDER_PROFILE_KEYS,
   'serve@websoftora.com': 'serve',
   'servecreusen@websoftora.com': 'serve',
-  'martijn@softora.nl': 'martijn',
-  'martijnvandeven@softora.nl': 'martijn',
-  'martijnven123@gmail.com': 'martijn',
   'martijn@websoftora.com': 'martijn',
   'martijnven@websoftora.com': 'martijn',
   'martijnvandeven@websoftora.com': 'martijn',

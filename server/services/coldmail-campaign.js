@@ -23,6 +23,10 @@ const {
   renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
+const {
+  OUTBOUND_SENDER_DISPLAY_NAMES: SENDER_DISPLAY_NAMES,
+  OUTBOUND_SENDER_LOCATION_NAMES: SENDER_LOCATION_NAMES,
+} = require('./outbound-sender-identity');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -132,7 +136,7 @@ const DEFAULT_COLDMAIL_WEBDESIGN_SUBJECT = 'Kleine vraag over jullie website';
 const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   'Goedendag,',
   '',
-  'Afgelopen week kwam ik jullie website, {{website}}, tegen.',
+  'Afgelopen week kwam ik jullie website {{website}} tegen.',
   '',
   'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
   '',
@@ -187,29 +191,6 @@ const COLDMAIL_AUTOPILOT_ALLOWED_SENDER_EMAILS = new Set([
   'servecreusen7@gmail.com',
   'contact.venvisuals@gmail.com',
 ]);
-const SENDER_DISPLAY_NAMES = {
-  'serve@softora.nl': 'Servé Creusen',
-  'martijn@softora.nl': 'Martijn van de Ven',
-  'servecreusen@softora.nl': 'Servé Creusen',
-  'martijnvandeven@softora.nl': 'Martijn van de Ven',
-  'ruben@softora.nl': 'Ruben',
-  'servec321@gmail.com': 'Servé Creusen',
-  'martijnven123@gmail.com': 'Martijn van de Ven',
-  'serve290@gmail.com': 'Servé Creusen',
-  'servecreusen7@gmail.com': 'Servé Creusen',
-  'contact.venvisuals@gmail.com': 'Martijn van de Ven',
-};
-const SENDER_LOCATION_NAMES = {
-  'serve@softora.nl': 'Liempde',
-  'martijn@softora.nl': 'Alphen',
-  'servecreusen@softora.nl': 'Liempde',
-  'martijnvandeven@softora.nl': 'Alphen',
-  'servec321@gmail.com': 'Liempde',
-  'martijnven123@gmail.com': 'Alphen',
-  'serve290@gmail.com': 'Liempde',
-  'servecreusen7@gmail.com': 'Liempde',
-  'contact.venvisuals@gmail.com': 'Alphen',
-};
 const COLDMAIL_WEBDESIGN_LEAD_RECIPIENT_EMAILS = Object.freeze([
   'serve@softora.nl',
   'martijn@softora.nl',
@@ -532,8 +513,28 @@ function createColdmailCampaignService(deps = {}) {
         Number.isFinite(Number(account.smtpPort)) &&
         Number(account.smtpPort) > 0 &&
         account.smtpUser &&
-        account.smtpPass
+        account.smtpPass &&
+        isSenderSmtpIdentityCompatible(account)
     );
+  }
+
+  function isSenderSmtpIdentityCompatible(account) {
+    if (!account) return false;
+    const selectedEmail = normalizeEmailAddress(account.email);
+    const authEmail = normalizeEmailAddress(account.smtpUser);
+    const domain = selectedEmail.split('@').pop() || '';
+    if (!PERSONAL_MAILBOX_DOMAINS.has(domain)) return true;
+    return Boolean(selectedEmail && authEmail && selectedEmail === authEmail);
+  }
+
+  function assertSenderSmtpIdentityCompatible(account, senderEmail = '') {
+    if (isSenderSmtpIdentityCompatible(account)) return;
+    const selectedEmail = normalizeEmailAddress(senderEmail || (account && account.email));
+    const error = new Error(
+      `De SMTP-login hoort niet bij het gekozen afzenderadres (${selectedEmail}). Verzending is geblokkeerd.`
+    );
+    error.code = 'SENDER_SMTP_IDENTITY_MISMATCH';
+    throw error;
   }
 
   function isSmtpMailConfigured() {
@@ -696,7 +697,8 @@ function createColdmailCampaignService(deps = {}) {
 
   function getSenderSmtpTransport(senderEmail) {
     const account = resolveSenderSmtpAccount(senderEmail);
-    if (!account.smtpHost || !account.smtpUser || !account.smtpPass) return null;
+    assertSenderSmtpIdentityCompatible(account, senderEmail);
+    if (!isSenderSmtpAccountConfigured(account)) return null;
     const key = [
       account.smtpHost,
       account.smtpPort,
@@ -2403,6 +2405,7 @@ function createColdmailCampaignService(deps = {}) {
       mail,
       messageId: normalizeString(info && info.messageId),
       sentAt: now(),
+      logger,
     });
   }
 
@@ -2837,7 +2840,7 @@ function createColdmailCampaignService(deps = {}) {
     const accountName = smtpAccount && normalizeEmailAddress(smtpAccount.email) === address
       ? normalizeString(smtpAccount.name)
       : '';
-    return normalizeString(accountName || SENDER_DISPLAY_NAMES[address] || mailFromName || 'Softora');
+    return normalizeString(SENDER_DISPLAY_NAMES[address] || accountName || mailFromName || 'Softora');
   }
 
   function isColdmailPrivateCopyBlockedSender(senderEmail) {
@@ -6523,14 +6526,22 @@ function createColdmailCampaignService(deps = {}) {
   function applySenderVariablesToTemplate(template, senderEmail) {
     const senderName = getSenderDisplayName(senderEmail);
     const senderLocation = getSenderLocationName(senderEmail);
-    return normalizeString(template)
+    const canonicalSenderName = SENDER_DISPLAY_NAMES[normalizeEmailAddress(senderEmail)] || '';
+    let value = normalizeString(template)
       .replace(/\{\{\s*(afzender|afzendernaam|sender|sendername)\s*\}\}/gi, senderName)
-      .replace(/\{\{\s*(softora[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
-      .replace(
-        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\})/gi,
-        `$1${senderName}$2{{stad}}`
-      )
-      .replace(/\bServe Creusen\b/g, 'Servé Creusen');
+      .replace(/\{\{\s*(softora[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation);
+    if (canonicalSenderName) {
+      value = value
+        .replace(
+          /(Met vriendelijke groet(?:en)?[:,]?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)/gi,
+          `$1${canonicalSenderName}`
+        )
+        .replace(
+          /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\})/gi,
+          `$1${canonicalSenderName}$2{{stad}}`
+        );
+    }
+    return value.replace(/\bServe Creusen\b/g, 'Servé Creusen');
   }
 
   function personalizeTemplate(template, row, options = {}) {
@@ -7153,7 +7164,11 @@ function createColdmailCampaignService(deps = {}) {
     const buildAttachment = (image, original, fallbackName) => {
       if (!image || !Buffer.isBuffer(image.content)) return null;
       const attachment = {
-        filename: image.filename || filenameForImage(fallbackName, image.contentType, fallbackName),
+        filename: filenameForImage(
+          fallbackName === 'device-mockup' ? 'Mockup' : 'Webdesign',
+          image.contentType,
+          fallbackName
+        ),
         content: image.content,
         contentType: image.contentType,
         contentDisposition: inline ? 'inline' : 'attachment',
@@ -7203,33 +7218,7 @@ function createColdmailCampaignService(deps = {}) {
     }
     return `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${escapeHtmlAttribute(
       publicLink.href
-    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link</a> bekijken 🎨`;
-  }
-
-  function renderColdmailDomainToken(rawValue) {
-    const value = normalizeString(rawValue).replace(/[.,;:!?]+$/g, '');
-    if (!value || !/\.[a-z]{2,}(?:\/|$)/i.test(value)) return escapeHtml(rawValue);
-    const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-    return `<a href="${escapeHtmlAttribute(href)}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">${escapeHtml(value.replace(/^https?:\/\//i, ''))}</a>${escapeHtml(String(rawValue || '').slice(value.length))}`;
-  }
-
-  function renderColdmailHtmlText(line) {
-    const source = String(line || '');
-    const domainPattern = /(^|[\s(])((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})(?:\/[^\s<>()]*)?)/gi;
-    let html = '';
-    let lastIndex = 0;
-    for (const match of source.matchAll(domainPattern)) {
-      const prefix = match[1] || '';
-      const token = match[2] || '';
-      const tokenStart = (match.index || 0) + prefix.length;
-      const previousChar = tokenStart > 0 ? source[tokenStart - 1] : '';
-      if (previousChar === '@') continue;
-      html += escapeHtml(source.slice(lastIndex, tokenStart));
-      html += renderColdmailDomainToken(token);
-      lastIndex = tokenStart + token.length;
-    }
-    html += escapeHtml(source.slice(lastIndex));
-    return html;
+    )}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:400;">link</a> bekijken 🎨`;
   }
 
   function renderColdmailHtmlLine(line, options = {}) {
@@ -7237,7 +7226,7 @@ function createColdmailCampaignService(deps = {}) {
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(cleanLine, options);
     }
-    return renderColdmailHtmlText(cleanLine);
+    return escapeHtml(cleanLine);
   }
 
   function isColdmailLinkOnlyImageArtifactLine(line) {
@@ -7281,16 +7270,22 @@ function createColdmailCampaignService(deps = {}) {
   function assertColdmailAttachmentOnlyMail(mail = {}) {
     const html = String(mail.html || '');
     const attachments = Array.isArray(mail.attachments) ? mail.attachments : [];
-    const attachment = attachments[0];
+    const expectedAttachmentNames = [/^Webdesign\.(?:jpe?g|png|webp|gif)$/i, /^Mockup\.(?:jpe?g|png|webp|gif)$/i];
     const invalid =
       /<img\b/i.test(html) ||
       /\bcid:/i.test(html) ||
       /\/coldmailing\/webdesign-foto\?t=/i.test(html) ||
-      attachments.length !== 1 ||
-      normalizeString(attachment && attachment.contentDisposition).toLowerCase() !== 'attachment' ||
-      Boolean(attachment && attachment.cid);
+      attachments.length !== 2 ||
+      attachments.some((item, index) =>
+        normalizeString(item && item.contentDisposition).toLowerCase() !== 'attachment' ||
+        Boolean(item && item.cid) ||
+        !expectedAttachmentNames[index].test(normalizeString(item && item.filename)) ||
+        !/^image\/(?:jpe?g|png|webp|gif)$/i.test(normalizeString(item && item.contentType)) ||
+        !Buffer.isBuffer(item && item.content) ||
+        item.content.length === 0
+      );
     if (!invalid) return;
-    const error = new Error('Attachment-only webdesignmail bevat inline beeld of geen enkele geldige designbijlage.');
+    const error = new Error('Attachment-only webdesignmail bevat inline beeld of niet exact twee geldige designbijlagen.');
     error.code = 'COLDMAIL_WEBDESIGN_ATTACHMENT_ONLY_VIOLATION';
     error.status = 500;
     throw error;
@@ -7311,7 +7306,7 @@ function createColdmailCampaignService(deps = {}) {
             .join('<br>')}</p>`;
       })
       .join('\n');
-    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
+    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:600px;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
   }
 
   function getWebdesignPhotoSource(photo) {
@@ -7648,8 +7643,8 @@ function createColdmailCampaignService(deps = {}) {
     return /^re\s*:/i.test(value) ? value : `Re: ${value}`;
   }
 
-  async function sendColdmailAutoReply({ parsedMail, row, senderEmail, replyText }) {
-    const delivery = getSenderSmtpTransport(senderEmail);
+  async function sendColdmailAutoReply({ parsedMail, row, senderEmail, replyText, delivery: preparedDelivery = null }) {
+    const delivery = preparedDelivery || getSenderSmtpTransport(senderEmail);
     const transporter = delivery && delivery.transporter;
     if (!transporter) {
       const error = new Error('SMTP transporter kon niet worden opgebouwd.');
@@ -8684,6 +8679,7 @@ function createColdmailCampaignService(deps = {}) {
 
     const senderEmail = assertSenderAllowed(input.senderEmail);
     const senderAccount = resolveSenderSmtpAccount(senderEmail);
+    if (senderAccount) assertSenderSmtpIdentityCompatible(senderAccount, senderEmail);
     if (!isSenderSmtpAccountConfigured(senderAccount)) {
       const error = new Error(
         `Deze afzender (${senderEmail}) heeft nog geen eigen SMTP-wachtwoord op de server.`
@@ -8917,7 +8913,7 @@ function createColdmailCampaignService(deps = {}) {
       }
       if (
         shouldIncludeWebdesignPhoto &&
-        webdesignImageDelivery !== 'attachment' &&
+        webdesignImageDelivery !== 'link' &&
         !webdesignPhoto.mockup
       ) {
         failed.push({
@@ -8937,7 +8933,7 @@ function createColdmailCampaignService(deps = {}) {
       let remoteWebdesignAttachment = null;
       let remoteMockupAttachment = null;
       const shouldSendWebdesignImages = Boolean(webdesignPhoto && webdesignImageDelivery !== 'link');
-      const shouldPrepareMockup = shouldSendWebdesignImages && webdesignImageDelivery !== 'attachment';
+      const shouldPrepareMockup = shouldSendWebdesignImages && Boolean(webdesignPhoto.mockup);
       if (shouldSendWebdesignImages) {
         const preparedWebdesignImage = await preparePreviewImageForEmail(webdesignPhoto, 'webdesign');
         const preparedMockupImage = shouldPrepareMockup && webdesignPhoto.mockup
@@ -9017,8 +9013,9 @@ function createColdmailCampaignService(deps = {}) {
         : shouldSendWebdesignImages && webdesignImageDelivery === 'attachment'
           ? buildWebdesignImageAttachments(webdesignPhoto, {
               inline: false,
-              includeMockup: false,
+              includeMockup: true,
               webdesignImage: preparedWebdesignAttachment || webdesignPhoto,
+              mockupImage: preparedMockupAttachment || webdesignPhoto.mockup,
             })
           : undefined;
       try {
@@ -9441,13 +9438,35 @@ function createColdmailCampaignService(deps = {}) {
 
               stats.matched += 1;
               const mailboxId = buildMailboxMessageId(mailboxName, message.uid);
+              const senderEmail = deliveryFailure ? '' : resolveInboundSenderEmail(parsedMail);
+              let autoReplyDelivery = null;
+              if (!deliveryFailure && coldmailAutoReplyEnabled) {
+                try {
+                  autoReplyDelivery = getSenderSmtpTransport(senderEmail);
+                  if (!autoReplyDelivery) {
+                    const error = new Error('SMTP transporter kon niet worden opgebouwd.');
+                    error.code = 'SMTP_TRANSPORT_UNAVAILABLE';
+                    throw error;
+                  }
+                } catch (error) {
+                  stats.errors.push(
+                    `${from.address || 'onbekende afzender'}: ${truncateText(
+                      error && error.message ? error.message : String(error),
+                      220
+                    )}`
+                  );
+                  continue;
+                }
+              }
               const classification = deliveryFailure
                 ? deliveryFailure
-                : await classifyInboundColdmailReplyLifecycleWithAi({
-                    row: match.row,
-                    parsedMail,
-                    inboundText,
-                  });
+                : coldmailAutoReplyEnabled
+                  ? await classifyInboundColdmailReplyLifecycleWithAi({
+                      row: match.row,
+                      parsedMail,
+                      inboundText,
+                    })
+                  : classifyInboundColdmailReplyLifecycle(inboundText);
               try {
                 if (deliveryFailure && bounceProcessingEnabled) {
                   try {
@@ -9529,7 +9548,6 @@ function createColdmailCampaignService(deps = {}) {
                   );
                 }
 
-                const senderEmail = resolveInboundSenderEmail(parsedMail);
                 const autoReplyQuota = await getColdmailSendQuota(senderEmail);
                 if (autoReplyQuota.safetyPause) {
                   stats.autoReplySkippedSafetyPaused += 1;
@@ -9564,6 +9582,7 @@ function createColdmailCampaignService(deps = {}) {
                   row: match.row,
                   senderEmail,
                   replyText: aiReply.text,
+                  delivery: autoReplyDelivery,
                 });
                 replyState.processed[processedKey] = {
                   at: now().toISOString(),

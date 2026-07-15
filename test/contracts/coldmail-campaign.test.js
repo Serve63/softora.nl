@@ -127,76 +127,48 @@ const COLDMAIL_MOCKUP_CAPTION_TEXT =
 
 function assertWebdesignImagePairLayout(html, options = {}) {
   const value = String(html || '');
-  assert.match(value, /softora-webdesign-email-2026-07-15-v6/);
+  assert.match(value, /softora-webdesign-email-2026-07-15-v7/);
   assert.match(value, /^<!doctype html><html lang="nl"><head>/);
   assert.match(value, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
-  assert.match(value, /@media only screen and \(min-width:981px\) and \(min-device-width:981px\)/);
   assert.match(
     value,
-    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-15-v6" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;"/
-  );
-  assert.match(
-    value,
-    /\.softora-mobile-image-pair[^}]+display:none!important/
-  );
-  assert.match(
-    value,
-    /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important;max-height:none!important;overflow:visible!important\}/
+    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-15-v7" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:600px;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;/
   );
   assert.match(value, /<p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;max-width:100%;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">/);
-  assert.match(value, /\.softora-coldmail-body\{width:100%!important;max-width:100%!important;/);
-  assert.match(value, /@media only screen and \(min-device-width:601px\)\{\.softora-coldmail-body\{max-width:600px!important\}\}/);
-  assert.doesNotMatch(value, /class="softora-email-shell"/);
-  assert.match(value, /class="softora-mobile-image-pair" style="display:block;[^\"]+width:100%;max-width:100%;max-height:none;overflow:visible;/);
-  assert.match(value, /class="softora-desktop-image-pair"[^>]+style="display:none;mso-hide:all;[^\"]+width:0;max-width:0;max-height:0;/);
-  assert.doesNotMatch(value, /class="softora-desktop-image-pair" role="presentation" width="900"/);
-  assert.match(value, /<td width="300" valign="top" style="[^"]*width:300px;max-width:300px;[^"]*">/);
-  assert.match(value, /<td width="16" style="[^"]*width:16px;min-width:16px;[^"]*">/);
-  assert.match(value, /<td width="584" valign="top" style="[^"]*width:584px;max-width:584px;[^"]*">/);
+  assert.match(value, /\.softora-webdesign-email-body\{width:100%!important;max-width:600px!important;/);
+  assert.match(value, /class="softora-webdesign-image-stack" style="display:block;[^\"]+max-width:600px/);
   assert.match(
     value,
-    /class="softora-webdesign-desktop-image" width="300" height="560" style="display:block;width:300px;max-width:300px;height:560px;max-height:560px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/
+    /class="softora-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/
   );
   assert.match(
     value,
-    /class="softora-webdesign-desktop-image" width="584" height="560" style="display:block;width:584px;max-width:584px;height:560px;max-height:560px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;"/
+    /class="softora-webdesign-image" width="600" style="display:block;width:100%;max-width:600px;height:auto;max-height:none;object-fit:contain;[^\"]*font-size:0;line-height:0;"/
   );
   assert.match(
     value,
-    /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/
-  );
-  assert.match(
-    value,
-    /class="softora-webdesign-image" width="100%" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;[^\"]*font-size:0;line-height:0;"/
-  );
-  assert.match(
-    value,
-    /class="softora-webdesign-image softora-webdesign-image--mockup" width="100%" style="display:block;width:100%;max-width:100%;height:auto;max-height:none;object-fit:contain;object-position:center top;[^\"]*font-size:0;line-height:0;"/
+    /class="softora-webdesign-image softora-webdesign-image--mockup" width="600" style="display:block;width:100%;max-width:600px;height:auto;max-height:none;object-fit:contain;object-position:center top;[^\"]*font-size:0;line-height:0;"/
   );
 
-  const desktopIndex = value.indexOf('class="softora-desktop-image-pair"');
-  const mobileIndex = value.indexOf('class="softora-mobile-image-pair"');
+  const stackIndex = value.indexOf('class="softora-webdesign-image-stack"');
   const captionIndex = value.indexOf(COLDMAIL_MOCKUP_CAPTION_TEXT);
-  assert.ok(desktopIndex > 0, 'desktop image table is present');
-  assert.ok(mobileIndex < desktopIndex, 'mobile-safe image block precedes the progressive desktop table');
+  assert.ok(stackIndex > 0, 'width-safe image stack is present');
   assert.equal(value.indexOf(COLDMAIL_MOCKUP_CAPTION_TEXT), value.lastIndexOf(COLDMAIL_MOCKUP_CAPTION_TEXT));
-  assert.ok(captionIndex > mobileIndex, 'caption only appears inside the mobile image block');
+  assert.ok(captionIndex > stackIndex, 'caption appears inside the image stack');
 
   if (options.mobileMainAlt && options.mobileMockupAlt) {
-    const mobileMainIndex = value.indexOf(`alt="${options.mobileMainAlt}"`, mobileIndex);
-    const mobileMockupIndex = value.indexOf(`alt="${options.mobileMockupAlt}"`, captionIndex);
-    assert.ok(mobileMainIndex > mobileIndex, 'mobile design image appears before the mobile caption');
-    assert.ok(captionIndex > mobileMainIndex, 'mobile caption appears after the design image');
-    assert.ok(mobileMockupIndex > captionIndex, 'mobile mockup appears after the mobile caption');
+    const mainIndex = value.indexOf(`alt="${options.mobileMainAlt}"`, stackIndex);
+    const mockupIndex = value.indexOf(`alt="${options.mobileMockupAlt}"`, captionIndex);
+    assert.ok(mainIndex > stackIndex, 'design image appears before the caption');
+    assert.ok(captionIndex > mainIndex, 'caption appears after the design image');
+    assert.ok(mockupIndex > captionIndex, 'mockup appears after the caption');
   }
 
-  assert.doesNotMatch(value, /softora-webdesign-image-pair|softora-webdesign-image-cell|display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table/);
-  assert.doesNotMatch(value, /height="360"/);
-  assert.doesNotMatch(value, /background-image/i);
+  assert.equal((value.match(/<img\b/g) || []).length, 2);
+  assert.doesNotMatch(value, /900px|softora-desktop-image-pair|softora-mobile-image-pair|softora-webdesign-image-pair|softora-webdesign-image-cell|display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table|height="360"|background-image|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/i);
 
   const withoutHeadCss = value.replace(/<style type="text\/css">[\s\S]*?<\/style>/, '');
-  assert.match(withoutHeadCss, /class="softora-mobile-image-pair" style="display:block;/);
-  assert.match(withoutHeadCss, /class="softora-desktop-image-pair"[^>]+style="display:none;/);
+  assert.match(withoutHeadCss, /class="softora-webdesign-image-stack" style="display:block;[^\"]+max-width:600px/);
 }
 
 function buildColdmailOpenTrackingToken(input = {}, secret = 'tracking-secret') {
@@ -1165,6 +1137,35 @@ test('coldmail campaign maps contact venvisuals sender identity to Martijn', asy
   assert.equal(sentMessages[0].replyTo, 'contact.venvisuals@gmail.com');
   assert.match(sentMessages[0].text, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
   assert.doesNotMatch(sentMessages[0].text, /Serv[ée] Creusen/);
+});
+
+test('coldmail campaign blocks Venvisual before SMTP when it would authenticate as Servé', async () => {
+  const { service, sentMessages } = createService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'contact.venvisuals@gmail.com',
+        name: 'Servé',
+        smtpHost: 'smtp.gmail.test',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Goedendag,\n\nMet vriendelijke groet,\n{{afzender}}',
+      senderEmail: 'contact.venvisuals@gmail.com',
+    }),
+    (error) => {
+      assert.equal(error.code, 'SENDER_SMTP_IDENTITY_MISMATCH');
+      assert.match(error.message, /SMTP-login hoort niet bij/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
 });
 
 test('coldmail campaign keeps the standard subject and body when variants are provided', async () => {
@@ -3989,7 +3990,7 @@ test('coldmail autopilot refuses legacy config without saved sender profiles', a
   assert.equal(sentMessages.length, 0);
 });
 
-test('coldmail autopilot uses the saved dashboard profile and attaches only the webdesign', async () => {
+test('coldmail autopilot uses the saved dashboard profile and attaches webdesign plus mockup', async () => {
   const { service, sentMessages, getAutopilotState } = createService({
     env: {
       COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
@@ -4072,9 +4073,10 @@ test('coldmail autopilot uses the saved dashboard profile and attaches only the 
   assert.match(sentMessages[0].text, /actuele dashboardtekst/);
   assert.doesNotMatch(sentMessages[0].text, /actuele variant/);
   assert.doesNotMatch(sentMessages[0].text, /oudere tekst/);
-  assert.equal(sentMessages[0].attachments.length, 1);
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
-  assert.equal(sentMessages[0].attachments[0].cid, undefined);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.deepEqual(sentMessages[0].attachments.map((item) => item.filename), ['Webdesign.png', 'Mockup.png']);
+  assert.ok(sentMessages[0].attachments.every((item) => item.contentDisposition === 'attachment'));
+  assert.ok(sentMessages[0].attachments.every((item) => item.cid === undefined));
   assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
@@ -4156,12 +4158,13 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   );
   assert.match(
     sentMessages[0].html,
-    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link<\/a> bekijken 🎨/
+    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/rolsteiger-net\?cid=import-5-db-mpfntuzo-cifdr3&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:400;">link<\/a> bekijken 🎨/
   );
   assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
-  assert.equal(sentMessages[0].attachments.length, 1);
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.deepEqual(sentMessages[0].attachments.map((item) => item.filename), ['Webdesign.png', 'Mockup.png']);
+  assert.ok(sentMessages[0].attachments.every((item) => item.contentDisposition === 'attachment'));
 
   const customerSave = getSavedStates().find((entry) => entry.scope === 'premium_customers_database');
   const savedRows = JSON.parse(customerSave.values.softora_customers_premium_v1);
@@ -4236,7 +4239,7 @@ test('coldmail autopilot does not send fris webdesign mail when no design assets
   assert.equal(preparedJobs[0].customer.id, 'import-5-db-mpfntuzo-cifdr3');
 });
 
-test('coldmail autopilot requires a design image but not a device mockup', async () => {
+test('coldmail autopilot requires both a design image and a device mockup', async () => {
   const { service, sentMessages } = createService({
     env: {
       COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
@@ -4333,8 +4336,9 @@ test('coldmail autopilot requires a design image but not a device mockup', async
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].to, 'mockup@example.test');
   assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt voor Mockup Klaar BV');
-  assert.equal(sentMessages[0].attachments.length, 1);
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.deepEqual(sentMessages[0].attachments.map((item) => item.filename), ['Webdesign.png', 'Mockup.png']);
+  assert.ok(sentMessages[0].attachments.every((item) => item.contentDisposition === 'attachment'));
   assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
   assert.doesNotMatch(sentMessages[0].html, /\/coldmailing\/webdesign-foto\?t=/);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
@@ -5129,7 +5133,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.equal(sentMessages.length, 1);
   assert.equal(
     sentMessages[0].headers['X-Softora-Template-Version'],
-    'softora-webdesign-email-2026-07-15-v6'
+    'softora-webdesign-email-2026-07-15-v7'
   );
   assert.match(sentMessages[0].text, /Servé Creusen/);
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
@@ -5139,12 +5143,11 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   );
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(sentMessages[0].html, /📍 Alphen/);
-  assert.match(sentMessages[0].html, /width:100%;max-width:100%;min-width:0;/);
-  assert.match(sentMessages[0].html, /min-device-width:601px[^<]+max-width:600px!important/);
-  assert.doesNotMatch(sentMessages[0].html, /style="[^"]*max-width:600px;width:100%/);
+  assert.match(sentMessages[0].html, /width:100%;max-width:600px;min-width:0;/);
+  assert.doesNotMatch(sentMessages[0].html, /min-device-width|900px|white-space:nowrap|display:inline-block/);
   assert.match(
     sentMessages[0].html,
-    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link<\/a> bekijken 🎨/
+    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:400;">link<\/a> bekijken 🎨/
   );
   assertWebdesignImagePairLayout(sentMessages[0].html, {
     mobileMainAlt: 'Bakkerij Zon webdesign',
@@ -5152,7 +5155,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   });
   assert.match(
     sentMessages[0].html,
-    /softora-desktop-image-pair[\s\S]*<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
+    /softora-webdesign-image-stack[\s\S]*<img src="https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=[^"]+"/
   );
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.doesNotMatch(sentMessages[0].html, /data:image\//);
@@ -5661,7 +5664,7 @@ test('coldmail autopilot stores a compact failure reason summary after a partial
   assert.equal(summary[0].sample.email, 'info@geenfoto.test');
 });
 
-test('coldmail autopilot uses one regular attachment and no inline images', async () => {
+test('coldmail autopilot uses two regular attachments and no inline images', async () => {
   const { service, sentMessages } = createService({
     env: {
       COLDMAIL_WEBDESIGN_IMAGE_DELIVERY: 'cid',
@@ -5738,17 +5741,16 @@ test('coldmail autopilot uses one regular attachment and no inline images', asyn
   assert.match(sentMessages[0].text, /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze link bekijken 🎨/);
   assert.match(
     sentMessages[0].html,
-    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:700;">link<\/a> bekijken 🎨/
+    /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:400;">link<\/a> bekijken 🎨/
   );
-  assert.match(
-    sentMessages[0].html,
-    /<a href="https:\/\/bakkerijzon\.nl" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">bakkerijzon\.nl<\/a>/
-  );
+  assert.match(sentMessages[0].html, /website \(bakkerijzon\.nl\) tegen/);
+  assert.doesNotMatch(sentMessages[0].html, /href="https:\/\/bakkerijzon\.nl"|white-space:nowrap|word-break:keep-all/);
   assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
-  assert.equal(sentMessages[0].attachments.length, 1);
-  assert.equal(sentMessages[0].attachments[0].contentDisposition, 'attachment');
-  assert.equal(sentMessages[0].attachments[0].cid, undefined);
+  assert.equal(sentMessages[0].attachments.length, 2);
+  assert.deepEqual(sentMessages[0].attachments.map((item) => item.filename), ['Webdesign.png', 'Mockup.png']);
+  assert.ok(sentMessages[0].attachments.every((item) => item.contentDisposition === 'attachment'));
+  assert.ok(sentMessages[0].attachments.every((item) => item.cid === undefined));
 });
 
 test('coldmail campaign replaces sender name but keeps recipient city in the signature', async () => {
@@ -6762,7 +6764,7 @@ test('coldmail campaign prefers stored design photo records over stale row mocku
   assert.equal(sentMessages[0].attachments.length, 2);
   assert.equal(sentMessages[0].attachments[0].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
   assert.equal(sentMessages[0].attachments[1].content.toString('base64'), TINY_PNG_DATA_URL.split(',')[1]);
-  assert.equal(sentMessages[0].attachments[1].filename, 'Oude-mockup-achtergrond.png');
+  assert.equal(sentMessages[0].attachments[1].filename, 'Mockup.png');
 });
 
 test('coldmail campaign sends test recipient without marking database row as mailed', async () => {
@@ -7583,6 +7585,85 @@ test('coldmail auto-reply uses the mailbox owner identity for Martijn replies', 
   assert.equal(userPayload.sender.name, 'Martijn van de Ven');
   assert.equal(userPayload.sender.email, 'martijn@softora.nl');
   assert.equal(sentMessages[0].from, 'Martijn van de Ven <martijn@softora.nl>');
+});
+
+test('coldmail auto-reply blocks a mismatched Venvisual SMTP login before OpenAI and SMTP', async () => {
+  const parsedInbound = {
+    messageId: '<incoming-venvisual-mismatch@example.test>',
+    subject: 'Re: Kleine vraag over jullie website',
+    text: 'Hoi Martijn, kun je meer informatie sturen?',
+    from: { value: [{ address: 'prospect@example.test', name: 'Prospect' }] },
+    to: { value: [{ address: 'contact.venvisuals@gmail.com', name: 'Martijn van de Ven' }] },
+    cc: { value: [] },
+    references: '<sent-venvisual@softora>',
+  };
+  let openAiCalled = false;
+  const { service, sentMessages } = createService({
+    imapHost: 'imap.example.test',
+    imapUser: 'contact.venvisuals@gmail.com',
+    imapPass: 'secret',
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'contact.venvisuals@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 465,
+        smtpSecure: true,
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'secret',
+        imapHost: 'imap.gmail.com',
+        imapPort: 993,
+        imapSecure: true,
+        imapUser: 'contact.venvisuals@gmail.com',
+        imapPass: 'secret',
+      },
+    ]),
+    openAiApiKey: 'openai-secret',
+    coldmailAutoReplyEnabled: true,
+    rows: [
+      {
+        id: 'prospect-venvisual-mismatch',
+        bedrijf: 'Prospect BV',
+        naam: 'Prospect',
+        email: 'prospect@example.test',
+        status: 'gemaild',
+        databaseStatus: 'gemaild',
+        campaignType: 'webdesign',
+        lastColdmailSentAt: '2026-04-24T10:00:00.000Z',
+        lastColdmailSenderEmail: 'contact.venvisuals@gmail.com',
+        mail: true,
+      },
+    ],
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => {},
+      logout: async () => {},
+      getMailboxLock: async () => ({ release: () => {} }),
+      search: async () => [1],
+      fetch: async function* () {
+        yield { uid: 1, source: 'raw-message', flags: new Set() };
+      },
+      messageFlagsAdd: async () => {},
+    }),
+    parseMailSource: async () => parsedInbound,
+    fetchJsonWithTimeout: async () => {
+      openAiCalled = true;
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: 'gpt-5.5-pro',
+          choices: [{ message: { content: 'Dit mag nooit verstuurd worden.' } }],
+        },
+      };
+    },
+  });
+
+  const result = await service.syncInboundColdmailRepliesFromImap({ force: true, maxMessages: 5 });
+
+  assert.equal(result.replied, 0);
+  assert.equal(openAiCalled, false);
+  assert.equal(sentMessages.length, 0);
+  assert.ok(result.errors.some((message) => /SMTP-login hoort niet bij/.test(message)));
 });
 
 test('coldmail auto-reply marks positive inbound replies as interested in the database', async () => {
@@ -10111,7 +10192,7 @@ test('remote webdesign sent copy contains responsive HTML and no image attachmen
   assert.doesNotMatch(rawSentCopy, /Content-Disposition:\s*(?:attachment|inline)/i);
   assert.doesNotMatch(rawSentCopy, /Content-ID:/i);
   assert.equal(parsedSentCopy.attachments.length, 0);
-  assert.match(String(parsedSentCopy.html || ''), /softora-webdesign-email-2026-07-15-v6/);
+  assert.match(String(parsedSentCopy.html || ''), /softora-webdesign-email-2026-07-15-v7/);
   assert.match(String(parsedSentCopy.html || ''), /https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertWebdesignImagePairLayout(String(parsedSentCopy.html || ''), {
     mobileMainAlt: 'Responsive Voorbeeld B.V. webdesign',

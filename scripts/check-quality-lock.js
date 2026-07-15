@@ -65,6 +65,12 @@ function normalizeRepoPath(filePath) {
   return String(filePath || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
 }
 
+function listExistingRepoFiles(filePaths, existsFile = (filePath) => fs.existsSync(path.join(repoRoot, filePath))) {
+  return Array.from(new Set(filePaths.map(normalizeRepoPath).filter(Boolean)))
+    .filter((filePath) => existsFile(filePath))
+    .sort();
+}
+
 function getTrackedFiles() {
   const trackedOutput = execFileSync('git', ['ls-files'], {
     cwd: repoRoot,
@@ -76,14 +82,7 @@ function getTrackedFiles() {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  return Array.from(
-    new Set(
-      `${trackedOutput}\n${untrackedOutput}`
-        .split('\n')
-        .map(normalizeRepoPath)
-        .filter(Boolean)
-    )
-  ).sort();
+  return listExistingRepoFiles(`${trackedOutput}\n${untrackedOutput}`.split('\n'));
 }
 
 function readRepoFile(relativePath) {
@@ -332,5 +331,6 @@ if (require.main === module) {
 
 module.exports = {
   PREMIUM_SIDEBAR_THEME_VERSION,
+  listExistingRepoFiles,
   listQualityLockViolations,
 };

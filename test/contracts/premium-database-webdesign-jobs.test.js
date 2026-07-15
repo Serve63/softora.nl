@@ -451,6 +451,33 @@ test('premium database webdesign jobs generate and persist a customer photo in t
     roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
     source: 'premium-database-webdesign-jobs',
   });
+
+  const martijnRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'contact.venvisuals@gmail.com', userId: 'user-2' },
+      body: {
+        jobId: 'job_venvisual_123456789',
+        websiteUrl: 'venvisuals.nl',
+        customer: {
+          id: 'customer-venvisual',
+          bedrijf: 'VenVisuals',
+          naam: 'Martijn',
+          tel: '+31687654321',
+          dom: 'venvisuals.nl',
+        },
+      },
+    },
+    martijnRes
+  );
+  assert.equal(martijnRes.statusCode, 202);
+  const martijnJob = await waitForJobDone(coordinator, 'job_venvisual_123456789');
+  assert.equal(martijnJob.status, 'done');
+  assert.deepEqual(pipelineCalls[1].options.body.softoraOutreachProfile, {
+    name: 'Martijn van de Ven',
+    roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
+    source: 'premium-database-webdesign-jobs',
+  });
 });
 
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {
