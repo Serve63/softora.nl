@@ -127,7 +127,6 @@ button {
 .chart-card {
   position: relative;
   padding: 1.2rem 0 1rem 3.7rem;
-  border-bottom: 1px solid var(--line);
 }
 .chart-scale {
   position: absolute;
