@@ -124,36 +124,6 @@ button {
   outline: none;
   box-shadow: 0 0 0 3px rgba(46, 204, 113, .24);
 }
-.today-score {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  min-width: 82px;
-  padding: .05rem 0 .05rem 1.25rem;
-  border-left: 1px solid var(--line);
-}
-.score-label {
-  color: var(--muted-soft);
-  font-family: var(--font-display);
-  font-size: .72rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1.1;
-  text-transform: uppercase;
-}
-.today-score strong {
-  color: var(--good-dark);
-  font-family: var(--font-display);
-  font-size: 2.35rem;
-  font-weight: 700;
-  line-height: .95;
-}
-.today-score.is-warning strong {
-  color: var(--warning-dark);
-}
-.today-score.is-danger strong {
-  color: var(--danger-dark);
-}
 .chart-card {
   position: relative;
   padding: 1.2rem 0 1rem 3.7rem;
@@ -553,12 +523,6 @@ button {
     align-items: flex-end;
     justify-content: space-between;
   }
-  .today-score {
-    width: 100%;
-    min-width: 0;
-    padding-left: 0;
-    border-left: 0;
-  }
   .chart-card {
     padding: 22px 0 18px 58px;
     overflow-x: auto;
@@ -579,16 +543,9 @@ button {
   .momentum-head h1 {
     font-size: 24px;
   }
-  .today-score {
-    column-gap: 20px;
-    padding: 2px 0 0;
-  }
   .momentum-actions {
     align-items: flex-start;
     flex-direction: column-reverse;
     gap: 16px;
-  }
-  .today-score strong {
-    font-size: 34px;
   }
 }

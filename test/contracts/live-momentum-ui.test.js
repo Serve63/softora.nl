@@ -16,11 +16,11 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260715b"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260715c"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260714d" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -30,7 +30,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
   assert.match(html, /Juli 2026 .* gestart op 13 juli/);
-  assert.match(html, /<strong>100%<\/strong>/);
+  assert.doesNotMatch(html, /today-score|score-label|Score vandaag/);
   assert.doesNotMatch(html, /score-points|100 \/ 100|punten<\/span>/);
   assert.match(html, /<div class="bar-chart" aria-hidden="true"><\/div>/);
   assert.match(html, /class="chart-switch is-active"[^>]*data-chart-mode="bars"[^>]*aria-pressed="true"/);
@@ -105,6 +105,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.add-goal\s*\{[\s\S]*background:\s*transparent;/);
   assert.doesNotMatch(css, /\.habit-add(?:-cell)?\s*\{/);
   assert.doesNotMatch(css, /\.score-points\s*\{/);
+  assert.doesNotMatch(css, /\.today-score|\.score-label/);
   assert.doesNotMatch(css, /\.habit-name-empty/);
   assert.match(css, /\.habit-spacer\s*\{[\s\S]*font-family:\s*var\(--font-display\);/);
   assert.match(css, /\.habit-spacer\s*\{[\s\S]*font-weight:\s*500;/);
@@ -115,7 +116,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /@media \(max-width:\s*780px\)/);
 });
 
-test('live momentum script wires habit toggles to chart and score state', () => {
+test('live momentum script wires habit toggles to chart and persisted state', () => {
   const js = read('assets/live-momentum.js');
 
   assert.match(js, /startDay:\s*13/);
@@ -154,6 +155,7 @@ test('live momentum script wires habit toggles to chart and score state', () => 
   assert.match(js, /is-danger/);
   assert.match(js, /aria-checked/);
   assert.doesNotMatch(js, /scorePoints|100 \/ 100/);
+  assert.doesNotMatch(js, /scoreValue|todayScore|Score vandaag/);
   assert.match(js, /STATE_SCOPE = 'premium_live_momentum'/);
   assert.match(js, /STATE_KEY = 'softora_live_momentum_state_v1'/);
   assert.match(js, /window\.SoftoraUiStateClient/);
