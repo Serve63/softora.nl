@@ -127,13 +127,13 @@ const COLDMAIL_MOCKUP_CAPTION_TEXT =
 
 function assertWebdesignImagePairLayout(html, options = {}) {
   const value = String(html || '');
-  assert.match(value, /softora-webdesign-email-2026-07-11-v4/);
+  assert.match(value, /softora-webdesign-email-2026-07-15-v5/);
   assert.match(value, /^<!doctype html><html lang="nl"><head>/);
   assert.match(value, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
   assert.match(value, /@media only screen and \(min-width:981px\)/);
   assert.match(
     value,
-    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-11-v4" style="font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;max-width:600px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;"/
+    /class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="softora-webdesign-email-2026-07-15-v5" style="font-family:Arial,sans-serif;font-size:17px;line-height:27px;color:#1a1a2e;max-width:600px;width:100%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;"/
   );
   assert.match(
     value,
@@ -143,7 +143,7 @@ function assertWebdesignImagePairLayout(html, options = {}) {
     value,
     /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important;max-height:none!important;overflow:visible!important\}/
   );
-  assert.match(value, /<p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">/);
+  assert.match(value, /<p style="margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:17px;line-height:27px;color:#1a1a2e;max-width:100%;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">/);
   assert.match(value, /class="softora-mobile-image-pair" style="display:block;[^\"]+width:100%;max-width:100%;max-height:none;overflow:visible;/);
   assert.match(value, /class="softora-desktop-image-pair"[^>]+style="display:none;mso-hide:all;[^\"]+width:0;max-width:0;max-height:0;/);
   assert.doesNotMatch(value, /class="softora-desktop-image-pair" role="presentation" width="900"/);
@@ -594,7 +594,7 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.doesNotMatch(sentMessages[0].text, /Geen interesse\? Reageer met "stop" of "afmelden"/);
   assert.doesNotMatch(sentMessages[0].text, /Referentie: SF-/);
   assert.match(sentMessages[0].html, /font-family:Arial,sans-serif/);
-  assert.match(sentMessages[0].html, /<p style="[^"]*font-size:15px;line-height:24px[^"]*">Goedemorgen Ruben,<\/p>/);
+  assert.match(sentMessages[0].html, /<p style="[^"]*font-size:17px;line-height:27px[^"]*">Goedemorgen Ruben,<\/p>/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/api\/coldmailing\/open\.gif\?/);
   assert.doesNotMatch(sentMessages[0].html, /https:\/\/www\.softora\.nl\/afmelden\?t=/);
   assert.doesNotMatch(sentMessages[0].html, />Geen webdesign willen ontvangen\? Laat het me weten!<\/a>/);
@@ -5126,7 +5126,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.equal(sentMessages.length, 1);
   assert.equal(
     sentMessages[0].headers['X-Softora-Template-Version'],
-    'softora-webdesign-email-2026-07-11-v4'
+    'softora-webdesign-email-2026-07-15-v5'
   );
   assert.match(sentMessages[0].text, /Servé Creusen/);
   assert.doesNotMatch(sentMessages[0].text, /Serve Creusen/);
@@ -10106,7 +10106,7 @@ test('remote webdesign sent copy contains responsive HTML and no image attachmen
   assert.doesNotMatch(rawSentCopy, /Content-Disposition:\s*(?:attachment|inline)/i);
   assert.doesNotMatch(rawSentCopy, /Content-ID:/i);
   assert.equal(parsedSentCopy.attachments.length, 0);
-  assert.match(String(parsedSentCopy.html || ''), /softora-webdesign-email-2026-07-11-v4/);
+  assert.match(String(parsedSentCopy.html || ''), /softora-webdesign-email-2026-07-15-v5/);
   assert.match(String(parsedSentCopy.html || ''), /https:\/\/www\.softora\.nl\/coldmailing\/webdesign-foto\?t=/);
   assertWebdesignImagePairLayout(String(parsedSentCopy.html || ''), {
     mobileMainAlt: 'Responsive Voorbeeld B.V. webdesign',
