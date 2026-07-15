@@ -1,6 +1,6 @@
 'use strict';
 
-const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-15-v5';
+const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-11-v4';
 const WEBDESIGN_EMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -25,16 +25,10 @@ function renderWebdesignEmailHeadStyles() {
   ].join('');
 }
 
-function renderWebdesignEmailDocument(content, options = {}) {
-  const requestedMaxWidth = Number(options.maxWidth);
-  const maxWidth = Number.isFinite(requestedMaxWidth) && requestedMaxWidth > 0
-    ? Math.round(requestedMaxWidth)
-    : null;
-  const renderedContent = String(content || '');
-  const wrappedContent = maxWidth
-    ? `<table class="softora-email-viewport" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;table-layout:fixed;margin:0;padding:0;"><tr><td align="left" valign="top" width="100%" style="width:100%;max-width:100%;min-width:0;margin:0;padding:0;vertical-align:top;overflow-wrap:anywhere;word-break:normal;"><table class="softora-email-shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:${maxWidth}px;table-layout:fixed;margin:0;padding:0;"><tr><td align="left" valign="top" width="100%" style="width:100%;max-width:${maxWidth}px;min-width:0;margin:0;padding:0;vertical-align:top;overflow-wrap:anywhere;word-break:normal;">${renderedContent}</td></tr></table></td></tr></table>`
-    : renderedContent;
-  return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><style type="text/css">${renderWebdesignEmailHeadStyles()}</style></head><body style="margin:0;padding:0;width:100%;max-width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${wrappedContent}</body></html>`;
+function renderWebdesignEmailDocument(content) {
+  return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"><style type="text/css">${renderWebdesignEmailHeadStyles()}</style></head><body style="margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${String(
+    content || ''
+  )}</body></html>`;
 }
 
 function normalizeString(value) {

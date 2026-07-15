@@ -7298,7 +7298,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function toHtml(text, options = {}) {
-    const paragraphStyle = 'margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:17px;line-height:27px;color:#1a1a2e;max-width:100%;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;';
+    const paragraphStyle = 'margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;';
     const body = normalizeString(text)
       .split(/\n{2,}/)
       .map((paragraph) => {
@@ -7312,7 +7312,7 @@ function createColdmailCampaignService(deps = {}) {
             .join('<br>')}</p>`;
       })
       .join('\n');
-    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:17px;line-height:27px;color:#1a1a2e;max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;width:100%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
+    return `<div class="softora-webdesign-email-body softora-coldmail-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#1a1a2e;max-width:${COLDMAIL_EMAIL_CONTENT_MAX_WIDTH}px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${body}</div>`;
   }
 
   function getWebdesignPhotoSource(photo) {
@@ -9005,9 +9005,7 @@ function createColdmailCampaignService(deps = {}) {
             optOutUrl: '',
           })
         : htmlBase;
-      const html = renderWebdesignEmailDocument(htmlWithContent, {
-        maxWidth: COLDMAIL_EMAIL_CONTENT_MAX_WIDTH,
-      });
+      const html = renderWebdesignEmailDocument(htmlWithContent);
       const attachments = shouldSendWebdesignImages && webdesignImageDelivery === 'cid'
         ? buildWebdesignImageAttachments(
             webdesignPhoto,
