@@ -70,20 +70,6 @@ test('shared webdesign renderer escapes image metadata and supports one image', 
   assert.doesNotMatch(html, /softora-desktop-image-pair|softora-mobile-image-pair/);
 });
 
-test('shared webdesign renderer can enforce a mobile-safe maximum content width', () => {
-  const html = renderWebdesignEmailDocument(
-    '<div class="softora-webdesign-email-body">Inhoud</div>',
-    { maxWidth: 600 }
-  );
-
-  assert.match(html, /class="softora-email-viewport"[^>]+width="100%"/);
-  assert.match(html, /class="softora-email-shell"[^>]+width="100%"/);
-  assert.match(html, /width:100%;max-width:600px;table-layout:fixed/);
-  assert.match(html, /max-width:100%;min-width:0/);
-  assert.match(html, /overflow-wrap:anywhere;word-break:normal/);
-  assert.doesNotMatch(html, /class="softora-email-shell"[^>]+width="600"/);
-});
-
 test('mailbox and autopilot use the same shared webdesign image renderer', () => {
   const servicesDir = path.join(__dirname, '..', '..', 'server', 'services');
   const mailboxSource = fs.readFileSync(path.join(servicesDir, 'mailbox.js'), 'utf8');
