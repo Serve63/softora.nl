@@ -22,6 +22,10 @@ const {
   renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
+const {
+  OUTBOUND_SENDER_DISPLAY_NAMES: MAILBOX_DISPLAY_NAMES,
+  OUTBOUND_SENDER_LOCATION_NAMES: MAILBOX_LOCATION_NAMES,
+} = require('./outbound-sender-identity');
 
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
@@ -37,29 +41,6 @@ const DEFAULT_MAILBOX_EMAILS = [
   'servecreusen7@gmail.com',
   'contact.venvisuals@gmail.com',
 ];
-const MAILBOX_DISPLAY_NAMES = {
-  'serve@softora.nl': 'Servé Creusen',
-  'martijn@softora.nl': 'Martijn van de Ven',
-  'servecreusen@softora.nl': 'Servé Creusen',
-  'martijnvandeven@softora.nl': 'Martijn van de Ven',
-  'servec321@gmail.com': 'Servé Creusen',
-  'martijnven123@gmail.com': 'Martijn van de Ven',
-  'serve290@gmail.com': 'Servé Creusen',
-  'servecreusen7@gmail.com': 'Servé Creusen',
-  'contact.venvisuals@gmail.com': 'Martijn van de Ven',
-};
-const CANONICAL_MAILBOX_DISPLAY_NAMES = new Set(Object.values(MAILBOX_DISPLAY_NAMES));
-const MAILBOX_LOCATION_NAMES = {
-  'serve@softora.nl': 'Liempde',
-  'martijn@softora.nl': 'Alphen',
-  'servecreusen@softora.nl': 'Liempde',
-  'martijnvandeven@softora.nl': 'Alphen',
-  'servec321@gmail.com': 'Liempde',
-  'martijnven123@gmail.com': 'Alphen',
-  'serve290@gmail.com': 'Liempde',
-  'servecreusen7@gmail.com': 'Liempde',
-  'contact.venvisuals@gmail.com': 'Alphen',
-};
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
@@ -575,21 +556,7 @@ function createMailboxService(deps = {}) {
     const address = normalizeEmail(email);
     const name = normalizeString(preferredName);
     const canonicalName = MAILBOX_DISPLAY_NAMES[address] || '';
-    const shortName = address.split('@')[0] || '';
-    if (
-      canonicalName &&
-      (
-        !name ||
-        name.toLowerCase() === shortName ||
-        (
-          CANONICAL_MAILBOX_DISPLAY_NAMES.has(name) &&
-          name.toLowerCase() !== canonicalName.toLowerCase()
-        )
-      )
-    ) {
-      return canonicalName;
-    }
-    return name || canonicalName || address;
+    return canonicalName || name || address;
   }
 
   function envKeyForEmail(email) {
@@ -643,24 +610,32 @@ function createMailboxService(deps = {}) {
 
   function envAccountForKey(email, key) {
     if (!key) return {};
-    const env = process.env || {};
-    const sharedUser = normalizeString(env[`MAILBOX_${key}_USER`] || '');
-    const sharedPass = normalizeString(env[`MAILBOX_${key}_PASS`] || '');
+    const runtimeEnv = env || {};
+    const sharedUser = normalizeString(runtimeEnv[`MAILBOX_${key}_USER`] || '');
+    const sharedPass = normalizeString(runtimeEnv[`MAILBOX_${key}_PASS`] || '');
     return {
       email,
-      name: normalizeString(env[`MAILBOX_${key}_NAME`] || ''),
-      smtpHost: normalizeString(env[`MAILBOX_${key}_SMTP_HOST`] || ''),
-      smtpPort: readPortEnv(env[`MAILBOX_${key}_SMTP_PORT`]),
-      smtpSecure: readBooleanEnv(env[`MAILBOX_${key}_SMTP_SECURE`]),
-      smtpUser: normalizeString(env[`MAILBOX_${key}_SMTP_USER`] || sharedUser),
-      smtpPass: normalizeString(env[`MAILBOX_${key}_SMTP_PASS`] || sharedPass),
-      imapHost: normalizeString(env[`MAILBOX_${key}_IMAP_HOST`] || ''),
-      imapPort: readPortEnv(env[`MAILBOX_${key}_IMAP_PORT`]),
-      imapSecure: readBooleanEnv(env[`MAILBOX_${key}_IMAP_SECURE`]),
-      imapUser: normalizeString(env[`MAILBOX_${key}_IMAP_USER`] || sharedUser),
-      imapPass: normalizeString(env[`MAILBOX_${key}_IMAP_PASS`] || sharedPass),
-      useBaseCredentials: readBooleanEnv(env[`MAILBOX_${key}_USE_BASE_CREDENTIALS`]) === true,
+      name: normalizeString(runtimeEnv[`MAILBOX_${key}_NAME`] || ''),
+      smtpHost: normalizeString(runtimeEnv[`MAILBOX_${key}_SMTP_HOST`] || ''),
+      smtpPort: readPortEnv(runtimeEnv[`MAILBOX_${key}_SMTP_PORT`]),
+      smtpSecure: readBooleanEnv(runtimeEnv[`MAILBOX_${key}_SMTP_SECURE`]),
+      smtpUser: normalizeString(runtimeEnv[`MAILBOX_${key}_SMTP_USER`] || sharedUser),
+      smtpPass: normalizeString(runtimeEnv[`MAILBOX_${key}_SMTP_PASS`] || sharedPass),
+      imapHost: normalizeString(runtimeEnv[`MAILBOX_${key}_IMAP_HOST`] || ''),
+      imapPort: readPortEnv(runtimeEnv[`MAILBOX_${key}_IMAP_PORT`]),
+      imapSecure: readBooleanEnv(runtimeEnv[`MAILBOX_${key}_IMAP_SECURE`]),
+      imapUser: normalizeString(runtimeEnv[`MAILBOX_${key}_IMAP_USER`] || sharedUser),
+      imapPass: normalizeString(runtimeEnv[`MAILBOX_${key}_IMAP_PASS`] || sharedPass),
+      useBaseCredentials: readBooleanEnv(runtimeEnv[`MAILBOX_${key}_USE_BASE_CREDENTIALS`]) === true,
     };
+  }
+
+  function isMailboxSmtpIdentityCompatible(email, smtpUser) {
+    const selectedEmail = normalizeEmail(email);
+    const authEmail = normalizeEmail(smtpUser);
+    const domain = selectedEmail.split('@').pop() || '';
+    if (!PERSONAL_MAILBOX_DOMAINS.has(domain)) return true;
+    return Boolean(selectedEmail && authEmail && selectedEmail === authEmail);
   }
 
   function envAccountForEmail(email) {
@@ -776,7 +751,10 @@ function createMailboxService(deps = {}) {
         ),
       };
       account.imapConfigured = Boolean(account.imapHost && account.imapUser && account.imapPass);
-      account.smtpConfigured = Boolean(account.smtpHost && account.smtpUser && account.smtpPass);
+      account.smtpIdentityMatches = isMailboxSmtpIdentityCompatible(account.email, account.smtpUser);
+      account.smtpConfigured = Boolean(
+        account.smtpHost && account.smtpUser && account.smtpPass && account.smtpIdentityMatches
+      );
       return account;
     });
   }
@@ -1539,14 +1517,22 @@ function createMailboxService(deps = {}) {
   function applyMailboxSenderVariablesToText(text, senderEmail) {
     const senderName = getMailboxSenderDisplayName(senderEmail);
     const senderLocation = getMailboxSenderLocationName(senderEmail);
-    return String(text || '')
+    const canonicalSenderName = MAILBOX_DISPLAY_NAMES[normalizeEmail(senderEmail)] || '';
+    let value = String(text || '')
       .replace(/\{\{\s*(afzender|afzendernaam|sender|sendername)\s*\}\}/gi, senderName)
-      .replace(/\{\{\s*(softora[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation)
-      .replace(
-        /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\})/gi,
-        `$1${senderName}$2{{stad}}`
-      )
-      .replace(/\bServe Creusen\b/g, 'Servé Creusen');
+      .replace(/\{\{\s*(softora[_\s-]?(plaats|stad|locatie)|sender[_\s-]?(city|location))\s*\}\}/gi, senderLocation);
+    if (canonicalSenderName) {
+      value = value
+        .replace(
+          /(Met vriendelijke groet(?:en)?[:,]?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)/gi,
+          `$1${canonicalSenderName}`
+        )
+        .replace(
+          /(Met vriendelijke groet,?\s*\n)(?:Serv[ée]\s+Creusen|Martijn\s+van\s+de\s+Ven)(\s*\n+\s*📍\s*)(?:(?:Alphen|Liempde)\b|\{\{\s*(?:stad|plaats|locatie|afzender[_\s-]?(?:plaats|stad|locatie))\s*\}\})/gi,
+          `$1${canonicalSenderName}$2{{stad}}`
+        );
+    }
+    return value.replace(/\bServe Creusen\b/g, 'Servé Creusen');
   }
 
   function applyMailboxRecipientLocationVariables(text, row = {}) {
@@ -1559,20 +1545,7 @@ function createMailboxService(deps = {}) {
     if (isMailboxImageVisibilityPsLine(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl);
     }
-    return renderNonBreakingWebsiteNames(renderInlineMarkdownLinks(line));
-  }
-
-  function renderNonBreakingWebsiteNames(html) {
-    return String(html || '').replace(
-      /(^|[\s(])((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})(?:\/[^\s<>()]*)?)/gi,
-      (match, prefix, token, offset, source) => {
-        const previousChar = offset + String(prefix || '').length > 0
-          ? String(source || '')[offset + String(prefix || '').length - 1]
-          : '';
-        if (previousChar === '@' || /<[^>]*$/.test(String(source || '').slice(0, offset))) return match;
-        return `${prefix}<span style="white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">${token}</span>`;
-      }
-    );
+    return renderInlineMarkdownLinks(line);
   }
 
   function mailboxImageExtension(contentType) {
@@ -1648,15 +1621,16 @@ function createMailboxService(deps = {}) {
 
   function renderMailboxWebdesignHtml(text, options = {}) {
     const bodyText = stripColdmailOptOutLines(text);
+    const paragraphStyle = 'margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;max-width:100%;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;';
     const paragraphs = bodyText
       .split(/\n{2,}/)
       .map((paragraph) => normalizeString(paragraph))
       .filter(Boolean)
       .map((paragraph) => {
         if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(paragraph)) {
-          return `<p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;">${renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl)}</p>`;
+          return `<p style="${paragraphStyle}">${renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl)}</p>`;
         }
-        return `<p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;">${paragraph
+        return `<p style="${paragraphStyle}">${paragraph
             .split('\n')
             .map((line) => renderMailboxWebdesignLineHtml(line, options))
             .join('<br>')}</p>`;
@@ -1679,7 +1653,7 @@ function createMailboxService(deps = {}) {
         )}</a></p>`
       : '';
     return renderWebdesignEmailDocument(
-      `<div class="softora-webdesign-email-body softora-mailbox-webdesign-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;max-width:900px;width:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${paragraphs}${imagesHtml}${optOutHtml}</div>`
+      `<div class="softora-webdesign-email-body softora-mailbox-webdesign-body" data-softora-template-version="${WEBDESIGN_EMAIL_TEMPLATE_VERSION}" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:600px;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">${paragraphs}${imagesHtml}${optOutHtml}</div>`
     );
   }
 
@@ -1907,13 +1881,15 @@ function createMailboxService(deps = {}) {
       ? decorateRecoveredWebdesignImagesText(text, bodyImages)
       : text;
     const preview = truncateText(bodyText.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
-    const fromText = folder === 'sent' ? account.name || account.email : displayName(parsed.from?.value);
+    const parsedFromName = displayName(parsed.from?.value);
+    const parsedFromEmail = addressText(parsed.from?.value);
+    const fromText = parsedFromName || account.name || account.email;
     return {
       id: `${folder}:${message.uid}`,
       uid: message.uid,
       folder,
       from: fromText,
-      email: folder === 'sent' ? account.email : addressText(parsed.from?.value),
+      email: parsedFromEmail || account.email,
       to: addressText(parsed.to?.value),
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
@@ -2348,6 +2324,12 @@ function createMailboxService(deps = {}) {
       error.status = 404;
       throw error;
     }
+    if (account.smtpIdentityMatches === false) {
+      const error = new Error('De SMTP-login hoort niet bij het gekozen afzenderadres. Verzending is geblokkeerd.');
+      error.status = 503;
+      error.code = 'SENDER_SMTP_IDENTITY_MISMATCH';
+      throw error;
+    }
     if (!account.smtpConfigured) {
       const error = new Error('SMTP is niet geconfigureerd voor deze mailbox.');
       error.status = 503;
@@ -2413,6 +2395,7 @@ function createMailboxService(deps = {}) {
       mail,
       messageId: normalizeString(info?.messageId || ''),
       sentAt: new Date(),
+      logger,
     });
     return {
       messageId: normalizeString(info?.messageId || ''),

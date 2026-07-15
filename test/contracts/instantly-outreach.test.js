@@ -91,7 +91,7 @@ function extractImageTags(html) {
 }
 
 function assertInstantlyHtmlUsesReadableWidth(html) {
-  assert.match(html, /<div style="max-width:600px;margin:0;">/);
+  assert.match(html, /<div style="width:100%;max-width:600px;min-width:0;box-sizing:border-box;margin:0;overflow-wrap:anywhere;word-break:normal;">/);
 }
 
 function assertInstantlyHtmlUsesVisibleWebdesignImages(html, expectedPath = '/webdesign/bakkerij-zon?cid=prospect-1&sender=serve') {
@@ -109,20 +109,16 @@ function assertInstantlyHtmlUsesVisibleWebdesignImages(html, expectedPath = '/we
   assert.match(html, new RegExp(escapedExpectedPath));
   assert.match(html, /Webdesign niet zichtbaar\? Check het <a [^>]*>hier<\/a> 👈/);
   assert.doesNotMatch(html, /Je kunt (je|het) webdesign/i);
-  assert.match(html, /@media only screen and \(max-width:980px\), only screen and \(max-device-width:980px\)/);
-  assert.match(html, /\.softora-webdesign-image\{width:100%!important;max-width:100%!important;height:auto!important\}/);
-  assert.match(html, /class="softora-webdesign-image-pair" style="max-width:900px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"/);
-  assert.match(html, /class="softora-webdesign-image-cell" style="display:inline-block;width:300px;max-width:100%;vertical-align:bottom;margin:0 16px 16px 0/);
-  assert.match(html, /class="softora-webdesign-image-cell" style="display:inline-block;width:584px;max-width:100%;vertical-align:bottom;margin:0 0 16px 0/);
-  assert.match(imageTags[0], /width="300"/);
+  assert.match(html, /class="softora-instantly-email-body"[^>]+font-size:16px;line-height:26px[^>]+max-width:600px/);
+  assert.match(html, /class="softora-webdesign-image-stack" style="display:block;[^\"]+max-width:600px/);
+  assert.match(imageTags[0], /width="600"/);
   assert.match(imageTags[0], /class="softora-webdesign-image"/);
-  assert.match(imageTags[0], /style="display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;"/);
-  assert.match(imageTags[1], /width="584"/);
+  assert.match(imageTags[0], /style="display:block;width:100%;max-width:600px;height:auto;max-height:none;object-fit:contain;/);
+  assert.match(imageTags[1], /width="600"/);
   assert.match(imageTags[1], /class="softora-webdesign-image softora-webdesign-image--mockup"/);
-  assert.match(imageTags[1], /height="450"/);
-  assert.match(imageTags[1], /style="display:block;width:100%;max-width:100%;height:450px;max-height:450px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;border-radius:6px;"/);
-  assert.doesNotMatch(html, /display:flex|flex-wrap|max-width:480px/);
-  assert.match(html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assert.match(imageTags[1], /style="display:block;width:100%;max-width:600px;height:auto;max-height:none;object-fit:contain;object-position:center top;/);
+  assert.doesNotMatch(html, /display:flex|flex-wrap|max-width:480px|900px|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/);
+  assert.match(html, /class="softora-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(html, /PS: Wordt het webdesign niet zichtbaar|device mockup/i);
 }
 
@@ -602,6 +598,53 @@ test('safe Instantly upload stores the explicit sender persona in CSV, guards an
   assert.equal(row.sentFromEmail, 'martijn@websoftora.com');
   assert.equal(row.outreachSentFromEmail, 'martijn@websoftora.com');
   assert.equal(row.replyMailboxAccount, 'martijn@websoftora.com');
+});
+
+test('safe Instantly upload resolves every canonical mailbox alias without falling back to Servé', async () => {
+  const aliases = [
+    ['serve@softora.nl', 'serve', 'Servé Creusen'],
+    ['martijn@softora.nl', 'martijn', 'Martijn van de Ven'],
+    ['servecreusen@softora.nl', 'serve', 'Servé Creusen'],
+    ['martijnvandeven@softora.nl', 'martijn', 'Martijn van de Ven'],
+    ['servec321@gmail.com', 'serve', 'Servé Creusen'],
+    ['martijnven123@gmail.com', 'martijn', 'Martijn van de Ven'],
+    ['serve290@gmail.com', 'serve', 'Servé Creusen'],
+    ['servecreusen7@gmail.com', 'serve', 'Servé Creusen'],
+    ['contact.venvisuals@gmail.com', 'martijn', 'Martijn van de Ven'],
+  ];
+
+  for (const [email, profileKey, name] of aliases) {
+    const { service, getRows, outboundGuardCalls } = createService({
+      syncEnabled: false,
+      coldmailingSettings: {
+        senderEmail: email,
+        senders: {
+          [email]: {
+            subject: 'Kleine vraag over jullie website',
+            body: 'Goedendag,\n\nMet vriendelijke groet,\n{{afzender}}\n\n📍 {{stad}}',
+          },
+        },
+      },
+    });
+    const result = await service.prepareInstantlyUpload({
+      actor: 'Alias-test',
+      campaignId: `campaign-${profileKey}`,
+      uploadId: `upload-${profileKey}`,
+      limit: 1,
+      senderEmail: email,
+    });
+
+    assert.equal(result.senderProfileKey, profileKey, email);
+    assert.equal(result.senderName, name, email);
+    assert.equal(result.senderEmail, email, email);
+    assert.match(result.csv, new RegExp(name), email);
+    assert.equal(outboundGuardCalls[0].options.payload.senderProfileKey, profileKey, email);
+    assert.equal(outboundGuardCalls[0].options.payload.senderName, name, email);
+    const row = getRows()[0];
+    assert.equal(row.instantlySenderProfileKey, profileKey, email);
+    assert.equal(row.instantlySenderName, name, email);
+    assert.equal(row.instantlySenderEmail, email, email);
+  }
 });
 
 test('safe Instantly upload rejects mismatched sender persona and mailbox', async () => {

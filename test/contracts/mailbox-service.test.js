@@ -294,33 +294,23 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
     sent[0].message.html,
     /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
-  assert.match(
-    sent[0].message.html,
-    /<span style="white-space:nowrap;word-break:keep-all;overflow-wrap:normal;">pckbv\.eu<\/span>/
-  );
+  assert.match(sent[0].message.html, /website \(pckbv\.eu\) tegen/);
+  assert.doesNotMatch(sent[0].message.html, /white-space:nowrap|word-break:keep-all/);
   assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
-  assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-15-v6');
+  assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-15-v7');
   assert.match(sent[0].message.html, /^<!doctype html><html lang="nl"><head>/);
   assert.match(sent[0].message.html, /<meta name="viewport" content="width=device-width,initial-scale=1\.0">/);
-  assert.match(sent[0].message.html, /data-softora-template-version="softora-webdesign-email-2026-07-15-v6"/);
-  assert.match(sent[0].message.html, /<table class="softora-desktop-image-pair" role="presentation"[^>]+style="display:none;/);
+  assert.match(sent[0].message.html, /data-softora-template-version="softora-webdesign-email-2026-07-15-v7"/);
   assert.match(sent[0].message.html, /class="softora-webdesign-email-body softora-mailbox-webdesign-body"/);
-  assert.match(sent[0].message.html, /@media only screen and \(min-width:981px\) and \(min-device-width:981px\)/);
-  assert.match(sent[0].message.html, /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-desktop-image" width="300" height="560"/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-desktop-image" width="584" height="560"/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="100%"/);
-  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="100%"/);
-  assert.doesNotMatch(sent[0].message.html, /softora-webdesign-image-cell|softora-webdesign-image-gap|softora-webdesign-image-table/);
-  assert.match(sent[0].message.html, /class="softora-mobile-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
-  const mobilePairIndex = sent[0].message.html.indexOf('class="softora-mobile-image-pair"');
-  const mobileMainIndex = sent[0].message.html.indexOf('alt="PCK B.V. webdesign"', mobilePairIndex);
-  const mobileCaptionIndex = sent[0].message.html.indexOf('class="softora-mobile-mockup-caption"', mobilePairIndex);
-  const mobileMockupIndex = sent[0].message.html.indexOf('alt="PCK B.V. device mockup"', mobileCaptionIndex);
-  assert.ok(mobileMainIndex > mobilePairIndex);
-  assert.ok(mobileCaptionIndex > mobileMainIndex);
-  assert.ok(mobileMockupIndex > mobileCaptionIndex);
+  assert.match(sent[0].message.html, /font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:600px;/);
+  assert.match(sent[0].message.html, /class="softora-webdesign-image-stack"[^>]+max-width:600px/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. webdesign" class="softora-webdesign-image" width="600"/);
+  assert.match(sent[0].message.html, /alt="PCK B\.V\. device mockup" class="softora-webdesign-image softora-webdesign-image--mockup" width="600"/);
+  assert.match(sent[0].message.html, /class="softora-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
+  assert.equal((sent[0].message.html.match(/alt="PCK B\.V\. webdesign"/g) || []).length, 1);
+  assert.equal((sent[0].message.html.match(/alt="PCK B\.V\. device mockup"/g) || []).length, 1);
+  assert.doesNotMatch(sent[0].message.html, /900px|softora-desktop-image-pair|softora-mobile-image-pair|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/);
   assert.equal(sent[0].message.attachments.length, 2);
   assert.deepEqual(
     sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),
@@ -790,20 +780,31 @@ test('mailbox service sends Martijn mail with the full display name', async () =
   assert.equal(sent[0].message.from, 'Martijn van de Ven <martijn@softora.nl>');
 });
 
-test('mailbox service maps contact venvisuals to Martijn even when stored with the wrong name', async () => {
+test('mailbox service enforces the canonical name and exact SMTP login for all nine sender aliases', async () => {
   const sent = [];
+  const aliases = [
+    ['serve@softora.nl', 'Servé Creusen'],
+    ['martijn@softora.nl', 'Martijn van de Ven'],
+    ['servecreusen@softora.nl', 'Servé Creusen'],
+    ['martijnvandeven@softora.nl', 'Martijn van de Ven'],
+    ['servec321@gmail.com', 'Servé Creusen'],
+    ['martijnven123@gmail.com', 'Martijn van de Ven'],
+    ['serve290@gmail.com', 'Servé Creusen'],
+    ['servecreusen7@gmail.com', 'Servé Creusen'],
+    ['contact.venvisuals@gmail.com', 'Martijn van de Ven'],
+  ];
   const service = createMailboxService({
     mailConfig: {},
-    mailboxAccountsRaw: JSON.stringify([
+    mailboxAccountsRaw: JSON.stringify(aliases.map(([email, expectedName]) => (
       {
-        email: 'contact.venvisuals@gmail.com',
-        name: 'Servé Creusen',
+        email,
+        name: expectedName === 'Servé Creusen' ? 'Martijn' : 'Servé',
         smtpHost: 'smtp.example.test',
         smtpPort: 587,
-        smtpUser: 'contact.venvisuals@gmail.com',
+        smtpUser: email,
         smtpPass: 'secret',
-      },
-    ]),
+      }
+    ))),
     createTransport: (config) => ({
       sendMail: async (message) => {
         sent.push({ config, message });
@@ -812,30 +813,60 @@ test('mailbox service maps contact venvisuals to Martijn even when stored with t
     }),
   });
   const accountsRes = createResponseRecorder();
-  const sendRes = createResponseRecorder();
-
   await service.accountsResponse({}, accountsRes);
-  await service.sendMessageResponse(
-    {
-      body: {
-        account: 'contact.venvisuals@gmail.com',
-        to: 'klant@example.nl',
-        subject: 'Test',
-        body: 'Hallo',
-      },
-    },
-    sendRes
-  );
-
   assert.equal(accountsRes.statusCode, 200);
-  assert.equal(
-    accountsRes.body.accounts.find((account) => account.email === 'contact.venvisuals@gmail.com').name,
-    'Martijn van de Ven'
+  for (const [email, expectedName] of aliases) {
+    const account = accountsRes.body.accounts.find((item) => item.email === email);
+    assert.equal(account.name, expectedName, email);
+    assert.equal(account.smtpConfigured, true, email);
+    await service.sendMessage({
+      accountEmail: email,
+      to: 'klant@example.nl',
+      subject: 'Test',
+      text: 'Hallo',
+    });
+    const delivery = sent.at(-1);
+    assert.equal(delivery.config.auth.user, email, email);
+    assert.equal(delivery.message.from, `${expectedName} <${email}>`, email);
+  }
+  assert.equal(sent.length, aliases.length);
+});
+
+test('mailbox service blocks Venvisual before SMTP when it would authenticate as Servé', async () => {
+  let smtpCalls = 0;
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'contact.venvisuals@gmail.com',
+        name: 'Servé',
+        smtpHost: 'smtp.gmail.test',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'serve-secret',
+      },
+    ]),
+    createTransport: () => ({
+      async sendMail() {
+        smtpCalls += 1;
+        return { messageId: 'must-not-send' };
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () => service.sendMessage({
+      accountEmail: 'contact.venvisuals@gmail.com',
+      to: 'klant@example.nl',
+      subject: 'Test',
+      text: 'Hallo',
+    }),
+    (error) => {
+      assert.equal(error.code, 'SENDER_SMTP_IDENTITY_MISMATCH');
+      assert.match(error.message, /SMTP-login hoort niet bij/);
+      return true;
+    }
   );
-  assert.equal(sendRes.statusCode, 200);
-  assert.equal(sendRes.body.ok, true);
-  assert.equal(sent[0].config.auth.user, 'contact.venvisuals@gmail.com');
-  assert.equal(sent[0].message.from, 'Martijn van de Ven <contact.venvisuals@gmail.com>');
+  assert.equal(smtpCalls, 0);
 });
 
 test('mailbox service stores app-sent mail in the resolved sent folder when IMAP is available', async () => {
@@ -929,7 +960,7 @@ test('mailbox service resolves sent folders through IMAP special-use metadata', 
   assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].subject, 'Verzonden bericht');
-  assert.equal(messages[0].from, 'Servé Creusen');
+  assert.equal(messages[0].from, 'Serve');
   assert.equal(messages[0].email, 'serve@softora.nl');
   assert.equal(messages[0].to, 'klant@example.nl');
 });

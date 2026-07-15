@@ -12,6 +12,12 @@ const {
   getPreviewImageCacheKey,
   rememberPreviewImage,
 } = require('./coldmail-preview-image-cache');
+const {
+  OUTBOUND_SENDER_PROFILE_KEYS,
+} = require('./outbound-sender-identity');
+const {
+  renderWebdesignImageSection,
+} = require('./webdesign-email-renderer');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -50,13 +56,8 @@ const INSTANTLY_SAFE_MANUAL_UPLOAD_LABEL = 'Veilige Instantly upload voorbereid'
 const INSTANTLY_CAMPAIGN_TEMPLATE_FILE_NAME = 'softora-instantly-campaign-template.html';
 const INSTANTLY_CAMPAIGN_INSTRUCTIONS_FILE_NAME = 'softora-instantly-lees-mij.txt';
 const INSTANTLY_CAMPAIGN_SUBJECT_TEMPLATE = '{{softora_subject}}';
-const COLDMAIL_EMAIL_IMAGE_WIDTH = 480;
+const COLDMAIL_EMAIL_IMAGE_WIDTH = 600;
 const INSTANTLY_EMAIL_CONTENT_MAX_WIDTH = 600;
-const INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH = 300;
-const INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH = 584;
-const INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT = 450;
-const INSTANTLY_IMAGE_PAIR_GAP_WIDTH = 16;
-const INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX = 980;
 const INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN =
   /(?:je\s+kunt\s+(?:je|het)\s+webdesign\s+hier\s+bekijken|webdesign\s+niet\s+zichtbaar\?\s*check\s+het\s+hier)\s*👈?/i;
 const INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH = 1024;
@@ -327,6 +328,8 @@ function getInstantlySenderProfileKey(value, normalizeString = defaultNormalizeS
     .trim();
   if (!normalized) return '';
   const email = normalizeEmailAddress(normalized, normalizeString);
+  const canonicalProfileKey = OUTBOUND_SENDER_PROFILE_KEYS[email];
+  if (canonicalProfileKey) return canonicalProfileKey;
   const source = email || normalized;
   if (/\bmartijn\b/.test(source) || source.includes('martijn@') || source.includes('martijnven@')) return 'martijn';
   if (/\bserve\b/.test(source) || source.includes('serve@') || source.includes('servec321@')) return 'serve';
@@ -1755,17 +1758,18 @@ function renderInstantlyWebdesignPreviewCtaHtmlLine(line, normalizeString = defa
 }
 
 function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, options = {}) {
+  const paragraphStyle = 'margin:0 0 18px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;max-width:100%;overflow-wrap:anywhere;word-break:normal;';
   const body = normalizeString(text)
     .split(/\n{2,}/)
     .map((paragraph) => {
       const cleanParagraph = normalizeString(paragraph);
       if (INSTANTLY_WEBDESIGN_PREVIEW_CTA_PATTERN.test(cleanParagraph)) {
-        return `<p>${renderInstantlyWebdesignPreviewCtaHtmlLine(cleanParagraph, normalizeString, options)}</p>`;
+        return `<p style="${paragraphStyle}">${renderInstantlyWebdesignPreviewCtaHtmlLine(cleanParagraph, normalizeString, options)}</p>`;
       }
       if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanParagraph)) {
-        return `<p>${renderImageVisibilityPsHtmlLine(cleanParagraph, normalizeString, options)}</p>`;
+        return `<p style="${paragraphStyle}">${renderImageVisibilityPsHtmlLine(cleanParagraph, normalizeString, options)}</p>`;
       }
-      return `<p>${paragraph
+      return `<p style="${paragraphStyle}">${paragraph
           .split('\n')
           .map((line) => {
             const cleanLine = normalizeString(line);
@@ -1780,7 +1784,7 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, op
           .join('<br>')}</p>`;
     })
     .join('\n');
-  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a2e;">${body}</div>`;
+  return `<div class="softora-instantly-email-body" style="font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#1a1a2e;width:100%;max-width:600px;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;word-break:normal;">${body}</div>`;
 }
 
 function normalizeInstantlyImageAlt(value, normalizeString = defaultNormalizeString) {
@@ -1798,50 +1802,13 @@ function renderImageHtml(src, alt, margin = '24px 0 0 0', normalizeString = defa
   const scaledDimensions = scaleEmailImageDimensions(dimensions);
   const imageWidth = scaledDimensions ? scaledDimensions.width : fallbackWidth;
   const imageHeight = scaledDimensions ? scaledDimensions.height : fallbackHeight;
-  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:100%;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;background:#f3f6fb;border:1px solid #dbe3f0;"><img src="${escapeHtmlAttribute(
+  return `\n<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;margin:${margin};"><tr><td align="left" style="padding:0;margin:0;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;background:#f3f6fb;border:1px solid #dbe3f0;"><img src="${escapeHtmlAttribute(
     cleanSrc,
     normalizeString
   )}" alt="${escapeHtmlAttribute(
     cleanAlt,
     normalizeString
   )}" width="${imageWidth}" height="${imageHeight}" loading="eager" decoding="async" fetchpriority="high" style="display:block;width:100%;max-width:${COLDMAIL_EMAIL_IMAGE_WIDTH}px;height:auto;aspect-ratio:${imageWidth}/${imageHeight};border:0;outline:none;text-decoration:none;" /></td></tr></table>`;
-}
-
-function renderInlinePairImageHtml(src, alt, normalizeString = defaultNormalizeString, dimensions = null, desktopWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH, options = {}) {
-  const cleanSrc = normalizeString(src);
-  if (!cleanSrc) return '';
-  const cleanAlt = normalizeInstantlyImageAlt(alt, normalizeString);
-  const isWebdesign = cleanAlt === 'Webdesign';
-  const fallbackDimensions = {
-    width: isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_WIDTH : INSTANTLY_MOCKUP_PLACEHOLDER_WIDTH,
-    height: isWebdesign ? INSTANTLY_WEBDESIGN_PLACEHOLDER_HEIGHT : INSTANTLY_MOCKUP_PLACEHOLDER_HEIGHT,
-  };
-  const scaledDimensions =
-    scaleEmailImageDimensions(dimensions, desktopWidth) ||
-    scaleEmailImageDimensions(fallbackDimensions, desktopWidth);
-  const imageHeight = scaledDimensions ? scaledDimensions.height : desktopWidth;
-  const isMockup = options && options.mockup;
-  const className = isMockup ? 'softora-webdesign-image softora-webdesign-image--mockup' : 'softora-webdesign-image';
-  const outputHeight = isMockup ? INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT : imageHeight;
-  const imageStyle = isMockup
-    ? `display:block;width:100%;max-width:100%;height:${INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT}px;max-height:${INSTANTLY_MOCKUP_IMAGE_MATCH_HEIGHT}px;object-fit:cover;object-position:center top;border:0;outline:none;text-decoration:none;border-radius:6px;`
-    : `display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;border-radius:6px;`;
-  return `<img src="${escapeHtmlAttribute(
-    cleanSrc,
-    normalizeString
-  )}" alt="${escapeHtmlAttribute(
-    cleanAlt,
-    normalizeString
-  )}" class="${className}" width="${desktopWidth}" height="${outputHeight}" loading="eager" decoding="async" fetchpriority="high" style="${imageStyle}" />`;
-}
-
-function renderMobileMockupCaptionHtml(caption, normalizeString = defaultNormalizeString) {
-  const cleanCaption = normalizeString(caption || COLDMAIL_MOCKUP_CAPTION);
-  if (!cleanCaption) return '';
-  return `\n<p class="softora-mobile-mockup-caption" style="display:none;mso-hide:all;margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.45;color:#111827;font-weight:700;max-height:0;overflow:hidden;">${escapeHtml(
-    cleanCaption,
-    normalizeString
-  )}</p>`;
 }
 
 function renderInstantlyImagePairHtml(
@@ -1861,34 +1828,24 @@ function renderInstantlyImagePairHtml(
       ? renderImageHtml(cleanWebdesignUrl, 'Webdesign', '24px 0 0 0', normalizeString, webdesignImageDimensions)
       : '';
     const mockupImageHtml = cleanMockupUrl
-      ? `${renderMobileMockupCaptionHtml(caption, normalizeString)}${renderImageHtml(cleanMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
+      ? `<p class="softora-mockup-caption" style="margin:20px 0 12px 0;font-family:Arial,sans-serif;font-size:16px;line-height:26px;color:#111827;font-weight:700;overflow-wrap:anywhere;word-break:normal;">${escapeHtml(caption, normalizeString)}</p>${renderImageHtml(cleanMockupUrl, 'Mockup', '0', normalizeString, webdesignMockupDimensions)}`
       : '';
     return `${webdesignImageHtml}${mockupImageHtml}`;
   }
-
-  const pairWidth = INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH + INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH + INSTANTLY_IMAGE_PAIR_GAP_WIDTH;
-  const webdesignImageHtml = renderInlinePairImageHtml(
-    cleanWebdesignUrl,
-    'Webdesign',
-    normalizeString,
-    webdesignImageDimensions,
-    INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH
+  return renderWebdesignImageSection(
+    { src: cleanWebdesignUrl, alt: 'Webdesign', dimensions: webdesignImageDimensions },
+    {
+      mockupImage: { src: cleanMockupUrl, alt: 'Mockup', dimensions: webdesignMockupDimensions },
+      caption: normalizeString(caption) || COLDMAIL_MOCKUP_CAPTION,
+      margin: '24px 0 0 0',
+    }
   );
-  const mockupImageHtml = renderInlinePairImageHtml(
-    cleanMockupUrl,
-    'Mockup',
-    normalizeString,
-    webdesignMockupDimensions,
-    INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH,
-    { mockup: true }
-  );
-  return `${renderMobileMockupCaptionHtml(caption, normalizeString)}\n<style>@media only screen and (max-width:${INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX}px), only screen and (max-device-width:${INSTANTLY_EMAIL_MOBILE_BREAKPOINT_PX}px){.softora-mobile-mockup-caption{display:block!important;mso-hide:none!important;max-height:none!important;overflow:visible!important}.softora-webdesign-image-pair{max-width:100%!important}.softora-webdesign-image-cell{display:block!important;width:100%!important;max-width:100%!important;margin:0 0 16px 0!important;padding:0!important}.softora-webdesign-image{width:100%!important;max-width:100%!important;height:auto!important}.softora-webdesign-image--mockup{height:auto!important;max-height:none!important;object-fit:contain!important}}</style><div class="softora-webdesign-image-pair" style="max-width:${pairWidth}px;width:100%;font-size:0;line-height:0;margin:0;padding:0;"><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_WEBDESIGN_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:bottom;margin:0 ${INSTANTLY_IMAGE_PAIR_GAP_WIDTH}px 16px 0;padding:0;font-size:16px;line-height:1.4;">${webdesignImageHtml}</div><div class="softora-webdesign-image-cell" style="display:inline-block;width:${INSTANTLY_MOCKUP_IMAGE_PAIR_WIDTH}px;max-width:100%;vertical-align:bottom;margin:0 0 16px 0;padding:0;font-size:16px;line-height:1.4;">${mockupImageHtml}</div></div>`;
 }
 
 function wrapInstantlyEmailHtml(content, normalizeString = defaultNormalizeString) {
   const html = typeof content === 'string' ? content.trim() : normalizeString(content);
   if (!html) return '';
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td align="left" style="padding:0;margin:0;"><div style="max-width:${INSTANTLY_EMAIL_CONTENT_MAX_WIDTH}px;margin:0;">${html}</div></td></tr></table>`;
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:100%;max-width:${INSTANTLY_EMAIL_CONTENT_MAX_WIDTH}px;"><tr><td align="left" style="padding:0;margin:0;width:100%;max-width:${INSTANTLY_EMAIL_CONTENT_MAX_WIDTH}px;"><div style="width:100%;max-width:${INSTANTLY_EMAIL_CONTENT_MAX_WIDTH}px;min-width:0;box-sizing:border-box;margin:0;overflow-wrap:anywhere;word-break:normal;">${html}</div></td></tr></table>`;
 }
 
 function buildInstantlyEmailHtml(

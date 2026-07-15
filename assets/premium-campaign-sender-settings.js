@@ -9,7 +9,7 @@
   const DEFAULT_WEBDESIGN_BODY = [
     "Goedendag,",
     "",
-    "Afgelopen week kwam ik jullie website, {{website}}, tegen.",
+    "Afgelopen week kwam ik jullie website {{website}} tegen.",
     "",
     "Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.",
     "",
