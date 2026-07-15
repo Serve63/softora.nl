@@ -12,7 +12,7 @@ function read(fileName) {
 test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
-  assert.match(html, /<title>Live Momentum \| Softora<\/title>/);
+  assert.match(html, /<title>ATTACK, ATTACK, ATTACK\. \| Softora<\/title>/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
@@ -28,7 +28,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /assets\/premium-sidebar-profile-prefill\.js\?v=20260715a/);
   assert.doesNotMatch(html, /data-live-momentum-sidebar-host/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
-  assert.match(html, /<h1 id="momentum-title">Live momentum<\/h1>/);
+  assert.match(html, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
   assert.match(html, /Juli 2026 .* gestart op 13 juli/);
   assert.doesNotMatch(html, /today-score|score-label|Score vandaag/);
   assert.doesNotMatch(html, /score-points|100 \/ 100|punten<\/span>/);
