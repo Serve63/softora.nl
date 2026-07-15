@@ -20,7 +20,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260715a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260715b" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -164,7 +164,13 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /replace:\s*true/);
   assert.match(js, /response\.source !== 'supabase'/);
   assert.match(js, /function parseStoredState\(rawValue\)/);
-  assert.match(js, /function scheduleStateWrite\(\)/);
+  assert.match(js, /function scheduleStateWrite\(options = \{\}\)/);
+  assert.match(js, /function markStateChanged\(\)/);
+  assert.match(js, /function flushStateWrite\(\)/);
+  assert.match(js, /label\.addEventListener\('input',[\s\S]*markStateChanged\(\)/);
+  assert.match(js, /window\.addEventListener\('pagehide', flushStateWrite\)/);
+  assert.match(js, /queuedKeepalive = true/);
+  assert.match(js, /MAX_SAVE_RETRIES = 3/);
   assert.doesNotMatch(js, /is-soft/);
   assert.doesNotMatch(js, /localStorage|sessionStorage/);
 });
