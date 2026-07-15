@@ -307,9 +307,7 @@ function mountExtraSettingsCategory() {
       '.settings-extra-grid>.tegel{width:100%;min-width:0;}',
       '.settings-extra-card{cursor:default;}',
       '.settings-extra-card[data-settings-extra-href]{cursor:pointer;}',
-      '.settings-local-database-frame{display:block;width:100%;height:calc(100vh - 170px);min-height:680px;border:1px solid var(--border);border-radius:8px;background:#f8f7f4;}',
       '@media (max-width:720px){.settings-tile-grid,.settings-extra-grid{grid-template-columns:minmax(0,1fr);max-width:100%;}.settings-tile-grid>.tegel{width:100%;}}',
-      '@media (max-width:720px){.settings-local-database-frame{height:calc(100vh - 140px);min-height:560px;}}',
     ].join('');
     document.head.appendChild(style);
   }
@@ -371,7 +369,6 @@ function mountExtraSettingsCategory() {
   appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
   extraTile.addEventListener('click', function () {
     extraGrid.hidden = false;
-    localDatabaseFrame.hidden = true;
     headerTitle.textContent = 'Extra';
     headerSubtitle.textContent = 'Interne modules en placeholders';
     goTo('screen-extra');
@@ -418,12 +415,6 @@ function mountExtraSettingsCategory() {
 
   var extraGrid = document.createElement('div');
   extraGrid.className = 'settings-extra-grid';
-  var localDatabaseFrame = document.createElement('iframe');
-  localDatabaseFrame.id = 'settings-local-database-frame';
-  localDatabaseFrame.className = 'settings-local-database-frame';
-  localDatabaseFrame.src = '/kvk-database?softora_sidebar_content=1';
-  localDatabaseFrame.title = 'Softora Database Bedrijven Scraper';
-  localDatabaseFrame.hidden = true;
   extraItems.forEach(function (label, index) {
     var number = String(index + 1).padStart(2, '0');
     var isFlynow = label === 'Flynow';
@@ -441,13 +432,6 @@ function mountExtraSettingsCategory() {
       card.type = 'button';
       card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
-        if (isDatabase) {
-          extraGrid.hidden = true;
-          localDatabaseFrame.hidden = false;
-          headerTitle.textContent = 'Database';
-          headerSubtitle.textContent = 'Bedrijven Scraper';
-          return;
-        }
         navigateToSettingsModule(moduleHref);
       });
     }
@@ -505,7 +489,6 @@ function mountExtraSettingsCategory() {
     extraGrid.appendChild(card);
   });
   extraScreen.appendChild(extraGrid);
-  extraScreen.appendChild(localDatabaseFrame);
   overviewScreen.insertAdjacentElement('afterend', extraScreen);
 }
 
