@@ -316,6 +316,29 @@ button {
 .habit-board::-webkit-scrollbar {
   display: none;
 }
+.momentum-watermark {
+  display: grid;
+  width: fit-content;
+  margin: clamp(4.5rem, 9vh, 7.5rem) clamp(1rem, 4vw, 4.5rem) 0 auto;
+  color: transparent;
+  font-family: var(--font-display);
+  font-size: clamp(3.2rem, 5.2vw, 5.8rem);
+  font-weight: 700;
+  line-height: .78;
+  text-align: right;
+  text-transform: uppercase;
+  user-select: none;
+  pointer-events: none;
+  -webkit-text-stroke: 1px rgba(26, 26, 46, .075);
+}
+.momentum-watermark span:nth-child(2) {
+  margin-right: .42em;
+}
+.momentum-watermark span:last-child {
+  margin-right: .08em;
+  color: rgba(35, 159, 88, .045);
+  -webkit-text-stroke-color: rgba(35, 159, 88, .12);
+}
 .habit-grid {
   display: grid;
   grid-template-columns: minmax(190px, 12vw) repeat(var(--day-count, 31), minmax(32px, 1fr));
@@ -686,6 +709,11 @@ button {
   .bar-chart {
     min-width: 820px;
   }
+  .momentum-watermark {
+    margin-top: 4rem;
+    margin-right: .75rem;
+    font-size: clamp(2.8rem, 13vw, 4.5rem);
+  }
 }
 @media (max-width: 520px) {
   .momentum-page {
@@ -708,5 +736,8 @@ button {
   }
   .icon-picker-results {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .momentum-watermark {
+    margin-top: 3rem;
   }
 }
