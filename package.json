@@ -9,6 +9,7 @@
     "dev": "node server.js",
     "worker:website-video": "node scripts/company-website-video-worker.js",
     "worker:website-video:once": "node scripts/company-website-video-worker.js --once",
+    "papertrader:v17": "node scripts/run-papertrader-v17-research.js",
     "test:contracts": "node --test test/contracts/*.test.js",
     "test:smoke": "node --test test/smoke/*.test.js",
     "test:e2e:website-video": "node --test test/e2e/company-website-video.e2e.test.js",

@@ -67,6 +67,16 @@ test('websitevideo tooling blijft lokaal en expliciet startbaar', () => {
   assert.ok(packageJson.dependencies['ffprobe-static']);
 });
 
+test('PaperTrader V17 research blijft een expliciete lokale CLI zonder live ordercommando', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const command = packageJson.scripts['papertrader:v17'];
+  const runner = readRepoFile('scripts/run-papertrader-v17-research.js');
+
+  assert.equal(command, 'node scripts/run-papertrader-v17-research.js');
+  assert.match(runner, /--dataset/);
+  assert.doesNotMatch(runner, /api\/v3\/order|secret|API_KEY|TRADE/);
+});
+
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],
