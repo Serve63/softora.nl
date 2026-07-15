@@ -17,6 +17,8 @@
     ? window.SoftoraMomentumIconCatalog
     : [];
   const ICONS_BY_KEY = new Map(ICON_CATALOG.map((icon) => [icon.key, icon]));
+  const ICON_CATEGORIES = Array.from(new Set(ICON_CATALOG.map((icon) => icon.category).filter(Boolean)));
+  const ALL_ICON_CATEGORIES = 'Alle';
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
     { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [TODAY] },
@@ -38,6 +40,7 @@
   let saveRetryCount = 0;
   let iconPicker = null;
   let iconPickerTrigger = null;
+  let activeIconCategory = ALL_ICON_CATEGORIES;
   if (!grid || !chart || !chartSwitches.length) {
     return;
   }
@@ -408,7 +411,11 @@
     const emptyState = iconPicker.querySelector('.icon-picker-empty');
     const row = iconPickerTrigger?.closest('.habit-name');
     const selectedKey = row?.dataset.iconKey;
-    const matches = ICON_CATALOG.filter((icon) => `${icon.label} ${icon.keywords}`.toLocaleLowerCase('nl').includes(query));
+    const matches = ICON_CATALOG.filter((icon) => {
+      const matchesCategory = activeIconCategory === ALL_ICON_CATEGORIES || icon.category === activeIconCategory;
+      const matchesQuery = `${icon.label} ${icon.keywords}`.toLocaleLowerCase('nl').includes(query);
+      return matchesCategory && matchesQuery;
+    });
     const fragment = document.createDocumentFragment();
     matches.forEach((icon) => {
       const button = document.createElement('button');
@@ -427,6 +434,23 @@
     results.replaceChildren(fragment);
     emptyState.hidden = matches.length > 0;
   }
+  function renderIconPickerCategories() {
+    if (!iconPicker) {
+      return;
+    }
+    const categoryList = iconPicker.querySelector('.icon-picker-categories');
+    const fragment = document.createDocumentFragment();
+    [ALL_ICON_CATEGORIES, ...ICON_CATEGORIES].forEach((category) => {
+      const button = document.createElement('button');
+      button.className = 'icon-picker-category';
+      button.type = 'button';
+      button.dataset.category = category;
+      button.setAttribute('aria-pressed', category === activeIconCategory ? 'true' : 'false');
+      button.textContent = category;
+      fragment.append(button);
+    });
+    categoryList.replaceChildren(fragment);
+  }
   function ensureIconPicker() {
     if (iconPicker) {
       return iconPicker;
@@ -434,9 +458,12 @@
     const backdrop = document.createElement('div');
     const dialog = document.createElement('section');
     const header = document.createElement('header');
+    const heading = document.createElement('div');
     const title = document.createElement('h2');
+    const summary = document.createElement('p');
     const closeButton = document.createElement('button');
     const search = document.createElement('input');
+    const categories = document.createElement('div');
     const results = document.createElement('div');
     const emptyState = document.createElement('p');
     backdrop.className = 'icon-picker-backdrop';
@@ -446,29 +473,49 @@
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('aria-labelledby', 'icon-picker-title');
     header.className = 'icon-picker-header';
+    heading.className = 'icon-picker-heading';
     title.id = 'icon-picker-title';
     title.textContent = 'Kies een icoon';
+    summary.className = 'icon-picker-summary';
+    summary.textContent = `${ICON_CATALOG.length} iconen · ${ICON_CATEGORIES.length} categorieën`;
     closeButton.className = 'icon-picker-close';
     closeButton.type = 'button';
     closeButton.setAttribute('aria-label', 'Iconenkiezer sluiten');
     closeButton.textContent = '×';
     search.className = 'icon-picker-search';
     search.type = 'search';
-    search.placeholder = 'Zoek een icoon';
+    search.placeholder = 'Zoek op icoon of betekenis';
     search.setAttribute('aria-label', 'Zoek een icoon');
     search.autocomplete = 'off';
+    categories.className = 'icon-picker-categories';
+    categories.setAttribute('aria-label', 'Icooncategorieën');
     results.className = 'icon-picker-results';
     results.setAttribute('role', 'group');
     results.setAttribute('aria-label', 'Beschikbare iconen');
     emptyState.className = 'icon-picker-empty';
     emptyState.textContent = 'Geen iconen gevonden.';
     emptyState.hidden = true;
-    header.append(title, closeButton);
-    dialog.append(header, search, results, emptyState);
+    heading.append(title, summary);
+    header.append(heading, closeButton);
+    dialog.append(header, search, categories, results, emptyState);
     backdrop.append(dialog);
     document.body.append(backdrop);
     closeButton.addEventListener('click', closeIconPicker);
-    search.addEventListener('input', () => renderIconPickerResults(search.value));
+    search.addEventListener('input', () => {
+      activeIconCategory = ALL_ICON_CATEGORIES;
+      renderIconPickerCategories();
+      renderIconPickerResults(search.value);
+    });
+    categories.addEventListener('click', (event) => {
+      const option = event.target.closest('.icon-picker-category');
+      if (!option) {
+        return;
+      }
+      activeIconCategory = option.dataset.category || ALL_ICON_CATEGORIES;
+      search.value = '';
+      renderIconPickerCategories();
+      renderIconPickerResults();
+    });
     results.addEventListener('click', (event) => {
       const option = event.target.closest('.icon-picker-result');
       const row = iconPickerTrigger?.closest('.habit-name');
@@ -507,6 +554,8 @@
     picker.hidden = false;
     document.body.classList.add('has-icon-picker');
     search.value = '';
+    activeIconCategory = ALL_ICON_CATEGORIES;
+    renderIconPickerCategories();
     renderIconPickerResults();
     window.requestAnimationFrame(() => search.focus());
   }

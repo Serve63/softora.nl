@@ -16,12 +16,12 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716b"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716c"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -113,6 +113,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.goal-icon-button\s*\{[\s\S]*cursor:\s*pointer;/);
   assert.match(css, /\.icon-picker-search\s*\{[\s\S]*width:\s*100%;/);
   assert.match(css, /\.icon-picker-results\s*\{[\s\S]*grid-template-columns:/);
+  assert.match(css, /\.icon-picker-categories\s*\{[\s\S]*overflow-x:\s*auto;/);
+  assert.match(css, /\.icon-picker-category\[aria-pressed="true"\]/);
   assert.match(css, /\.icon-picker-backdrop\[hidden\]\s*\{[\s\S]*display:\s*none;/);
   assert.doesNotMatch(css, /\.habit-add(?:-cell)?\s*\{/);
   assert.doesNotMatch(css, /\.score-points\s*\{/);
@@ -137,6 +139,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /Juli 2026|shortLabel:\s*'Jul'/);
   assert.match(js, /DEFAULT_GOALS/);
   assert.match(js, /window\.SoftoraMomentumIconCatalog/);
+  assert.match(js, /ICON_CATEGORIES/);
+  assert.match(js, /function renderIconPickerCategories\(\)/);
+  assert.match(js, /Zoek op icoon of betekenis/);
   assert.match(js, /Workout/);
   assert.match(js, /90 min deep work/);
   assert.match(js, /Dagdoel behalen/);
