@@ -16,11 +16,12 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260715d"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260715b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -105,6 +106,10 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.add-goal\s*\{[\s\S]*border:\s*0;/);
   assert.match(css, /\.add-goal\s*\{[\s\S]*border-radius:\s*0;/);
   assert.match(css, /\.add-goal\s*\{[\s\S]*background:\s*transparent;/);
+  assert.match(css, /\.goal-icon-button\s*\{[\s\S]*cursor:\s*pointer;/);
+  assert.match(css, /\.icon-picker-search\s*\{[\s\S]*width:\s*100%;/);
+  assert.match(css, /\.icon-picker-results\s*\{[\s\S]*grid-template-columns:/);
+  assert.match(css, /\.icon-picker-backdrop\[hidden\]\s*\{[\s\S]*display:\s*none;/);
   assert.doesNotMatch(css, /\.habit-add(?:-cell)?\s*\{/);
   assert.doesNotMatch(css, /\.score-points\s*\{/);
   assert.doesNotMatch(css, /\.today-score|\.score-label/);
@@ -127,6 +132,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /const TOTAL_DAYS = DAYS\.length;/);
   assert.match(js, /Juli 2026|shortLabel:\s*'Jul'/);
   assert.match(js, /DEFAULT_GOALS/);
+  assert.match(js, /window\.SoftoraMomentumIconCatalog/);
   assert.match(js, /Workout/);
   assert.match(js, /90 min deep work/);
   assert.match(js, /Dagdoel behalen/);
@@ -149,6 +155,14 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /closest\('\.add-goal'\)/);
   assert.match(js, /addButton\.textContent = '\+'/);
   assert.match(js, /createGoalHeader\(goal, index === goals\.length - 1\)/);
+  assert.match(js, /function openIconPicker\(trigger\)/);
+  assert.match(js, /function renderIconPickerResults\(searchValue = ''\)/);
+  assert.match(js, /event\.key === 'Escape'/);
+  assert.match(js, /event\.target === backdrop/);
+  assert.match(js, /className = 'goal-icon-button'/);
+  assert.match(js, /iconKey:\s*goal\.iconKey/);
+  assert.match(js, /row\.dataset\.iconKey = icon\.key/);
+  assert.match(js, /markStateChanged\(\);[\s\S]*closeIconPicker\(\);/);
   assert.doesNotMatch(js, /habit-add-cell|habit-add/);
   assert.match(js, /is-untracked/);
   assert.match(js, /day >= TODAY/);

@@ -13,11 +13,16 @@
   const TOTAL_DAYS = DAYS.length;
   const TODAY = PERIOD.today;
   const CHART_MAX_HEIGHT = 164;
+  const ICON_CATALOG = Array.isArray(window.SoftoraMomentumIconCatalog)
+    ? window.SoftoraMomentumIconCatalog
+    : [];
+  const ICONS_BY_KEY = new Map(ICON_CATALOG.map((icon) => [icon.key, icon]));
+  const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
-    { id: 'workout', label: 'Workout', icon: '<path d="M5 8v8M19 8v8M3 10v4M21 10v4M7 12h10" />', doneDays: [TODAY] },
-    { id: 'deep-work', label: '90 min deep work', icon: '<path d="M4 5.5c2.5-1 4.5-.7 7 1v12c-2.5-1.7-5-1.9-7-1V5.5Zm16 0c-2.5-1-4.5-.7-7 1v12c2.5-1.7 5-1.9 7-1V5.5Z" />', doneDays: [TODAY] },
-    { id: 'daily-goal', label: 'Dagdoel behalen', icon: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m15 9 4-4M19 5h-4v4" />', doneDays: [TODAY] },
-    { id: 'healthy-food', label: 'Gezonde voeding', icon: '<path d="M20.4 5.9a5.1 5.1 0 0 0-7.2 0L12 7.1l-1.2-1.2a5.1 5.1 0 0 0-7.2 7.2L12 21l8.4-7.9a5.1 5.1 0 0 0 0-7.2Z" />', doneDays: [TODAY] }
+    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [TODAY] },
+    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [TODAY] },
+    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [TODAY] },
+    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [TODAY] }
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
@@ -31,6 +36,8 @@
   let stateRevision = 0;
   let queuedKeepalive = false;
   let saveRetryCount = 0;
+  let iconPicker = null;
+  let iconPickerTrigger = null;
   if (!grid || !chart || !chartSwitches.length) {
     return;
   }
@@ -46,6 +53,7 @@
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
   const formatDay = (day) => `${day} juli`;
   const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
+  const getIcon = (key) => ICONS_BY_KEY.get(key) || ICONS_BY_KEY.get(DEFAULT_ICON_KEY) || null;
   const getDefaultTrackedDays = () => DAYS.filter((day) => day >= PERIOD.startDay);
   function sanitizeDayList(value) {
     return Array.from(new Set((Array.isArray(value) ? value : [])
@@ -59,6 +67,8 @@
     const id = rawId.replace(/[^a-z0-9_-]/gi, '').slice(0, 64) || `goal-${index + 1}`;
     const label = String(goal?.label || fallback.label || `Doel ${index + 1}`).trim().slice(0, MAX_LABEL_LENGTH) || `Doel ${index + 1}`;
     const defaultGoal = getDefaultGoal(id);
+    const requestedIconKey = String(goal?.iconKey || defaultGoal?.iconKey || DEFAULT_ICON_KEY || '');
+    const iconKey = ICONS_BY_KEY.has(requestedIconKey) ? requestedIconKey : DEFAULT_ICON_KEY;
     const trackedDays = sanitizeDayList(goal?.trackedDays);
     const normalizedTrackedDays = trackedDays.length
       ? trackedDays
@@ -68,7 +78,8 @@
     return {
       id,
       label,
-      icon: defaultGoal?.icon || '<path d="M12 5v14M5 12h14" />',
+      iconKey,
+      icon: getIcon(iconKey)?.markup || '<path d="M12 5v14M5 12h14" />',
       doneDays: sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day)),
       trackedDays: normalizedTrackedDays
     };
@@ -93,7 +104,7 @@
       return normalizeGoal({
         id: row.dataset.goalId,
         label: row.querySelector('.habit-label')?.textContent || '',
-        icon: defaultGoal?.icon,
+        iconKey: row.dataset.iconKey || defaultGoal?.iconKey,
         doneDays: cells.filter(isChecked).map(getDay),
         trackedDays: cells.filter(isTracked).map(getDay)
       }, index);
@@ -107,6 +118,7 @@
       goals: getCurrentGoals().map((goal) => ({
         id: goal.id,
         label: goal.label,
+        iconKey: goal.iconKey,
         doneDays: goal.doneDays,
         trackedDays: goal.trackedDays
       })),
@@ -377,6 +389,127 @@
     template.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${markup}</svg>`;
     return template.content.firstElementChild;
   }
+  function closeIconPicker() {
+    if (!iconPicker || iconPicker.hidden) {
+      return;
+    }
+    iconPicker.hidden = true;
+    document.body.classList.remove('has-icon-picker');
+    const trigger = iconPickerTrigger;
+    iconPickerTrigger = null;
+    trigger?.focus();
+  }
+  function renderIconPickerResults(searchValue = '') {
+    if (!iconPicker) {
+      return;
+    }
+    const query = searchValue.trim().toLocaleLowerCase('nl');
+    const results = iconPicker.querySelector('.icon-picker-results');
+    const emptyState = iconPicker.querySelector('.icon-picker-empty');
+    const row = iconPickerTrigger?.closest('.habit-name');
+    const selectedKey = row?.dataset.iconKey;
+    const matches = ICON_CATALOG.filter((icon) => `${icon.label} ${icon.keywords}`.toLocaleLowerCase('nl').includes(query));
+    const fragment = document.createDocumentFragment();
+    matches.forEach((icon) => {
+      const button = document.createElement('button');
+      button.className = 'icon-picker-result';
+      button.type = 'button';
+      button.dataset.iconKey = icon.key;
+      button.setAttribute('aria-label', icon.label);
+      button.setAttribute('aria-pressed', icon.key === selectedKey ? 'true' : 'false');
+      button.title = icon.label;
+      button.append(createIcon(icon.markup));
+      const label = document.createElement('span');
+      label.textContent = icon.label;
+      button.append(label);
+      fragment.append(button);
+    });
+    results.replaceChildren(fragment);
+    emptyState.hidden = matches.length > 0;
+  }
+  function ensureIconPicker() {
+    if (iconPicker) {
+      return iconPicker;
+    }
+    const backdrop = document.createElement('div');
+    const dialog = document.createElement('section');
+    const header = document.createElement('header');
+    const title = document.createElement('h2');
+    const closeButton = document.createElement('button');
+    const search = document.createElement('input');
+    const results = document.createElement('div');
+    const emptyState = document.createElement('p');
+    backdrop.className = 'icon-picker-backdrop';
+    backdrop.hidden = true;
+    dialog.className = 'icon-picker';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-labelledby', 'icon-picker-title');
+    header.className = 'icon-picker-header';
+    title.id = 'icon-picker-title';
+    title.textContent = 'Kies een icoon';
+    closeButton.className = 'icon-picker-close';
+    closeButton.type = 'button';
+    closeButton.setAttribute('aria-label', 'Iconenkiezer sluiten');
+    closeButton.textContent = '×';
+    search.className = 'icon-picker-search';
+    search.type = 'search';
+    search.placeholder = 'Zoek een icoon';
+    search.setAttribute('aria-label', 'Zoek een icoon');
+    search.autocomplete = 'off';
+    results.className = 'icon-picker-results';
+    results.setAttribute('role', 'group');
+    results.setAttribute('aria-label', 'Beschikbare iconen');
+    emptyState.className = 'icon-picker-empty';
+    emptyState.textContent = 'Geen iconen gevonden.';
+    emptyState.hidden = true;
+    header.append(title, closeButton);
+    dialog.append(header, search, results, emptyState);
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    closeButton.addEventListener('click', closeIconPicker);
+    search.addEventListener('input', () => renderIconPickerResults(search.value));
+    results.addEventListener('click', (event) => {
+      const option = event.target.closest('.icon-picker-result');
+      const row = iconPickerTrigger?.closest('.habit-name');
+      const icon = getIcon(option?.dataset.iconKey);
+      const trigger = row?.querySelector('.goal-icon-button');
+      if (!option || !row || !icon || !trigger) {
+        return;
+      }
+      row.dataset.iconKey = icon.key;
+      trigger.replaceChildren(createIcon(icon.markup));
+      trigger.setAttribute('aria-label', `Icoon kiezen voor ${row.querySelector('.habit-label')?.textContent.trim() || 'doel'}`);
+      markStateChanged();
+      closeIconPicker();
+    });
+    backdrop.addEventListener('pointerdown', (event) => {
+      if (event.target === backdrop) {
+        closeIconPicker();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !backdrop.hidden) {
+        event.preventDefault();
+        closeIconPicker();
+      }
+    });
+    iconPicker = backdrop;
+    return iconPicker;
+  }
+  function openIconPicker(trigger) {
+    if (!ICON_CATALOG.length) {
+      return;
+    }
+    const picker = ensureIconPicker();
+    const search = picker.querySelector('.icon-picker-search');
+    iconPickerTrigger = trigger;
+    picker.hidden = false;
+    document.body.classList.add('has-icon-picker');
+    search.value = '';
+    renderIconPickerResults();
+    window.requestAnimationFrame(() => search.focus());
+  }
   function createLabel(text) {
     const label = document.createElement('span');
     label.className = 'habit-label';
@@ -403,6 +536,7 @@
     rowHeader.className = 'habit-name';
     rowHeader.setAttribute('role', 'rowheader');
     rowHeader.dataset.goalId = goal.id;
+    rowHeader.dataset.iconKey = goal.iconKey;
     if (isLastGoal) {
       const addButton = document.createElement('button');
       addButton.className = 'add-goal';
@@ -411,7 +545,12 @@
       addButton.textContent = '+';
       rowHeader.append(addButton);
     } else {
-      rowHeader.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
+      const iconButton = document.createElement('button');
+      iconButton.className = 'goal-icon-button';
+      iconButton.type = 'button';
+      iconButton.setAttribute('aria-label', `Icoon kiezen voor ${goal.label}`);
+      iconButton.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
+      rowHeader.append(iconButton);
     }
     rowHeader.append(createLabel(goal.label));
     return rowHeader;
@@ -608,6 +747,11 @@
     const addButton = event.target.closest('.add-goal');
     if (addButton && grid.contains(addButton)) {
       createGoalRow();
+      return;
+    }
+    const iconButton = event.target.closest('.goal-icon-button');
+    if (iconButton && grid.contains(iconButton)) {
+      openIconPicker(iconButton);
       return;
     }
     const cell = event.target.closest('.status');
