@@ -33,5 +33,11 @@
     { key: 'plus', label: 'Plus', keywords: 'nieuw toevoegen algemeen', markup: '<path d="M12 5v14M5 12h14" />' }
   ];
 
-  window.SoftoraMomentumIconCatalog = Object.freeze(icons.map((icon) => Object.freeze(icon)));
+  const catalog = Object.freeze(icons.map((icon) => Object.freeze(icon)));
+  if (typeof window !== 'undefined') {
+    window.SoftoraMomentumIconCatalog = catalog;
+  }
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = catalog;
+  }
 })();

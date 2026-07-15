@@ -1,16 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '../..');
 
 test('live momentum exposes a safe and searchable icon catalog', () => {
-  const source = fs.readFileSync(path.join(repoRoot, 'assets/live-momentum-icon-catalog.js'), 'utf8');
-  const context = { window: {} };
-  vm.runInNewContext(source, context);
-  const catalog = context.window.SoftoraMomentumIconCatalog;
+  const catalog = require(path.join(repoRoot, 'assets/live-momentum-icon-catalog.js'));
 
   assert.ok(Array.isArray(catalog));
   assert.ok(catalog.length >= 30);
