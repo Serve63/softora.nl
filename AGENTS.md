@@ -49,7 +49,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 
 ## Softora coldmail dagtempo
 - De live Softora/Gmail/Strato coldmail-autopilot is bedoeld voor minimaal/target 81 mails per werkdag zolang alle safety-, duplicate-, provider- en voorraadguards groen blijven. Dit blijft maximaal 9 mails per mailbox per werkdag; met negen mailboxen is het totale dagdoel 81 en de harde dagcap 81, niet 60.
-- Het veilige verzendvenster is 07:00-23:30 Europe/Amsterdam. De globale autopilot-interval hoort rond 5 minuten te staan zodat die geen dagcap-rem wordt; de spreiding per mailbox komt uit de dag-slot pacing in de scheduler met `senderMinIntervalMinutes=60` en `senderMaxIntervalMinutes=74`.
+- Het veilige verzendvenster is 07:00-22:00 Europe/Amsterdam. De globale autopilot-interval hoort rond 5 minuten te staan zodat die geen dagcap-rem wordt; de spreiding per mailbox komt uit de dag-slot pacing in de scheduler met `senderMinIntervalMinutes=60` en `senderMaxIntervalMinutes=74`.
 - De scheduler hoort 9 dag-slots per mailbox over het hele venster te bewaken. Verlaag of verhoog niet blind een cooldown: controleer eerst `count=1`, `minIntervalMinutes`, sender-cooldowns, rolling 24-uurs quota, echte mail-ready selectie en recipient guards. Noem ruwe assetvoorraad nooit automatisch verzendcapaciteit.
 
 ## Wijzigen zonder regressies
