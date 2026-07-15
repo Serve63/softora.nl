@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="nl" data-personnel-loading="true" data-theme-mode="light" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Softora Database | Bedrijven Scraper</title>
+  <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
+  <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
+  <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; background: #f8f7f4; }
+    .kvk-database-shell { display: flex; min-height: 100vh; }
+    .kvk-database-shell__content {
+      width: calc(100% - var(--premium-sidebar-width, 320px));
+      min-height: 100vh;
+      margin-left: var(--premium-sidebar-width, 320px);
+      padding: 0;
+      overflow: hidden;
+      background: #f8f7f4;
+    }
+    .kvk-database-shell__frame {
+      display: block;
+      width: 100%;
+      height: 100vh;
+      border: 0;
+      background: #f8f7f4;
+    }
+    @media (max-width: 900px) {
+      .kvk-database-shell { display: block; }
+      .kvk-database-shell__content { width: 100%; margin-left: 0; }
+      .kvk-database-shell__frame { min-height: 720px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical">
+    <aside class="sidebar" data-sidebar-ready="false" aria-label="Premium navigatie"></aside>
+    <main class="main-content kvk-database-shell__content" aria-label="Bedrijven Scraper">
+      <iframe
+        class="kvk-database-shell__frame"
+        src="/premium-kvk-database?softora_sidebar_content=1"
+        title="Softora Database Bedrijven Scraper"
+      ></iframe>
+    </main>
+  </div>
+</body>
+</html>

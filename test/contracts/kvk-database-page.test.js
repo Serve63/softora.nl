@@ -7,11 +7,23 @@ const { createKnownPrettyPageSlugToFile } = require('../../server/config/page-ro
 
 const repoRoot = path.join(__dirname, '../..');
 
-test('kvk database clean URL resolves to the protected premium snapshot page', () => {
-  const slugMap = createKnownPrettyPageSlugToFile(new Set(['premium-kvk-database.html']));
+test('kvk database clean URL resolves to the protected premium sidebar shell', () => {
+  const slugMap = createKnownPrettyPageSlugToFile(
+    new Set(['premium-kvk-database.html', 'premium-kvk-database-shell.html'])
+  );
 
   assert.equal(slugMap.get('premium-kvk-database'), 'premium-kvk-database.html');
-  assert.equal(slugMap.get('kvk-database'), 'premium-kvk-database.html');
+  assert.equal(slugMap.get('kvk-database'), 'premium-kvk-database-shell.html');
+});
+
+test('kvk database shell keeps the premium sidebar around the scraper', () => {
+  const shellSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database-shell.html'), 'utf8');
+
+  assert.match(shellSource, /data-sidebar-shell="canonical"/);
+  assert.match(shellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(shellSource, /<main class="main-content kvk-database-shell__content"/);
+  assert.match(shellSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  assert.match(shellSource, /title="Softora Database Bedrijven Scraper"/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
