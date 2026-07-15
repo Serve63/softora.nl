@@ -38,36 +38,8 @@ Module._extensions['.js'] = function softoraColdmailHotfix(module, filename) {
   source = replaceRequired(
     source,
     '    return renderColdmailHtmlText(cleanLine);',
-    '    return `<span style="white-space:nowrap!important;display:inline-block;">${escapeHtml(cleanLine)}</span>`;',
-    'website als niet-klikbare tekst zonder regelafbreking'
-  );
-
-  source = replaceRequired(
-    source,
-    "  const body = normalizeString(text)\n      .split(/\\n{2,}/)",
-    "  const desktopNoWrapSentences = [\n      'Je vindt het ontwerp in de bijlage bij deze e-mail.',\n      'Daar leer ik dan weer van!',\n      'Dan kun je het webdesign ook via deze link bekijken 🎨',\n    ];\n    const wrapDesktopSentences = (html) => desktopNoWrapSentences.reduce(\n      (result, sentence) => result.replace(\n        escapeHtml(sentence),\n        `<span class=\"softora-desktop-nowrap\">${escapeHtml(sentence)}</span>`\n      ),\n      html\n    );\n    const body = normalizeString(text)\n      .split(/\\n{2,}/)",
-    'desktop nowrap-zinnen'
-  );
-
-  source = replaceRequired(
-    source,
-    "      .join('\\n');\n    return `<div class=\"softora-webdesign-email-body",
-    "      .join('\\n');\n    const desktopCss = '<style>@media screen and (min-width:601px){.softora-desktop-nowrap{white-space:nowrap!important;}}</style>';\n    return `${desktopCss}<div class=\"softora-webdesign-email-body",
-    'desktop-only CSS'
-  );
-
-  source = replaceRequired(
-    source,
-    "        const cleanParagraph = normalizeString(paragraph);\n        if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanParagraph)) {\n          return `<p style=\"${paragraphStyle}\">${renderImageVisibilityPsHtmlLine(cleanParagraph, options)}</p>`;\n        }\n        return `<p style=\"${paragraphStyle}\">${paragraph",
-    "        const cleanParagraph = normalizeString(paragraph);\n        if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanParagraph)) {\n          return `<p style=\"${paragraphStyle}\">${wrapDesktopSentences(renderImageVisibilityPsHtmlLine(cleanParagraph, options))}</p>`;\n        }\n        return `<p style=\"${paragraphStyle}\">${wrapDesktopSentences(paragraph",
-    'nowrap toepassen op HTML-alinea’s'
-  );
-
-  source = replaceRequired(
-    source,
-    "            .join('<br>')}</p>`;",
-    "            .join('<br>'))}</p>`;",
-    'nowrap helper correct afsluiten'
+    '    return escapeHtml(cleanLine);',
+    'website als veilige niet-klikbare tekst die mobiel mag afbreken'
   );
 
   source = replaceRequired(
