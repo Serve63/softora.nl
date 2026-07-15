@@ -6,6 +6,8 @@
   const MAX_GOALS = 24;
   const MAX_LABEL_LENGTH = 80;
   const SAVE_DEBOUNCE_MS = 250;
+  const SAVE_RETRY_MS = 1500;
+  const MAX_SAVE_RETRIES = 3;
   const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', startDay: 13, today: 13, lastDay: 31 };
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
@@ -26,6 +28,9 @@
   let stateDirty = false;
   let saveTimer = null;
   let writeInFlight = false;
+  let stateRevision = 0;
+  let queuedKeepalive = false;
+  let saveRetryCount = 0;
   if (!grid || !chart || !chartSwitches.length) {
     return;
   }
@@ -135,11 +140,16 @@
   }
   async function writeState(options = {}) {
     const uiStateClient = window.SoftoraUiStateClient;
-    if (!stateReady || !stateDirty || writeInFlight || !uiStateClient || typeof uiStateClient.set !== 'function') {
+    if (!stateReady || !stateDirty || !uiStateClient || typeof uiStateClient.set !== 'function') {
+      return;
+    }
+    if (writeInFlight) {
+      queuedKeepalive = queuedKeepalive || options.keepalive === true;
       return;
     }
     stateDirty = false;
     writeInFlight = true;
+    const writeRevision = stateRevision;
     let writeSucceeded = false;
     setPersistenceState('saving');
     const snapshot = buildStateSnapshot();
@@ -153,31 +163,69 @@
         throw new Error('Supabase bevestigde de Live Momentum-opslag niet.');
       }
       writeSucceeded = true;
-      setPersistenceState('saved');
+      saveRetryCount = 0;
+      if (stateRevision === writeRevision) {
+        setPersistenceState('saved');
+      }
     } catch (error) {
       stateDirty = true;
       setPersistenceState('error');
       console.error('[LiveMomentum][state-save]', error?.message || error);
     } finally {
       writeInFlight = false;
-      if (writeSucceeded && stateDirty && !options.keepalive) {
-        scheduleStateWrite();
+      if (stateRevision !== writeRevision) {
+        stateDirty = true;
+      }
+      if (stateDirty) {
+        const keepalive = queuedKeepalive || options.keepalive === true;
+        queuedKeepalive = false;
+        if (writeSucceeded || saveRetryCount < MAX_SAVE_RETRIES) {
+          const delay = writeSucceeded || keepalive ? 0 : SAVE_RETRY_MS * (saveRetryCount + 1);
+          if (!writeSucceeded) {
+            saveRetryCount += 1;
+          }
+          scheduleStateWrite({ delay, keepalive });
+        }
       }
     }
   }
-  function scheduleStateWrite() {
+  function scheduleStateWrite(options = {}) {
     if (!stateReady) {
       return;
     }
-    stateDirty = true;
-    setPersistenceState('pending');
     if (saveTimer) {
       window.clearTimeout(saveTimer);
     }
+    const delay = Math.max(0, Number(options.delay ?? SAVE_DEBOUNCE_MS) || 0);
+    const writeOptions = options.keepalive === true ? { keepalive: true, timeoutMs: 5000 } : {};
     saveTimer = window.setTimeout(() => {
       saveTimer = null;
-      void writeState();
-    }, SAVE_DEBOUNCE_MS);
+      void writeState(writeOptions);
+    }, delay);
+  }
+  function markStateChanged() {
+    if (!stateReady) {
+      return;
+    }
+    stateRevision += 1;
+    stateDirty = true;
+    saveRetryCount = 0;
+    setPersistenceState('pending');
+    scheduleStateWrite();
+  }
+  function flushStateWrite() {
+    if (!stateReady || !stateDirty) {
+      return;
+    }
+    if (saveTimer) {
+      window.clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    if (writeInFlight) {
+      queuedKeepalive = true;
+      return;
+    }
+    void writeState({ keepalive: true, timeoutMs: 5000 });
   }
   function getScoreBand(score) {
     if (score >= 75) {
@@ -282,7 +330,7 @@
   function toggleCell(cell) {
     setChecked(cell, !isChecked(cell));
     updateChart();
-    scheduleStateWrite();
+    markStateChanged();
   }
   function updateTodayColumnEnd(statusCells = getStatusCells()) {
     statusCells.forEach((cell) => cell.classList.remove('is-today-end'));
@@ -318,6 +366,7 @@
     });
     label.addEventListener('input', () => {
       getStatusCells().forEach(syncCellA11y);
+      markStateChanged();
     });
   }
   function createGoalIcon() {
@@ -454,7 +503,7 @@
     }
     updateChart();
     if (persist) {
-      scheduleStateWrite();
+      markStateChanged();
     }
   }
   function renderGridShell(goals) {
@@ -503,7 +552,7 @@
     getLabels().forEach(bindLabel);
     updateChart();
     focusLabel(getLabels()[getLabels().length - 1]);
-    scheduleStateWrite();
+    markStateChanged();
   }
   async function hydrateState() {
     const uiStateClient = window.SoftoraUiStateClient;
@@ -531,7 +580,7 @@
       stateReady = true;
       setPersistenceState('saved');
       if (!storedState) {
-        scheduleStateWrite();
+        markStateChanged();
       }
     } catch (error) {
       setPersistenceState('error');
@@ -587,15 +636,12 @@
       label.textContent = 'Nieuw doel';
     }
     getStatusCells().forEach(syncCellA11y);
-    scheduleStateWrite();
+    markStateChanged();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && stateDirty) {
-      if (saveTimer) {
-        window.clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      void writeState({ keepalive: true, timeoutMs: 5000 });
+      flushStateWrite();
     }
   });
+  window.addEventListener('pagehide', flushStateWrite);
 })();
