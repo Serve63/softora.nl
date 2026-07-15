@@ -78,7 +78,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /var isLinkedModule = isFlynow \|\| isWinning \|\| isDatabase;/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
   assert.match(userManagementSource, /\? '\/premium-flynow'[\s\S]*\? '\/live-momentum'[\s\S]*: '\/kvk-database';/);
-  assert.match(userManagementSource, /localDatabaseFrame\.src = '\/kvk-database';/);
+  assert.match(userManagementSource, /localDatabaseFrame\.src = '\/kvk-database\?softora_sidebar_content=1';/);
   assert.match(userManagementSource, /localDatabaseFrame\.title = 'Softora Database Bedrijven Scraper';/);
   assert.match(userManagementSource, /if \(isDatabase\) \{[\s\S]*localDatabaseFrame\.hidden = false;/);
   assert.match(userManagementSource, /extraGrid\.hidden = true;/);
@@ -90,7 +90,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260715a/);
+  assert.match(source, /premium-user-management\.js\?v=20260715b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-count', 'Extra ' \+ number\);/);

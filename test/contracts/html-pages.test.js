@@ -263,8 +263,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260715a/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260715a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260715b/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260715b/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.css\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.js\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-dashboard-ai-chat-scope\.js\?v=20260611a/);
