@@ -1,6 +1,6 @@
 'use strict';
 
-const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-11-v4';
+const WEBDESIGN_EMAIL_TEMPLATE_VERSION = 'softora-webdesign-email-2026-07-15-v6';
 const WEBDESIGN_EMAIL_MOCKUP_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -15,7 +15,10 @@ function renderWebdesignEmailHeadStyles() {
   return [
     `html,body{margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
     `.softora-webdesign-email-body{-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
-    `@media only screen and (min-width:${MOBILE_BREAKPOINT_PX + 1}px){`,
+    `.softora-coldmail-body{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;overflow-wrap:anywhere!important;word-break:normal!important}`,
+    `.softora-coldmail-body p{font-size:16px!important;line-height:26px!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important}`,
+    `@media only screen and (min-device-width:601px){.softora-coldmail-body{max-width:600px!important}}`,
+    `@media only screen and (min-width:${MOBILE_BREAKPOINT_PX + 1}px) and (min-device-width:${MOBILE_BREAKPOINT_PX + 1}px){`,
     `.softora-mobile-image-pair,.softora-mobile-image-pair table,.softora-mobile-image-pair p,.softora-mobile-image-pair img{display:none!important;mso-hide:all!important;max-height:0!important;overflow:hidden!important;width:0!important;max-width:0!important;line-height:0!important;font-size:0!important}`,
     `.softora-desktop-image-pair{display:table!important;width:${DESKTOP_WEBDESIGN_WIDTH + DESKTOP_GAP_WIDTH + DESKTOP_MOCKUP_WIDTH}px!important;max-width:${DESKTOP_WEBDESIGN_WIDTH + DESKTOP_GAP_WIDTH + DESKTOP_MOCKUP_WIDTH}px!important;max-height:none!important;overflow:visible!important}`,
     `.softora-desktop-image-pair tr{display:table-row!important}`,

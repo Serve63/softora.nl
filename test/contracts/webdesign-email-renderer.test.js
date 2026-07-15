@@ -32,7 +32,9 @@ test('shared webdesign renderer is mobile-safe without CSS and progressively pai
   assert.doesNotMatch(imageSection, /<style\b/i);
   const styles = renderWebdesignEmailHeadStyles();
   assert.match(styles, /html,body\{margin:0;padding:0;width:100%;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important\}/);
-  assert.match(styles, /@media only screen and \(min-width:981px\)/);
+  assert.match(styles, /@media only screen and \(min-width:981px\) and \(min-device-width:981px\)/);
+  assert.match(styles, /\.softora-coldmail-body p\{font-size:16px!important;line-height:26px!important/);
+  assert.match(styles, /@media only screen and \(min-device-width:601px\)\{\.softora-coldmail-body\{max-width:600px!important\}\}/);
   assert.match(styles, /\.softora-mobile-image-pair[^}]+display:none!important/);
   assert.match(styles, /\.softora-desktop-image-pair\{display:table!important;width:900px!important;max-width:900px!important/);
   assert.match(html, /class="softora-mobile-image-pair" style="display:block;[^\"]+width:100%;max-width:100%/);
