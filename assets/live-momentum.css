@@ -319,6 +319,17 @@ button {
 .habit-board::-webkit-scrollbar {
   display: none;
 }
+.end-game-title {
+  margin: clamp(3.5rem, 7vh, 6rem) auto 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 4.4vw, 5rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: .9;
+  text-align: center;
+  text-transform: uppercase;
+}
 .momentum-watermark {
   display: grid;
   width: fit-content;
