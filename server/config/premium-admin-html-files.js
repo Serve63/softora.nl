@@ -1,5 +1,5 @@
 /**
- * `premium-*.html` files that require an authenticated admin session.
+ * Internal HTML files that require an authenticated admin session.
  * These files stay behind the normale premium login, but are additionally
  * blocked for non-admin accounts.
  */
@@ -7,6 +7,7 @@ const PREMIUM_ADMIN_ONLY_HTML_FILE_NAMES = Object.freeze([
   'premium-instellingen.html',
   'premium-wachtwoordenregister.html',
   'premium-flynow.html',
+  'live-momentum.html',
 ]);
 
 function createPremiumAdminOnlyHtmlFilesSet() {

@@ -337,6 +337,7 @@ function createUiStateStore(deps = {}) {
       const rowKey = getUiStateRowKey(normalizedScope);
       const client = getSupabaseClient();
       let row = null;
+      let restReadFailed = false;
       async function readRowViaRest(clientError = null) {
         const restRequestOptions = {
           timeoutMs,
@@ -349,6 +350,7 @@ function createUiStateStore(deps = {}) {
           restRequestOptions
         );
         if (!fallback.ok) {
+          restReadFailed = true;
           const fallbackMsg = fallback.error
             ? ` | REST fallback: ${fallback.error}`
             : fallback.status
@@ -370,7 +372,7 @@ function createUiStateStore(deps = {}) {
 
       if (readOptions.preferSupabaseRestRead) {
         row = await readRowViaRest();
-        if (row === null) return null;
+        if (row === null && restReadFailed) return null;
       } else if (client) {
         try {
           const { data, error } = await client

@@ -122,6 +122,8 @@ npm install
 npm start
 ```
 
+De lokale Playwright/FFmpeg-worker voor websitevideo's staat beschreven in [docs/company-website-video.md](docs/company-website-video.md).
+
 Open daarna:
 
 - `http://localhost:3000/ai-lead-generator.html`

@@ -29,6 +29,7 @@
 
     function resolvePremiumSidebarActiveKey() {
         var p = String((window.location && window.location.pathname) || "").toLowerCase();
+        if (p === "/live-momentum" || p === "/live-momentum.html") return "live_momentum";
         var hashRaw = String((window.location && window.location.hash) || "").replace(/^#/, "").toLowerCase();
         if (p.indexOf("/premium-advertenties") === 0) {
             if (hashRaw === "google") return "ads_google";

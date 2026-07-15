@@ -275,6 +275,11 @@ function backToInstellingenOverzicht() {
   goTo('screen-overzicht');
 }
 
+function navigateToSettingsModule(moduleHref) {
+  var targetWindow = window.top && window.top !== window ? window.top : window;
+  targetWindow.location.href = moduleHref;
+}
+
 function mountExtraSettingsCategory() {
   var overviewScreen = document.getElementById('screen-overzicht');
   var personnelTile = overviewScreen && overviewScreen.querySelector('.tegel[data-settings-action="open-pin"]');
@@ -288,6 +293,8 @@ function mountExtraSettingsCategory() {
     'Transfermarkt',
     'Ruben’s Company',
     'Ruben’s Trading System',
+    'Winnen',
+    'Database',
   ];
 
   if (!document.getElementById('settings-extra-style')) {
@@ -300,7 +307,9 @@ function mountExtraSettingsCategory() {
       '.settings-extra-grid>.tegel{width:100%;min-width:0;}',
       '.settings-extra-card{cursor:default;}',
       '.settings-extra-card[data-settings-extra-href]{cursor:pointer;}',
+      '.settings-local-database-frame{display:block;width:100%;height:calc(100vh - 170px);min-height:680px;border:1px solid var(--border);border-radius:8px;background:#f8f7f4;}',
       '@media (max-width:720px){.settings-tile-grid,.settings-extra-grid{grid-template-columns:minmax(0,1fr);max-width:100%;}.settings-tile-grid>.tegel{width:100%;}}',
+      '@media (max-width:720px){.settings-local-database-frame{height:calc(100vh - 140px);min-height:560px;}}',
     ].join('');
     document.head.appendChild(style);
   }
@@ -359,8 +368,12 @@ function mountExtraSettingsCategory() {
     'tegel-desc',
     'Losse interne modules en extra onderdelen die later verder ingevuld kunnen worden.'
   );
-  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '7 onderdelen');
+  appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
   extraTile.addEventListener('click', function () {
+    extraGrid.hidden = false;
+    localDatabaseFrame.hidden = true;
+    headerTitle.textContent = 'Extra';
+    headerSubtitle.textContent = 'Interne modules en placeholders';
     goTo('screen-extra');
   });
   if (tileParent) tileParent.insertBefore(extraTile, personnelTile);
@@ -372,8 +385,8 @@ function mountExtraSettingsCategory() {
   var header = document.createElement('div');
   header.className = 'beheer-header';
   var headerText = document.createElement('div');
-  appendUserManagementTextElement(headerText, 'div', 'beheer-title', 'Extra');
-  appendUserManagementTextElement(headerText, 'div', 'beheer-subtitle', 'Interne modules en placeholders');
+  var headerTitle = appendUserManagementTextElement(headerText, 'div', 'beheer-title', 'Extra');
+  var headerSubtitle = appendUserManagementTextElement(headerText, 'div', 'beheer-subtitle', 'Interne modules en placeholders');
   header.appendChild(headerText);
 
   var headerActions = document.createElement('div');
@@ -405,16 +418,37 @@ function mountExtraSettingsCategory() {
 
   var extraGrid = document.createElement('div');
   extraGrid.className = 'settings-extra-grid';
+  var localDatabaseFrame = document.createElement('iframe');
+  localDatabaseFrame.id = 'settings-local-database-frame';
+  localDatabaseFrame.className = 'settings-local-database-frame';
+  localDatabaseFrame.src = '/kvk-database';
+  localDatabaseFrame.title = 'Softora Database Bedrijven Scraper';
+  localDatabaseFrame.hidden = true;
   extraItems.forEach(function (label, index) {
     var number = String(index + 1).padStart(2, '0');
     var isFlynow = label === 'Flynow';
-    var card = document.createElement(isFlynow ? 'button' : 'div');
+    var isWinning = label === 'Winnen';
+    var isDatabase = label === 'Database';
+    var isLinkedModule = isFlynow || isWinning || isDatabase;
+    var moduleHref = isFlynow
+        ? '/premium-flynow'
+        : isWinning
+          ? '/live-momentum'
+          : '/kvk-database';
+    var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
-    if (isFlynow) {
+    if (isLinkedModule) {
       card.type = 'button';
-      card.setAttribute('data-settings-extra-href', '/premium-flynow');
+      card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
-        window.location.href = '/premium-flynow';
+        if (isDatabase) {
+          extraGrid.hidden = true;
+          localDatabaseFrame.hidden = false;
+          headerTitle.textContent = 'Database';
+          headerSubtitle.textContent = 'Bedrijven Scraper';
+          return;
+        }
+        navigateToSettingsModule(moduleHref);
       });
     }
     var moduleArrow = createUserManagementSvgElement('svg', {
@@ -459,12 +493,19 @@ function mountExtraSettingsCategory() {
       card,
       'div',
       'tegel-desc',
-      isFlynow ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.' : 'Interne template-module die later verder ingevuld kan worden.'
+      isFlynow
+        ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
+        : isWinning
+          ? 'Live momentum voor dagelijkse doelen, discipline en voortgang.'
+          : isDatabase
+            ? 'Lokale database voor het scrapen en behandelen van bedrijven.'
+            : 'Interne template-module die later verder ingevuld kan worden.'
     );
     appendUserManagementTextElement(card, 'div', 'tegel-count', 'Extra ' + number);
     extraGrid.appendChild(card);
   });
   extraScreen.appendChild(extraGrid);
+  extraScreen.appendChild(localDatabaseFrame);
   overviewScreen.insertAdjacentElement('afterend', extraScreen);
 }
 

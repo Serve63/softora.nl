@@ -71,6 +71,7 @@ const staticSidebarPages = [
   ...customLayoutPages,
   'premium-advertenties.html',
   'premium-socialmedia.html',
+  'live-momentum.html',
 ];
 
 test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
@@ -111,6 +112,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
   assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
   assert.match(themeJsSource, /function isSidebarNavigationCurrentTarget\(href\) \{/);
+  assert.match(themeJsSource, /pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);
+  assert.match(themeJsSource, /return p === "\/live-momentum" \|\| p === "\/live-momentum\.html" \? "live_momentum" : "dashboard"/);
+  assert.match(prefillSource, /p === "\/live-momentum" \|\| p === "\/live-momentum\.html"\) return "live_momentum"/);
+  assert.match(stabilityJsSource, /path === "\/live-momentum" \|\| path === "\/live-momentum\.html"/);
   assert.match(themeJsSource, /anchor\.dataset\.sidebarHref = normalizeSidebarNavigationTarget\(href\);[\s\S]*anchor\.setAttribute\("href", anchor\.dataset\.sidebarHref\);/);
   assert.doesNotMatch(themeJsSource, /window\.location\.assign\(href\);/);
   assert.doesNotMatch(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);
@@ -245,7 +250,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260617a'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260715a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);

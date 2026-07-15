@@ -809,9 +809,37 @@ test('ui-state store can isolate critical reads through REST-first scoped option
   });
 });
 
-test('ui-seo runtime keeps coldmail state reads critical and isolated by default', () => {
+test('ui-state store treats a missing REST-first row as valid empty Supabase state', async () => {
+  const { store } = createFixture({
+    uiStateReadTimeoutMsByScope: {
+      premium_live_momentum: 12000,
+    },
+    uiStateReadOptionsByScope: {
+      premium_live_momentum: {
+        preferSupabaseRestRead: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      },
+    },
+    fetchResult: {
+      ok: true,
+      body: [],
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_live_momentum');
+
+  assert.deepEqual(state, {
+    values: {},
+    updatedAt: null,
+    source: 'supabase',
+  });
+});
+
+test('ui-seo runtime keeps durable state reads critical and isolated by default', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../server/services/ui-seo-runtime.js'), 'utf8');
 
+  assert.match(source, /premium_live_momentum:\s*12000/);
   assert.match(source, /premium_coldmail_autopilot:\s*12000/);
   assert.match(source, /premium_coldmail_send_guard:\s*25000/);
   assert.match(source, /premium_coldmailing_settings:\s*12000/);

@@ -62,10 +62,12 @@ test('marketing premium landing pages are not auth-gated', () => {
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-coldmailing-lead.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-dashboard.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-flynow.html'), true);
+  assert.equal(controller.isPremiumProtectedHtmlFile('live-momentum.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-wachtwoordenregister.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-instellingen.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-wachtwoordenregister.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-flynow.html'), true);
+  assert.equal(controller.isPremiumAdminOnlyHtmlFile('live-momentum.html'), true);
 });
 
 test('premium login page redirects authenticated users to a safe next path', async () => {

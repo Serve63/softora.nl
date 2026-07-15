@@ -1,6 +1,6 @@
 (function () {
     const pathname = (window.location.pathname || "").toLowerCase();
-    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1;
+    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/live-momentum" || pathname === "/live-momentum.html";
     const personnelStorageKey = isPremiumPersonnelContext
         ? "softora_premium_personnel_theme_mode"
         : "softora_software_personnel_theme_mode";
@@ -540,7 +540,7 @@
             return "monthly_costs";
         }
         if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
-        return "dashboard";
+        return p === "/live-momentum" || p === "/live-momentum.html" ? "live_momentum" : "dashboard";
     }
 
     function renderSidebarLink(link, activeKey) {

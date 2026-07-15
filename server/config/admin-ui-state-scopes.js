@@ -3,6 +3,7 @@
  * authenticated admin session, not just a generic premium login.
  */
 const ADMIN_ONLY_UI_STATE_SCOPES = Object.freeze([
+  'premium_live_momentum',
   'premium_password_register',
 ]);
 
