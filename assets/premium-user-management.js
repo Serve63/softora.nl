@@ -421,7 +421,7 @@ function mountExtraSettingsCategory() {
   var localDatabaseFrame = document.createElement('iframe');
   localDatabaseFrame.id = 'settings-local-database-frame';
   localDatabaseFrame.className = 'settings-local-database-frame';
-  localDatabaseFrame.src = '/kvk-database';
+  localDatabaseFrame.src = '/kvk-database?softora_sidebar_content=1';
   localDatabaseFrame.title = 'Softora Database Bedrijven Scraper';
   localDatabaseFrame.hidden = true;
   extraItems.forEach(function (label, index) {
