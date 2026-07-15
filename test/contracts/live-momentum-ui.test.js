@@ -16,7 +16,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716e"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716f"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -39,7 +39,12 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, />Staven<\/span>/);
   assert.match(html, />Lijn<\/span>/);
   assert.match(html, /<div class="habit-grid" role="table" aria-label="Momentum taken in juli"><\/div>/);
-  assert.match(html, /<\/section>\s*<h2 class="end-game-title">END GAME<\/h2>\s*<div class="momentum-watermark"/);
+  assert.match(html, /<\/section>\s*<h2 class="end-game-title">END GAME<\/h2>\s*<div class="momentum-art-quotes" aria-hidden="true">/);
+  assert.match(html, /<span class="momentum-art-quote is-end-game">The end game is to win<\/span>/);
+  assert.match(html, /<span class="momentum-art-quote is-attack">Attack, attack, attack<\/span>/);
+  assert.match(html, /<span class="momentum-art-quote is-sleeping">Sleeping is for losers<\/span>/);
+  assert.match(html, /<span class="momentum-art-quote is-winners">In life there are winners and losers<\/span>/);
+  assert.match(html, /<span class="momentum-art-quote is-old-days">Nog een rondje voor die oude dagen<\/span>/);
   assert.match(html, /<div class="momentum-watermark" aria-hidden="true">[\s\S]*Never[\s\S]*Ever[\s\S]*Quit[\s\S]*<\/div>/);
   assert.match(html, /13 juli is vandaag/);
   assert.doesNotMatch(html, /laatste 30 dagen/);
@@ -102,6 +107,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.habit-board\s*\{[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/);
   assert.match(css, /\.habit-board::\-webkit-scrollbar\s*\{[^}]*display:\s*none;/);
   assert.match(css, /\.end-game-title\s*\{[\s\S]*margin:\s*clamp\(3\.5rem, 7vh, 6rem\) auto 0;[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*text-align:\s*center;/);
+  assert.match(css, /\.momentum-art-quotes\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.12fr\);[\s\S]*pointer-events:\s*none;/);
+  assert.match(css, /\.momentum-art-quote\s*\{[\s\S]*color:\s*transparent;[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*\-webkit-text-stroke:\s*1px rgba\(26, 26, 46, \.07\);/);
+  assert.match(css, /\.momentum-art-quote\.is-sleeping\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*text-align:\s*center;/);
   assert.match(css, /\.momentum-watermark\s*\{[\s\S]*pointer-events:\s*none;/);
   assert.match(css, /\.momentum-watermark\s*\{[\s\S]*\-webkit-text-stroke:\s*1px rgba\(26, 26, 46, \.075\);/);
   assert.match(css, /\.momentum-watermark span:last-child\s*\{[\s\S]*rgba\(35, 159, 88, \.045\)/);
