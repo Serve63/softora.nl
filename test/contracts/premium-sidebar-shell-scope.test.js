@@ -270,6 +270,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /id="softora-premium-sidebar-critical"/);
   assert.match(htmlPagesSource, /@view-transition\{navigation:auto;\}/);
   assert.match(htmlPagesSource, /view-transition-name:softora-premium-sidebar !important;/);
+  assert.match(htmlPagesSource, /LIVE_MOMENTUM_VIEW_TRANSITION_OPTOUT/);
+  assert.match(htmlPagesSource, /@view-transition\{navigation:none;\}/);
+  assert.match(htmlPagesSource, /fileName === 'live-momentum\.html'/);
   assert.match(htmlPagesSource, /function injectSnippetAfterHeadOpen\(html, snippet, marker\) \{/);
   assert.match(htmlPagesSource, /function hasPremiumStaticSidebar\(html\) \{/);
   assert.match(htmlPagesSource, /margin-left:var\(--premium-sidebar-width,320px\) !important;/);
