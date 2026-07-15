@@ -289,11 +289,14 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
 
 test('kvk database route keeps the canonical sidebar outside its scraper frame', () => {
   const pageSource = readRepoFile('premium-kvk-database-shell.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
 
   assert.match(pageSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
   assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="false"/);
   assert.match(pageSource, /class="main-content kvk-database-shell__content"/);
   assert.match(pageSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  assert.match(themeSource, /pathname === "\/kvk-database"/);
+  assert.match(themeSource, /pathname === "\/kvk-database\.html"/);
 });
 
 test('premium dashboard keeps its first-paint boot overlay in the shell contract', () => {

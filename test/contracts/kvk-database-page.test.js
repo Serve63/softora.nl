@@ -21,9 +21,20 @@ test('kvk database shell keeps the premium sidebar around the scraper', () => {
 
   assert.match(shellSource, /data-sidebar-shell="canonical"/);
   assert.match(shellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(shellSource, /personnel-theme\.css\?v=20260519b/);
+  assert.match(shellSource, /personnel-theme\.js\?v=20260519b/);
   assert.match(shellSource, /<main class="main-content kvk-database-shell__content"/);
   assert.match(shellSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.match(shellSource, /title="Softora Database Bedrijven Scraper"/);
+});
+
+test('shared premium sidebar script also initializes on the clean kvk database route', () => {
+  const themeSource = fs.readFileSync(path.join(repoRoot, 'assets/personnel-theme.js'), 'utf8');
+
+  assert.match(themeSource, /pathname === "\/kvk-database"/);
+  assert.match(themeSource, /pathname === "\/kvk-database\.html"/);
+  assert.match(themeSource, /sidebar\.innerHTML = buildUnifiedPremiumSidebarHtml\(activeKey\)/);
+  assert.match(themeSource, /sidebar\.dataset\.sidebarReady = "true"/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
