@@ -641,11 +641,13 @@ button {
   box-shadow: inset 3px 0 0 var(--good);
 }
 .add-goal {
-  display: inline-block;
-  flex: 0 0 auto;
-  width: auto;
-  height: auto;
+  position: absolute;
+  left: 0;
+  display: inline-grid;
+  width: 16px;
+  height: 28px;
   padding: 0;
+  place-items: center;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -655,6 +657,7 @@ button {
   font-size: 1.3rem;
   font-weight: 500;
   line-height: 1;
+  text-align: center;
   transition: color .16s ease;
 }
 .add-goal:hover {

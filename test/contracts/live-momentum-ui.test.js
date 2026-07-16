@@ -26,7 +26,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716x"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716y"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
@@ -172,6 +172,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.add-goal\s*\{[\s\S]*border:\s*0;/);
   assert.match(css, /\.add-goal\s*\{[\s\S]*border-radius:\s*0;/);
   assert.match(css, /\.add-goal\s*\{[\s\S]*background:\s*transparent;/);
+  assert.match(css, /\.add-goal\s*\{[\s\S]*position:\s*absolute;[\s\S]*left:\s*0;[\s\S]*width:\s*16px;[\s\S]*height:\s*28px;/);
   assert.match(css, /\.goal-icon-button\s*\{[\s\S]*cursor:\s*pointer;/);
   assert.match(css, /\.goal-drag-handle\s*\{[\s\S]*cursor:\s*grab;/);
   assert.match(css, /\.goal-row-actions\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*1000;/);
