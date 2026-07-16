@@ -74,6 +74,14 @@ const staticSidebarPages = [
   'live-momentum.html',
 ];
 
+test('premium database consistency assets stay outside the static sidebar', () => {
+  const source = readRepoFile('premium-database.html');
+  const asideEnd = source.indexOf('</aside>');
+  assert.ok(asideEnd > 0);
+  assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260716a') > asideEnd);
+});
+
 test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
   const source = readRepoFile('premium-opdracht-dossier.html');
   const asideEnd = source.indexOf('</aside>');

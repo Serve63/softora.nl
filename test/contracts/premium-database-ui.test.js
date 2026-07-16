@@ -993,7 +993,7 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(loaded, true);
   assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=3000&offset=0');
   assert.equal(requests[0][1].method, 'GET');
-  assert.equal(requests[0][1].cache, 'default');
+  assert.equal(requests[0][1].cache, 'no-store');
   assert.equal(requests[0][2], 6000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0']);
   assert.equal(state.mailReadySnapshotLoaded, true);
@@ -1027,6 +1027,46 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(merged[1].mailReady, false);
   assert.equal(client.isSnapshotMailReadyCustomer(merged[2]), false);
   assert.equal(client.isSnapshotAvailableCustomer(merged[2]), false);
+});
+
+test('mail-ready snapshot client never lets an older response replace a newer count', async () => {
+  const client = loadDatabaseMailReadySnapshotClient({ console: { warn() {} } });
+  const newerGeneratedAt = Date.parse('2026-07-16T14:00:00.000Z');
+  const state = {
+    klanten: [{ id: 'newer-ready', mailReady: true, mailReadySnapshot: true }],
+    mailReadySnapshotLoaded: true,
+    mailReadySnapshotGeneratedAtMs: newerGeneratedAt,
+    mailReadySnapshotTotal: 1,
+    mailReadySnapshotCustomers: [{ id: 'newer-ready', mailReady: true, mailReadySnapshot: true }],
+    mailReadySnapshotPending: false,
+    availableSnapshotLoaded: true,
+    availableSnapshotTotal: 0,
+    availableSnapshotCustomers: [],
+  };
+  const applied = [];
+
+  const loaded = await client.load({
+    state,
+    normalizeCustomer: (raw) => ({ ...raw }),
+    applyCustomerList: (customers) => applied.push(customers),
+    fetchJsonWithTimeout: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        generatedAt: '2026-07-16T13:59:00.000Z',
+        total: 740,
+        customers: [{ id: 'older-ready', mailReady: true }],
+        availableTotal: 1,
+        availableCustomers: [{ id: 'older-deleted', availableSnapshot: true }],
+      }),
+    }),
+  });
+
+  assert.equal(loaded, false);
+  assert.equal(state.mailReadySnapshotPending, false);
+  assert.equal(state.mailReadySnapshotTotal, 1);
+  assert.deepEqual(state.mailReadySnapshotCustomers.map((customer) => customer.id), ['newer-ready']);
+  assert.deepEqual(applied, []);
 });
 
 test('premium database applies remote customers once after guard and photo enrichment complete', () => {
@@ -1111,8 +1151,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /catch \(error\) \{[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);[\s\S]*state\.dataUnavailable = !hadBootstrapCustomers;/);
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
-  assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260710d/);
+  assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260716a/);
   assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
@@ -1122,6 +1162,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(snapshotSource, /state\.mailReadySnapshotCustomers = snapshotCustomers;/);
   assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers, availableSnapshotCustomers\)/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{/);
+  assert.match(pageSource, /state\.activeStatus === "benaderbaar" && state\.mailReadySnapshotLoaded\) return false;/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return false;/);
   assert.match(pageSource, /state\.photoRestoreFailed && !state\.mailReadySnapshotLoaded/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotPending && !state\.mailReadySnapshotLoaded/);
   assert.doesNotMatch(pageSource, /state\.mailReadySnapshotFailed && !state\.mailReadySnapshotLoaded/);
@@ -1606,7 +1648,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(leadDeleteScriptSource, /global\[ACTION_PROPERTY\] = removeCustomerLead;/);
   assert.match(leadDeleteScriptSource, /target\.closest\("\.lead-delete-button"\)/);
   assert.match(leadDeleteScriptSource, /action\(button\.getAttribute\("data-delete-lead-id"\)\)/);
-  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260617a/);
+  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260716a/);
   assert.match(pageSource, /function deleteCustomerLead\(customerId\)/);
   assert.match(pageSource, /\/api\/premium-database\/delete-lead/);
   assert.match(pageSource, /JSON\.stringify\(\{ customerId: normalizeString\(customerId\), confirm: true \}\)/);
@@ -2355,6 +2397,10 @@ test('premium database lead delete uses the small server delete route instead of
   const calls = [];
   const state = {
     klanten: [{ id: 'lead-413', bedrijf: 'Payload BV' }, { id: 'lead-414', bedrijf: 'Blijft BV' }],
+    mailReadySnapshotCustomers: [{ id: 'lead-414', bedrijf: 'Blijft BV' }],
+    mailReadySnapshotTotal: 1,
+    availableSnapshotCustomers: [{ id: 'lead-413', bedrijf: 'Payload BV' }],
+    availableSnapshotTotal: 1,
     openId: 'lead-413',
   };
 
@@ -2383,6 +2429,10 @@ test('premium database lead delete uses the small server delete route instead of
   await controller.removeCustomerLead('lead-413');
 
   assert.deepEqual(state.klanten.map((customer) => customer.id), ['lead-414']);
+  assert.deepEqual(state.mailReadySnapshotCustomers.map((customer) => customer.id), ['lead-414']);
+  assert.equal(state.mailReadySnapshotTotal, 1);
+  assert.deepEqual(state.availableSnapshotCustomers, []);
+  assert.equal(state.availableSnapshotTotal, 0);
   assert.deepEqual(calls, [
     ['close-panel'],
     ['render'],
@@ -2417,6 +2467,30 @@ test('premium database lead delete stops before server delete when confirmation 
 
   assert.deepEqual(state.klanten.map((customer) => customer.id), ['lead-413', 'lead-414']);
   assert.deepEqual(calls, []);
+});
+
+test('premium database lead delete restores canonical snapshot rows when the server delete fails', async () => {
+  const deleteClient = loadDatabaseLeadDeleteClient();
+  const state = {
+    klanten: [{ id: 'lead-413', bedrijf: 'Payload BV' }],
+    mailReadySnapshotCustomers: [],
+    mailReadySnapshotTotal: 0,
+    availableSnapshotCustomers: [{ id: 'lead-413', bedrijf: 'Payload BV' }],
+    availableSnapshotTotal: 1,
+  };
+  const controller = deleteClient.createController({
+    state,
+    deleteCustomerLead: async () => ({ ok: false, error: new Error('serverfout') }),
+    sortCustomers: (customers) => customers,
+    setStatusMessage: () => {},
+    renderPage: () => {},
+  });
+
+  await controller.removeCustomerLead('lead-413');
+
+  assert.deepEqual(state.klanten.map((customer) => customer.id), ['lead-413']);
+  assert.deepEqual(state.availableSnapshotCustomers.map((customer) => customer.id), ['lead-413']);
+  assert.equal(state.availableSnapshotTotal, 1);
 });
 
 test('premium database webdesign action queues missing mockup repairs outside render', async () => {

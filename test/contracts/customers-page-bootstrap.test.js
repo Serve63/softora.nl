@@ -141,6 +141,7 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
     ],
   };
   const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-07-10T12:00:30.000Z'),
     getUiStateValues: async (scope, options) => {
       seenReads.push({ scope, options });
       if (scope === 'premium_coldmail_stats_cache') return { source: 'supabase', values: { softora_coldmail_stats_cache_v1: JSON.stringify({ ok: true, stats: { systemSentToday: 4, totalBounces: 29, systemTotalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' } }) } };
@@ -172,6 +173,36 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   ]);
   assert.equal(seenReads.every((read) => read.options.uiStateReadTimeoutMs === 650), true);
   assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
+});
+
+test('premium database bootstrap rejects an expired snapshot instead of flashing stale rows', async () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-07-10T12:02:00.000Z'),
+    getUiStateValues: async (scope) => {
+      if (scope !== MAIL_READY_BOOTSTRAP_CACHE_SCOPE) return { source: 'supabase', values: {} };
+      return {
+        source: 'supabase',
+        values: {
+          [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify({
+            version: 2,
+            generatedAt: '2026-07-10T12:00:00.000Z',
+            total: 740,
+            customers: [{ id: 'stale-ready', mailReady: true, mailReadySnapshot: true }],
+            availableTotal: 1,
+            availableCustomers: [{ id: 'stale-deleted', availableSnapshot: true }],
+          }),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.source, 'deferred');
+  assert.equal(payload.deferred, true);
+  assert.deepEqual(payload.customers, []);
+  assert.equal(payload.mailReadySnapshotTotal, null);
+  assert.equal(payload.availableSnapshotTotal, null);
 });
 
 test('premium database bootstrap never turns a missing cache into fake zero totals', async () => {

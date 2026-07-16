@@ -26,6 +26,8 @@ test('data ops store restores large premium database webdesign job queues', () =
     source,
     /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)/
   );
+  assert.match(source, /forgetReads\('customers', 'customers-snapshot', 'dashboard-customers'\)/);
+  assert.match(source, /forgetReads\('design-photo-asset-flags', 'design-photos-signed:\*'\)/);
 });
 
 test('data ops store reads mailbox messages for coldmail bounce stats', async () => {
@@ -459,6 +461,88 @@ test('data ops store can soft-delete explicit customer ids without replacing the
   assert.equal(result.ok, true);
   assert.deepEqual(recorder.deletedIds, ['lead-413']);
   assert.deepEqual(recorder.upsertRows, []);
+});
+
+test('data ops customer deletes invalidate the compact mail-ready source cache', async () => {
+  let customerRows = [{ customer_id: 'lead-413', company: 'Payload BV', updated_at: '2026-07-16T12:00:00.000Z' }];
+  let snapshotReads = 0;
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      const query = {
+        select() { return query; },
+        is() { return query; },
+        order() { return query; },
+        range(from, to) {
+          snapshotReads += 1;
+          return Promise.resolve({ data: customerRows.slice(from, to + 1), error: null });
+        },
+        update() {
+          return {
+            in() {
+              customerRows = [];
+              return Promise.resolve({ data: [], error: null });
+            },
+          };
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadCacheTtlMs: 60_000,
+    logger: { error() {}, warn() {} },
+  });
+
+  assert.equal((await store.listCustomerSnapshotRows()).length, 1);
+  assert.equal((await store.listCustomerSnapshotRows()).length, 1);
+  assert.equal(snapshotReads, 1);
+  await store.deleteCustomers(['lead-413']);
+  assert.deepEqual(await store.listCustomerSnapshotRows(), []);
+  assert.equal(snapshotReads, 2);
+});
+
+test('data ops photo deletes invalidate the mail-ready asset flag cache', async () => {
+  let photoRows = [{ customer_id: 'lead-413', storage_path: 'customers/lead-413/photo.png', legacy_meta: {}, updated_at: '2026-07-16T12:00:00.000Z' }];
+  let flagReads = 0;
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_design_photos');
+      const query = {
+        select() { return query; },
+        is() { return query; },
+        order() { return query; },
+        range(from, to) {
+          flagReads += 1;
+          return Promise.resolve({ data: photoRows.slice(from, to + 1), error: null });
+        },
+        update() {
+          return {
+            in() {
+              photoRows = [];
+              return Promise.resolve({ data: [], error: null });
+            },
+          };
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    dataOpsReadCacheTtlMs: 60_000,
+    logger: { error() {}, warn() {} },
+  });
+
+  assert.equal((await store.listDesignPhotoAssetFlags()).length, 1);
+  assert.equal((await store.listDesignPhotoAssetFlags()).length, 1);
+  assert.equal(flagReads, 1);
+  await store.deleteDesignPhotos(['lead-413']);
+  assert.deepEqual(await store.listDesignPhotoAssetFlags(), []);
+  assert.equal(flagReads, 2);
 });
 
 test('data ops store can upsert customer patches without deleting missing customers', async () => {

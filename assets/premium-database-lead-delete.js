@@ -63,9 +63,35 @@
 
             removingIds.add(normalizedId);
             const previousCustomers = state.klanten.slice();
+            const previousSnapshotState = {
+                mailReadySnapshotCustomers: Array.isArray(state.mailReadySnapshotCustomers) ? state.mailReadySnapshotCustomers.slice() : null,
+                mailReadySnapshotTotal: state.mailReadySnapshotTotal,
+                availableSnapshotCustomers: Array.isArray(state.availableSnapshotCustomers) ? state.availableSnapshotCustomers.slice() : null,
+                availableSnapshotTotal: state.availableSnapshotTotal
+            };
+            function removeFromSnapshot(listKey, totalKey) {
+                if (!Array.isArray(state[listKey])) return;
+                const previousList = state[listKey];
+                const nextList = previousList.filter(function (item) {
+                    return normalizeString(item && item.id) !== normalizedId;
+                });
+                const removedCount = previousList.length - nextList.length;
+                state[listKey] = nextList;
+                if (removedCount && Number.isFinite(Number(state[totalKey]))) {
+                    state[totalKey] = Math.max(nextList.length, Number(state[totalKey]) - removedCount);
+                }
+            }
+            function restoreSnapshotState() {
+                if (previousSnapshotState.mailReadySnapshotCustomers) state.mailReadySnapshotCustomers = previousSnapshotState.mailReadySnapshotCustomers;
+                if (previousSnapshotState.availableSnapshotCustomers) state.availableSnapshotCustomers = previousSnapshotState.availableSnapshotCustomers;
+                state.mailReadySnapshotTotal = previousSnapshotState.mailReadySnapshotTotal;
+                state.availableSnapshotTotal = previousSnapshotState.availableSnapshotTotal;
+            }
             state.klanten = sortCustomers(state.klanten.filter(function (item) {
                 return normalizeString(item && item.id) !== normalizedId;
             }));
+            removeFromSnapshot("mailReadySnapshotCustomers", "mailReadySnapshotTotal");
+            removeFromSnapshot("availableSnapshotCustomers", "availableSnapshotTotal");
             if (state.openId === normalizedId) closePanel();
             if (state.modalEditId === normalizedId) closeModal();
             renderPage();
@@ -80,6 +106,7 @@
                     return;
                 } catch (error) {
                     state.klanten = previousCustomers;
+                    restoreSnapshotState();
                     renderPage();
                     setStatusMessage("Lead verwijderen mislukt: " + getErrorMessage(error), "error");
                     removingIds.delete(normalizedId);
@@ -92,6 +119,7 @@
                 if (!result || !result.ok) throw result && result.error;
             } catch (error) {
                 state.klanten = previousCustomers;
+                restoreSnapshotState();
                 renderPage();
                 setStatusMessage("Lead verwijderen mislukt: " + getErrorMessage(error), "error");
                 removingIds.delete(normalizedId);
