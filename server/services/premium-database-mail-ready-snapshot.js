@@ -498,11 +498,13 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
       return dataOpsStore.listCustomerSnapshotRows({
+        bypassReadCache: true,
         suppressTransientReadFailureLog: true,
       });
     }
     if (dataOpsStore && typeof dataOpsStore.listCustomers === 'function') {
       return dataOpsStore.listCustomers({
+        bypassReadCache: true,
         suppressTransientReadFailureLog: true,
       });
     }
@@ -512,6 +514,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function readPhotoFlags() {
     if (dataOpsStore && typeof dataOpsStore.listDesignPhotoAssetFlags === 'function') {
       return dataOpsStore.listDesignPhotoAssetFlags({
+        bypassReadCache: true,
         suppressTransientReadFailureLog: true,
       });
     }
@@ -733,6 +736,14 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
           },
         };
         if (countBootstrapSignedMedia(enriched) <= countBootstrapSignedMedia(data)) return data;
+        const latestDurableData = await readDurableSnapshotData();
+        if (getSnapshotGeneratedAtMs(latestDurableData) > getSnapshotGeneratedAtMs(enriched)) {
+          snapshotDataCache = {
+            cachedAtMs: getSnapshotGeneratedAtMs(latestDurableData) || nowMs(),
+            data: latestDurableData,
+          };
+          return latestDurableData;
+        }
         await persistDurableSnapshotData(enriched);
         snapshotDataCache = { cachedAtMs: nowMs(), data: enriched };
         return enriched;
@@ -747,6 +758,15 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     if (!snapshotDataPromise) {
       snapshotDataPromise = loadMailReadySnapshotData()
         .then(async (data) => {
+          const latestDurableData = await readDurableSnapshotData();
+          if (getSnapshotGeneratedAtMs(latestDurableData) > getSnapshotGeneratedAtMs(data)) {
+            snapshotDataCache = {
+              cachedAtMs: getSnapshotGeneratedAtMs(latestDurableData) || nowMs(),
+              data: latestDurableData,
+            };
+            snapshotInvalidated = false;
+            return latestDurableData;
+          }
           await persistDurableSnapshotData(data);
           snapshotDataCache = { cachedAtMs: nowMs(), data };
           snapshotInvalidated = false;
@@ -759,26 +779,35 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     return snapshotDataPromise;
   }
 
-  async function hydrateDurableSnapshotData() {
-    if (snapshotDataCache) return snapshotDataCache.data;
+  function getSnapshotGeneratedAtMs(data) {
+    const parsed = Date.parse(normalizeString(data && data.generatedAt));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  async function hydrateDurableSnapshotData(options = {}) {
+    const force = options.force === true;
+    if (snapshotDataCache && !force) return snapshotDataCache.data;
     if (!durableSnapshotReadPromise) {
       durableSnapshotReadPromise = readDurableSnapshotData().finally(() => {
         durableSnapshotReadPromise = null;
       });
     }
     const data = await durableSnapshotReadPromise;
-    if (!data) return null;
-    const generatedAtMs = Date.parse(normalizeString(data.generatedAt));
-    snapshotDataCache = {
-      cachedAtMs: Number.isFinite(generatedAtMs) ? generatedAtMs : nowMs(),
-      data,
-    };
-    return data;
+    if (!data) return snapshotDataCache ? snapshotDataCache.data : null;
+    const generatedAtMs = getSnapshotGeneratedAtMs(data);
+    const currentGeneratedAtMs = getSnapshotGeneratedAtMs(snapshotDataCache && snapshotDataCache.data);
+    if (!snapshotDataCache || generatedAtMs > currentGeneratedAtMs) {
+      snapshotDataCache = {
+        cachedAtMs: generatedAtMs || nowMs(),
+        data,
+      };
+    }
+    return snapshotDataCache.data;
   }
 
   async function getMailReadySnapshotData() {
     if (snapshotInvalidated) return startSnapshotRefresh();
-    if (!snapshotDataCache) await hydrateDurableSnapshotData();
+    await hydrateDurableSnapshotData({ force: Boolean(snapshotDataCache) });
     if (snapshotDataCache && snapshotNeedsBootstrapSignedMedia(snapshotDataCache.data)) {
       startSnapshotMediaRefresh(snapshotDataCache.data).catch((error) => {
         if (logger && typeof logger.warn === 'function') logger.warn('[PremiumDatabaseMailReadySnapshot][media-refresh]', error?.message || error);
@@ -787,20 +816,54 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
     const cacheAgeMs = snapshotDataCache ? nowMs() - cachedAtMs : Number.POSITIVE_INFINITY;
     if (snapshotDataCache && cacheAgeMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
-    const refreshPromise = startSnapshotRefresh();
-    if (snapshotDataCache) {
-      refreshPromise.catch((error) => {
-        if (logger && typeof logger.warn === 'function') logger.warn('[PremiumDatabaseMailReadySnapshot][refresh]', error?.message || error);
-      });
-      return snapshotDataCache.data;
-    }
-    return refreshPromise;
+    return startSnapshotRefresh();
   }
 
   function invalidate() {
     snapshotInvalidated = true;
     snapshotDataCache = null;
     durableSnapshotReadPromise = null;
+  }
+
+  async function removeCustomers(customerIds = []) {
+    const removedIds = new Set(
+      (Array.isArray(customerIds) ? customerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    );
+    if (!removedIds.size) return true;
+
+    snapshotInvalidated = true;
+    const pendingWork = [snapshotDataPromise, snapshotMediaRefreshPromise].filter(Boolean);
+    if (pendingWork.length) await Promise.allSettled(pendingWork);
+
+    const durableData = await readDurableSnapshotData();
+    const cachedData = snapshotDataCache && snapshotDataCache.data;
+    const baseData = getSnapshotGeneratedAtMs(durableData) > getSnapshotGeneratedAtMs(cachedData)
+      ? durableData
+      : cachedData || durableData;
+    if (!baseData) {
+      invalidate();
+      return false;
+    }
+
+    const withoutRemoved = (customers) => (Array.isArray(customers) ? customers : []).filter((customer) => (
+      !removedIds.has(normalizeString(customer && customer.id))
+    ));
+    const nextData = {
+      ...baseData,
+      generatedAt: now().toISOString(),
+      customers: withoutRemoved(baseData.customers),
+      availableCustomers: withoutRemoved(baseData.availableCustomers),
+    };
+    nextData.total = nextData.customers.length;
+    nextData.availableTotal = nextData.availableCustomers.length;
+
+    const persisted = await persistDurableSnapshotData(nextData);
+    snapshotDataCache = { cachedAtMs: nowMs(), data: nextData };
+    snapshotInvalidated = false;
+    durableSnapshotReadPromise = null;
+    return persisted;
   }
 
   async function buildMailReadySnapshot(options = {}) {
@@ -829,7 +892,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         limit: req && req.query ? req.query.limit : undefined,
         offset: req && req.query ? req.query.offset : undefined,
       });
-      res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       return res.status(200).json(payload);
     } catch (error) {
       const statusCode = Number(error && error.statusCode) || 500;
@@ -848,6 +913,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   return {
     buildMailReadySnapshot,
     invalidate,
+    removeCustomers,
     sendMailReadySnapshotResponse,
   };
 }
@@ -860,6 +926,7 @@ module.exports = {
   MAIL_READY_BOOTSTRAP_ROW_LIMIT,
   MAIL_READY_SNAPSHOT_CACHE_KEY,
   MAIL_READY_SNAPSHOT_CACHE_SCOPE,
+  SNAPSHOT_CACHE_TTL_MS,
   SNAPSHOT_SOURCE,
   buildGuardKeysForRow,
   createPremiumDatabaseMailReadySnapshotService,

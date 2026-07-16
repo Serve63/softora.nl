@@ -14,13 +14,15 @@ const {
 function createService(overrides = {}) {
   const calls = [];
   const dataOpsStore = {
-    async listCustomerSnapshotRows() {
+    async listCustomerSnapshotRows(options) {
       calls.push('customers-snapshot');
+      calls.push(['customers-snapshot-options', options]);
       if (overrides.customerRowsPromise) return overrides.customerRowsPromise;
       return overrides.customers || [];
     },
-    async listDesignPhotoAssetFlags() {
+    async listDesignPhotoAssetFlags(options) {
       calls.push('photo-flags');
+      calls.push(['photo-flags-options', options]);
       return Object.prototype.hasOwnProperty.call(overrides, 'photoFlags') ? overrides.photoFlags : [];
     },
     async listOutboundRecipientGuardKeys(keys) {
@@ -35,10 +37,13 @@ function createService(overrides = {}) {
   const getUiStateValues = async (scope) => {
     if (scope === MAIL_READY_SNAPSHOT_CACHE_SCOPE) {
       calls.push(['durable-snapshot-read', scope]);
+      const durableSnapshot = typeof overrides.getDurableSnapshot === 'function'
+        ? overrides.getDurableSnapshot()
+        : overrides.durableSnapshot;
       return {
         source: 'supabase',
-        values: overrides.durableSnapshot
-          ? { [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify(overrides.durableSnapshot) }
+        values: durableSnapshot
+          ? { [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify(durableSnapshot) }
           : {},
       };
     }
@@ -140,6 +145,8 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(Object.prototype.hasOwnProperty.call(payload.customers[0], 'websiteMockup'), false);
   assert.equal(calls.includes('customers-snapshot'), true);
   assert.equal(calls.includes('photo-flags'), true);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].bypassReadCache, true);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'photo-flags-options')[1].bypassReadCache, true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'guard-keys'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
@@ -315,7 +322,7 @@ test('premium database snapshot upgrades a legacy bootstrap cache with signed ph
   assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).version, 2);
 });
 
-test('premium database mail-ready snapshot serves an old durable snapshot without waiting for refresh', async () => {
+test('premium database mail-ready snapshot refreshes an expired durable snapshot before responding', async () => {
   const durableSnapshot = {
     version: 1,
     generatedAt: '2026-06-16T10:00:00.000Z',
@@ -327,17 +334,75 @@ test('premium database mail-ready snapshot serves an old durable snapshot withou
   const { service, calls } = createService({
     durableSnapshot,
     nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
-    customerRowsPromise: new Promise(() => {}),
+    customers: [{ customer_id: 'ready-live', company: 'Live BV', email: 'info@live.nl', website: 'live.nl', database_status: 'prospect' }],
+    photoFlags: [{ customerId: 'ready-live', hasPhoto: true, hasMockup: true }],
   });
 
-  const payload = await Promise.race([
-    service.buildMailReadySnapshot({ limit: 3000 }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('stale snapshot response timeout')), 50)),
-  ]);
+  const payload = await service.buildMailReadySnapshot({ limit: 3000 });
 
-  assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-cached']);
-  assert.deepEqual(payload.availableCustomers.map((customer) => customer.id), ['available-cached']);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-live']);
+  assert.deepEqual(payload.availableCustomers, []);
   assert.equal(calls.includes('customers-snapshot'), true);
+});
+
+test('an older in-flight refresh cannot overwrite a newer durable snapshot generation', async () => {
+  const durableSnapshots = [
+    {
+      version: 2,
+      generatedAt: '2026-06-16T10:00:00.000Z',
+      total: 1,
+      customers: [{ id: 'expired-ready', mailReady: true, mailReadySnapshot: true }],
+      availableCustomers: [],
+    },
+    {
+      version: 2,
+      generatedAt: '2026-06-16T12:01:00.000Z',
+      total: 1,
+      customers: [{ id: 'newer-ready', mailReady: true, mailReadySnapshot: true }],
+      availableCustomers: [],
+    },
+  ];
+  const { service, calls } = createService({
+    getDurableSnapshot: () => durableSnapshots.shift() || durableSnapshots[durableSnapshots.length - 1] || null,
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+    customers: [{ customer_id: 'older-refresh', company: 'Older BV', email: 'info@older.nl', website: 'older.nl', database_status: 'prospect' }],
+    photoFlags: [{ customerId: 'older-refresh', hasPhoto: true, hasMockup: true }],
+  });
+
+  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['newer-ready']);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write'), false);
+});
+
+test('premium database mail-ready snapshot prunes deleted customers from both durable caches', async () => {
+  const { service, calls } = createService({
+    durableSnapshot: {
+      version: 2,
+      generatedAt: '2026-06-16T11:59:30.000Z',
+      total: 2,
+      customers: [
+        { id: 'deleted-ready', mailReady: true, mailReadySnapshot: true },
+        { id: 'kept-ready', mailReady: true, mailReadySnapshot: true },
+      ],
+      availableTotal: 1,
+      availableCustomers: [{ id: 'deleted-available', availableSnapshot: true }],
+    },
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+  });
+
+  assert.equal(await service.removeCustomers(['deleted-ready', 'deleted-available']), true);
+  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['kept-ready']);
+  assert.deepEqual(payload.availableCustomers, []);
+  const cacheWrites = calls.filter((call) => Array.isArray(call) && call[0] === 'ui-state-write');
+  const fullSnapshot = JSON.parse(cacheWrites.find((call) => call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE)[2][MAIL_READY_SNAPSHOT_CACHE_KEY]);
+  const bootstrapSnapshot = JSON.parse(cacheWrites.find((call) => call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE)[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]);
+  assert.deepEqual(fullSnapshot.customers.map((customer) => customer.id), ['kept-ready']);
+  assert.deepEqual(fullSnapshot.availableCustomers, []);
+  assert.deepEqual(bootstrapSnapshot.customers.map((customer) => customer.id), ['kept-ready']);
+  assert.deepEqual(bootstrapSnapshot.availableCustomers, []);
 });
 
 test('premium database mail-ready snapshot persists compact full and bootstrap caches', async () => {
@@ -364,7 +429,7 @@ test('premium database mail-ready snapshot persists compact full and bootstrap c
   assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).total, 120);
 });
 
-test('premium database mail-ready snapshot serves stale data while refreshing centrally', async () => {
+test('premium database mail-ready snapshot waits for the central refresh after its memory cache expires', async () => {
   let clockMs = 1000;
   const customers = [{ customer_id: 'ready-1', company: 'Ready One', email: 'info@ready.nl', website: 'ready.nl', database_status: 'prospect' }];
   const { service, calls } = createService({
@@ -375,14 +440,13 @@ test('premium database mail-ready snapshot serves stale data while refreshing ce
 
   await service.buildMailReadySnapshot({ limit: 10 });
   clockMs += 61 * 1000;
-  const stale = await service.buildMailReadySnapshot({ limit: 10 });
-  await new Promise((resolve) => setImmediate(resolve));
+  const refreshed = await service.buildMailReadySnapshot({ limit: 10 });
 
-  assert.equal(stale.total, 1);
+  assert.equal(refreshed.total, 1);
   assert.equal(calls.filter((call) => call === 'customers-snapshot').length, 2);
 });
 
-test('premium database mail-ready snapshot response is privately browser-cacheable', async () => {
+test('premium database mail-ready snapshot response cannot be replayed from a browser cache', async () => {
   const customers = [{ customer_id: 'ready-1', company: 'Ready One', email: 'info@ready.nl', website: 'ready.nl', database_status: 'prospect' }];
   const { service } = createService({
     customers,
@@ -398,7 +462,9 @@ test('premium database mail-ready snapshot response is privately browser-cacheab
   await service.sendMailReadySnapshotResponse({ query: { limit: '10', offset: '0' } }, res);
 
   assert.equal(res.statusCode, 200);
-  assert.equal(headers['Cache-Control'], 'private, max-age=30, stale-while-revalidate=120');
+  assert.equal(headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.equal(headers.Pragma, 'no-cache');
+  assert.equal(headers.Expires, '0');
   assert.equal(res.payload.total, 1);
 });
 

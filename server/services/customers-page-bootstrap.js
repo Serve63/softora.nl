@@ -1,6 +1,7 @@
 const {
   MAIL_READY_BOOTSTRAP_CACHE_KEY,
   MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  SNAPSHOT_CACHE_TTL_MS,
   parseMailReadySnapshotCacheValue,
 } = require('./premium-database-mail-ready-snapshot');
 
@@ -21,6 +22,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     orderKey = 'softora_custom_orders_premium_v1',
     orderRuntimeKey = 'softora_order_runtime_premium_v1',
     listDashboardCustomers = null,
+    now = () => new Date(),
   } = deps;
 
   function normalizeDate(value) {
@@ -919,6 +921,11 @@ function createCustomersPageBootstrapService(deps = {}) {
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
     if (!snapshot) return { ...unavailable, ...databaseBootstrapState };
+    const snapshotGeneratedAtMs = Date.parse(normalizeString(snapshot.generatedAt));
+    const snapshotAgeMs = now().getTime() - snapshotGeneratedAtMs;
+    if (!Number.isFinite(snapshotGeneratedAtMs) || snapshotAgeMs > SNAPSHOT_CACHE_TTL_MS) {
+      return { ...unavailable, ...databaseBootstrapState };
+    }
     return {
       ok: true,
       loadedAt: new Date().toISOString(),

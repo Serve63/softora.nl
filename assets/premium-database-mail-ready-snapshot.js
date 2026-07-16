@@ -171,13 +171,13 @@
     }
 
     async function fetchSnapshotPage(config, limit, offset, timeoutMs) {
-        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "default" }, timeoutMs);
+        const response = await config.fetchJsonWithTimeout(buildEndpoint(limit, offset), { method: "GET", cache: "no-store" }, timeoutMs);
         if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
         const payload = await response.json().catch(function () { return {}; });
         if (!payload || payload.ok !== true) throw new Error(String(payload && (payload.detail || payload.error) || "Mailklare snapshot gaf geen geldige data terug."));
         const rows = Array.isArray(payload.customers) ? payload.customers : [];
         const total = Math.max(rows.length + offset, Number(payload.total) || 0);
-        return { payload: payload, rows: rows, total: total };
+        return { payload: payload, rows: rows, total: total, generatedAt: String(payload.generatedAt || "").trim() };
     }
 
     function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
@@ -186,11 +186,15 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, pending) {
+    function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, generatedAt, pending) {
         const state = config.state;
+        const incomingGeneratedAtMs = Date.parse(String(generatedAt || "").trim()) || 0;
+        const currentGeneratedAtMs = Math.max(0, Number(state.mailReadySnapshotGeneratedAtMs) || 0);
+        if (incomingGeneratedAtMs && currentGeneratedAtMs && incomingGeneratedAtMs < currentGeneratedAtMs) return false;
         state.mailReadySnapshotLoaded = true;
         state.mailReadySnapshotFailed = false;
         state.mailReadySnapshotPending = Boolean(pending);
+        if (incomingGeneratedAtMs) state.mailReadySnapshotGeneratedAtMs = incomingGeneratedAtMs;
         state.mailReadySnapshotTotal = pending ? Math.max(snapshotCustomers.length, Number(total) || 0) : snapshotCustomers.length;
         state.mailReadySnapshotCustomers = snapshotCustomers;
         state.availableSnapshotLoaded = true;
@@ -204,6 +208,7 @@
             const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers));
             config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, false);
         }
+        return true;
     }
 
     async function fetchRemainingPages(config, total, firstRows) {
@@ -236,12 +241,13 @@
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
             let availableCustomers = normalizeAvailableSnapshotRows(firstPage.payload.availableCustomers, 0, config.normalizeCustomer);
             const hasRemainingPages = firstPage.total > firstPage.rows.length;
-            publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, hasRemainingPages);
+            const published = publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.generatedAt, hasRemainingPages);
+            if (!published) { state.mailReadySnapshotPending = false; return false; }
             if (hasRemainingPages && firstPage.rows.length < MAX_SNAPSHOT_ROWS) {
                 try {
                     const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
                     snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
-                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, false);
+                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.generatedAt, false);
                 } catch (error) {
                     state.mailReadySnapshotFailed = true;
                     state.mailReadySnapshotPending = true;

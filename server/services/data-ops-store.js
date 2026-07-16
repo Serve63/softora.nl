@@ -1192,7 +1192,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
-    forgetReads('customers', 'dashboard-customers');
+    forgetReads('customers', 'customers-snapshot', 'dashboard-customers');
     return deleteMissingCustomerIds(missingDeletePlan.data, meta.source);
   }
 
@@ -1211,7 +1211,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
       getWriteOperationOptions()
     );
-    if (upsert.ok) forgetReads('customers', 'dashboard-customers');
+    if (upsert.ok) forgetReads('customers', 'customers-snapshot', 'dashboard-customers');
     return upsert.ok ? { ...upsert, upserted: rows.length } : upsert;
   }
 
@@ -1231,7 +1231,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('customer_id', ids),
       getWriteOperationOptions()
     );
-    if (result.ok) forgetReads('customers', 'dashboard-customers');
+    if (result.ok) forgetReads('customers', 'customers-snapshot', 'dashboard-customers');
     return result;
   }
 
@@ -1490,12 +1490,14 @@ function createSoftoraDataOpsStore(deps = {}) {
       const saved = await uploadDesignPhoto(entry, meta);
       if (!saved.ok) return saved;
     }
-    return markMissingDeleted(
+    const result = await markMissingDeleted(
       TABLES.designPhotos,
       'customer_id',
       list.map((entry) => entry.customerId),
       source
     );
+    if (result.ok) forgetReads('design-photo-asset-flags', 'design-photos-signed:*');
+    return result;
   }
 
   async function upsertDesignPhotos(entries, meta = {}) {
@@ -1504,6 +1506,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       const saved = await uploadDesignPhoto(entry, meta);
       if (!saved.ok) return saved;
     }
+    forgetReads('design-photo-asset-flags', 'design-photos-signed:*');
     return { ok: true, data: [], upserted: list.length };
   }
 
@@ -1523,7 +1526,7 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('customer_id', ids),
       getWriteOperationOptions()
     );
-    if (result.ok) forgetReads('design-photos', 'design-photos-signed:*');
+    if (result.ok) forgetReads('design-photo-asset-flags', 'design-photos-signed:*');
     return result;
   }
 

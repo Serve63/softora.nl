@@ -2167,8 +2167,18 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
         });
       }
     }
-    if (mailReadySnapshotService && typeof mailReadySnapshotService.invalidate === 'function') {
-      mailReadySnapshotService.invalidate();
+    if (mailReadySnapshotService) {
+      let snapshotPruned = false;
+      if (typeof mailReadySnapshotService.removeCustomers === 'function') {
+        try {
+          snapshotPruned = await mailReadySnapshotService.removeCustomers([customerId]);
+        } catch (_error) {
+          snapshotPruned = false;
+        }
+      }
+      if (!snapshotPruned && typeof mailReadySnapshotService.invalidate === 'function') {
+        mailReadySnapshotService.invalidate();
+      }
     }
 
     return res.status(200).json({

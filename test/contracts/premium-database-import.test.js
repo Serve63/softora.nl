@@ -362,6 +362,10 @@ test('premium database delete lead route removes one customer through data ops w
   const calls = [];
   const coordinator = createPremiumDatabaseImportCoordinator({
     mailReadySnapshotService: {
+      async removeCustomers(customerIds) {
+        calls.push({ type: 'snapshot-prune', customerIds });
+        return true;
+      },
       invalidate() {
         calls.push({ type: 'snapshot-invalidate' });
       },
@@ -394,7 +398,7 @@ test('premium database delete lead route removes one customer through data ops w
       customerIds: ['customer-413'],
       meta: { source: 'premium-database-delete-lead', actor: 'Premium database' },
     },
-    { type: 'snapshot-invalidate' },
+    { type: 'snapshot-prune', customerIds: ['customer-413'] },
   ]);
 });
 
