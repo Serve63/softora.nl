@@ -90,9 +90,6 @@ const COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES = new Set([
   'COLDMAIL_AUTOPILOT_DISABLED',
   'COLDMAIL_AUTOPILOT_STATE_UNAVAILABLE',
   'COLDMAIL_DAILY_LIMIT_REACHED',
-  'COLDMAIL_EMAIL_VERIFICATION_INVALID',
-  'COLDMAIL_EMAIL_VERIFICATION_PENDING',
-  'COLDMAIL_EMAIL_VERIFICATION_UNKNOWN',
   'COLDMAIL_RECIPIENT_RECENTLY_SENT',
   'COLDMAIL_SAFETY_PAUSED',
   'COLDMAIL_SEND_IN_PROGRESS',
@@ -380,7 +377,6 @@ function createColdmailCampaignService(deps = {}) {
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     outboundRecipientGuardStore = null,
-    emailVerificationStore = null,
     dataOpsStore = null,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
     customerDbKey = DEFAULT_CUSTOMER_DB_KEY,
@@ -1888,8 +1884,6 @@ function createColdmailCampaignService(deps = {}) {
         error: `E-maildomein bestaat niet of ontvangt geen mail: ${domain || email}`,
       };
     }
-    const verificationBlock = await getColdmailEmailVerificationBlock(item);
-    if (verificationBlock) return verificationBlock;
     return null;
   }
 
@@ -5856,7 +5850,6 @@ function createColdmailCampaignService(deps = {}) {
       const knownSkip = COLDMAIL_AUTOPILOT_KNOWN_SKIP_CODES.has(code);
       const shouldKeepPreviousStartTime =
         code === 'COLDMAIL_AUTOPILOT_DISABLED' ||
-        code === 'COLDMAIL_EMAIL_VERIFICATION_PENDING' ||
         code === 'NO_VALID_RECIPIENT_DOMAINS' ||
         code === 'NO_WEBDESIGN_PHOTOS' ||
         code === 'WEBDESIGN_PREPARATION_QUEUED';
@@ -6101,59 +6094,6 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  function buildColdmailEmailVerificationFailure(item, decision = {}) {
-    const status = normalizeString(decision.status || 'unavailable').toLowerCase();
-    const code = status === 'invalid'
-      ? 'COLDMAIL_EMAIL_VERIFICATION_INVALID'
-      : status === 'unknown'
-        ? 'COLDMAIL_EMAIL_VERIFICATION_UNKNOWN'
-        : status === 'unavailable'
-          ? 'COLDMAIL_EMAIL_VERIFICATION_UNAVAILABLE'
-          : 'COLDMAIL_EMAIL_VERIFICATION_PENDING';
-    const messages = {
-      invalid: 'Mailbox bestaat niet en wordt niet gemaild.',
-      unknown: 'Mailbox kon niet betrouwbaar worden bevestigd en wordt niet gemaild.',
-      unavailable: 'Eigen mailboxverificatie is niet beschikbaar; verzenden is veilig gestopt.',
-      pending: decision.queued
-        ? 'Mailboxcontrole is ingepland; verzenden wacht op bevestiging.'
-        : 'Mailboxcontrole loopt nog; verzenden wacht op bevestiging.',
-      processing: 'Mailboxcontrole loopt nog; verzenden wacht op bevestiging.',
-    };
-    return {
-      id: item && item.id,
-      bedrijf: getRowCompany(item && item.row),
-      email: getRowEmail(item && item.row),
-      code,
-      verificationStatus: status,
-      verificationReason: normalizeString(decision.reason),
-      verificationQueued: decision.queued === true,
-      error: messages[status] || messages.pending,
-    };
-  }
-
-  async function getColdmailEmailVerificationBlock(item) {
-    const email = getRowEmail(item && item.row);
-    if (isTestRecipientRow(item && item.row, email)) return null;
-    if (!emailVerificationStore || typeof emailVerificationStore.getDecision !== 'function') {
-      return buildColdmailEmailVerificationFailure(item, {
-        status: 'unavailable',
-        reason: 'verification_store_unavailable',
-      });
-    }
-    const decision = await emailVerificationStore.getDecision(email, {
-      source: 'softora-coldmail-autopilot',
-      customerId: normalizeString(item && item.id),
-      company: getRowCompany(item && item.row),
-      domain: getEmailDomain(email),
-    });
-    return decision && decision.allowed === true && decision.status === 'valid'
-      ? null
-      : buildColdmailEmailVerificationFailure(item, decision || {
-          status: 'unavailable',
-          reason: 'verification_decision_missing',
-        });
-  }
-
   function isPersonalMailboxDomain(email) {
     const domain = getEmailDomain(email);
     return Boolean(domain && PERSONAL_MAILBOX_DOMAINS.has(domain));
@@ -6178,9 +6118,6 @@ function createColdmailCampaignService(deps = {}) {
     const code = normalizeString(item && item.code).toLowerCase();
     const error = normalizeString(item && item.error).toLowerCase();
     const combined = `${code} ${error}`;
-    if (/coldmail_email_verification|mailboxcontrole|mailbox bestaat niet|mailbox kon niet/.test(combined)) {
-      return 'email_verification';
-    }
     if (/duplicate|guard|al eerder|recently|recipient_recently_sent/.test(combined)) {
       return 'duplicate_guard';
     }
@@ -6301,8 +6238,6 @@ function createColdmailCampaignService(deps = {}) {
     const candidateRows = [];
     const selectedRows = [];
     let webdesignPreparationCandidate = null;
-    let mailboxVerificationChecks = 0;
-    const maxMailboxVerificationChecks = Math.max(10, Math.min(50, count * 20));
 
     for (const item of eligibleRows) {
       if (readyWebdesignMatcher && !readyWebdesignMatcher.hasRow(item.row, item.index)) {
@@ -6345,15 +6280,8 @@ function createColdmailCampaignService(deps = {}) {
         continue;
       }
       if (await isDeliverableEmailDomain(email)) {
-        const verificationBlock = await getColdmailEmailVerificationBlock(item);
-        mailboxVerificationChecks += 1;
-        if (verificationBlock) {
-          failed.push(verificationBlock);
-          if (mailboxVerificationChecks >= maxMailboxVerificationChecks) break;
-        } else {
-          selectedRows.push(item);
-          if (selectedRows.length >= count) break;
-        }
+        selectedRows.push(item);
+        if (selectedRows.length >= count) break;
       } else {
         const domain = getEmailDomain(email);
         failed.push({
@@ -8813,21 +8741,8 @@ function createColdmailCampaignService(deps = {}) {
       }
       const firstFailure = pickFailureMessage(failed, candidateRows);
       const recipientGuardFailure = failed.length > 0 && failed.every((item) => isColdmailRecipientGuardFailure(item));
-      const verificationFailure = [
-        'COLDMAIL_EMAIL_VERIFICATION_UNAVAILABLE',
-        'COLDMAIL_EMAIL_VERIFICATION_PENDING',
-        'COLDMAIL_EMAIL_VERIFICATION_UNKNOWN',
-        'COLDMAIL_EMAIL_VERIFICATION_INVALID',
-      ].map((code) => failed.find((item) => normalizeString(item && item.code) === code)).find(Boolean);
-      const errorMessage = verificationFailure
-        ? normalizeString(verificationFailure.error)
-        : firstFailure;
-      const error = new Error(errorMessage || 'Geen geldige e-maildomeinen gevonden in de database.');
-      error.code = recipientGuardFailure
-        ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
-        : verificationFailure
-          ? normalizeString(verificationFailure.code)
-          : 'NO_VALID_RECIPIENT_DOMAINS';
+      const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
+      error.code = recipientGuardFailure ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT' : 'NO_VALID_RECIPIENT_DOMAINS';
       error.failedItems = failed;
       error.invalidRecipientDomainsBlocked = invalidRecipientDomainsBlocked;
       throw error;
@@ -8851,11 +8766,6 @@ function createColdmailCampaignService(deps = {}) {
       const row = item.row;
       const to = getRowEmail(row);
       if (!testMode) {
-        const verificationBlock = await getColdmailEmailVerificationBlock(item);
-        if (verificationBlock) {
-          failed.push(verificationBlock);
-          continue;
-        }
         await runColdmailBeforeSendGuard(input, {
           actor,
           index,
