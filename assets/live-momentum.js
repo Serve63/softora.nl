@@ -71,13 +71,23 @@
       .trim()
       .slice(0, MAX_END_GAME_GOAL_LENGTH));
   }
+  function getEndGameGoalIndex(field) {
+    const index = Number(field.dataset.endGameGoalIndex);
+    return Number.isInteger(index) && index >= 0 && index < END_GAME_GOAL_COUNT ? index : -1;
+  }
   function getCurrentEndGameGoals() {
-    return normalizeEndGameGoals(getEndGameGoalFields().map((field) => field.value));
+    const goals = normalizeEndGameGoals([]);
+    getEndGameGoalFields().forEach((field) => {
+      const index = getEndGameGoalIndex(field);
+      if (index >= 0) goals[index] = String(field.value || '').trim().slice(0, MAX_END_GAME_GOAL_LENGTH);
+    });
+    return goals;
   }
   function renderEndGameGoals(goals) {
     const normalizedGoals = normalizeEndGameGoals(goals);
-    getEndGameGoalFields().forEach((field, index) => {
-      field.value = normalizedGoals[index];
+    getEndGameGoalFields().forEach((field) => {
+      const index = getEndGameGoalIndex(field);
+      if (index >= 0) field.value = normalizedGoals[index];
     });
   }
   function normalizeGoal(goal, index) {
