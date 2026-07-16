@@ -16,7 +16,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716p"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716q"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -95,7 +95,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(css, /88366b|74265c|91436f|7f426b/i);
   assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--day-count, 31\),/);
   assert.doesNotMatch(css, /chart-switch|is-line-mode|\.line-(?:stage|grid|segment|point|day-axis)/);
-  assert.match(css, /\.habit-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(190px, 12vw\) repeat\(var\(--day-count, 31\), minmax\(32px, 1fr\)\);/);
+  assert.match(css, /\.habit-grid\s*\{[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(190px, 12vw\) repeat\(var\(--day-count, 31\), minmax\(32px, 1fr\)\);[\s\S]*min-width:\s*min\(100%, 1320px\);/);
+  assert.doesNotMatch(css, /\.habit-grid\s*\{[^}]*min-width:\s*1320px;/);
   assert.match(css, /width:\s*100%;/);
   assert.doesNotMatch(css, /width:\s*min\(1320px, 100%\);/);
   assert.doesNotMatch(css, /\.momentum-hero,\s*\.habit-board,\s*\.closing-quote/);
