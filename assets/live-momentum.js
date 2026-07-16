@@ -5,8 +5,6 @@
   const PERIOD_KEY = '2026-07';
   const MAX_GOALS = 24;
   const MAX_LABEL_LENGTH = 80;
-  const END_GAME_GOAL_COUNT = 10;
-  const MAX_END_GAME_GOAL_LENGTH = 240;
   const SAVE_DEBOUNCE_MS = 250;
   const SAVE_RETRY_MS = 1500;
   const MAX_SAVE_RETRIES = 3;
@@ -21,6 +19,7 @@
   const ICON_CATEGORIES = Array.from(new Set(ICON_CATALOG.map((icon) => icon.category).filter(Boolean)));
   const ALL_ICON_CATEGORIES = 'Alle';
   const goalActionsApi = window.SoftoraMomentumGoalActions;
+  const endGameCardsApi = window.SoftoraMomentumEndGameCards;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
     { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [TODAY] },
@@ -32,10 +31,6 @@
   const chart = document.querySelector('.bar-chart');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const endGameGoalTrack = document.querySelector('.end-game-goal-track');
-  const endGameMissionCard = endGameGoalTrack?.querySelector('.end-game-goal-card--mission');
-  const endGameMissionActions = endGameMissionCard?.querySelector('.end-game-mission-actions');
-  const endGameMissionCompleteButton = endGameMissionActions?.querySelector('[data-end-game-mission-action="toggle-complete"]');
-  const endGameMissionRemoveButton = endGameMissionActions?.querySelector('[data-end-game-mission-action="remove"]');
   let stateReady = false;
   let stateDirty = false;
   let saveTimer = null;
@@ -46,9 +41,8 @@
   let iconPicker = null;
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
-  let endGameMissionCardState = { completed: false, deleted: false };
   let draggedGoalId = '';
-  if (!grid || !chart || !endGameGoalTrack || !endGameMissionCard || !endGameMissionActions || !endGameMissionCompleteButton || !endGameMissionRemoveButton || !goalActionsApi) {
+  if (!grid || !chart || !endGameGoalTrack || !goalActionsApi || !endGameCardsApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -56,9 +50,13 @@
   const getChartBars = () => Array.from(chart.querySelectorAll('.bar-wrap'));
   const getGoalRows = () => Array.from(grid.querySelectorAll('.habit-name'));
   const goalActions = goalActionsApi.createController({ grid, getGoalRows });
+  const endGameCards = endGameCardsApi.createController({
+    track: endGameGoalTrack,
+    isReady: () => stateReady,
+    onStateChange: markStateChanged
+  });
   const getLabels = () => Array.from(grid.querySelectorAll('.habit-label'));
   const getStatusCells = () => Array.from(grid.querySelectorAll('.status'));
-  const getEndGameGoalFields = () => Array.from(endGameGoalTrack.querySelectorAll('textarea'));
   const getDay = (cell) => Number(cell.dataset.day || 0);
   const getLabelText = (index) => getLabels()[index]?.textContent.trim() || `Taak ${index + 1}`;
   const isChecked = (cell) => cell.classList.contains('is-done');
@@ -72,71 +70,6 @@
       .map((day) => Number(day))
       .filter((day) => Number.isInteger(day) && day >= 1 && day <= PERIOD.lastDay)))
       .sort((left, right) => left - right);
-  }
-  function normalizeEndGameGoals(value) {
-    return Array.from({ length: END_GAME_GOAL_COUNT }, (_, index) => String(value?.[index] || '')
-      .trim()
-      .slice(0, MAX_END_GAME_GOAL_LENGTH));
-  }
-  function normalizeEndGameMissionCard(value) {
-    return {
-      completed: value?.completed === true,
-      deleted: value?.deleted === true
-    };
-  }
-  function resetEndGameMissionRemoveConfirmation() {
-    endGameMissionRemoveButton.dataset.confirmRemove = 'false';
-    endGameMissionRemoveButton.textContent = 'Verwijderen';
-  }
-  function closeEndGameMissionActions(options = {}) {
-    endGameMissionActions.hidden = true;
-    endGameMissionCard.setAttribute('aria-expanded', 'false');
-    resetEndGameMissionRemoveConfirmation();
-    if (options.restoreFocus === true && !endGameMissionCard.hidden) {
-      endGameMissionCard.focus();
-    }
-  }
-  function openEndGameMissionActions() {
-    if (!stateReady || endGameMissionCardState.deleted) {
-      return;
-    }
-    endGameMissionActions.hidden = false;
-    endGameMissionCard.setAttribute('aria-expanded', 'true');
-    resetEndGameMissionRemoveConfirmation();
-    endGameMissionCompleteButton.focus();
-  }
-  function renderEndGameMissionCard(value) {
-    endGameMissionCardState = normalizeEndGameMissionCard(value);
-    endGameMissionCard.hidden = endGameMissionCardState.deleted;
-    endGameMissionCard.classList.toggle('is-completed', endGameMissionCardState.completed);
-    endGameMissionCard.setAttribute('aria-label', endGameMissionCardState.completed
-      ? 'Missie: Eigen automaat rijden, afgerond. Klik voor acties.'
-      : 'Missie: Eigen automaat rijden. Klik voor acties.');
-    endGameMissionCompleteButton.textContent = endGameMissionCardState.completed ? 'Afronding ongedaan maken' : 'Afronden';
-    endGameMissionCompleteButton.setAttribute('aria-pressed', String(endGameMissionCardState.completed));
-    endGameMissionCard.querySelector('.end-game-mission-complete')?.setAttribute('aria-hidden', String(!endGameMissionCardState.completed));
-    if (endGameMissionCardState.deleted) {
-      closeEndGameMissionActions();
-    }
-  }
-  function getEndGameGoalIndex(field) {
-    const index = Number(field.dataset.endGameGoalIndex);
-    return Number.isInteger(index) && index >= 0 && index < END_GAME_GOAL_COUNT ? index : -1;
-  }
-  function getCurrentEndGameGoals() {
-    const goals = normalizeEndGameGoals([]);
-    getEndGameGoalFields().forEach((field) => {
-      const index = getEndGameGoalIndex(field);
-      if (index >= 0) goals[index] = String(field.value || '').trim().slice(0, MAX_END_GAME_GOAL_LENGTH);
-    });
-    return goals;
-  }
-  function renderEndGameGoals(goals) {
-    const normalizedGoals = normalizeEndGameGoals(goals);
-    getEndGameGoalFields().forEach((field) => {
-      const index = getEndGameGoalIndex(field);
-      if (index >= 0) field.value = normalizedGoals[index];
-    });
   }
   function normalizeGoal(goal, index) {
     const fallback = DEFAULT_GOALS[index] || {};
@@ -210,8 +143,8 @@
     return {
       version: STATE_VERSION,
       period: PERIOD_KEY,
-      endGameMissionCard: normalizeEndGameMissionCard(endGameMissionCardState),
-      endGameGoals: getCurrentEndGameGoals(),
+      endGameMissionCard: endGameCards.getLegacyMissionState(),
+      endGameCards: endGameCards.getState(),
       goals: getCurrentGoals().map((goal) => ({
         id: goal.id,
         label: goal.label,
@@ -238,9 +171,8 @@
       }
       return {
         goals,
-        needsMigration,
-        endGameMissionCard: normalizeEndGameMissionCard(parsed.endGameMissionCard),
-        endGameGoals: normalizeEndGameGoals(parsed.endGameGoals)
+        needsMigration: needsMigration || endGameCards.needsMigration(parsed.endGameCards),
+        endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
       };
     } catch (error) {
       console.warn('[LiveMomentum][state-parse]', error?.message || error);
@@ -862,8 +794,7 @@
       const storedState = parseStoredState(response.values?.[STATE_KEY]);
       if (storedState) {
         renderGridShell(storedState.goals);
-        renderEndGameMissionCard(storedState.endGameMissionCard);
-        renderEndGameGoals(storedState.endGameGoals);
+        endGameCards.render(storedState.endGameCards);
         refreshCellData();
         getLabels().forEach(bindLabel);
         updateChart();
@@ -880,8 +811,7 @@
   }
   renderChartShell();
   renderGridShell(getDefaultGoals());
-  renderEndGameMissionCard({ completed: false, deleted: false });
-  renderEndGameGoals([]);
+  endGameCards.render();
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
@@ -1028,69 +958,12 @@
     getStatusCells().forEach(syncCellA11y);
     markStateChanged();
   });
-  endGameGoalTrack.addEventListener('input', (event) => {
-    const field = event.target.closest('textarea');
-    if (!field || !endGameGoalTrack.contains(field)) {
-      return;
-    }
-    markStateChanged();
-  });
-  endGameGoalTrack.addEventListener('click', (event) => {
-    const actionButton = event.target.closest('[data-end-game-mission-action]');
-    if (actionButton && endGameMissionActions.contains(actionButton)) {
-      event.stopPropagation();
-      if (!stateReady) {
-        return;
-      }
-      if (actionButton.dataset.endGameMissionAction === 'toggle-complete') {
-        renderEndGameMissionCard({ ...endGameMissionCardState, completed: !endGameMissionCardState.completed });
-        closeEndGameMissionActions({ restoreFocus: true });
-        markStateChanged();
-        return;
-      }
-      if (actionButton.dataset.endGameMissionAction === 'remove') {
-        if (endGameMissionRemoveButton.dataset.confirmRemove !== 'true') {
-          endGameMissionRemoveButton.dataset.confirmRemove = 'true';
-          endGameMissionRemoveButton.textContent = 'Nogmaals: verwijderen';
-          return;
-        }
-        renderEndGameMissionCard({ ...endGameMissionCardState, deleted: true });
-        markStateChanged();
-      }
-      return;
-    }
-    if (event.target.closest('.end-game-goal-card--mission') === endGameMissionCard) {
-      if (endGameMissionActions.hidden) {
-        openEndGameMissionActions();
-      } else {
-        closeEndGameMissionActions({ restoreFocus: true });
-      }
-    }
-  });
-  endGameMissionCard.addEventListener('keydown', (event) => {
-    if (event.target !== endGameMissionCard) {
-      return;
-    }
-    if ([' ', 'Enter'].includes(event.key)) {
-      event.preventDefault();
-      openEndGameMissionActions();
-    }
-    if (event.key === 'Escape') {
-      closeEndGameMissionActions({ restoreFocus: true });
-    }
-  });
   document.addEventListener('click', (event) => {
-    if (!endGameMissionActions.hidden && !endGameMissionCard.contains(event.target)) {
-      closeEndGameMissionActions();
-    }
     if (!event.target.closest('.goal-row-actions, .goal-drag-handle')) {
       goalActions.close();
     }
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !endGameMissionActions.hidden) {
-      closeEndGameMissionActions({ restoreFocus: true });
-    }
     if (event.key === 'Escape') {
       const openGoalActions = grid.querySelector('.goal-row-actions:not([hidden])');
       const goalId = openGoalActions?.closest('.habit-name')?.dataset.goalId;
