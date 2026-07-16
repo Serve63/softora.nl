@@ -16,12 +16,13 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716r"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716s"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716i" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716j" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -142,6 +143,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.add-goal\s*\{[\s\S]*background:\s*transparent;/);
   assert.match(css, /\.goal-icon-button\s*\{[\s\S]*cursor:\s*pointer;/);
   assert.match(css, /\.goal-drag-handle\s*\{[\s\S]*cursor:\s*grab;/);
+  assert.match(css, /\.goal-row-actions\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*1000;/);
+  assert.match(css, /\.goal-row-actions\[hidden\]\s*\{[\s\S]*display:\s*none;/);
+  assert.match(css, /\.goal-remove-action\s*\{[\s\S]*color:\s*#c83e36;/);
   assert.match(css, /\.habit-name\.is-drop-target\s*\{[\s\S]*box-shadow:\s*inset 3px 0 0 var\(--good\);/);
   assert.match(css, /\.icon-picker-search\s*\{[\s\S]*width:\s*100%;/);
   assert.match(css, /\.icon-picker-results\s*\{[\s\S]*grid-template-columns:/);
@@ -163,6 +167,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
 
 test('live momentum script wires habit toggles to chart and persisted state', () => {
   const js = read('assets/live-momentum.js');
+  const goalActionsJs = read('assets/live-momentum-goal-actions.js');
 
   assert.match(js, /startDay:\s*13/);
   assert.match(js, /today:\s*13/);
@@ -203,6 +208,17 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.doesNotMatch(js, /renderLineChart|setChartMode|chartMode|chartSwitches|getVisibleScore/);
   assert.match(js, /function renderGridShell\(goals\)/);
   assert.match(js, /function createGoalDragHandle\(goal\)/);
+  assert.match(js, /function removeGoal\(goalId\)/);
+  assert.match(js, /goalActions\.create\(goal\)/);
+  assert.match(js, /goalActions\.isClickSuppressed\(\)/);
+  assert.match(js, /window\.addEventListener\('scroll', \(\) => goalActions\.close\(\), true\)/);
+  assert.match(goalActionsJs, /const DRAG_THRESHOLD_PX = 6;/);
+  assert.match(goalActionsJs, /distance >= DRAG_THRESHOLD_PX/);
+  assert.match(goalActionsJs, /Date\.now\(\) < suppressClickUntil/);
+  assert.match(goalActionsJs, /handle\.getBoundingClientRect\(\)/);
+  assert.match(goalActionsJs, /window\.SoftoraMomentumGoalActions = \{ createController \}/);
+  assert.match(js, /data-goal-action/);
+  assert.match(js, /Nogmaals: verwijderen/);
   assert.match(js, /function reorderGoal\(goalId, targetGoalId\)/);
   assert.match(js, /function moveGoalByOffset\(goalId, offset\)/);
   assert.match(js, /grid\.addEventListener\('dragstart'/);
@@ -223,6 +239,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /function updateTodayColumnEnd/);
   assert.match(js, /closest\('\.add-goal'\)/);
   assert.match(js, /addButton\.textContent = '\+'/);
+  assert.match(js, /rowHeader\.append\(addButton\);[\s\S]*className = 'goal-icon-button'/);
+  assert.match(js, /rowHeader\.append\(iconButton, createLabel\(goal\.label, goal\.isDraft\), dragHandle, goalActions\.create\(goal\)\)/);
   assert.match(js, /createGoalHeader\(goal, index === goals\.length - 1\)/);
   assert.match(js, /function openIconPicker\(trigger\)/);
   assert.match(js, /function renderIconPickerResults\(searchValue = ''\)/);
