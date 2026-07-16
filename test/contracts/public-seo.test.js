@@ -28,6 +28,7 @@ function runPublicConversionTracker({ formIsValid = true, trigger = 'submit', li
   const listeners = {};
   const opened = [];
   const dispatched = [];
+  const beacons = [];
   const fakeLinkAttrs = {
     href: 'https://wa.me/31643262792',
     ...linkAttrs,
@@ -77,6 +78,16 @@ function runPublicConversionTracker({ formIsValid = true, trigger = 'submit', li
     },
     window: {
       location: { origin: 'https://www.softora.nl', pathname: '/contact', search: '?bron=seo' },
+      Blob: function Blob(parts, options) {
+        this.parts = parts;
+        this.options = options;
+      },
+      navigator: {
+        sendBeacon(url, blob) {
+          beacons.push({ url, body: blob.parts.join(''), type: blob.options.type });
+          return true;
+        },
+      },
       open(url, target, features) {
         opened.push({ url, target, features });
         return {};
@@ -109,6 +120,7 @@ function runPublicConversionTracker({ formIsValid = true, trigger = 'submit', li
 
   return {
     opened,
+    beacons,
     dispatched,
     prevented,
     linkHref: fakeLinkAttrs.href,
@@ -274,10 +286,11 @@ test('public seo pages load first-party conversion tracking once', () => {
 
   assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(trackerSource, /softora:public-conversion/);
-  assert.match(trackerSource, /recordConversion\(link\)/);
+  assert.match(trackerSource, /sendFirstPartyConversion\(recordConversion\(link\)\)/);
   assert.match(trackerSource, /public-whatsapp-link/);
   assert.match(trackerSource, /document\.addEventListener\('submit', handleConversionSubmit\)/);
-  assert.match(trackerSource, /recordConversion\(control\)/);
+  assert.match(trackerSource, /sendFirstPartyConversion\(recordConversion\(control\)\)/);
+  assert.match(trackerSource, /\/api\/public-conversion/);
   assert.match(trackerSource, /window\.open\(MARTIJN_WHATSAPP_URL, '_blank', 'noopener,noreferrer'\)/);
   assert.match(trackerSource, /link\.setAttribute\('href', MARTIJN_WHATSAPP_URL\)/);
   assert.doesNotMatch(trackerSource, /Landingspagina: |CTA-pagina: |Referrer: |\?text=|searchParams\.set\('text'|buildWhatsappText|withWhatsappText/);
@@ -308,6 +321,9 @@ test('public conversion tracker measures bare Martijn WhatsApp links as fallback
   assert.equal(result.lastConversion.landing, '/contact?bron=seo');
   assert.equal(result.lastConversion.referrer, '/diensten?utm=test');
   assert.equal(result.dispatched[0].type, 'softora:public-conversion');
+  assert.equal(result.beacons.length, 1);
+  assert.equal(result.beacons[0].url, '/api/public-conversion');
+  assert.equal(JSON.parse(result.beacons[0].body).name, 'public-whatsapp-link');
 });
 
 test('public conversion tracker records valid WhatsApp form submits without browser storage', () => {
@@ -338,6 +354,9 @@ test('public conversion tracker measures and routes valid WhatsApp form submits'
   assert.equal(result.lastConversion.landing, '/contact?bron=seo');
   assert.equal(result.lastConversion.referrer, '/diensten?utm=test');
   assert.equal(result.dispatched[0].type, 'softora:public-conversion');
+  assert.equal(result.beacons.length, 1);
+  assert.equal(result.beacons[0].url, '/api/public-conversion');
+  assert.equal(JSON.parse(result.beacons[0].body).name, 'public-form-submit');
 });
 
 test('public conversion tracker does not count invalid WhatsApp form submits', () => {

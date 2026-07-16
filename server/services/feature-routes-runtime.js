@@ -26,6 +26,7 @@ const { registerSupabaseCostRoutes } = require('../routes/supabase-costs');
 const { registerSupabaseMaintenanceRoutes } = require('../routes/supabase-maintenance');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerPublicContactRoutes } = require('../routes/public-contact');
+const { registerPublicConversionRoutes } = require('../routes/public-conversion');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerKvkDatabaseRoutes } = require('../routes/kvk-database');
@@ -76,6 +77,7 @@ function registerFeatureRoutes(app, deps = {}) {
     mailboxCoordinator = null,
     mailboxCronSecret = '',
     publicContactCoordinator = null,
+    publicConversionCoordinator = null,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
@@ -127,6 +129,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
 
   registerPublicContactRoutes(app, { coordinator: publicContactCoordinator });
+  registerPublicConversionRoutes(app, { coordinator: publicConversionCoordinator });
 
   registerSupabaseMaintenanceRoutes(app, {
     ...(supabaseMaintenance || {}),
