@@ -4,9 +4,6 @@
   var root = document.querySelector('[data-health-dossier]');
   if (!root) return;
 
-  var connectButton = root.querySelector('[data-health-connect]');
-  var syncButton = root.querySelector('[data-health-sync]');
-  var sheetLink = root.querySelector('[data-health-sheet]');
   var statusBox = root.querySelector('[data-health-status]');
   var statusText = root.querySelector('[data-health-status-text]');
 
@@ -159,12 +156,6 @@
 
   async function load() {
     var status = await request('/api/health/whoop/status');
-    if (status.spreadsheetUrl) {
-      sheetLink.href = status.spreadsheetUrl;
-      sheetLink.hidden = false;
-    }
-    connectButton.textContent = status.connected ? 'WHOOP opnieuw koppelen' : 'WHOOP koppelen';
-    syncButton.disabled = !status.connected;
     setText('[data-health-last-sync]', formatDate(status.lastSyncCompletedAt, true));
     setText('[data-health-last-day]', status.lastSyncedDay);
     if (!status.configured) setStatus('error', 'WHOOP-app is nog niet volledig geconfigureerd.');
@@ -176,7 +167,6 @@
   }
 
   async function sync(mode) {
-    syncButton.disabled = true;
     setStatus('', mode === 'backfill' ? 'Volledige WHOOP-geschiedenis wordt ingeladen…' : 'WHOOP-data wordt bijgewerkt…');
     try {
       var result = await request('/api/health/whoop/sync', {
@@ -188,22 +178,8 @@
       await load();
     } catch (error) {
       setStatus('error', error.message);
-    } finally {
-      syncButton.disabled = false;
     }
   }
-
-  connectButton.addEventListener('click', async function () {
-    connectButton.disabled = true;
-    try {
-      var payload = await request('/api/health/whoop/authorize');
-      window.location.assign(payload.authorizationUrl);
-    } catch (error) {
-      setStatus('error', error.message);
-      connectButton.disabled = false;
-    }
-  });
-  syncButton.addEventListener('click', function () { sync('manual'); });
 
   var params = new URLSearchParams(window.location.search);
   var whoopResult = params.get('whoop');
