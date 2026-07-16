@@ -299,6 +299,16 @@ function createService(overrides = {}) {
       return { ok: true };
     },
   };
+  const defaultEmailVerificationStore = {
+    getDecision: async (email) => ({
+      ok: true,
+      email,
+      allowed: true,
+      status: 'valid',
+      reason: 'mailbox_verified',
+      queued: false,
+    }),
+  };
   const service = createColdmailCampaignService({
     env: overrides.env || {},
     mailConfig: {
@@ -337,6 +347,10 @@ function createService(overrides = {}) {
       overrides.outboundRecipientGuardStore === undefined
         ? defaultOutboundRecipientGuardStore
         : overrides.outboundRecipientGuardStore,
+    emailVerificationStore:
+      overrides.emailVerificationStore === undefined
+        ? defaultEmailVerificationStore
+        : overrides.emailVerificationStore,
     dataOpsStore: overrides.dataOpsStore || null,
     getUiStateValues: async (scope) => {
       if (scope === 'premium_database_photos') {
@@ -10714,4 +10728,62 @@ test('coldmail campaign refuses to send when all recipient domains are invalid',
   assert.equal(savedRows[0].doNotMail, true);
   assert.equal(savedRows[0].coldmailInvalidEmailDomain, 'mcvecommerce.nl');
   assert.equal(savedRows[0].hist[0].source, 'coldmail-invalid-email-domain');
+});
+
+test('coldmail campaign queues an unverified mailbox and never reaches SMTP', async () => {
+  const decisions = [];
+  const { service, sentMessages } = createService({
+    emailVerificationStore: {
+      getDecision: async (email, metadata) => {
+        decisions.push({ email, metadata });
+        return {
+          ok: true,
+          email,
+          allowed: false,
+          status: 'pending',
+          reason: 'verification_missing',
+          queued: true,
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Test',
+      body: 'Test',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_EMAIL_VERIFICATION_PENDING');
+      assert.match(error.message, /Mailboxcontrole is ingepland/);
+      return true;
+    }
+  );
+
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].email, 'ruben@example.test');
+  assert.equal(decisions[0].metadata.source, 'softora-coldmail-autopilot');
+  assert.equal(sentMessages.length, 0);
+});
+
+test('coldmail campaign fails closed when the own mailbox store is unavailable', async () => {
+  const { service, sentMessages } = createService({ emailVerificationStore: null });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Test',
+      body: 'Test',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_EMAIL_VERIFICATION_UNAVAILABLE');
+      assert.match(error.message, /veilig gestopt/);
+      return true;
+    }
+  );
+
+  assert.equal(sentMessages.length, 0);
 });

@@ -4,6 +4,7 @@ const {
 const { createColdmailCampaignService } = require('./coldmail-campaign');
 const { createInstantlyOutreachService } = require('./instantly-outreach');
 const { createOutboundRecipientGuardStore } = require('./outbound-recipient-guard-store');
+const { createEmailVerificationStore } = require('./email-verification-store');
 
 const DEFAULT_DATA_OPS_UI_STATE_READ_TIMEOUT_MS = 2500;
 const DATA_OPS_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
@@ -153,6 +154,11 @@ function buildServerAppFeatureWiringRuntimeContext({
     getSupabaseClient: platformRuntime.getSupabaseClient,
     normalizeString: shared.normalizeString,
     truncateText: shared.truncateText,
+    logger: console,
+  });
+  const emailVerificationStore = createEmailVerificationStore({
+    isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
+    getSupabaseClient: platformRuntime.getSupabaseClient,
     logger: console,
   });
 
@@ -405,6 +411,7 @@ function buildServerAppFeatureWiringRuntimeContext({
           getUiStateValues: dataOpsAwareUiStateGetter,
           setUiStateValues: dataOpsAwareUiStateSetter,
           outboundRecipientGuardStore,
+          emailVerificationStore,
           dataOpsStore: uiSeoRuntime.dataOpsStore,
           customerDbScope: bootstrapState.PREMIUM_CUSTOMERS_SCOPE,
           customerDbKey: bootstrapState.PREMIUM_CUSTOMERS_KEY,
