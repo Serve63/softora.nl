@@ -8,6 +8,7 @@ const {
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
   protectWebsiteDomainInText,
   renderTextWithUnlinkedWebsiteDomain,
+  renderUnlinkedWebsiteDomain,
   renderWebdesignEmailDocument,
   renderWebdesignEmailHeadStyles,
   renderWebdesignImageSection,
@@ -27,10 +28,8 @@ test('website domain stays plain and indivisible while visible text remains unch
   );
   assert.doesNotMatch(html, /<a\b|href=|color:#0a66c2/);
   assert.equal(
-    html
-      .replace(/<[^>]+>/g, '')
-      .replace(/\u2060/g, ''),
-    line
+    html,
+    `Afgelopen week kwam ik jullie website ${renderUnlinkedWebsiteDomain(domain)} tegen.`
   );
 });
 
