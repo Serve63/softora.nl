@@ -2,15 +2,18 @@
   const root = document.querySelector('.seo-performance-main');
   if (!root) return;
 
-  const endpoint = '/api/seo/search-console-performance';
+  const performanceEndpoint = '/api/seo/search-console-performance';
+  const auditEndpoint = '/api/seo/site-audit';
   const state = {
     days: 90,
     activeTab: 'queries',
     payload: null,
+    audit: null,
+    search: '',
   };
 
   const tableLabels = {
-    queries: 'Meest uitgevoerde zoekopdracht',
+    queries: 'Zoekwoord',
     pages: 'Pagina',
     countries: 'Land',
     devices: 'Apparaat',
@@ -86,14 +89,23 @@
     return `${number > 0 ? '+' : ''}${formatNumber(number)}`;
   }
 
-  function setMetric(key, value, subtext) {
+  function signedPercent(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number) || number === 0) return '0,0%';
+    return `${number > 0 ? '+' : ''}${formatPercent(number)}`;
+  }
+
+  function setMetric(key, value, subtext, trend = '') {
     const valueEl = get(`[data-seo-metric="${key}"]`);
     const subtextEl = get(`[data-seo-delta="${key}"]`);
     if (valueEl) {
       valueEl.textContent = value;
       valueEl.classList.toggle('zero', value === '0' || value === '0%' || value === '-');
     }
-    if (subtextEl) subtextEl.textContent = subtext || '';
+    if (subtextEl) {
+      subtextEl.textContent = subtext || '';
+      subtextEl.dataset.trend = trend;
+    }
   }
 
   function setStatus(text, tone) {
@@ -108,20 +120,23 @@
   function renderMetrics(payload) {
     const totals = payload?.totals || {};
     const current = totals.current || {};
+    const previous = totals.previous || {};
     const clicksDelta = totals.clicksDelta || 0;
     const impressionsDelta = totals.impressionsDelta || 0;
     const ctrDelta = totals.ctrDelta || 0;
     const positionDelta = totals.positionDelta || 0;
 
-    setMetric('clicks', formatNumber(current.clicks), `${signed(clicksDelta)} vs vorige periode`);
-    setMetric('impressions', formatNumber(current.impressions, true), `${signed(impressionsDelta)} vs vorige periode`);
-    setMetric('ctr', formatPercent(current.ctr), `${formatPercent(ctrDelta)} verschil`);
+    setMetric('clicks', formatNumber(current.clicks), `${signed(clicksDelta)} vs vorige periode`, clicksDelta > 0 ? 'up' : clicksDelta < 0 ? 'down' : '');
+    setMetric('impressions', formatNumber(current.impressions, true), `${signed(impressionsDelta)} vs vorige periode`, impressionsDelta > 0 ? 'up' : impressionsDelta < 0 ? 'down' : '');
+    setMetric('ctr', formatPercent(current.ctr), `${signedPercent(ctrDelta)} vs vorige periode`, ctrDelta > 0 ? 'up' : ctrDelta < 0 ? 'down' : '');
 
-    const positionCopy =
-      positionDelta === 0
+    const positionCopy = Number(previous.position || 0) <= 0 && Number(current.position || 0) > 0
+      ? 'Nieuwe meetperiode'
+      : positionDelta === 0
         ? 'Geen positieverschuiving'
         : `${decimalFormatter.format(Math.abs(positionDelta))} positie ${positionDelta < 0 ? 'beter' : 'lager'}`;
-    setMetric('position', formatPosition(current.position), positionCopy);
+    const positionTrend = Number(previous.position || 0) <= 0 ? '' : positionDelta < 0 ? 'up' : positionDelta > 0 ? 'down' : '';
+    setMetric('position', formatPosition(current.position), positionCopy, positionTrend);
   }
 
   function pointSeries(rows, key, width, height, padding) {
@@ -188,6 +203,85 @@
     if (label) label.textContent = first === last ? first : `${first} - ${last}`;
   }
 
+  function renderOpportunities(payload) {
+    const target = get('[data-seo-opportunities]');
+    if (!target) return;
+    const queries = Array.isArray(payload?.rows?.queries) ? payload.rows.queries : [];
+    const pages = Array.isArray(payload?.rows?.pages) ? payload.rows.pages : [];
+    const actions = Array.isArray(payload?.actionQueue) ? payload.actionQueue : [];
+    const bestQuery = queries.slice().sort((a, b) => Number(b.clicks || 0) - Number(a.clicks || 0))[0];
+    const bestPage = pages.slice().sort((a, b) => Number(b.clicks || 0) - Number(a.clicks || 0))[0];
+    const quickWin = actions.find((item) => item.query) || queries
+      .filter((row) => !/softora/i.test(row.label || ''))
+      .filter((row) => Number(row.position || 0) > 4 && Number(row.position || 0) <= 20)
+      .sort((a, b) => Number(b.impressions || 0) - Number(a.impressions || 0))[0];
+    const cards = [
+      bestQuery && { icon: 'Q', title: bestQuery.label, meta: `${formatNumber(bestQuery.clicks)} klikken · ${formatNumber(bestQuery.impressions)} vertoningen` },
+      quickWin && { icon: '↗', title: quickWin.query || quickWin.label, meta: quickWin.action || `Positie ${formatPosition(quickWin.position)} · versterk snippet en content` },
+      bestPage && { icon: 'P', title: bestPage.label, meta: `Beste pagina · ${formatNumber(bestPage.clicks)} klikken · CTR ${formatPercent(bestPage.ctr)}` },
+    ].filter(Boolean);
+
+    if (cards.length === 0) {
+      target.innerHTML = '<p class="health-summary">Nog niet genoeg data om betrouwbare groeikansen te berekenen.</p>';
+      return;
+    }
+    target.innerHTML = cards.map((card) => `
+      <div class="opportunity-item">
+        <span class="opportunity-item__icon">${escapeHtml(card.icon)}</span>
+        <div><strong title="${escapeHtml(card.title)}">${escapeHtml(card.title)}</strong><span>${escapeHtml(card.meta)}</span></div>
+      </div>`).join('');
+  }
+
+  function renderActions() {
+    const target = get('[data-seo-actions]');
+    const count = get('[data-seo-action-count]');
+    if (!target) return;
+    const gscActions = Array.isArray(state.payload?.actionQueue) ? state.payload.actionQueue : [];
+    const auditActions = Array.isArray(state.audit?.improvements)
+      ? state.audit.improvements.map((action) => ({ priority: 'middel', action }))
+      : [];
+    const actions = [...gscActions, ...auditActions]
+      .filter((item, index, list) => item?.action && list.findIndex((candidate) => candidate.action === item.action) === index)
+      .slice(0, 5);
+    if (count) count.textContent = String(actions.length);
+    if (actions.length === 0) {
+      target.innerHTML = '<p class="health-summary">Geen directe rode vlaggen. Blijf prestaties en indexatie volgen.</p>';
+      return;
+    }
+    target.innerHTML = actions.map((item) => `
+      <div class="action-item">
+        <span class="action-priority${item.priority === 'hoog' ? '' : ' action-priority--middel'}">${escapeHtml(item.priority || 'middel')}</span>
+        <p>${escapeHtml(item.action)}</p>
+      </div>`).join('');
+  }
+
+  function renderAudit(audit) {
+    const score = get('[data-seo-health-score]');
+    const summary = get('[data-seo-health-summary]');
+    const metrics = get('[data-seo-health-metrics]');
+    if (!metrics) return;
+    if (!audit?.ok) {
+      if (score) score.textContent = '—';
+      if (summary) summary.textContent = 'De technische pagina-audit kon nu niet worden geladen.';
+      metrics.innerHTML = '';
+      return;
+    }
+    state.audit = audit;
+    if (score) score.textContent = String(audit.overallScore || 0);
+    if (summary) {
+      const pages = Number(audit.totals?.pages || 0);
+      const attention = Number(audit.totals?.pagesNeedingAttention || 0);
+      summary.textContent = `${pages} pagina's gecontroleerd · ${attention} vragen aandacht · score is gebaseerd op echte on-page checks.`;
+    }
+    metrics.innerHTML = (audit.metrics || []).slice(0, 5).map((metric) => `
+      <div class="health-metric">
+        <span class="health-metric__label">${escapeHtml(metric.label)}</span>
+        <span class="health-metric__track"><span class="health-metric__bar" style="width:${Math.max(0, Math.min(100, Number(metric.percent || 0)))}%"></span></span>
+        <span class="health-metric__value">${formatNumber(metric.percent)}%</span>
+      </div>`).join('');
+    renderActions();
+  }
+
   function renderTable() {
     const body = get('[data-seo-table-body]');
     const empty = get('[data-seo-empty-state]');
@@ -195,7 +289,8 @@
     const emptySub = get('[data-seo-empty-sub]');
     const label = get('[data-seo-table-label]');
     const payload = state.payload || {};
-    const rows = Array.isArray(payload?.rows?.[state.activeTab]) ? payload.rows[state.activeTab] : [];
+    const sourceRows = Array.isArray(payload?.rows?.[state.activeTab]) ? payload.rows[state.activeTab] : [];
+    const rows = sourceRows.filter((row) => String(row.label || '').toLowerCase().includes(state.search));
 
     if (label) label.textContent = tableLabels[state.activeTab] || tableLabels.queries;
     if (!body || !empty) return;
@@ -219,8 +314,10 @@
     if (rows.length === 0) {
       body.innerHTML = '';
       empty.hidden = false;
-      if (emptyTitle) emptyTitle.textContent = 'Geen gegevens gevonden';
-      if (emptySub) emptySub.textContent = emptyLabels[state.activeTab] || emptyLabels.queries;
+      if (emptyTitle) emptyTitle.textContent = state.search ? 'Geen match gevonden' : 'Geen gegevens gevonden';
+      if (emptySub) emptySub.textContent = state.search
+        ? 'Pas het filter aan om meer resultaten te zien.'
+        : emptyLabels[state.activeTab] || emptyLabels.queries;
       return;
     }
 
@@ -234,6 +331,8 @@
             <span class="td-query" title="${escapeHtml(labelText)}">${escapeHtml(labelText)}</span>
             <span class="td-num">${formatNumber(row.clicks)}</span>
             <span class="td-num">${formatNumber(row.impressions)}</span>
+            <span class="td-num">${formatPercent(row.ctr)}</span>
+            <span class="td-num">${formatPosition(row.position)}</span>
           </div>`;
       })
       .join('');
@@ -243,7 +342,12 @@
     state.payload = payload;
     renderMetrics(payload);
     renderChart(payload);
+    renderOpportunities(payload);
     renderTable();
+    renderActions();
+
+    const property = get('[data-seo-property]');
+    if (property && payload.siteUrl) property.textContent = String(payload.siteUrl).replace(/^sc-domain:/, '');
 
     if (!payload.connected) {
       setStatus('Search Console koppeling nodig', 'warning');
@@ -260,10 +364,25 @@
     setStatus(`Live bijgewerkt: ${time}`, 'good');
   }
 
-  async function loadPerformance() {
-    setStatus('Search Console laden...', 'muted');
+  async function loadAudit() {
     try {
-      const response = await fetch(`${endpoint}?days=${state.days}`, {
+      const response = await fetch(auditEndpoint, { headers: { Accept: 'application/json' } });
+      const audit = await response.json().catch(() => ({}));
+      renderAudit(response.ok ? audit : { ok: false });
+    } catch (_error) {
+      renderAudit({ ok: false });
+    }
+  }
+
+  async function loadPerformance() {
+    const refreshButton = get('[data-seo-refresh]');
+    setStatus('Search Console laden...', 'muted');
+    if (refreshButton) {
+      refreshButton.disabled = true;
+      refreshButton.classList.add('is-loading');
+    }
+    try {
+      const response = await fetch(`${performanceEndpoint}?days=${state.days}`, {
         headers: { Accept: 'application/json' },
       });
       const payload = await response.json().catch(() => ({}));
@@ -288,7 +407,17 @@
         },
         rows: {},
       });
+    } finally {
+      if (refreshButton) {
+        refreshButton.disabled = false;
+        refreshButton.classList.remove('is-loading');
+      }
     }
+  }
+
+  function loadConsole() {
+    loadPerformance();
+    loadAudit();
   }
 
   getAll('[data-seo-days]').forEach((button) => {
@@ -309,5 +438,16 @@
     });
   });
 
-  loadPerformance();
+  const searchInput = get('[data-seo-table-search]');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      state.search = String(searchInput.value || '').trim().toLowerCase();
+      renderTable();
+    });
+  }
+
+  const refreshButton = get('[data-seo-refresh]');
+  if (refreshButton) refreshButton.addEventListener('click', loadConsole);
+
+  loadConsole();
 }());
