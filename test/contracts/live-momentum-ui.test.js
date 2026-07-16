@@ -4,6 +4,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '../..');
+const endGameCardFiles = [
+  'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
+  'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
+  'gewenst-lang-kapsel.png', 'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png',
+  'gezondheidscenter.png', 'haartransplantatie.png', 'kantoorpand-in-haaren.png',
+  'ketting-armband.png', 'leuke-vriendin.png', 'nieuwe-whoop.png', 'prp-behandeling.png',
+  'ruben-zet-toto.png', 'rubens-company.png', 'rubens-trading-system.png',
+  'serves-gezondheidsdossier.png', 'tanden-rechtzetten.png', 'tandenbleek-voorraad.png',
+  'transfermarkt.png', 'vijf-kilo-spiermassa.png', 'world-watcher.png'
+];
 
 function read(fileName) {
   return fs.readFileSync(path.join(repoRoot, fileName), 'utf8');
@@ -16,13 +26,14 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716s"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716t"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716j" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716k" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -40,17 +51,13 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<div class="habit-grid" role="table" aria-label="Momentum taken in juli"><\/div>/);
   assert.match(html, /<\/section>\s*<h2 class="end-game-title">HET EINDSPEL<\/h2>\s*<section class="end-game-goals"/);
   assert.match(html, /<h2 class="end-game-title">HET EINDSPEL<\/h2>\s*<section class="end-game-goals" aria-label="Het Eindspel doelen">/);
-  assert.equal((html.match(/<article class="end-game-goal-card(?: [^"]+)?"/g) || []).length, 10);
-  assert.equal((html.match(/maxlength="240" aria-label="End Game doel \d+"/g) || []).length, 9);
-  assert.match(html, /<article class="end-game-goal-card end-game-goal-card--mission" tabindex="0" role="button" aria-haspopup="menu" aria-expanded="false"/);
-  assert.match(html, /src="\/assets\/live-momentum-eigen-automaat-rijden-card\.jpg\?v=20260716a"/);
-  assert.match(html, /alt="END GAME missie: Eigen automaat rijden"/);
-  assert.match(html, /class="end-game-mission-complete" aria-hidden="true"/);
-  assert.match(html, /<strong>AFGEROND<\/strong>/);
-  assert.match(html, /data-end-game-mission-action="toggle-complete">Afronden<\/button>/);
-  assert.match(html, /data-end-game-mission-action="remove">Verwijderen<\/button>/);
-  assert.deepEqual(Array.from(html.matchAll(/data-end-game-goal-index="(\d+)"/g), (match) => Number(match[1])), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.match(html, /<div class="end-game-goal-track"><\/div>/);
+  assert.doesNotMatch(html, /data-end-game-goal-index|Schrijf je doel/);
   assert.equal(fs.existsSync(path.join(repoRoot, 'assets/live-momentum-eigen-automaat-rijden-card.jpg')), true);
+  assert.deepEqual(
+    fs.readdirSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards')).filter((file) => file.endsWith('.png')).sort(),
+    endGameCardFiles
+  );
   assert.match(html, /<span class="momentum-art-quote is-end-game">The end game is to win<\/span>/);
   assert.match(html, /<span class="momentum-art-quote is-attack">Attack, attack, attack<\/span>/);
   assert.doesNotMatch(html, /Sleeping is for losers|is-sleeping/i);
@@ -119,6 +126,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.end-game-goal-card\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*min-height:\s*clamp\(290px, 33vh, 340px\);/);
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*padding:\s*0;[\s\S]*border:\s*0;/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
+  assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
+  assert.match(css, /\.end-game-card-name\s*\{[\s\S]*text-transform:\s*uppercase;/);
+  assert.match(css, /\.end-game-card-target\s*\{[\s\S]*border-radius:\s*50%;/);
   assert.match(css, /\.end-game-mission-complete\s*\{[\s\S]*background:\s*linear-gradient\([\s\S]*opacity:\s*0;/);
   assert.match(css, /\.end-game-goal-card--mission\.is-completed \.end-game-mission-complete\s*\{[\s\S]*opacity:\s*1;[\s\S]*visibility:\s*visible;/);
   assert.match(css, /\.end-game-mission-actions\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*3;/);
@@ -168,6 +178,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
 test('live momentum script wires habit toggles to chart and persisted state', () => {
   const js = read('assets/live-momentum.js');
   const goalActionsJs = read('assets/live-momentum-goal-actions.js');
+  const endGameCardsJs = read('assets/live-momentum-endgame-cards.js');
 
   assert.match(js, /startDay:\s*13/);
   assert.match(js, /today:\s*13/);
@@ -190,21 +201,34 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /function updateChart\(\)/);
   assert.match(js, /function getDayScore\(day\)/);
   assert.match(js, /function renderChartShell\(\)/);
-  assert.match(js, /const END_GAME_GOAL_COUNT = 10;/);
-  assert.match(js, /function normalizeEndGameMissionCard\(value\)/);
-  assert.match(js, /endGameMissionCard:\s*normalizeEndGameMissionCard\(endGameMissionCardState\)/);
-  assert.match(js, /renderEndGameMissionCard\(storedState\.endGameMissionCard\)/);
-  assert.match(js, /data-end-game-mission-action/);
-  assert.match(js, /completed:\s*!endGameMissionCardState\.completed/);
-  assert.match(js, /deleted:\s*true/);
-  assert.match(js, /Nogmaals: verwijderen/);
-  assert.match(js, /function getEndGameGoalIndex\(field\)/);
-  assert.match(js, /field\.dataset\.endGameGoalIndex/);
-  assert.match(js, /goals\[index\] = String\(field\.value/);
-  assert.match(js, /field\.value = normalizedGoals\[index\]/);
-  assert.match(js, /endGameGoals:\s*getCurrentEndGameGoals\(\)/);
-  assert.match(js, /renderEndGameGoals\(storedState\.endGameGoals\)/);
-  assert.match(js, /endGameGoalTrack\.addEventListener\('input'/);
+  assert.match(js, /endGameMissionCard:\s*endGameCards\.getLegacyMissionState\(\)/);
+  assert.match(js, /endGameCards:\s*endGameCards\.getState\(\)/);
+  assert.match(js, /endGameCards\.render\(storedState\.endGameCards\)/);
+  assert.match(js, /endGameCards\.needsMigration\(parsed\.endGameCards\)/);
+  assert.match(endGameCardsJs, /const CARD_CATALOG = \[/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.id\}\.png\?v=20260716a/);
+  assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
+  assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
+  assert.match(endGameCardsJs, /title:\s*'Ketting & Armband'/);
+  assert.match(endGameCardsJs, /title:\s*'Haartransplantatie'/);
+  assert.match(endGameCardsJs, /title:\s*'<13% bodyfat'/);
+  assert.match(endGameCardsJs, /title:\s*'\+5KG Spiermassa'/);
+  assert.match(endGameCardsJs, /title:\s*"Servé's gezondheidsdossier"/);
+  assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
+  assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
+  [
+    'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Gezichtsbeharing naar wens',
+    'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
+    'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Gezondheidscenter',
+    "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Transfermarkt',
+    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast'
+  ].forEach((title) => assert.equal(endGameCardsJs.includes(title), true, `missing card title: ${title}`));
+  assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'toggle-complete'/);
+  assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'remove'/);
+  assert.match(endGameCardsJs, /Nogmaals: verwijderen/);
+  assert.match(endGameCardsJs, /updateCard\(cardId, \{ deleted: true \}\)/);
+  assert.match(endGameCardsJs, /onStateChange\(\);/);
+  assert.match(endGameCardsJs, /window\.SoftoraMomentumEndGameCards/);
   assert.doesNotMatch(js, /renderLineChart|setChartMode|chartMode|chartSwitches|getVisibleScore/);
   assert.match(js, /function renderGridShell\(goals\)/);
   assert.match(js, /function createGoalDragHandle\(goal\)/);
