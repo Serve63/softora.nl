@@ -95,6 +95,18 @@ test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => 
   assert.match(readRepoFile('assets/premium-health-dossier.js'), /mode:\s*mode \|\| 'manual'/);
 });
 
+test('gezondheidsdossier krijgt een eigen actief sidebar-item onder Extra', () => {
+  const pageSource = readRepoFile('premium-gezondheidsdossier.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const settingsLink = pageSource.match(/<a [^>]*data-sidebar-key="settings"[^>]*>/);
+
+  assert.ok(settingsLink, 'gezondheidsdossier mist de instellingenlink');
+  assert.doesNotMatch(settingsLink[0], /\bactive\b/);
+  assert.match(themeSource, /p\.indexOf\("\/premium-gezondheidsdossier"\) === 0\) return "health_dossier"/);
+  assert.match(themeSource, /key: "health_dossier"[\s\S]*href: "\/premium-gezondheidsdossier"[\s\S]*label: "Gezondheidsdossier"/);
+  assert.match(themeSource, /ensureStaticSidebarLink\([\s\S]*"extra",[\s\S]*getHealthDossierSidebarLink\(\),[\s\S]*\["monthly_costs"/);
+});
+
 test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
   const source = readRepoFile('premium-opdracht-dossier.html');
   const asideEnd = source.indexOf('</aside>');
