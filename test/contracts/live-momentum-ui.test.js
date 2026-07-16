@@ -5,11 +5,12 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
-  'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
-  'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
+  '2030.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
+  'eigen-automaat-rijden.png', 'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
   'gewenst-lang-kapsel.png', 'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png',
   'gezondheidscenter.png', 'haartransplantatie.png', 'kantoorpand-in-haaren.png',
-  'ketting-armband.png', 'leuke-vriendin.png', 'nieuwe-whoop.png', 'prp-behandeling.png',
+  'ketting-armband.png', 'leuke-vriendin.png', 'nieuwe-whoop.png', 'oktober-2024.png',
+  'prp-behandeling.png',
   'ruben-zet-toto.png', 'rubens-company.png', 'rubens-trading-system.png',
   'serves-gezondheidsdossier.png', 'tanden-rechtzetten.png', 'tandenbleek-voorraad.png',
   'transfermarkt.png', 'vijf-kilo-spiermassa.png', 'world-watcher.png'
@@ -26,14 +27,15 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716y"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716z"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716l" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
@@ -60,7 +62,6 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<h2 class="end-game-title">HET EINDSPEL<\/h2>\s*<section class="end-game-goals" aria-label="Het Eindspel doelen">/);
   assert.match(html, /<div class="end-game-goal-track"><\/div>/);
   assert.doesNotMatch(html, /data-end-game-goal-index|Schrijf je doel/);
-  assert.equal(fs.existsSync(path.join(repoRoot, 'assets/live-momentum-eigen-automaat-rijden-card.jpg')), true);
   assert.deepEqual(
     fs.readdirSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards')).filter((file) => file.endsWith('.png')).sort(),
     endGameCardFiles
@@ -146,6 +147,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.end-game-goal-track\s*\{[\s\S]*display:\s*flex;[\s\S]*width:\s*max-content;/);
   assert.match(css, /\.end-game-goal-card\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*min-height:\s*clamp\(290px, 33vh, 340px\);/);
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*padding:\s*0;[\s\S]*border:\s*0;/);
+  assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*cursor:\s*grab;[\s\S]*touch-action:\s*pan-y;[\s\S]*user-select:\s*none;/);
+  assert.match(css, /\.end-game-goals\.is-card-reordering\s*\{[\s\S]*scroll-snap-type:\s*none;[\s\S]*cursor:\s*grabbing;/);
+  assert.match(css, /\.end-game-goal-card--mission\.is-card-dragging\s*\{[\s\S]*will-change:\s*transform;/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-name\s*\{[\s\S]*text-transform:\s*uppercase;/);
@@ -201,6 +205,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   const js = read('assets/live-momentum.js');
   const goalActionsJs = read('assets/live-momentum-goal-actions.js');
   const endGameCardsJs = read('assets/live-momentum-endgame-cards.js');
+  const endGameInteractionsJs = read('assets/live-momentum-endgame-interactions.js');
   const videoJs = read('assets/live-momentum-video.js');
 
   assert.match(js, /startDay:\s*13/);
@@ -234,6 +239,11 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /endGameCards\.render\(storedState\.endGameCards\)/);
   assert.match(js, /endGameCards\.needsMigration\(parsed\.endGameCards\)/);
   assert.match(endGameCardsJs, /const CARD_CATALOG = \[/);
+  assert.match(endGameCardsJs, /normalized\.__order = normalizeOrder\(value\?\.__order\)/);
+  assert.match(endGameCardsJs, /__order:\s*\[\.\.\.state\.__order\]/);
+  assert.match(endGameCardsJs, /onOrderChange\(visibleOrder\)/);
+  assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
+  assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.id\}\.png\?v=20260716a/);
   assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
   assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
@@ -244,12 +254,14 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*"Servé's gezondheidsdossier"/);
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
+  assert.match(endGameCardsJs, /\{ id: '2030', title: '2030\?' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…' \}/);
   [
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Transfermarkt',
-    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast'
+    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast', '2030?', 'Oktober 2024…'
   ].forEach((title) => assert.equal(endGameCardsJs.includes(title), true, `missing card title: ${title}`));
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'toggle-complete'/);
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'remove'/);
@@ -257,6 +269,14 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /updateCard\(cardId, \{ deleted: true \}\)/);
   assert.match(endGameCardsJs, /onStateChange\(\);/);
   assert.match(endGameCardsJs, /window\.SoftoraMomentumEndGameCards/);
+  assert.match(endGameInteractionsJs, /const DRAG_THRESHOLD = 8/);
+  assert.match(endGameInteractionsJs, /addEventListener\('pointerdown'/);
+  assert.match(endGameInteractionsJs, /addEventListener\('pointermove'/);
+  assert.match(endGameInteractionsJs, /addEventListener\('pointerup', finishDrag\)/);
+  assert.match(endGameInteractionsJs, /onOrderChange\(getVisibleCardIds\(\)\)/);
+  assert.match(endGameInteractionsJs, /event\.preventDefault\(\);[\s\S]*wheelTarget = nextTarget/);
+  assert.match(endGameInteractionsJs, /\{ passive: false \}/);
+  assert.match(endGameInteractionsJs, /window\.SoftoraMomentumEndGameInteractions/);
   assert.match(videoJs, /const VIDEO_ID = 'XwtdR-oW6XA'/);
   assert.match(videoJs, /youtube-nocookie\.com\/embed\/\$\{VIDEO_ID\}/);
   assert.match(videoJs, /autoplay:\s*'1'/);
