@@ -1,6 +1,6 @@
 (() => {
   const CARD_CATALOG = [
-    { id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden', standaloneImage: '/assets/live-momentum-eigen-automaat-rijden-card.jpg?v=20260716a' },
+    { id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' },
     { id: 'prp-behandeling', title: 'PRP Behandeling' },
     { id: 'ketting-armband', title: 'Ketting & Armband' },
     { id: 'haartransplantatie', title: 'Haartransplantatie' },
@@ -112,7 +112,7 @@
     return artwork;
   }
 
-  function createCard(card, state, index) {
+  function createCard(card, state) {
     const article = document.createElement('article');
     article.className = 'end-game-goal-card end-game-goal-card--mission';
     article.dataset.endGameCardId = card.id;
@@ -124,18 +124,7 @@
       ? `Missie: ${card.title}, afgerond. Klik voor acties.`
       : `Missie: ${card.title}. Klik voor acties.`);
     article.classList.toggle('is-completed', state.completed);
-    if (index === 0) {
-      const image = document.createElement('img');
-      image.src = card.standaloneImage;
-      image.alt = `END GAME missie: ${card.title}`;
-      image.width = 1024;
-      image.height = 1536;
-      image.loading = 'eager';
-      image.decoding = 'async';
-      article.append(image);
-    } else {
-      article.append(createCardArtwork(card));
-    }
+    article.append(createCardArtwork(card));
     article.append(createCompletionOverlay(), createActions(card, state.completed));
     return article;
   }
@@ -146,8 +135,8 @@
     function render(value = state) {
       state = normalizeState(value);
       const fragment = document.createDocumentFragment();
-      CARD_CATALOG.forEach((card, index) => {
-        if (!state[card.id].deleted) fragment.append(createCard(card, state[card.id], index));
+      CARD_CATALOG.forEach((card) => {
+        if (!state[card.id].deleted) fragment.append(createCard(card, state[card.id]));
       });
       track.replaceChildren(fragment);
     }

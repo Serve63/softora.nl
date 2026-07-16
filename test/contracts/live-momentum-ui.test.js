@@ -6,7 +6,7 @@ const path = require('node:path');
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
   'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
-  'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
+  'eigen-automaat-rijden.png', 'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
   'gewenst-lang-kapsel.png', 'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png',
   'gezondheidscenter.png', 'haartransplantatie.png', 'kantoorpand-in-haaren.png',
   'ketting-armband.png', 'leuke-vriendin.png', 'nieuwe-whoop.png', 'prp-behandeling.png',
@@ -60,7 +60,6 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<h2 class="end-game-title">HET EINDSPEL<\/h2>\s*<section class="end-game-goals" aria-label="Het Eindspel doelen">/);
   assert.match(html, /<div class="end-game-goal-track"><\/div>/);
   assert.doesNotMatch(html, /data-end-game-goal-index|Schrijf je doel/);
-  assert.equal(fs.existsSync(path.join(repoRoot, 'assets/live-momentum-eigen-automaat-rijden-card.jpg')), true);
   assert.deepEqual(
     fs.readdirSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards')).filter((file) => file.endsWith('.png')).sort(),
     endGameCardFiles
@@ -234,6 +233,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /endGameCards\.render\(storedState\.endGameCards\)/);
   assert.match(js, /endGameCards\.needsMigration\(parsed\.endGameCards\)/);
   assert.match(endGameCardsJs, /const CARD_CATALOG = \[/);
+  assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
+  assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.id\}\.png\?v=20260716a/);
   assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
   assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
