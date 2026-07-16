@@ -16,7 +16,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716k"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716l"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -96,7 +96,9 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.habit-board::\-webkit-scrollbar\s*\{[^}]*display:\s*none;/);
   assert.match(css, /\.end-game-title\s*\{[\s\S]*margin:\s*clamp\(3\.5rem, 7vh, 6rem\) auto 0;[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*font-size:\s*2rem;[\s\S]*text-align:\s*center;/);
   assert.match(css, /\.momentum-hero,\s*\.habit-board,\s*\.end-game-title,\s*\.end-game-goals\s*\{[\s\S]*z-index:\s*1;/);
-  assert.match(css, /\.end-game-goals\s*\{[\s\S]*overflow-x:\s*auto;[\s\S]*scroll-snap-type:\s*x proximity;/);
+  assert.match(css, /\.end-game-goals\s*\{[\s\S]*overflow-x:\s*auto;[\s\S]*scroll-padding-inline-start:\s*3rem;[\s\S]*scroll-snap-type:\s*x proximity;/);
+  assert.match(css, /@media \(max-width:\s*1200px\)[\s\S]*\.end-game-goals\s*\{[\s\S]*scroll-padding-inline-start:\s*18px;/);
+  assert.match(css, /@media \(max-width:\s*520px\)[\s\S]*\.end-game-goals\s*\{[\s\S]*scroll-padding-inline-start:\s*12px;/);
   assert.match(css, /\.end-game-goal-track\s*\{[\s\S]*display:\s*flex;[\s\S]*width:\s*max-content;/);
   assert.match(css, /\.end-game-goal-card\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*min-height:\s*clamp\(290px, 33vh, 340px\);/);
   assert.match(css, /\.momentum-art-quotes\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*0;[\s\S]*inset:\s*0;[\s\S]*pointer-events:\s*none;/);
