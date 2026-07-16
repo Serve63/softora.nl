@@ -20,6 +20,7 @@
   const ICONS_BY_KEY = new Map(ICON_CATALOG.map((icon) => [icon.key, icon]));
   const ICON_CATEGORIES = Array.from(new Set(ICON_CATALOG.map((icon) => icon.category).filter(Boolean)));
   const ALL_ICON_CATEGORIES = 'Alle';
+  const goalActionsApi = window.SoftoraMomentumGoalActions;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
     { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [TODAY] },
@@ -47,13 +48,14 @@
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let endGameMissionCardState = { completed: false, deleted: false };
   let draggedGoalId = '';
-  if (!grid || !chart || !endGameGoalTrack || !endGameMissionCard || !endGameMissionActions || !endGameMissionCompleteButton || !endGameMissionRemoveButton) {
+  if (!grid || !chart || !endGameGoalTrack || !endGameMissionCard || !endGameMissionActions || !endGameMissionCompleteButton || !endGameMissionRemoveButton || !goalActionsApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
   chart.style.setProperty('--day-count', String(TOTAL_DAYS));
   const getChartBars = () => Array.from(chart.querySelectorAll('.bar-wrap'));
   const getGoalRows = () => Array.from(grid.querySelectorAll('.habit-name'));
+  const goalActions = goalActionsApi.createController({ grid, getGoalRows });
   const getLabels = () => Array.from(grid.querySelectorAll('.habit-label'));
   const getStatusCells = () => Array.from(grid.querySelectorAll('.status'));
   const getEndGameGoalFields = () => Array.from(endGameGoalTrack.querySelectorAll('textarea'));
@@ -677,8 +679,9 @@
     handle.className = 'goal-drag-handle';
     handle.type = 'button';
     handle.draggable = true;
-    handle.setAttribute('aria-label', `Sleep ${goal.label || 'dit doel'} om de volgorde te wijzigen`);
-    handle.title = 'Sleep om de volgorde te wijzigen';
+    handle.setAttribute('aria-label', `Sleep ${goal.label || 'dit doel'} om de volgorde te wijzigen of klik voor acties`);
+    handle.setAttribute('aria-haspopup', 'menu');
+    handle.title = 'Sleep om te verplaatsen of klik voor acties';
     handle.append(createIcon([
       '<circle cx="8" cy="7" r="1" />',
       '<circle cx="16" cy="7" r="1" />',
@@ -705,15 +708,15 @@
       addButton.setAttribute('aria-label', 'Doel toevoegen na laatste opdracht');
       addButton.textContent = '+';
       rowHeader.append(addButton);
-    } else {
-      const iconButton = document.createElement('button');
-      iconButton.className = 'goal-icon-button';
-      iconButton.type = 'button';
-      iconButton.setAttribute('aria-label', `Icoon kiezen voor ${goal.label}`);
-      iconButton.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
-      rowHeader.append(iconButton);
     }
-    rowHeader.append(createLabel(goal.label, goal.isDraft), createGoalDragHandle(goal));
+    const iconButton = document.createElement('button');
+    const dragHandle = createGoalDragHandle(goal);
+    iconButton.className = 'goal-icon-button';
+    iconButton.type = 'button';
+    iconButton.setAttribute('aria-label', `Icoon kiezen voor ${goal.label}`);
+    iconButton.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
+    dragHandle.setAttribute('aria-expanded', 'false');
+    rowHeader.append(iconButton, createLabel(goal.label, goal.isDraft), dragHandle, goalActions.create(goal));
     return rowHeader;
   }
   function renderChartShell() {
@@ -828,6 +831,22 @@
     draggedGoalId = '';
     getGoalRows().forEach((row) => row.classList.remove('is-dragging', 'is-drop-target'));
   }
+  function removeGoal(goalId) {
+    const goals = getCurrentGoals({ includeDraft: true });
+    if (goals.length <= 1) {
+      return false;
+    }
+    const nextGoals = goals.filter((goal) => goal.id !== goalId);
+    if (nextGoals.length === goals.length) {
+      return false;
+    }
+    renderGridShell(nextGoals);
+    refreshCellData();
+    getLabels().forEach(bindLabel);
+    updateChart();
+    markStateChanged();
+    return true;
+  }
   async function hydrateState() {
     const uiStateClient = window.SoftoraUiStateClient;
     if (!uiStateClient || typeof uiStateClient.get !== 'function' || typeof uiStateClient.set !== 'function') {
@@ -871,6 +890,37 @@
     if (!stateReady) {
       return;
     }
+    const goalAction = event.target.closest('[data-goal-action]');
+    if (goalAction && grid.contains(goalAction)) {
+      event.stopPropagation();
+      const row = goalAction.closest('.habit-name');
+      const actions = goalAction.closest('.goal-row-actions');
+      if (goalAction.dataset.goalAction === 'remove') {
+        if (getCurrentGoals({ includeDraft: true }).length <= 1) {
+          goalAction.textContent = 'Minimaal één doel nodig';
+          return;
+        }
+        if (goalAction.dataset.confirmRemove !== 'true') {
+          goalAction.dataset.confirmRemove = 'true';
+          goalAction.textContent = 'Nogmaals: verwijderen';
+          return;
+        }
+        goalActions.close();
+        removeGoal(row?.dataset.goalId || '');
+      } else {
+        goalActions.reset(actions);
+      }
+      return;
+    }
+    const dragHandle = event.target.closest('.goal-drag-handle');
+    if (dragHandle && grid.contains(dragHandle)) {
+      event.preventDefault();
+      if (goalActions.isClickSuppressed()) {
+        return;
+      }
+      goalActions.toggle(dragHandle);
+      return;
+    }
     const addButton = event.target.closest('.add-goal');
     if (addButton && grid.contains(addButton)) {
       createGoalRow();
@@ -887,6 +937,10 @@
     }
     toggleCell(cell);
   });
+  grid.addEventListener('pointerdown', goalActions.handlePointerDown);
+  grid.addEventListener('pointermove', goalActions.handlePointerMove);
+  grid.addEventListener('pointerup', goalActions.clearPointerGesture);
+  grid.addEventListener('pointercancel', goalActions.clearPointerGesture);
   grid.addEventListener('keydown', (event) => {
     if (!stateReady) {
       return;
@@ -917,6 +971,7 @@
       return;
     }
     draggedGoalId = row.dataset.goalId || '';
+    goalActions.suppressClick();
     row.classList.add('is-dragging');
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
@@ -949,7 +1004,10 @@
     clearGoalDragState();
     reorderGoal(sourceGoalId, targetGoalId);
   });
-  grid.addEventListener('dragend', clearGoalDragState);
+  grid.addEventListener('dragend', () => {
+    goalActions.suppressClick();
+    clearGoalDragState();
+  });
   grid.addEventListener('focusout', (event) => {
     const label = event.target.closest('.habit-label');
     if (!label) {
@@ -1025,12 +1083,23 @@
     if (!endGameMissionActions.hidden && !endGameMissionCard.contains(event.target)) {
       closeEndGameMissionActions();
     }
+    if (!event.target.closest('.goal-row-actions, .goal-drag-handle')) {
+      goalActions.close();
+    }
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !endGameMissionActions.hidden) {
       closeEndGameMissionActions({ restoreFocus: true });
     }
+    if (event.key === 'Escape') {
+      const openGoalActions = grid.querySelector('.goal-row-actions:not([hidden])');
+      const goalId = openGoalActions?.closest('.habit-name')?.dataset.goalId;
+      if (openGoalActions && goalId) {
+        goalActions.close({ restoreFocus: true, goalId });
+      }
+    }
   });
+  window.addEventListener('scroll', () => goalActions.close(), true);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && stateDirty) {
       flushStateWrite();
