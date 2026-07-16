@@ -5,6 +5,8 @@
   const PERIOD_KEY = '2026-07';
   const MAX_GOALS = 24;
   const MAX_LABEL_LENGTH = 80;
+  const END_GAME_GOAL_COUNT = 10;
+  const MAX_END_GAME_GOAL_LENGTH = 240;
   const SAVE_DEBOUNCE_MS = 250;
   const SAVE_RETRY_MS = 1500;
   const MAX_SAVE_RETRIES = 3;
@@ -29,6 +31,7 @@
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
   const srSummary = document.querySelector('.chart-card .sr-only');
+  const endGameGoalTrack = document.querySelector('.end-game-goal-track');
   let stateReady = false;
   let stateDirty = false;
   let saveTimer = null;
@@ -39,7 +42,7 @@
   let iconPicker = null;
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
-  if (!grid || !chart) {
+  if (!grid || !chart || !endGameGoalTrack) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -48,6 +51,7 @@
   const getGoalRows = () => Array.from(grid.querySelectorAll('.habit-name'));
   const getLabels = () => Array.from(grid.querySelectorAll('.habit-label'));
   const getStatusCells = () => Array.from(grid.querySelectorAll('.status'));
+  const getEndGameGoalFields = () => Array.from(endGameGoalTrack.querySelectorAll('textarea'));
   const getDay = (cell) => Number(cell.dataset.day || 0);
   const getLabelText = (index) => getLabels()[index]?.textContent.trim() || `Taak ${index + 1}`;
   const isChecked = (cell) => cell.classList.contains('is-done');
@@ -61,6 +65,20 @@
       .map((day) => Number(day))
       .filter((day) => Number.isInteger(day) && day >= 1 && day <= PERIOD.lastDay)))
       .sort((left, right) => left - right);
+  }
+  function normalizeEndGameGoals(value) {
+    return Array.from({ length: END_GAME_GOAL_COUNT }, (_, index) => String(value?.[index] || '')
+      .trim()
+      .slice(0, MAX_END_GAME_GOAL_LENGTH));
+  }
+  function getCurrentEndGameGoals() {
+    return normalizeEndGameGoals(getEndGameGoalFields().map((field) => field.value));
+  }
+  function renderEndGameGoals(goals) {
+    const normalizedGoals = normalizeEndGameGoals(goals);
+    getEndGameGoalFields().forEach((field, index) => {
+      field.value = normalizedGoals[index];
+    });
   }
   function normalizeGoal(goal, index) {
     const fallback = DEFAULT_GOALS[index] || {};
@@ -115,6 +133,7 @@
     return {
       version: STATE_VERSION,
       period: PERIOD_KEY,
+      endGameGoals: getCurrentEndGameGoals(),
       goals: getCurrentGoals().map((goal) => ({
         id: goal.id,
         label: goal.label,
@@ -138,7 +157,7 @@
       if (!goals.length) {
         return null;
       }
-      return { goals };
+      return { goals, endGameGoals: normalizeEndGameGoals(parsed.endGameGoals) };
     } catch (error) {
       console.warn('[LiveMomentum][state-parse]', error?.message || error);
       return null;
@@ -665,6 +684,7 @@
       const storedState = parseStoredState(response.values?.[STATE_KEY]);
       if (storedState) {
         renderGridShell(storedState.goals);
+        renderEndGameGoals(storedState.endGameGoals);
         refreshCellData();
         getLabels().forEach(bindLabel);
         updateChart();
@@ -681,6 +701,7 @@
   }
   renderChartShell();
   renderGridShell(getDefaultGoals());
+  renderEndGameGoals([]);
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
@@ -725,6 +746,13 @@
       label.textContent = 'Nieuw doel';
     }
     getStatusCells().forEach(syncCellA11y);
+    markStateChanged();
+  });
+  endGameGoalTrack.addEventListener('input', (event) => {
+    const field = event.target.closest('textarea');
+    if (!field || !endGameGoalTrack.contains(field)) {
+      return;
+    }
     markStateChanged();
   });
   document.addEventListener('visibilitychange', () => {
