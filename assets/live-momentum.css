@@ -384,21 +384,6 @@ button {
   text-align: right;
   -webkit-text-stroke-color: rgba(35, 159, 88, .1);
 }
-.momentum-art-quote.is-winners {
-  top: 57%;
-  left: 5%;
-  max-width: 10em;
-  font-size: clamp(2rem, 3.3vw, 4rem);
-}
-.momentum-art-quote.is-old-days {
-  top: 64%;
-  right: 4%;
-  max-width: 10.5em;
-  color: rgba(35, 159, 88, .028);
-  font-size: clamp(1.9rem, 2.9vw, 3.5rem);
-  text-align: right;
-  -webkit-text-stroke-color: rgba(35, 159, 88, .085);
-}
 .momentum-watermark {
   position: absolute;
   top: 76%;
@@ -898,14 +883,6 @@ button {
   }
   .momentum-art-quote.is-attack {
     top: 17%;
-    right: 3%;
-  }
-  .momentum-art-quote.is-winners {
-    top: 59%;
-    left: 3%;
-  }
-  .momentum-art-quote.is-old-days {
-    top: 68%;
     right: 3%;
   }
 }
