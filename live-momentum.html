@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
   <link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=20260611a">
-  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260716t">
+  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260716w">
+  <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260716a">
   <script src="/assets/personnel-theme.js?v=20260715a" defer></script>
   <script src="/assets/premium-sidebar-autopilot.js?v=20260611a" defer></script>
 </head>
@@ -93,6 +94,14 @@
           <h1 id="momentum-title">ATTACK, ATTACK, ATTACK.</h1>
           <p>Back on Track</p>
         </div>
+        <button class="momentum-video-trigger" type="button" aria-label="Motivatievideo openen" aria-haspopup="dialog" aria-controls="momentum-video-dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="6" width="13" height="12" rx="3"></rect>
+            <path d="m16 10 4.2-2.4a.55.55 0 0 1 .8.48v7.84a.55.55 0 0 1-.8.48L16 14"></path>
+            <path d="m8.6 10 3.8 2-3.8 2z" fill="currentColor" stroke="none"></path>
+          </svg>
+          <span class="momentum-video-trigger-dot" aria-hidden="true"></span>
+        </button>
       </header>
 
       <div class="chart-card">
@@ -119,10 +128,27 @@
     </section>
     </main>
   </div>
+  <dialog class="momentum-video-dialog" id="momentum-video-dialog" aria-labelledby="momentum-video-title">
+    <div class="momentum-video-shell">
+      <header class="momentum-video-header">
+        <div>
+          <span>Softora momentum</span>
+          <h2 id="momentum-video-title">ATTACK MODE</h2>
+        </div>
+        <button class="momentum-video-close" type="button" aria-label="Video sluiten">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M7 7l10 10M17 7 7 17"></path>
+          </svg>
+        </button>
+      </header>
+      <div class="momentum-video-stage" data-momentum-video-player></div>
+    </div>
+  </dialog>
   <script src="/assets/premium-ui-state-client.js?v=20260605a"></script>
   <script src="/assets/live-momentum-icon-catalog.js?v=20260716b" defer></script>
   <script src="/assets/live-momentum-goal-actions.js?v=20260716a" defer></script>
   <script src="/assets/live-momentum-endgame-cards.js?v=20260716a" defer></script>
+  <script src="/assets/live-momentum-video.js?v=20260716a" defer></script>
   <script src="/assets/live-momentum.js?v=20260716k" defer></script>
 </body>
 </html>

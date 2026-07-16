@@ -26,13 +26,15 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716t"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716w"/);
+  assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716k" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
@@ -43,6 +45,11 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">\s*<div class="momentum-art-quotes" aria-hidden="true">/);
   assert.match(html, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
   assert.match(html, /<p>Back on Track<\/p>/);
+  assert.match(html, /class="momentum-video-trigger"[^>]*aria-label="Motivatievideo openen"[^>]*aria-haspopup="dialog"/);
+  assert.match(html, /<dialog class="momentum-video-dialog" id="momentum-video-dialog" aria-labelledby="momentum-video-title">/);
+  assert.match(html, /<h2 id="momentum-video-title">ATTACK MODE<\/h2>/);
+  assert.match(html, /class="momentum-video-stage" data-momentum-video-player/);
+  assert.doesNotMatch(html, /youtube\.com\/shorts|youtu\.be/);
   assert.doesNotMatch(html, /Juli 2026 .* gestart op 13 juli/);
   assert.doesNotMatch(html, /today-score|score-label|Score vandaag/);
   assert.doesNotMatch(html, /score-points|100 \/ 100|punten<\/span>/);
@@ -80,6 +87,7 @@ test('live momentum page renders the requested dashboard surface', () => {
 
 test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const css = read('assets/live-momentum.css');
+  const videoCss = read('assets/live-momentum-video.css');
 
   assert.match(css, /--page-bg:\s*#f8f7f4;/);
   assert.match(css, /--ink:\s*#1a1a2e;/);
@@ -96,6 +104,14 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-family:\s*var\(--font-display\);/);
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*font-size:\s*2rem;/);
   assert.match(css, /\.momentum-head h1\s*\{[\s\S]*text-transform:\s*uppercase;/);
+  assert.doesNotMatch(css, /\.momentum-video-trigger|\.momentum-video-dialog|\.momentum-video-shell/);
+  assert.match(videoCss, /\.momentum-video-trigger\s*\{[\s\S]*width:\s*46px;[\s\S]*height:\s*46px;[\s\S]*cursor:\s*pointer;/);
+  assert.match(videoCss, /\.momentum-video-dialog::backdrop\s*\{[\s\S]*backdrop-filter:\s*blur\(12px\);/);
+  assert.match(videoCss, /\.momentum-video-dialog\s*\{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*0;[\s\S]*width:\s*100vw;[\s\S]*height:\s*100dvh;/);
+  assert.match(videoCss, /\.momentum-video-dialog\[open\]\s*\{[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/);
+  assert.match(videoCss, /\.momentum-video-shell\s*\{[\s\S]*width:\s*min\(88vw, 430px, calc\(\(100dvh - 110px\) \* \.5625\)\);/);
+  assert.match(videoCss, /\.momentum-video-stage\s*\{[\s\S]*aspect-ratio:\s*9 \/ 16;/);
+  assert.match(videoCss, /body\.momentum-video-open\s*\{[\s\S]*overflow:\s*hidden;/);
   const letterSpacingValues = Array.from(css.matchAll(/letter-spacing:\s*([^;]+);/g), (match) => match[1].trim());
   assert.ok(letterSpacingValues.length > 0);
   assert.deepEqual([...new Set(letterSpacingValues)], ['0']);
@@ -179,6 +195,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   const js = read('assets/live-momentum.js');
   const goalActionsJs = read('assets/live-momentum-goal-actions.js');
   const endGameCardsJs = read('assets/live-momentum-endgame-cards.js');
+  const videoJs = read('assets/live-momentum-video.js');
 
   assert.match(js, /startDay:\s*13/);
   assert.match(js, /today:\s*13/);
@@ -229,6 +246,14 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /updateCard\(cardId, \{ deleted: true \}\)/);
   assert.match(endGameCardsJs, /onStateChange\(\);/);
   assert.match(endGameCardsJs, /window\.SoftoraMomentumEndGameCards/);
+  assert.match(videoJs, /const VIDEO_ID = 'XwtdR-oW6XA'/);
+  assert.match(videoJs, /youtube-nocookie\.com\/embed\/\$\{VIDEO_ID\}/);
+  assert.match(videoJs, /autoplay:\s*'1'/);
+  assert.match(videoJs, /mute:\s*'0'/);
+  assert.match(videoJs, /iframe\.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'/);
+  assert.match(videoJs, /dialog\.showModal\(\)/);
+  assert.match(videoJs, /player\.replaceChildren\(\)/);
+  assert.match(videoJs, /dialog\.addEventListener\('close'/);
   assert.doesNotMatch(js, /renderLineChart|setChartMode|chartMode|chartSwitches|getVisibleScore/);
   assert.match(js, /function renderGridShell\(goals\)/);
   assert.match(js, /function createGoalDragHandle\(goal\)/);
