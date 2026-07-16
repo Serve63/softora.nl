@@ -10787,3 +10787,60 @@ test('coldmail campaign fails closed when the own mailbox store is unavailable',
 
   assert.equal(sentMessages.length, 0);
 });
+
+test('coldmail campaign reports the verification wait instead of an earlier duplicate skip', async () => {
+  const { service, sentMessages } = createService({
+    rows: [
+      {
+        id: 'duplicate-first',
+        bedrijf: 'Dubbel BV',
+        email: 'dubbel@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+      {
+        id: 'verify-second',
+        bedrijf: 'Controle BV',
+        email: 'controle@example.test',
+        status: 'prospect',
+        mail: true,
+      },
+    ],
+    outboundRecipientGuardStore: {
+      findRecipientConflict: async (identity) => identity.recipientEmail === 'dubbel@example.test'
+        ? {
+            guard_key: 'email:dubbel@example.test',
+            provider: 'softora',
+            recipient_email: 'dubbel@example.test',
+            permanent: true,
+          }
+        : null,
+    },
+    emailVerificationStore: {
+      getDecision: async (email) => ({
+        ok: true,
+        email,
+        allowed: false,
+        status: 'pending',
+        reason: 'verification_missing',
+        queued: true,
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => service.sendColdmailCampaign({
+      count: 1,
+      subject: 'Test',
+      body: 'Test',
+      senderEmail: 'info@softora.nl',
+    }),
+    (error) => {
+      assert.equal(error.code, 'COLDMAIL_EMAIL_VERIFICATION_PENDING');
+      assert.match(error.message, /Mailboxcontrole is ingepland/);
+      assert.doesNotMatch(error.message, /recent al gemaild/);
+      return true;
+    }
+  );
+  assert.equal(sentMessages.length, 0);
+});
