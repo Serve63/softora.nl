@@ -22,6 +22,7 @@ test('premium advertenties toont een aparte AI beheer workspace boven de persone
   assert.match(pageSource, /data-content-lock-scope="premium_advertenties_content_lock"/);
   assert.match(pageSource, /data-content-lock-input/);
   assert.match(pageSource, /data-content-lock-submit/);
+  assert.match(pageSource, /data-google-ads-open/);
   assert.match(pageSource, /<div class="ai-marketing-shell" id="aiMarketingShell" data-ai-tone="idle">/);
   assert.match(pageSource, /<div class="page-personnel-shell">/);
   assert.match(pageSource, /AI Beheer/);
@@ -30,12 +31,16 @@ test('premium advertenties toont een aparte AI beheer workspace boven de persone
   assert.doesNotMatch(pageSource, /function unlockAdvertentiesArea/);
   assert.doesNotMatch(lockAssetSource, /localStorage|sessionStorage/);
   assert.match(lockAssetSource, /window\.SoftoraUiStateClient/);
+  assert.match(lockAssetSource, /isOpenGoogleAdsView/);
+  assert.match(lockAssetSource, /document\.documentElement\.removeAttribute\('data-google-ads-open'\)/);
+  assert.match(lockAssetSource, /remoteUnlocked \|\| googleAdsOpen/);
   assert.match(lockAssetSource, /client\.get\(remoteScope\)/);
   assert.match(lockAssetSource, /client\.set\(remoteScope,/);
   assert.match(lockAssetSource, /submitButton\.addEventListener\('click', unlockContent\)/);
   assert.match(lockAssetSource, /event\.key === 'Enter'/);
   assert.match(assetSource, /ads_google: '\/premium-advertenties#google'/);
-  assert.match(assetSource, /AI gebruikt Google Ads nu actief/);
+  assert.match(assetSource, /Google Ads is geopend/);
+  assert.match(assetSource, /Er draait nog geen campagne en er wordt nog geen advertentiebudget uitgegeven/);
   assert.match(assetSource, /AI gebruikt Pinterest nu niet/);
   assert.match(assetSource, /refs\.tools\.replaceChildren\(\);/);
   assert.match(assetSource, /label\.className = 'ai-marketing-tool';/);
@@ -68,7 +73,7 @@ test('premium socialmedia toont een aparte AI beheer workspace boven de personee
   assert.doesNotMatch(lockAssetSource, /localStorage|sessionStorage/);
   assert.match(lockAssetSource, /patch: \{/);
   assert.match(lockAssetSource, /source: 'premium-marketing-content-lock'/);
-  assert.match(lockAssetSource, /window\.addEventListener\('hashchange', scrollToCurrentHash\)/);
+  assert.match(lockAssetSource, /window\.addEventListener\('hashchange', function \(\) \{[\s\S]*syncOverlayVisibility\(\);[\s\S]*scrollToCurrentHash\(\);/);
   assert.match(assetSource, /social_instagram: '\/premium-socialmedia#instagram'/);
   assert.match(assetSource, /AI gebruikt Instagram nu actief/);
   assert.match(assetSource, /AI gebruikt X \/ Twitter nu niet/);

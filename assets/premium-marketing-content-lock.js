@@ -13,6 +13,13 @@
   var input = document.querySelector('[data-content-lock-input]');
   var submitButton = document.querySelector('[data-content-lock-submit]');
   var error = document.getElementById('contentLockError');
+  var remoteUnlocked = false;
+
+  function isOpenGoogleAdsView() {
+    var path = String(window.location.pathname || '').toLowerCase();
+    var hash = String(window.location.hash || '').replace(/^#/, '').toLowerCase();
+    return path.indexOf('/premium-advertenties') === 0 && (!hash || hash === 'google');
+  }
 
   function getUiStateClient() {
     return window.SoftoraUiStateClient || null;
@@ -48,8 +55,14 @@
     }
   }
 
-  function hideOverlay() {
-    overlay.style.display = 'none';
+  function syncOverlayVisibility() {
+    var googleAdsOpen = isOpenGoogleAdsView();
+    if (googleAdsOpen) {
+      document.documentElement.setAttribute('data-google-ads-open', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-google-ads-open');
+    }
+    overlay.style.display = remoteUnlocked || googleAdsOpen ? 'none' : '';
   }
 
   function scrollToCurrentHash() {
@@ -66,7 +79,8 @@
     if (!input || !error) return;
 
     if (input.value === CONTENT_LOCK_CODE) {
-      hideOverlay();
+      remoteUnlocked = true;
+      syncOverlayVisibility();
       void writeRemoteUnlockFlag();
       scrollToCurrentHash();
       return;
@@ -78,8 +92,10 @@
   }
 
   function bindContentLock() {
+    syncOverlayVisibility();
     void readRemoteUnlockFlag().then(function (isUnlocked) {
-      if (isUnlocked) hideOverlay();
+      remoteUnlocked = isUnlocked;
+      syncOverlayVisibility();
     });
 
     if (submitButton) {
@@ -94,7 +110,10 @@
       });
     }
 
-    window.addEventListener('hashchange', scrollToCurrentHash);
+    window.addEventListener('hashchange', function () {
+      syncOverlayVisibility();
+      scrollToCurrentHash();
+    });
     window.addEventListener('load', scrollToCurrentHash, { once: true });
   }
 
