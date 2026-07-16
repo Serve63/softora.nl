@@ -41,9 +41,19 @@ button {
   color: inherit;
 }
 .momentum-page {
+  position: relative;
+  isolation: isolate;
   width: 100%;
+  min-height: calc(100vh - 1px);
   margin: 0;
   padding: 3rem 3rem 1.8rem;
+  overflow: hidden;
+}
+.momentum-hero,
+.habit-board,
+.end-game-title {
+  position: relative;
+  z-index: 1;
 }
 .momentum-hero {
   padding-bottom: 4px;
@@ -181,16 +191,15 @@ button {
   text-transform: uppercase;
 }
 .momentum-art-quotes {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
-  align-items: center;
-  gap: clamp(3rem, 7vw, 7rem) clamp(2rem, 8vw, 9rem);
-  width: min(1120px, 92%);
-  margin: clamp(5rem, 10vh, 8.5rem) auto 0;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
   user-select: none;
 }
 .momentum-art-quote {
+  position: absolute;
   color: transparent;
   font-family: var(--font-display);
   font-weight: 700;
@@ -200,40 +209,49 @@ button {
   -webkit-text-stroke: 1px rgba(26, 26, 46, .07);
 }
 .momentum-art-quote.is-end-game {
+  top: 3%;
+  left: 38%;
   max-width: 8.5em;
-  font-size: clamp(2.4rem, 4vw, 4.7rem);
+  font-size: clamp(2.2rem, 3.4vw, 4.2rem);
 }
 .momentum-art-quote.is-attack {
+  top: 7%;
+  right: 3%;
   max-width: 8em;
-  justify-self: end;
   color: rgba(35, 159, 88, .035);
-  font-size: clamp(2.1rem, 3.4vw, 4rem);
+  font-size: clamp(2rem, 3vw, 3.7rem);
   text-align: right;
   -webkit-text-stroke-color: rgba(35, 159, 88, .1);
 }
 .momentum-art-quote.is-sleeping {
-  grid-column: 1 / -1;
-  justify-self: center;
-  font-size: clamp(3.2rem, 6vw, 7rem);
+  top: 28%;
+  left: 18%;
+  width: 64%;
+  font-size: clamp(3rem, 5.4vw, 6.4rem);
   text-align: center;
   -webkit-text-stroke-color: rgba(26, 26, 46, .085);
 }
 .momentum-art-quote.is-winners {
+  top: 57%;
+  left: 5%;
   max-width: 10em;
-  font-size: clamp(2.2rem, 3.7vw, 4.3rem);
+  font-size: clamp(2rem, 3.3vw, 4rem);
 }
 .momentum-art-quote.is-old-days {
+  top: 64%;
+  right: 4%;
   max-width: 10.5em;
-  justify-self: end;
   color: rgba(35, 159, 88, .028);
-  font-size: clamp(2rem, 3.2vw, 3.7rem);
+  font-size: clamp(1.9rem, 2.9vw, 3.5rem);
   text-align: right;
   -webkit-text-stroke-color: rgba(35, 159, 88, .085);
 }
 .momentum-watermark {
+  position: absolute;
+  top: 76%;
+  right: 8%;
   display: grid;
   width: fit-content;
-  margin: clamp(4.5rem, 9vh, 7.5rem) clamp(1rem, 4vw, 4.5rem) 0 auto;
   color: transparent;
   font-family: var(--font-display);
   font-size: clamp(3.2rem, 5.2vw, 5.8rem);
@@ -653,11 +671,6 @@ button {
     flex-direction: column;
     align-items: flex-start;
   }
-  .momentum-actions {
-    width: 100%;
-    align-items: flex-end;
-    justify-content: space-between;
-  }
   .chart-card {
     padding: 22px 0 18px 58px;
     overflow-x: auto;
@@ -671,23 +684,34 @@ button {
     min-width: 820px;
   }
   .momentum-watermark {
-    margin-top: 4rem;
-    margin-right: .75rem;
+    top: 79%;
+    right: 4%;
     font-size: clamp(2.8rem, 13vw, 4.5rem);
   }
   .momentum-art-quotes {
-    grid-template-columns: 1fr;
-    gap: 3.5rem;
-    width: 92%;
-    margin-top: 4.5rem;
+    inset: 0;
   }
   .momentum-art-quote.is-sleeping {
-    grid-column: auto;
+    top: 31%;
+    left: 4%;
+    width: 92%;
     font-size: clamp(3rem, 14vw, 5rem);
   }
-  .momentum-art-quote.is-attack,
+  .momentum-art-quote.is-end-game {
+    top: 8%;
+    left: 29%;
+  }
+  .momentum-art-quote.is-attack {
+    top: 17%;
+    right: 3%;
+  }
+  .momentum-art-quote.is-winners {
+    top: 59%;
+    left: 3%;
+  }
   .momentum-art-quote.is-old-days {
-    justify-self: end;
+    top: 68%;
+    right: 3%;
   }
 }
 @media (max-width: 520px) {
@@ -696,11 +720,6 @@ button {
   }
   .momentum-head h1 {
     font-size: 24px;
-  }
-  .momentum-actions {
-    align-items: flex-start;
-    flex-direction: column-reverse;
-    gap: 16px;
   }
   .icon-picker-backdrop {
     padding: 12px;
@@ -711,8 +730,5 @@ button {
   }
   .icon-picker-results {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .momentum-watermark {
-    margin-top: 3rem;
   }
 }
