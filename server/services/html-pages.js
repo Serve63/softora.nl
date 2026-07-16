@@ -120,6 +120,13 @@ const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
   "media-src 'self' data: blob: https:",
 ];
 
+function removeInternalPremiumSidebarLinks(html) {
+  return String(html || '').replace(
+    /<a\b(?=[^>]*\bdata-sidebar-key=["']coldmailing["'])[^>]*>[\s\S]*?<\/a>/gi,
+    ''
+  );
+}
+
 function createHtmlPageCoordinator(options = {}) {
   const {
     pagesDir = process.cwd(),
@@ -570,7 +577,9 @@ function createHtmlPageCoordinator(options = {}) {
             logTimeout: false,
           })
         : {};
-      let rendered = shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html;
+      let rendered = removeInternalPremiumSidebarLinks(
+        shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html
+      );
       try {
         const shouldLoadBootstrapData = !isLoginPage;
         const bootstrapTimeoutMs =
@@ -629,4 +638,5 @@ function createHtmlPageCoordinator(options = {}) {
 
 module.exports = {
   createHtmlPageCoordinator,
+  removeInternalPremiumSidebarLinks,
 };

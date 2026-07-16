@@ -110,6 +110,16 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     /\.dashboard-layout > \.main-content,\s*\.dashboard-layout > main\.main-content/s
   );
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
+  assert.doesNotMatch(
+    themeJsSource.match(/function buildUnifiedPremiumSidebarHtml\(activeKey\) \{[\s\S]*?function pruneDeprecatedSidebarLinks/)?.[0] || '',
+    /key:\s*"coldmailing"/,
+    'de gedeelde sidebar-template mag Coldmailing niet meer tonen'
+  );
+  assert.match(
+    themeJsSource,
+    /a\[data-sidebar-key="coldmailing"\]/,
+    'oude statische Coldmailing-links horen client-side te worden opgeruimd'
+  );
   assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
   assert.match(themeJsSource, /function isSidebarNavigationCurrentTarget\(href\) \{/);
   assert.match(themeJsSource, /pathname === "\/live-momentum" \|\| pathname === "\/live-momentum\.html"/);

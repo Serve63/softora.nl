@@ -4,7 +4,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { createHtmlPageCoordinator } = require('../../server/services/html-pages');
+const {
+  createHtmlPageCoordinator,
+  removeInternalPremiumSidebarLinks,
+} = require('../../server/services/html-pages');
 
 function createResponseRecorder() {
   return {
@@ -116,6 +119,21 @@ test('html page coordinator resolves known html files from direct names and slug
     'premium-personeel-agenda.html'
   );
   assert.equal(coordinator.resolveSeoPageFileFromRequest('', '../etc/passwd'), '');
+});
+
+test('html page coordinator strips internal coldmailing navigation before rendering', () => {
+  const source = [
+    '<aside class="sidebar">',
+    '<a href="/premium-bevestigingsmails" class="sidebar-link" data-sidebar-key="coldmailing"><span>Coldmailing</span></a>',
+    '<a href="/premium-database" class="sidebar-link" data-sidebar-key="database"><span>Database</span></a>',
+    '</aside>',
+  ].join('');
+
+  const rendered = removeInternalPremiumSidebarLinks(source);
+
+  assert.doesNotMatch(rendered, /data-sidebar-key="coldmailing"/);
+  assert.doesNotMatch(rendered, />Coldmailing</);
+  assert.match(rendered, /data-sidebar-key="database"/);
 });
 
 test('html page coordinator reads known html files and returns empty content for missing files', async () => {

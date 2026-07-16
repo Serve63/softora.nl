@@ -8,6 +8,8 @@ const defaultLegacyPrettyPageRedirectEntries = Object.freeze([
   ['ai-coldmailing', 'premium-ai-coldmailing'],
   ['premium-ai-coldmailing', 'premium-leads'],
   ['ai-lead-generator', 'premium-ai-lead-generator'],
+  ['premium-ai-lead-generator', 'premium-personeel-dashboard'],
+  ['premium-bevestigingsmails', 'premium-personeel-dashboard'],
   ['seo-crm-system', 'premium-seo-crm-system'],
   ['opdracht-preview', 'premium-opdracht-preview'],
   ['premium-maandelijkse-kosten', 'premium-vaste-lasten'],
@@ -43,10 +45,6 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
     map.set('kvk-database', map.get('premium-kvk-database-shell'));
   } else if (map.has('premium-kvk-database')) {
     map.set('kvk-database', map.get('premium-kvk-database'));
-  }
-  // Zelfde coldmailing-UI als /premium-bevestigingsmails, aparte URL voor legacy/bookmarks.
-  if (map.has('premium-bevestigingsmails')) {
-    map.set('premium-ai-lead-generator', map.get('premium-bevestigingsmails'));
   }
   if (map.has('sportschool')) {
     map.set('logboek', map.get('sportschool'));
