@@ -597,7 +597,11 @@ test('premium database autopilot toggle switches the real coldmail autopilot sta
       }
       return {
         ok: true,
-        json: async () => ({ ok: true, autopilot: { enabled } }),
+        json: async () => ({
+          ok: true,
+          persistenceConfirmed: url === '/api/coldmailing/autopilot/settings' ? true : undefined,
+          autopilot: { enabled },
+        }),
       };
     },
     setInterval: () => 0,
@@ -630,9 +634,63 @@ test('premium database autopilot toggle switches the real coldmail autopilot sta
   settingsRequests.forEach((request) => {
     assert.equal(request.options.method, 'POST');
     assert.equal(request.options.credentials, 'same-origin');
-    assert.equal(request.options.cache, 'default');
+    assert.equal(request.options.cache, 'no-store');
     assert.equal(request.options.headers['Content-Type'], 'application/json');
   });
+});
+
+test('premium database autopilot toggle keeps the previous UI state without durable confirmation', async () => {
+  let enabled = false;
+  function makeNode() {
+    const attrs = {};
+    return {
+      textContent: '',
+      disabled: false,
+      title: '',
+      classList: { add() {}, remove() {} },
+      addEventListener() {},
+      setAttribute(name, value) { attrs[name] = String(value); },
+      getAttribute(name) { return attrs[name] || ''; },
+    };
+  }
+  const nodes = {
+    databaseAutopilotCard: makeNode(),
+    databaseAutopilotToggle: makeNode(),
+    databaseAutopilotToggleLabel: makeNode(),
+    toast: makeNode(),
+  };
+  const autopilotToggleClient = loadDatabaseAutopilotToggleClient({
+    document: {
+      readyState: 'complete',
+      hidden: false,
+      getElementById: (id) => nodes[id] || null,
+      addEventListener: () => {},
+    },
+    fetch: async (url, options = {}) => {
+      if (url === '/api/coldmailing/autopilot/settings') {
+        enabled = JSON.parse(String(options.body || '{}')).enabled;
+        return {
+          ok: true,
+          json: async () => ({ ok: true, autopilot: { enabled } }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ ok: true, autopilot: { enabled: false } }),
+      };
+    },
+    setInterval: () => 0,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+  });
+
+  await autopilotToggleClient.refresh();
+  await autopilotToggleClient.toggle();
+
+  assert.equal(enabled, true);
+  assert.equal(autopilotToggleClient.getState().enabled, false);
+  assert.equal(nodes.databaseAutopilotToggleLabel.textContent, 'Uit');
+  assert.match(nodes.toast.textContent, /niet duurzaam bevestigd/i);
 });
 
 test('premium database mail ROI calculator persists the customer count', async () => {
@@ -1267,7 +1325,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /\["softora", "gmail", "smtp", "strato"\]\.indexOf\(provider\) !== -1/);
   assert.match(autopilotToggleScriptSource, /const STATUS_URL = "\/api\/coldmailing\/autopilot\/status";/);
   assert.match(autopilotToggleScriptSource, /const SETTINGS_URL = "\/api\/coldmailing\/autopilot\/settings";/);
-  assert.match(autopilotToggleScriptSource, /cache: "default"/);
+  assert.match(autopilotToggleScriptSource, /cache: "no-store"/);
+  assert.match(autopilotToggleScriptSource, /payload\.persistenceConfirmed !== true/);
   assert.match(autopilotToggleScriptSource, /body: JSON\.stringify\(\{ enabled: nextEnabled \}\)/);
   assert.doesNotMatch(autopilotToggleScriptSource, /senderProfiles|senderEmails|subject|schedule|buildAutopilotConfig/);
   assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded \|\| state\.photoRestorePending \|\| state\.photoRestoreFailed/);
@@ -1631,7 +1690,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617d/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260710c/);
-  assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260710b/);
+  assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldcalling/);
@@ -1895,7 +1954,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710c"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260710b"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710c"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);

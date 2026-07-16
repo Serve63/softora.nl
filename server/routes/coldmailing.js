@@ -342,7 +342,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         });
         return;
       }
-      res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+      res.setHeader('Cache-Control', 'no-store, private');
       res.json(await coldmailCampaignService.getColdmailAutopilotStatus());
     } catch (error) {
       res.status(500).json({
