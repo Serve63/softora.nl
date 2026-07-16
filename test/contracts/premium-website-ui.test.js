@@ -436,6 +436,7 @@ test('premium homepage heeft een werkende cookie melding', () => {
 
   assert.match(source, /<div class="cookie-consent" id="cookieConsent" role="dialog" aria-labelledby="cookie-consent-title" hidden>/);
   assert.match(source, /<div class="cookie-consent-title" id="cookie-consent-title">Cookies op Softora\.nl<\/div>/);
+  assert.match(source, /Met jouw akkoord laden we Google Ads-meting om te zien welke advertentie tot contact leidt/);
   assert.match(source, /data-cookie-choice="declined"[\s\S]*Weigeren<\/button>/);
   assert.match(source, /data-cookie-choice="accepted"[\s\S]*Akkoord<\/button>/);
   assert.match(source, /<button type="button" data-cookie-settings>Cookie-instellingen<\/button>/);

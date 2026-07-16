@@ -795,6 +795,23 @@ function addPublicConversionTrackingScriptIfMissing(htmlRaw) {
   );
 }
 
+function addGoogleAdsConsentAssetsIfMissing(htmlRaw) {
+  let html = String(htmlRaw || '');
+  if (!hasTag(html, /<link\b[^>]*\bhref=["']\/assets\/google-ads-consent\.css(?:\?[^"']*)?["'][^>]*>/i)) {
+    html = injectBeforeHeadClose(
+      html,
+      '    <link rel="stylesheet" href="/assets/google-ads-consent.css?v=20260717a">'
+    );
+  }
+  if (!hasTag(html, /<script\b[^>]*\bsrc=["']\/assets\/google-ads-consent\.js(?:\?[^"']*)?["'][^>]*>/i)) {
+    html = injectBeforeBodyClose(
+      html,
+      '    <script src="/assets/google-ads-consent.js?v=20260717a" defer></script>'
+    );
+  }
+  return html;
+}
+
 function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   const entry = getIndexablePublicSeoPage(fileNameRaw);
   let html = String(htmlRaw || '');
@@ -821,6 +838,7 @@ function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT
   html = addStructuredDataIfMissing(html, entry, siteOrigin);
   html = addInternalLinksIfMissing(html, entry);
   html = addConversionTrackingAttributesIfMissing(html, entry);
+  html = addGoogleAdsConsentAssetsIfMissing(html);
   html = addPublicConversionTrackingScriptIfMissing(html);
 
   if (!hasTag(html, /<html\b[^>]*lang=["']nl["']/i)) {

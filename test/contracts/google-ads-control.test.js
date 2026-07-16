@@ -83,6 +83,50 @@ test('conversiesanitizer weigert onvolledige en niet-WhatsApp events', () => {
   assert.equal(sanitizeAttribution({ name: 'x', page: '/', target: 'whatsapp' }), null);
 });
 
+test('publieke tagconfig blijft uit zonder volledige toestemming en lekt nooit OAuth-secrets', () => {
+  const disabled = createGoogleAdsControlService({
+    env: {
+      GOOGLE_ADS_CONVERSION_ID: 'AW-123456789',
+      GOOGLE_ADS_CONVERSION_LABEL: 'contact-label',
+      GOOGLE_ADS_CLIENT_SECRET: 'never-public',
+    },
+  }).getPublicConfig();
+  assert.deepEqual(disabled, {
+    enabled: false,
+    consentMode: 'basic-v2',
+    tagId: '',
+    conversionLabel: '',
+  });
+
+  const enabled = createGoogleAdsControlService({
+    env: {
+      GOOGLE_ADS_CONVERSION_ID: 'AW-123456789',
+      GOOGLE_ADS_CONVERSION_LABEL: 'contact-label',
+      GOOGLE_ADS_CONSENT_MODE_CONFIGURED: 'true',
+      GOOGLE_ADS_DEVELOPER_TOKEN: 'never-public',
+      GOOGLE_ADS_CLIENT_SECRET: 'never-public',
+      GOOGLE_ADS_REFRESH_TOKEN: 'never-public',
+    },
+  }).getPublicConfig();
+  assert.deepEqual(enabled, {
+    enabled: true,
+    consentMode: 'basic-v2',
+    tagId: 'AW-123456789',
+    conversionLabel: 'contact-label',
+  });
+  assert.equal(JSON.stringify(enabled).includes('never-public'), false);
+
+  const malformed = createGoogleAdsControlService({
+    env: {
+      GOOGLE_ADS_CONVERSION_ID: 'not-an-aw-id',
+      GOOGLE_ADS_CONVERSION_LABEL: 'contact-label',
+      GOOGLE_ADS_CONSENT_MODE_CONFIGURED: 'true',
+    },
+  }).getPublicConfig();
+  assert.equal(malformed.enabled, false);
+  assert.equal(malformed.tagId, '');
+});
+
 test('Google Ads routes beschermen dashboard en bieden bewust geen activatie- of budgetendpoint', () => {
   const routes = [];
   const app = {
@@ -93,12 +137,13 @@ test('Google Ads routes beschermen dashboard en bieden bewust geen activatie- of
   registerGoogleAdsRoutes(app, {
     cronSecret: 'cron-secret',
     requirePremiumAdminApiAccess: requireAdmin,
-    service: { getStatus() {}, getBlueprint() {}, getLaunchPack() {}, getEditorAssetsCsv() {}, runDryRun() {}, recordConversion() {} },
+    service: { getStatus() {}, getBlueprint() {}, getLaunchPack() {}, getEditorAssetsCsv() {}, getPublicConfig() {}, runDryRun() {}, recordConversion() {} },
   });
 
   const paths = routes.map(([method, path]) => `${method} ${path}`);
   assert.deepEqual(paths, [
     'POST /api/public-conversion',
+    'GET /api/google-ads/public-config',
     'GET /api/google-ads/daily-run',
     'GET /api/google-ads/status',
     'GET /api/google-ads/blueprint',
@@ -107,6 +152,7 @@ test('Google Ads routes beschermen dashboard en bieden bewust geen activatie- of
     'POST /api/google-ads/dry-run',
   ]);
   assert.equal(routes.find((route) => route[1] === '/api/google-ads/status')[2][0], requireAdmin);
+  assert.notEqual(routes.find((route) => route[1] === '/api/google-ads/public-config')[2][0], requireAdmin);
   assert.equal(paths.some((path) => /activate|budget|mutate|campaign/.test(path)), false);
 });
 

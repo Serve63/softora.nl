@@ -16,6 +16,11 @@ function registerGoogleAdsRoutes(app, deps = {}) {
     }
   });
 
+  app.get('/api/google-ads/public-config', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ ok: true, ...service.getPublicConfig() });
+  });
+
   app.get('/api/google-ads/daily-run', async (req, res) => {
     if (!cronSecret) return res.status(503).json({ ok: false, error: 'Google Ads-cron is niet geconfigureerd.' });
     if (String(req.headers?.authorization || '').trim() !== `Bearer ${cronSecret}`) {

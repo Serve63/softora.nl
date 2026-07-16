@@ -198,10 +198,14 @@ test('public seo head defaults add canonical metadata and structured data once',
   assert.match(first, /"contactType":"sales"/);
   assert.match(first, /data-softora-public-seo="internal-links"/);
   assert.match(first, /<script src="\/assets\/public-conversion-tracking\.js\?v=20260601a" defer><\/script>/);
+  assert.match(first, /<link rel="stylesheet" href="\/assets\/google-ads-consent\.css\?v=20260717a">/);
+  assert.match(first, /<script src="\/assets\/google-ads-consent\.js\?v=20260717a" defer><\/script>/);
   assert.match(first, /href="\/diensten"/);
   assert.equal((second.match(/data-softora-public-seo="structured-data"/g) || []).length, 1);
   assert.equal((second.match(/data-softora-public-seo="internal-links"/g) || []).length, 1);
   assert.equal((second.match(/\/assets\/public-conversion-tracking\.js/g) || []).length, 1);
+  assert.equal((second.match(/\/assets\/google-ads-consent\.js/g) || []).length, 1);
+  assert.equal((second.match(/\/assets\/google-ads-consent\.css/g) || []).length, 1);
   assert.equal(getIndexablePublicPathFromHtmlFile('premium-website.html'), '/');
 });
 
@@ -271,6 +275,7 @@ test('public seo pages do not render fallback internal link bars', () => {
 
 test('public seo pages load first-party conversion tracking once', () => {
   const trackerSource = fs.readFileSync(path.join(root, 'assets/public-conversion-tracking.js'), 'utf8');
+  const consentSource = fs.readFileSync(path.join(root, 'assets/google-ads-consent.js'), 'utf8');
 
   assert.match(trackerSource, /MARTIJN_WHATSAPP_URL = 'https:\/\/wa\.me\/31643262792'/);
   assert.match(trackerSource, /softora:public-conversion/);
@@ -287,6 +292,17 @@ test('public seo pages load first-party conversion tracking once', () => {
   assert.match(trackerSource, /link\.setAttribute\('href', MARTIJN_WHATSAPP_URL\)/);
   assert.doesNotMatch(trackerSource, /Landingspagina: |CTA-pagina: |Referrer: |\?text=|searchParams\.set\('text'|buildWhatsappText|withWhatsappText/);
   assert.doesNotMatch(trackerSource, /localStorage|sessionStorage/);
+  assert.match(trackerSource, /SoftoraGoogleAdsConsent\.recordConversion\(eventData\)/);
+  assert.match(consentSource, /window\.gtag\('consent', 'default'/);
+  assert.match(consentSource, /ad_storage: 'denied'/);
+  assert.match(consentSource, /analytics_storage: 'denied'/);
+  assert.match(consentSource, /ad_user_data: 'denied'/);
+  assert.match(consentSource, /ad_personalization: 'denied'/);
+  assert.match(consentSource, /consentMode !== 'basic-v2'/);
+  assert.match(consentSource, /state !== 'granted'/);
+  assert.match(consentSource, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=/);
+  assert.match(consentSource, /send_to: config\.tagId \+ '\/' \+ config\.conversionLabel/);
+  assert.doesNotMatch(consentSource, /localStorage|sessionStorage/);
 
   for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {
     const source = fs.readFileSync(path.join(root, entry.fileName), 'utf8');
@@ -298,6 +314,16 @@ test('public seo pages load first-party conversion tracking once', () => {
       (html.match(/\/assets\/public-conversion-tracking\.js/g) || []).length,
       1,
       `${entry.path} mist de publieke conversietracker.`
+    );
+    assert.equal(
+      (html.match(/\/assets\/google-ads-consent\.js/g) || []).length,
+      1,
+      `${entry.path} mist de consent-veilige Google Ads tag-gate.`
+    );
+    assert.equal(
+      (html.match(/\/assets\/google-ads-consent\.css/g) || []).length,
+      1,
+      `${entry.path} mist de consent-styling.`
     );
   }
 });
