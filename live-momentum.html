@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
   <link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=20260611a">
-  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260716m">
+  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260716n">
   <script src="/assets/personnel-theme.js?v=20260715a" defer></script>
   <script src="/assets/premium-sidebar-autopilot.js?v=20260611a" defer></script>
 </head>
@@ -118,8 +118,16 @@
     <h2 class="end-game-title">END GAME</h2>
     <section class="end-game-goals" aria-label="End Game doelen">
       <div class="end-game-goal-track">
-        <article class="end-game-goal-card end-game-goal-card--mission" aria-label="Missie: Eigen automaat rijden">
+        <article class="end-game-goal-card end-game-goal-card--mission" tabindex="0" role="button" aria-haspopup="menu" aria-expanded="false" aria-label="Missie: Eigen automaat rijden. Klik voor acties.">
           <img src="/assets/live-momentum-eigen-automaat-rijden-card.jpg?v=20260716a" alt="END GAME missie: Eigen automaat rijden" width="1024" height="1536" loading="eager" decoding="async">
+          <div class="end-game-mission-complete" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7" /></svg>
+            <strong>AFGEROND</strong>
+          </div>
+          <div class="end-game-mission-actions" role="menu" aria-label="Acties voor Eigen automaat rijden" hidden>
+            <button type="button" role="menuitem" data-end-game-mission-action="toggle-complete">Afronden</button>
+            <button type="button" role="menuitem" class="is-remove" data-end-game-mission-action="remove">Verwijderen</button>
+          </div>
         </article>
         <article class="end-game-goal-card"><span>Doel 02</span><textarea data-end-game-goal-index="1" maxlength="240" aria-label="End Game doel 2" placeholder="Schrijf je doel..."></textarea></article>
         <article class="end-game-goal-card"><span>Doel 03</span><textarea data-end-game-goal-index="2" maxlength="240" aria-label="End Game doel 3" placeholder="Schrijf je doel..."></textarea></article>
@@ -136,6 +144,6 @@
   </div>
   <script src="/assets/premium-ui-state-client.js?v=20260605a"></script>
   <script src="/assets/live-momentum-icon-catalog.js?v=20260716b" defer></script>
-  <script src="/assets/live-momentum.js?v=20260716f" defer></script>
+  <script src="/assets/live-momentum.js?v=20260716g" defer></script>
 </body>
 </html>

@@ -32,6 +32,10 @@
   const chart = document.querySelector('.bar-chart');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const endGameGoalTrack = document.querySelector('.end-game-goal-track');
+  const endGameMissionCard = endGameGoalTrack?.querySelector('.end-game-goal-card--mission');
+  const endGameMissionActions = endGameMissionCard?.querySelector('.end-game-mission-actions');
+  const endGameMissionCompleteButton = endGameMissionActions?.querySelector('[data-end-game-mission-action="toggle-complete"]');
+  const endGameMissionRemoveButton = endGameMissionActions?.querySelector('[data-end-game-mission-action="remove"]');
   let stateReady = false;
   let stateDirty = false;
   let saveTimer = null;
@@ -42,7 +46,8 @@
   let iconPicker = null;
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
-  if (!grid || !chart || !endGameGoalTrack) {
+  let endGameMissionCardState = { completed: false, deleted: false };
+  if (!grid || !chart || !endGameGoalTrack || !endGameMissionCard || !endGameMissionActions || !endGameMissionCompleteButton || !endGameMissionRemoveButton) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -70,6 +75,47 @@
     return Array.from({ length: END_GAME_GOAL_COUNT }, (_, index) => String(value?.[index] || '')
       .trim()
       .slice(0, MAX_END_GAME_GOAL_LENGTH));
+  }
+  function normalizeEndGameMissionCard(value) {
+    return {
+      completed: value?.completed === true,
+      deleted: value?.deleted === true
+    };
+  }
+  function resetEndGameMissionRemoveConfirmation() {
+    endGameMissionRemoveButton.dataset.confirmRemove = 'false';
+    endGameMissionRemoveButton.textContent = 'Verwijderen';
+  }
+  function closeEndGameMissionActions(options = {}) {
+    endGameMissionActions.hidden = true;
+    endGameMissionCard.setAttribute('aria-expanded', 'false');
+    resetEndGameMissionRemoveConfirmation();
+    if (options.restoreFocus === true && !endGameMissionCard.hidden) {
+      endGameMissionCard.focus();
+    }
+  }
+  function openEndGameMissionActions() {
+    if (!stateReady || endGameMissionCardState.deleted) {
+      return;
+    }
+    endGameMissionActions.hidden = false;
+    endGameMissionCard.setAttribute('aria-expanded', 'true');
+    resetEndGameMissionRemoveConfirmation();
+    endGameMissionCompleteButton.focus();
+  }
+  function renderEndGameMissionCard(value) {
+    endGameMissionCardState = normalizeEndGameMissionCard(value);
+    endGameMissionCard.hidden = endGameMissionCardState.deleted;
+    endGameMissionCard.classList.toggle('is-completed', endGameMissionCardState.completed);
+    endGameMissionCard.setAttribute('aria-label', endGameMissionCardState.completed
+      ? 'Missie: Eigen automaat rijden, afgerond. Klik voor acties.'
+      : 'Missie: Eigen automaat rijden. Klik voor acties.');
+    endGameMissionCompleteButton.textContent = endGameMissionCardState.completed ? 'Afronding ongedaan maken' : 'Afronden';
+    endGameMissionCompleteButton.setAttribute('aria-pressed', String(endGameMissionCardState.completed));
+    endGameMissionCard.querySelector('.end-game-mission-complete')?.setAttribute('aria-hidden', String(!endGameMissionCardState.completed));
+    if (endGameMissionCardState.deleted) {
+      closeEndGameMissionActions();
+    }
   }
   function getEndGameGoalIndex(field) {
     const index = Number(field.dataset.endGameGoalIndex);
@@ -143,6 +189,7 @@
     return {
       version: STATE_VERSION,
       period: PERIOD_KEY,
+      endGameMissionCard: normalizeEndGameMissionCard(endGameMissionCardState),
       endGameGoals: getCurrentEndGameGoals(),
       goals: getCurrentGoals().map((goal) => ({
         id: goal.id,
@@ -167,7 +214,11 @@
       if (!goals.length) {
         return null;
       }
-      return { goals, endGameGoals: normalizeEndGameGoals(parsed.endGameGoals) };
+      return {
+        goals,
+        endGameMissionCard: normalizeEndGameMissionCard(parsed.endGameMissionCard),
+        endGameGoals: normalizeEndGameGoals(parsed.endGameGoals)
+      };
     } catch (error) {
       console.warn('[LiveMomentum][state-parse]', error?.message || error);
       return null;
@@ -694,6 +745,7 @@
       const storedState = parseStoredState(response.values?.[STATE_KEY]);
       if (storedState) {
         renderGridShell(storedState.goals);
+        renderEndGameMissionCard(storedState.endGameMissionCard);
         renderEndGameGoals(storedState.endGameGoals);
         refreshCellData();
         getLabels().forEach(bindLabel);
@@ -711,6 +763,7 @@
   }
   renderChartShell();
   renderGridShell(getDefaultGoals());
+  renderEndGameMissionCard({ completed: false, deleted: false });
   renderEndGameGoals([]);
   refreshCellData();
   getLabels().forEach(bindLabel);
@@ -764,6 +817,60 @@
       return;
     }
     markStateChanged();
+  });
+  endGameGoalTrack.addEventListener('click', (event) => {
+    const actionButton = event.target.closest('[data-end-game-mission-action]');
+    if (actionButton && endGameMissionActions.contains(actionButton)) {
+      event.stopPropagation();
+      if (!stateReady) {
+        return;
+      }
+      if (actionButton.dataset.endGameMissionAction === 'toggle-complete') {
+        renderEndGameMissionCard({ ...endGameMissionCardState, completed: !endGameMissionCardState.completed });
+        closeEndGameMissionActions({ restoreFocus: true });
+        markStateChanged();
+        return;
+      }
+      if (actionButton.dataset.endGameMissionAction === 'remove') {
+        if (endGameMissionRemoveButton.dataset.confirmRemove !== 'true') {
+          endGameMissionRemoveButton.dataset.confirmRemove = 'true';
+          endGameMissionRemoveButton.textContent = 'Nogmaals: verwijderen';
+          return;
+        }
+        renderEndGameMissionCard({ ...endGameMissionCardState, deleted: true });
+        markStateChanged();
+      }
+      return;
+    }
+    if (event.target.closest('.end-game-goal-card--mission') === endGameMissionCard) {
+      if (endGameMissionActions.hidden) {
+        openEndGameMissionActions();
+      } else {
+        closeEndGameMissionActions({ restoreFocus: true });
+      }
+    }
+  });
+  endGameMissionCard.addEventListener('keydown', (event) => {
+    if (event.target !== endGameMissionCard) {
+      return;
+    }
+    if ([' ', 'Enter'].includes(event.key)) {
+      event.preventDefault();
+      openEndGameMissionActions();
+    }
+    if (event.key === 'Escape') {
+      closeEndGameMissionActions({ restoreFocus: true });
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (!endGameMissionActions.hidden && !endGameMissionCard.contains(event.target)) {
+      closeEndGameMissionActions();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !endGameMissionActions.hidden) {
+      closeEndGameMissionActions({ restoreFocus: true });
+    }
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && stateDirty) {
