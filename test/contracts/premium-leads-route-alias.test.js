@@ -8,7 +8,7 @@ const {
   resolveLegacyPrettyPageRedirect,
 } = require('../../server/config/page-routing');
 
-test('premium leads exposes a clean pretty route and redirects the old slug', () => {
+test('premium leads stays available while coldmailing management routes return to the dashboard', () => {
   const knownPages = new Set([
     'premium-ai-coldmailing.html',
     'premium-ai-lead-generator.html',
@@ -18,10 +18,12 @@ test('premium leads exposes a clean pretty route and redirects the old slug', ()
   const slugMap = createKnownPrettyPageSlugToFile(knownPages);
 
   assert.equal(slugMap.get('premium-leads'), 'premium-ai-coldmailing.html');
-  assert.equal(slugMap.get('premium-ai-lead-generator'), 'premium-bevestigingsmails.html');
+  assert.equal(slugMap.get('premium-ai-lead-generator'), 'premium-ai-lead-generator.html');
   assert.equal(slugMap.get('premium-bevestigingsmails'), 'premium-bevestigingsmails.html');
   assert.equal(slugMap.get('premium-coldmailing-lead'), 'premium-coldmailing-lead.html');
   assert.equal(resolveLegacyPrettyPageRedirect('premium-ai-coldmailing'), 'premium-leads');
+  assert.equal(resolveLegacyPrettyPageRedirect('premium-ai-lead-generator'), 'premium-personeel-dashboard');
+  assert.equal(resolveLegacyPrettyPageRedirect('premium-bevestigingsmails'), 'premium-personeel-dashboard');
 });
 
 test('premium sidebar navigation normalizes old leads links to the clean route', () => {

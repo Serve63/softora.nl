@@ -795,12 +795,6 @@
                 label: "Coldcalling",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg>',
             },
-            {
-                key: "coldmailing",
-                href: "/premium-bevestigingsmails",
-                label: "Coldmailing",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
-            },
             getDatabaseSidebarLink(),
         ];
 
@@ -973,7 +967,7 @@
     function pruneDeprecatedSidebarLinks(sidebar) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const legacyAnalyticsLinks = sidebar.querySelectorAll(
-            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"]'
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"]'
         );
         legacyAnalyticsLinks.forEach(function (link) {
             if (link && link.parentNode) {

@@ -198,7 +198,7 @@ test('premium bevestigingsmails keeps the campaign duration setting without a se
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);
 });
 
-test('premium bevestigingsmails is directly accessible without coming-soon lock styling', () => {
+test('premium bevestigingsmails stays internal and is absent from the shared sidebar template', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const themePath = path.join(__dirname, '../../assets/personnel-theme.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -212,7 +212,8 @@ test('premium bevestigingsmails is directly accessible without coming-soon lock 
   assert.doesNotMatch(pageSource, /Binnenkort beschikbaar/);
   assert.ok(comingSoonKeysMatch);
   assert.doesNotMatch(comingSoonKeysMatch[1], /"coldmailing"/);
-  assert.match(themeSource, /key: "coldmailing"/);
+  assert.doesNotMatch(themeSource, /key: "coldmailing"/);
+  assert.match(themeSource, /a\[data-sidebar-key="coldmailing"\]/);
 });
 
 test('premium bevestigingsmails hides the old zone cards from the dashboard grid', () => {
