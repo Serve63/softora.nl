@@ -83,6 +83,17 @@ test('kvk database renders latest treated snapshot rows in the restored panel', 
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 });
 
+test('kvk database hides the page scrollbar without disabling scrolling', () => {
+  const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
+
+  assert.match(styleSource, /html\{[^}]*scrollbar-width:none;[^}]*-ms-overflow-style:none/);
+  assert.match(styleSource, /body\{[^}]*scrollbar-width:none;[^}]*-ms-overflow-style:none/);
+  assert.match(styleSource, /(?:html|body)::\-webkit-scrollbar,(?:html|body)::\-webkit-scrollbar/);
+  assert.match(styleSource, /::\-webkit-scrollbar\{display:none;width:0;height:0\}/);
+  assert.doesNotMatch(styleSource, /html\{[^}]*overflow:hidden/);
+  assert.doesNotMatch(styleSource, /body\{[^}]*overflow:hidden/);
+});
+
 test('kvk database page loads a live snapshot before using embedded fallback data', () => {
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
 
