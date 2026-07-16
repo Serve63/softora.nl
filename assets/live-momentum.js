@@ -14,7 +14,6 @@
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
   const TODAY = PERIOD.today;
-  const CHART_MAX_HEIGHT = 164;
   const ICON_CATALOG = Array.isArray(window.SoftoraMomentumIconCatalog)
     ? window.SoftoraMomentumIconCatalog
     : [];
@@ -378,6 +377,10 @@
     }
     return label;
   }
+  function getChartMaxHeight(wrap) {
+    const height = Number.parseFloat(window.getComputedStyle(wrap).getPropertyValue('--chart-max-height'));
+    return Number.isFinite(height) && height > 0 ? height : 164;
+  }
   function updateBar(day, score) {
     const wrap = getChartBars()[day - 1];
     const bar = wrap?.querySelector('.bar');
@@ -389,7 +392,7 @@
     const isToday = day === TODAY;
     const isOpen = !hasScore || (!isToday && score === 0 && day > TODAY);
     const scoreBand = hasScore ? getScoreBand(score) : '';
-    const barHeight = hasScore ? Math.round((Math.max(0, Math.min(score, 100)) / 100) * CHART_MAX_HEIGHT) : 0;
+    const barHeight = hasScore ? Math.round((Math.max(0, Math.min(score, 100)) / 100) * getChartMaxHeight(wrap)) : 0;
     wrap.classList.remove('is-good', 'is-warning', 'is-danger');
     bar.classList.remove('is-good', 'is-warning', 'is-danger');
     bar.classList.toggle('is-today', isToday);

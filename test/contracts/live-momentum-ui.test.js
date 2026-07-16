@@ -16,7 +16,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716q"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716r"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -94,6 +94,11 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(css, /purple/i);
   assert.doesNotMatch(css, /88366b|74265c|91436f|7f426b/i);
   assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--day-count, 31\),/);
+  assert.match(css, /\.chart-card\s*\{[\s\S]*--chart-max-height:\s*164px;[\s\S]*--chart-axis-height:\s*26px;[\s\S]*--chart-total-height:\s*218px;/);
+  assert.match(css, /\.chart-scale\s*\{[\s\S]*top:\s*calc\(1\.2rem \+ var\(--chart-total-height\) - var\(--chart-max-height\) - var\(--chart-axis-height\)\);[\s\S]*bottom:\s*calc\(1rem \+ var\(--chart-axis-height\)\);/);
+  assert.match(css, /\.chart-scale span\s*\{[\s\S]*position:\s*absolute;[\s\S]*transform:\s*translateY\(-50%\);/);
+  assert.match(css, /\.chart-scale span:nth-child\(1\)\s*\{\s*top:\s*0;\s*\}[\s\S]*nth-child\(2\)\s*\{\s*top:\s*25%;\s*\}[\s\S]*nth-child\(3\)\s*\{\s*top:\s*50%;\s*\}[\s\S]*nth-child\(4\)\s*\{\s*top:\s*75%;\s*\}[\s\S]*nth-child\(5\)\s*\{\s*top:\s*100%;\s*\}/);
+  assert.match(css, /\.bar-wrap\s*\{[\s\S]*grid-template-rows:\s*var\(--chart-max-height\) var\(--chart-axis-height\);/);
   assert.doesNotMatch(css, /chart-switch|is-line-mode|\.line-(?:stage|grid|segment|point|day-axis)/);
   assert.match(css, /\.habit-grid\s*\{[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(190px, 12vw\) repeat\(var\(--day-count, 31\), minmax\(32px, 1fr\)\);[\s\S]*min-width:\s*min\(100%, 1320px\);/);
   assert.doesNotMatch(css, /\.habit-grid\s*\{[^}]*min-width:\s*1320px;/);
@@ -174,6 +179,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /Dagdoel behalen/);
   assert.match(js, /Gezonde voeding/);
   assert.match(js, /function getScoreBand\(score\)/);
+  assert.match(js, /function getChartMaxHeight\(wrap\)[\s\S]*getComputedStyle\(wrap\)[\s\S]*--chart-max-height/);
+  assert.doesNotMatch(js, /const CHART_MAX_HEIGHT/);
   assert.match(js, /function toggleCell\(cell\)/);
   assert.match(js, /function updateChart\(\)/);
   assert.match(js, /function getDayScore\(day\)/);
