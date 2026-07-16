@@ -2,12 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-
-const source = fs.readFileSync(
-  path.join(__dirname, '../../assets/google-ads-consent.js'),
-  'utf8'
-);
+const { bootGoogleAdsConsent } = require('../../assets/google-ads-consent');
 const middlewareSource = fs.readFileSync(
   path.join(__dirname, '../../server/services/app-middleware-runtime.js'),
   'utf8'
@@ -52,16 +47,12 @@ async function runConsentAsset({ payload, cookie = '', existingBanner = null } =
     get cookie() { return storedCookie; },
     set cookie(value) { storedCookie = value; },
   };
-  const window = { document };
-  window.window = window;
-  const context = {
-    Date,
+  const window = {
     document,
-    encodeURIComponent,
     fetch: async () => ({ ok: true, json: async () => payload }),
-    window,
   };
-  vm.runInNewContext(source, context);
+  window.window = window;
+  bootGoogleAdsConsent(window);
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
   return { body, head, window, getCookie: () => storedCookie };

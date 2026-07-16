@@ -1,5 +1,15 @@
-(function () {
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = { bootGoogleAdsConsent: factory };
+    return;
+  }
+  factory(root);
+})(typeof window !== 'undefined' ? window : null, function bootGoogleAdsConsent(window) {
   'use strict';
+
+  if (!window || !window.document || typeof window.fetch !== 'function') return;
+  var document = window.document;
+  var fetchConfig = window.fetch.bind(window);
 
   var COOKIE_NAME = 'softora_cookie_consent';
   var MAX_AGE_SECONDS = 15552000;
@@ -150,7 +160,7 @@
     recordConversion: recordConversion,
   };
 
-  fetch('/api/google-ads/public-config', { credentials: 'same-origin', cache: 'no-store' })
+  fetchConfig('/api/google-ads/public-config', { credentials: 'same-origin', cache: 'no-store' })
     .then(function (response) { return response.ok ? response.json() : null; })
     .then(function (payload) {
       if (!payload || !payload.enabled || payload.consentMode !== 'basic-v2') return;
@@ -172,4 +182,4 @@
     .catch(function () {
       /* Fail-closed: zonder geldige configuratie blijft Google volledig uit. */
     });
-})();
+});
