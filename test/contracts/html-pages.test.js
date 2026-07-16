@@ -20,6 +20,9 @@ function createResponseRecorder() {
       this.headers[name] = value;
       return this;
     },
+    getHeader(name) {
+      return this.headers[name];
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -316,6 +319,8 @@ test('html page coordinator disables cross-document view transitions on Live Mom
   );
 
   const res = createResponseRecorder();
+  res.setHeader('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none'");
+  res.setHeader('Permissions-Policy', 'autoplay=(self), camera=()');
   await coordinator.sendSeoManagedHtmlPageResponse(
     { originalUrl: '/live-momentum' },
     res,
@@ -329,6 +334,15 @@ test('html page coordinator disables cross-document view transitions on Live Mom
   assert.ok(stabilityIndex > -1, 'Live Momentum hoort de sidebar-stability assets te behouden');
   assert.ok(optoutIndex > stabilityIndex, 'de route-optout hoort na de gedeelde stability CSS te staan');
   assert.match(res.body, /@view-transition\{navigation:none;\}/);
+  assert.match(
+    res.headers['Content-Security-Policy'],
+    /default-src 'self'; frame-ancestors 'none'; frame-src 'self' https:\/\/www\.youtube-nocookie\.com/
+  );
+  assert.match(
+    res.headers['Permissions-Policy'],
+    /autoplay=\(self "https:\/\/www\.youtube-nocookie\.com"\), camera=\(\)/
+  );
+  assert.doesNotMatch(res.headers['Content-Security-Policy'], /https:\/\/www\.youtube\.com/);
 });
 
 test('html page coordinator renders premium content-frame pages without an active sidebar shell', async () => {
