@@ -6,6 +6,9 @@ const WEBDESIGN_EMAIL_MOCKUP_CAPTION =
 
 const EMAIL_CONTENT_MAX_WIDTH = 600;
 const SINGLE_IMAGE_WIDTH = 480;
+const EMAIL_WORD_JOINER = '\u2060';
+const UNLINKED_WEBSITE_DOMAIN_STYLE =
+  'display:inline-block;white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important;color:inherit!important;text-decoration:none!important;';
 
 function renderWebdesignEmailHeadStyles() {
   return [
@@ -33,6 +36,75 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normalizeWebsiteDomain(value) {
+  const raw = normalizeString(value)
+    .replace(/^<|>$/g, '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/[/?#].*$/g, '')
+    .replace(/[.,;:!?]+$/g, '')
+    .toLowerCase();
+  return /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)+$/i.test(raw)
+    ? raw
+    : '';
+}
+
+function escapeRegexText(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function protectWebsiteDomainText(value) {
+  return String(value || '').replace(/([.-])/g, `${EMAIL_WORD_JOINER}$1${EMAIL_WORD_JOINER}`);
+}
+
+function renderUnlinkedWebsiteDomain(value, options = {}) {
+  const display = normalizeString(value);
+  if (!display) return '';
+  return `<span class="softora-unlinked-website-domain" style="${UNLINKED_WEBSITE_DOMAIN_STYLE}">${escapeHtml(
+    options.protectPunctuation === false ? display : protectWebsiteDomainText(display)
+  )}</span>`;
+}
+
+function replaceWebsiteDomainInText(value, websiteDomain, replacement) {
+  const source = String(value || '');
+  const domain = normalizeWebsiteDomain(websiteDomain);
+  if (!source || !domain || typeof replacement !== 'function') return source;
+  const pattern = new RegExp(
+    `(^|[^a-z0-9@._-])((?:www\\.)?${escapeRegexText(domain)})(?=$|[^a-z0-9._-])`,
+    'gi'
+  );
+  let result = '';
+  let lastIndex = 0;
+  for (const match of source.matchAll(pattern)) {
+    const prefix = match[1] || '';
+    const token = match[2] || '';
+    const tokenStart = (match.index || 0) + prefix.length;
+    result += source.slice(lastIndex, tokenStart);
+    result += replacement(token);
+    lastIndex = tokenStart + token.length;
+  }
+  return lastIndex ? `${result}${source.slice(lastIndex)}` : source;
+}
+
+function protectWebsiteDomainInText(value, websiteDomain) {
+  return replaceWebsiteDomainInText(value, websiteDomain, protectWebsiteDomainText);
+}
+
+function renderTextWithUnlinkedWebsiteDomain(value, websiteDomain) {
+  const source = String(value || '');
+  const domain = normalizeWebsiteDomain(websiteDomain);
+  if (!domain) return escapeHtml(source);
+  const protectedSource = replaceWebsiteDomainInText(
+    source,
+    domain,
+    (token) => `\u0000${token}\u0000`
+  );
+  const parts = protectedSource.split('\u0000');
+  return parts
+    .map((part, index) => (index % 2 === 1 ? renderUnlinkedWebsiteDomain(part) : escapeHtml(part)))
+    .join('');
 }
 
 function imageSource(image) {
@@ -93,5 +165,10 @@ module.exports = {
   renderWebdesignEmailHeadStyles,
   renderResponsiveImagePair,
   renderSingleImage,
+  normalizeWebsiteDomain,
+  protectWebsiteDomainInText,
+  protectWebsiteDomainText,
+  renderTextWithUnlinkedWebsiteDomain,
+  renderUnlinkedWebsiteDomain,
   renderWebdesignImageSection,
 };

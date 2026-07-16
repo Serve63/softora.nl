@@ -122,6 +122,17 @@ function extractPreviewImageTokens(html) {
   return matches.map((match) => decodeURIComponent(match[1]));
 }
 
+function stripUnlinkedWebsiteDomainMarkup(html) {
+  return String(html || '').replace(
+    /<span class="softora-unlinked-website-domain"[^>]*>([\s\S]*?)<\/span>/g,
+    '$1'
+  );
+}
+
+function stripEmailWordJoiners(value) {
+  return String(value || '').replace(/\u2060/g, '');
+}
+
 const COLDMAIL_MOCKUP_CAPTION_TEXT =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -165,7 +176,7 @@ function assertWebdesignImagePairLayout(html, options = {}) {
   }
 
   assert.equal((value.match(/<img\b/g) || []).length, 2);
-  assert.doesNotMatch(value, /900px|softora-desktop-image-pair|softora-mobile-image-pair|softora-webdesign-image-pair|softora-webdesign-image-cell|display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table|height="360"|background-image|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/i);
+  assert.doesNotMatch(stripUnlinkedWebsiteDomainMarkup(value), /900px|softora-desktop-image-pair|softora-mobile-image-pair|softora-webdesign-image-pair|softora-webdesign-image-cell|display:flex|flex-wrap|softora-webdesign-image-gap|softora-webdesign-image-table|height="360"|background-image|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/i);
 
   const withoutHeadCss = value.replace(/<style type="text\/css">[\s\S]*?<\/style>/, '');
   assert.match(withoutHeadCss, /class="softora-webdesign-image-stack" style="display:block;[^\"]+max-width:600px/);
@@ -1251,9 +1262,9 @@ test('coldmail campaign keeps the standard subject and body when variants are pr
     assert.match(message.text, /Ik kwam .* tegen en heb een nieuw webdesign gemaakt\./);
     assert.doesNotMatch(message.text, /Deze week zag ik|Vanuit enthousiasme/);
   });
-  assert.match(sentMessages[0].text, /bakkerijzon\.nl/);
-  assert.match(sentMessages[1].text, /lunchroommaan\.nl/);
-  assert.match(sentMessages[2].text, /cafenova\.nl/);
+  assert.match(stripEmailWordJoiners(sentMessages[0].text), /bakkerijzon\.nl/);
+  assert.match(stripEmailWordJoiners(sentMessages[1].text), /lunchroommaan\.nl/);
+  assert.match(stripEmailWordJoiners(sentMessages[2].text), /cafenova\.nl/);
 });
 
 test('coldmail campaign does not add open tracking pixels to new outbound mail', async () => {
@@ -4998,7 +5009,7 @@ test('coldmail campaign replaces website variable from database website aliases'
   assert.equal(result.sent, 1);
   assert.equal(sentMessages.length, 1);
   assert.equal(sentMessages[0].subject, 'Nieuwe website voor bakkerijzon.nl');
-  assert.match(sentMessages[0].text, /website bakkerijzon\.nl tegen/);
+  assert.match(stripEmailWordJoiners(sentMessages[0].text), /website bakkerijzon\.nl tegen/);
   assert.doesNotMatch(sentMessages[0].text, /\{\{website\}\}/);
 });
 
@@ -5144,7 +5155,7 @@ test('coldmail campaign can use durable remote webdesign photo and device mockup
   assert.doesNotMatch(sentMessages[0].text, /PS: Wordt het webdesign niet zichtbaar/);
   assert.match(sentMessages[0].html, /📍 Alphen/);
   assert.match(sentMessages[0].html, /width:100%;max-width:600px;min-width:0;/);
-  assert.doesNotMatch(sentMessages[0].html, /min-device-width|900px|white-space:nowrap|display:inline-block/);
+  assert.doesNotMatch(stripUnlinkedWebsiteDomainMarkup(sentMessages[0].html), /min-device-width|900px|white-space:nowrap|display:inline-block/);
   assert.match(
     sentMessages[0].html,
     /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:400;">link<\/a> bekijken 🎨/
@@ -5743,8 +5754,9 @@ test('coldmail autopilot uses two regular attachments and no inline images', asy
     sentMessages[0].html,
     /Lukt het niet om de bijlage te openen\? Dan kun je het webdesign ook via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/bakkerij-zon\?cid=prospect-1&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;font-weight:400;">link<\/a> bekijken 🎨/
   );
-  assert.match(sentMessages[0].html, /website \(bakkerijzon\.nl\) tegen/);
-  assert.doesNotMatch(sentMessages[0].html, /href="https:\/\/bakkerijzon\.nl"|white-space:nowrap|word-break:keep-all/);
+  assert.match(sentMessages[0].html, /website \(<span class="softora-unlinked-website-domain"[^>]+>bakkerijzon\u2060\.\u2060nl<\/span>\) tegen/);
+  assert.doesNotMatch(sentMessages[0].html, /href="https:\/\/bakkerijzon\.nl"/);
+  assert.doesNotMatch(stripUnlinkedWebsiteDomainMarkup(sentMessages[0].html), /white-space:nowrap|word-break:keep-all/);
   assert.doesNotMatch(sentMessages[0].html, /<img\b/i);
   assert.doesNotMatch(sentMessages[0].html, /cid:/);
   assert.equal(sentMessages[0].attachments.length, 2);
@@ -6952,7 +6964,7 @@ test('coldmail campaign test mode infers webdesign assets from the mail content 
   assert.equal(sentMessages[0].to, 'servec321@gmail.com');
   assert.equal(sentMessages[0].subject, 'Nieuw webdesign gemaakt!');
   assert.doesNotMatch(sentMessages[0].subject, /\(test \d{8}T\d{6}Z\)/);
-  assert.match(sentMessages[0].text, /website softora\.nl tegen/);
+  assert.match(stripEmailWordJoiners(sentMessages[0].text), /website softora\.nl tegen/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-softora-test-mode-recipient@softora"/);
   assert.match(sentMessages[0].html, /<img src="cid:webdesign-mockup-softora-test-mode-recipient@softora"/);
   assertWebdesignImagePairLayout(sentMessages[0].html, {

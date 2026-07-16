@@ -24,20 +24,19 @@ test('production mail runtime uses direct source without loader monkey patches',
   assert.match(source, /website \{\{website\}\} tegen/);
   assert.doesNotMatch(source, /website, \{\{website\}\}, tegen/);
   assert.match(source, /font-weight:400/);
-  assert.match(source, /return escapeHtml\(cleanLine\)/);
+  assert.match(source, /return renderTextWithUnlinkedWebsiteDomain\(cleanLine, options\.websiteDomain\)/);
   assert.match(source, /includeMockup: true/);
   assert.match(source, /attachments\.length !== 2/);
   assert.match(source, /'Mockup'/);
   assert.match(source, /'Webdesign'/);
   assert.match(source, /Je vindt het ontwerp in de bijlage bij deze e-mail\./);
   assert.match(source, /max-width:600px/);
-  assert.doesNotMatch(source, /renderColdmailDomainToken|softora-desktop-nowrap|word-break:keep-all/);
+  assert.doesNotMatch(source, /renderColdmailDomainToken|softora-desktop-nowrap/);
 
   for (const relativePath of [
     'server/services/coldmail-campaign.js',
     'server/services/mailbox.js',
     'server/services/instantly-outreach.js',
-    'server/services/webdesign-email-renderer.js',
     'scripts/render-webdesign-email-preview.js',
   ]) {
     const mailSource = read(relativePath);
@@ -47,6 +46,11 @@ test('production mail runtime uses direct source without loader monkey patches',
       relativePath
     );
   }
+
+  const sharedRendererSource = read('server/services/webdesign-email-renderer.js');
+  assert.match(sharedRendererSource, /softora-unlinked-website-domain/);
+  assert.match(sharedRendererSource, /display:inline-block;white-space:nowrap!important;/);
+  assert.match(sharedRendererSource, /renderTextWithUnlinkedWebsiteDomain/);
 });
 
 test('temporary one-shot coldmail endpoint is removed from production', () => {

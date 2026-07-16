@@ -6,10 +6,32 @@ const path = require('node:path');
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  protectWebsiteDomainInText,
+  renderTextWithUnlinkedWebsiteDomain,
+  renderUnlinkedWebsiteDomain,
   renderWebdesignEmailDocument,
   renderWebdesignEmailHeadStyles,
   renderWebdesignImageSection,
 } = require('../../server/services/webdesign-email-renderer');
+
+test('website domain stays plain and indivisible while visible text remains unchanged', () => {
+  const domain = 'de-rustende-jager.nl';
+  const line = `Afgelopen week kwam ik jullie website ${domain} tegen.`;
+  const protectedText = protectWebsiteDomainInText(line, `https://${domain}/`);
+  const html = renderTextWithUnlinkedWebsiteDomain(line, domain);
+
+  assert.equal(protectedText.replace(/\u2060/g, ''), line);
+  assert.doesNotMatch(protectedText, /de-rustende-jager\.nl/);
+  assert.match(
+    html,
+    /website <span class="softora-unlinked-website-domain" style="display:inline-block;white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important;color:inherit!important;text-decoration:none!important;">de\u2060-\u2060rustende\u2060-\u2060jager\u2060\.\u2060nl<\/span> tegen\./
+  );
+  assert.doesNotMatch(html, /<a\b|href=|color:#0a66c2/);
+  assert.equal(
+    html,
+    `Afgelopen week kwam ik jullie website ${renderUnlinkedWebsiteDomain(domain)} tegen.`
+  );
+});
 
 test('shared webdesign renderer is width-safe without CSS and stacks each image exactly once', () => {
   const imageSection = renderWebdesignImageSection(

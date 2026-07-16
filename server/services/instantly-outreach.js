@@ -16,6 +16,9 @@ const {
   OUTBOUND_SENDER_PROFILE_KEYS,
 } = require('./outbound-sender-identity');
 const {
+  protectWebsiteDomainInText,
+  renderTextWithUnlinkedWebsiteDomain,
+  renderUnlinkedWebsiteDomain,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
 
@@ -1779,7 +1782,7 @@ function renderMailTextAsHtml(text, normalizeString = defaultNormalizeString, op
             if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
               return renderImageVisibilityPsHtmlLine(cleanLine, normalizeString, options);
             }
-            return escapeHtml(cleanLine, normalizeString);
+            return renderTextWithUnlinkedWebsiteDomain(cleanLine, options.websiteDomain);
           })
           .join('<br>')}</p>`;
     })
@@ -1857,11 +1860,13 @@ function buildInstantlyEmailHtml(
     webdesignImageDimensions,
     webdesignMockupDimensions,
     webdesignPublicUrl,
+    websiteDomain,
   },
   normalizeString = defaultNormalizeString
 ) {
   const bodyHtml = renderMailTextAsHtml(baseText, normalizeString, {
     webdesignPreviewUrl: webdesignPublicUrl,
+    websiteDomain,
   });
   const imageHtml = renderInstantlyImagePairHtml(
     {
@@ -1889,9 +1894,14 @@ function buildInstantlyCampaignTemplateText() {
 }
 
 function buildInstantlyCampaignHtmlTemplate(normalizeString = defaultNormalizeString) {
-  const bodyHtml = renderMailTextAsHtml(buildInstantlyCampaignTemplateText(), normalizeString, {
-    webdesignPreviewUrl: '{{softora_webdesign_public_url}}',
-  });
+  const bodyHtml = renderMailTextAsHtml(
+    buildInstantlyCampaignTemplateText(),
+    normalizeString,
+    { webdesignPreviewUrl: '{{softora_webdesign_public_url}}' }
+  ).replace(
+    /\{\{softora_website_domain\}\}/g,
+    renderUnlinkedWebsiteDomain('{{softora_website_domain}}', { protectPunctuation: false })
+  );
   const imageHtml = renderInstantlyImagePairHtml(
     {
       webdesignImageUrl: '{{softora_webdesign_image_url}}',
@@ -2742,6 +2752,8 @@ function createInstantlyOutreachService(deps = {}) {
     }, normalizeString);
     const senderName = normalizeString(sender.name) || inferInstantlySenderName(bodyTemplate, sender.email, normalizeString);
     const baseMailBody = buildInstantlyWebdesignMailText(row, city, senderName, normalizeString);
+    const websiteDomain = getRowDomain(row, normalizeString);
+    const protectedBaseMailBody = protectWebsiteDomainInText(baseMailBody, websiteDomain);
     const assets = getReadyWebdesignAssets(item, context);
     const webdesignLink = assets.ready
       ? buildColdmailPreviewImageLink(row, item.id, reference, config, 'webdesign', normalizeString, now)
@@ -2772,7 +2784,7 @@ function createInstantlyOutreachService(deps = {}) {
     const webdesignMockupUrl = webdesignMockupLink ? webdesignMockupLink.url : '';
     const instantlyEmailBody = buildInstantlyBodyWithWebdesignLinks(
       {
-        baseText: baseMailBody,
+        baseText: protectedBaseMailBody,
         webdesignImageUrl,
         webdesignMockupUrl,
         unsubscribeUrl,
@@ -2788,6 +2800,7 @@ function createInstantlyOutreachService(deps = {}) {
         webdesignImageDimensions: webdesignCache.dimensions,
         webdesignMockupDimensions: webdesignMockupCache.dimensions,
         webdesignPublicUrl,
+        websiteDomain,
         unsubscribeUrl,
       },
       normalizeString
@@ -2804,8 +2817,8 @@ function createInstantlyOutreachService(deps = {}) {
       softora_city: city,
       softora_city_with_pin: formatPinnedCity(city, normalizeString),
       softora_subject: subject,
-      softora_mail_body: baseMailBody,
-      softora_mail_body_with_optout: baseMailBody,
+      softora_mail_body: protectedBaseMailBody,
+      softora_mail_body_with_optout: protectedBaseMailBody,
       softora_instantly_email_text: instantlyEmailBody,
       softora_instantly_email_body: instantlyEmailBody,
       softora_instantly_email_html: instantlyEmailHtml,
@@ -2819,7 +2832,7 @@ function createInstantlyOutreachService(deps = {}) {
       softora_webdesign_image_prewarmed: webdesignPublicPrewarm && webdesignPublicPrewarm.ok ? 'true' : 'false',
       softora_webdesign_mockup_prewarmed: webdesignMockupPublicPrewarm && webdesignMockupPublicPrewarm.ok ? 'true' : 'false',
       softora_mockup_caption: COLDMAIL_MOCKUP_CAPTION,
-      softora_website_domain: getRowDomain(row, normalizeString),
+      softora_website_domain: protectWebsiteDomainInText(websiteDomain, websiteDomain),
       softora_webdesign_ready: assets.ready ? 'true' : 'false',
     };
 

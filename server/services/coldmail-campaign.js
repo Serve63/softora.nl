@@ -20,6 +20,8 @@ const {
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  protectWebsiteDomainInText,
+  renderTextWithUnlinkedWebsiteDomain,
   renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
@@ -7226,7 +7228,7 @@ function createColdmailCampaignService(deps = {}) {
     if (COLDMAIL_IMAGE_VISIBILITY_PS_PATTERN.test(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(cleanLine, options);
     }
-    return escapeHtml(cleanLine);
+    return renderTextWithUnlinkedWebsiteDomain(cleanLine, options.websiteDomain);
   }
 
   function isColdmailLinkOnlyImageArtifactLine(line) {
@@ -8899,7 +8901,8 @@ function createColdmailCampaignService(deps = {}) {
       const baseText = shouldIncludeWebdesignPhoto && webdesignImageDelivery === 'link'
         ? stripColdmailLinkOnlyImageArtifacts(rawBaseText)
         : rawBaseText;
-      const text = baseText;
+      const websiteDomain = getRowDomain(row);
+      const text = protectWebsiteDomainInText(baseText, websiteDomain);
       const subject = personalizeTemplate(selectedSubjectTemplate, row, { senderEmail });
       const webdesignPhoto = shouldIncludeWebdesignPhoto ? await resolveRowWebdesignPhoto(row, customerPhotoMap) : null;
       if (shouldIncludeWebdesignPhoto && !webdesignPhoto) {
@@ -8982,6 +8985,7 @@ function createColdmailCampaignService(deps = {}) {
       const htmlBase = appendHiddenColdmailReferenceHtml(
         toHtml(baseText, {
           senderEmail,
+          websiteDomain,
           webdesignPreviewUrl: buildPublicWebdesignPreviewUrl(row, publicWebdesignPreviewId, {
             ...input,
             senderEmail,
