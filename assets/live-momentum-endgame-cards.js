@@ -1,5 +1,6 @@
 (() => {
   const CARD_CATALOG = [
+    { id: 'oktober-2024', title: 'Oktober 2024…', type: 'origin' },
     { id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' },
     { id: 'prp-behandeling', title: 'PRP Behandeling' },
     { id: 'ketting-armband', title: 'Ketting & Armband' },
@@ -26,15 +27,18 @@
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
-    { id: '2030', title: '2030?' },
-    { id: 'oktober-2024', title: 'Oktober 2024…' }
+    { id: '2030', title: '2030?' }
   ];
+  const ORIGIN_CARD_ID = 'oktober-2024';
+  const LEGACY_MISSION_ID = 'eigen-automaat-rijden';
   const DEFAULT_CARD_ORDER = CARD_CATALOG.map((card) => card.id);
 
   function normalizeOrder(value) {
     const validIds = new Set(DEFAULT_CARD_ORDER);
-    const order = Array.from(new Set((Array.isArray(value) ? value : []).filter((id) => validIds.has(id))));
-    return order.concat(DEFAULT_CARD_ORDER.filter((id) => !order.includes(id)));
+    const requestedOrder = Array.from(new Set((Array.isArray(value) ? value : [])
+      .filter((id) => validIds.has(id) && id !== ORIGIN_CARD_ID)));
+    const remainingOrder = DEFAULT_CARD_ORDER.filter((id) => id !== ORIGIN_CARD_ID && !requestedOrder.includes(id));
+    return [ORIGIN_CARD_ID, ...requestedOrder, ...remainingOrder];
   }
 
   function normalizeCardState(value) {
@@ -42,9 +46,11 @@
   }
 
   function normalizeState(value, legacyMissionState) {
-    const normalized = Object.fromEntries(CARD_CATALOG.map((card, index) => [
+    const normalized = Object.fromEntries(CARD_CATALOG.map((card) => [
       card.id,
-      normalizeCardState(index === 0 && !value?.[card.id] ? legacyMissionState : value?.[card.id])
+      card.id === ORIGIN_CARD_ID
+        ? { completed: false, deleted: false }
+        : normalizeCardState(card.id === LEGACY_MISSION_ID && !value?.[card.id] ? legacyMissionState : value?.[card.id])
     ]));
     normalized.__order = normalizeOrder(value?.__order);
     return normalized;
@@ -112,31 +118,46 @@
     image.decoding = 'async';
     shade.className = 'end-game-card-photo-shade';
     top.className = 'end-game-card-kicker';
-    top.textContent = 'END GAME';
+    top.textContent = card.type === 'origin' ? 'STARTPUNT' : 'END GAME';
     title.className = 'end-game-card-name';
     title.textContent = card.title;
-    mission.className = 'end-game-card-mission';
-    mission.textContent = 'MISSIE';
-    target.className = 'end-game-card-target';
-    target.append(createTargetIcon());
-    artwork.append(image, shade, top, title, mission, target);
+    if (card.type === 'origin') {
+      const originLabel = document.createElement('span');
+      originLabel.className = 'end-game-card-origin-label';
+      originLabel.textContent = 'HIER BEGON HET';
+      artwork.classList.add('end-game-card-photo--origin');
+      artwork.append(image, shade, top, title, originLabel);
+    } else {
+      mission.className = 'end-game-card-mission';
+      mission.textContent = 'MISSIE';
+      target.className = 'end-game-card-target';
+      target.append(createTargetIcon());
+      artwork.append(image, shade, top, title, mission, target);
+    }
     return artwork;
   }
 
   function createCard(card, state) {
     const article = document.createElement('article');
-    article.className = 'end-game-goal-card end-game-goal-card--mission';
+    const isOrigin = card.type === 'origin';
+    article.className = `end-game-goal-card end-game-goal-card--mission${isOrigin ? ' end-game-goal-card--origin' : ''}`;
     article.dataset.endGameCardId = card.id;
-    article.tabIndex = 0;
-    article.setAttribute('role', 'button');
-    article.setAttribute('aria-haspopup', 'menu');
-    article.setAttribute('aria-expanded', 'false');
-    article.setAttribute('aria-label', state.completed
-      ? `Missie: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
-      : `Missie: ${card.title}. Sleep om te verplaatsen of klik voor acties.`);
+    if (isOrigin) {
+      article.dataset.endGameCardFixed = 'true';
+      article.setAttribute('role', 'img');
+      article.setAttribute('aria-label', 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.');
+    } else {
+      article.tabIndex = 0;
+      article.setAttribute('role', 'button');
+      article.setAttribute('aria-haspopup', 'menu');
+      article.setAttribute('aria-expanded', 'false');
+      article.setAttribute('aria-label', state.completed
+        ? `Missie: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
+        : `Missie: ${card.title}. Sleep om te verplaatsen of klik voor acties.`);
+    }
     article.classList.toggle('is-completed', state.completed);
     article.append(createCardArtwork(card));
-    article.append(createCompletionOverlay(), createActions(card, state.completed));
+    if (!isOrigin) article.append(createCompletionOverlay(), createActions(card, state.completed));
     return article;
   }
 
@@ -245,7 +266,7 @@
     });
 
     return {
-      getLegacyMissionState: () => ({ ...state[CARD_CATALOG[0].id] }),
+      getLegacyMissionState: () => ({ ...state[LEGACY_MISSION_ID] }),
       getState: () => ({
         ...Object.fromEntries(CARD_CATALOG.map((card) => [card.id, { ...state[card.id] }])),
         __order: [...state.__order]

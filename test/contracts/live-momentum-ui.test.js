@@ -27,15 +27,15 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716z"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260716b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260717a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716l" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
@@ -255,7 +255,13 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
   assert.match(endGameCardsJs, /\{ id: '2030', title: '2030\?' \}/);
-  assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…', type: 'origin' \}/);
+  assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.requestedOrder, \.\.\.remainingOrder\]/);
+  assert.match(endGameCardsJs, /dataset\.endGameCardFixed = 'true'/);
+  assert.match(endGameCardsJs, /top\.textContent = card\.type === 'origin' \? 'STARTPUNT' : 'END GAME'/);
+  assert.match(endGameCardsJs, /originLabel\.textContent = 'HIER BEGON HET'/);
+  assert.match(endGameCardsJs, /if \(!isOrigin\) article\.append\(createCompletionOverlay\(\), createActions\(card, state\.completed\)\)/);
+  assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
   [
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
@@ -271,6 +277,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /window\.SoftoraMomentumEndGameCards/);
   assert.match(endGameInteractionsJs, /const DRAG_THRESHOLD = 8/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointerdown'/);
+  assert.match(endGameInteractionsJs, /card\.dataset\.endGameCardFixed === 'true'/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointermove'/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointerup', finishDrag\)/);
   assert.match(endGameInteractionsJs, /onOrderChange\(getVisibleCardIds\(\)\)/);
