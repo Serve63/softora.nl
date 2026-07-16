@@ -229,6 +229,10 @@ button {
   padding: 0;
   border: 0;
   background: #11131e;
+  cursor: pointer;
+}
+.end-game-goal-card--mission[hidden] {
+  display: none;
 }
 .end-game-goal-card--mission img {
   display: block;
@@ -236,6 +240,85 @@ button {
   height: 100%;
   min-height: inherit;
   object-fit: cover;
+}
+.end-game-goal-card--mission:focus-visible {
+  outline: 3px solid rgba(46, 204, 113, .62);
+  outline-offset: 3px;
+}
+.end-game-mission-complete {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: .7rem;
+  background: linear-gradient(160deg, rgba(26, 177, 91, .82), rgba(10, 105, 54, .9));
+  color: #fff;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+.end-game-goal-card--mission.is-completed .end-game-mission-complete {
+  opacity: 1;
+  visibility: visible;
+}
+.end-game-mission-complete svg {
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: .75rem;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.end-game-mission-complete strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+.end-game-mission-actions {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex-direction: column;
+  gap: .65rem;
+  padding: 1.1rem;
+  background: rgba(17, 19, 30, .88);
+  backdrop-filter: blur(6px);
+}
+.end-game-mission-actions[hidden] {
+  display: none;
+}
+.end-game-mission-actions button {
+  min-height: 2.75rem;
+  padding: .65rem .8rem;
+  border: 1px solid rgba(255, 255, 255, .34);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .95);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: .92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.end-game-mission-actions button:hover,
+.end-game-mission-actions button:focus-visible {
+  border-color: var(--good);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, .22);
+}
+.end-game-mission-actions button.is-remove {
+  border-color: rgba(231, 76, 60, .48);
+  color: #b83228;
 }
 .end-game-goal-card > span {
   color: var(--muted);
