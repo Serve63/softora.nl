@@ -47,6 +47,7 @@
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let endGameMissionCardState = { completed: false, deleted: false };
+  let draggedGoalId = '';
   if (!grid || !chart || !endGameGoalTrack || !endGameMissionCard || !endGameMissionActions || !endGameMissionCompleteButton || !endGameMissionRemoveButton) {
     return;
   }
@@ -668,6 +669,23 @@
     }
     return cell;
   }
+  function createGoalDragHandle(goal) {
+    const handle = document.createElement('button');
+    handle.className = 'goal-drag-handle';
+    handle.type = 'button';
+    handle.draggable = true;
+    handle.setAttribute('aria-label', `Sleep ${goal.label || 'dit doel'} om de volgorde te wijzigen`);
+    handle.title = 'Sleep om de volgorde te wijzigen';
+    handle.append(createIcon([
+      '<circle cx="8" cy="7" r="1" />',
+      '<circle cx="16" cy="7" r="1" />',
+      '<circle cx="8" cy="12" r="1" />',
+      '<circle cx="16" cy="12" r="1" />',
+      '<circle cx="8" cy="17" r="1" />',
+      '<circle cx="16" cy="17" r="1" />'
+    ].join('')));
+    return handle;
+  }
   function createGoalHeader(goal, isLastGoal) {
     const rowHeader = document.createElement('div');
     rowHeader.className = 'habit-name';
@@ -692,7 +710,7 @@
       iconButton.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
       rowHeader.append(iconButton);
     }
-    rowHeader.append(createLabel(goal.label, goal.isDraft));
+    rowHeader.append(createLabel(goal.label, goal.isDraft), createGoalDragHandle(goal));
     return rowHeader;
   }
   function renderChartShell() {
@@ -759,6 +777,54 @@
     updateChart();
     focusLabel(getLabels()[getLabels().length - 1]);
   }
+  function renderReorderedGoals(goals) {
+    renderGridShell(goals);
+    refreshCellData();
+    getLabels().forEach(bindLabel);
+    updateChart();
+    markStateChanged();
+  }
+  function reorderGoal(goalId, targetGoalId) {
+    const goals = getCurrentGoals();
+    const sourceIndex = goals.findIndex((goal) => goal.id === goalId);
+    const targetIndex = goals.findIndex((goal) => goal.id === targetGoalId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+      return false;
+    }
+    const [movedGoal] = goals.splice(sourceIndex, 1);
+    goals.splice(targetIndex, 0, movedGoal);
+    renderReorderedGoals(goals);
+    return true;
+  }
+  function moveGoalByOffset(goalId, offset) {
+    const goals = getCurrentGoals();
+    const sourceIndex = goals.findIndex((goal) => goal.id === goalId);
+    const targetIndex = Math.max(0, Math.min(goals.length - 1, sourceIndex + offset));
+    if (sourceIndex < 0 || sourceIndex === targetIndex) {
+      return false;
+    }
+    const [movedGoal] = goals.splice(sourceIndex, 1);
+    goals.splice(targetIndex, 0, movedGoal);
+    renderReorderedGoals(goals);
+    getGoalRows()[targetIndex]?.querySelector('.goal-drag-handle')?.focus();
+    return true;
+  }
+  function getGoalRowFromDragTarget(target) {
+    if (!(target instanceof Element)) {
+      return null;
+    }
+    const header = target.closest('.habit-name');
+    if (header && grid.contains(header)) {
+      return header;
+    }
+    const cell = target.closest('.status');
+    const taskIndex = Number(cell?.dataset.task);
+    return Number.isInteger(taskIndex) ? getGoalRows()[taskIndex] || null : null;
+  }
+  function clearGoalDragState() {
+    draggedGoalId = '';
+    getGoalRows().forEach((row) => row.classList.remove('is-dragging', 'is-drop-target'));
+  }
   async function hydrateState() {
     const uiStateClient = window.SoftoraUiStateClient;
     if (!uiStateClient || typeof uiStateClient.get !== 'function' || typeof uiStateClient.set !== 'function') {
@@ -822,6 +888,13 @@
     if (!stateReady) {
       return;
     }
+    const dragHandle = event.target.closest('.goal-drag-handle');
+    if (dragHandle && grid.contains(dragHandle) && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault();
+      const row = dragHandle.closest('.habit-name');
+      moveGoalByOffset(row?.dataset.goalId || '', event.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
     const cell = event.target.closest('.status');
     if (!cell || !grid.contains(cell) || ![' ', 'Enter'].includes(event.key)) {
       return;
@@ -829,6 +902,51 @@
     event.preventDefault();
     toggleCell(cell);
   });
+  grid.addEventListener('dragstart', (event) => {
+    if (!stateReady) {
+      event.preventDefault();
+      return;
+    }
+    const handle = event.target.closest('.goal-drag-handle');
+    const row = handle?.closest('.habit-name');
+    if (!handle || !row || row.dataset.goalDraft === 'true') {
+      event.preventDefault();
+      return;
+    }
+    draggedGoalId = row.dataset.goalId || '';
+    row.classList.add('is-dragging');
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', draggedGoalId);
+    }
+  });
+  grid.addEventListener('dragover', (event) => {
+    if (!draggedGoalId) {
+      return;
+    }
+    const targetRow = getGoalRowFromDragTarget(event.target);
+    if (!targetRow || targetRow.dataset.goalId === draggedGoalId || targetRow.dataset.goalDraft === 'true') {
+      return;
+    }
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    getGoalRows().forEach((row) => row.classList.toggle('is-drop-target', row === targetRow));
+  });
+  grid.addEventListener('drop', (event) => {
+    const targetRow = getGoalRowFromDragTarget(event.target);
+    if (!draggedGoalId || !targetRow) {
+      clearGoalDragState();
+      return;
+    }
+    event.preventDefault();
+    const targetGoalId = targetRow.dataset.goalId || '';
+    const sourceGoalId = draggedGoalId;
+    clearGoalDragState();
+    reorderGoal(sourceGoalId, targetGoalId);
+  });
+  grid.addEventListener('dragend', clearGoalDragState);
   grid.addEventListener('focusout', (event) => {
     const label = event.target.closest('.habit-label');
     if (!label) {
