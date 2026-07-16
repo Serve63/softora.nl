@@ -83,17 +83,17 @@ button {
   font-weight: 300;
 }
 .chart-card {
+  --chart-max-height: 164px;
+  --chart-axis-height: 26px;
+  --chart-total-height: 218px;
   position: relative;
   padding: 1.2rem 0 1rem 3.7rem;
 }
 .chart-scale {
   position: absolute;
   left: 0;
-  top: 1.3rem;
-  bottom: 4.75rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  top: calc(1.2rem + var(--chart-total-height) - var(--chart-max-height) - var(--chart-axis-height));
+  bottom: calc(1rem + var(--chart-axis-height));
   width: 2.55rem;
   color: var(--muted-soft);
   font-family: var(--font-display);
@@ -101,18 +101,28 @@ button {
   font-weight: 500;
   letter-spacing: 0;
 }
+.chart-scale span {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+}
+.chart-scale span:nth-child(1) { top: 0; }
+.chart-scale span:nth-child(2) { top: 25%; }
+.chart-scale span:nth-child(3) { top: 50%; }
+.chart-scale span:nth-child(4) { top: 75%; }
+.chart-scale span:nth-child(5) { top: 100%; }
 .bar-chart {
   display: grid;
   grid-template-columns: repeat(var(--day-count, 31), minmax(18px, 1fr));
   align-items: end;
   gap: clamp(5px, .55vw, 10px);
-  min-height: 218px;
+  min-height: var(--chart-total-height);
   padding-right: 4px;
 }
 .bar-wrap {
   position: relative;
   display: grid;
-  grid-template-rows: 174px 26px;
+  grid-template-rows: var(--chart-max-height) var(--chart-axis-height);
   place-items: end center;
   min-width: 18px;
 }
@@ -145,7 +155,7 @@ button {
 }
 .bar-label {
   position: absolute;
-  bottom: calc(26px + var(--bar-height, 84px) + 5px);
+  bottom: calc(var(--chart-axis-height) + var(--bar-height, 84px) + 5px);
   left: 50%;
   transform: translateX(-50%);
   color: var(--good-dark);
