@@ -38,6 +38,9 @@ De standaard combineert tempo met harde kwaliteit:
 - Raak homepage-content niet aan zonder expliciete toestemming.
 - Voeg geen willekeurige pagina's of tools toe zonder duidelijke SEO-reden.
 - Houd in de ene bestaande SEO-automation minimaal 15 gescoorde kandidaatbriefs vooruit, zodat zwakke dagelijkse GSC-data niet tot stilstand leidt.
+- Gebruik uitsluitend `docs/growth/seo-machine-backlog.json` als machineleesbare backlogbron en laat `npm run seo:backlog:check` groen zijn voordat een kandidaat wordt gekozen.
+- Draai `npm run seo:publications:report` voor de 7/28-daagse cohorttelling; alleen live 200-, indexeerbare, self-canonical sitemap-URL's op de actuele productiecommit tellen mee.
+- Draai `npm run seo:cadence:check` als dagelijkse beslispoort. Exitcode `2` betekent dat contentpublicatie verplicht is; exitcode `1` betekent operationele P0.
 - Doe geen backlink-outreach, gastblogplaatsingen, directorylinks, linkruil of betaalde links.
 - Gebruik bestaande templates en secties.
 - Schrijf alleen over Softora-diensten die echt bestaan: websites, bedrijfssoftware, CRM, AI automatisering, chatbots, AI telefonie, Oisterwijk/Tilburg/regio en MKB leadopvolging.

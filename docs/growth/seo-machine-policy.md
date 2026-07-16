@@ -33,7 +33,7 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Vergelijk 7, 28 en 90 dagen voor non-branded verkeer, money pages en queryclusters.
 - Beoordeel welke experimenten voldoende data hebben en plan het volgende cluster.
 - Houd 5 tot 7 sterke publieke contentleveringen per week aan. Kwaliteitspoorten blijven hard; het tempo is geen toestemming voor dunne pagina's.
-- Houd minimaal 15 unieke, gescoorde kandidaatbriefs vooruit in de automation memory, verdeeld over de commerciële clusters.
+- Houd minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs vooruit in `docs/growth/seo-machine-backlog.json`, verdeeld over de commerciële clusters. Dit versieerbare JSON-register is de enige backlogbron; de automation memory bewaart alleen runhistorie, experimenten en beslissingen.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
 - Backlinks en off-site linkbuilding vallen volledig buiten deze automation. Doe geen backlinkanalyse als actielijn, outreach, gastblogs, directoryplaatsingen, partner-/leveranciersprofielen, linkruil of betaalde links. Natuurlijke interne links binnen `softora.nl` blijven wel onderdeel van iedere relevante publicatie.
 - Bereken vanaf het actuele 28-daagse klikniveau en de resterende tijd tot 31 december 2026 de vereiste samengestelde groeicurve. Vergelijk werkelijke voortgang met die curve zonder dagelijkse ruis als causaliteit te presenteren.
@@ -87,6 +87,16 @@ Ieder hoofdcluster bestaat uit een money page met ondersteunende rollen zoals:
 Spreid de productie bewust over blogs, kennisbank, vergelijkingen en commerciële landingspagina's. Nieuwsupdates zijn alleen geschikt wanneer de ontwikkeling actueel, bronbaar, relevant voor een Softora-dienst en nuttig na de eerste nieuwspiek is.
 
 Een kandidaat is pas publicatieklaar wanneer de zoekintentie, primaire money page, onderscheid met bestaande URL's, interne links, conversiepad, bewijsbehoefte en twee nuttige visualconcepten vooraf zijn vastgelegd. Publiceer geen synoniempagina, dunne city-swap of tekst die alleen een bestaand artikel herschrijft.
+
+## Machine Enforcement
+
+De instructietekst is niet de poort. Deze drie commando's leveren de afdwingbare staat:
+
+- `npm run seo:backlog:check` valideert het JSON-schema, minimaal 15 `ready` briefs, unieke URL's en ID's, de vaste scoreformule, exact drie overlap-URL's, publicatiebriefvelden en minimaal 70% commerciële intentie. Deze validator draait ook tegen het echte register in de contracttests van `verify:critical`.
+- `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen. Een URL telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en dezelfde `datePublished` toont als het contentregister.
+- `npm run seo:cadence:check` combineert backlog en live ledger. Exitcode `0` is op schema, exitcode `2` is `CONTENT_REQUIRED` en verplicht dezelfde automation de hoogst scorende veilige publicatie te shippen, exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
+
+De live cadence-check draait bewust niet als mergeblokker in CI. Een bestaande publicatieachterstand mag de PR met de eerste herstelpublicatie niet blokkeren. De dagelijkse automation moet de check wel als harde preflight draaien en exitcode `2` als uitvoeropdracht behandelen, niet als reden voor een no-op.
 
 ## Opportunity Ranking
 
