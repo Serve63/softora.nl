@@ -105,6 +105,7 @@ const PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE = Object.freeze({
   'premium-voicesoftware.html': '<link rel="preload" as="image" href="/assets/softora-telefonie-studio.jpg">',
 });
 const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260516a" defer></script>';
+const LIVE_MOMENTUM_VIDEO_ORIGIN = 'https://www.youtube-nocookie.com';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -336,6 +337,31 @@ function createHtmlPageCoordinator(options = {}) {
       ...PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE,
       ...(isProduction ? ['upgrade-insecure-requests'] : []),
     ].join('; ');
+  }
+
+  function applyLiveMomentumVideoSecurityHeaders(res, fileName) {
+    if (fileName !== 'live-momentum.html' || !res || typeof res.setHeader !== 'function') return;
+
+    const getHeader = typeof res.getHeader === 'function' ? (name) => res.getHeader(name) : () => '';
+    const currentCsp = String(getHeader('Content-Security-Policy') || '').trim();
+    const frameDirective = `frame-src 'self' ${LIVE_MOMENTUM_VIDEO_ORIGIN}`;
+    const nextCsp = /(?:^|;)\s*frame-src\s+[^;]*/i.test(currentCsp)
+      ? currentCsp.replace(/(?:^|;)\s*frame-src\s+[^;]*/i, (match) => {
+          const prefix = match.trimStart().startsWith(';') ? '; ' : '';
+          return `${prefix}${frameDirective}`;
+        })
+      : [currentCsp, frameDirective].filter(Boolean).join('; ');
+    res.setHeader('Content-Security-Policy', nextCsp);
+
+    const currentPermissions = String(getHeader('Permissions-Policy') || '').trim();
+    const autoplayDirective = `autoplay=(self "${LIVE_MOMENTUM_VIDEO_ORIGIN}")`;
+    const nextPermissions = /(?:^|,)\s*autoplay=\([^)]*\)/i.test(currentPermissions)
+      ? currentPermissions.replace(/(?:^|,)\s*autoplay=\([^)]*\)/i, (match) => {
+          const prefix = match.trimStart().startsWith(',') ? ', ' : '';
+          return `${prefix}${autoplayDirective}`;
+        })
+      : [currentPermissions, autoplayDirective].filter(Boolean).join(', ');
+    res.setHeader('Permissions-Policy', nextPermissions);
   }
 
   function applyPremiumSidebarContentFrameHtml(html) {
@@ -611,6 +637,7 @@ function createHtmlPageCoordinator(options = {}) {
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
         res.setHeader('Content-Security-Policy', getPremiumSidebarContentFrameCsp());
       }
+      applyLiveMomentumVideoSecurityHeaders(res, fileName);
       res.setHeader(
         'Cache-Control',
         isLoginPage || isProtectedPremiumPage
