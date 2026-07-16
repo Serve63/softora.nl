@@ -36,8 +36,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<div class="bar-chart" aria-hidden="true"><\/div>/);
   assert.doesNotMatch(html, /chart-switch|data-chart-mode|Grafiekweergave/);
   assert.match(html, /<div class="habit-grid" role="table" aria-label="Momentum taken in juli"><\/div>/);
-  assert.match(html, /<\/section>\s*<h2 class="end-game-title">END GAME<\/h2>\s*<section class="end-game-goals"/);
-  assert.match(html, /<h2 class="end-game-title">END GAME<\/h2>\s*<section class="end-game-goals" aria-label="End Game doelen">/);
+  assert.match(html, /<\/section>\s*<h2 class="end-game-title">HET EINDSPEL<\/h2>\s*<section class="end-game-goals"/);
+  assert.match(html, /<h2 class="end-game-title">HET EINDSPEL<\/h2>\s*<section class="end-game-goals" aria-label="Het Eindspel doelen">/);
   assert.equal((html.match(/<article class="end-game-goal-card(?: [^"]+)?"/g) || []).length, 10);
   assert.equal((html.match(/maxlength="240" aria-label="End Game doel \d+"/g) || []).length, 9);
   assert.match(html, /<article class="end-game-goal-card end-game-goal-card--mission" tabindex="0" role="button" aria-haspopup="menu" aria-expanded="false"/);
