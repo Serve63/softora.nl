@@ -23,6 +23,8 @@ test('kvk database shell keeps the premium sidebar around the scraper', () => {
   assert.match(shellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
   assert.match(shellSource, /personnel-theme\.css\?v=20260519b/);
   assert.match(shellSource, /personnel-theme\.js\?v=20260519b/);
+  assert.match(shellSource, /html, body \{ height: 100%; margin: 0; overflow: hidden;/);
+  assert.match(shellSource, /\.kvk-database-shell \{ display: flex; height: 100vh; \}/);
   assert.match(shellSource, /<main class="main-content kvk-database-shell__content"/);
   assert.match(shellSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.match(shellSource, /title="Softora Database Bedrijven Scraper"/);
