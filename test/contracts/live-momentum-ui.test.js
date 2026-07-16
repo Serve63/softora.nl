@@ -26,7 +26,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716w"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716x"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
@@ -118,6 +118,11 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(css, /purple/i);
   assert.doesNotMatch(css, /88366b|74265c|91436f|7f426b/i);
   assert.match(css, /\.bar-chart\s*\{[\s\S]*grid-template-columns:\s*repeat\(var\(--day-count, 31\),/);
+  assert.match(css, /\.bar-chart\s*\{[\s\S]*--average-score:\s*\.65;[\s\S]*--average-line-y:\s*57\.4px;[\s\S]*position:\s*relative;/);
+  assert.match(css, /\.bar-chart::before,\s*\.bar-chart::after\s*\{[\s\S]*var\(--chart-total-height\) - var\(--chart-max-height\) - var\(--chart-axis-height\)[\s\S]*\+ var\(--average-line-y\)[\s\S]*pointer-events:\s*none;/);
+  assert.match(css, /\.bar-chart::before\s*\{[\s\S]*border-top:\s*2px dotted rgba\(96, 98, 114, \.52\);/);
+  assert.match(css, /\.bar-chart::after\s*\{[\s\S]*content:\s*"AVARAGE";[\s\S]*font-family:\s*var\(--font-display\);/);
+  assert.match(css, /\.bar-wrap\s*\{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
   assert.match(css, /\.chart-card\s*\{[\s\S]*--chart-max-height:\s*164px;[\s\S]*--chart-axis-height:\s*26px;[\s\S]*--chart-total-height:\s*218px;/);
   assert.match(css, /\.chart-scale\s*\{[\s\S]*top:\s*calc\(1\.2rem \+ var\(--chart-total-height\) - var\(--chart-max-height\) - var\(--chart-axis-height\)\);[\s\S]*bottom:\s*calc\(1rem \+ var\(--chart-axis-height\)\);/);
   assert.match(css, /\.chart-scale span\s*\{[\s\S]*position:\s*absolute;[\s\S]*transform:\s*translateY\(-50%\);/);
