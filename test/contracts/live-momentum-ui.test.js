@@ -42,7 +42,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.equal((html.match(/maxlength="240" aria-label="End Game doel \d+"/g) || []).length, 10);
   assert.match(html, /<span class="momentum-art-quote is-end-game">The end game is to win<\/span>/);
   assert.match(html, /<span class="momentum-art-quote is-attack">Attack, attack, attack<\/span>/);
-  assert.match(html, /<span class="momentum-art-quote is-sleeping">Sleeping is for losers<\/span>/);
+  assert.doesNotMatch(html, /Sleeping is for losers|is-sleeping/i);
   assert.match(html, /<span class="momentum-art-quote is-winners">In life there are winners and losers<\/span>/);
   assert.match(html, /<span class="momentum-art-quote is-old-days">Nog een rondje voor die oude dagen<\/span>/);
   assert.match(html, /<span class="momentum-watermark">[\s\S]*Never[\s\S]*Ever[\s\S]*Quit[\s\S]*<\/span>/);
@@ -101,7 +101,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.end-game-goal-card\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*min-height:\s*clamp\(290px, 33vh, 340px\);/);
   assert.match(css, /\.momentum-art-quotes\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*0;[\s\S]*inset:\s*0;[\s\S]*pointer-events:\s*none;/);
   assert.match(css, /\.momentum-art-quote\s*\{[\s\S]*position:\s*absolute;[\s\S]*color:\s*transparent;[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*\-webkit-text-stroke:\s*1px rgba\(26, 26, 46, \.07\);/);
-  assert.match(css, /\.momentum-art-quote\.is-sleeping\s*\{[\s\S]*top:\s*28%;[\s\S]*text-align:\s*center;/);
+  assert.doesNotMatch(css, /is-sleeping/);
   assert.match(css, /\.momentum-watermark\s*\{[\s\S]*pointer-events:\s*none;/);
   assert.match(css, /\.momentum-watermark\s*\{[\s\S]*\-webkit-text-stroke:\s*1px rgba\(26, 26, 46, \.075\);/);
   assert.match(css, /\.momentum-watermark span:last-child\s*\{[\s\S]*rgba\(35, 159, 88, \.045\)/);
