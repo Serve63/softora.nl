@@ -1,0 +1,55 @@
+*,*::before,*::after{box-sizing:border-box}
+:root{--health-ink:#17151c;--health-muted:#777381;--health-line:rgba(45,37,50,.11);--health-card:rgba(255,255,255,.92);--health-accent:#8b2252;--health-green:#22a66a;--health-yellow:#e0ae2e;--health-red:#d4565b}
+body{margin:0;background:var(--bg-primary,#f7f4f1);color:var(--health-ink);font-family:'Inter',sans-serif;min-height:100vh}
+.dashboard-layout{display:flex;min-height:100vh}
+.sidebar{width:280px;position:fixed;inset:0 auto 0 0;height:100vh;z-index:100}
+.main-content{margin-left:280px;width:calc(100% - 280px);min-height:100vh;padding:44px 48px 56px}
+.health-shell{width:min(1320px,100%);margin:0 auto}
+.health-header{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;margin-bottom:24px}
+.health-eyebrow,.health-panel__eyebrow{margin:0 0 8px;color:var(--health-accent);font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
+.health-title{margin:0;font-family:'Oswald',sans-serif;font-size:clamp(32px,4vw,54px);font-weight:600;letter-spacing:-.02em;line-height:1;text-transform:uppercase}
+.health-subtitle{max-width:700px;margin:12px 0 0;color:var(--health-muted);font-size:14px;line-height:1.6}
+.health-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px}
+.health-button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 15px;border:1px solid var(--health-line);border-radius:7px;background:rgba(255,255,255,.82);color:var(--health-ink);font:600 11px/1 'Inter',sans-serif;letter-spacing:.04em;text-decoration:none;cursor:pointer;transition:border-color .15s ease,background .15s ease}
+.health-button:hover{border-color:rgba(139,34,82,.42);background:#fff}
+.health-button:disabled{cursor:wait;opacity:.55}
+.health-button[hidden]{display:none!important}
+.health-button--primary{border-color:var(--health-accent);background:var(--health-accent);color:#fff}
+.health-button--primary:hover{background:#741b44;color:#fff}
+.health-status{display:flex;align-items:center;gap:10px;min-height:44px;margin-bottom:18px;padding:10px 14px;border:1px solid var(--health-line);border-radius:7px;background:rgba(255,255,255,.55);color:var(--health-muted);font-size:12px}
+.health-status__dot{width:8px;height:8px;border-radius:50%;background:var(--health-yellow);box-shadow:0 0 0 4px rgba(224,174,46,.12)}
+.health-status[data-state="connected"] .health-status__dot{background:var(--health-green);box-shadow:0 0 0 4px rgba(34,166,106,.12)}
+.health-status[data-state="error"] .health-status__dot{background:var(--health-red);box-shadow:0 0 0 4px rgba(212,86,91,.12)}
+.health-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.health-kpi,.health-panel{border:1px solid var(--health-line);border-radius:8px;background:var(--health-card);box-shadow:0 12px 35px rgba(43,32,40,.04)}
+.health-kpi{position:relative;min-height:150px;padding:20px;overflow:hidden}
+.health-kpi::after{content:"";position:absolute;right:-34px;bottom:-48px;width:105px;height:105px;border:18px solid rgba(139,34,82,.045);border-radius:50%}
+.health-kpi__label{display:block;margin-bottom:18px;color:var(--health-muted);font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.health-kpi strong{display:block;margin-bottom:8px;font-family:'Oswald',sans-serif;font-size:42px;font-weight:600;line-height:1}
+.health-kpi>span:last-child{color:var(--health-muted);font-size:11px}
+.health-kpi--high strong{color:var(--health-green)}.health-kpi--medium strong{color:var(--health-yellow)}.health-kpi--low strong{color:var(--health-red)}
+.health-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(290px,.8fr);gap:12px}
+.health-panel{min-height:260px;padding:22px}
+.health-panel__header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}
+.health-panel__header h2{margin:0;font-family:'Oswald',sans-serif;font-size:21px;font-weight:600;text-transform:uppercase}
+.health-date{color:var(--health-muted);font-size:11px}
+.health-chart{display:flex;align-items:flex-end;gap:8px;height:172px;padding-top:12px;border-bottom:1px solid var(--health-line)}
+.health-chart__item{display:flex;flex:1;min-width:0;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.health-chart__value{margin-bottom:5px;color:var(--health-muted);font-size:9px}
+.health-chart__bar{width:min(24px,70%);min-height:3px;border-radius:3px 3px 0 0;background:var(--health-green);transition:height .2s ease}
+.health-chart__bar--medium{background:var(--health-yellow)}.health-chart__bar--low{background:var(--health-red)}
+.health-chart__day{margin-top:7px;color:var(--health-muted);font-size:9px;text-transform:uppercase}
+.health-facts{margin:0}
+.health-facts>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--health-line)}
+.health-facts>div:last-child{border-bottom:0}
+.health-facts dt{color:var(--health-muted);font-size:12px}.health-facts dd{margin:0;font-family:'Oswald',sans-serif;font-size:16px;font-weight:600}
+.health-workouts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.health-workout{padding:15px;border:1px solid var(--health-line);border-radius:7px;background:rgba(247,244,241,.55)}
+.health-workout__top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}
+.health-workout h3{margin:0;font-family:'Oswald',sans-serif;font-size:15px;text-transform:uppercase}
+.health-workout time,.health-workout p{color:var(--health-muted);font-size:10px}.health-workout p{margin:5px 0 0}
+.health-workout strong{font-family:'Oswald',sans-serif;font-size:24px}
+.health-empty{grid-column:1/-1;margin:42px 0;color:var(--health-muted);font-size:13px;text-align:center}
+@media(max-width:1180px){.health-kpis{grid-template-columns:repeat(3,1fr)}.health-workouts{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.sidebar{position:static;width:100%;height:auto}.main-content{margin-left:0;width:100%;padding:25px 18px 42px}.health-header{align-items:flex-start;flex-direction:column}.health-actions{justify-content:flex-start}.health-kpis{grid-template-columns:repeat(2,1fr)}.health-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.health-kpis{grid-template-columns:1fr}.health-workouts{grid-template-columns:1fr}.health-actions,.health-button{width:100%}.health-chart{gap:3px}.health-chart__value{display:none}}

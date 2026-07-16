@@ -42,6 +42,7 @@ const canonicalPages = [
   'premium-ai-lead-generator.html',
   'premium-bevestigingsmails.html',
   'premium-boekhouding.html',
+  'premium-gezondheidsdossier.html',
   'premium-instellingen.html',
   'premium-kladblok.html',
   'premium-word.html',
@@ -80,6 +81,18 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260716a') > asideEnd);
+});
+
+test('gezondheidsdossier houdt WHOOP-logica buiten de statische sidebar', () => {
+  const source = readRepoFile('premium-gezondheidsdossier.html');
+  const asideEnd = source.indexOf('</aside>');
+
+  assert.ok(asideEnd > 0);
+  assert.ok(source.indexOf('assets/premium-health-dossier.css?v=20260716a') < asideEnd);
+  assert.ok(source.indexOf('assets/premium-health-dossier.js?v=20260716a') > asideEnd);
+  assert.match(source, /data-health-dossier/);
+  assert.match(readRepoFile('assets/premium-health-dossier.js'), /\/api\/health\/whoop\/status/);
+  assert.match(readRepoFile('assets/premium-health-dossier.js'), /mode:\s*mode \|\| 'manual'/);
 });
 
 test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
