@@ -8,10 +8,29 @@
   const SAVE_DEBOUNCE_MS = 250;
   const SAVE_RETRY_MS = 1500;
   const MAX_SAVE_RETRIES = 3;
-  const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', startDay: 13, today: 13, lastDay: 31 };
+  const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', year: 2026, month: 7, startDay: 13, lastDay: 31 };
+  const TODAY_REFRESH_MS = 60 * 1000;
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
-  const TODAY = PERIOD.today;
+  function getAmsterdamDateParts(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Amsterdam',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    return Object.fromEntries(parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]));
+  }
+  function getCurrentPeriodDay(date = new Date()) {
+    const { year, month, day } = getAmsterdamDateParts(date);
+    if (year !== PERIOD.year || month !== PERIOD.month) {
+      return null;
+    }
+    return Number.isInteger(day) && day >= 1 && day <= PERIOD.lastDay ? day : null;
+  }
+  let TODAY = getCurrentPeriodDay();
   const ICON_CATALOG = Array.isArray(window.SoftoraMomentumIconCatalog)
     ? window.SoftoraMomentumIconCatalog
     : [];
@@ -84,7 +103,9 @@
       ? trackedDays
       : defaultGoal
         ? getDefaultTrackedDays()
-        : DAYS.filter((day) => day >= TODAY);
+        : TODAY
+          ? DAYS.filter((day) => day >= TODAY)
+          : [];
     return {
       id,
       label,
@@ -346,6 +367,12 @@
     }
   }
   function updateScore() {
+    if (!TODAY) {
+      if (srSummary) {
+        srSummary.textContent = `De huidige dag valt buiten ${PERIOD.label}.`;
+      }
+      return;
+    }
     const score = getDayScore(TODAY);
     const safeScore = Number.isFinite(score) ? score : 0;
     if (srSummary) {
@@ -388,6 +415,15 @@
       syncCellA11y(cell);
     });
     updateTodayColumnEnd(statusCells);
+  }
+  function refreshToday() {
+    const currentPeriodDay = getCurrentPeriodDay();
+    if (currentPeriodDay === TODAY) {
+      return;
+    }
+    TODAY = currentPeriodDay;
+    refreshCellData();
+    updateChart();
   }
   function bindLabel(label) {
     if (label.dataset.bound === 'true') {
@@ -816,6 +852,8 @@
   getLabels().forEach(bindLabel);
   updateChart();
   void hydrateState();
+  window.setInterval(refreshToday, TODAY_REFRESH_MS);
+  window.addEventListener('focus', refreshToday);
   grid.addEventListener('click', (event) => {
     if (!stateReady) {
       return;
@@ -974,6 +1012,9 @@
   });
   window.addEventListener('scroll', () => goalActions.close(), true);
   document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshToday();
+    }
     if (document.visibilityState === 'hidden' && stateDirty) {
       flushStateWrite();
     }

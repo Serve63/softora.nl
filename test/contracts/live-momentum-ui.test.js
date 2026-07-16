@@ -35,7 +35,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716k" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716l" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -71,7 +71,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.doesNotMatch(html, /In life there are winners and losers|is-winners/i);
   assert.doesNotMatch(html, /Nog een rondje voor die oude dagen|is-old-days/i);
   assert.match(html, /<span class="momentum-watermark">[\s\S]*Never[\s\S]*Ever[\s\S]*Quit[\s\S]*<\/span>/);
-  assert.match(html, /13 juli is vandaag/);
+  assert.match(html, /De huidige dag en momentumscore worden automatisch bijgewerkt/);
   assert.doesNotMatch(html, /laatste 30 dagen/);
   assert.doesNotMatch(html, /Dag<br>/);
   assert.doesNotMatch(html, /chart-legend|legend-dot|Legenda/);
@@ -204,7 +204,12 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   const videoJs = read('assets/live-momentum-video.js');
 
   assert.match(js, /startDay:\s*13/);
-  assert.match(js, /today:\s*13/);
+  assert.match(js, /timeZone:\s*'Europe\/Amsterdam'/);
+  assert.match(js, /function getCurrentPeriodDay\(date = new Date\(\)\)/);
+  assert.match(js, /let TODAY = getCurrentPeriodDay\(\);/);
+  assert.match(js, /window\.setInterval\(refreshToday, TODAY_REFRESH_MS\);/);
+  assert.match(js, /window\.addEventListener\('focus', refreshToday\);/);
+  assert.doesNotMatch(js, /today:\s*13/);
   assert.match(js, /lastDay:\s*31/);
   assert.match(js, /const TOTAL_DAYS = DAYS\.length;/);
   assert.match(js, /Juli 2026|shortLabel:\s*'Jul'/);
