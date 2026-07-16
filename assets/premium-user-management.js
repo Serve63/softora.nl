@@ -286,6 +286,8 @@ function mountExtraSettingsCategory() {
   if (!overviewScreen || !personnelTile || document.getElementById('screen-extra')) return;
 
   var extraItems = [
+    'Winnen',
+    'Database',
     "Servé's gezondheidsdossier",
     'Ruben zet toto',
     'world watcher',
@@ -293,8 +295,6 @@ function mountExtraSettingsCategory() {
     'Transfermarkt',
     'Ruben’s Company',
     'Ruben’s Trading System',
-    'Winnen',
-    'Database',
   ];
 
   if (!document.getElementById('settings-extra-style')) {
@@ -307,9 +307,13 @@ function mountExtraSettingsCategory() {
       '.settings-extra-grid>.tegel{width:100%;min-width:0;}',
       '.settings-extra-card{cursor:default;}',
       '.settings-extra-card[data-settings-extra-href]{cursor:pointer;}',
-      '.settings-local-database-frame{display:block;width:100%;height:calc(100vh - 170px);min-height:680px;border:1px solid var(--border);border-radius:8px;background:#f8f7f4;}',
+      '.settings-extra-card--locked{opacity:.52;cursor:not-allowed;background:rgba(255,255,255,.58);filter:saturate(.35);box-shadow:none;}',
+      '.settings-extra-card--locked:hover{transform:none;box-shadow:none;border-color:var(--border);}',
+      '.settings-extra-card--locked::after{display:none;}',
+      '.settings-extra-card--locked .tegel-icon-wrap{background:rgba(96,98,114,.08);}',
+      '.settings-extra-card--locked .tegel-count{color:var(--text-mid);background:rgba(96,98,114,.1);}',
+      '.settings-extra-lock{position:absolute;top:20px;right:20px;width:18px;height:18px;color:var(--text-mid);}',
       '@media (max-width:720px){.settings-tile-grid,.settings-extra-grid{grid-template-columns:minmax(0,1fr);max-width:100%;}.settings-tile-grid>.tegel{width:100%;}}',
-      '@media (max-width:720px){.settings-local-database-frame{height:calc(100vh - 140px);min-height:560px;}}',
     ].join('');
     document.head.appendChild(style);
   }
@@ -371,7 +375,6 @@ function mountExtraSettingsCategory() {
   appendUserManagementTextElement(extraTile, 'div', 'tegel-count', '9 onderdelen');
   extraTile.addEventListener('click', function () {
     extraGrid.hidden = false;
-    localDatabaseFrame.hidden = true;
     headerTitle.textContent = 'Extra';
     headerSubtitle.textContent = 'Interne modules en placeholders';
     goTo('screen-extra');
@@ -418,41 +421,27 @@ function mountExtraSettingsCategory() {
 
   var extraGrid = document.createElement('div');
   extraGrid.className = 'settings-extra-grid';
-  var localDatabaseFrame = document.createElement('iframe');
-  localDatabaseFrame.id = 'settings-local-database-frame';
-  localDatabaseFrame.className = 'settings-local-database-frame';
-  localDatabaseFrame.src = '/kvk-database';
-  localDatabaseFrame.title = 'Softora Database Bedrijven Scraper';
-  localDatabaseFrame.hidden = true;
   extraItems.forEach(function (label, index) {
     var number = String(index + 1).padStart(2, '0');
-    var isFlynow = label === 'Flynow';
     var isWinning = label === 'Winnen';
     var isDatabase = label === 'Database';
-    var isLinkedModule = isFlynow || isWinning || isDatabase;
-    var moduleHref = isFlynow
-        ? '/premium-flynow'
-        : isWinning
-          ? '/live-momentum'
-          : '/kvk-database';
+    var isLinkedModule = isWinning || isDatabase;
+    var moduleHref = isWinning ? '/live-momentum' : '/kvk-database';
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {
       card.type = 'button';
       card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
-        if (isDatabase) {
-          extraGrid.hidden = true;
-          localDatabaseFrame.hidden = false;
-          headerTitle.textContent = 'Database';
-          headerSubtitle.textContent = 'Bedrijven Scraper';
-          return;
-        }
         navigateToSettingsModule(moduleHref);
       });
+    } else {
+      card.classList.add('settings-extra-card--locked');
+      card.setAttribute('data-settings-extra-locked', 'true');
+      card.setAttribute('aria-disabled', 'true');
     }
-    var moduleArrow = createUserManagementSvgElement('svg', {
-      class: 'tegel-arrow',
+    var moduleStatusIcon = createUserManagementSvgElement('svg', {
+      class: isLinkedModule ? 'tegel-arrow' : 'settings-extra-lock',
       width: '16',
       height: '16',
       viewBox: '0 0 24 24',
@@ -461,10 +450,23 @@ function mountExtraSettingsCategory() {
       'stroke-width': '2',
       'aria-hidden': 'true'
     });
-    moduleArrow.appendChild(createUserManagementSvgElement('polyline', {
-      points: '9 18 15 12 9 6'
-    }));
-    card.appendChild(moduleArrow);
+    if (isLinkedModule) {
+      moduleStatusIcon.appendChild(createUserManagementSvgElement('polyline', {
+        points: '9 18 15 12 9 6'
+      }));
+    } else {
+      moduleStatusIcon.appendChild(createUserManagementSvgElement('rect', {
+        x: '5',
+        y: '10',
+        width: '14',
+        height: '10',
+        rx: '2'
+      }));
+      moduleStatusIcon.appendChild(createUserManagementSvgElement('path', {
+        d: 'M8 10V7a4 4 0 0 1 8 0v3'
+      }));
+    }
+    card.appendChild(moduleStatusIcon);
 
     var moduleIconWrap = document.createElement('div');
     moduleIconWrap.className = 'tegel-icon-wrap';
@@ -493,19 +495,23 @@ function mountExtraSettingsCategory() {
       card,
       'div',
       'tegel-desc',
-      isFlynow
-        ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
-        : isWinning
+      isWinning
           ? 'Live momentum voor dagelijkse doelen, discipline en voortgang.'
           : isDatabase
             ? 'Lokale database voor het scrapen en behandelen van bedrijven.'
+            : label === 'Flynow'
+              ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
             : 'Interne template-module die later verder ingevuld kan worden.'
     );
-    appendUserManagementTextElement(card, 'div', 'tegel-count', 'Extra ' + number);
+    appendUserManagementTextElement(
+      card,
+      'div',
+      'tegel-count',
+      isLinkedModule ? 'Extra ' + number : 'Vergrendeld'
+    );
     extraGrid.appendChild(card);
   });
   extraScreen.appendChild(extraGrid);
-  extraScreen.appendChild(localDatabaseFrame);
   overviewScreen.insertAdjacentElement('afterend', extraScreen);
 }
 

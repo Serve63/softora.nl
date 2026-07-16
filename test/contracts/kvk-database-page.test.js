@@ -7,11 +7,34 @@ const { createKnownPrettyPageSlugToFile } = require('../../server/config/page-ro
 
 const repoRoot = path.join(__dirname, '../..');
 
-test('kvk database clean URL resolves to the protected premium snapshot page', () => {
-  const slugMap = createKnownPrettyPageSlugToFile(new Set(['premium-kvk-database.html']));
+test('kvk database clean URL resolves to the protected premium sidebar shell', () => {
+  const slugMap = createKnownPrettyPageSlugToFile(
+    new Set(['premium-kvk-database.html', 'premium-kvk-database-shell.html'])
+  );
 
   assert.equal(slugMap.get('premium-kvk-database'), 'premium-kvk-database.html');
-  assert.equal(slugMap.get('kvk-database'), 'premium-kvk-database.html');
+  assert.equal(slugMap.get('kvk-database'), 'premium-kvk-database-shell.html');
+});
+
+test('kvk database shell keeps the premium sidebar around the scraper', () => {
+  const shellSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database-shell.html'), 'utf8');
+
+  assert.match(shellSource, /data-sidebar-shell="canonical"/);
+  assert.match(shellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(shellSource, /personnel-theme\.css\?v=20260519b/);
+  assert.match(shellSource, /personnel-theme\.js\?v=20260519b/);
+  assert.match(shellSource, /<main class="main-content kvk-database-shell__content"/);
+  assert.match(shellSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  assert.match(shellSource, /title="Softora Database Bedrijven Scraper"/);
+});
+
+test('shared premium sidebar script also initializes on the clean kvk database route', () => {
+  const themeSource = fs.readFileSync(path.join(repoRoot, 'assets/personnel-theme.js'), 'utf8');
+
+  assert.match(themeSource, /pathname === "\/kvk-database"/);
+  assert.match(themeSource, /pathname === "\/kvk-database\.html"/);
+  assert.match(themeSource, /sidebar\.innerHTML = buildUnifiedPremiumSidebarHtml\(activeKey\)/);
+  assert.match(themeSource, /sidebar\.dataset\.sidebarReady = "true"/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -29,6 +52,12 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(pageSource, /"usable":263/);
   assert.match(pageSource, /"bedrijfsnaam":"Scouting St\. Joris Haaren"/);
   assert.match(pageSource, /id="planning-search-input"/);
+  assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
+  assert.match(pageSource, /id="latest-treated-table-frame"/);
+  assert.ok(
+    pageSource.indexOf('<h2>Laatste 10 Behandeld</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
+    'Laatste 10 Behandeld hoort boven Planning te staan'
+  );
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260618b/);
@@ -40,6 +69,18 @@ test('kvk database collapse state survives a refresh', () => {
   assert.match(scriptSource, /kvkCollapsedPanels/);
   assert.match(scriptSource, /history\.replaceState/);
   assert.doesNotMatch(scriptSource, /function saveCollapsedPanels\(\)\{\}/);
+});
+
+test('kvk database renders latest treated snapshot rows in the restored panel', () => {
+  const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
+  const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
+
+  assert.match(scriptSource, /latestTreated:Array\.isArray\(embeddedSnapshot\.latestTreated\)/);
+  assert.match(scriptSource, /state\.latestTreated=Array\.isArray\(e\.latestTreated\)/);
+  assert.match(scriptSource, /function renderLatestTreatedRows\(\)/);
+  assert.match(scriptSource, /\[e\.woonplaats,e\.provincie\]\.filter\(Boolean\)\.join\(", "\)/);
+  assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
+  assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 });
 
 test('kvk database page loads a live snapshot before using embedded fallback data', () => {

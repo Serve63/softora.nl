@@ -45,6 +45,7 @@ function createFixture() {
     'premium-voicesoftware.html',
     'premium-personeel-login.html',
     'premium-personeel-agenda.html',
+    'live-momentum.html',
   ]);
   const loggerCalls = [];
   const coordinator = createHtmlPageCoordinator({
@@ -60,6 +61,7 @@ function createFixture() {
     knownPrettyPageSlugToFile: new Map([
       ['premium-personeel-login', 'premium-personeel-login.html'],
       ['premium-personeel-agenda', 'premium-personeel-agenda.html'],
+      ['live-momentum', 'live-momentum.html'],
     ]),
     resolvePremiumHtmlPageAccess: async () => ({
       handled: false,
@@ -261,8 +263,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260715a/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260715a/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260715b/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260715b/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.css\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.js\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-dashboard-ai-chat-scope\.js\?v=20260611a/);
@@ -278,6 +280,37 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.doesNotMatch(res.body, /font-size:2rem !important/);
   assert.doesNotMatch(res.body, /min-height:2\.35rem !important/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com\/css2\?family=Inter/);
+});
+
+test('html page coordinator disables cross-document view transitions on Live Momentum', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'live-momentum.html'),
+    [
+      '<!DOCTYPE html><html><head>',
+      '<title>Live Momentum</title>',
+      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">',
+      '</head><body>',
+      '<aside class="sidebar" data-static-sidebar="1"><nav class="sidebar-nav"></nav></aside>',
+      '<main class="main-content">Momentum</main>',
+      '</body></html>',
+    ].join('')
+  );
+
+  const res = createResponseRecorder();
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/live-momentum' },
+    res,
+    () => {},
+    'live-momentum.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  const stabilityIndex = res.body.indexOf('/assets/premium-sidebar-stability.css');
+  const optoutIndex = res.body.indexOf('id="softora-live-momentum-view-transition-optout"');
+  assert.ok(stabilityIndex > -1, 'Live Momentum hoort de sidebar-stability assets te behouden');
+  assert.ok(optoutIndex > stabilityIndex, 'de route-optout hoort na de gedeelde stability CSS te staan');
+  assert.match(res.body, /@view-transition\{navigation:none;\}/);
 });
 
 test('html page coordinator renders premium content-frame pages without an active sidebar shell', async () => {

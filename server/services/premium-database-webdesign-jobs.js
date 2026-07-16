@@ -1,4 +1,5 @@
 const { randomUUID } = require('crypto');
+const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
 const DEVICE_MOCKUP_FILE_VERSION = 'v8';
@@ -28,25 +29,9 @@ const DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
   name: 'Servé Creusen',
   roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
 });
-const SOFTORA_WEBDESIGN_OUTREACH_PROFILES_BY_EMAIL = Object.freeze({
-  'serve@softora.nl': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
-  'servecreusen@softora.nl': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
-  'servec321@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
-  'serve290@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
-  'servecreusen7@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
-  'contact.venvisuals@gmail.com': DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE,
-  'martijn@softora.nl': {
-    name: 'Martijn van de Ven',
-    roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
-  },
-  'martijnvandeven@softora.nl': {
-    name: 'Martijn van de Ven',
-    roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
-  },
-  'martijnven123@gmail.com': {
-    name: 'Martijn van de Ven',
-    roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
-  },
+const MARTIJN_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
+  name: 'Martijn van de Ven',
+  roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
 });
 let cachedSharp = null;
 
@@ -623,9 +608,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function resolveWebdesignOutreachProfile(ownerKey) {
     const ownerEmail = ownerEmailFromOwnerKey(ownerKey);
-    const profile =
-      SOFTORA_WEBDESIGN_OUTREACH_PROFILES_BY_EMAIL[ownerEmail] ||
-      DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE;
+    const identity = getOutboundSenderIdentity(ownerEmail);
+    const profile = identity && identity.profileKey === 'martijn'
+      ? MARTIJN_WEBDESIGN_OUTREACH_PROFILE
+      : DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE;
     return {
       ...profile,
       source: 'premium-database-webdesign-jobs',

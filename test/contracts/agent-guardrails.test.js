@@ -17,12 +17,33 @@ const {
   listAddedBrowserStorageApis,
   listAddedTestWeakeningPatterns,
 } = require('../../scripts/lib/agent-guardrails-core');
+const { listExistingRepoFiles } = require('../../scripts/check-quality-lock');
 
 const repoRoot = path.resolve(__dirname, '../..');
 
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
+
+test('quality lock ignores deleted index entries but keeps existing and untracked files', () => {
+  const existingFiles = new Set([
+    'scripts/check-quality-lock.js',
+    'test/contracts/new-mail-runtime.test.js',
+  ]);
+
+  assert.deepEqual(
+    listExistingRepoFiles(
+      [
+        'test/contracts/deleted-mail-hotfix.test.js',
+        './scripts/check-quality-lock.js',
+        'test/contracts/new-mail-runtime.test.js',
+        'scripts/check-quality-lock.js',
+      ],
+      (filePath) => existingFiles.has(filePath)
+    ),
+    ['scripts/check-quality-lock.js', 'test/contracts/new-mail-runtime.test.js']
+  );
+});
 
 test('protocol docs point agents at structured data ops storage', () => {
   const protocol = readRepoFile('docs/quality-protocol.md');
@@ -541,7 +562,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /ontvanger-email, ontvanger-domein, company key en stabiel customer id/);
   assert.match(agentsSource, /## Softora coldmail dagtempo/);
   assert.match(agentsSource, /totale dagdoel 81/);
-  assert.match(agentsSource, /verzendvenster is 07:00-23:30 Europe\/Amsterdam/);
+  assert.match(agentsSource, /verzendvenster is 07:00-22:00 Europe\/Amsterdam/);
   assert.match(agentsSource, /dag-slot pacing/);
   assert.match(agentsSource, /senderMinIntervalMinutes=60/);
   assert.match(agentsSource, /senderMaxIntervalMinutes=74/);

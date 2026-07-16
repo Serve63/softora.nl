@@ -13,7 +13,7 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   ...LOCAL_FONT_PRELOAD_LINKS,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260715a';
+const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260715b';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
@@ -24,6 +24,9 @@ const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
   `<script src="/assets/premium-sidebar-autopilot.js?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}" defer></script>`,
   `<script src="/assets/premium-dashboard-ai-chat-scope.js?v=${PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION}" defer></script>`,
 ].join('\n');
+const LIVE_MOMENTUM_VIEW_TRANSITION_OPTOUT = `<style id="softora-live-momentum-view-transition-optout">
+@view-transition{navigation:none;}
+</style>`;
 const PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE = `<style id="softora-premium-sidebar-content-frame">
 html[data-softora-sidebar-content-frame="1"]{--premium-sidebar-width:0px !important;}
 html[data-softora-sidebar-content-frame="1"],html[data-softora-sidebar-content-frame="1"] body{min-height:100vh !important;overflow-x:hidden !important;background:#f8f7f4 !important;}
@@ -456,6 +459,12 @@ function createHtmlPageCoordinator(options = {}) {
           renderedHtml,
           PREMIUM_SIDEBAR_STABILITY_ASSETS
         );
+        if (fileName === 'live-momentum.html') {
+          renderedHtml = injectSnippetBeforeHeadClose(
+            renderedHtml,
+            LIVE_MOMENTUM_VIEW_TRANSITION_OPTOUT
+          );
+        }
       }
     }
     renderedHtml = optimizeLocalFontDelivery(renderedHtml, { preferHeadStart: hasStaticSidebar });
