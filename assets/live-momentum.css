@@ -411,8 +411,9 @@ button {
 }
 .habit-grid {
   display: grid;
+  width: 100%;
   grid-template-columns: minmax(190px, 12vw) repeat(var(--day-count, 31), minmax(32px, 1fr));
-  min-width: 1320px;
+  min-width: min(100%, 1320px);
   border-top: 1px solid var(--line);
   border-left: 0;
 }
