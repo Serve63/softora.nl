@@ -1,0 +1,1192 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-17",
+  "minimumReady": 15,
+  "minimumCommercialShare": 0.7,
+  "scoreFormula": {
+    "version": "2026-07-17-v1",
+    "positiveWeights": {
+      "businessFit": 0.25,
+      "conversionProximity": 0.2,
+      "nonBrandOpportunity": 0.2,
+      "attainability": 0.15,
+      "uniqueness": 0.2
+    },
+    "maximumPenalties": {
+      "cannibalizationRisk": 0.6,
+      "effort": 0.2
+    }
+  },
+  "items": [
+    {
+      "id": "software-cost-001",
+      "status": "ready",
+      "path": "/blog/bedrijfssoftware-laten-maken-kosten",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "bedrijfssoftware laten maken kosten",
+      "intent": "Kosten en budgetkeuze voor maatwerk bedrijfssoftware",
+      "intentClass": "cost",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/bedrijfssoftware-op-maat",
+      "clusterRole": "Kostenpagina tussen orientatie en offerteaanvraag",
+      "demandEvidence": [
+        {
+          "type": "gsc",
+          "source": "GSC 28 dagen tot en met 2026-07-15",
+          "observedAt": "2026-07-16",
+          "detail": "Bedrijfssoftware laten maken had 156 impressies op gemiddelde positie 25.90; de live site mist een aparte kostenbehandeling voor deze koopvraag."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/vergelijkingen/maatwerk-software-vs-standaard-software",
+          "/blog/crm-systeem-op-maat-spreadsheets-vervangen"
+        ],
+        "decision": "distinct",
+        "rationale": "Bestaande content legt definitie en keuze uit, maar beantwoordt niet hoe budget, scope, fasering en terugkerende kosten van laten maken worden beoordeeld."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 5,
+        "attainability": 3,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 4
+      },
+      "weightedScore": 4.4,
+      "brief": {
+        "title": "Bedrijfssoftware laten maken: kosten, keuzes en budget",
+        "metaDescription": "Bekijk welke keuzes de kosten van maatwerk bedrijfssoftware bepalen, hoe je scope afbakent en waarop je een voorstel voor het MKB beoordeelt.",
+        "h1": "Wat kost bedrijfssoftware laten maken?",
+        "outline": [
+          "Welke onderdelen het budget bepalen",
+          "Verschil tussen startversie en volledige suite",
+          "Eenmalige bouwkosten en doorlopend beheer",
+          "Hoe je offertes op dezelfde scope vergelijkt",
+          "Wanneer gefaseerd starten verstandig is"
+        ],
+        "buyerQuestions": [
+          "Welke functies maken maatwerk software duurder?",
+          "Kan een MKB-bedrijf klein beginnen?",
+          "Welke beheer- en koppelkosten komen later terug?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/vergelijkingen/maatwerk-software-vs-standaard-software"
+        ],
+        "outgoingLinks": [
+          "/bedrijfssoftware-op-maat",
+          "/crm-systeem-op-maat"
+        ],
+        "conversionPath": "Van budgetuitleg naar /bedrijfssoftware-op-maat en vervolgens een schoon WhatsApp-contactmoment.",
+        "claimRisk": "Gebruik bandbreedtes alleen wanneer ze intern zijn geverifieerd; beloof geen vaste terugverdientijd.",
+        "visualConcepts": [
+          "Scopekaart met modules, koppelingen en fasen die het budget bepalen",
+          "Beslisdiagram voor startversie, uitbreiding en beheer"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer actuele SERP-vraagvormen en werk de kostenfactoren claim-safe uit."
+    },
+    {
+      "id": "crm-migration-002",
+      "status": "ready",
+      "path": "/kennisbank/crm-migratie-stappenplan",
+      "contentType": "kennisbank",
+      "cluster": "software-crm",
+      "primaryQuery": "crm migratie stappenplan",
+      "intent": "Migratie voorbereiden zonder klantdata of opvolging te verliezen",
+      "intentClass": "migration",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Praktisch migratiepad voor CRM-kopers",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "CRM-integratie en datakwaliteit zijn gedekt, maar een end-to-end migratievolgorde met acceptatie en terugvalplan ontbreekt."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/kennisbank/wat-is-een-crm-integratie",
+          "/kennisbank/wat-is-crm-datakwaliteit",
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat behandelt volgorde, datamapping, tests, cutover en rollback in plaats van alleen integraties of definities."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.2,
+      "brief": {
+        "title": "CRM migratie stappenplan voor het MKB",
+        "metaDescription": "Plan een CRM-migratie met inventarisatie, opschoning, datamapping, testen, overdracht en een duidelijk terugvalplan.",
+        "h1": "CRM migreren zonder grip op klantdata te verliezen",
+        "outline": [
+          "Inventariseer bronnen en eigenaren",
+          "Schoon data op voor de verhuizing",
+          "Maak veldmapping en acceptatiecriteria",
+          "Test met een beperkte dataset",
+          "Plan cutover, controle en rollback"
+        ],
+        "buyerQuestions": [
+          "Welke data moet mee naar een nieuw CRM?",
+          "Hoe voorkom je dubbele of ontbrekende records?",
+          "Wanneer is een migratie voldoende getest?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/wat-is-crm-datakwaliteit",
+          "/kennisbank/wat-is-een-crm-integratie"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/bedrijfssoftware-op-maat"
+        ],
+        "conversionPath": "Van migratiechecklist naar een gesprek over CRM-scope en datarisico's.",
+        "claimRisk": "Geen nul-downtime of foutloze migratie beloven; benadruk testen en menselijke acceptatie.",
+        "visualConcepts": [
+          "CRM-migratiefunnel van broninventaris tot gecontroleerde cutover",
+          "Datamappingvoorbeeld met bronveld, doelveld en acceptatiecheck"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer buyer questions en werk een concrete maar systeemneutrale migratiechecklist uit."
+    },
+    {
+      "id": "crm-implementation-003",
+      "status": "ready",
+      "path": "/blog/crm-implementatie-doorlooptijd-mkb",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "crm implementatie doorlooptijd",
+      "intent": "Doorlooptijd, fasering en verantwoordelijkheden bij CRM-implementatie",
+      "intentClass": "implementation",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Implementatieverwachting vlak voor leverancierskeuze",
+      "demandEvidence": [
+        {
+          "type": "buyer-question",
+          "source": "Softora clusteranalyse CRM",
+          "observedAt": "2026-07-17",
+          "detail": "De inventaris bevat definities, vergelijking en takenautomatisering, maar geen pagina die fasen, afhankelijkheden en doorlooptijd uitlegt."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm",
+          "/blog/crm-systeem-op-maat-spreadsheets-vervangen",
+          "/kennisbank/wat-is-een-crm-systeem"
+        ],
+        "decision": "distinct",
+        "rationale": "Deze pagina gaat specifiek over implementatiefasen, besluitmomenten en factoren die de doorlooptijd vertragen of versnellen."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.4,
+      "brief": {
+        "title": "CRM implementatie: fasen en doorlooptijd voor het MKB",
+        "metaDescription": "Lees welke fasen een CRM-implementatie doorloopt, welke keuzes tijd kosten en hoe je klein maar beheerst live gaat.",
+        "h1": "Hoe lang duurt een CRM-implementatie?",
+        "outline": [
+          "Waarom doorlooptijd van scope afhangt",
+          "Fasen van procesinventarisatie tot livegang",
+          "Welke keuzes vertraging veroorzaken",
+          "Rollen van leverancier en intern team",
+          "Gefaseerd livegaan en evalueren"
+        ],
+        "buyerQuestions": [
+          "Wat moet vooraf besloten zijn?",
+          "Hoeveel interne tijd vraagt een implementatie?",
+          "Wanneer kun je veilig met een eerste team starten?"
+        ],
+        "incomingLinks": [
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm",
+          "/kennisbank/wat-is-een-crm-systeem"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/bedrijfssoftware-op-maat"
+        ],
+        "conversionPath": "Van implementatieverwachting naar CRM-scopegesprek via /crm-systeem-op-maat.",
+        "claimRisk": "Noem geen universele doorlooptijd; werk met factoren en geverifieerde scenario's.",
+        "visualConcepts": [
+          "Tijdlijn met CRM-implementatiefasen en beslismomenten",
+          "Rolverdeling tussen proceseigenaar, gebruikers en bouwer"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Onderbouw scenario's zonder vaste levertijdbelofte en koppel naar de migratiebrief."
+    },
+    {
+      "id": "software-proposal-004",
+      "status": "ready",
+      "path": "/blog/maatwerk-software-offerte-beoordelen",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "maatwerk software offerte vergelijken",
+      "intent": "Offertes voor maatwerk software inhoudelijk vergelijken",
+      "intentClass": "buying",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/bedrijfssoftware-op-maat",
+      "clusterRole": "Leveranciers- en offertebeslissing",
+      "demandEvidence": [
+        {
+          "type": "buyer-question",
+          "source": "Softora clusteranalyse maatwerk software",
+          "observedAt": "2026-07-17",
+          "detail": "De huidige vergelijking behandelt maatwerk versus standaard, maar niet hoe kopers scope, eigenaarschap, acceptatie, beheer en meerwerk in voorstellen vergelijken."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/vergelijkingen/maatwerk-software-vs-standaard-software",
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/crm-systeem-op-maat-spreadsheets-vervangen"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat is een offerte-audit en behandelt contractuele en operationele vergelijkingspunten, niet de productcategoriekeuze."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.55,
+      "brief": {
+        "title": "Maatwerk software offerte beoordelen: praktische checklist",
+        "metaDescription": "Vergelijk softwareoffertes op scope, acceptatie, koppelingen, eigenaarschap, beheer, veiligheid en afspraken over wijzigingen.",
+        "h1": "Waar let je op bij een maatwerk software offerte?",
+        "outline": [
+          "Vergelijk eerst dezelfde scope",
+          "Controleer acceptatie en verantwoordelijkheden",
+          "Beoordeel koppelingen, data en eigenaarschap",
+          "Maak beheer en wijzigingswerk zichtbaar",
+          "Herken onduidelijke aannames en uitsluitingen"
+        ],
+        "buyerQuestions": [
+          "Welke onderdelen horen minimaal in een voorstel?",
+          "Wie is eigenaar van data en broncode?",
+          "Hoe vergelijk je beheer en meerwerk eerlijk?"
+        ],
+        "incomingLinks": [
+          "/vergelijkingen/maatwerk-software-vs-standaard-software",
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat"
+        ],
+        "outgoingLinks": [
+          "/bedrijfssoftware-op-maat",
+          "/diensten"
+        ],
+        "conversionPath": "Van onafhankelijke checklist naar een scopegesprek over bedrijfssoftware.",
+        "claimRisk": "Geen juridisch advies geven; benoem dat contractvoorwaarden apart beoordeeld moeten worden.",
+        "visualConcepts": [
+          "Vergelijkingsmatrix voor scope, acceptatie, beheer en eigenaarschap",
+          "Waarschuwingssignalen in een onduidelijke softwareofferte"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer claims rond broncode en contracten en schrijf als praktische aankoopcheck, niet als juridisch advies."
+    },
+    {
+      "id": "software-accounting-005",
+      "status": "ready",
+      "path": "/kennisbank/bedrijfssoftware-koppelen-boekhouding",
+      "contentType": "kennisbank",
+      "cluster": "software-crm",
+      "primaryQuery": "bedrijfssoftware koppelen boekhouding",
+      "intent": "Integratiekeuzes tussen bedrijfssoftware en boekhouding",
+      "intentClass": "integration",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/bedrijfssoftware-op-maat",
+      "clusterRole": "Concrete integratievraag rond maatwerk software",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "Er is een algemene CRM-integratiepagina, maar geen uitleg over synchronisatierichting, foutafhandeling en eigenaarschap bij boekhoudkoppelingen."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/kennisbank/wat-is-een-crm-integratie",
+          "/blog/website-crm-koppeling-leadopvolging-mkb",
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat behandelt een specifieke operationele koppeling met transactiestromen, synchronisatie en uitzonderingen."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 3,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 4
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "Bedrijfssoftware koppelen aan boekhouding: keuzes en controles",
+        "metaDescription": "Leer hoe je gegevensstromen, synchronisatie, uitzonderingen en controle inricht tussen bedrijfssoftware en boekhoudsoftware.",
+        "h1": "Hoe koppel je bedrijfssoftware veilig aan de boekhouding?",
+        "outline": [
+          "Bepaal welke gegevens leidend zijn",
+          "Kies een- of tweerichtingssynchronisatie",
+          "Leg validatie en uitzonderingen vast",
+          "Test met herkenbare transacties",
+          "Monitor fouten en herstelacties"
+        ],
+        "buyerQuestions": [
+          "Welk systeem is bron voor klant- en factuurdata?",
+          "Wat gebeurt er bij dubbele of afgekeurde records?",
+          "Hoe controleer je of synchronisatie compleet is?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/wat-is-een-crm-integratie",
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat"
+        ],
+        "outgoingLinks": [
+          "/bedrijfssoftware-op-maat",
+          "/crm-systeem-op-maat"
+        ],
+        "conversionPath": "Van integratievraag naar een technisch scopesgesprek voor maatwerk software.",
+        "claimRisk": "Noem geen specifieke pakketondersteuning zonder actuele verificatie; beloof geen foutloze synchronisatie.",
+        "visualConcepts": [
+          "Gegevensstroom tussen bedrijfssoftware, validatielaag en boekhouding",
+          "Foutafhandelingspad voor afgekeurde en dubbele transacties"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Verifieer actuele integratievoorbeelden en houd leveranciersnamen buiten de kernuitleg."
+    },
+    {
+      "id": "ai-cost-006",
+      "status": "ready",
+      "path": "/blog/ai-automatisering-kosten-mkb",
+      "contentType": "blog",
+      "cluster": "ai-automatisering",
+      "primaryQuery": "ai automatisering kosten mkb",
+      "intent": "Budget en scope voor een eerste AI-automatisering",
+      "intentClass": "cost",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/ai-automatisering",
+      "clusterRole": "Kosten- en koopintentie voor AI-automatisering",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "De site legt start, use cases en menselijke controle uit, maar mist een eigen kosten- en scopepagina voor MKB-kopers."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/blog/ai-automatisering-mkb-waar-beginnen",
+          "/kennisbank/wat-is-ai-automatisering",
+          "/blog/ai-processen-automatiseren-zonder-controle-verliezen"
+        ],
+        "decision": "distinct",
+        "rationale": "Bestaande pagina's behandelen orientatie en controle; deze kandidaat behandelt budgetdrivers, beheer en gefaseerde inkoop."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 3,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 4
+      },
+      "weightedScore": 4.2,
+      "brief": {
+        "title": "Wat kost AI automatisering voor het MKB?",
+        "metaDescription": "Ontdek welke proces-, data-, integratie- en beheerkosten een AI-automatisering bepalen en hoe je beheerst klein begint.",
+        "h1": "Kosten van AI automatisering voor het MKB",
+        "outline": [
+          "Waarom procescomplexiteit de prijs bepaalt",
+          "Kosten van data, koppelingen en uitzonderingen",
+          "Eenmalige inrichting en doorlopend beheer",
+          "Klein beginnen met een meetbare flow",
+          "Offertes vergelijken zonder AI-hype"
+        ],
+        "buyerQuestions": [
+          "Welke onderdelen bepalen het budget?",
+          "Welke terugkerende kosten blijven bestaan?",
+          "Wanneer is een pilot groot genoeg om te beoordelen?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-automatisering-mkb-waar-beginnen",
+          "/kennisbank/wat-is-ai-automatisering"
+        ],
+        "outgoingLinks": [
+          "/ai-automatisering",
+          "/bedrijfssoftware-op-maat"
+        ],
+        "conversionPath": "Van kostenorientatie naar een concreet procesgesprek via /ai-automatisering.",
+        "claimRisk": "Geen besparings- of omzetgarantie; gebruik alleen geverifieerde prijsbanden en benadruk gebruikskosten.",
+        "visualConcepts": [
+          "Kostenopbouw van procesanalyse, koppelingen, AI-gebruik en beheer",
+          "Faseringsmodel van een kleine pilot naar gecontroleerde uitbreiding"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Verifieer actuele kostencomponenten en publiceer zonder vaste ROI-belofte."
+    },
+    {
+      "id": "ai-implementation-007",
+      "status": "ready",
+      "path": "/kennisbank/ai-automatisering-implementatieplan",
+      "contentType": "kennisbank",
+      "cluster": "ai-automatisering",
+      "primaryQuery": "ai automatisering implementatieplan",
+      "intent": "Implementatievolgorde voor een beheersbare AI-workflow",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-automatisering",
+      "clusterRole": "Implementatiechecklist tussen orientatie en projectscope",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "De kennisbank definieert AI-workflows en procesautomatisering, maar bevat geen implementatieplan met acceptatie, logging en overdracht."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/kennisbank/wat-is-een-ai-workflow",
+          "/kennisbank/wat-is-procesautomatisering",
+          "/blog/ai-automatisering-mkb-waar-beginnen"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat is een uitvoerbaar implementatiepad met eigenaarschap, tests, logging en menselijke escalatie."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 4
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "AI automatisering implementatieplan in 7 beheersbare stappen",
+        "metaDescription": "Van proceskeuze en data tot testen, logging, menselijke overdracht en beheer: bouw een AI-automatisering stap voor stap.",
+        "h1": "Zo maak je een implementatieplan voor AI automatisering",
+        "outline": [
+          "Kies proces en eigenaar",
+          "Definieer invoer, uitvoer en uitzonderingen",
+          "Bepaal data- en toegangsgrenzen",
+          "Bouw acceptatietests en menselijke overdracht",
+          "Log, monitor en verbeter na livegang"
+        ],
+        "buyerQuestions": [
+          "Welke processen zijn geschikt om mee te starten?",
+          "Wie beoordeelt uitzonderingen?",
+          "Welke metingen zijn nodig na livegang?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/wat-is-een-ai-workflow",
+          "/blog/ai-automatisering-mkb-waar-beginnen"
+        ],
+        "outgoingLinks": [
+          "/ai-automatisering",
+          "/bedrijfssoftware-op-maat"
+        ],
+        "conversionPath": "Van implementatiecheck naar een gesprek over een eerste afgebakende workflow.",
+        "claimRisk": "Geen volledig autonome of altijd correcte AI claimen; menselijke controle blijft expliciet.",
+        "visualConcepts": [
+          "Implementatiepad met zeven stappen en go-no-go momenten",
+          "Escalatiemodel voor automatische verwerking en menselijke beoordeling"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Werk de zeven stappen uit met een concreet MKB-proces als doorlopend voorbeeld."
+    },
+    {
+      "id": "ai-operations-008",
+      "status": "ready",
+      "path": "/blog/ai-automatisering-beheer-na-livegang",
+      "contentType": "blog",
+      "cluster": "ai-automatisering",
+      "primaryQuery": "ai automatisering beheer",
+      "intent": "Beheer, monitoring en eigenaarschap na livegang",
+      "intentClass": "risk",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-automatisering",
+      "clusterRole": "Operationeel vertrouwen voor risicobewuste kopers",
+      "demandEvidence": [
+        {
+          "type": "buyer-question",
+          "source": "Softora clusteranalyse AI automatisering",
+          "observedAt": "2026-07-17",
+          "detail": "Menselijke controle is inhoudelijk aanwezig, maar structureel beheer, wijzigingscontrole, monitoring en incidentafhandeling ontbreken als eigen zoekintentie."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/blog/ai-processen-automatiseren-zonder-controle-verliezen",
+          "/kennisbank/wat-is-een-ai-workflow",
+          "/blog/ai-automatisering-mkb-waar-beginnen"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat begint na livegang en behandelt monitoring, wijzigingen, incidenten en periodieke menselijke review."
+      },
+      "scores": {
+        "businessFit": 4,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 3.75,
+      "brief": {
+        "title": "AI automatisering beheren na livegang",
+        "metaDescription": "Richt monitoring, eigenaarschap, wijzigingscontrole en menselijke evaluatie in zodat een AI-workflow beheersbaar blijft.",
+        "h1": "Wie beheert AI automatisering nadat deze live staat?",
+        "outline": [
+          "Wijs een proceseigenaar aan",
+          "Monitor kwaliteit en uitzonderingen",
+          "Beheer prompts, regels en koppelingen gecontroleerd",
+          "Leg incidenten en herstelacties vast",
+          "Plan periodieke menselijke evaluatie"
+        ],
+        "buyerQuestions": [
+          "Welke signalen moet je monitoren?",
+          "Wie mag wijzigingen doorvoeren?",
+          "Wanneer moet een flow worden gepauzeerd?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-processen-automatiseren-zonder-controle-verliezen",
+          "/kennisbank/wat-is-een-ai-workflow"
+        ],
+        "outgoingLinks": [
+          "/ai-automatisering",
+          "/bedrijfssoftware-op-maat"
+        ],
+        "conversionPath": "Van beheervraag naar een gesprek over een controleerbare AI-workflow.",
+        "claimRisk": "Geen foutloze werking of permanente beschikbaarheid beloven; incident- en fallbackpaden benoemen.",
+        "visualConcepts": [
+          "Beheerkring van monitoren, beoordelen, aanpassen en opnieuw testen",
+          "Dashboardconcept met kwaliteitssignalen en menselijke escalaties"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Gebruik een praktisch beheerrooster en voorkom overlap met de bestaande controlepagina."
+    },
+    {
+      "id": "chatbot-cost-009",
+      "status": "ready",
+      "path": "/blog/chatbot-kosten-mkb",
+      "contentType": "blog",
+      "cluster": "ai-contact",
+      "primaryQuery": "chatbot laten maken kosten",
+      "intent": "Kosten en scope van een zakelijke chatbot",
+      "intentClass": "cost",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/chatbot-laten-maken",
+      "clusterRole": "Kostenpagina voor chatbotkopers",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "De site behandelt wanneer een chatbot zinvol is, livechatvergelijking en CRM-koppeling, maar niet de kostenopbouw van laten maken."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/blog/chatbot-laten-maken-wanneer-zinvol",
+          "/vergelijkingen/chatbot-vs-livechat",
+          "/blog/chatbot-crm-koppeling-leads-opvolgen"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat richt zich op budgetdrivers zoals kennisbron, integraties, overdracht, testen en beheer."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 3,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 4
+      },
+      "weightedScore": 4.35,
+      "brief": {
+        "title": "Chatbot laten maken: kosten en keuzes voor het MKB",
+        "metaDescription": "Bekijk welke keuzes de kosten van een zakelijke chatbot bepalen, van kennisbron en CRM-koppeling tot menselijke overdracht en beheer.",
+        "h1": "Wat kost een chatbot laten maken?",
+        "outline": [
+          "Verschil tussen eenvoudige flow en maatwerkassistent",
+          "Invloed van kennisbronnen en integraties",
+          "Kosten van testen en menselijke overdracht",
+          "Gebruik, monitoring en onderhoud",
+          "Welke scope past bij een eerste versie"
+        ],
+        "buyerQuestions": [
+          "Welke functies maken een chatbot duurder?",
+          "Welke kosten lopen door na livegang?",
+          "Wanneer is een CRM-koppeling de investering waard?"
+        ],
+        "incomingLinks": [
+          "/blog/chatbot-laten-maken-wanneer-zinvol",
+          "/vergelijkingen/chatbot-vs-livechat"
+        ],
+        "outgoingLinks": [
+          "/chatbot-laten-maken",
+          "/ai-automatisering"
+        ],
+        "conversionPath": "Van kostenkeuze naar een gesprek over chatbotdoel, kennisbron en overdracht.",
+        "claimRisk": "Geen vaste leadwinst of volledig autonome afhandeling beloven; prijsbanden eerst verifieren.",
+        "visualConcepts": [
+          "Kostenlagen van chatbotinterface, kennis, koppelingen en beheer",
+          "Scopevergelijking tussen FAQ-bot, intakebot en gekoppelde assistent"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Verifieer actuele kostencomponenten en houd het artikel productneutraal."
+    },
+    {
+      "id": "chatbot-implementation-010",
+      "status": "ready",
+      "path": "/kennisbank/chatbot-implementatie-website-crm",
+      "contentType": "kennisbank",
+      "cluster": "ai-contact",
+      "primaryQuery": "chatbot implementeren website crm",
+      "intent": "Chatbot technisch en organisatorisch implementeren",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/chatbot-laten-maken",
+      "clusterRole": "Implementatiechecklist voor chatbotprojecten",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "De CRM-koppeling en menselijke overdracht zijn losse onderwerpen; een volledige implementatievolgorde van doel tot monitoring ontbreekt."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/blog/chatbot-crm-koppeling-leads-opvolgen",
+          "/kennisbank/wat-is-chatbot-overdracht",
+          "/blog/chatbot-laten-maken-wanneer-zinvol"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat bundelt niet de bestaande uitleg, maar ordent requirements, kennis, integratie, acceptatie en beheer als implementatieproces."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 4
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "Chatbot implementeren op website en CRM: stappenplan",
+        "metaDescription": "Plan doel, kennisbron, websiteplaatsing, CRM-koppeling, menselijke overdracht, acceptatietests en beheer van een zakelijke chatbot.",
+        "h1": "Zo implementeer je een chatbot op website en CRM",
+        "outline": [
+          "Definieer doel en afbakening",
+          "Maak kennisbronnen bruikbaar",
+          "Ontwerp CRM-data en toestemming",
+          "Test antwoorden en menselijke overdracht",
+          "Monitor na livegang"
+        ],
+        "buyerQuestions": [
+          "Welke data mag naar het CRM?",
+          "Wanneer draagt de chatbot over aan een mens?",
+          "Hoe test je antwoorden voor livegang?"
+        ],
+        "incomingLinks": [
+          "/blog/chatbot-crm-koppeling-leads-opvolgen",
+          "/kennisbank/wat-is-chatbot-overdracht"
+        ],
+        "outgoingLinks": [
+          "/chatbot-laten-maken",
+          "/crm-systeem-op-maat"
+        ],
+        "conversionPath": "Van implementatiecheck naar een afgebakend chatbot- en CRM-gesprek.",
+        "claimRisk": "Geen altijd-correcte antwoorden of volledige vervanging van medewerkers claimen.",
+        "visualConcepts": [
+          "Architectuur van websitechat, kennisbron, CRM en menselijke overdracht",
+          "Acceptatietestmatrix voor vragen, antwoorden en escalaties"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Werk een implementatievoorbeeld uit zonder klant- of leveranciersclaims."
+    },
+    {
+      "id": "voice-cost-011",
+      "status": "ready",
+      "path": "/blog/ai-telefonist-kosten-mkb",
+      "contentType": "blog",
+      "cluster": "ai-contact",
+      "primaryQuery": "ai telefonist kosten",
+      "intent": "Kosten, gebruik en scope van AI-telefonie",
+      "intentClass": "cost",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/ai-telefonist",
+      "clusterRole": "Kostenpagina voor AI-telefoniekopers",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "De site vergelijkt met een receptionist en behandelt afspraakintake en overdracht, maar mist een pagina over inrichting, belgebruik, koppelingen en beheer."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/vergelijkingen/ai-telefonist-vs-receptionist",
+          "/blog/ai-telefonist-voor-afspraakintake",
+          "/kennisbank/wat-is-een-ai-telefonist"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat behandelt kostenstructuur en scope, niet definitie, use case of personeelsvergelijking."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 3,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 4
+      },
+      "weightedScore": 4.35,
+      "brief": {
+        "title": "AI telefonist: kosten en keuzes voor het MKB",
+        "metaDescription": "Bekijk welke keuzes de kosten van AI-telefonie bepalen, van gespreksflow en belgebruik tot agenda-, CRM- en menselijke overdracht.",
+        "h1": "Wat kost een AI telefonist?",
+        "outline": [
+          "Inrichting van gesprek en uitzonderingen",
+          "Gebruikskosten en belvolume",
+          "Koppelingen met agenda en CRM",
+          "Testen, monitoring en menselijke overdracht",
+          "Starten met een beperkte use case"
+        ],
+        "buyerQuestions": [
+          "Welke kosten zijn eenmalig en terugkerend?",
+          "Hoe beïnvloedt belvolume het budget?",
+          "Welke koppelingen zijn echt nodig?"
+        ],
+        "incomingLinks": [
+          "/vergelijkingen/ai-telefonist-vs-receptionist",
+          "/blog/ai-telefonist-voor-afspraakintake"
+        ],
+        "outgoingLinks": [
+          "/ai-telefonist",
+          "/ai-automatisering"
+        ],
+        "conversionPath": "Van kostenkeuze naar een gesprek over een beperkte, controleerbare telefonieflow.",
+        "claimRisk": "Geen vaste bereikbaarheid, foutloze intake of personeelsbesparing beloven; actuele gebruikskosten verifieren.",
+        "visualConcepts": [
+          "Kostenopbouw van gespreksflow, belgebruik, koppelingen en beheer",
+          "Scopekaart voor intake, afspraak, routering en menselijke overdracht"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Verifieer actuele kostendrijvers en gebruik geen prijsclaim zonder interne bron."
+    },
+    {
+      "id": "voice-comparison-012",
+      "status": "ready",
+      "path": "/vergelijkingen/ai-telefonist-vs-voicemail",
+      "contentType": "vergelijkingen",
+      "cluster": "ai-contact",
+      "primaryQuery": "ai telefonist versus voicemail",
+      "intent": "Keuze tussen interactieve intake en terugbelbericht",
+      "intentClass": "comparison",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/ai-telefonist",
+      "clusterRole": "Alternatievenvergelijking voor gemiste oproepen",
+      "demandEvidence": [
+        {
+          "type": "problem-gap",
+          "source": "Softora AI-contactcluster",
+          "observedAt": "2026-07-17",
+          "detail": "De receptionistvergelijking dekt bemensing; de keuze tussen passieve voicemail en gestructureerde digitale intake is nog niet behandeld."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/vergelijkingen/ai-telefonist-vs-receptionist",
+          "/blog/ai-telefonist-voor-afspraakintake",
+          "/blog/ai-telefonie-menselijke-overdracht"
+        ],
+        "decision": "distinct",
+        "rationale": "Deze keuze draait om informatiekwaliteit en vervolgactie bij gemiste oproepen, niet om AI versus een medewerker."
+      },
+      "scores": {
+        "businessFit": 4,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 3.9,
+      "brief": {
+        "title": "AI telefonist of voicemail: wat past bij gemiste oproepen?",
+        "metaDescription": "Vergelijk voicemail en AI-telefonie op intake, bereikbaarheid, privacy, opvolging, kosten en menselijke overdracht.",
+        "h1": "AI telefonist versus voicemail",
+        "outline": [
+          "Wat beide oplossingen wel en niet doen",
+          "Verschil in informatiekwaliteit",
+          "Opvolging, privacy en uitzonderingen",
+          "Kosten en beheer vergelijken",
+          "Wanneer eenvoudige voicemail genoeg is"
+        ],
+        "buyerQuestions": [
+          "Wanneer levert interactieve intake meerwaarde?",
+          "Welke gesprekken moeten direct naar een mens?",
+          "Wanneer is voicemail de eenvoudigere keuze?"
+        ],
+        "incomingLinks": [
+          "/blog/ai-telefonist-voor-afspraakintake",
+          "/blog/ai-telefonie-menselijke-overdracht"
+        ],
+        "outgoingLinks": [
+          "/ai-telefonist",
+          "/diensten"
+        ],
+        "conversionPath": "Van eerlijke alternatievenvergelijking naar een use-casegesprek over gemiste oproepen.",
+        "claimRisk": "Voicemail niet kunstmatig afwaarderen en geen bereikbaarheidsgarantie voor AI geven.",
+        "visualConcepts": [
+          "Vergelijkingstabel voor informatie, opvolging, beheer en uitzonderingen",
+          "Beslisboom voor voicemail, terugbelservice of interactieve intake"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer SERP-intent en schrijf de vergelijking evenwichtig met duidelijke niet-passend-situaties."
+    },
+    {
+      "id": "website-migration-013",
+      "status": "ready",
+      "path": "/kennisbank/website-migratie-zonder-seo-verlies",
+      "contentType": "kennisbank",
+      "cluster": "websites",
+      "primaryQuery": "website migratie zonder seo verlies",
+      "intent": "Technische en inhoudelijke migratiecontrole voor een nieuwe website",
+      "intentClass": "migration",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Migratierisico voor websitekopers",
+      "demandEvidence": [
+        {
+          "type": "inventory-gap",
+          "source": "Softora SEO-contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "De websitecluster behandelt prijs, pagina's, conversie en links, maar geen redirects, canonicals, sitemap en meetplan bij migratie."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/blog/website-laten-maken-kosten-2026",
+          "/blog/website-laten-maken-mkb-paginas",
+          "/kennisbank/wat-is-interne-linkstructuur"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat behandelt migratie-inventaris, URL-mapping, redirects, canonicals, tracking en post-livecontrole als aparte taak."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 4
+      },
+      "weightedScore": 4.3,
+      "brief": {
+        "title": "Website migreren zonder onnodig SEO-verlies: checklist",
+        "metaDescription": "Controleer URL-mapping, redirects, canonicals, sitemap, interne links, tracking en live signalen bij een website-migratie.",
+        "h1": "Website migreren zonder SEO-signalen kwijt te raken",
+        "outline": [
+          "Maak een volledige URL-inventaris",
+          "Bepaal behoud, samenvoeging en redirects",
+          "Controleer canonicals en interne links",
+          "Test sitemap, robots en meetcodes",
+          "Monitor fouten en zoekprestaties na livegang"
+        ],
+        "buyerQuestions": [
+          "Welke oude URL's moeten blijven bestaan?",
+          "Hoe test je redirects voor livegang?",
+          "Welke signalen controleer je direct na migratie?"
+        ],
+        "incomingLinks": [
+          "/blog/website-laten-maken-mkb-paginas",
+          "/kennisbank/wat-is-interne-linkstructuur"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/diensten"
+        ],
+        "conversionPath": "Van migratierisico naar een websitegesprek waarin behoud van bestaande vindbaarheid expliciet wordt gescoped.",
+        "claimRisk": "Geen nul-verliesgarantie; benoem tijdelijke schommelingen en het belang van monitoring.",
+        "visualConcepts": [
+          "URL-mapping van oude pagina naar behouden, samengevoegde of omgeleide bestemming",
+          "Livegangcontrole voor status, canonical, sitemap, tracking en interne links"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Werk de checklist technisch correct uit en vermijd de claim dat rankingverlies volledig te voorkomen is."
+    },
+    {
+      "id": "website-proposal-014",
+      "status": "ready",
+      "path": "/blog/website-offerte-vergelijken",
+      "contentType": "blog",
+      "cluster": "websites",
+      "primaryQuery": "website offerte vergelijken",
+      "intent": "Websitevoorstellen vergelijken op resultaat en eigenaarschap",
+      "intentClass": "buying",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Leverancierskeuze voor websitekopers",
+      "demandEvidence": [
+        {
+          "type": "buyer-question",
+          "source": "Softora websiteclusteranalyse",
+          "observedAt": "2026-07-17",
+          "detail": "Prijsfactoren en zelf-maken zijn gedekt, maar kopers missen een checklist voor scope, content, SEO, analytics, beheer en eigenaarschap in offertes."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/blog/website-laten-maken-kosten-2026",
+          "/vergelijkingen/website-laten-maken-vs-zelf-maken",
+          "/blog/website-laten-maken-mkb-paginas"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat vergelijkt leveranciersvoorstellen en acceptatiecriteria, niet alleen prijs of zelfbouw."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 4
+      },
+      "weightedScore": 4.5,
+      "brief": {
+        "title": "Website offertes vergelijken: checklist voor ondernemers",
+        "metaDescription": "Vergelijk websiteoffertes op strategie, pagina's, content, SEO, analytics, snelheid, beheer, eigenaarschap en acceptatie.",
+        "h1": "Hoe vergelijk je website offertes eerlijk?",
+        "outline": [
+          "Maak scope en doelen vergelijkbaar",
+          "Controleer content, SEO en conversie",
+          "Beoordeel techniek, snelheid en meten",
+          "Leg beheer en eigenaarschap vast",
+          "Vraag naar acceptatie en nazorg"
+        ],
+        "buyerQuestions": [
+          "Welke onderdelen ontbreken vaak uit een offerte?",
+          "Wie levert teksten en beelden?",
+          "Welke toegang en eigendommen krijg je na oplevering?"
+        ],
+        "incomingLinks": [
+          "/blog/website-laten-maken-kosten-2026",
+          "/vergelijkingen/website-laten-maken-vs-zelf-maken"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/pakketten"
+        ],
+        "conversionPath": "Van offertecheck naar een transparant gesprek over website-scope en verantwoordelijkheden.",
+        "claimRisk": "Geen juridisch advies of superioriteitsclaim; vergelijk controleerbare onderdelen en benoem context.",
+        "visualConcepts": [
+          "Website-offertematrix voor scope, content, SEO, techniek en beheer",
+          "Checklist van opleverrechten, toegang en meetbaarheid"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer commerciële intentie en maak de vergelijking nuttig zonder concurrenten ongefundeerd af te zetten."
+    },
+    {
+      "id": "crm-cost-015",
+      "status": "ready",
+      "path": "/blog/crm-systeem-kosten-mkb",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "crm systeem kosten mkb",
+      "intent": "Totale kosten van CRM-keuze, inrichting en gebruik",
+      "intentClass": "cost",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Kostenpagina voor CRM-kopers",
+      "demandEvidence": [
+        {
+          "type": "gsc-and-gap",
+          "source": "GSC 28 dagen tot en met 2026-07-15 en Softora contentinventaris",
+          "observedAt": "2026-07-16",
+          "detail": "CRM op maat had 178 impressies op gemiddelde positie 34.48; de live content vergelijkt CRM-typen maar behandelt totale kosten nog niet afzonderlijk."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm",
+          "/blog/crm-systeem-op-maat-spreadsheets-vervangen",
+          "/kennisbank/wat-is-een-crm-systeem"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat behandelt licentie, inrichting, migratie, koppelingen, training en beheer als total-cost-vraag."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 5,
+        "attainability": 4,
+        "uniqueness": 4,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.4,
+      "brief": {
+        "title": "CRM systeem kosten voor het MKB: volledige kostenopbouw",
+        "metaDescription": "Bekijk licentie, inrichting, migratie, koppelingen, training en beheer om de totale kosten van een CRM-systeem eerlijk te vergelijken.",
+        "h1": "Wat kost een CRM-systeem voor het MKB?",
+        "outline": [
+          "Licentie of maatwerk is niet de hele prijs",
+          "Inrichting, migratie en datakwaliteit",
+          "Koppelingen, training en adoptie",
+          "Beheer en wijzigingen na livegang",
+          "Vergelijk scenario's op totale kosten"
+        ],
+        "buyerQuestions": [
+          "Welke kosten worden vaak vergeten?",
+          "Wanneer is maatwerk financieel logisch?",
+          "Hoe voorkom je dat lage instapkosten later oplopen?"
+        ],
+        "incomingLinks": [
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm",
+          "/blog/crm-systeem-op-maat-spreadsheets-vervangen"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/bedrijfssoftware-op-maat"
+        ],
+        "conversionPath": "Van total-cost-inzicht naar een CRM-scopegesprek met duidelijke aannames.",
+        "claimRisk": "Geen vaste prijs of besparingsgarantie; vergelijk scenario's alleen met geverifieerde aannames.",
+        "visualConcepts": [
+          "Totale CRM-kosten over licentie, inrichting, migratie, adoptie en beheer",
+          "Scenariovergelijking tussen standaard CRM en maatwerk CRM"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer actuele SERP-intent en voorkom overlap met de bredere bedrijfssoftware-kostenpagina."
+    }
+  ]
+}
