@@ -286,14 +286,6 @@ button {
   text-align: right;
   -webkit-text-stroke-color: rgba(35, 159, 88, .1);
 }
-.momentum-art-quote.is-sleeping {
-  top: 28%;
-  left: 18%;
-  width: 64%;
-  font-size: clamp(3rem, 5.4vw, 6.4rem);
-  text-align: center;
-  -webkit-text-stroke-color: rgba(26, 26, 46, .085);
-}
 .momentum-art-quote.is-winners {
   top: 57%;
   left: 5%;
@@ -760,12 +752,6 @@ button {
   }
   .momentum-art-quotes {
     inset: 0;
-  }
-  .momentum-art-quote.is-sleeping {
-    top: 31%;
-    left: 4%;
-    width: 92%;
-    font-size: clamp(3rem, 14vw, 5rem);
   }
   .momentum-art-quote.is-end-game {
     top: 8%;
