@@ -51,7 +51,8 @@ button {
 }
 .momentum-hero,
 .habit-board,
-.end-game-title {
+.end-game-title,
+.end-game-goals {
   position: relative;
   z-index: 1;
 }
@@ -189,6 +190,68 @@ button {
   line-height: .9;
   text-align: center;
   text-transform: uppercase;
+}
+.end-game-goals {
+  width: calc(100% + 6rem);
+  margin: 2rem -3rem 0;
+  padding: 0 3rem 1.15rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-color: rgba(26, 26, 46, .18) transparent;
+  scrollbar-width: thin;
+}
+.end-game-goal-track {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  min-width: 100%;
+}
+.end-game-goal-card {
+  display: flex;
+  flex: 0 0 clamp(190px, 13vw, 220px);
+  flex-direction: column;
+  min-height: clamp(290px, 33vh, 340px);
+  padding: 1.3rem 1.2rem;
+  scroll-snap-align: start;
+  border: 1px solid rgba(26, 26, 46, .16);
+  border-top: 3px solid rgba(46, 204, 113, .52);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(26, 26, 46, .085);
+  backdrop-filter: blur(3px);
+}
+.end-game-goal-card > span {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.end-game-goal-card textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  margin-top: 1rem;
+  padding: 0;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.12;
+  text-transform: uppercase;
+}
+.end-game-goal-card textarea::placeholder {
+  color: rgba(96, 98, 114, .72);
+}
+.end-game-goal-card:focus-within {
+  border-color: rgba(46, 204, 113, .58);
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, .1), 0 16px 34px rgba(26, 26, 46, .06);
 }
 .momentum-art-quotes {
   position: absolute;
@@ -665,6 +728,13 @@ button {
   .bar-chart {
     min-width: 900px;
   }
+  .end-game-goals {
+    width: calc(100% + 36px);
+    margin-right: -18px;
+    margin-left: -18px;
+    padding-right: 18px;
+    padding-left: 18px;
+  }
 }
 @media (max-width: 780px) {
   .momentum-head {
@@ -720,6 +790,17 @@ button {
   }
   .momentum-head h1 {
     font-size: 24px;
+  }
+  .end-game-goals {
+    width: calc(100% + 24px);
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .end-game-goal-card {
+    flex-basis: 180px;
+    min-height: 270px;
   }
   .icon-picker-backdrop {
     padding: 12px;
