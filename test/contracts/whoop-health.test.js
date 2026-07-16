@@ -153,3 +153,12 @@ test('WHOOP cron runs at both UTC hours that can represent 08:00 Europe/Amsterda
     cron.path === '/api/health/whoop/daily-sync' && cron.schedule === '0 6,7 * * *'
   ));
 });
+
+test('health dossier has no manual WHOOP or spreadsheet controls', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../premium-gezondheidsdossier.html'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '../../assets/premium-health-dossier.js'), 'utf8');
+  ['data-health-connect', 'data-health-sync', 'data-health-sheet'].forEach((selector) => {
+    assert.doesNotMatch(html, new RegExp(selector));
+    assert.doesNotMatch(script, new RegExp(selector));
+  });
+});

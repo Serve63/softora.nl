@@ -9,13 +9,6 @@ body{margin:0;background:var(--bg-primary,#f7f4f1);color:var(--health-ink);font-
 .health-eyebrow,.health-panel__eyebrow{margin:0 0 8px;color:var(--health-accent);font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
 .health-title{margin:0;font-family:'Oswald',sans-serif;font-size:clamp(32px,4vw,54px);font-weight:600;letter-spacing:-.02em;line-height:1;text-transform:uppercase}
 .health-subtitle{max-width:700px;margin:12px 0 0;color:var(--health-muted);font-size:14px;line-height:1.6}
-.health-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px}
-.health-button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 15px;border:1px solid var(--health-line);border-radius:7px;background:rgba(255,255,255,.82);color:var(--health-ink);font:600 11px/1 'Inter',sans-serif;letter-spacing:.04em;text-decoration:none;cursor:pointer;transition:border-color .15s ease,background .15s ease}
-.health-button:hover{border-color:rgba(139,34,82,.42);background:#fff}
-.health-button:disabled{cursor:wait;opacity:.55}
-.health-button[hidden]{display:none!important}
-.health-button--primary{border-color:var(--health-accent);background:var(--health-accent);color:#fff}
-.health-button--primary:hover{background:#741b44;color:#fff}
 .health-status{display:flex;align-items:center;gap:10px;min-height:44px;margin-bottom:18px;padding:10px 14px;border:1px solid var(--health-line);border-radius:7px;background:rgba(255,255,255,.55);color:var(--health-muted);font-size:12px}
 .health-status__dot{width:8px;height:8px;border-radius:50%;background:var(--health-yellow);box-shadow:0 0 0 4px rgba(224,174,46,.12)}
 .health-status[data-state="connected"] .health-status__dot{background:var(--health-green);box-shadow:0 0 0 4px rgba(34,166,106,.12)}
@@ -51,5 +44,5 @@ body{margin:0;background:var(--bg-primary,#f7f4f1);color:var(--health-ink);font-
 .health-workout strong{font-family:'Oswald',sans-serif;font-size:24px}
 .health-empty{grid-column:1/-1;margin:42px 0;color:var(--health-muted);font-size:13px;text-align:center}
 @media(max-width:1180px){.health-kpis{grid-template-columns:repeat(3,1fr)}.health-workouts{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:900px){.sidebar{position:static;width:100%;height:auto}.main-content{margin-left:0;width:100%;padding:25px 18px 42px}.health-header{align-items:flex-start;flex-direction:column}.health-actions{justify-content:flex-start}.health-kpis{grid-template-columns:repeat(2,1fr)}.health-grid{grid-template-columns:1fr}}
-@media(max-width:560px){.health-kpis{grid-template-columns:1fr}.health-workouts{grid-template-columns:1fr}.health-actions,.health-button{width:100%}.health-chart{gap:3px}.health-chart__value{display:none}}
+@media(max-width:900px){.sidebar{position:static;width:100%;height:auto}.main-content{margin-left:0;width:100%;padding:25px 18px 42px}.health-header{align-items:flex-start;flex-direction:column}.health-kpis{grid-template-columns:repeat(2,1fr)}.health-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.health-kpis{grid-template-columns:1fr}.health-workouts{grid-template-columns:1fr}.health-chart{gap:3px}.health-chart__value{display:none}}
