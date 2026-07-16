@@ -10,7 +10,11 @@
     negatives: document.getElementById('googleAdsNegatives'),
     dryRun: document.getElementById('googleAdsDryRun'),
     machineResult: document.getElementById('googleAdsMachineResult'),
+    downloadPack: document.getElementById('googleAdsDownloadPack'),
+    packStatus: document.getElementById('googleAdsPackStatus'),
+    adAssets: document.getElementById('googleAdsAdAssets'),
   };
+  var launchPack = null;
 
   function replaceChildren(parent, children) {
     if (!parent) return;
@@ -74,6 +78,50 @@
     }));
   }
 
+  function renderLaunchPack(pack) {
+    launchPack = pack;
+    if (refs.downloadPack) refs.downloadPack.disabled = !pack.validation || !pack.validation.valid;
+    if (refs.packStatus) {
+      var valid = pack.validation && pack.validation.valid;
+      refs.packStatus.className = 'google-ads-pack-status' + (valid ? '' : ' has-errors');
+      refs.packStatus.textContent = valid
+        ? pack.validation.campaignsChecked + ' campagnes en ' + pack.validation.landingPagesReady + ' landingspagina’s volledig gevalideerd.'
+        : 'Launch-pack geblokkeerd: ' + ((pack.validation && pack.validation.errors.length) || 0) + ' validatiefouten.';
+    }
+    var cards = (pack.campaigns || []).map(function (campaign) {
+      var card = text('article', 'google-ads-ad-asset', '');
+      var header = text('div', 'google-ads-ad-asset-header', '');
+      header.appendChild(text('h3', '', campaign.name));
+      header.appendChild(text('span', '', 'PAUSED'));
+      var preview = text('div', 'google-ads-ad-preview', '');
+      preview.appendChild(text('strong', '', campaign.headlines.slice(0, 3).join(' | ')));
+      preview.appendChild(text('p', '', campaign.descriptions.slice(0, 2).join(' ')));
+      var counts = text('div', 'google-ads-ad-counts', '');
+      counts.appendChild(text('span', '', campaign.headlines.length + ' headlines'));
+      counts.appendChild(text('span', '', campaign.descriptions.length + ' descriptions'));
+      counts.appendChild(text('span', '', campaign.keywords.length + ' keywords'));
+      card.appendChild(header);
+      card.appendChild(text('div', 'google-ads-ad-url', campaign.finalUrl + '/' + campaign.path1 + '/' + campaign.path2));
+      card.appendChild(preview);
+      card.appendChild(counts);
+      return card;
+    });
+    replaceChildren(refs.adAssets, cards);
+  }
+
+  function downloadLaunchPack() {
+    if (!launchPack || !launchPack.validation || !launchPack.validation.valid) return;
+    var blob = new window.Blob([JSON.stringify(launchPack, null, 2)], { type: 'application/json' });
+    var url = window.URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'softora-google-ads-launch-pack.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
   function showError(error) {
     if (refs.readinessNote) refs.readinessNote.textContent = String(error.message || error);
   }
@@ -90,7 +138,9 @@
     });
   }
 
-  Promise.all([fetchJson('/api/google-ads/status'), fetchJson('/api/google-ads/blueprint')])
-    .then(function (results) { renderStatus(results[0]); renderBlueprint(results[1]); })
+  if (refs.downloadPack) refs.downloadPack.addEventListener('click', downloadLaunchPack);
+
+  Promise.all([fetchJson('/api/google-ads/status'), fetchJson('/api/google-ads/blueprint'), fetchJson('/api/google-ads/launch-pack')])
+    .then(function (results) { renderStatus(results[0]); renderBlueprint(results[1]); renderLaunchPack(results[2]); })
     .catch(showError);
 })();

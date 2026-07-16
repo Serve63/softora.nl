@@ -15,10 +15,10 @@ test('premium advertenties is een dedicated Google Ads dry-run commandocentrale'
 
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.match(pageSource, /<title>Google Ads – Softora\.nl<\/title>/);
-  assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-google-ads\.css\?v=20260716a">/);
+  assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-google-ads\.css\?v=20260716b">/);
   assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260427a" defer><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260716a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260716b" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_advertenties_content_lock"/);
   assert.match(pageSource, /data-content-lock-input/);
   assert.match(pageSource, /data-content-lock-submit/);
@@ -28,6 +28,9 @@ test('premium advertenties is een dedicated Google Ads dry-run commandocentrale'
   assert.match(pageSource, /Kostenslot actief/);
   assert.match(pageSource, /Draai dry-run/);
   assert.match(pageSource, /Search-blueprint/);
+  assert.match(pageSource, /Advertenties, keywords en URL-tracking/);
+  assert.match(pageSource, /id="googleAdsDownloadPack"/);
+  assert.match(pageSource, /href="\/api\/google-ads\/editor-assets\.csv" download/);
   assert.doesNotMatch(pageSource, /Trustoo-campagnes|Pinterest promoted pins|Meta \/ Facebook advertenties|LinkedIn Campaign Manager/);
   assert.doesNotMatch(pageSource, /onclick=/);
   assert.doesNotMatch(pageSource, /onkeydown=/);
@@ -44,6 +47,9 @@ test('premium advertenties is een dedicated Google Ads dry-run commandocentrale'
   assert.match(assetSource, /fetchJson\('\/api\/google-ads\/status'\)/);
   assert.match(assetSource, /fetchJson\('\/api\/google-ads\/blueprint'\)/);
   assert.match(assetSource, /fetchJson\('\/api\/google-ads\/dry-run'/);
+  assert.match(assetSource, /fetchJson\('\/api\/google-ads\/launch-pack'\)/);
+  assert.match(assetSource, /softora-google-ads-launch-pack\.json/);
+  assert.match(assetSource, /campaign\.headlines\.slice\(0, 3\)/);
   assert.match(assetSource, /replaceChildren/);
   assert.doesNotMatch(assetSource, /innerHTML/);
   assert.match(cssSource, /\.google-ads-safety/);
