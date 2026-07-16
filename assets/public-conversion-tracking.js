@@ -26,13 +26,42 @@
     return String((element && element.getAttribute(name)) || '').trim();
   }
 
+  function getAttribution() {
+    try {
+      var params = new URL(getPagePath(), window.location.origin).searchParams;
+      return {
+        gclid: String(params.get('gclid') || '').slice(0, 180),
+        gbraid: String(params.get('gbraid') || '').slice(0, 180),
+        wbraid: String(params.get('wbraid') || '').slice(0, 180),
+        utmSource: String(params.get('utm_source') || '').slice(0, 80),
+        utmMedium: String(params.get('utm_medium') || '').slice(0, 80),
+        utmCampaign: String(params.get('utm_campaign') || '').slice(0, 160),
+        utmTerm: String(params.get('utm_term') || '').slice(0, 160),
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  function createEventId() {
+    try {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+      }
+    } catch {
+      /* Fall through to a non-identifying event key. */
+    }
+    return 'public-conversion-' + Date.now() + '-' + Math.random().toString(36).slice(2, 12);
+  }
+
   function isMartijnWhatsappUrl(url) {
     return /^https:\/\/wa\.me\/31643262792(?:[?#].*)?$/i.test(String(url || '').trim());
   }
 
   function recordConversion(element) {
     var isWhatsappLink = isMartijnWhatsappUrl(getAttr(element, 'href'));
-    var eventData = {
+    var eventData = Object.assign({
+      id: createEventId(),
       name: getAttr(element, 'data-softora-conversion') || (isWhatsappLink ? 'public-whatsapp-link' : ''),
       page: getAttr(element, 'data-softora-conversion-page') || getPagePath(),
       target: getAttr(element, 'data-softora-conversion-target') || (isWhatsappLink ? 'whatsapp' : ''),
@@ -40,7 +69,7 @@
       referrer: getReferrerPath(),
       path: getPagePath(),
       at: new Date().toISOString(),
-    };
+    }, getAttribution());
 
     window.__softoraPublicLastConversion = eventData;
     window.__softoraPublicConversionEvents = window.__softoraPublicConversionEvents || [];
@@ -55,6 +84,33 @@
     return eventData;
   }
 
+  function sendFirstPartyConversion(eventData) {
+    try {
+      var body = JSON.stringify(eventData);
+      if (
+        window.navigator &&
+        typeof window.navigator.sendBeacon === 'function' &&
+        typeof window.Blob === 'function'
+      ) {
+        window.navigator.sendBeacon(
+          '/api/public-conversion',
+          new window.Blob([body], { type: 'application/json' })
+        );
+        return;
+      }
+      if (typeof window.fetch === 'function') {
+        window.fetch('/api/public-conversion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          keepalive: true,
+        }).catch(function () {});
+      }
+    } catch {
+      /* De CTA mag nooit afhankelijk zijn van meting. */
+    }
+  }
+
   function handleConversionClick(event) {
     var link = event.target && event.target.closest
       ? event.target.closest('a[data-softora-conversion][data-softora-conversion-target="whatsapp"],a[href]')
@@ -64,7 +120,7 @@
     var href = getAttr(link, 'href');
     if (!isMartijnWhatsappUrl(href)) return;
 
-    recordConversion(link);
+    sendFirstPartyConversion(recordConversion(link));
     link.setAttribute('href', MARTIJN_WHATSAPP_URL);
   }
 
@@ -97,7 +153,7 @@
     var form = event && event.target;
     if (form && form.checkValidity && !form.checkValidity()) return;
 
-    recordConversion(control);
+    sendFirstPartyConversion(recordConversion(control));
 
     if (event && !event.defaultPrevented) {
       event.preventDefault();

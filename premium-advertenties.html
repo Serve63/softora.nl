@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
 <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-<title>Advertenties – Softora.nl</title>
+<title>Google Ads – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-<link rel="stylesheet" href="assets/premium-marketing-management.css?v=20260423a">
+<link rel="stylesheet" href="assets/premium-google-ads.css?v=20260716a">
 <script>
   (function () {
     document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -40,7 +40,6 @@
   })();
 </script>
 <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
-<script src="assets/ai-management-mode.js?v=20260423a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -224,143 +223,67 @@ html[data-google-ads-open="true"] .content-lock-overlay { display: none; }
           </div>
         </aside>
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
-<main class="main-content">
-<div class="ai-marketing-shell" id="aiMarketingShell" data-ai-tone="idle">
-  <div class="ai-marketing-topbar">
-    <div class="ai-marketing-topbar-copy">
-      <div class="ai-marketing-kicker" id="aiMarketingKicker">Advertenties</div>
-      <h1 class="ai-marketing-title" id="aiMarketingTitle">AI Beheer</h1>
-      <p class="ai-marketing-sub" id="aiMarketingSub">AI beslist hier zelf welk advertentiekanaal, budget en moment het meeste oplevert voor je doel.</p>
-    </div>
-    <div class="ai-marketing-status">
-      <div class="ai-marketing-status-dot" aria-hidden="true"></div>
+<main class="main-content" id="google">
+  <div class="google-ads-shell">
+    <header class="google-ads-header">
       <div>
-        <span class="ai-marketing-status-kicker">Live status</span>
-        <span class="ai-marketing-status-title" id="aiMarketingStatusTitle">AI bewaakt advertenties op de achtergrond</span>
-        <div class="ai-marketing-status-note" id="aiMarketingStatusNote">AI kiest zelf wanneer dit kanaal wel of niet moet meedoen.</div>
+        <div class="google-ads-kicker">Acquisitie · Search</div>
+        <h1>Google Ads</h1>
+        <p>Dezelfde discipline als de SEO-machine: meten, kansen rangschikken, één veilige actie kiezen en pas na bewijs opschalen.</p>
       </div>
+      <div class="google-ads-mode"><span></span><strong>Dry-run</strong><small>€0 uitgaven · mutaties geblokkeerd</small></div>
+    </header>
+
+    <section class="google-ads-kpis" aria-label="Google Ads kerncijfers">
+      <article><span>Uitgaven</span><strong id="googleAdsSpend">€ 0,00</strong><small>Hard vergrendeld</small></article>
+      <article><span>Live campagnes</span><strong id="googleAdsLiveCampaigns">0</strong><small>Geen campagne actief</small></article>
+      <article><span>Conversies gemeten</span><strong id="googleAdsConversions">—</strong><small>First-party ledger</small></article>
+      <article><span>Readiness</span><strong id="googleAdsReadiness">—</strong><small id="googleAdsReadinessNote">Status laden…</small></article>
+    </section>
+
+    <section class="google-ads-safety">
+      <div class="google-ads-safety-icon">€</div>
+      <div><strong>Kostenslot actief</strong><p>Deze werkruimte kan analyseren en voorbereiden, maar bevat bewust geen endpoint voor campagne-activatie, budgetwijzigingen of betaalde Google Ads-mutaties.</p></div>
+      <span>LOCKED</span>
+    </section>
+
+    <div class="google-ads-layout">
+      <section class="google-ads-panel google-ads-machine">
+        <div class="google-ads-panel-head"><div><span>Dagmachine</span><h2>Volgende veiligste actie</h2></div><button id="googleAdsDryRun" type="button">Draai dry-run</button></div>
+        <div class="google-ads-machine-result" id="googleAdsMachineResult">
+          <span>Nog niet gedraaid</span>
+          <strong>De machine controleert eerst account, API, consent en conversiemeting.</strong>
+          <p>Er wordt niets bij Google aangemaakt of gewijzigd.</p>
+        </div>
+      </section>
+
+      <aside class="google-ads-panel">
+        <div class="google-ads-panel-head"><div><span>Launch gate</span><h2>Technische readiness</h2></div></div>
+        <div class="google-ads-checklist" id="googleAdsReadinessList" aria-live="polite"><p>Status laden…</p></div>
+      </aside>
+    </div>
+
+    <section class="google-ads-panel google-ads-blueprint">
+      <div class="google-ads-panel-head"><div><span>Campagnestructuur</span><h2>Search-blueprint</h2></div><div class="google-ads-chip">Alle concepten gepauzeerd</div></div>
+      <div class="google-ads-campaigns" id="googleAdsCampaigns"><p>Blueprint laden…</p></div>
+    </section>
+
+    <div class="google-ads-layout google-ads-layout-bottom">
+      <section class="google-ads-panel">
+        <div class="google-ads-panel-head"><div><span>Queryhygiëne</span><h2>Gedeelde uitsluitingen</h2></div></div>
+        <div class="google-ads-negatives" id="googleAdsNegatives"></div>
+      </section>
+      <aside class="google-ads-panel google-ads-measurement">
+        <div class="google-ads-panel-head"><div><span>Meetfundament</span><h2>Conversiepad</h2></div></div>
+        <ol><li><b>1</b><span>GCLID / GBRAID / WBRAID en UTM vastleggen</span></li><li><b>2</b><span>WhatsApp-conversie first-party opslaan</span></li><li><b>3</b><span>Pas na consent naar Google Ads doorzetten</span></li></ol>
+      </aside>
     </div>
   </div>
-
-  <section class="ai-marketing-hero">
-    <h2 class="ai-marketing-hero-title" id="aiMarketingHeroTitle">AI beslist zelf of dit advertentiekanaal nu nodig is</h2>
-    <p class="ai-marketing-hero-copy" id="aiMarketingSummary">AI gebruikt advertentiekanalen alleen als ze je doel sneller dichterbij brengen dan je andere Softora-tools.</p>
-  </section>
-
-  <section class="ai-marketing-grid">
-    <article class="ai-marketing-card">
-      <span class="ai-marketing-card-kicker">Actief doel</span>
-      <span class="ai-marketing-card-value" id="aiMarketingGoal">Meer gekwalificeerde aanvragen</span>
-      <div class="ai-marketing-card-note" id="aiMarketingGoalNote">Jij stuurt op uitkomst; de AI kiest zelf de route.</div>
-    </article>
-    <article class="ai-marketing-card">
-      <span class="ai-marketing-card-kicker">Nu bezig</span>
-      <span class="ai-marketing-card-value" id="aiMarketingCurrent">Kanaal beoordelen</span>
-      <div class="ai-marketing-card-note" id="aiMarketingCurrentNote">AI vergelijkt dit kanaal met andere acquisitieroutes.</div>
-    </article>
-    <article class="ai-marketing-card">
-      <span class="ai-marketing-card-kicker">Voortgang</span>
-      <span class="ai-marketing-card-value" id="aiMarketingProgress">Stand-by</span>
-      <div class="ai-marketing-card-note" id="aiMarketingProgressNote">Alleen live als het ook echt wat oplevert.</div>
-    </article>
-    <article class="ai-marketing-card">
-      <span class="ai-marketing-card-kicker">Volgende stap</span>
-      <span class="ai-marketing-card-value" id="aiMarketingNext">Beste kanaal kiezen</span>
-      <div class="ai-marketing-card-note" id="aiMarketingNextNote">De AI mag zelf doorschakelen naar andere Softora-tools.</div>
-    </article>
-  </section>
-
-  <section class="ai-marketing-footer">
-    <article class="ai-marketing-card">
-      <span class="ai-marketing-card-kicker">AI gebruikt hier</span>
-      <div class="ai-marketing-tools" id="aiMarketingTools">
-        <span class="ai-marketing-tool">Advertenties</span>
-        <span class="ai-marketing-tool">Leads</span>
-        <span class="ai-marketing-tool">Database</span>
-        <span class="ai-marketing-tool">Agenda</span>
-      </div>
-    </article>
-    <article class="ai-marketing-card">
-      <span class="ai-marketing-card-kicker">Autonomie</span>
-      <div class="ai-marketing-card-note">
-        In <strong>AI beheer</strong> beslist de AI zelf of dit kanaal nu aan moet, rustig moet blijven of moet doorschakelen naar coldcalling, coldmailing, database of agenda.
-      </div>
-    </article>
-  </section>
-</div>
-
-<div class="page-personnel-shell">
-<div class="page-shell">
-<div class="page-title">Advertenties</div>
-<div class="page-sub">Beheer advertentiecampagnes per kanaal. Campagne-instellingen en resultaten verschijnen hier zodra de koppelingen live zijn.</div>
-
-<div class="card" id="trustoo">
-  <div class="card-head">
-    <div class="card-title">Trustoo</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    Trustoo-campagnes, leads en rapportages voor advertenties verschijnen hier zodra de koppeling live is.
-  </div>
-</div>
-
-<div class="card" id="pinterest">
-  <div class="card-head">
-    <div class="card-title">Pinterest</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    Pinterest promoted pins en advertentierapportages komen hier te staan.
-  </div>
-</div>
-
-<div class="card" id="facebook">
-  <div class="card-head">
-    <div class="card-title">Facebook</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    Meta / Facebook advertenties worden hier geconfigureerd en gevolgd.
-  </div>
-</div>
-
-<div class="card" id="twitter">
-  <div class="card-head">
-    <div class="card-title">X / Twitter</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    X / Twitter advertentiecampagnes en resultaten krijgen hier hun eigen advertentiepagina.
-  </div>
-</div>
-
-<div class="card" id="google">
-  <div class="card-head">
-    <div class="card-title">Google</div>
-    <div class="card-sub">Geopend · nog geen actieve campagne.</div>
-  </div>
-  <div class="card-body">
-    De Google Ads-werkruimte staat klaar voor campagnestructuur, zoekwoorden, uitsluitingen, conversiemeting en rapportage. Er wordt pas advertentiebudget uitgegeven nadat doel, regio en één concreet budget expliciet zijn goedgekeurd.
-  </div>
-</div>
-
-<div class="card" id="linkedin">
-  <div class="card-head">
-    <div class="card-title">LinkedIn</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    LinkedIn Campaign Manager-integratie volgt in een latere release.
-  </div>
-</div>
-
-</div>
-</div>
 </main>
 </div>
 
 <script src="assets/premium-ui-state-client.js?v=20260605a"></script>
 <script src="assets/premium-marketing-content-lock.js?v=20260427a" defer></script>
-<script src="assets/premium-marketing-management.js?v=20260423a" defer></script>
+<script src="assets/premium-google-ads.js?v=20260716a" defer></script>
 </body>
 </html>

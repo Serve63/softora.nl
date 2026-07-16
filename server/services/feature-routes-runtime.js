@@ -36,6 +36,7 @@ const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
 const { registerSeoWriteRoutes } = require('../routes/seo-write');
+const { registerGoogleAdsRoutes } = require('../routes/google-ads');
 const {
   registerWhoopHealthProtectedRoutes,
   registerWhoopHealthPublicRoutes,
@@ -59,6 +60,7 @@ const {
 } = require('./company-website-video');
 const { createGoogleHealthSheetService } = require('./google-health-sheet');
 const { createWhoopHealthService } = require('./whoop-health');
+const { createGoogleAdsControlService } = require('./google-ads-control');
 
 function registerFeatureRoutes(app, deps = {}) {
   const {
@@ -136,6 +138,11 @@ function registerFeatureRoutes(app, deps = {}) {
     getSupabaseClient: whoopHealth.getSupabaseClient,
     sheetService: googleHealthSheetService,
   });
+  const googleAdsService = createGoogleAdsControlService({
+    getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
+    env: deps.env || process.env,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -152,6 +159,12 @@ function registerFeatureRoutes(app, deps = {}) {
   registerWhoopHealthPublicRoutes(app, {
     service: whoopHealthService,
     cronSecret: mailboxCronSecret,
+  });
+
+  registerGoogleAdsRoutes(app, {
+    service: googleAdsService,
+    cronSecret: mailboxCronSecret,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
 
   createPremiumRouteRuntime({
