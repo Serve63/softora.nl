@@ -127,7 +127,12 @@ function applyAppMiddleware(app, deps = {}) {
           formAction: ["'self'"],
           frameAncestors: ["'none'"],
           objectSrc: ["'none'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdnjs.cloudflare.com',
+            'https://www.googletagmanager.com',
+          ],
           scriptSrcAttr: ["'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],

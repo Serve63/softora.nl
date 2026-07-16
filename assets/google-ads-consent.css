@@ -1,0 +1,52 @@
+.softora-consent {
+  position: fixed;
+  z-index: 2147483000;
+  right: 20px;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 22px;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  color: #171729;
+  background: #fff;
+  border: 1px solid rgba(24, 24, 42, .12);
+  border-radius: 18px;
+  box-shadow: 0 18px 55px rgba(24, 24, 42, .2);
+  font: 15px/1.5 Arial, sans-serif;
+}
+
+.softora-consent__copy { max-width: 700px; }
+.softora-consent__copy strong { display: block; margin-bottom: 5px; font-size: 17px; }
+.softora-consent__copy p { margin: 0 0 5px; }
+.softora-consent__copy a { color: #8f1f52; font-weight: 700; }
+.softora-consent__actions { display: flex; flex: 0 0 auto; gap: 10px; }
+.softora-consent__button,
+.softora-consent-settings {
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font: 700 14px/1 Arial, sans-serif;
+}
+.softora-consent__button { padding: 13px 17px; }
+.softora-consent__button--quiet { color: #29293c; background: #ececf2; }
+.softora-consent__button--accept { color: #fff; background: #971d55; }
+.softora-consent-settings {
+  position: fixed;
+  z-index: 2147482999;
+  right: 14px;
+  bottom: 12px;
+  padding: 8px 10px;
+  color: #5b5b6c;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 4px 18px rgba(24, 24, 42, .12);
+}
+
+@media (max-width: 700px) {
+  .softora-consent { right: 12px; bottom: 12px; left: 12px; display: block; padding: 18px; }
+  .softora-consent__actions { margin-top: 16px; }
+  .softora-consent__button { flex: 1; }
+}

@@ -81,6 +81,17 @@
       /* Older browsers still get the WhatsApp route. */
     }
 
+    try {
+      if (
+        window.SoftoraGoogleAdsConsent &&
+        typeof window.SoftoraGoogleAdsConsent.recordConversion === 'function'
+      ) {
+        window.SoftoraGoogleAdsConsent.recordConversion(eventData);
+      }
+    } catch {
+      /* Google-meting mag de first-party route nooit blokkeren. */
+    }
+
     return eventData;
   }
 

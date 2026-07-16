@@ -9,7 +9,10 @@ test('premium privacy policy page shows the Softora VOF privacy declaration', ()
 
   assert.match(pageSource, /<title>Privacyverklaring Softora VOF - Softora\.nl<\/title>/);
   assert.match(pageSource, /<h1 class="privacy-title">Privacyverklaring Softora VOF<\/h1>/);
-  assert.match(pageSource, /<strong>Versie:<\/strong> 27 april 2026/);
+  assert.match(pageSource, /<strong>Versie:<\/strong> 17 juli 2026/);
+  assert.match(pageSource, /Google-tag wordt pas geladen nadat de bezoeker/);
+  assert.match(pageSource, /geen cookieloze Google-meetsignalen verstuurd/);
+  assert.match(pageSource, /toestemmingskeuze wordt maximaal zes maanden/);
   assert.match(pageSource, /<strong>Gevestigd te:<\/strong> Oisterwijk, Nederland/);
   assert.match(pageSource, /<strong>E-mail:<\/strong> info@softora\.nl/);
   assert.match(pageSource, /<strong>Website:<\/strong> www\.softora\.nl/);

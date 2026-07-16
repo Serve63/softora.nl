@@ -76,7 +76,9 @@ function readConfiguration(env = process.env) {
     apiConfigured: Boolean(
       config.developerToken && config.clientId && config.clientSecret && config.refreshToken
     ),
-    conversionConfigured: Boolean(config.conversionId && config.conversionLabel),
+    conversionConfigured: Boolean(
+      /^AW-\d{6,20}$/.test(config.conversionId) && config.conversionLabel
+    ),
     consentModeConfigured: config.consentModeConfigured,
   };
 }
@@ -132,6 +134,7 @@ function createGoogleAdsControlService(deps = {}) {
       { id: 'landing-pages', label: 'Alle landingspagina-preflights groen', ready: launchPack.validation.landingPagesReady === launchPack.validation.landingPagesTotal },
       { id: 'cost-lock', label: 'Uitgaven en externe mutaties geblokkeerd', ready: true },
       { id: 'first-party', label: 'First-party conversieregistratie', ready: true },
+      { id: 'consent-gate', label: 'Basic Consent Mode v2 tag-gate gebouwd', ready: true },
       { id: 'account', label: 'Google Ads-account gekoppeld', ready: configuration.accountConfigured },
       { id: 'api', label: 'Google Ads API OAuth gekoppeld', ready: configuration.apiConfigured },
       { id: 'consent', label: 'Consent Mode v2 geconfigureerd', ready: configuration.consentModeConfigured },
@@ -157,11 +160,23 @@ function createGoogleAdsControlService(deps = {}) {
       spendCents: 0,
       conversionCount: conversions.length,
       configuration,
+      publicTagEnabled: configuration.conversionConfigured && configuration.consentModeConfigured,
       readiness,
       readinessReady: readiness.filter((item) => item.ready).length,
       readinessTotal: readiness.length,
       lastRun: state[MACHINE_STATE_KEY]?.lastRun || null,
       launchPackValid: launchPack.validation.valid,
+    };
+  }
+
+  function getPublicConfig() {
+    const configuration = readConfiguration(env);
+    const enabled = configuration.conversionConfigured && configuration.consentModeConfigured;
+    return {
+      enabled,
+      consentMode: 'basic-v2',
+      tagId: enabled ? clean(env.GOOGLE_ADS_CONVERSION_ID, 64) : '',
+      conversionLabel: enabled ? clean(env.GOOGLE_ADS_CONVERSION_LABEL, 128) : '',
     };
   }
 
@@ -219,7 +234,7 @@ function createGoogleAdsControlService(deps = {}) {
     return buildGoogleAdsEditorAssetsCsv(getLaunchPack());
   }
 
-  return { getBlueprint, getEditorAssetsCsv, getLaunchPack, getStatus, recordConversion, runDryRun, sanitizeAttribution };
+  return { getBlueprint, getEditorAssetsCsv, getLaunchPack, getPublicConfig, getStatus, recordConversion, runDryRun, sanitizeAttribution };
 }
 
 module.exports = {
