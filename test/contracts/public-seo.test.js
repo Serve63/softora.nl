@@ -278,6 +278,11 @@ test('public seo pages load first-party conversion tracking once', () => {
   assert.match(trackerSource, /public-whatsapp-link/);
   assert.match(trackerSource, /document\.addEventListener\('submit', handleConversionSubmit\)/);
   assert.match(trackerSource, /recordConversion\(control\)/);
+  assert.match(trackerSource, /\/api\/public-conversion/);
+  assert.match(trackerSource, /gclid/);
+  assert.match(trackerSource, /gbraid/);
+  assert.match(trackerSource, /wbraid/);
+  assert.match(trackerSource, /sendFirstPartyConversion/);
   assert.match(trackerSource, /window\.open\(MARTIJN_WHATSAPP_URL, '_blank', 'noopener,noreferrer'\)/);
   assert.match(trackerSource, /link\.setAttribute\('href', MARTIJN_WHATSAPP_URL\)/);
   assert.doesNotMatch(trackerSource, /Landingspagina: |CTA-pagina: |Referrer: |\?text=|searchParams\.set\('text'|buildWhatsappText|withWhatsappText/);

@@ -72,6 +72,10 @@
     {
       "path": "/api/health/whoop/daily-sync",
       "schedule": "0 6,7 * * *"
+    },
+    {
+      "path": "/api/google-ads/daily-run",
+      "schedule": "15 6 * * 1-5"
     }
   ],
   "headers": [
