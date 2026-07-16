@@ -76,6 +76,16 @@ test('kvk database collapse state survives a refresh', () => {
   assert.doesNotMatch(scriptSource, /function saveCollapsedPanels\(\)\{\}/);
 });
 
+test('kvk database planning merges current parallel route progress', () => {
+  const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
+
+  assert.match(scriptSource, /contact_parallel_routes/);
+  assert.match(scriptSource, /location_code/);
+  assert.match(scriptSource, /\.done/);
+  assert.match(scriptSource, /contact_parallel_active_location_codes/);
+  assert.match(scriptSource, /function getContactActiveCodes\(\)/);
+});
+
 test('kvk database renders latest treated snapshot rows in the restored panel', () => {
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
