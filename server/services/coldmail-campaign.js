@@ -8792,10 +8792,16 @@ function createColdmailCampaignService(deps = {}) {
       }
       const firstFailure = pickFailureMessage(failed, candidateRows);
       const recipientGuardFailure = failed.length > 0 && failed.every((item) => isColdmailRecipientGuardFailure(item));
-      const verificationFailure = failed.find((item) =>
-        /^COLDMAIL_EMAIL_VERIFICATION_/.test(normalizeString(item && item.code))
-      );
-      const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
+      const verificationFailure = [
+        'COLDMAIL_EMAIL_VERIFICATION_UNAVAILABLE',
+        'COLDMAIL_EMAIL_VERIFICATION_PENDING',
+        'COLDMAIL_EMAIL_VERIFICATION_UNKNOWN',
+        'COLDMAIL_EMAIL_VERIFICATION_INVALID',
+      ].map((code) => failed.find((item) => normalizeString(item && item.code) === code)).find(Boolean);
+      const errorMessage = verificationFailure
+        ? normalizeString(verificationFailure.error)
+        : firstFailure;
+      const error = new Error(errorMessage || 'Geen geldige e-maildomeinen gevonden in de database.');
       error.code = recipientGuardFailure
         ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
         : verificationFailure
