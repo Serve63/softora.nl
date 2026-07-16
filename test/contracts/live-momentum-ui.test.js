@@ -21,7 +21,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716g" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716h" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -191,6 +191,13 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.doesNotMatch(js, /renderLineChart|setChartMode|chartMode|chartSwitches|getVisibleScore/);
   assert.match(js, /function renderGridShell\(goals\)/);
   assert.match(js, /function createGoalRow\(\)/);
+  assert.match(js, /function removeLegacyTrailingGoalPlaceholders\(goals\)/);
+  assert.match(js, /needsMigration/);
+  assert.match(js, /rowHeader\.dataset\.goalDraft = 'true'/);
+  assert.match(js, /goals\.push\(\{ \.\.\.draftGoal, label: '', isDraft: true \}\)/);
+  assert.match(js, /delete row\.dataset\.goalDraft/);
+  assert.match(js, /if \(!storedState \|\| storedState\.needsMigration\)/);
+  assert.match(js, /label\.dataset\.placeholder = 'Vul je doel in'/);
   assert.match(js, /function refreshCellData\(\)/);
   assert.match(js, /function updateTodayColumnEnd/);
   assert.match(js, /closest\('\.add-goal'\)/);

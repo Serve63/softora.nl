@@ -159,6 +159,21 @@
       trackedDays: normalizedTrackedDays
     };
   }
+  function removeLegacyTrailingGoalPlaceholders(goals) {
+    const cleanedGoals = [...goals];
+    let needsMigration = false;
+    while (cleanedGoals.length > 1) {
+      const lastGoal = cleanedGoals[cleanedGoals.length - 1];
+      const isGeneratedGoal = String(lastGoal?.id || '').startsWith('goal-');
+      const isLegacyPlaceholder = String(lastGoal?.label || '').trim().toLocaleLowerCase('nl') === 'nieuw doel';
+      if (!isGeneratedGoal || !isLegacyPlaceholder) {
+        break;
+      }
+      cleanedGoals.pop();
+      needsMigration = true;
+    }
+    return { goals: cleanedGoals, needsMigration };
+  }
   function getDefaultGoals() {
     return DEFAULT_GOALS.map((goal, index) => normalizeGoal({
       ...goal,
@@ -171,19 +186,23 @@
     }
     return `goal-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
-  function getCurrentGoals() {
+  function getCurrentGoals(options = {}) {
     const statusCells = getStatusCells();
     return getGoalRows().slice(0, MAX_GOALS).map((row, index) => {
       const cells = statusCells.slice(index * TOTAL_DAYS, (index + 1) * TOTAL_DAYS);
       const defaultGoal = getDefaultGoal(row.dataset.goalId);
-      return normalizeGoal({
-        id: row.dataset.goalId,
-        label: row.querySelector('.habit-label')?.textContent || '',
-        iconKey: row.dataset.iconKey || defaultGoal?.iconKey,
-        doneDays: cells.filter(isChecked).map(getDay),
-        trackedDays: cells.filter(isTracked).map(getDay)
-      }, index);
-    });
+      return {
+        isDraft: row.dataset.goalDraft === 'true',
+        goal: normalizeGoal({
+          id: row.dataset.goalId,
+          label: row.querySelector('.habit-label')?.textContent || '',
+          iconKey: row.dataset.iconKey || defaultGoal?.iconKey,
+          doneDays: cells.filter(isChecked).map(getDay),
+          trackedDays: cells.filter(isTracked).map(getDay)
+        }, index)
+      };
+    }).filter((entry) => options.includeDraft === true || !entry.isDraft)
+      .map((entry) => entry.goal);
   }
   function buildStateSnapshot() {
     return {
@@ -210,12 +229,14 @@
       if (!parsed || parsed.version !== STATE_VERSION || parsed.period !== PERIOD_KEY || !Array.isArray(parsed.goals)) {
         return null;
       }
-      const goals = parsed.goals.slice(0, MAX_GOALS).map(normalizeGoal);
+      const normalizedGoals = parsed.goals.slice(0, MAX_GOALS).map(normalizeGoal);
+      const { goals, needsMigration } = removeLegacyTrailingGoalPlaceholders(normalizedGoals);
       if (!goals.length) {
         return null;
       }
       return {
         goals,
+        needsMigration,
         endGameMissionCard: normalizeEndGameMissionCard(parsed.endGameMissionCard),
         endGameGoals: normalizeEndGameGoals(parsed.endGameGoals)
       };
@@ -442,6 +463,11 @@
       }
     });
     label.addEventListener('input', () => {
+      const row = label.closest('.habit-name');
+      if (row?.dataset.goalDraft === 'true' && label.textContent.trim()) {
+        delete row.dataset.goalDraft;
+        label.setAttribute('aria-label', `Taaknaam ${label.textContent.trim()}`);
+      }
       getStatusCells().forEach(syncCellA11y);
       markStateChanged();
     });
@@ -621,14 +647,14 @@
     renderIconPickerResults();
     window.requestAnimationFrame(() => search.focus());
   }
-  function createLabel(text) {
+  function createLabel(text, isDraft = false) {
     const label = document.createElement('span');
     label.className = 'habit-label';
     label.contentEditable = 'plaintext-only';
     label.setAttribute('role', 'textbox');
-    label.setAttribute('aria-label', `Taaknaam ${text}`);
+    label.setAttribute('aria-label', isDraft ? 'Naam van nieuw doel' : `Taaknaam ${text}`);
     label.setAttribute('spellcheck', 'false');
-    label.dataset.placeholder = 'Nieuwe taak';
+    label.dataset.placeholder = 'Vul je doel in';
     label.textContent = text;
     return label;
   }
@@ -648,6 +674,9 @@
     rowHeader.setAttribute('role', 'rowheader');
     rowHeader.dataset.goalId = goal.id;
     rowHeader.dataset.iconKey = goal.iconKey;
+    if (goal.isDraft) {
+      rowHeader.dataset.goalDraft = 'true';
+    }
     if (isLastGoal) {
       const addButton = document.createElement('button');
       addButton.className = 'add-goal';
@@ -663,7 +692,7 @@
       iconButton.append(goal.icon ? createIcon(goal.icon) : createGoalIcon());
       rowHeader.append(iconButton);
     }
-    rowHeader.append(createLabel(goal.label));
+    rowHeader.append(createLabel(goal.label, goal.isDraft));
     return rowHeader;
   }
   function renderChartShell() {
@@ -717,18 +746,18 @@
     if (!stateReady || !goals.length || goals.length >= MAX_GOALS) {
       return;
     }
-    goals.push(normalizeGoal({
+    const draftGoal = normalizeGoal({
       id: createGoalId(),
-      label: 'Nieuw doel',
+      label: 'Doel',
       doneDays: [],
       trackedDays: DAYS.filter((day) => day >= TODAY)
-    }, goals.length));
+    }, goals.length);
+    goals.push({ ...draftGoal, label: '', isDraft: true });
     renderGridShell(goals);
     refreshCellData();
     getLabels().forEach(bindLabel);
     updateChart();
     focusLabel(getLabels()[getLabels().length - 1]);
-    markStateChanged();
   }
   async function hydrateState() {
     const uiStateClient = window.SoftoraUiStateClient;
@@ -753,7 +782,7 @@
       }
       stateReady = true;
       setPersistenceState('saved');
-      if (!storedState) {
+      if (!storedState || storedState.needsMigration) {
         markStateChanged();
       }
     } catch (error) {
@@ -805,8 +834,17 @@
     if (!label) {
       return;
     }
+    const row = label.closest('.habit-name');
+    if (row?.dataset.goalDraft === 'true' && !label.textContent.trim()) {
+      const goals = getCurrentGoals();
+      renderGridShell(goals);
+      refreshCellData();
+      getLabels().forEach(bindLabel);
+      updateChart();
+      return;
+    }
     if (!label.textContent.trim()) {
-      label.textContent = 'Nieuw doel';
+      label.textContent = 'Doel';
     }
     getStatusCells().forEach(syncCellA11y);
     markStateChanged();
