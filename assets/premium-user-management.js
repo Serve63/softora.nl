@@ -425,8 +425,13 @@ function mountExtraSettingsCategory() {
     var number = String(index + 1).padStart(2, '0');
     var isWinning = label === 'Winnen';
     var isDatabase = label === 'Database';
-    var isLinkedModule = isWinning || isDatabase;
-    var moduleHref = isWinning ? '/live-momentum' : '/kvk-database';
+    var isHealth = label === "Servé's gezondheidsdossier";
+    var isLinkedModule = isWinning || isDatabase || isHealth;
+    var moduleHref = isWinning
+      ? '/live-momentum'
+      : isDatabase
+        ? '/kvk-database'
+        : '/premium-gezondheidsdossier';
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {
@@ -499,6 +504,8 @@ function mountExtraSettingsCategory() {
           ? 'Live momentum voor dagelijkse doelen, discipline en voortgang.'
           : isDatabase
             ? 'Lokale database voor het scrapen en behandelen van bedrijven.'
+            : isHealth
+              ? 'WHOOP-herstel, slaap en trainingen, dagelijks automatisch bijgewerkt.'
             : label === 'Flynow'
               ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
             : 'Interne template-module die later verder ingevuld kan worden.'

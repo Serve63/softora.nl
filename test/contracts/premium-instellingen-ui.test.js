@@ -74,9 +74,10 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /goTo\('screen-extra'\)/);
   assert.match(userManagementSource, /var isWinning = label === 'Winnen';/);
   assert.match(userManagementSource, /var isDatabase = label === 'Database';/);
-  assert.match(userManagementSource, /var isLinkedModule = isWinning \|\| isDatabase;/);
+  assert.match(userManagementSource, /var isHealth = label === "Servé's gezondheidsdossier";/);
+  assert.match(userManagementSource, /var isLinkedModule = isWinning \|\| isDatabase \|\| isHealth;/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-href', moduleHref\);/);
-  assert.match(userManagementSource, /var moduleHref = isWinning \? '\/live-momentum' : '\/kvk-database';/);
+  assert.match(userManagementSource, /: '\/premium-gezondheidsdossier';/);
   assert.match(userManagementSource, /card\.classList\.add\('settings-extra-card--locked'\);/);
   assert.match(userManagementSource, /card\.setAttribute\('data-settings-extra-locked', 'true'\);/);
   assert.match(userManagementSource, /card\.setAttribute\('aria-disabled', 'true'\);/);
@@ -94,7 +95,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260715c/);
+  assert.match(source, /premium-user-management\.js\?v=20260716a/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);
