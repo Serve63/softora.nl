@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
-  'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
+  '2030.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
   'eigen-automaat-rijden.png', 'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
   'gewenst-lang-kapsel.png', 'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png',
   'gezondheidscenter.png', 'haartransplantatie.png', 'kantoorpand-in-haaren.png',
@@ -253,12 +253,13 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*"Servé's gezondheidsdossier"/);
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
+  assert.match(endGameCardsJs, /\{ id: '2030', title: '2030\?' \}/);
   [
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Transfermarkt',
-    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast'
+    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast', '2030?'
   ].forEach((title) => assert.equal(endGameCardsJs.includes(title), true, `missing card title: ${title}`));
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'toggle-complete'/);
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'remove'/);
