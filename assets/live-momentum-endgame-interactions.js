@@ -99,7 +99,7 @@
       if (!isReady() || event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
       if (event.target.closest('[data-end-game-card-action]')) return;
       const card = event.target.closest('[data-end-game-card-id]');
-      if (!card) return;
+      if (!card || card.dataset.endGameCardFixed === 'true') return;
       dragState = {
         card,
         pointerId: event.pointerId,
@@ -134,11 +134,11 @@
     track.addEventListener('keydown', (event) => {
       if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key) || event.target.closest('[data-end-game-card-action]')) return;
       const card = event.target.closest('[data-end-game-card-id]');
-      if (!card || event.target !== card || !isReady()) return;
+      if (!card || card.dataset.endGameCardFixed === 'true' || event.target !== card || !isReady()) return;
       const cards = getCards();
       const index = cards.indexOf(card);
       const nextIndex = event.key === 'ArrowLeft' ? index - 1 : index + 1;
-      if (nextIndex < 0 || nextIndex >= cards.length) return;
+      if (nextIndex < 0 || nextIndex >= cards.length || cards[nextIndex]?.dataset.endGameCardFixed === 'true') return;
       event.preventDefault();
       const previousPositions = new Map(cards.filter((item) => item !== card).map((item) => [item, item.getBoundingClientRect().left]));
       if (event.key === 'ArrowLeft') track.insertBefore(card, cards[nextIndex]);
