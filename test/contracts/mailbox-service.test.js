@@ -106,6 +106,13 @@ function createOutboundGuardStore(calls = [], overrides = {}) {
   };
 }
 
+function stripUnlinkedWebsiteDomainMarkup(html) {
+  return String(html || '').replace(
+    /<span class="softora-unlinked-website-domain"[^>]*>([\s\S]*?)<\/span>/g,
+    '$1'
+  );
+}
+
 test('mailbox service exposes configured softora mailbox accounts', async () => {
   const service = createMailboxService({
     mailConfig: {
@@ -294,8 +301,8 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
     sent[0].message.html,
     /Webdesign niet zichtbaar\? Check het <a href="https:\/\/www\.softora\.nl\/webdesign\/pck-b-v\?cid=manual-import-pckbv-eu-privacy-0583&amp;sender=serve" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">hier<\/a> 👈/
   );
-  assert.match(sent[0].message.html, /website \(pckbv\.eu\) tegen/);
-  assert.doesNotMatch(sent[0].message.html, /white-space:nowrap|word-break:keep-all/);
+  assert.match(sent[0].message.html, /website \(<span class="softora-unlinked-website-domain"[^>]+>pckbv\u2060\.\u2060eu<\/span>\) tegen/);
+  assert.doesNotMatch(sent[0].message.html, /<a[^>]+href="https?:\/\/(?:www\.)?pckbv\.eu/i);
   assert.match(sent[0].message.html, /<img src="cid:webdesign-manual-import-pckbv-eu-privacy-0583-1@softora"/);
   assert.match(sent[0].message.html, /<img src="cid:mockup-manual-import-pckbv-eu-privacy-0583-2@softora"/);
   assert.equal(sent[0].message.headers['X-Softora-Template-Version'], 'softora-webdesign-email-2026-07-15-v7');
@@ -310,7 +317,7 @@ test('mailbox service enriches normal webdesign sends with public link and inlin
   assert.match(sent[0].message.html, /class="softora-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.equal((sent[0].message.html.match(/alt="PCK B\.V\. webdesign"/g) || []).length, 1);
   assert.equal((sent[0].message.html.match(/alt="PCK B\.V\. device mockup"/g) || []).length, 1);
-  assert.doesNotMatch(sent[0].message.html, /900px|softora-desktop-image-pair|softora-mobile-image-pair|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/);
+  assert.doesNotMatch(stripUnlinkedWebsiteDomainMarkup(sent[0].message.html), /900px|softora-desktop-image-pair|softora-mobile-image-pair|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/);
   assert.equal(sent[0].message.attachments.length, 2);
   assert.deepEqual(
     sent[0].message.attachments.map((attachment) => [attachment.cid, attachment.contentDisposition]),

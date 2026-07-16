@@ -90,6 +90,17 @@ function extractImageTags(html) {
   return [...String(html || '').matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
 }
 
+function stripUnlinkedWebsiteDomainMarkup(html) {
+  return String(html || '').replace(
+    /<span class="softora-unlinked-website-domain"[^>]*>([\s\S]*?)<\/span>/g,
+    '$1'
+  );
+}
+
+function stripEmailWordJoiners(value) {
+  return String(value || '').replace(/\u2060/g, '');
+}
+
 function assertInstantlyHtmlUsesReadableWidth(html) {
   assert.match(html, /<div style="width:100%;max-width:600px;min-width:0;box-sizing:border-box;margin:0;overflow-wrap:anywhere;word-break:normal;">/);
 }
@@ -117,7 +128,9 @@ function assertInstantlyHtmlUsesVisibleWebdesignImages(html, expectedPath = '/we
   assert.match(imageTags[1], /width="600"/);
   assert.match(imageTags[1], /class="softora-webdesign-image softora-webdesign-image--mockup"/);
   assert.match(imageTags[1], /style="display:block;width:100%;max-width:600px;height:auto;max-height:none;object-fit:contain;object-position:center top;/);
-  assert.doesNotMatch(html, /display:flex|flex-wrap|max-width:480px|900px|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/);
+  assert.match(html, /class="softora-unlinked-website-domain"[^>]+display:inline-block;white-space:nowrap!important;[^>]+word-break:keep-all!important;color:inherit!important;text-decoration:none!important;/);
+  assert.doesNotMatch(html, /<a[^>]+href="https?:\/\/(?:www\.)?bakkerijzon\.test/i);
+  assert.doesNotMatch(stripUnlinkedWebsiteDomainMarkup(html), /display:flex|flex-wrap|max-width:480px|900px|white-space:nowrap|display:inline-block|word-break:keep-all|table-layout:fixed|min-device-width/);
   assert.match(html, /class="softora-mockup-caption"[^>]*>Hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.<\/p>/);
   assert.doesNotMatch(html, /PS: Wordt het webdesign niet zichtbaar|device mockup/i);
 }
@@ -365,7 +378,7 @@ test('instantly sync pushes eligible Softora leads only after central guard rese
   assert.equal(body.leads[0].custom_variables.softora_customer_id, 'prospect-1');
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Nieuw webdesign gemaakt!');
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Beste lezer/);
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
+  assert.match(stripEmailWordJoiners(body.leads[0].custom_variables.softora_mail_body), /website \(bakkerijzon\.test\) tegen/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Webdesign niet zichtbaar\? Check het hier 👈/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Servé Creusen/);
   assert.match(body.leads[0].custom_variables.softora_mail_body, /📍 uw regio/);
@@ -499,6 +512,11 @@ test('safe Instantly upload prepares CSV only after reserving leads and permanen
   assert.match(result.campaignHtmlTemplate, /<img[^>]+src="\{\{softora_webdesign_image_url\}\}"/);
   assert.match(result.campaignHtmlTemplate, /<img[^>]+src="\{\{softora_webdesign_mockup_url\}\}"/);
   assert.match(result.campaignHtmlTemplate, /href="\{\{softora_webdesign_public_url\}\}"/);
+  assert.match(
+    result.campaignHtmlTemplate,
+    /<span class="softora-unlinked-website-domain"[^>]+>\{\{softora_website_domain\}\}<\/span>/
+  );
+  assert.doesNotMatch(result.campaignHtmlTemplate, /<a[^>]+>\{\{softora_website_domain\}\}<\/a>/);
   assert.doesNotMatch(result.campaignHtmlTemplate, /softora_unsubscribe_url/);
   assert.doesNotMatch(result.campaignHtmlTemplate, /Geen webdesign willen ontvangen/);
   assert.match(result.campaignHtmlTemplate, /\{\{softora_sender_name\}\}/);
@@ -2065,7 +2083,7 @@ test('instantly sync uses the active coldmail autopilot profile before fallback 
   const body = JSON.parse(fetchCalls[0].options.body);
   assert.equal(body.leads[0].custom_variables.softora_subject, 'Autopilot webdesign voor Bakkerij Zon');
   assert.match(body.leads[0].custom_variables.softora_mail_body, /Beste lezer/);
-  assert.match(body.leads[0].custom_variables.softora_mail_body, /website \(bakkerijzon\.test\) tegen/);
+  assert.match(stripEmailWordJoiners(body.leads[0].custom_variables.softora_mail_body), /website \(bakkerijzon\.test\) tegen/);
   assert.doesNotMatch(body.leads[0].custom_variables.softora_mail_body, /Deze tekst draait nu via autopilot/);
 });
 

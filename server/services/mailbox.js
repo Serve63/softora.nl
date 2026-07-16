@@ -19,6 +19,10 @@ const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+  normalizeWebsiteDomain,
+  protectWebsiteDomainInText,
+  renderTextWithUnlinkedWebsiteDomain,
+  renderUnlinkedWebsiteDomain,
   renderWebdesignEmailDocument,
   renderWebdesignImageSection,
 } = require('./webdesign-email-renderer');
@@ -1483,17 +1487,25 @@ function createMailboxService(deps = {}) {
       .trim();
   }
 
-  function renderInlineMarkdownLinks(line) {
+  function renderInlineMarkdownLinks(line, options = {}) {
     const source = String(line || '');
+    const websiteDomain = normalizeWebsiteDomain(options.websiteDomain);
     const pattern = /\[([^\]\n]{1,180})\]\((https?:\/\/[^)\s]+)\)/g;
     let html = '';
     let lastIndex = 0;
     for (const match of source.matchAll(pattern)) {
-      html += escapeHtml(source.slice(lastIndex, match.index));
-      html += `<a href="${escapeHtmlAttribute(match[2])}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(match[1])}</a>`;
+      html += renderTextWithUnlinkedWebsiteDomain(
+        source.slice(lastIndex, match.index),
+        websiteDomain
+      );
+      const labelDomain = normalizeWebsiteDomain(match[1]);
+      const hrefDomain = normalizeWebsiteDomain(match[2]);
+      html += websiteDomain && (labelDomain === websiteDomain || hrefDomain === websiteDomain)
+        ? renderUnlinkedWebsiteDomain(match[1])
+        : `<a href="${escapeHtmlAttribute(match[2])}" target="_blank" rel="noopener noreferrer" style="color:#0a66c2;text-decoration:underline;">${escapeHtml(match[1])}</a>`;
       lastIndex = (match.index || 0) + match[0].length;
     }
-    html += escapeHtml(source.slice(lastIndex));
+    html += renderTextWithUnlinkedWebsiteDomain(source.slice(lastIndex), websiteDomain);
     return html;
   }
 
@@ -1545,7 +1557,7 @@ function createMailboxService(deps = {}) {
     if (isMailboxImageVisibilityPsLine(cleanLine)) {
       return renderImageVisibilityPsHtmlLine(options.webdesignPreviewUrl);
     }
-    return renderInlineMarkdownLinks(line);
+    return renderInlineMarkdownLinks(line, options);
   }
 
   function mailboxImageExtension(contentType) {
@@ -1751,12 +1763,15 @@ function createMailboxService(deps = {}) {
         ? await prepareMailboxInlineWebdesignImages(images, matchedId)
         : [];
       const recipientText = applyMailboxRecipientLocationVariables(normalizedText, matchedRow || {});
-      if (!previewUrl && !inlineImages.length) return { text: recipientText, outboundIdentity };
+      const websiteDomain = getCustomerDomain(matchedRow || {});
+      const protectedRecipientText = protectWebsiteDomainInText(recipientText, websiteDomain);
+      if (!previewUrl && !inlineImages.length) return { text: protectedRecipientText, outboundIdentity };
 
       return {
-        text: recipientText,
+        text: protectedRecipientText,
         outboundIdentity,
         html: renderMailboxWebdesignHtml(recipientText, {
+          websiteDomain,
           webdesignPreviewUrl: previewUrl,
           inlineImages,
           optOutUrl: extractColdmailOptOutUrlFromText(rawText) || extractColdmailOptOutUrlFromText(recipientText),
