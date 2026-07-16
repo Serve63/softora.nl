@@ -67,21 +67,6 @@ test('websitevideo tooling blijft lokaal en expliciet startbaar', () => {
   assert.ok(packageJson.dependencies['ffprobe-static']);
 });
 
-test('mailboxverificatie blijft eigen lokale tooling zonder externe validator', () => {
-  const packageJson = JSON.parse(readRepoFile('package.json'));
-  const worker = readRepoFile('scripts/local-email-verification-worker.js');
-  const installer = readRepoFile('scripts/install-local-email-verifier.js');
-  const validator = readRepoFile('server/services/smtp-mailbox-validator.js');
-
-  assert.equal(packageJson.scripts['worker:email-verification'], 'node scripts/local-email-verification-worker.js');
-  assert.equal(packageJson.scripts['worker:email-verification:once'], 'node scripts/local-email-verification-worker.js --once');
-  assert.equal(packageJson.scripts['install:email-verification-worker'], 'node scripts/install-local-email-verifier.js');
-  assert.match(worker, /verifyMailbox/);
-  assert.match(installer, /nl\.softora\.mailbox-validator/);
-  assert.match(validator, /RCPT TO:/);
-  assert.doesNotMatch(validator, /\bDATA\b/);
-});
-
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
   const violations = buildGuardrailViolations({
     changedFiles: ['server.js', 'server/services/agenda-read.js'],

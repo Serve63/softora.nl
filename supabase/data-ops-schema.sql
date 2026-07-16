@@ -325,36 +325,6 @@ create index if not exists softora_outbound_recipient_guards_domain_idx
 create index if not exists softora_outbound_recipient_guards_updated_at_idx
   on public.softora_outbound_recipient_guards (updated_at desc);
 
-create table if not exists public.softora_email_verifications (
-  email text primary key,
-  domain text not null,
-  status text not null default 'pending'
-    check (status in ('pending', 'processing', 'valid', 'invalid', 'unknown')),
-  reason text not null default '',
-  smtp_code integer,
-  smtp_response text not null default '',
-  mx_host text not null default '',
-  catch_all boolean,
-  requested_at timestamptz not null default now(),
-  checked_at timestamptz,
-  valid_until timestamptz,
-  retry_after timestamptz,
-  attempt_count integer not null default 0 check (attempt_count >= 0),
-  source text not null default 'softora-self-hosted-smtp-v1',
-  payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index if not exists softora_email_verifications_status_requested_idx
-  on public.softora_email_verifications (status, requested_at);
-create index if not exists softora_email_verifications_valid_until_idx
-  on public.softora_email_verifications (valid_until)
-  where status = 'valid';
-create index if not exists softora_email_verifications_retry_after_idx
-  on public.softora_email_verifications (retry_after)
-  where status = 'unknown';
-
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'softora-design-photos',
@@ -393,29 +363,15 @@ alter table public.softora_company_website_videos enable row level security;
 alter table public.softora_mailbox_messages enable row level security;
 alter table public.softora_mailbox_sync_state enable row level security;
 alter table public.softora_outbound_recipient_guards enable row level security;
-alter table public.softora_email_verifications enable row level security;
-
-drop policy if exists softora_email_verifications_service_role_all
-  on public.softora_email_verifications;
-create policy softora_email_verifications_service_role_all
-  on public.softora_email_verifications
-  for all
-  to service_role
-  using (true)
-  with check (true);
 
 revoke all on table public.softora_outbound_recipient_guards from public;
 revoke all on table public.softora_outbound_recipient_guards from anon;
 revoke all on table public.softora_outbound_recipient_guards from authenticated;
-revoke all on table public.softora_email_verifications from public;
-revoke all on table public.softora_email_verifications from anon;
-revoke all on table public.softora_email_verifications from authenticated;
 
 grant select, insert, update, delete on public.softora_customer_identity_keys to service_role;
 grant select, insert, update, delete on public.softora_mailbox_messages to service_role;
 grant select, insert, update, delete on public.softora_mailbox_sync_state to service_role;
 grant select, insert, update, delete on public.softora_outbound_recipient_guards to service_role;
-grant select, insert, update, delete on public.softora_email_verifications to service_role;
 grant select, insert, update, delete on public.softora_company_website_videos to service_role;
 grant execute on function public.softora_queue_company_website_video(text, text, text, boolean) to service_role;
 grant execute on function public.softora_claim_company_website_video(text, integer) to service_role;
