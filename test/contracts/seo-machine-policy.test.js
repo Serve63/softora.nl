@@ -22,7 +22,7 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /Dagelijkse fallback-ladder/i);
   assert.match(policy, /bronvaste nieuws- of marktupdate/i);
   assert.match(policy, /100\.000 organische klikken per 28 dagen uiterlijk 31 december 2026/i);
-  assert.match(policy, /authority-spoor/i);
+  assert.match(policy, /Backlinks en off-site linkbuilding vallen volledig buiten deze automation/i);
   assert.match(qualityGates, /publieke SEO-groeiverbetering per succesvolle dagelijkse run/i);
 });
 
@@ -34,4 +34,5 @@ test('SEO machine quality gates keep daily publishing claim-safe and visual-comp
   assert.match(policy, /Publiceer geen synoniempagina, dunne city-swap/i);
   assert.match(qualityGates, /exact twee eigen, nuttige Softora-visuals/i);
   assert.match(qualityGates, /Geen stockfoto's/i);
+  assert.match(qualityGates, /Doe geen backlink-outreach/i);
 });

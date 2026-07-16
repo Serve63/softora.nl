@@ -35,7 +35,7 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Houd 5 tot 7 sterke publieke contentleveringen per week aan. Kwaliteitspoorten blijven hard; het tempo is geen toestemming voor dunne pagina's.
 - Houd minimaal 15 unieke, gescoorde kandidaatbriefs vooruit in de automation memory, verdeeld over de commerciële clusters.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
-- Voer binnen dezelfde automation een authority-spoor uit: controleer relevante verwijzende links, lokale/entity-citaties, partner- en leveranciersprofielen en bronwaardige contentkansen. Bereid outreach of profielcorrecties voor, maar voer geen externe publicatie, claim of bericht uit zonder de benodigde verificatie en toestemming.
+- Backlinks en off-site linkbuilding vallen volledig buiten deze automation. Doe geen backlinkanalyse als actielijn, outreach, gastblogs, directoryplaatsingen, partner-/leveranciersprofielen, linkruil of betaalde links. Natuurlijke interne links binnen `softora.nl` blijven wel onderdeel van iedere relevante publicatie.
 - Bereken vanaf het actuele 28-daagse klikniveau en de resterende tijd tot 31 december 2026 de vereiste samengestelde groeicurve. Vergelijk werkelijke voortgang met die curve zonder dagelijkse ruis als causaliteit te presenteren.
 
 ### Maandelijks
@@ -156,4 +156,4 @@ Een open technische of conversie-PR mag niet dagelijks de groeilevering vervange
 
 ## Menselijk Bewijs
 
-De automation mag een bewijsqueue maken voor echte cases, reviews, partnerships, lokale vermeldingen en leadkwaliteit. Publicatie of externe outreach vereist geverifieerde informatie en de normale goedkeuring; de automation verzint nooit klanten, resultaten, profielen, credentials of citaties.
+De automation mag een bewijsqueue maken voor echte cases, reviews, partnerships en leadkwaliteit die op Softora's eigen site bruikbaar zijn. De automation voert geen backlinkwerk of externe SEO-publicatie uit en verzint nooit klanten, resultaten, profielen, credentials of citaties.

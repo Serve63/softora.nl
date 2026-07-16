@@ -30,7 +30,7 @@ De standaard combineert tempo met harde kwaliteit:
 - Nieuwe publicaties krijgen pas groen licht als tekst, visuals, alt-tekst, interne links, CTA en E-E-A-T samen kloppen.
 - Blogs, kennisbank, vergelijkingen, unieke landingspagina's en bronvaste nieuwsupdates mogen allemaal bijdragen; de dagelijkse keuze volgt verwachte gekwalificeerde impact en clusterfit.
 - Een no-op is alleen geldig bij een gedocumenteerde P0, claim-/expertiserisico, onoplosbare cannibalisatie of externe merge/deployblokkade.
-- Dezelfde automation bewaakt wekelijks authority, entity-citaties en bronwaardige linkkansen; volume alleen is geen geloofwaardige route naar 100.000 organische klikken per 28 dagen op 31 december 2026.
+- Backlinks en off-site linkbuilding vallen buiten de automation; alle publieke groei komt uit on-site content, techniek, indexatie, interne links, structured data, UX, CRO, visuals en aantoonbare eigen trustsignalen.
 
 ## Werkwijze Voor Agents
 
@@ -38,6 +38,7 @@ De standaard combineert tempo met harde kwaliteit:
 - Raak homepage-content niet aan zonder expliciete toestemming.
 - Voeg geen willekeurige pagina's of tools toe zonder duidelijke SEO-reden.
 - Houd in de ene bestaande SEO-automation minimaal 15 gescoorde kandidaatbriefs vooruit, zodat zwakke dagelijkse GSC-data niet tot stilstand leidt.
+- Doe geen backlink-outreach, gastblogplaatsingen, directorylinks, linkruil of betaalde links.
 - Gebruik bestaande templates en secties.
 - Schrijf alleen over Softora-diensten die echt bestaan: websites, bedrijfssoftware, CRM, AI automatisering, chatbots, AI telefonie, Oisterwijk/Tilburg/regio en MKB leadopvolging.
 - Verboden zonder harde bron: "gegarandeerd nummer 1", vaste lead/omzetgaranties, "100% veilig", "hackvrij", "Google Partner", "ISO 27001", "marktleider", "grootste speler", verzonnen klantenaantallen, reviews, awards of gereguleerd medisch/juridisch/fiscaal/beleggingsadvies.
