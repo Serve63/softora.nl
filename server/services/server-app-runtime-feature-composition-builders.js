@@ -524,6 +524,22 @@ function buildServerAppFeatureWiringRuntimeContext({
         },
       },
       mailboxCronSecret: env.CRON_SECRET || '',
+      whoopHealth: {
+        fetchImpl: globalThis.fetch,
+        getSupabaseClient: platformRuntime.getSupabaseClient,
+        whoop: {
+          clientId: env.WHOOP_CLIENT_ID || '',
+          clientSecret: env.WHOOP_CLIENT_SECRET || '',
+          redirectUri: env.WHOOP_REDIRECT_URI || 'https://www.softora.nl/api/health/whoop/callback',
+          tokenEncryptionKey: env.WHOOP_TOKEN_ENCRYPTION_KEY || '',
+          timezone: env.WHOOP_TIMEZONE || 'Europe/Amsterdam',
+        },
+        googleSheet: {
+          clientEmail: envConfig.GOOGLE_CALENDAR_CLIENT_EMAIL,
+          privateKey: envConfig.GOOGLE_CALENDAR_PRIVATE_KEY,
+          spreadsheetId: env.GOOGLE_HEALTH_SHEET_ID || '',
+        },
+      },
       kvkDatabaseSnapshot: {
         fetchSupabaseRowByKeyViaRest: platformRuntime.fetchSupabaseRowByKeyViaRest,
         upsertSupabaseRowViaRest: platformRuntime.upsertSupabaseRowViaRest,

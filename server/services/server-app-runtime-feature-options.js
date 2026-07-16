@@ -223,6 +223,7 @@ function buildFeatureRoutesOptions({
   seoReadCoordinator,
   seoWriteCoordinator,
   kvkDatabaseSnapshot,
+  whoopHealth,
   getUiStateValues,
   setUiStateValues,
 }) {
@@ -255,6 +256,7 @@ function buildFeatureRoutesOptions({
     seoReadCoordinator,
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
+    whoopHealth,
     getUiStateValues,
     setUiStateValues,
   };
