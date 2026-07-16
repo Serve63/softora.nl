@@ -26,7 +26,8 @@
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
-    { id: '2030', title: '2030?' }
+    { id: '2030', title: '2030?' },
+    { id: 'oktober-2024', title: 'Oktober 2024…' }
   ];
   const DEFAULT_CARD_ORDER = CARD_CATALOG.map((card) => card.id);
 

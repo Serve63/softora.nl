@@ -9,7 +9,8 @@ const endGameCardFiles = [
   'eigen-automaat-rijden.png', 'eigen-cinema.png', 'eigen-kantoor.png', 'eigen-koophuis-kopen.png',
   'gewenst-lang-kapsel.png', 'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png',
   'gezondheidscenter.png', 'haartransplantatie.png', 'kantoorpand-in-haaren.png',
-  'ketting-armband.png', 'leuke-vriendin.png', 'nieuwe-whoop.png', 'prp-behandeling.png',
+  'ketting-armband.png', 'leuke-vriendin.png', 'nieuwe-whoop.png', 'oktober-2024.png',
+  'prp-behandeling.png',
   'ruben-zet-toto.png', 'rubens-company.png', 'rubens-trading-system.png',
   'serves-gezondheidsdossier.png', 'tanden-rechtzetten.png', 'tandenbleek-voorraad.png',
   'transfermarkt.png', 'vijf-kilo-spiermassa.png', 'world-watcher.png'
@@ -254,12 +255,13 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /title:\s*'Ruben’s Trading System'/);
   assert.match(endGameCardsJs, /title:\s*'Gewenste kledingkast'/);
   assert.match(endGameCardsJs, /\{ id: '2030', title: '2030\?' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…' \}/);
   [
     'Tanden rechtzetten', 'Black Gel voorraad', 'Tandenbleek voorraad', 'Gezichtsbeharing naar wens',
     'Bestaanszekerheid bedrijf', 'Eigen koophuis kopen', 'Leuke vriendin', 'Eigen Cinema',
     'Eigen kantoor', 'Kantoorpand in Haaren', 'Nieuwe Whoop', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'Ruben zet toto', 'world watcher', 'Transfermarkt',
-    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast', '2030?'
+    'Ruben’s Company', 'Ruben’s Trading System', 'Gewenst lang kapsel', 'Gewenste kledingkast', '2030?', 'Oktober 2024…'
   ].forEach((title) => assert.equal(endGameCardsJs.includes(title), true, `missing card title: ${title}`));
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'toggle-complete'/);
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'remove'/);
