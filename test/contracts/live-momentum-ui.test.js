@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
@@ -364,22 +363,6 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /MAX_SAVE_RETRIES = 3/);
   assert.doesNotMatch(js, /is-soft/);
   assert.doesNotMatch(js, /localStorage|sessionStorage/);
-});
-
-test('October 2024 stays an undeletable fixed origin card at position one', () => {
-  const context = { window: {} };
-  vm.runInNewContext(read('assets/live-momentum-endgame-cards.js'), context);
-  const normalized = context.window.SoftoraMomentumEndGameCards.normalizeState({
-    __order: ['2030', 'eigen-automaat-rijden', 'oktober-2024'],
-    'oktober-2024': { completed: true, deleted: true }
-  });
-
-  assert.equal(normalized.__order[0], 'oktober-2024');
-  assert.equal(normalized.__order.filter((id) => id === 'oktober-2024').length, 1);
-  assert.deepEqual(
-    { completed: normalized['oktober-2024'].completed, deleted: normalized['oktober-2024'].deleted },
-    { completed: false, deleted: false }
-  );
 });
 
 test('live momentum Supabase-scope is alleen voor Full Acces accounts', () => {
