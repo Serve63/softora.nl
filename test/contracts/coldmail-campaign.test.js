@@ -360,6 +360,13 @@ function createService(overrides = {}) {
           },
         };
       }
+      if (scope === 'premium_coldmail_stats_cache' && Object.prototype.hasOwnProperty.call(overrides, 'coldmailStatsCacheRaw')) {
+        return {
+          values: {
+            softora_coldmail_stats_cache_v1: overrides.coldmailStatsCacheRaw,
+          },
+        };
+      }
       if (scope === 'premium_coldmail_send_guard') {
         if (sendGuardReadStates && sendGuardReadStates.length) {
           return {
@@ -743,7 +750,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
           sender_email: 'mailer-daemon@example.test',
           subject: 'Returned Mail: Kleine vraag over jullie website',
           preview: '*** MAIL DELIVERY FAILURE REPORT ***',
-          body_text: 'Diagnostic-Code: smtp; 5.1.1 user unknown',
+          body_text: 'Final-Recipient: rfc822; ruben@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
           date: '2026-04-24T09:20:00.000Z',
         },
         {
@@ -756,7 +763,7 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
           sender_email: 'postmaster@example.test',
           subject: 'Warning: could not send message for past 1 hour',
           preview: 'Delivery is delayed and we will keep trying.',
-          body_text: 'Temporary failure, 4.2.0 mailbox unavailable.',
+          body_text: 'Final-Recipient: rfc822; guard-only@example.test\nTemporary failure, 4.2.0 mailbox unavailable.',
           date: '2026-04-24T10:20:00.000Z',
         },
         {
@@ -894,23 +901,30 @@ test('coldmail live stats count real sends from the guard and Softora/Gmail data
   assert.equal(result.stats.legacySystemSentToday, 3);
   assert.equal(result.stats.activeCampaignTotal, 1);
   assert.equal(result.stats.interestedTotal, 1);
-  assert.equal(result.stats.bounces, 4);
-  assert.equal(result.stats.totalBounces, 4);
-  assert.equal(result.stats.bounceStatsSource, 'mailbox-index');
+  assert.equal(result.stats.bounces, 6);
+  assert.equal(result.stats.totalBounces, 6);
+  assert.equal(result.stats.bounceStatsSource, 'recipient-deduplicated');
+  assert.equal(result.stats.bounceStatsReliable, true);
+  assert.equal(result.stats.bounceDeduplication, 'recipient-email');
   assert.equal(result.stats.databaseBounces, 4);
   assert.equal(result.stats.databaseBouncesToday, 1);
-  assert.equal(result.stats.mailboxBounces, 3);
-  assert.equal(result.stats.bounceTypes.hard, 1);
-  assert.equal(result.stats.bounceTypes.soft, 2);
+  assert.equal(result.stats.mailboxBounces, 2);
+  assert.equal(result.stats.mailboxBounceMessages, 3);
+  assert.equal(result.stats.mailboxBounceMatchedMessages, 2);
+  assert.equal(result.stats.mailboxBounceUnresolvedMessages, 1);
+  assert.equal(result.stats.mailboxBounceDuplicateNotices, 0);
+  assert.equal(result.stats.bounceTypes.hard, 2);
+  assert.equal(result.stats.bounceTypes.soft, 3);
   assert.equal(result.stats.bounceTypes.instantly, 1);
-  assert.equal(result.stats.bouncesToday, 2);
-  assert.equal(result.stats.todayBounces, 2);
+  assert.equal(result.stats.bouncesToday, 3);
+  assert.equal(result.stats.todayBounces, 3);
   assert.equal(result.stats.mailboxBouncesToday, 2);
-  assert.equal(result.stats.bounceTypesToday.hard, 1);
+  assert.equal(result.stats.bounceTypesToday.hard, 2);
   assert.equal(result.stats.bounceTypesToday.soft, 1);
-  assert.deepEqual(result.stats.bounceItemsToday.map((item) => [item.accountEmail, item.type]), [
-    ['servecreusen@softora.nl', 'soft'],
-    ['serve@softora.nl', 'hard'],
+  assert.deepEqual(result.stats.bounceItemsToday.map((item) => [item.email, item.type]), [
+    ['guard-only@example.test', 'soft'],
+    ['ruben@example.test', 'hard'],
+    ['bounce-vandaag@example.test', 'hard'],
   ]);
   assert.equal(result.stats.conversionRate, 33);
   assert.equal(result.stats.lastSuccessfulSendAt, '2026-04-24T08:00:00.000Z');
@@ -971,7 +985,15 @@ test('coldmail live stats preserve proven bounces when the targeted mailbox read
     now: () => new Date(clockMs),
     outboundRecipientGuardStore: {
       async listSentRecipientGroups() {
-        return [];
+        return [{
+          reservation_id: 'sent-bounced-recipient',
+          recipient_email: 'bounced@example.test',
+          sender_email: 'serve@softora.nl',
+          provider: 'softora',
+          channel: 'coldmail',
+          source: 'softora-coldmail-pre-send',
+          updated_at: '2026-04-23T08:00:00.000Z',
+        }];
       },
     },
     dataOpsStore: {
@@ -983,6 +1005,7 @@ test('coldmail live stats preserve proven bounces when the targeted mailbox read
           folder: 'inbox',
           sender_email: 'mailer-daemon@softora.nl',
           subject: 'Returned Mail: Kleine vraag over jullie website',
+          body_text: 'Final-Recipient: rfc822; bounced@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
           date: '2026-04-23T09:00:00.000Z',
         }];
       },
@@ -1003,6 +1026,52 @@ test('coldmail live stats preserve proven bounces when the targeted mailbox read
   assert.equal(preserved.stats.reliable, true);
   assert.equal(preserved.stats.bounces, 1);
   assert.equal(preserved.stats.mailboxBounceStatsAvailable, true);
+});
+
+test('coldmail live stats ignore the legacy message-count bounce cache', async () => {
+  const { service } = createService({
+    coldmailStatsCacheRaw: JSON.stringify({
+      ok: true,
+      stats: {
+        reliable: true,
+        dateKey: '2026-04-24',
+        updatedAt: '2026-04-24T11:59:00.000Z',
+        totalSent: 40,
+        totalBounces: 40,
+      },
+    }),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups() {
+        return [{
+          reservation_id: 'sent-current-recipient',
+          recipient_email: 'current@example.test',
+          sender_email: 'serve@softora.nl',
+          provider: 'softora',
+          channel: 'coldmail',
+          source: 'softora-coldmail-pre-send',
+          updated_at: '2026-04-24T08:00:00.000Z',
+        }];
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages() {
+        return [{
+          account_email: 'serve@softora.nl',
+          folder: 'inbox',
+          sender_email: 'mailer-daemon@example.test',
+          subject: 'Returned Mail: Kleine vraag over jullie website',
+          body_text: 'Mail delivery to the following recipient has finally failed:\ncurrent@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
+          date: '2026-04-24T09:00:00.000Z',
+        }];
+      },
+    },
+  });
+
+  const result = await service.getColdmailLiveStats();
+
+  assert.equal(result.stats.totalBounces, 1);
+  assert.equal(result.stats.bounceDeduplication, 'recipient-email');
+  assert.equal(result.stats.bounceStatsReliable, true);
 });
 
 test('coldmail live stats requests only targeted mailbox bounce candidates', async () => {

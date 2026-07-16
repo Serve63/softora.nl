@@ -1121,7 +1121,7 @@ function createSoftoraDataOpsStore(deps = {}) {
 
     return cachedRead(cacheKey, async () => {
       const selectedColumns = bounceCandidatesOnly
-        ? 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,deleted_at'
+        ? 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,deleted_at'
         : 'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,payload,deleted_at';
       const loadRows = (accountEmail = '') => run('list-mailbox-messages', (client) => {
         let query = client
