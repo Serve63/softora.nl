@@ -502,6 +502,13 @@ button {
   font-weight: 500;
   white-space: nowrap;
 }
+.habit-name.is-dragging {
+  opacity: .42;
+}
+.habit-name.is-drop-target {
+  background: rgba(46, 204, 113, .1);
+  box-shadow: inset 3px 0 0 var(--good);
+}
 .add-goal {
   display: inline-block;
   flex: 0 0 auto;
@@ -535,6 +542,38 @@ button {
   stroke-linecap: round;
   stroke-linejoin: round;
   flex: 0 0 auto;
+}
+.goal-drag-handle {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 28px;
+  padding: 3px;
+  margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-soft);
+  cursor: grab;
+  touch-action: none;
+}
+.goal-drag-handle:hover {
+  color: var(--ink);
+  background: rgba(26, 26, 46, .06);
+}
+.goal-drag-handle:active {
+  cursor: grabbing;
+}
+.goal-drag-handle:focus-visible {
+  outline: 2px solid var(--good-dark);
+  outline-offset: 2px;
+}
+.goal-drag-handle svg {
+  width: 16px;
+  height: 20px;
+  fill: currentColor;
+  stroke: none;
 }
 .goal-icon-button {
   display: inline-grid;
@@ -730,6 +769,7 @@ button {
 }
 .habit-label {
   display: inline-block;
+  flex: 1 1 auto;
   min-width: 42px;
   max-width: 100%;
   padding: 2px 3px;
