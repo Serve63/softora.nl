@@ -81,7 +81,7 @@ test('Google health sheet service replaces the five managed data ranges', async 
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push({ url: String(url), options });
-    if (String(url).includes('oauth2.googleapis.com')) {
+    if (new URL(String(url)).hostname === 'oauth2.googleapis.com') {
       return { ok: true, status: 200, json: async () => ({ access_token: 'google-token', expires_in: 3600 }) };
     }
     return { ok: true, status: 200, json: async () => ({}) };
