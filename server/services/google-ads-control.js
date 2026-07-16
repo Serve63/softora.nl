@@ -2,6 +2,7 @@ const GOOGLE_ADS_SCOPE = 'premium_google_ads';
 const MACHINE_STATE_KEY = 'softora_google_ads_machine_v1';
 const CONVERSION_LEDGER_KEY = 'softora_google_ads_conversion_ledger_v1';
 const MAX_CONVERSION_EVENTS = 250;
+const { buildGoogleAdsEditorAssetsCsv, buildGoogleAdsLaunchPack } = require('./google-ads-launch-pack');
 
 const CAMPAIGN_BLUEPRINT = Object.freeze([
   {
@@ -124,9 +125,11 @@ function createGoogleAdsControlService(deps = {}) {
     return true;
   }
 
-  function buildReadiness(configuration, conversionCount) {
+  function buildReadiness(configuration, conversionCount, launchPack) {
     return [
       { id: 'blueprint', label: 'Zoekcampagnes en uitsluitingen', ready: true },
+      { id: 'launch-pack', label: 'Advertentieteksten, keywords en assets gevalideerd', ready: launchPack.validation.valid },
+      { id: 'landing-pages', label: 'Alle landingspagina-preflights groen', ready: launchPack.validation.landingPagesReady === launchPack.validation.landingPagesTotal },
       { id: 'cost-lock', label: 'Uitgaven en externe mutaties geblokkeerd', ready: true },
       { id: 'first-party', label: 'First-party conversieregistratie', ready: true },
       { id: 'account', label: 'Google Ads-account gekoppeld', ready: configuration.accountConfigured },
@@ -143,7 +146,8 @@ function createGoogleAdsControlService(deps = {}) {
     const conversions = Array.isArray(state[CONVERSION_LEDGER_KEY])
       ? state[CONVERSION_LEDGER_KEY]
       : [];
-    const readiness = buildReadiness(configuration, conversions.length);
+    const launchPack = buildGoogleAdsLaunchPack();
+    const readiness = buildReadiness(configuration, conversions.length, launchPack);
     return {
       mode: 'dry-run',
       spendEnabled: false,
@@ -157,6 +161,7 @@ function createGoogleAdsControlService(deps = {}) {
       readinessReady: readiness.filter((item) => item.ready).length,
       readinessTotal: readiness.length,
       lastRun: state[MACHINE_STATE_KEY]?.lastRun || null,
+      launchPackValid: launchPack.validation.valid,
     };
   }
 
@@ -206,7 +211,15 @@ function createGoogleAdsControlService(deps = {}) {
     };
   }
 
-  return { getBlueprint, getStatus, recordConversion, runDryRun, sanitizeAttribution };
+  function getLaunchPack() {
+    return buildGoogleAdsLaunchPack();
+  }
+
+  function getEditorAssetsCsv() {
+    return buildGoogleAdsEditorAssetsCsv(getLaunchPack());
+  }
+
+  return { getBlueprint, getEditorAssetsCsv, getLaunchPack, getStatus, recordConversion, runDryRun, sanitizeAttribution };
 }
 
 module.exports = {

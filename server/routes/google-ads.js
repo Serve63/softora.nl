@@ -40,6 +40,25 @@ function registerGoogleAdsRoutes(app, deps = {}) {
     return res.json({ ok: true, ...service.getBlueprint() });
   });
 
+  app.get('/api/google-ads/launch-pack', requireAdmin, (_req, res) => {
+    try {
+      return res.json({ ok: true, ...service.getLaunchPack() });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 300) });
+    }
+  });
+
+  app.get('/api/google-ads/editor-assets.csv', requireAdmin, (_req, res) => {
+    try {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="softora-google-ads-editor-assets.csv"');
+      res.setHeader('Cache-Control', 'no-store, private');
+      return res.status(200).send(service.getEditorAssetsCsv());
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 300) });
+    }
+  });
+
   app.post('/api/google-ads/dry-run', requireAdmin, async (_req, res) => {
     try {
       return res.json({ ok: true, result: await service.runDryRun() });
