@@ -1782,7 +1782,7 @@ test('coldmail autopilot disable toggle keeps sender configuration and live sche
     },
   });
 
-  await service.updateColdmailAutopilotSettings({
+  const result = await service.updateColdmailAutopilotSettings({
     enabled: false,
     config: {
       senderEmails: [],
@@ -1802,6 +1802,8 @@ test('coldmail autopilot disable toggle keeps sender configuration and live sche
   }, 'Dashboard toggle');
 
   const state = getAutopilotState();
+  assert.equal(result.persistenceConfirmed, true);
+  assert.equal(result.autopilot.enabled, false);
   assert.equal(state.enabled, false);
   assert.deepEqual(state.config.senderEmails, ['serve@softora.nl', 'martijn@softora.nl']);
   assert.deepEqual(Object.keys(state.config.senderProfiles), ['serve@softora.nl', 'martijn@softora.nl']);
@@ -1812,6 +1814,39 @@ test('coldmail autopilot disable toggle keeps sender configuration and live sche
   assert.equal(state.schedule.senderMaxIntervalMinutes, 82);
   assert.equal(state.schedule.sendJitterMinSeconds, 45);
   assert.equal(state.schedule.sendJitterMaxSeconds, 240);
+});
+
+test('coldmail autopilot toggle fails closed when Supabase does not confirm the write', async () => {
+  const { service } = createService({
+    autopilotState: {
+      enabled: true,
+      updatedAt: '2026-04-24T11:59:00.000Z',
+      updatedBy: 'Dashboard toggle',
+    },
+    onSetUiStateValues: ({ scope }) => scope === 'premium_coldmail_autopilot' ? null : undefined,
+  });
+
+  await assert.rejects(
+    service.updateColdmailAutopilotSettings({ enabled: false }, 'Dashboard toggle'),
+    (error) => error && error.code === 'COLDMAIL_AUTOPILOT_STATE_PERSIST_FAILED'
+  );
+});
+
+test('coldmail autopilot toggle rejects a stale read-back instead of claiming success', async () => {
+  const enabledState = {
+    enabled: true,
+    updatedAt: '2026-04-24T11:59:00.000Z',
+    updatedBy: 'Dashboard toggle',
+  };
+  const { service } = createService({
+    autopilotState: enabledState,
+    autopilotReadStates: [enabledState, enabledState],
+  });
+
+  await assert.rejects(
+    service.updateColdmailAutopilotSettings({ enabled: false }, 'Dashboard toggle'),
+    (error) => error && error.code === 'COLDMAIL_AUTOPILOT_STATE_CONFIRM_FAILED'
+  );
 });
 
 test('coldmail autopilot compacts oversized run details before saving state', async () => {

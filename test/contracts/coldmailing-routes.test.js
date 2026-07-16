@@ -566,7 +566,7 @@ test('coldmailing autopilot status route is visible to authenticated staff witho
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.autopilot.enabled, true);
-  assert.equal(res.headers['cache-control'], 'private, max-age=30, stale-while-revalidate=60');
+  assert.equal(res.headers['cache-control'], 'no-store, private');
   assert.equal(premiumAccessCalls, 1);
   assert.equal(adminAccessCalls, 0);
 });
@@ -622,7 +622,7 @@ test('coldmailing autopilot settings route stores dashboard configuration throug
       getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: false } }),
       updateColdmailAutopilotSettings: async (payload, actor) => {
         received = { payload, actor };
-        return { ok: true, autopilot: { enabled: payload.enabled } };
+        return { ok: true, persistenceConfirmed: true, autopilot: { enabled: payload.enabled } };
       },
     },
     normalizeString: (value) => String(value || '').trim(),
@@ -637,6 +637,7 @@ test('coldmailing autopilot settings route stores dashboard configuration throug
   });
 
   assert.equal(res.statusCode, 200);
+  assert.equal(res.body.persistenceConfirmed, true);
   assert.equal(res.body.autopilot.enabled, true);
   assert.equal(received.actor, 'Servé');
   assert.deepEqual(received.payload.config.senderEmails, ['serve@softora.nl', 'martijn@softora.nl']);

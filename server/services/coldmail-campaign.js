@@ -4912,7 +4912,7 @@ function createColdmailCampaignService(deps = {}) {
 
   async function saveColdmailAutopilotState(state, actor = 'coldmail-autopilot') {
     const { normalized, payload } = buildColdmailAutopilotStateStoragePayload(state);
-    await setUiStateValues(
+    const persisted = await setUiStateValues(
       coldmailAutopilotScope,
       {
         [coldmailAutopilotKey]: payload,
@@ -4922,6 +4922,13 @@ function createColdmailCampaignService(deps = {}) {
         actor,
       }
     );
+    if (!persisted) {
+      const error = new Error(
+        'Autopilotstand kon niet duurzaam in Supabase worden opgeslagen. De knopstatus is niet gewijzigd.'
+      );
+      error.code = 'COLDMAIL_AUTOPILOT_STATE_PERSIST_FAILED';
+      throw error;
+    }
     return normalized;
   }
 
@@ -5050,13 +5057,27 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
     const saved = await saveColdmailAutopilotState(nextState, actor);
+    const confirmedRecord = await loadColdmailAutopilotStateRecord();
+    const persistenceConfirmed = Boolean(
+      confirmedRecord.hasValue &&
+      confirmedRecord.state.enabled === saved.enabled &&
+      confirmedRecord.state.updatedAt === saved.updatedAt
+    );
+    if (!persistenceConfirmed) {
+      const error = new Error(
+        'Autopilotstand kon na opslaan niet vanuit Supabase worden bevestigd. De knop toont daarom geen nieuwe stand.'
+      );
+      error.code = 'COLDMAIL_AUTOPILOT_STATE_CONFIRM_FAILED';
+      throw error;
+    }
     const sendGuardState = await loadColdmailSendGuardState().catch((error) => {
       logger.warn('[ColdmailAutopilot][today-sends]', error && error.message ? error.message : error);
       return null;
     });
     return {
       ok: true,
-      autopilot: summarizeColdmailAutopilotState(saved, sendGuardState),
+      persistenceConfirmed: true,
+      autopilot: summarizeColdmailAutopilotState(confirmedRecord.state, sendGuardState),
     };
   }
 

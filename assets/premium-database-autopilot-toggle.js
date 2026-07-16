@@ -122,7 +122,7 @@
         const requestOptions = Object.assign({
             credentials: "same-origin",
             headers: { Accept: "application/json" },
-            cache: "default",
+            cache: "no-store",
         }, options || {});
         const response = await fetchImpl(url, requestOptions);
         const payload = await response.json().catch(function () { return null; });
@@ -158,14 +158,18 @@
         busy = true;
         render();
         try {
-            await requestJson(SETTINGS_URL, {
+            const payload = await requestJson(SETTINGS_URL, {
                 method: "POST",
                 headers: {
                     Accept: "application/json",
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ enabled: nextEnabled }),
-            }).then(applyStatusPayload);
+            });
+            if (payload.persistenceConfirmed !== true || !payload.autopilot || payload.autopilot.enabled !== nextEnabled) {
+                throw new Error("Autopilotstand is niet duurzaam bevestigd. De vorige stand blijft zichtbaar.");
+            }
+            applyStatusPayload(payload);
             showToast(nextEnabled ? "Autopilot staat aan." : "Autopilot staat uit.");
         } catch (error) {
             showToast(error && error.message ? error.message : "Autopilot kon niet worden opgeslagen.");
