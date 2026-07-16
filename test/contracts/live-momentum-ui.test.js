@@ -16,7 +16,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716o"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260716p"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -30,7 +30,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.doesNotMatch(html, /data-live-momentum-sidebar-host/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">\s*<div class="momentum-art-quotes" aria-hidden="true">/);
   assert.match(html, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
-  assert.match(html, /Juli 2026 .* gestart op 13 juli/);
+  assert.match(html, /<p>Back on Track<\/p>/);
+  assert.doesNotMatch(html, /Juli 2026 .* gestart op 13 juli/);
   assert.doesNotMatch(html, /today-score|score-label|Score vandaag/);
   assert.doesNotMatch(html, /score-points|100 \/ 100|punten<\/span>/);
   assert.match(html, /<div class="bar-chart" aria-hidden="true"><\/div>/);
@@ -52,8 +53,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<span class="momentum-art-quote is-end-game">The end game is to win<\/span>/);
   assert.match(html, /<span class="momentum-art-quote is-attack">Attack, attack, attack<\/span>/);
   assert.doesNotMatch(html, /Sleeping is for losers|is-sleeping/i);
-  assert.match(html, /<span class="momentum-art-quote is-winners">In life there are winners and losers<\/span>/);
-  assert.match(html, /<span class="momentum-art-quote is-old-days">Nog een rondje voor die oude dagen<\/span>/);
+  assert.doesNotMatch(html, /In life there are winners and losers|is-winners/i);
+  assert.doesNotMatch(html, /Nog een rondje voor die oude dagen|is-old-days/i);
   assert.match(html, /<span class="momentum-watermark">[\s\S]*Never[\s\S]*Ever[\s\S]*Quit[\s\S]*<\/span>/);
   assert.match(html, /13 juli is vandaag/);
   assert.doesNotMatch(html, /laatste 30 dagen/);
@@ -118,6 +119,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.momentum-art-quotes\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*0;[\s\S]*inset:\s*0;[\s\S]*pointer-events:\s*none;/);
   assert.match(css, /\.momentum-art-quote\s*\{[\s\S]*position:\s*absolute;[\s\S]*color:\s*transparent;[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*\-webkit-text-stroke:\s*1px rgba\(26, 26, 46, \.07\);/);
   assert.doesNotMatch(css, /is-sleeping/);
+  assert.doesNotMatch(css, /is-winners|is-old-days/);
   assert.match(css, /\.momentum-watermark\s*\{[\s\S]*pointer-events:\s*none;/);
   assert.match(css, /\.momentum-watermark\s*\{[\s\S]*\-webkit-text-stroke:\s*1px rgba\(26, 26, 46, \.075\);/);
   assert.match(css, /\.momentum-watermark span:last-child\s*\{[\s\S]*rgba\(35, 159, 88, \.045\)/);
