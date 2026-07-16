@@ -198,6 +198,7 @@ button {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
+  scroll-padding-inline-start: 3rem;
   scroll-snap-type: x proximity;
   scrollbar-color: rgba(26, 26, 46, .18) transparent;
   scrollbar-width: thin;
@@ -726,6 +727,7 @@ button {
     margin-left: -18px;
     padding-right: 18px;
     padding-left: 18px;
+    scroll-padding-inline-start: 18px;
   }
 }
 @media (max-width: 780px) {
@@ -783,6 +785,7 @@ button {
     margin-left: -12px;
     padding-right: 12px;
     padding-left: 12px;
+    scroll-padding-inline-start: 12px;
   }
   .end-game-goal-card {
     flex-basis: 180px;
