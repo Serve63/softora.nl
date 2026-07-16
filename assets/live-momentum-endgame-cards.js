@@ -27,16 +27,25 @@
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' }
   ];
+  const DEFAULT_CARD_ORDER = CARD_CATALOG.map((card) => card.id);
+
+  function normalizeOrder(value) {
+    const validIds = new Set(DEFAULT_CARD_ORDER);
+    const order = Array.from(new Set((Array.isArray(value) ? value : []).filter((id) => validIds.has(id))));
+    return order.concat(DEFAULT_CARD_ORDER.filter((id) => !order.includes(id)));
+  }
 
   function normalizeCardState(value) {
     return { completed: value?.completed === true, deleted: value?.deleted === true };
   }
 
   function normalizeState(value, legacyMissionState) {
-    return Object.fromEntries(CARD_CATALOG.map((card, index) => [
+    const normalized = Object.fromEntries(CARD_CATALOG.map((card, index) => [
       card.id,
       normalizeCardState(index === 0 && !value?.[card.id] ? legacyMissionState : value?.[card.id])
     ]));
+    normalized.__order = normalizeOrder(value?.__order);
+    return normalized;
   }
 
   function createTargetIcon() {
@@ -121,8 +130,8 @@
     article.setAttribute('aria-haspopup', 'menu');
     article.setAttribute('aria-expanded', 'false');
     article.setAttribute('aria-label', state.completed
-      ? `Missie: ${card.title}, afgerond. Klik voor acties.`
-      : `Missie: ${card.title}. Klik voor acties.`);
+      ? `Missie: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
+      : `Missie: ${card.title}. Sleep om te verplaatsen of klik voor acties.`);
     article.classList.toggle('is-completed', state.completed);
     article.append(createCardArtwork(card));
     article.append(createCompletionOverlay(), createActions(card, state.completed));
@@ -131,11 +140,24 @@
 
   function createController({ track, isReady, onStateChange }) {
     let state = normalizeState();
+    const interactions = window.SoftoraMomentumEndGameInteractions?.createController({
+      track,
+      scrollContainer: track.closest('.end-game-goals'),
+      isReady,
+      onOrderChange(visibleOrder) {
+        const visibleIds = new Set(visibleOrder);
+        const hiddenOrder = state.__order.filter((id) => !visibleIds.has(id));
+        state = { ...state, __order: normalizeOrder(visibleOrder.concat(hiddenOrder)) };
+        onStateChange();
+      }
+    });
 
     function render(value = state) {
       state = normalizeState(value);
       const fragment = document.createDocumentFragment();
-      CARD_CATALOG.forEach((card) => {
+      state.__order.forEach((cardId) => {
+        const card = CARD_CATALOG.find((item) => item.id === cardId);
+        if (!card) return;
         if (!state[card.id].deleted) fragment.append(createCard(card, state[card.id]));
       });
       track.replaceChildren(fragment);
@@ -174,6 +196,10 @@
     }
 
     track.addEventListener('click', (event) => {
+      if (interactions?.shouldSuppressClick()) {
+        event.preventDefault();
+        return;
+      }
       const action = event.target.closest('[data-end-game-card-action]');
       const cardElement = event.target.closest('[data-end-game-card-id]');
       const cardId = cardElement?.dataset.endGameCardId;
@@ -218,8 +244,11 @@
 
     return {
       getLegacyMissionState: () => ({ ...state[CARD_CATALOG[0].id] }),
-      getState: () => Object.fromEntries(Object.entries(state).map(([id, value]) => [id, { ...value }])),
-      needsMigration: (value) => !value || typeof value !== 'object',
+      getState: () => ({
+        ...Object.fromEntries(CARD_CATALOG.map((card) => [card.id, { ...state[card.id] }])),
+        __order: [...state.__order]
+      }),
+      needsMigration: (value) => !value || typeof value !== 'object' || !Array.isArray(value.__order),
       normalize: normalizeState,
       render
     };
