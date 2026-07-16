@@ -37,6 +37,10 @@ const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops')
 const { registerSeoReadRoutes } = require('../routes/seo-read');
 const { registerSeoWriteRoutes } = require('../routes/seo-write');
 const {
+  registerWhoopHealthProtectedRoutes,
+  registerWhoopHealthPublicRoutes,
+} = require('../routes/whoop-health');
+const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
 const {
@@ -53,6 +57,8 @@ const { createPremiumRouteRuntime } = require('./premium-route-runtime');
 const {
   createCompanyWebsiteVideoCoordinator,
 } = require('./company-website-video');
+const { createGoogleHealthSheetService } = require('./google-health-sheet');
+const { createWhoopHealthService } = require('./whoop-health');
 
 function registerFeatureRoutes(app, deps = {}) {
   const {
@@ -83,6 +89,7 @@ function registerFeatureRoutes(app, deps = {}) {
     seoReadCoordinator,
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
+    whoopHealth = {},
   } = deps;
   const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
     dataOpsStore: deps.dataOpsStore,
@@ -119,6 +126,16 @@ function registerFeatureRoutes(app, deps = {}) {
     dataOpsStore: deps.dataOpsStore,
     logger: deps.logger || console,
   });
+  const googleHealthSheetService = createGoogleHealthSheetService({
+    config: whoopHealth.googleSheet,
+    fetchImpl: whoopHealth.fetchImpl,
+  });
+  const whoopHealthService = createWhoopHealthService({
+    config: whoopHealth.whoop,
+    fetchImpl: whoopHealth.fetchImpl,
+    getSupabaseClient: whoopHealth.getSupabaseClient,
+    sheetService: googleHealthSheetService,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -132,9 +149,19 @@ function registerFeatureRoutes(app, deps = {}) {
     ...(supabaseMaintenance || {}),
   });
 
+  registerWhoopHealthPublicRoutes(app, {
+    service: whoopHealthService,
+    cronSecret: mailboxCronSecret,
+  });
+
   createPremiumRouteRuntime({
     app,
     ...premiumRouteRuntime,
+  });
+
+  registerWhoopHealthProtectedRoutes(app, {
+    service: whoopHealthService,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
 
   registerColdcallingRoutes(app, {
