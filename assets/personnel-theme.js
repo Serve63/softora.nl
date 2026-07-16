@@ -498,7 +498,7 @@
             if (hashRaw === "pinterest") return "ads_pinterest";
             if (hashRaw === "linkedin") return "ads_linkedin";
             if (hashRaw === "twitter") return "ads_twitter";
-            return "ads_pinterest";
+            return "ads_google";
         }
         if (p.indexOf("/premium-socialmedia") === 0) {
             if (hashRaw === "instagram") return "social_instagram";
@@ -583,7 +583,6 @@
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "leads", "coldcalling", "qr_code",
-        "ads_google",
         "ads_facebook",
         "ads_linkedin",
         "ads_pinterest",
