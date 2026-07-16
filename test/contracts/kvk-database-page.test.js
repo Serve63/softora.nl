@@ -68,8 +68,11 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
 test('kvk database collapse state survives a refresh', () => {
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
 
-  assert.match(scriptSource, /kvkCollapsedPanels/);
-  assert.match(scriptSource, /history\.replaceState/);
+  assert.match(scriptSource, /function collapsedPanelsHistory\(\)/);
+  assert.match(scriptSource, /window\.parent!==window&&window\.parent\.history/);
+  assert.match(scriptSource, /collapsedPanelsHistory\(\)/);
+  assert.match(scriptSource, /\.replaceState\(/);
+  assert.doesNotMatch(scriptSource, /localStorage|sessionStorage/);
   assert.doesNotMatch(scriptSource, /function saveCollapsedPanels\(\)\{\}/);
 });
 
