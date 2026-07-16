@@ -112,15 +112,49 @@ button {
 .chart-scale span:nth-child(4) { top: 75%; }
 .chart-scale span:nth-child(5) { top: 100%; }
 .bar-chart {
+  --average-score: .65;
+  --average-line-y: 57.4px;
   display: grid;
+  position: relative;
   grid-template-columns: repeat(var(--day-count, 31), minmax(18px, 1fr));
   align-items: end;
   gap: clamp(5px, .55vw, 10px);
   min-height: var(--chart-total-height);
   padding-right: 4px;
 }
+.bar-chart::before,
+.bar-chart::after {
+  position: absolute;
+  top: calc(
+    var(--chart-total-height) - var(--chart-max-height) - var(--chart-axis-height)
+    + var(--average-line-y)
+  );
+  pointer-events: none;
+}
+.bar-chart::before {
+  z-index: 0;
+  right: 4px;
+  left: 0;
+  border-top: 2px dotted rgba(96, 98, 114, .52);
+  content: "";
+}
+.bar-chart::after {
+  z-index: 2;
+  right: 4px;
+  padding: 0 0 2px .45rem;
+  transform: translateY(-100%);
+  background: var(--page-bg);
+  color: var(--muted);
+  content: "AVARAGE";
+  font-family: var(--font-display);
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+}
 .bar-wrap {
   position: relative;
+  z-index: 1;
   display: grid;
   grid-template-rows: var(--chart-max-height) var(--chart-axis-height);
   place-items: end center;
