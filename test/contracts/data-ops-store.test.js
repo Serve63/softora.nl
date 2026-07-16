@@ -84,7 +84,7 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
   assert.deepEqual(calls[0], [
     'select',
     'softora_mailbox_messages',
-    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,deleted_at',
+    'message_key,account_email,folder,uid,provider_id,message_id,sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,deleted_at',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'is'), ['is', 'deleted_at', null]);
   assert.deepEqual(calls.find((call) => call[0] === 'eq' && call[1] === 'account_email'), [

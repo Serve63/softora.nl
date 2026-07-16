@@ -29,6 +29,14 @@ const {
   OUTBOUND_SENDER_DISPLAY_NAMES: SENDER_DISPLAY_NAMES,
   OUTBOUND_SENDER_LOCATION_NAMES: SENDER_LOCATION_NAMES,
 } = require('./outbound-sender-identity');
+const {
+  COLDMAIL_DELIVERY_FAILURE_PATTERN,
+  COLDMAIL_HARD_BOUNCE_PATTERN,
+  COLDMAIL_SOFT_BOUNCE_PATTERN,
+  buildBounceTypeCounts,
+  mergeBounceRecords,
+  summarizeMailboxBounceStats,
+} = require('./coldmail-bounce-stats');
 
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const DEFAULT_CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
@@ -103,12 +111,6 @@ const COLDMAIL_PROVIDER_WARNING_SENDER_PATTERN =
   /\b(strato|mailer-daemon|postmaster|mail delivery|delivery subsystem|abuse|security|noreply|no-reply|support|kundenservice|customer service)\b/i;
 const COLDMAIL_PROVIDER_WARNING_SUBJECT_PATTERN =
   /\b(strato|smtp|mailbox|mailserver|mail server|e-mail|email|account|delivery|bezorging|mail delivery|sending|verzenden|blocked|geblokkeerd|warning|waarschuwing|spam|phishing|dmarc|spf|rate limit|limiet|sperrung|versandlimit)\b/i;
-const COLDMAIL_DELIVERY_FAILURE_PATTERN =
-  /\b(delivery status notification|undeliverable|undelivered mail|mail delivery failed|delivery has failed|failure notice|returned mail|unzustellbar|unzustellbarkeitsmail|niet bezorgd|onbestelbaar|bezorging mislukt|final-recipient|diagnostic-code)\b/i;
-const COLDMAIL_HARD_BOUNCE_PATTERN =
-  /\b(user unknown|unknown user|no such user|mailbox unknown|mailbox not found|recipient unknown|unknown address|invalid recipient|invalid address|no such mailbox|unknown local part|not known to us|recipient address rejected|5\.1\.1|5\.1\.10|5\.0\.0)\b/i;
-const COLDMAIL_SOFT_BOUNCE_PATTERN =
-  /\b(mailbox full|quota exceeded|overquota|temporary failure|try again later|temporarily unavailable|deferred|delayed|warning: could not send message|could not send message for past|will keep trying|greylist|greylisted|4\.[0-9]\.[0-9]|resources temporarily unavailable|user has exhausted allowed storage space)\b/i;
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -3566,11 +3568,13 @@ function createColdmailCampaignService(deps = {}) {
       bounces,
       totalBounces: bounces,
       bounceTypes,
+      bounceRecords: bounceItems,
       bounceItems: bounceItems
         .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
         .slice(0, 12),
       bouncesToday,
       bounceTypesToday,
+      bounceRecordsToday: bounceItemsToday,
       bounceItemsToday: bounceItemsToday
         .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
         .slice(0, 12),
@@ -3579,159 +3583,32 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function buildColdmailMailboxBounceText(message = {}) {
-    const payload = message && typeof message.payload === 'object' ? message.payload : {};
-    return [
-      normalizeString(message.subject),
-      normalizeString(message.sender_email || message.senderEmail),
-      normalizeString(message.sender_name || message.senderName),
-      normalizeString(message.preview),
-      normalizeString(message.body_text || message.bodyText || message.body),
-      normalizeString(payload.subject),
-      normalizeString(payload.preview),
-      normalizeString(payload.body_text || payload.bodyText || payload.body),
-    ].join('\n');
-  }
-
-  function isColdmailMailboxBounceMessage(message = {}) {
-    const subject = normalizeString(message.subject);
-    const text = buildColdmailMailboxBounceText(message);
-    const fromText = normalizeString(
-      `${message.sender_email || message.senderEmail || ''} ${message.sender_name || message.senderName || ''}`
-    );
-    const providerLike = /\b(mailer-daemon|postmaster|mail delivery|delivery subsystem)\b/i.test(fromText);
-    const deliveryFailure =
-      COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) ||
-      COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text) ||
-      COLDMAIL_HARD_BOUNCE_PATTERN.test(text) ||
-      COLDMAIL_SOFT_BOUNCE_PATTERN.test(text);
-    return Boolean(deliveryFailure && (providerLike || COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) || COLDMAIL_DELIVERY_FAILURE_PATTERN.test(text)));
-  }
-
-  function getColdmailMailboxBounceType(message = {}) {
-    const text = buildColdmailMailboxBounceText(message);
-    if (COLDMAIL_HARD_BOUNCE_PATTERN.test(text)) return 'hard';
-    if (COLDMAIL_SOFT_BOUNCE_PATTERN.test(text)) return 'soft';
-    return 'unknown';
-  }
-
-  function getColdmailMailboxMessageDate(message = {}) {
-    const payload = message && typeof message.payload === 'object' ? message.payload : {};
-    return normalizeString(
-      message.date ||
-        message.internal_date ||
-        message.internalDate ||
-        message.created_at ||
-        message.updated_at ||
-        payload.date ||
-        payload.internal_date ||
-        payload.internalDate
-    );
-  }
-
-  function buildColdmailMailboxBounceKey(message = {}, index = 0) {
-    return normalizeMailboxMessageKey(
-      message.message_key ||
-        message.messageKey ||
-        message.message_id ||
-        message.messageId ||
-        `${message.account_email || message.accountEmail || 'mailbox'}:${message.folder || 'inbox'}:${message.uid || index}`
-    ) || `mailbox-bounce:${index}`;
-  }
-
-  function summarizeColdmailMailboxBounceStats(messages) {
-    const bounceKeys = new Set();
-    const bounceTodayKeys = new Set();
-    const bounceTypes = {
-      hard: 0,
-      soft: 0,
-      instantly: 0,
-      unknown: 0,
-    };
-    const bounceTypesToday = {
-      hard: 0,
-      soft: 0,
-      instantly: 0,
-      unknown: 0,
-    };
-    const bounceItems = [];
-    const bounceItemsToday = [];
-    const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
-
-    (Array.isArray(messages) ? messages : []).forEach((message, index) => {
-      if (!message || typeof message !== 'object') return;
-      if (normalizeString(message.deleted_at || message.deletedAt)) return;
-      const folder = normalizeString(message.folder).toLowerCase();
-      if (folder && folder !== 'inbox') return;
-      if (!isColdmailMailboxBounceMessage(message)) return;
-
-      const bounceKey = buildColdmailMailboxBounceKey(message, index);
-      const bounceType = getColdmailMailboxBounceType(message);
-      const at = getColdmailMailboxMessageDate(message);
-      const bounceAtMs = parseTimestampMs(at);
-      const bounceItem = {
-        company: '',
-        email: normalizeEmailAddress(message.sender_email || message.senderEmail),
-        accountEmail: normalizeEmailAddress(message.account_email || message.accountEmail),
-        subject: truncateText(normalizeString(message.subject), 120),
-        type: bounceType,
-        at,
-      };
-
-      if (!bounceKeys.has(bounceKey)) {
-        bounceKeys.add(bounceKey);
-        bounceTypes[bounceType] = (bounceTypes[bounceType] || 0) + 1;
-        bounceItems.push(bounceItem);
-      }
-      if (
-        bounceAtMs &&
-        getColdmailAutopilotDateKey(new Date(bounceAtMs), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE) === currentDayKey &&
-        !bounceTodayKeys.has(bounceKey)
-      ) {
-        bounceTodayKeys.add(bounceKey);
-        bounceTypesToday[bounceType] = (bounceTypesToday[bounceType] || 0) + 1;
-        bounceItemsToday.push(bounceItem);
-      }
-    });
-
-    return {
-      available: true,
-      bounces: bounceKeys.size,
-      totalBounces: bounceKeys.size,
-      bounceTypes,
-      bounceItems: bounceItems
-        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
-        .slice(0, 12),
-      bouncesToday: bounceTodayKeys.size,
-      bounceTypesToday,
-      bounceItemsToday: bounceItemsToday
-        .sort((left, right) => parseTimestampMs(right.at) - parseTimestampMs(left.at))
-        .slice(0, 12),
-    };
-  }
-
   function chooseColdmailLiveBounceStats(databaseStats, mailboxStats) {
     const safeMailboxStats = mailboxStats && mailboxStats.available ? mailboxStats : null;
-    const totalSource = safeMailboxStats && safeMailboxStats.totalBounces > databaseStats.totalBounces
-      ? safeMailboxStats
-      : databaseStats;
-    const todaySource = safeMailboxStats && safeMailboxStats.bouncesToday > databaseStats.bouncesToday
-      ? safeMailboxStats
-      : databaseStats;
-    const source = totalSource === safeMailboxStats || todaySource === safeMailboxStats
-      ? 'mailbox-index'
-      : 'database';
+    const bounceRecords = mergeBounceRecords(
+      databaseStats.bounceRecords || databaseStats.bounceItems,
+      safeMailboxStats && (safeMailboxStats.bounceRecords || safeMailboxStats.bounceItems)
+    );
+    const bounceRecordsToday = mergeBounceRecords(
+      databaseStats.bounceRecordsToday || databaseStats.bounceItemsToday,
+      safeMailboxStats && (safeMailboxStats.bounceRecordsToday || safeMailboxStats.bounceItemsToday)
+    );
     return {
-      source,
-      bounces: Math.max(databaseStats.bounces, safeMailboxStats ? safeMailboxStats.bounces : 0),
-      totalBounces: Math.max(databaseStats.totalBounces, safeMailboxStats ? safeMailboxStats.totalBounces : 0),
-      bounceTypes: totalSource.bounceTypes,
-      bounceItems: totalSource.bounceItems,
-      bouncesToday: Math.max(databaseStats.bouncesToday, safeMailboxStats ? safeMailboxStats.bouncesToday : 0),
-      bounceTypesToday: todaySource.bounceTypesToday,
-      bounceItemsToday: todaySource.bounceItemsToday,
+      source: safeMailboxStats ? 'recipient-deduplicated' : 'database',
+      reliable: Boolean(safeMailboxStats && safeMailboxStats.reliable),
+      bounces: bounceRecords.length,
+      totalBounces: bounceRecords.length,
+      bounceTypes: buildBounceTypeCounts(bounceRecords),
+      bounceItems: bounceRecords.slice(0, 12),
+      bouncesToday: bounceRecordsToday.length,
+      bounceTypesToday: buildBounceTypeCounts(bounceRecordsToday),
+      bounceItemsToday: bounceRecordsToday.slice(0, 12),
       mailboxBounces: safeMailboxStats ? safeMailboxStats.totalBounces : null,
       mailboxBouncesToday: safeMailboxStats ? safeMailboxStats.bouncesToday : null,
+      mailboxBounceMessages: safeMailboxStats ? safeMailboxStats.bounceMessages : null,
+      mailboxBounceMatchedMessages: safeMailboxStats ? safeMailboxStats.matchedMessages : null,
+      mailboxBounceUnresolvedMessages: safeMailboxStats ? safeMailboxStats.unresolvedMessages : null,
+      mailboxBounceDuplicateNotices: safeMailboxStats ? safeMailboxStats.duplicateNotices : null,
       mailboxBounceStatsAvailable: Boolean(safeMailboxStats),
       mailboxBounceStatsUnavailableReason: safeMailboxStats ? '' : normalizeString(mailboxStats && mailboxStats.unavailableReason),
     };
@@ -3828,11 +3705,11 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
-  async function loadColdmailMailboxBounceStats() {
+  async function loadColdmailMailboxBounceCandidates() {
     if (!dataOpsStore || typeof dataOpsStore.listMailboxMessages !== 'function') {
       return {
-        ...summarizeColdmailMailboxBounceStats([]),
         available: false,
+        messages: [],
         unavailableReason: 'data_ops_mailbox_store_unavailable',
       };
     }
@@ -3850,33 +3727,45 @@ function createColdmailCampaignService(deps = {}) {
       });
       if (!Array.isArray(messages)) {
         return {
-          ...summarizeColdmailMailboxBounceStats([]),
           available: false,
+          messages: [],
           unavailableReason: 'mailbox_bounce_read_failed',
         };
       }
-      return summarizeColdmailMailboxBounceStats(messages);
+      return { available: true, messages, unavailableReason: '' };
     } catch (error) {
       logger.warn('[ColdmailLiveStats][mailbox-bounces]', error && error.message ? error.message : error);
       return {
-        ...summarizeColdmailMailboxBounceStats([]),
         available: false,
+        messages: [],
         unavailableReason: 'mailbox_bounce_read_failed',
       };
     }
   }
 
   async function loadFreshColdmailLiveStats() {
-    const [sendGuardState, customerState, centralGuardStats, mailboxBounceStats] = await Promise.all([
+    const [sendGuardState, customerState, centralGuardStats, mailboxBounceCandidates] = await Promise.all([
       loadColdmailSendGuardState(),
       getUiStateValues(customerDbScope),
       loadColdmailCentralGuardStats(),
-      loadColdmailMailboxBounceStats(),
+      loadColdmailMailboxBounceCandidates(),
     ]);
     const values = customerState && typeof customerState.values === 'object' ? customerState.values : {};
     const rows = parseDatabaseRows(values);
     const guardStats = summarizeColdmailSendGuardLiveStats(sendGuardState.entries);
     const databaseStats = summarizeColdmailDatabaseLiveStats(rows);
+    const mailboxBounceStats = {
+      ...summarizeMailboxBounceStats(mailboxBounceCandidates.messages, {
+        currentDayKey: getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
+        getDayKey: (date) => getColdmailAutopilotDateKey(date, DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE),
+        ownMailboxEmails: getAllowedSenderEmails(),
+        sentRecipientCounts: centralGuardStats.recipientCounts,
+        requireSentRecipientMatch: centralGuardStats.available === true,
+      }),
+      available: mailboxBounceCandidates.available === true,
+      reliable: mailboxBounceCandidates.available === true && centralGuardStats.available === true,
+      unavailableReason: mailboxBounceCandidates.unavailableReason || '',
+    };
     const bounceStats = chooseColdmailLiveBounceStats(databaseStats, mailboxBounceStats);
     const centralGuardAvailable = Boolean(centralGuardStats.available);
     const centralGuardTotalSent = centralGuardAvailable
@@ -3943,10 +3832,16 @@ function createColdmailCampaignService(deps = {}) {
         bounces: bounceStats.bounces,
         totalBounces: bounceStats.totalBounces,
         bounceStatsSource: bounceStats.source,
+        bounceStatsReliable: bounceStats.reliable,
+        bounceDeduplication: 'recipient-email',
         databaseBounces: databaseStats.totalBounces,
         databaseBouncesToday: databaseStats.bouncesToday,
         mailboxBounces: bounceStats.mailboxBounces,
         mailboxBouncesToday: bounceStats.mailboxBouncesToday,
+        mailboxBounceMessages: bounceStats.mailboxBounceMessages,
+        mailboxBounceMatchedMessages: bounceStats.mailboxBounceMatchedMessages,
+        mailboxBounceUnresolvedMessages: bounceStats.mailboxBounceUnresolvedMessages,
+        mailboxBounceDuplicateNotices: bounceStats.mailboxBounceDuplicateNotices,
         mailboxBounceStatsAvailable: bounceStats.mailboxBounceStatsAvailable,
         mailboxBounceStatsUnavailableReason: bounceStats.mailboxBounceStatsUnavailableReason,
         bounceTypes: bounceStats.bounceTypes,
@@ -3967,6 +3862,7 @@ function createColdmailCampaignService(deps = {}) {
     try {
       const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue || '{}') : rawValue;
       if (!parsed || typeof parsed !== 'object' || parsed.ok !== true || !parsed.stats || typeof parsed.stats !== 'object') return null;
+      if (normalizeString(parsed.stats.bounceDeduplication) !== 'recipient-email') return null;
       const updatedAtMs = Date.parse(normalizeString(parsed.stats.updatedAt));
       const expectedDateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
       if (!updatedAtMs || normalizeString(parsed.stats.dateKey) !== expectedDateKey) return null;
@@ -4044,13 +3940,23 @@ function createColdmailCampaignService(deps = {}) {
       mergedStats.authoritativeStatsUpdatedAt = previous.authoritativeStatsUpdatedAt || previous.updatedAt || '';
       changed = true;
     }
-    if (stats.mailboxBounceStatsAvailable === false && previous.mailboxBounceStatsAvailable !== false) {
+    if (
+      (stats.mailboxBounceStatsAvailable === false || stats.bounceStatsReliable === false) &&
+      previous.mailboxBounceStatsAvailable !== false &&
+      previous.bounceStatsReliable !== false
+    ) {
       [
         'bounces',
         'totalBounces',
         'bounceStatsSource',
+        'bounceStatsReliable',
+        'bounceDeduplication',
         'mailboxBounces',
         'mailboxBouncesToday',
+        'mailboxBounceMessages',
+        'mailboxBounceMatchedMessages',
+        'mailboxBounceUnresolvedMessages',
+        'mailboxBounceDuplicateNotices',
         'mailboxBounceStatsAvailable',
         'mailboxBounceStatsUnavailableReason',
         'bounceTypes',
