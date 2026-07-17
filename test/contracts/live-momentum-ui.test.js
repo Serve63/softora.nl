@@ -27,7 +27,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717d"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717e"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
@@ -37,7 +37,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260717c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260717c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260716l" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
   assert.match(html, /data-sidebar-key="dashboard"/);
@@ -173,6 +173,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.bar\.is-danger\s*\{[\s\S]*var\(--danger\)/);
   assert.match(css, /\.status\.is-today-end\s*\{[\s\S]*border-bottom:\s*2px solid var\(--good-line\);/);
   assert.match(css, /\.status\.is-untracked::before\s*\{[\s\S]*background:\s*#d4d9df;/);
+  assert.match(css, /\.status\.is-untracked\.is-empty::before\s*\{[\s\S]*width:\s*18px;[\s\S]*border:\s*2px solid #e1e0e5;[\s\S]*background:\s*#fff;/);
   assert.match(css, /\.status\.is-missed::before\s*\{[\s\S]*background-color:\s*var\(--danger\);/);
   assert.doesNotMatch(css, /\.status\.is-soft|is-soft::before/);
   assert.match(css, /\.habit-label:focus\s*\{[\s\S]*box-shadow:\s*0 0 0 2px rgba\(86, 196, 134, \.34\);/);
@@ -234,6 +235,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /function getChartMaxHeight\(wrap\)[\s\S]*getComputedStyle\(wrap\)[\s\S]*--chart-max-height/);
   assert.doesNotMatch(js, /const CHART_MAX_HEIGHT/);
   assert.match(js, /function toggleCell\(cell\)/);
+  assert.match(js, /if \(isChecked\(cell\)\)\s*\{[\s\S]*setChecked\(cell, false\);[\s\S]*else if \(isTracked\(cell\)\)\s*\{[\s\S]*setEmpty\(cell\);[\s\S]*else\s*\{[\s\S]*setChecked\(cell, true\);/);
+  assert.match(js, /emptyDays:\s*cells\.filter\(isEmpty\)\.map\(getDay\)/);
+  assert.match(js, /emptyDays:\s*goal\.emptyDays/);
   assert.match(js, /function updateChart\(\)/);
   assert.match(js, /function getDayScore\(day\)/);
   assert.match(js, /function renderChartShell\(\)/);

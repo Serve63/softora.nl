@@ -80,6 +80,7 @@
   const getLabelText = (index) => getLabels()[index]?.textContent.trim() || `Taak ${index + 1}`;
   const isChecked = (cell) => cell.classList.contains('is-done');
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
+  const isEmpty = (cell) => cell.classList.contains('is-empty');
   const formatDay = (day) => `${day} juli`;
   const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
   const getIcon = (key) => ICONS_BY_KEY.get(key) || ICONS_BY_KEY.get(DEFAULT_ICON_KEY) || null;
@@ -106,12 +107,14 @@
         : TODAY
           ? DAYS.filter((day) => day >= TODAY)
           : [];
+    const doneDays = sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day));
     return {
       id,
       label,
       iconKey,
       icon: getIcon(iconKey)?.markup || '<path d="M12 5v14M5 12h14" />',
-      doneDays: sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day)),
+      doneDays,
+      emptyDays: sanitizeDayList(goal?.emptyDays).filter((day) => !doneDays.includes(day)),
       trackedDays: normalizedTrackedDays
     };
   }
@@ -154,6 +157,7 @@
           label: row.querySelector('.habit-label')?.textContent || '',
           iconKey: row.dataset.iconKey || defaultGoal?.iconKey,
           doneDays: cells.filter(isChecked).map(getDay),
+          emptyDays: cells.filter(isEmpty).map(getDay),
           trackedDays: cells.filter(isTracked).map(getDay)
         }, index)
       };
@@ -171,6 +175,7 @@
         label: goal.label,
         iconKey: goal.iconKey,
         doneDays: goal.doneDays,
+        emptyDays: goal.emptyDays,
         trackedDays: goal.trackedDays
       })),
       updatedAt: new Date().toISOString()
@@ -306,12 +311,14 @@
     const day = getDay(cell);
     const checked = isChecked(cell);
     const tracked = isTracked(cell);
+    const empty = isEmpty(cell);
     const missed = tracked && !checked && day > 0 && day <= TODAY;
     cell.classList.toggle('is-missed', missed);
     cell.setAttribute('role', 'checkbox');
     cell.setAttribute('tabindex', '0');
     cell.setAttribute('aria-checked', checked ? 'true' : 'false');
-    cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${tracked ? '' : ', nog niet bijgehouden'}`);
+    const statusLabel = checked ? ', afgerond' : empty ? ', leeg' : tracked ? ', niet afgerond' : ', nog niet bijgehouden';
+    cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${statusLabel}`);
   }
   function getDayScore(day) {
     const statusCells = getStatusCells();
@@ -386,12 +393,23 @@
     updateScore();
   }
   function setChecked(cell, checked) {
-    cell.classList.remove('is-untracked');
+    cell.classList.remove('is-untracked', 'is-empty');
     cell.classList.toggle('is-done', checked);
     syncCellA11y(cell);
   }
+  function setEmpty(cell) {
+    cell.classList.remove('is-done');
+    cell.classList.add('is-untracked', 'is-empty');
+    syncCellA11y(cell);
+  }
   function toggleCell(cell) {
-    setChecked(cell, !isChecked(cell));
+    if (isChecked(cell)) {
+      setChecked(cell, false);
+    } else if (isTracked(cell)) {
+      setEmpty(cell);
+    } else {
+      setChecked(cell, true);
+    }
     updateChart();
     markStateChanged();
   }
@@ -635,7 +653,9 @@
   function createStatus(day, goal) {
     const cell = document.createElement('span');
     cell.className = 'status';
-    if (!goal.trackedDays.includes(day)) {
+    if (goal.emptyDays.includes(day)) {
+      cell.classList.add('is-untracked', 'is-empty');
+    } else if (!goal.trackedDays.includes(day)) {
       cell.classList.add('is-untracked');
     } else if (goal.doneDays.includes(day)) {
       cell.classList.add('is-done');
@@ -742,6 +762,7 @@
       id: createGoalId(),
       label: 'Doel',
       doneDays: [],
+      emptyDays: [],
       trackedDays: DAYS.filter((day) => day >= TODAY)
     }, goals.length);
     goals.push({ ...draftGoal, label: '', isDraft: true });

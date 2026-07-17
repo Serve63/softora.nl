@@ -1067,6 +1067,12 @@ button {
   border: 0;
   background: #d4d9df;
 }
+.status.is-untracked.is-empty::before {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e1e0e5;
+  background: #fff;
+}
 .status.is-done::before,
 .status.is-missed::before {
   content: "";
