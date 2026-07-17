@@ -550,6 +550,18 @@ test('seo content images zijn per cluster realistisch vastgezet met metadata', (
   }
 });
 
+test('nieuwe softwareoffertegids gebruikt precies twee eigen inhoudelijke beelden', () => {
+  const item = getSeoContentItem('blog', 'maatwerk-software-offerte-beoordelen');
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+
+  assert.equal(item.image.src, '/assets/seo-content/maatwerk-software-offerte-vergelijkingsmatrix-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/maatwerk-software-offerte-waarschuwingssignalen-softora.jpg');
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+});
+
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
     siteOrigin: 'https://www.softora.nl',
