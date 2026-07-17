@@ -1,34 +1,24 @@
 (() => {
   const STATE_SCOPE = 'premium_live_momentum';
-  const STATE_KEY = 'softora_live_momentum_state_v1';
-  const STATE_VERSION = 1;
-  const PERIOD_KEY = '2026-07';
+  const calendar = window.SoftoraMomentumCalendar;
+  if (!calendar) {
+    console.error('[LiveMomentum][calendar] Kalenderlogica kon niet worden geladen.');
+    return;
+  }
+  const STATE_VERSION = calendar.STATE_VERSION;
+  const PERIOD = calendar.getCurrentPeriod();
+  const PERIOD_KEY = PERIOD.key;
+  const STATE_KEY = calendar.getMonthStateKey(PERIOD_KEY);
   const MAX_GOALS = 24;
   const MAX_LABEL_LENGTH = 80;
   const SAVE_DEBOUNCE_MS = 250;
   const SAVE_RETRY_MS = 1500;
   const MAX_SAVE_RETRIES = 3;
-  const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', year: 2026, month: 7, startDay: 13, lastDay: 31 };
   const TODAY_REFRESH_MS = 60 * 1000;
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
-  function getAmsterdamDateParts(date = new Date()) {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Amsterdam',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(date);
-    return Object.fromEntries(parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, Number(part.value)]));
-  }
   function getCurrentPeriodDay(date = new Date()) {
-    const { year, month, day } = getAmsterdamDateParts(date);
-    if (year !== PERIOD.year || month !== PERIOD.month) {
-      return null;
-    }
-    return Number.isInteger(day) && day >= 1 && day <= PERIOD.lastDay ? day : null;
+    return calendar.getDayForPeriod(PERIOD, date);
   }
   let TODAY = getCurrentPeriodDay();
   const ICON_CATALOG = Array.isArray(window.SoftoraMomentumIconCatalog)
@@ -41,10 +31,10 @@
   const endGameCardsApi = window.SoftoraMomentumEndGameCards;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
-    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [TODAY] },
-    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [TODAY] },
-    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [TODAY] },
-    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [TODAY] }
+    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [] },
+    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [] },
+    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [] },
+    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [] }
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
@@ -66,6 +56,7 @@
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
   chart.style.setProperty('--day-count', String(TOTAL_DAYS));
+  grid.setAttribute('aria-label', `Momentum taken in ${PERIOD.label}`);
   const getChartBars = () => Array.from(chart.querySelectorAll('.bar-wrap'));
   const getGoalRows = () => Array.from(grid.querySelectorAll('.habit-name'));
   const goalActions = goalActionsApi.createController({ grid, getGoalRows });
@@ -81,7 +72,7 @@
   const isChecked = (cell) => cell.classList.contains('is-done');
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
   const isEmpty = (cell) => cell.classList.contains('is-empty');
-  const formatDay = (day) => `${day} juli`;
+  const formatDay = (day) => `${day} ${PERIOD.label.toLocaleLowerCase('nl-NL')}`;
   const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
   const getIcon = (key) => ICONS_BY_KEY.get(key) || ICONS_BY_KEY.get(DEFAULT_ICON_KEY) || null;
   const getDefaultTrackedDays = () => DAYS.filter((day) => day >= PERIOD.startDay);
@@ -181,13 +172,14 @@
       updatedAt: new Date().toISOString()
     };
   }
-  function parseStoredState(rawValue) {
+  function parseStoredState(rawValue, options = {}) {
     if (!rawValue) {
       return null;
     }
     try {
       const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
-      if (!parsed || parsed.version !== STATE_VERSION || parsed.period !== PERIOD_KEY || !Array.isArray(parsed.goals)) {
+      const acceptedVersion = parsed?.version === STATE_VERSION || (options.allowLegacy === true && parsed?.version === 1);
+      if (!parsed || !acceptedVersion || parsed.period !== PERIOD_KEY || !Array.isArray(parsed.goals)) {
         return null;
       }
       const normalizedGoals = parsed.goals.slice(0, MAX_GOALS).map(normalizeGoal);
@@ -197,11 +189,45 @@
       }
       return {
         goals,
-        needsMigration: needsMigration || endGameCards.needsMigration(parsed.endGameCards),
+        needsMigration:
+          parsed.version !== STATE_VERSION ||
+          needsMigration ||
+          endGameCards.needsMigration(parsed.endGameCards),
         endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
       };
     } catch (error) {
       console.warn('[LiveMomentum][state-parse]', error?.message || error);
+      return null;
+    }
+  }
+  function parseCarriedState(rawValue) {
+    if (!rawValue) {
+      return null;
+    }
+    try {
+      const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+      if (!parsed || !Array.isArray(parsed.goals)) {
+        return null;
+      }
+      const carriedGoals = parsed.goals.slice(0, MAX_GOALS).map((goal, index) => normalizeGoal({
+        id: goal?.id,
+        label: goal?.label,
+        iconKey: goal?.iconKey,
+        doneDays: [],
+        emptyDays: [],
+        trackedDays: getDefaultTrackedDays()
+      }, index));
+      const { goals } = removeLegacyTrailingGoalPlaceholders(carriedGoals);
+      if (!goals.length) {
+        return null;
+      }
+      return {
+        goals,
+        needsMigration: true,
+        endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
+      };
+    } catch (error) {
+      console.warn('[LiveMomentum][state-carry]', error?.message || error);
       return null;
     }
   }
@@ -225,9 +251,8 @@
     const snapshot = buildStateSnapshot();
     try {
       const response = await uiStateClient.set(STATE_SCOPE, {
-        replace: true,
         source: 'live-momentum',
-        values: { [STATE_KEY]: JSON.stringify(snapshot) }
+        patch: { [STATE_KEY]: JSON.stringify(snapshot) }
       }, options);
       if (!response?.ok || response.source !== 'supabase') {
         throw new Error('Supabase bevestigde de Live Momentum-opslag niet.');
@@ -435,6 +460,10 @@
     updateTodayColumnEnd(statusCells);
   }
   function refreshToday() {
+    if (calendar.getCurrentPeriod().key !== PERIOD_KEY) {
+      window.location.reload();
+      return;
+    }
     const currentPeriodDay = getCurrentPeriodDay();
     if (currentPeriodDay === TODAY) {
       return;
@@ -848,7 +877,20 @@
       if (!response?.ok || response.source !== 'supabase') {
         throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
       }
-      const storedState = parseStoredState(response.values?.[STATE_KEY]);
+      const values = response.values || {};
+      let storedState = parseStoredState(values[STATE_KEY]);
+      if (!storedState && PERIOD_KEY === calendar.INITIAL_PERIOD_KEY) {
+        storedState = parseStoredState(values[calendar.LEGACY_STATE_KEY], { allowLegacy: true });
+      }
+      if (!storedState) {
+        const priorStateKey = calendar.findLatestPriorMonthStateKey(values, PERIOD_KEY);
+        const priorRawState = priorStateKey
+          ? values[priorStateKey]
+          : PERIOD_KEY > calendar.INITIAL_PERIOD_KEY
+            ? values[calendar.LEGACY_STATE_KEY]
+            : null;
+        storedState = parseCarriedState(priorRawState);
+      }
       if (storedState) {
         renderGridShell(storedState.goals);
         endGameCards.render(storedState.endGameCards);
