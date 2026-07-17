@@ -243,12 +243,11 @@ button {
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
   scroll-padding-inline-start: 3rem;
-  scroll-snap-type: x proximity;
+  scroll-behavior: auto;
   scrollbar-color: rgba(26, 26, 46, .18) transparent;
   scrollbar-width: thin;
 }
 .end-game-goals.is-card-reordering {
-  scroll-snap-type: none;
   cursor: grabbing;
 }
 .end-game-goal-track {
@@ -263,7 +262,6 @@ button {
   flex-direction: column;
   min-height: clamp(290px, 33vh, 340px);
   padding: 1.3rem 1.2rem;
-  scroll-snap-align: start;
   border: 1px solid rgba(26, 26, 46, .16);
   border-top: 3px solid rgba(46, 204, 113, .52);
   border-radius: 10px;
@@ -277,6 +275,8 @@ button {
   padding: 0;
   border: 0;
   background: #11131e;
+  backdrop-filter: none;
+  contain: paint;
   cursor: grab;
   isolation: isolate;
   touch-action: pan-y;

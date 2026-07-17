@@ -4,7 +4,8 @@
   const CLICK_SUPPRESSION_MS = 350;
   const EDGE_SCROLL_ZONE = 72;
   const MAX_EDGE_SCROLL_STEP = 18;
-  const WHEEL_EASING = 0.24;
+  const WHEEL_EASING = 0.16;
+  const MAX_WHEEL_STEP = 48;
 
   const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -17,6 +18,13 @@
 
     const getCards = () => Array.from(track.querySelectorAll('[data-end-game-card-id]'));
     const getVisibleCardIds = () => getCards().map((card) => card.dataset.endGameCardId).filter(Boolean);
+
+    function cancelWheelScroll() {
+      if (wheelFrame) window.cancelAnimationFrame(wheelFrame);
+      wheelFrame = 0;
+      wheelTarget = scrollContainer?.scrollLeft || 0;
+      scrollContainer?.classList.remove('is-wheel-scrolling');
+    }
 
     function animateReflow(previousPositions, draggedCard) {
       if (prefersReducedMotion) return;
@@ -154,9 +162,11 @@
       if (prefersReducedMotion || Math.abs(distance) < 0.75) {
         scrollContainer.scrollLeft = wheelTarget;
         wheelFrame = 0;
+        scrollContainer.classList.remove('is-wheel-scrolling');
         return;
       }
-      scrollContainer.scrollLeft += distance * WHEEL_EASING;
+      const step = clamp(distance * WHEEL_EASING, -MAX_WHEEL_STEP, MAX_WHEEL_STEP);
+      scrollContainer.scrollLeft += step;
       wheelFrame = window.requestAnimationFrame(animateWheelScroll);
     }
 
@@ -169,12 +179,16 @@
       if (!canMove) return;
       event.preventDefault();
       wheelTarget = nextTarget;
-      if (!wheelFrame) wheelFrame = window.requestAnimationFrame(animateWheelScroll);
+      if (!wheelFrame) {
+        scrollContainer.classList.add('is-wheel-scrolling');
+        wheelFrame = window.requestAnimationFrame(animateWheelScroll);
+      }
     }, { passive: false });
 
-    scrollContainer?.addEventListener('pointerdown', () => {
+    scrollContainer?.addEventListener('pointerdown', cancelWheelScroll);
+    scrollContainer?.addEventListener('scroll', () => {
       if (!wheelFrame) wheelTarget = scrollContainer.scrollLeft;
-    });
+    }, { passive: true });
 
     return {
       shouldSuppressClick: () => Boolean(dragState?.dragging) || Date.now() < suppressClickUntil
