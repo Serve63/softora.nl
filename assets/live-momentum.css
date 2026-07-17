@@ -244,8 +244,10 @@ button {
   overscroll-behavior-inline: contain;
   scroll-padding-inline-start: 3rem;
   scroll-behavior: auto;
-  scrollbar-color: rgba(26, 26, 46, .18) transparent;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+.end-game-goals::-webkit-scrollbar {
+  display: none;
 }
 .end-game-goals.is-card-reordering {
   cursor: grabbing;
