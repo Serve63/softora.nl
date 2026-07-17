@@ -28,7 +28,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717e"/);
-  assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260716a"/);
+  assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260717b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
@@ -36,7 +36,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260717c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260717c" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260716a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260717b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
   assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
@@ -210,6 +210,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   const goalActionsJs = read('assets/live-momentum-goal-actions.js');
   const endGameCardsJs = read('assets/live-momentum-endgame-cards.js');
   const endGameInteractionsJs = read('assets/live-momentum-endgame-interactions.js');
+  const videoCss = read('assets/live-momentum-video.css');
   const videoJs = read('assets/live-momentum-video.js');
 
   assert.match(js, /startDay:\s*13/);
@@ -296,9 +297,16 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameInteractionsJs, /window\.SoftoraMomentumEndGameInteractions/);
   assert.match(videoJs, /const VIDEO_ID = 'XwtdR-oW6XA'/);
   assert.match(videoJs, /youtube-nocookie\.com\/embed\/\$\{VIDEO_ID\}/);
+  assert.match(videoJs, /controls:\s*'0'/);
+  assert.match(videoJs, /enablejsapi:\s*'1'/);
+  assert.match(videoJs, /cc_load_policy:\s*'0'/);
+  assert.match(videoJs, /interactionLayer\.className = 'momentum-video-interaction'/);
+  assert.match(videoJs, /sendPlayerCommand\(shouldPause \? 'pauseVideo' : 'playVideo'\)/);
+  assert.match(videoCss, /\.momentum-video-stage iframe\s*\{[\s\S]*top:\s*-23%;[\s\S]*left:\s*0;[\s\S]*width:\s*100%;[\s\S]*height:\s*146%;[\s\S]*pointer-events:\s*none;/);
+  assert.match(videoCss, /\.momentum-video-interaction\s*\{[\s\S]*position:\s*absolute;[\s\S]*inset:\s*0;[\s\S]*background:\s*transparent;/);
   assert.match(videoJs, /autoplay:\s*'1'/);
   assert.match(videoJs, /mute:\s*'0'/);
-  assert.match(videoJs, /iframe\.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'/);
+  assert.match(videoJs, /iframe\.allow = 'autoplay; encrypted-media'/);
   assert.match(videoJs, /dialog\.showModal\(\)/);
   assert.match(videoJs, /player\.replaceChildren\(\)/);
   assert.match(videoJs, /dialog\.addEventListener\('close'/);

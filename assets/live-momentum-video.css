@@ -124,10 +124,31 @@
   overflow: hidden;
 }
 .momentum-video-stage iframe {
+  position: absolute;
+  z-index: 1;
+  top: -23%;
+  left: 0;
   display: block;
   width: 100%;
-  height: 100%;
+  height: 146%;
   border: 0;
+  pointer-events: none;
+}
+.momentum-video-interaction {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.momentum-video-interaction:focus-visible {
+  outline: 3px solid rgba(46, 204, 113, .46);
+  outline-offset: -5px;
 }
 body.momentum-video-open {
   overflow: hidden;
