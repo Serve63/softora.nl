@@ -48,7 +48,11 @@
       const draggedCard = dragState?.card;
       if (!draggedCard) return;
       const siblings = getCards().filter((card) => card !== draggedCard);
-      const insertBefore = siblings.find((card) => clientX < card.getBoundingClientRect().left + (card.offsetWidth / 2)) || null;
+      const movableSiblings = siblings.filter((card) => card.dataset.endGameCardFixed !== 'true');
+      const fixedEndCard = siblings.find((card) => card.classList.contains('end-game-goal-card--destination')) || null;
+      const insertBefore = movableSiblings.find((card) => (
+        clientX < card.getBoundingClientRect().left + (card.offsetWidth / 2)
+      )) || fixedEndCard;
       if (draggedCard.nextElementSibling === insertBefore || (!insertBefore && draggedCard === track.lastElementChild)) return;
 
       const previousPositions = new Map(siblings.map((card) => [card, card.getBoundingClientRect().left]));

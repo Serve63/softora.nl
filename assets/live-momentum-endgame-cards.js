@@ -27,18 +27,21 @@
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
-    { id: '2030', title: '2030?' }
+    { id: '2030', title: '2030...', type: 'destination' }
   ];
   const ORIGIN_CARD_ID = 'oktober-2024';
+  const DESTINATION_CARD_ID = '2030';
   const LEGACY_MISSION_ID = 'eigen-automaat-rijden';
   const DEFAULT_CARD_ORDER = CARD_CATALOG.map((card) => card.id);
 
   function normalizeOrder(value) {
     const validIds = new Set(DEFAULT_CARD_ORDER);
     const requestedOrder = Array.from(new Set((Array.isArray(value) ? value : [])
-      .filter((id) => validIds.has(id) && id !== ORIGIN_CARD_ID)));
-    const remainingOrder = DEFAULT_CARD_ORDER.filter((id) => id !== ORIGIN_CARD_ID && !requestedOrder.includes(id));
-    return [ORIGIN_CARD_ID, ...requestedOrder, ...remainingOrder];
+      .filter((id) => validIds.has(id) && ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(id))));
+    const remainingOrder = DEFAULT_CARD_ORDER.filter((id) => (
+      ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(id) && !requestedOrder.includes(id)
+    ));
+    return [ORIGIN_CARD_ID, ...requestedOrder, ...remainingOrder, DESTINATION_CARD_ID];
   }
 
   function normalizeCardState(value) {
@@ -48,7 +51,7 @@
   function normalizeState(value, legacyMissionState) {
     const normalized = Object.fromEntries(CARD_CATALOG.map((card) => [
       card.id,
-      card.id === ORIGIN_CARD_ID
+      [ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(card.id)
         ? { completed: false, deleted: false }
         : normalizeCardState(card.id === LEGACY_MISSION_ID && !value?.[card.id] ? legacyMissionState : value?.[card.id])
     ]));
@@ -110,7 +113,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.id}.png?v=20260716a`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.id}.png?v=20260717c`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
@@ -118,15 +121,15 @@
     image.decoding = 'async';
     shade.className = 'end-game-card-photo-shade';
     top.className = 'end-game-card-kicker';
-    top.textContent = card.type === 'origin' ? 'STARTPUNT' : 'END GAME';
+    top.textContent = card.type === 'origin' ? 'STARTPUNT' : card.type === 'destination' ? 'EINDPUNT' : 'END GAME';
     title.className = 'end-game-card-name';
     title.textContent = card.title;
-    if (card.type === 'origin') {
-      const originLabel = document.createElement('span');
-      originLabel.className = 'end-game-card-origin-label';
-      originLabel.textContent = 'HIER BEGON HET';
-      artwork.classList.add('end-game-card-photo--origin');
-      artwork.append(image, shade, top, title, originLabel);
+    if (['origin', 'destination'].includes(card.type)) {
+      const specialLabel = document.createElement('span');
+      specialLabel.className = `end-game-card-special-label end-game-card-${card.type}-label`;
+      specialLabel.textContent = card.type === 'origin' ? 'HIER BEGON HET' : 'WIE BEN IK DAN?';
+      artwork.classList.add(`end-game-card-photo--${card.type}`);
+      artwork.append(image, shade, top, title, specialLabel);
     } else {
       mission.className = 'end-game-card-mission';
       mission.textContent = 'MISSIE';
@@ -140,12 +143,16 @@
   function createCard(card, state) {
     const article = document.createElement('article');
     const isOrigin = card.type === 'origin';
-    article.className = `end-game-goal-card end-game-goal-card--mission${isOrigin ? ' end-game-goal-card--origin' : ''}`;
+    const isDestination = card.type === 'destination';
+    const isFixed = isOrigin || isDestination;
+    article.className = `end-game-goal-card end-game-goal-card--mission${isOrigin ? ' end-game-goal-card--origin' : ''}${isDestination ? ' end-game-goal-card--destination' : ''}`;
     article.dataset.endGameCardId = card.id;
-    if (isOrigin) {
+    if (isFixed) {
       article.dataset.endGameCardFixed = 'true';
       article.setAttribute('role', 'img');
-      article.setAttribute('aria-label', 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.');
+      article.setAttribute('aria-label', isOrigin
+        ? 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.'
+        : 'Eindpunt: 2030. Wie ben ik dan? Deze kaart staat vast op de laatste positie.');
     } else {
       article.tabIndex = 0;
       article.setAttribute('role', 'button');
@@ -157,7 +164,7 @@
     }
     article.classList.toggle('is-completed', state.completed);
     article.append(createCardArtwork(card));
-    if (!isOrigin) article.append(createCompletionOverlay(), createActions(card, state.completed));
+    if (!isFixed) article.append(createCompletionOverlay(), createActions(card, state.completed));
     return article;
   }
 
