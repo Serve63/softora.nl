@@ -1,34 +1,24 @@
 (() => {
   const STATE_SCOPE = 'premium_live_momentum';
-  const STATE_KEY = 'softora_live_momentum_state_v1';
-  const STATE_VERSION = 1;
-  const PERIOD_KEY = '2026-07';
+  const calendar = window.SoftoraMomentumCalendar;
+  if (!calendar) {
+    console.error('[LiveMomentum][calendar] Kalenderlogica kon niet worden geladen.');
+    return;
+  }
+  const STATE_VERSION = calendar.STATE_VERSION;
+  const PERIOD = calendar.getCurrentPeriod();
+  const PERIOD_KEY = PERIOD.key;
+  const STATE_KEY = calendar.getMonthStateKey(PERIOD_KEY);
   const MAX_GOALS = 24;
   const MAX_LABEL_LENGTH = 80;
   const SAVE_DEBOUNCE_MS = 250;
   const SAVE_RETRY_MS = 1500;
   const MAX_SAVE_RETRIES = 3;
-  const PERIOD = { label: 'Juli 2026', shortLabel: 'Jul', year: 2026, month: 7, startDay: 13, lastDay: 31 };
   const TODAY_REFRESH_MS = 60 * 1000;
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
-  function getAmsterdamDateParts(date = new Date()) {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Amsterdam',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(date);
-    return Object.fromEntries(parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, Number(part.value)]));
-  }
   function getCurrentPeriodDay(date = new Date()) {
-    const { year, month, day } = getAmsterdamDateParts(date);
-    if (year !== PERIOD.year || month !== PERIOD.month) {
-      return null;
-    }
-    return Number.isInteger(day) && day >= 1 && day <= PERIOD.lastDay ? day : null;
+    return calendar.getDayForPeriod(PERIOD, date);
   }
   let TODAY = getCurrentPeriodDay();
   const ICON_CATALOG = Array.isArray(window.SoftoraMomentumIconCatalog)
@@ -41,13 +31,15 @@
   const endGameCardsApi = window.SoftoraMomentumEndGameCards;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
-    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [TODAY] },
-    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [TODAY] },
-    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [TODAY] },
-    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [TODAY] }
+    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [] },
+    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [] },
+    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [] },
+    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [] }
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
+  const chartViewport = document.querySelector('.bar-chart-viewport');
+  const habitBoard = document.querySelector('.habit-board');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const endGameGoalTrack = document.querySelector('.end-game-goal-track');
   let stateReady = false;
@@ -61,11 +53,12 @@
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let draggedGoalId = '';
-  if (!grid || !chart || !endGameGoalTrack || !goalActionsApi || !endGameCardsApi) {
+  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !goalActionsApi || !endGameCardsApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
   chart.style.setProperty('--day-count', String(TOTAL_DAYS));
+  grid.setAttribute('aria-label', `Momentum taken in ${PERIOD.label}`);
   const getChartBars = () => Array.from(chart.querySelectorAll('.bar-wrap'));
   const getGoalRows = () => Array.from(grid.querySelectorAll('.habit-name'));
   const goalActions = goalActionsApi.createController({ grid, getGoalRows });
@@ -80,7 +73,8 @@
   const getLabelText = (index) => getLabels()[index]?.textContent.trim() || `Taak ${index + 1}`;
   const isChecked = (cell) => cell.classList.contains('is-done');
   const isTracked = (cell) => !cell.classList.contains('is-untracked');
-  const formatDay = (day) => `${day} juli`;
+  const isEmpty = (cell) => cell.classList.contains('is-empty');
+  const formatDay = (day) => `${day} ${PERIOD.label.toLocaleLowerCase('nl-NL')}`;
   const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
   const getIcon = (key) => ICONS_BY_KEY.get(key) || ICONS_BY_KEY.get(DEFAULT_ICON_KEY) || null;
   const getDefaultTrackedDays = () => DAYS.filter((day) => day >= PERIOD.startDay);
@@ -106,12 +100,14 @@
         : TODAY
           ? DAYS.filter((day) => day >= TODAY)
           : [];
+    const doneDays = sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day));
     return {
       id,
       label,
       iconKey,
       icon: getIcon(iconKey)?.markup || '<path d="M12 5v14M5 12h14" />',
-      doneDays: sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day)),
+      doneDays,
+      emptyDays: sanitizeDayList(goal?.emptyDays).filter((day) => !doneDays.includes(day)),
       trackedDays: normalizedTrackedDays
     };
   }
@@ -154,6 +150,7 @@
           label: row.querySelector('.habit-label')?.textContent || '',
           iconKey: row.dataset.iconKey || defaultGoal?.iconKey,
           doneDays: cells.filter(isChecked).map(getDay),
+          emptyDays: cells.filter(isEmpty).map(getDay),
           trackedDays: cells.filter(isTracked).map(getDay)
         }, index)
       };
@@ -171,18 +168,20 @@
         label: goal.label,
         iconKey: goal.iconKey,
         doneDays: goal.doneDays,
+        emptyDays: goal.emptyDays,
         trackedDays: goal.trackedDays
       })),
       updatedAt: new Date().toISOString()
     };
   }
-  function parseStoredState(rawValue) {
+  function parseStoredState(rawValue, options = {}) {
     if (!rawValue) {
       return null;
     }
     try {
       const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
-      if (!parsed || parsed.version !== STATE_VERSION || parsed.period !== PERIOD_KEY || !Array.isArray(parsed.goals)) {
+      const acceptedVersion = parsed?.version === STATE_VERSION || (options.allowLegacy === true && parsed?.version === 1);
+      if (!parsed || !acceptedVersion || parsed.period !== PERIOD_KEY || !Array.isArray(parsed.goals)) {
         return null;
       }
       const normalizedGoals = parsed.goals.slice(0, MAX_GOALS).map(normalizeGoal);
@@ -192,11 +191,45 @@
       }
       return {
         goals,
-        needsMigration: needsMigration || endGameCards.needsMigration(parsed.endGameCards),
+        needsMigration:
+          parsed.version !== STATE_VERSION ||
+          needsMigration ||
+          endGameCards.needsMigration(parsed.endGameCards),
         endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
       };
     } catch (error) {
       console.warn('[LiveMomentum][state-parse]', error?.message || error);
+      return null;
+    }
+  }
+  function parseCarriedState(rawValue) {
+    if (!rawValue) {
+      return null;
+    }
+    try {
+      const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+      if (!parsed || !Array.isArray(parsed.goals)) {
+        return null;
+      }
+      const carriedGoals = parsed.goals.slice(0, MAX_GOALS).map((goal, index) => normalizeGoal({
+        id: goal?.id,
+        label: goal?.label,
+        iconKey: goal?.iconKey,
+        doneDays: [],
+        emptyDays: [],
+        trackedDays: getDefaultTrackedDays()
+      }, index));
+      const { goals } = removeLegacyTrailingGoalPlaceholders(carriedGoals);
+      if (!goals.length) {
+        return null;
+      }
+      return {
+        goals,
+        needsMigration: true,
+        endGameCards: endGameCards.normalize(parsed.endGameCards, parsed.endGameMissionCard)
+      };
+    } catch (error) {
+      console.warn('[LiveMomentum][state-carry]', error?.message || error);
       return null;
     }
   }
@@ -220,9 +253,8 @@
     const snapshot = buildStateSnapshot();
     try {
       const response = await uiStateClient.set(STATE_SCOPE, {
-        replace: true,
         source: 'live-momentum',
-        values: { [STATE_KEY]: JSON.stringify(snapshot) }
+        patch: { [STATE_KEY]: JSON.stringify(snapshot) }
       }, options);
       if (!response?.ok || response.source !== 'supabase') {
         throw new Error('Supabase bevestigde de Live Momentum-opslag niet.');
@@ -306,12 +338,14 @@
     const day = getDay(cell);
     const checked = isChecked(cell);
     const tracked = isTracked(cell);
+    const empty = isEmpty(cell);
     const missed = tracked && !checked && day > 0 && day <= TODAY;
     cell.classList.toggle('is-missed', missed);
     cell.setAttribute('role', 'checkbox');
     cell.setAttribute('tabindex', '0');
     cell.setAttribute('aria-checked', checked ? 'true' : 'false');
-    cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${tracked ? '' : ', nog niet bijgehouden'}`);
+    const statusLabel = checked ? ', afgerond' : empty ? ', leeg' : tracked ? ', niet afgerond' : ', nog niet bijgehouden';
+    cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${statusLabel}`);
   }
   function getDayScore(day) {
     const statusCells = getStatusCells();
@@ -386,12 +420,23 @@
     updateScore();
   }
   function setChecked(cell, checked) {
-    cell.classList.remove('is-untracked');
+    cell.classList.remove('is-untracked', 'is-empty');
     cell.classList.toggle('is-done', checked);
     syncCellA11y(cell);
   }
+  function setEmpty(cell) {
+    cell.classList.remove('is-done');
+    cell.classList.add('is-untracked', 'is-empty');
+    syncCellA11y(cell);
+  }
   function toggleCell(cell) {
-    setChecked(cell, !isChecked(cell));
+    if (isChecked(cell)) {
+      setChecked(cell, false);
+    } else if (isTracked(cell)) {
+      setEmpty(cell);
+    } else {
+      setChecked(cell, true);
+    }
     updateChart();
     markStateChanged();
   }
@@ -417,6 +462,10 @@
     updateTodayColumnEnd(statusCells);
   }
   function refreshToday() {
+    if (calendar.getCurrentPeriod().key !== PERIOD_KEY) {
+      window.location.reload();
+      return;
+    }
     const currentPeriodDay = getCurrentPeriodDay();
     if (currentPeriodDay === TODAY) {
       return;
@@ -424,6 +473,28 @@
     TODAY = currentPeriodDay;
     refreshCellData();
     updateChart();
+  }
+  function focusMobileCalendarOnToday() {
+    if (!TODAY || !window.matchMedia('(max-width: 1200px)').matches) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      const bar = getChartBars()[TODAY - 1];
+      const dayHeader = grid.querySelectorAll('.habit-day')[TODAY - 1];
+      if (bar) {
+        chartViewport.scrollLeft = Math.max(
+          0,
+          bar.offsetLeft - (chartViewport.clientWidth / 2) + (bar.offsetWidth / 2)
+        );
+      }
+      if (dayHeader) {
+        const firstColumnWidth = grid.querySelector('.habit-spacer')?.offsetWidth || 0;
+        habitBoard.scrollLeft = Math.max(
+          0,
+          dayHeader.offsetLeft - firstColumnWidth - dayHeader.offsetWidth
+        );
+      }
+    });
   }
   function bindLabel(label) {
     if (label.dataset.bound === 'true') {
@@ -635,7 +706,9 @@
   function createStatus(day, goal) {
     const cell = document.createElement('span');
     cell.className = 'status';
-    if (!goal.trackedDays.includes(day)) {
+    if (goal.emptyDays.includes(day)) {
+      cell.classList.add('is-untracked', 'is-empty');
+    } else if (!goal.trackedDays.includes(day)) {
       cell.classList.add('is-untracked');
     } else if (goal.doneDays.includes(day)) {
       cell.classList.add('is-done');
@@ -742,6 +815,7 @@
       id: createGoalId(),
       label: 'Doel',
       doneDays: [],
+      emptyDays: [],
       trackedDays: DAYS.filter((day) => day >= TODAY)
     }, goals.length);
     goals.push({ ...draftGoal, label: '', isDraft: true });
@@ -827,7 +901,20 @@
       if (!response?.ok || response.source !== 'supabase') {
         throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
       }
-      const storedState = parseStoredState(response.values?.[STATE_KEY]);
+      const values = response.values || {};
+      let storedState = parseStoredState(values[STATE_KEY]);
+      if (!storedState && PERIOD_KEY === calendar.INITIAL_PERIOD_KEY) {
+        storedState = parseStoredState(values[calendar.LEGACY_STATE_KEY], { allowLegacy: true });
+      }
+      if (!storedState) {
+        const priorStateKey = calendar.findLatestPriorMonthStateKey(values, PERIOD_KEY);
+        const priorRawState = priorStateKey
+          ? values[priorStateKey]
+          : PERIOD_KEY > calendar.INITIAL_PERIOD_KEY
+            ? values[calendar.LEGACY_STATE_KEY]
+            : null;
+        storedState = parseCarriedState(priorRawState);
+      }
       if (storedState) {
         renderGridShell(storedState.goals);
         endGameCards.render(storedState.endGameCards);
@@ -843,6 +930,8 @@
     } catch (error) {
       setPersistenceState('error');
       console.error('[LiveMomentum][state-load]', error?.message || error);
+    } finally {
+      focusMobileCalendarOnToday();
     }
   }
   renderChartShell();
@@ -851,6 +940,7 @@
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
+  focusMobileCalendarOnToday();
   void hydrateState();
   window.setInterval(refreshToday, TODAY_REFRESH_MS);
   window.addEventListener('focus', refreshToday);
