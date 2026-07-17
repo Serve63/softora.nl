@@ -17,16 +17,6 @@
   width: 23px;
   height: 23px;
 }
-.momentum-video-trigger-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--panel);
-  border-radius: 50%;
-  background: var(--danger);
-}
 .momentum-video-trigger:hover {
   border-color: rgba(35, 159, 88, .34);
   color: var(--good-dark);

@@ -49,6 +49,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<h1 id="momentum-title">ATTACK, ATTACK, ATTACK\.<\/h1>/);
   assert.match(html, /<p>Back on Track\.<\/p>/);
   assert.match(html, /class="momentum-video-trigger"[^>]*aria-label="Motivatievideo openen"[^>]*aria-haspopup="dialog"/);
+  assert.doesNotMatch(html, /momentum-video-trigger-dot/);
   assert.match(html, /<dialog class="momentum-video-dialog" id="momentum-video-dialog" aria-labelledby="momentum-video-title">/);
   assert.match(html, /<h2 id="momentum-video-title">ATTACK MODE<\/h2>/);
   assert.match(html, /class="momentum-video-stage" data-momentum-video-player/);
