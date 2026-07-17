@@ -254,7 +254,9 @@
     },
     {
       "id": "software-proposal-004",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-07-17",
+      "shippedPath": "/blog/maatwerk-software-offerte-beoordelen",
       "path": "/blog/maatwerk-software-offerte-beoordelen",
       "contentType": "blog",
       "cluster": "software-crm",
@@ -1187,6 +1189,84 @@
         ]
       },
       "nextAction": "Controleer actuele SERP-intent en voorkom overlap met de bredere bedrijfssoftware-kostenpagina."
+    },
+    {
+      "id": "software-implementation-016",
+      "status": "ready",
+      "path": "/blog/bedrijfsapplicatie-laten-maken-stappenplan",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "bedrijfsapplicatie laten maken",
+      "intent": "Van procesprobleem naar een testbare eerste bedrijfsapplicatie",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/bedrijfssoftware-op-maat",
+      "clusterRole": "Implementatiestappen voor kopers van een bedrijfsapplicatie",
+      "demandEvidence": [
+        {
+          "type": "gsc-and-gap",
+          "source": "GSC 28 dagen tot en met 2026-07-16 en Softora contentinventaris",
+          "observedAt": "2026-07-17",
+          "detail": "Bedrijfsapplicatie laten maken kreeg 2 impressies op gemiddelde positie 14,5; de money page behandelt het aanbod, maar een concrete route van procesanalyse via prototype naar acceptatie ontbreekt."
+        }
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-17",
+        "closestPaths": [
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/maatwerk-software-offerte-beoordelen",
+          "/vergelijkingen/maatwerk-software-vs-standaard-software"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat beschrijft de implementatievolgorde en beslismomenten voor een eerste bedrijfsapplicatie; de money page verkoopt de dienst, de kennisbank definieert maatwerk en de offertegids behandelt leveranciersvoorstellen."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 3,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 4
+      },
+      "weightedScore": 4.15,
+      "brief": {
+        "title": "Bedrijfsapplicatie laten maken: stappenplan van proces tot livegang",
+        "metaDescription": "Bereid een bedrijfsapplicatie voor met procesanalyse, scope, prototype, datamigratie, acceptatietests, livegang en beheer.",
+        "h1": "Hoe laat je een bedrijfsapplicatie maken?",
+        "outline": [
+          "Kies een afgebakend procesprobleem",
+          "Beschrijf rollen, data en uitzonderingen",
+          "Toets de flow met een prototype",
+          "Bouw en accepteer in kleine fases",
+          "Plan migratie, livegang en beheer"
+        ],
+        "buyerQuestions": [
+          "Welke informatie moet vooraf klaarstaan?",
+          "Hoe klein kan een eerste versie zijn?",
+          "Wie moet de applicatie voor livegang testen?"
+        ],
+        "incomingLinks": [
+          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/maatwerk-software-offerte-beoordelen"
+        ],
+        "outgoingLinks": [
+          "/bedrijfssoftware-op-maat",
+          "/maatwerk-platform"
+        ],
+        "conversionPath": "Van implementatiestappen naar een scopegesprek over een afgebakende eerste versie.",
+        "claimRisk": "Geen vaste doorlooptijd, foutloze migratie of resultaatgarantie; benoem afhankelijkheden en menselijke acceptatie.",
+        "visualConcepts": [
+          "Route van procesprobleem naar prototype, bouw, acceptatie en livegang",
+          "Rollen- en datamatrix voor een eerste bedrijfsapplicatie"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer de SERP-intent en werk een concreet maar leveranciersneutraal implementatiepad uit."
     }
   ]
 }
