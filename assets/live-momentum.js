@@ -38,6 +38,8 @@
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
+  const chartViewport = document.querySelector('.bar-chart-viewport');
+  const habitBoard = document.querySelector('.habit-board');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const endGameGoalTrack = document.querySelector('.end-game-goal-track');
   let stateReady = false;
@@ -51,7 +53,7 @@
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let draggedGoalId = '';
-  if (!grid || !chart || !endGameGoalTrack || !goalActionsApi || !endGameCardsApi) {
+  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !goalActionsApi || !endGameCardsApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -471,6 +473,28 @@
     TODAY = currentPeriodDay;
     refreshCellData();
     updateChart();
+  }
+  function focusMobileCalendarOnToday() {
+    if (!TODAY || !window.matchMedia('(max-width: 1200px)').matches) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      const bar = getChartBars()[TODAY - 1];
+      const dayHeader = grid.querySelectorAll('.habit-day')[TODAY - 1];
+      if (bar) {
+        chartViewport.scrollLeft = Math.max(
+          0,
+          bar.offsetLeft - (chartViewport.clientWidth / 2) + (bar.offsetWidth / 2)
+        );
+      }
+      if (dayHeader) {
+        const firstColumnWidth = grid.querySelector('.habit-spacer')?.offsetWidth || 0;
+        habitBoard.scrollLeft = Math.max(
+          0,
+          dayHeader.offsetLeft - firstColumnWidth - dayHeader.offsetWidth
+        );
+      }
+    });
   }
   function bindLabel(label) {
     if (label.dataset.bound === 'true') {
@@ -906,6 +930,8 @@
     } catch (error) {
       setPersistenceState('error');
       console.error('[LiveMomentum][state-load]', error?.message || error);
+    } finally {
+      focusMobileCalendarOnToday();
     }
   }
   renderChartShell();
@@ -914,6 +940,7 @@
   refreshCellData();
   getLabels().forEach(bindLabel);
   updateChart();
+  focusMobileCalendarOnToday();
   void hydrateState();
   window.setInterval(refreshToday, TODAY_REFRESH_MS);
   window.addEventListener('focus', refreshToday);

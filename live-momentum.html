@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
   <link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=20260611a">
-  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260717e">
+  <link rel="stylesheet" href="/assets/live-momentum.css?v=20260717f">
+  <link rel="stylesheet" href="/assets/live-momentum-mobile.css?v=20260717a">
   <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260717b">
   <script src="/assets/personnel-theme.js?v=20260715a" defer></script>
   <script src="/assets/premium-sidebar-autopilot.js?v=20260611a" defer></script>
@@ -83,6 +84,33 @@
     <script src="/assets/premium-sidebar-profile-prefill.js?v=20260715a"></script>
 
     <main class="main-content momentum-page" aria-labelledby="momentum-title">
+    <nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">
+      <a class="momentum-mobile-logo" href="/">Softora.nl</a>
+      <div class="momentum-mobile-links">
+        <a href="/premium-personeel-dashboard" aria-label="Dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+        </a>
+        <a href="/premium-personeel-agenda" aria-label="Agenda">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M8 2v3M16 2v3M3 9h18"></path>
+            <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+          </svg>
+        </a>
+        <a href="/premium-instellingen" aria-label="Instellingen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M4 6h9m3 0h4M4 12h3m3 0h10M4 18h11m3 0h2"></path>
+            <circle cx="14.5" cy="6" r="1.5"></circle>
+            <circle cx="8.5" cy="12" r="1.5"></circle>
+            <circle cx="16.5" cy="18" r="1.5"></circle>
+          </svg>
+        </a>
+      </div>
+    </nav>
     <div class="momentum-art-quotes" aria-hidden="true">
       <span class="momentum-art-quote is-end-game">The end game is to win</span>
       <span class="momentum-art-quote is-attack">Attack, attack, attack</span>
@@ -112,7 +140,9 @@
           <span>0%</span>
         </div>
 
-        <div class="bar-chart" aria-hidden="true"></div>
+        <div class="bar-chart-viewport">
+          <div class="bar-chart" aria-hidden="true"></div>
+        </div>
 
         <p class="sr-only">De huidige dag en momentumscore worden automatisch bijgewerkt.</p>
       </div>
@@ -150,6 +180,6 @@
   <script src="/assets/live-momentum-endgame-cards.js?v=20260717c" defer></script>
   <script src="/assets/live-momentum-video.js?v=20260717b" defer></script>
   <script src="/assets/live-momentum-calendar.js?v=20260717a" defer></script>
-  <script src="/assets/live-momentum.js?v=20260717b" defer></script>
+  <script src="/assets/live-momentum.js?v=20260717c" defer></script>
 </body>
 </html>

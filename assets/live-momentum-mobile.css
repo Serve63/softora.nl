@@ -1,0 +1,282 @@
+.momentum-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .bar-chart-viewport {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .bar-chart-viewport::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .momentum-layout .sidebar {
+    display: none !important;
+  }
+  .momentum-layout .momentum-page {
+    width: 100% !important;
+    min-height: 100dvh !important;
+    padding: 0 16px 32px !important;
+  }
+  .momentum-mobile-nav {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    min-height: 62px;
+    margin: 0 -16px 24px;
+    padding: 0 16px;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    background: rgba(248, 247, 244, .94);
+    backdrop-filter: blur(14px);
+  }
+  .momentum-mobile-logo {
+    color: #a52055;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+  .momentum-mobile-links {
+    display: flex;
+    gap: 6px;
+  }
+  .momentum-mobile-links a {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid rgba(26, 26, 46, .08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .72);
+    color: var(--muted);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .momentum-mobile-links a:focus-visible {
+    outline: 3px solid rgba(46, 204, 113, .3);
+    outline-offset: 2px;
+  }
+  .momentum-mobile-links svg {
+    width: 19px;
+    height: 19px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .momentum-head {
+    align-items: center;
+    padding-bottom: 1.35rem;
+  }
+  .momentum-head h1 {
+    max-width: 285px;
+    font-size: clamp(1.65rem, 7.5vw, 2rem);
+    line-height: .98;
+  }
+  .momentum-head p {
+    margin-top: .42rem;
+    font-size: .82rem;
+  }
+  .chart-card {
+    --chart-max-height: 136px;
+    --chart-total-height: 188px;
+    padding: 14px 0 10px 46px;
+    overflow: hidden;
+  }
+  .chart-card::after {
+    position: absolute;
+    z-index: 3;
+    top: 94px;
+    right: 0;
+    padding: 0 0 2px .42rem;
+    transform: translateY(-100%);
+    background: var(--page-bg);
+    color: var(--muted);
+    content: "AVARAGE";
+    font-family: var(--font-display);
+    font-size: .64rem;
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+  }
+  .chart-scale {
+    top: calc(14px + var(--chart-total-height) - var(--chart-max-height) - var(--chart-axis-height));
+    bottom: calc(10px + var(--chart-axis-height));
+    width: 38px;
+    font-size: .65rem;
+  }
+  .bar-chart-viewport {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bar-chart {
+    grid-template-columns: repeat(var(--day-count, 31), 34px);
+    gap: 8px;
+    min-width: max-content;
+  }
+  .bar-chart::after {
+    display: none;
+  }
+  .bar {
+    width: 24px;
+  }
+  .bar-label {
+    font-size: .68rem;
+  }
+  .habit-board {
+    margin-top: 1.05rem;
+    overscroll-behavior-inline: contain;
+    scroll-behavior: smooth;
+    scroll-padding-inline-start: 176px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .habit-grid {
+    width: max-content;
+    min-width: 0;
+    grid-template-columns: 176px repeat(var(--day-count, 31), 44px);
+  }
+  .habit-grid > * {
+    min-height: 48px;
+  }
+  .habit-spacer,
+  .habit-day {
+    min-height: 58px;
+  }
+  .habit-spacer,
+  .habit-name {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--page-bg);
+    box-shadow: 8px 0 14px -14px rgba(26, 26, 46, .48);
+  }
+  .habit-spacer {
+    z-index: 4;
+    padding: 0 12px 10px;
+  }
+  .habit-name {
+    gap: 7px;
+    min-height: 48px;
+    padding: 0 8px 0 12px;
+    font-size: .76rem;
+  }
+  .habit-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .goal-drag-handle {
+    width: 26px;
+    min-width: 26px;
+    height: 38px;
+  }
+  .status::before {
+    width: 22px;
+    height: 22px;
+  }
+  .end-game-title {
+    margin-top: 3.1rem;
+    font-size: 1.75rem;
+  }
+  .end-game-goals {
+    margin-top: 1.4rem;
+    padding-bottom: .5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .end-game-goal-track {
+    gap: 12px;
+  }
+  .end-game-goal-card {
+    flex-basis: min(74vw, 280px);
+    min-height: clamp(390px, 61vh, 455px);
+  }
+  .momentum-art-quote.is-end-game {
+    top: 12%;
+    left: 18%;
+  }
+  .momentum-art-quote.is-attack {
+    top: 22%;
+    right: -4%;
+  }
+  .momentum-watermark {
+    top: 75%;
+    right: -2%;
+    font-size: clamp(2.7rem, 15vw, 4.3rem);
+  }
+}
+
+@media (max-width: 780px) {
+  .momentum-head {
+    align-items: flex-start;
+  }
+  .chart-card {
+    overflow: hidden;
+  }
+  .chart-scale {
+    left: 0;
+  }
+  .momentum-watermark {
+    top: 79%;
+    right: 4%;
+    font-size: clamp(2.8rem, 13vw, 4.5rem);
+  }
+  .momentum-art-quotes {
+    inset: 0;
+  }
+  .momentum-art-quote.is-end-game {
+    top: 8%;
+    left: 29%;
+  }
+  .momentum-art-quote.is-attack {
+    top: 17%;
+    right: 3%;
+  }
+}
+
+@media (max-width: 520px) {
+  .momentum-layout .momentum-page {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
+  .momentum-mobile-nav {
+    min-height: 58px;
+    margin-right: -12px;
+    margin-bottom: 20px;
+    margin-left: -12px;
+    padding: 0 12px;
+  }
+  .momentum-head {
+    gap: 12px;
+  }
+  .momentum-head h1 {
+    max-width: 260px;
+    font-size: clamp(1.45rem, 7vw, 1.75rem);
+  }
+  .habit-grid {
+    grid-template-columns: 168px repeat(var(--day-count, 31), 44px);
+  }
+  .habit-board {
+    scroll-padding-inline-start: 168px;
+  }
+  .end-game-goals {
+    width: calc(100% + 24px);
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
+    scroll-padding-inline-start: 12px;
+  }
+  .end-game-goal-card {
+    flex-basis: min(78vw, 275px);
+    min-height: clamp(385px, 61vh, 445px);
+  }
+}
