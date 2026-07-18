@@ -228,6 +228,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
+    requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
   });
   registerKvkDatabaseRoutes(app, {
     coordinator: kvkDatabaseSnapshotCoordinator,

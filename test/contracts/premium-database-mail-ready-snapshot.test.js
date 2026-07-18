@@ -405,6 +405,50 @@ test('premium database mail-ready snapshot prunes deleted customers from both du
   assert.deepEqual(bootstrapSnapshot.availableCustomers, []);
 });
 
+test('premium database mail-ready snapshot moves removed webdesign assets to available in both durable caches', async () => {
+  const { service, calls } = createService({
+    durableSnapshot: {
+      version: 2,
+      generatedAt: '2026-06-16T11:59:30.000Z',
+      total: 1,
+      customers: [{
+        id: 'removed-assets',
+        bedrijf: 'Demo BV',
+        websitePhoto: 'https://assets.softora.test/demo.png',
+        websiteMockup: 'https://assets.softora.test/demo-mockup.png',
+        hasPhoto: true,
+        hasMockup: true,
+        websitePhotoAssetReady: true,
+        websiteMockupAssetReady: true,
+        mailReady: true,
+        mailReadySnapshot: true,
+      }],
+      availableTotal: 0,
+      availableCustomers: [],
+    },
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+  });
+
+  assert.equal(await service.markCustomersAvailableAfterAssetRemoval(['removed-assets']), true);
+  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(payload.availableCustomers.map((customer) => customer.id), ['removed-assets']);
+  assert.equal(payload.availableCustomers[0].websitePhoto, '');
+  assert.equal(payload.availableCustomers[0].websiteMockup, '');
+  assert.equal(payload.availableCustomers[0].websitePhotoAssetReady, false);
+  assert.equal(payload.availableCustomers[0].websiteMockupAssetReady, false);
+  assert.equal(payload.availableCustomers[0].mailReady, false);
+  assert.equal(payload.availableCustomers[0].availableSnapshot, true);
+  const cacheWrites = calls.filter((call) => Array.isArray(call) && call[0] === 'ui-state-write');
+  const fullSnapshot = JSON.parse(cacheWrites.find((call) => call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE)[2][MAIL_READY_SNAPSHOT_CACHE_KEY]);
+  const bootstrapSnapshot = JSON.parse(cacheWrites.find((call) => call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE)[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]);
+  assert.deepEqual(fullSnapshot.customers, []);
+  assert.deepEqual(fullSnapshot.availableCustomers.map((customer) => customer.id), ['removed-assets']);
+  assert.deepEqual(bootstrapSnapshot.customers, []);
+  assert.deepEqual(bootstrapSnapshot.availableCustomers.map((customer) => customer.id), ['removed-assets']);
+});
+
 test('premium database mail-ready snapshot persists compact full and bootstrap caches', async () => {
   const customers = Array.from({ length: 120 }, (_, index) => ({
     customer_id: `ready-${index + 1}`,

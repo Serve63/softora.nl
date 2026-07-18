@@ -422,6 +422,74 @@ test('premium database delete lead route requires explicit confirmation', async 
   assert.deepEqual(calls, []);
 });
 
+test('premium database remove webdesign assets route deletes both assets and moves the lead to available', async () => {
+  const calls = [];
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    mailReadySnapshotService: {
+      async markCustomersAvailableAfterAssetRemoval(customerIds) {
+        calls.push({ type: 'snapshot-available', customerIds });
+        return true;
+      },
+      invalidate() {
+        calls.push({ type: 'snapshot-invalidate' });
+      },
+    },
+    dataOpsStore: {
+      deleteDesignPhotos: async (customerIds, meta) => {
+        calls.push({ type: 'photos', customerIds, meta });
+        return { ok: true };
+      },
+    },
+  });
+  const response = createMockResponse();
+
+  await coordinator.sendRemoveWebdesignAssetsResponse(
+    { body: { customerId: 'customer-413', confirm: true } },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, {
+    ok: true,
+    customerId: 'customer-413',
+    assetsRemoved: true,
+    snapshotUpdated: true,
+  });
+  assert.deepEqual(calls, [
+    {
+      type: 'photos',
+      customerIds: ['customer-413'],
+      meta: {
+        source: 'premium-database-remove-webdesign-assets',
+        actor: 'Premium database',
+      },
+    },
+    { type: 'snapshot-available', customerIds: ['customer-413'] },
+  ]);
+});
+
+test('premium database remove webdesign assets route requires explicit confirmation', async () => {
+  const calls = [];
+  const coordinator = createPremiumDatabaseImportCoordinator({
+    dataOpsStore: {
+      deleteDesignPhotos: async () => {
+        calls.push('delete');
+        return { ok: true };
+      },
+    },
+  });
+  const response = createMockResponse();
+
+  await coordinator.sendRemoveWebdesignAssetsResponse(
+    { body: { customerId: 'customer-413' } },
+    response
+  );
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.code, 'WEBDESIGN_ASSET_DELETE_CONFIRM_REQUIRED');
+  assert.deepEqual(calls, []);
+});
+
 test('premium database delete lead route fails closed without a customer id or data ops delete storage', async () => {
   const coordinator = createPremiumDatabaseImportCoordinator();
   const missingIdResponse = createMockResponse();
@@ -1502,10 +1570,12 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /createPremiumDatabaseMailReadySnapshotService\(\{[\s\S]*dataOpsStore: deps\.dataOpsStore/);
   assert.match(featureRoutesSource, /getUiStateValues: deps\.getUiStateValues/);
   assert.match(featureRoutesSource, /mailReadySnapshotService: premiumDatabaseMailReadySnapshotService/);
+  assert.match(featureRoutesSource, /requirePremiumApiAccess: premiumRouteRuntime\?\.requirePremiumApiAccess/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/delete-lead'/);
+  assert.match(routeSource, /app\.post\('\/api\/premium-database\/remove-webdesign-assets', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);

@@ -2188,6 +2188,63 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     });
   }
 
+  async function sendRemoveWebdesignAssetsResponse(req, res) {
+    const body = req && req.body && typeof req.body === 'object' ? req.body : {};
+    const customerId = normalizeString(body.customerId);
+    if (!customerId) {
+      return res.status(400).json({
+        ok: false,
+        code: 'WEBDESIGN_ASSET_CUSTOMER_ID_REQUIRED',
+        error: 'Klant-id ontbreekt.',
+      });
+    }
+    if (body.confirm !== true) {
+      return res.status(400).json({
+        ok: false,
+        code: 'WEBDESIGN_ASSET_DELETE_CONFIRM_REQUIRED',
+        error: 'Bevestig dat het webdesign en de mockup verwijderd mogen worden.',
+      });
+    }
+    if (!dataOpsStore || typeof dataOpsStore.deleteDesignPhotos !== 'function') {
+      return res.status(503).json({
+        ok: false,
+        code: 'WEBDESIGN_ASSET_STORAGE_UNAVAILABLE',
+        error: 'Webdesign verwijderen is tijdelijk niet beschikbaar.',
+      });
+    }
+
+    const removed = await dataOpsStore.deleteDesignPhotos([customerId], {
+      source: 'premium-database-remove-webdesign-assets',
+      actor: 'Premium database',
+    });
+    if (!removed || !removed.ok) {
+      return res.status(503).json({
+        ok: false,
+        code: 'WEBDESIGN_ASSET_DELETE_FAILED',
+        error: truncateText(normalizeString(removed && removed.error && removed.error.message) || 'Webdesign verwijderen mislukt.', 500),
+      });
+    }
+
+    let snapshotUpdated = false;
+    if (mailReadySnapshotService && typeof mailReadySnapshotService.markCustomersAvailableAfterAssetRemoval === 'function') {
+      try {
+        snapshotUpdated = await mailReadySnapshotService.markCustomersAvailableAfterAssetRemoval([customerId]);
+      } catch (_error) {
+        snapshotUpdated = false;
+      }
+    }
+    if (!snapshotUpdated && mailReadySnapshotService && typeof mailReadySnapshotService.invalidate === 'function') {
+      mailReadySnapshotService.invalidate();
+    }
+
+    return res.status(200).json({
+      ok: true,
+      customerId,
+      assetsRemoved: true,
+      snapshotUpdated: Boolean(snapshotUpdated),
+    });
+  }
+
   return {
     sendSyncResponse,
     sendImportResponse,
@@ -2195,6 +2252,7 @@ function createPremiumDatabaseImportCoordinator(deps = {}) {
     sendDeepSearchEstimateResponse,
     sendDeepSearchBusinessesResponse,
     sendDeleteLeadResponse,
+    sendRemoveWebdesignAssetsResponse,
   };
 }
 

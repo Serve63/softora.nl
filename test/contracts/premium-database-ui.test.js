@@ -1029,6 +1029,44 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(client.isSnapshotAvailableCustomer(merged[2]), false);
 });
 
+test('mail-ready snapshot client moves a removed webdesign from mail-ready to available immediately', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const readyCustomer = {
+    id: 'customer-ready',
+    bedrijf: 'Demo BV',
+    websitePhoto: 'https://assets.softora.test/demo.png',
+    websiteMockup: 'https://assets.softora.test/demo-mockup.png',
+    websitePhotoAssetReady: true,
+    websiteMockupAssetReady: true,
+    hasPhoto: true,
+    hasMockup: true,
+    mailReady: true,
+    mailReadySnapshot: true,
+  };
+  const state = {
+    mailReadySnapshotLoaded: true,
+    mailReadySnapshotTotal: 1,
+    mailReadySnapshotCustomers: [readyCustomer],
+    availableSnapshotLoaded: true,
+    availableSnapshotTotal: 0,
+    availableSnapshotCustomers: [],
+  };
+
+  const moved = client.moveCustomerToAvailable(state, readyCustomer);
+
+  assert.equal(moved.websitePhoto, '');
+  assert.equal(moved.websiteMockup, '');
+  assert.equal(moved.websitePhotoAssetReady, false);
+  assert.equal(moved.websiteMockupAssetReady, false);
+  assert.equal(moved.mailReady, false);
+  assert.equal(moved.mailReadySnapshot, false);
+  assert.equal(moved.availableSnapshot, true);
+  assert.equal(state.mailReadySnapshotTotal, 0);
+  assert.deepEqual(state.mailReadySnapshotCustomers, []);
+  assert.equal(state.availableSnapshotTotal, 1);
+  assert.equal(client.isSnapshotAvailableCustomer(state.availableSnapshotCustomers[0]), true);
+});
+
 test('mail-ready snapshot client never lets an older response replace a newer count', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn() {} } });
   const newerGeneratedAt = Date.parse('2026-07-16T14:00:00.000Z');
@@ -1152,7 +1190,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260716a/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260718a/);
   assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
@@ -1161,6 +1199,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(snapshotSource, /global\.SoftoraDatabaseMailReadySnapshot =/);
   assert.match(snapshotSource, /state\.mailReadySnapshotCustomers = snapshotCustomers;/);
   assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers, availableSnapshotCustomers\)/);
+  assert.match(snapshotSource, /function moveCustomerToAvailable\(state, customer\)/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{/);
   assert.match(pageSource, /state\.activeStatus === "benaderbaar" && state\.mailReadySnapshotLoaded\) return false;/);
   assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return false;/);
@@ -1657,8 +1696,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId, kind\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
   assert.match(pageSource, /function removeWebsitePhotoForCustomer\(customerId\)/);
-  assert.match(pageSource, /websitePhoto: ""/);
-  assert.match(pageSource, /websiteMockup: ""/);
+  assert.match(pageSource, /\/api\/premium-database\/remove-webdesign-assets/);
+  assert.match(pageSource, /moveCustomerToAvailable\(state, normalizeCustomer\(/);
   assert.match(pageSource, /persistCustomerPhotos\(state\.klanten, \{ removeCustomerIds: \[customerId\] \}\)/);
   assert.match(pageSource, /window\.SoftoraDatabasePhotoStorage\.createController\(\{/);
   assert.match(photoStorageScriptSource, /function normalizeIdSet\(values\)/);
