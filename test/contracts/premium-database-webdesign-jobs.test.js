@@ -428,6 +428,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(res.statusCode, 202);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.job.status, 'queued');
+  assert.equal(res.body.job.variant, 'v1-prompt-only');
 
   const job = await waitForJobDone(coordinator, 'job_1234567890123');
   assert.equal(job.status, 'done');
@@ -478,6 +479,32 @@ test('premium database webdesign jobs generate and persist a customer photo in t
     roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
     source: 'premium-database-webdesign-jobs',
   });
+
+  const v2Res = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'serve@softora.nl', userId: 'user-1' },
+      body: {
+        jobId: 'job_visual_dna_123456789',
+        variant: 'v2-visual-dna',
+        websiteUrl: 'https://www.bliv.nl/',
+        customer: {
+          id: 'customer-v2',
+          bedrijf: 'Bliv Makelaardij',
+          dom: 'bliv.nl',
+        },
+      },
+    },
+    v2Res
+  );
+  assert.equal(v2Res.statusCode, 202);
+  assert.equal(v2Res.body.job.variant, 'v2-visual-dna');
+  const v2Job = await waitForJobDone(coordinator, 'job_visual_dna_123456789');
+  assert.equal(v2Job.status, 'done');
+  assert.equal(pipelineCalls[2].options.disableReferenceImages, false);
+  assert.equal(pipelineCalls[2].options.referenceImageMode, 'homepage-screenshot');
+  assert.equal(pipelineCalls[2].options.requireReferenceImages, true);
+  assert.equal(pipelineCalls[2].options.body.variant, 'v2-visual-dna');
 });
 
 test('premium database webdesign jobs keep status access scoped to the logged in user', async () => {

@@ -73,6 +73,8 @@ function createService(overrides = {}) {
           bytes: Buffer.from('png-image-bytes'),
         };
       }),
+    waitForWebsitePreviewScreenshotRetry:
+      overrides.waitForWebsitePreviewScreenshotRetry || (async () => {}),
     extractOpenAiTextContent:
       overrides.extractOpenAiTextContent ||
       ((content) => {
@@ -350,6 +352,98 @@ test('ai remote service skips reference image edits when prompt-only previews ar
   assert.equal(capturedPromptScan.referenceImageCount, 0);
   assert.match(String(calls[0].options.body || ''), /"size":"2160x3840"/);
   assert.equal(result.referenceImageCount, 0);
+});
+
+test('ai remote service waits for a required V2 homepage screenshot before image editing', async () => {
+  const generationCalls = [];
+  let screenshotFetches = 0;
+  const { service } = createService({
+    waitForWebsitePreviewScreenshotRetry: async () => {},
+    sanitizeReferenceImages: (images) => images,
+    fetchBinaryWithTimeout: async (url) => {
+      screenshotFetches += 1;
+      if (screenshotFetches === 1) {
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url: 'https://s0.wp.com/mshots/v1/default',
+            headers: { get: () => 'image/gif' },
+          },
+          bytes: Buffer.alloc(2048, 1),
+        };
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url,
+          headers: { get: () => 'image/png' },
+        },
+        bytes: Buffer.alloc(4096, 1),
+      };
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      generationCalls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: [{ b64_json: 'YWJjZA==' }] },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({
+    host: 'www.bliv.nl',
+    sourceUrl: 'https://www.bliv.nl/',
+    referenceImageMode: 'homepage-screenshot',
+    referenceImageFidelity: 'high',
+    requireReferenceImages: true,
+    referenceImageUrls: ['https://s0.wordpress.com/mshots/v1/https%3A%2F%2Fwww.bliv.nl%2F?w=1280&h=1600'],
+  });
+
+  assert.equal(screenshotFetches, 2);
+  assert.equal(generationCalls.length, 1);
+  assert.equal(generationCalls[0].url, 'https://api.openai.test/v1/images/edits');
+  assert.equal(generationCalls[0].options.body.getAll('image[]').length, 1);
+  assert.equal(generationCalls[0].options.body.get('input_fidelity'), 'high');
+  assert.equal(result.referenceImageCount, 1);
+});
+
+test('ai remote service fails V2 closed when no homepage screenshot becomes available', async () => {
+  let generationCalls = 0;
+  let screenshotFetches = 0;
+  const { service } = createService({
+    waitForWebsitePreviewScreenshotRetry: async () => {},
+    sanitizeReferenceImages: (images) => images,
+    fetchBinaryWithTimeout: async () => {
+      screenshotFetches += 1;
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://s0.wp.com/mshots/v1/default',
+          headers: { get: () => 'image/gif' },
+        },
+        bytes: Buffer.alloc(2048, 1),
+      };
+    },
+    fetchJsonWithTimeout: async () => {
+      generationCalls += 1;
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+
+  await assert.rejects(
+    service.generateWebsitePreviewImageWithAi({
+      host: 'www.bliv.nl',
+      referenceImageMode: 'homepage-screenshot',
+      requireReferenceImages: true,
+      referenceImageUrls: ['https://s0.wordpress.com/mshots/v1/bliv'],
+    }),
+    (error) => error && error.status === 503 && error.retryableOpenAiImage === true
+  );
+  assert.equal(screenshotFetches, 3);
+  assert.equal(generationCalls, 0);
 });
 
 test('ai remote service retries the smaller image size when the primary image request aborts', async () => {
