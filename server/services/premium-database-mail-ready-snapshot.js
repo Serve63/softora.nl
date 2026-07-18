@@ -866,6 +866,75 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     return persisted;
   }
 
+  async function markCustomersAvailableAfterAssetRemoval(customerIds = []) {
+    const movedIds = new Set(
+      (Array.isArray(customerIds) ? customerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    );
+    if (!movedIds.size) return true;
+
+    snapshotInvalidated = true;
+    const pendingWork = [snapshotDataPromise, snapshotMediaRefreshPromise].filter(Boolean);
+    if (pendingWork.length) await Promise.allSettled(pendingWork);
+
+    const durableData = await readDurableSnapshotData();
+    const cachedData = snapshotDataCache && snapshotDataCache.data;
+    const baseData = getSnapshotGeneratedAtMs(durableData) > getSnapshotGeneratedAtMs(cachedData)
+      ? durableData
+      : cachedData || durableData;
+    if (!baseData) {
+      invalidate();
+      return Boolean(await startSnapshotRefresh());
+    }
+
+    const sourceCustomers = (Array.isArray(baseData.customers) ? baseData.customers : [])
+      .concat(Array.isArray(baseData.availableCustomers) ? baseData.availableCustomers : []);
+    const movedCustomers = sourceCustomers
+      .filter((customer) => movedIds.has(normalizeString(customer && customer.id)))
+      .map((customer) => ({
+        ...customer,
+        websitePhoto: '',
+        websitePhotoName: '',
+        websiteMockup: '',
+        websiteMockupName: '',
+        signedUrlExpiresAt: '',
+        hasPhoto: false,
+        hasMockup: false,
+        websitePhotoAssetReady: false,
+        websiteMockupAssetReady: false,
+        mailReady: false,
+        mailReadySnapshot: false,
+        availableSnapshot: true,
+      }));
+    if (new Set(movedCustomers.map((customer) => normalizeString(customer && customer.id))).size !== movedIds.size) {
+      invalidate();
+      return Boolean(await startSnapshotRefresh());
+    }
+
+    const withoutMoved = (customers) => (Array.isArray(customers) ? customers : []).filter((customer) => (
+      !movedIds.has(normalizeString(customer && customer.id))
+    ));
+    const nextData = {
+      ...baseData,
+      generatedAt: now().toISOString(),
+      customers: withoutMoved(baseData.customers),
+      availableCustomers: withoutMoved(baseData.availableCustomers).concat(movedCustomers),
+    };
+    nextData.total = nextData.customers.length;
+    nextData.availableTotal = nextData.availableCustomers.length;
+
+    const persisted = await persistDurableSnapshotData(nextData);
+    if (!persisted) {
+      invalidate();
+      return Boolean(await startSnapshotRefresh());
+    }
+    snapshotDataCache = { cachedAtMs: nowMs(), data: nextData };
+    snapshotInvalidated = false;
+    durableSnapshotReadPromise = null;
+    return true;
+  }
+
   async function buildMailReadySnapshot(options = {}) {
     const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
     const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
@@ -913,6 +982,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   return {
     buildMailReadySnapshot,
     invalidate,
+    markCustomersAvailableAfterAssetRemoval,
     removeCustomers,
     sendMailReadySnapshotResponse,
   };

@@ -1464,7 +1464,7 @@
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-mass-research.js?v=20260629a"></script><script src="assets/premium-database-distance.js?v=20260616a"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260605a"></script>
-    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260716a"></script>
+    <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260718a"></script>
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
@@ -2471,14 +2471,10 @@
             });
             if (customerIndex === -1) return;
 
-            const nextCustomer = normalizeCustomer({
-                ...state.klanten[customerIndex],
-                websitePhoto: "",
-                websitePhotoName: "",
-                websiteMockup: "",
-                websiteMockupName: "",
-                updatedAt: formatDateForStorage(new Date())
-            }, customerId);
+            try { const response = await window.SoftoraDatabaseResilience.fetchJsonWithTimeout("/api/premium-database/remove-webdesign-assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: customerId, confirm: true }) }, 15000); const body = await response.json().catch(function () { return {}; }); if (!response.ok || !body.ok) throw new Error(body && body.error || "Webdesign verwijderen mislukt (" + response.status + ")"); }
+            catch (error) { setStatusMessage(String(error && error.message || "Webdesign verwijderen is mislukt."), "error"); return; }
+
+            const nextCustomer = window.SoftoraDatabaseMailReadySnapshot.moveCustomerToAvailable(state, normalizeCustomer({ ...state.klanten[customerIndex], updatedAt: formatDateForStorage(new Date()) }, customerId));
             state.klanten = sortCustomers(state.klanten.map(function (item) {
                 return item.id === customerId ? nextCustomer : item;
             }));
@@ -2486,12 +2482,10 @@
             closeWebsitePhotoPreview();
 
             const photoResult = await persistCustomerPhotos(state.klanten, { removeCustomerIds: [customerId] });
-            if (photoResult.ok) {
-                toast("Foto verwijderd");
-                setStatusMessage("Foto verwijderd.", "success", true);
-                return;
-            }
-            setStatusMessage("Foto is lokaal verwijderd, maar opslaan in Supabase mislukte.", "error");
+            if (!photoResult.ok) console.warn("Oude databasefoto-opslag opruimen mislukt:", photoResult.error);
+            await loadMailReadySnapshot();
+            toast("Webdesign verwijderd");
+            setStatusMessage("Webdesign en mockup verwijderd; bedrijf staat weer bij Beschikbaar.", "success", true);
         }
 
         function normalizeWebsiteCandidateUrl(value) {
