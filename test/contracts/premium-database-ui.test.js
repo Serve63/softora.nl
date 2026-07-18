@@ -140,6 +140,7 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   };
   const windowObject = {
     document,
+    SoftoraDatabaseWebdesignVariantPicker: options.SoftoraDatabaseWebdesignVariantPicker,
     setTimeout: options.setTimeout || setTimeout,
     clearTimeout: options.clearTimeout || clearTimeout,
     requestAnimationFrame: options.requestAnimationFrame || ((callback) => callback()),
@@ -1251,6 +1252,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const webdesignAssetStateScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-asset-state.js');
   const coldmailGuardScriptPath = path.join(__dirname, '../../assets/premium-database-coldmail-guard.js');
   const webdesignBulkScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-bulk.js');
+  const webdesignVariantPickerScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-variant-picker.js');
   const webdesignActionScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const webdesignPreviewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
   const leadDeleteScriptPath = path.join(__dirname, '../../assets/premium-database-lead-delete.js');
@@ -1272,6 +1274,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const webdesignAssetStateScriptSource = fs.readFileSync(webdesignAssetStateScriptPath, 'utf8');
   const coldmailGuardScriptSource = fs.readFileSync(coldmailGuardScriptPath, 'utf8');
   const webdesignBulkScriptSource = fs.readFileSync(webdesignBulkScriptPath, 'utf8');
+  const webdesignVariantPickerScriptSource = fs.readFileSync(webdesignVariantPickerScriptPath, 'utf8');
   const webdesignActionScriptSource = fs.readFileSync(webdesignActionScriptPath, 'utf8');
   const webdesignPreviewScriptSource = fs.readFileSync(webdesignPreviewScriptPath, 'utf8');
   const leadDeleteScriptSource = fs.readFileSync(leadDeleteScriptPath, 'utf8');
@@ -1517,7 +1520,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260718a/);
+  assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
+  assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
+  assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
+  assert.match(webdesignVariantPickerScriptSource, /V1 — Originele generator/);
   assert.match(webdesignActionScriptSource, /const FALLBACK_ICON = "<span class=\\"photo-fallback-icon\\" aria-hidden=\\"true\\"><\/span>";/);
   assert.match(webdesignActionScriptSource, /\.photo-fallback-icon\{display:none\}/);
   assert.doesNotMatch(webdesignActionScriptSource, /photo-fallback-icon[^\n]*>!<\/span>/);
@@ -1606,8 +1614,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignMockupScriptSource, /toast\("Device mockup wordt lokaal gemaakt, geen extra API-kosten"\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /\.photo-drop:hover \.photo-generate-cost/);
   assert.match(webdesignActionScriptSource, /function formatCentCost\(value\)/);
-  assert.match(webdesignActionScriptSource, /label\.textContent = formatCentCost\(costEur\);/);
-  assert.match(webdesignActionScriptSource, /showChargeLabel\(\);/);
+  assert.match(webdesignActionScriptSource, /label\.textContent = formatCentCost\(normalizeVariant\(variant\) === "v2-visual-dna" \? 0\.06 : costEur\);/);
+  assert.match(webdesignActionScriptSource, /showChargeLabel\(variant\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /AI-kosten/);
   assert.doesNotMatch(webdesignActionScriptSource, /Webdesign maken, kost/);
   assert.match(pageSource, /formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR/);
@@ -1762,7 +1770,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260718a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1913,7 +1921,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260714a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260718a/);
+  assert.match(webdesignActionScriptSource, /variant: normalizeVariant\(variant\)/);
+  assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
@@ -3029,6 +3039,81 @@ test('premium database webdesign bulk retries restore after a temporary batch li
   assert.match(statusNode.innerHTML, /959 \/ 2\.562/);
   assert.match(statusNode.innerHTML, /1\.603 resterend/);
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/run'));
+});
+
+test('premium database webdesign action sends the explicitly selected V2 variant', async () => {
+  let postedBody = null;
+  const chargeLabels = [];
+  const document = {
+    getElementById: () => null,
+    createElement: () => ({ ...createClassListNode(), style: {} }),
+    querySelectorAll: () => chargeLabels,
+    head: { appendChild() {} },
+    body: {
+      appendChild(node) {
+        node.parentNode = {
+          removeChild(child) {
+            const index = chargeLabels.indexOf(child);
+            if (index >= 0) chargeLabels.splice(index, 1);
+            child.parentNode = null;
+          },
+        };
+        chargeLabels.push(node);
+      },
+    },
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    document,
+    SoftoraDatabaseWebdesignVariantPicker: {
+      choose: async () => 'v2-visual-dna',
+    },
+    setTimeout(callback) {
+      callback();
+      return 0;
+    },
+    clearTimeout() {},
+    fetch: async (_url, options) => {
+      postedBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        json: async () => ({
+          job: {
+            id: postedBody.jobId,
+            customerId: 'customer-v2',
+            variant: 'v2-visual-dna',
+            status: 'error',
+            error: null,
+            safetyBlocked: true,
+          },
+        }),
+      };
+    },
+  });
+  const controller = webdesignActionClient.createController({
+    state: {
+      klanten: [{
+        id: 'customer-v2',
+        bedrijf: 'Bliv Makelaardij',
+        website: 'https://www.bliv.nl/',
+        dom: 'bliv.nl',
+        websitePhoto: '',
+      }],
+    },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: () => false,
+    resolveCustomerWebsiteUrl: () => 'https://www.bliv.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  await controller.generateForCustomer('customer-v2');
+
+  assert.equal(postedBody.variant, 'v2-visual-dna');
+  assert.equal(postedBody.customer.bedrijf, 'Bliv Makelaardij');
 });
 
 test('premium database webdesign action keeps generation errors visible until the next action', async () => {

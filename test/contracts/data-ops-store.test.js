@@ -184,6 +184,38 @@ test('data ops store saves cancelled webdesign batches with a table-compatible s
   assert.equal(upsertRows[0].row.payload.batch.summary.cancelled, 7);
 });
 
+test('data ops store persists the selected webdesign generation variant', async () => {
+  const upsertRows = [];
+  const client = {
+    from(table) {
+      return {
+        upsert(row) {
+          upsertRows.push({ table, row });
+          return Promise.resolve({ data: row, error: null });
+        },
+      };
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {} },
+  });
+
+  const result = await store.upsertWebdesignJob({
+    id: 'webdesign_v2_job',
+    ownerKey: 'owner',
+    websiteUrl: 'https://www.bliv.nl/',
+    customer: { id: 'customer-v2', bedrijf: 'Bliv Makelaardij' },
+    variant: 'v2-visual-dna',
+    status: 'queued',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(upsertRows[0].table, 'softora_webdesign_jobs');
+  assert.equal(upsertRows[0].row.payload.variant, 'v2-visual-dna');
+});
+
 function createSupabaseClientRecorder(currentCustomerIds = []) {
   const recorder = {
     upsertRows: [],

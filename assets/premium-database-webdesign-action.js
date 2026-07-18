@@ -23,13 +23,9 @@
     const FALLBACK_ICON = "<span class=\"photo-fallback-icon\" aria-hidden=\"true\"></span>";
     const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
 
-    function normalizeString(value) {
-        return String(value || "").trim();
-    }
-
-    function formatCentCost(value) {
-        return "-" + Math.round(Math.max(0, Number(value) || 0) * 100) + " cent";
-    }
+    function normalizeString(value) { return String(value || "").trim(); }
+    function normalizeVariant(value) { return normalizeString(value).toLowerCase() === "v2-visual-dna" ? "v2-visual-dna" : "v1-prompt-only"; }
+    function formatCentCost(value) { return "-" + Math.round(Math.max(0, Number(value) || 0) * 100) + " cent"; }
 
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
@@ -390,12 +386,12 @@
             });
         }
 
-        function showChargeLabel() {
+        function showChargeLabel(variant) {
             if (!global.document) return;
             const label = global.document.createElement("div");
             label.className = "photo-generate-charge-label";
             label.setAttribute("aria-live", "polite");
-            label.textContent = formatCentCost(costEur);
+            label.textContent = formatCentCost(normalizeVariant(variant) === "v2-visual-dna" ? 0.06 : costEur);
             global.document.body.appendChild(label);
             updateChargeLabelPositions();
             const frame = typeof global.requestAnimationFrame === "function"
@@ -432,9 +428,10 @@
             if (!(updateOptions && updateOptions.deferRender) && typeof renderPage === "function") renderPage();
         }
 
-        function buildJobPayload(target, jobId) {
+        function buildJobPayload(target, jobId, variant) {
             return {
                 jobId: jobId,
+                variant: normalizeVariant(variant),
                 websiteUrl: resolveCustomerWebsiteUrl(target),
                 customer: {
                     id: target.id,
@@ -585,7 +582,7 @@
                 let restoredCount = 0, clearedCount = pruneExpiredPendingJobs();
                 jobs.forEach(function (job) {
                     if (!job || (job.status !== "queued" && job.status !== "running")) return;
-                    const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
+                    const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), variant: normalizeVariant(job.variant), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
                     if (!isPendingJobFresh(pendingJob)) return;
                     activeRestoredJobIds.add(pendingJob.jobId); setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
                 });
@@ -715,6 +712,7 @@
             const quiet = Boolean(startOptions && startOptions.quiet);
             const deferRender = Boolean(startOptions && startOptions.deferRender);
             const pollDelay = Math.max(0, Number(startOptions && startOptions.pollDelay) || 0);
+            const variant = normalizeVariant(startOptions && startOptions.variant);
             if (!target) return { started: false, skipped: true };
             if (isValidWebsitePhotoDataUrl(target.websitePhoto)) {
                 if (!quiet) openWebsitePhotoPreview(target.id);
@@ -730,17 +728,17 @@
             }
             if (!quiet) {
                 setStatusMessage("");
-                showChargeLabel();
+                showChargeLabel(variant);
             }
             const jobId = createJobId();
-            setPendingJob({ customerId: target.id, jobId: jobId, startedAt: now() }, { deferRender: deferRender });
+            setPendingJob({ customerId: target.id, jobId: jobId, variant: variant, startedAt: now() }, { deferRender: deferRender });
             try {
                 const response = await fetch(JOB_ENDPOINT, {
                     method: "POST",
                     credentials: "same-origin",
                     cache: "no-store",
                     headers: { "Content-Type": "application/json", Accept: "application/json" },
-                    body: JSON.stringify(buildJobPayload(target, jobId))
+                    body: JSON.stringify(buildJobPayload(target, jobId, variant))
                 });
                 const payload = await response.json().catch(function () {
                     return {};
@@ -751,7 +749,7 @@
                 }
                 if (job.id !== jobId) {
                     clearPollTimer(jobId);
-                    setPendingJob({ customerId: target.id, jobId: job.id, startedAt: now() }, { deferRender: deferRender });
+                    setPendingJob({ customerId: target.id, jobId: job.id, variant: normalizeVariant(job.variant || variant), startedAt: now() }, { deferRender: deferRender });
                 }
                 if (job.status === "done") {
                     await finishPendingJob({ customerId: target.id, jobId: job.id }, "");
@@ -770,7 +768,7 @@
             }
         }
 
-        async function generateForCustomer(customerId) { await startJobForTarget(getCustomerById(customerId), { quiet: false, deferRender: false, pollDelay: 0 }); }
+        async function generateForCustomer(customerId) { const target = getCustomerById(customerId), picker = global.SoftoraDatabaseWebdesignVariantPicker; let variant = "v1-prompt-only"; if (picker && typeof picker.choose === "function") { variant = await picker.choose({ company: normalizeString(target && target.bedrijf) }); if (!variant) return { started: false, cancelled: true }; } return startJobForTarget(target, { quiet: false, deferRender: false, pollDelay: 0, variant: normalizeVariant(variant) }); }
 
         async function generateBatchForCustomers(customers, batchOptions) {
             const targets = (Array.isArray(customers) ? customers : []).filter(Boolean), total = targets.length;

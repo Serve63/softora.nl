@@ -933,6 +933,7 @@ function createAiRemoteService(deps = {}) {
     const referenceMode = normalizeString(
       scan.referenceImageMode || scan.websitePreviewReferenceMode || ''
     ).toLowerCase();
+    const requireReferenceImages = scan.requireReferenceImages === true;
     if (
       scan.disableReferenceImages === true ||
       scan.websitePreviewDisableReferenceImages === true ||
@@ -945,53 +946,81 @@ function createAiRemoteService(deps = {}) {
     const candidates = Array.isArray(scan.referenceImageUrls)
       ? scan.referenceImageUrls.map((item) => normalizeString(item || '')).filter(Boolean)
       : [];
-    if (candidates.length === 0) return [];
+    if (candidates.length === 0 && !requireReferenceImages) return [];
 
     const rawImages = [];
     let totalBytes = 0;
     const pageUrl = normalizeString(scan.sourceUrl || scan.url || '');
+    const isHomepageScreenshot = referenceMode === 'homepage-screenshot';
+    const maxImages = isHomepageScreenshot ? 1 : 3;
+    const maxFetchAttempts = isHomepageScreenshot ? 3 : 1;
+    const retryDelayMs = Math.max(
+      0,
+      Math.min(5000, Number(env.WEBSITE_PREVIEW_SCREENSHOT_RETRY_DELAY_MS ?? 1600) || 0)
+    );
 
     for (let index = 0; index < candidates.length; index += 1) {
-      if (rawImages.length >= 3) break;
+      if (rawImages.length >= maxImages) break;
       const candidateUrl = candidates[index];
       if (!isLikelyUsefulReferenceImageUrl(candidateUrl)) continue;
 
-      try {
-        const safeUrl = await assertWebsitePreviewUrlIsPublic(candidateUrl);
-        const { response, bytes } = await fetchBinaryWithTimeout(
-          safeUrl,
-          {
-            method: 'GET',
-            redirect: 'follow',
-            headers: buildWebsitePreviewImageHeaders(pageUrl),
-          },
-          15000
-        );
-        if (!response?.ok) continue;
-        const finalUrl = await assertWebsitePreviewFetchedUrlIsPublic(response, safeUrl);
-
-        const contentType =
-          normalizeString(extractResponseHeader(response, 'content-type') || '').split(';')[0] ||
-          guessImageMimeTypeFromUrl(finalUrl);
-        if (!isSupportedWebsitePreviewReferenceMimeType(contentType)) continue;
-        if (!Buffer.isBuffer(bytes) || bytes.length < 1024 || bytes.length > 2 * 1024 * 1024) continue;
-        if (totalBytes + bytes.length > 4 * 1024 * 1024) continue;
-
-        rawImages.push({
-          name: inferWebsitePreviewReferenceFileName(finalUrl, index, contentType),
-          dataUrl: `data:${contentType};base64,${bytes.toString('base64')}`,
-        });
-        totalBytes += bytes.length;
-      } catch (_) {
-        /* ignore reference-image fetch failures; prompt-only generation remains available */
+      for (let attempt = 0; attempt < maxFetchAttempts; attempt += 1) {
+        let accepted = false;
+        try {
+          const safeUrl = await assertWebsitePreviewUrlIsPublic(candidateUrl);
+          const { response, bytes } = await fetchBinaryWithTimeout(
+            safeUrl,
+            {
+              method: 'GET',
+              redirect: 'follow',
+              headers: buildWebsitePreviewImageHeaders(pageUrl),
+            },
+            15000
+          );
+          if (response?.ok) {
+            const finalUrl = await assertWebsitePreviewFetchedUrlIsPublic(response, safeUrl);
+            const contentType =
+              normalizeString(extractResponseHeader(response, 'content-type') || '').split(';')[0] ||
+              guessImageMimeTypeFromUrl(finalUrl);
+            if (
+              isSupportedWebsitePreviewReferenceMimeType(contentType) &&
+              Buffer.isBuffer(bytes) &&
+              bytes.length >= 1024 &&
+              bytes.length <= 2 * 1024 * 1024 &&
+              totalBytes + bytes.length <= 4 * 1024 * 1024
+            ) {
+              rawImages.push({
+                name: inferWebsitePreviewReferenceFileName(finalUrl, index, contentType),
+                dataUrl: `data:${contentType};base64,${bytes.toString('base64')}`,
+              });
+              totalBytes += bytes.length;
+              accepted = true;
+            }
+          }
+        } catch (_) {
+          /* Retry screenshot warming below; optional references may still fall back to prompt-only. */
+        }
+        if (accepted) break;
+        if (attempt < maxFetchAttempts - 1 && retryDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
       }
     }
 
-    return sanitizeReferenceImages(rawImages, {
-      maxItems: 3,
+    const referenceImages = sanitizeReferenceImages(rawImages, {
+      maxItems: maxImages,
       maxBytesPerImage: 2 * 1024 * 1024,
       maxTotalBytes: 4 * 1024 * 1024,
     });
+    if (requireReferenceImages && referenceImages.length === 0) {
+      const error = new Error(
+        'De homepage-screenshot voor V2 was nog niet beschikbaar. De opdracht probeert het automatisch opnieuw.'
+      );
+      error.status = 503;
+      error.retryableOpenAiImage = true;
+      throw error;
+    }
+    return referenceImages;
   }
 
   async function fetchWebsitePreviewCssSources(htmlRaw, pageUrlRaw) {
@@ -1028,6 +1057,7 @@ function createAiRemoteService(deps = {}) {
     imageModel,
     prompt,
     referenceImages = [],
+    inputFidelity = '',
     imageSize = '2160x3840',
     imageQuality = 'low',
     timeoutMs = 180000,
@@ -1038,6 +1068,9 @@ function createAiRemoteService(deps = {}) {
       body.set('prompt', prompt);
       body.set('size', imageSize);
       body.set('quality', imageQuality);
+      if (normalizeString(inputFidelity).toLowerCase() === 'high') {
+        body.set('input_fidelity', 'high');
+      }
       referenceImages.forEach((item) => {
         const parsed = parseImageDataUrl(item?.dataUrl || '');
         if (!parsed) return;
@@ -1223,6 +1256,9 @@ function createAiRemoteService(deps = {}) {
     const primaryImageSize = requestedImageSize || '2160x3840';
     const fallbackImageSize = primaryImageSize === '1024x1536' ? '' : '1024x1536';
     const imageQuality = resolveOpenAiWebsitePreviewImageQuality(scan);
+    const inputFidelity = normalizeString(
+      scan.referenceImageFidelity || scan.websitePreviewReferenceImageFidelity || ''
+    ).toLowerCase();
     const referenceImages = await fetchWebsitePreviewReferenceImages(scan);
     const prompt = buildWebsitePreviewPromptFromScan({
       ...scan,
@@ -1247,6 +1283,7 @@ function createAiRemoteService(deps = {}) {
           imageModel: attempt.imageModel,
           prompt,
           referenceImages,
+          inputFidelity,
           imageSize: attempt.imageSize,
           imageQuality,
           timeoutMs: imageGenerationTimeoutMs,

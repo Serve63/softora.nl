@@ -24,6 +24,8 @@ const WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE =
 const WEBDESIGN_TRANSIENT_STORAGE_ERROR_MESSAGE =
   'De webdesignfoto kon tijdelijk niet veilig worden opgeslagen. Probeer deze lead later opnieuw.';
 const WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE = 'Webdesign maken is mislukt. Probeer deze lead later opnieuw.';
+const WEBDESIGN_VARIANT_V1 = 'v1-prompt-only';
+const WEBDESIGN_VARIANT_V2 = 'v2-visual-dna';
 const SOFTORA_WEBDESIGN_OUTREACH_ROLE = 'WEBDESIGN & SOFTWARE ONTWIKKELING';
 const DEFAULT_SOFTORA_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
   name: 'Servé Creusen',
@@ -34,6 +36,12 @@ const MARTIJN_WEBDESIGN_OUTREACH_PROFILE = Object.freeze({
   roleLabel: SOFTORA_WEBDESIGN_OUTREACH_ROLE,
 });
 let cachedSharp = null;
+
+function normalizeWebdesignVariant(value) {
+  return String(value || '').trim().toLowerCase() === WEBDESIGN_VARIANT_V2
+    ? WEBDESIGN_VARIANT_V2
+    : WEBDESIGN_VARIANT_V1;
+}
 
 function loadSharpModule() {
   if (cachedSharp) return cachedSharp;
@@ -940,6 +948,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return {
       id: job.id,
       status: job.status,
+      variant: normalizeWebdesignVariant(job.variant),
       customerId: job.customer.id,
       company: job.customer.bedrijf,
       error: safetyBlocked ? null : sanitizeWebdesignJobErrorForUser(job.error),
@@ -1237,14 +1246,18 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       throw new Error('Websitegenerator is niet beschikbaar.');
     }
 
+    const variant = normalizeWebdesignVariant(job.variant);
+    const usesHomepageScreenshot = variant === WEBDESIGN_VARIANT_V2;
     const payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
       allowScanFallback: true,
       imageSize: DATABASE_PHOTO_IMAGE_SIZE,
-      disableReferenceImages: true,
-      referenceImageMode: 'prompt-only',
+      disableReferenceImages: !usesHomepageScreenshot,
+      referenceImageMode: usesHomepageScreenshot ? 'homepage-screenshot' : 'prompt-only',
+      requireReferenceImages: usesHomepageScreenshot,
       body: {
         source: 'premium-database',
         action: 'webdesign',
+        variant,
         company: job.customer.bedrijf,
         domain: job.customer.dom,
         softoraOutreachProfile: resolveWebdesignOutreachProfile(job.ownerKey),
@@ -1482,6 +1495,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       ownerKey,
       customer,
       websiteUrl,
+      variant: normalizeWebdesignVariant(input.variant),
       status: 'queued',
       error: null,
       createdAt: now(),

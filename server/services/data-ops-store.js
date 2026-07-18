@@ -2122,6 +2122,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     const payload = {
       customer: job.customer && typeof job.customer === 'object' ? job.customer : {},
     };
+    if (job.variant) payload.variant = normalizeString(job.variant).slice(0, 80);
     if (job.batchId) payload.batchId = normalizeString(job.batchId).slice(0, 120);
     if (Number.isFinite(Number(job.batchTargetIndex))) {
       payload.batchTargetIndex = Math.max(0, Math.floor(Number(job.batchTargetIndex)));
@@ -2163,6 +2164,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       finishedAt: toMsFromIso(row.finished_at),
       retry: normalizeWebdesignJobRetryPayload(payload.retry),
       cancelled: payload.cancelled === true,
+      variant: normalizeString(payload.variant || ''),
       batchId: normalizeString(payload.batchId || ''),
       batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))
         ? Math.max(0, Math.floor(Number(payload.batchTargetIndex)))

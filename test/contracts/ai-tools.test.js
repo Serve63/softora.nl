@@ -182,6 +182,44 @@ test('ai tools coordinator forwards database preview generation controls to the 
   });
 });
 
+test('ai tools coordinator gives V2 exactly one homepage screenshot reference', async () => {
+  let capturedScan = null;
+  const { coordinator } = createFixture({
+    fetchWebsitePreviewScanFromUrl: async () => ({
+      normalizedUrl: 'https://www.bliv.nl/',
+      finalUrl: 'https://www.bliv.nl/',
+      scan: {
+        host: 'www.bliv.nl',
+        referenceImageUrls: ['https://www.bliv.nl/og-image.jpg'],
+      },
+    }),
+    generateWebsitePreviewImageWithAi: async (scan) => {
+      capturedScan = scan;
+      return {
+        brief: 'V2 brief',
+        prompt: 'V2 prompt',
+        dataUrl: 'data:image/png;base64,abcd',
+        mimeType: 'image/png',
+        fileName: 'bliv-v2.png',
+        model: 'gpt-image-2',
+      };
+    },
+  });
+
+  await coordinator.runWebsitePreviewGeneratePipeline('https://www.bliv.nl/', {
+    referenceImageMode: 'homepage-screenshot',
+    requireReferenceImages: true,
+  });
+
+  assert.equal(capturedScan.disableReferenceImages, false);
+  assert.equal(capturedScan.referenceImageMode, 'homepage-screenshot');
+  assert.equal(capturedScan.requireReferenceImages, true);
+  assert.equal(capturedScan.referenceImageFidelity, 'high');
+  assert.deepEqual(capturedScan.referenceImageUrls, [
+    'https://s0.wordpress.com/mshots/v1/https%3A%2F%2Fwww.bliv.nl%2F?w=1280&h=1600',
+  ]);
+});
+
 test('ai tools coordinator wraps website preview failures in a stable error payload', async () => {
   const { coordinator } = createFixture({
     fetchWebsitePreviewScanFromUrl: async () => {

@@ -61,6 +61,13 @@ function createAiToolsCoordinator(deps = {}) {
 
   const WEBSITE_PREVIEW_SAFETY_DETAIL =
     'Deze websitepreview is door de AI-veiligheidscheck overgeslagen. Probeer opnieuw met een andere website of input.';
+  const HOMEPAGE_SCREENSHOT_REFERENCE_MODE = 'homepage-screenshot';
+
+  function buildHomepageScreenshotReferenceUrl(value) {
+    const targetUrl = normalizeString(value || '');
+    if (!targetUrl) return '';
+    return `https://s0.wordpress.com/mshots/v1/${encodeURIComponent(targetUrl)}?w=1280&h=1600`;
+  }
 
   function collectErrorText(value, out = []) {
     if (value === null || value === undefined) return out;
@@ -163,6 +170,8 @@ function createAiToolsCoordinator(deps = {}) {
 
   async function runWebsitePreviewGeneratePipeline(inputUrl, options = {}) {
     const body = options.body && typeof options.body === 'object' ? options.body : {};
+    const referenceImageMode = normalizeString(options.referenceImageMode || '').toLowerCase();
+    const usesHomepageScreenshot = referenceImageMode === HOMEPAGE_SCREENSHOT_REFERENCE_MODE;
     const softoraOutreachProfile = normalizeSoftoraOutreachProfile(
       body.softoraOutreachProfile || body.senderProfile || body.outreachProfile
     );
@@ -171,13 +180,22 @@ function createAiToolsCoordinator(deps = {}) {
       fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
     } catch (error) {
       if (!options.allowScanFallback) throw error;
+      if (usesHomepageScreenshot && [400, 401, 403, 422].includes(Number(error && error.status))) throw error;
       fetched = buildDatabasePreviewFallbackScan(inputUrl, body);
     }
+    const homepageScreenshotUrl = usesHomepageScreenshot
+      ? buildHomepageScreenshotReferenceUrl(fetched.finalUrl || fetched.normalizedUrl || inputUrl)
+      : '';
     const generationScan = {
       ...fetched.scan,
       imageSize: normalizeString(options.imageSize || ''),
       disableReferenceImages: options.disableReferenceImages === true,
-      referenceImageMode: normalizeString(options.referenceImageMode || ''),
+      referenceImageMode,
+      requireReferenceImages: options.requireReferenceImages === true,
+      referenceImageFidelity: usesHomepageScreenshot ? 'high' : '',
+      ...(usesHomepageScreenshot
+        ? { referenceImageUrls: homepageScreenshotUrl ? [homepageScreenshotUrl] : [] }
+        : {}),
       ...(softoraOutreachProfile ? { softoraOutreachProfile } : {}),
     };
     const generated = await generateWebsitePreviewImageWithAi(generationScan);
