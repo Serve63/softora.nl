@@ -73,6 +73,8 @@ function createService(overrides = {}) {
           bytes: Buffer.from('png-image-bytes'),
         };
       }),
+    waitForWebsitePreviewScreenshotRetry:
+      overrides.waitForWebsitePreviewScreenshotRetry || (async () => {}),
     extractOpenAiTextContent:
       overrides.extractOpenAiTextContent ||
       ((content) => {
@@ -356,7 +358,7 @@ test('ai remote service waits for a required V2 homepage screenshot before image
   const generationCalls = [];
   let screenshotFetches = 0;
   const { service } = createService({
-    env: { WEBSITE_PREVIEW_SCREENSHOT_RETRY_DELAY_MS: '0' },
+    waitForWebsitePreviewScreenshotRetry: async () => {},
     sanitizeReferenceImages: (images) => images,
     fetchBinaryWithTimeout: async (url) => {
       screenshotFetches += 1;
@@ -411,7 +413,7 @@ test('ai remote service fails V2 closed when no homepage screenshot becomes avai
   let generationCalls = 0;
   let screenshotFetches = 0;
   const { service } = createService({
-    env: { WEBSITE_PREVIEW_SCREENSHOT_RETRY_DELAY_MS: '0' },
+    waitForWebsitePreviewScreenshotRetry: async () => {},
     sanitizeReferenceImages: (images) => images,
     fetchBinaryWithTimeout: async () => {
       screenshotFetches += 1;

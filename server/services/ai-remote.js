@@ -33,6 +33,8 @@ function createAiRemoteService(deps = {}) {
       },
       text: '',
     }),
+    waitForWebsitePreviewScreenshotRetry = () =>
+      new Promise((resolve) => setTimeout(resolve, 1600)),
     fetchImpl = fetch,
     extractOpenAiTextContent = () => '',
     extractAnthropicTextContent = () => '',
@@ -954,10 +956,6 @@ function createAiRemoteService(deps = {}) {
     const isHomepageScreenshot = referenceMode === 'homepage-screenshot';
     const maxImages = isHomepageScreenshot ? 1 : 3;
     const maxFetchAttempts = isHomepageScreenshot ? 3 : 1;
-    const retryDelayMs = Math.max(
-      0,
-      Math.min(5000, Number(env.WEBSITE_PREVIEW_SCREENSHOT_RETRY_DELAY_MS ?? 1600) || 0)
-    );
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (rawImages.length >= maxImages) break;
@@ -1001,8 +999,8 @@ function createAiRemoteService(deps = {}) {
           /* Retry screenshot warming below; optional references may still fall back to prompt-only. */
         }
         if (accepted) break;
-        if (attempt < maxFetchAttempts - 1 && retryDelayMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        if (attempt < maxFetchAttempts - 1) {
+          await waitForWebsitePreviewScreenshotRetry();
         }
       }
     }
