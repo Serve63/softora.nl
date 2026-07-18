@@ -1036,7 +1036,9 @@
     },
     {
       "id": "website-proposal-014",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-07-18",
+      "shippedPath": "/blog/website-offerte-vergelijken",
       "path": "/blog/website-offerte-vergelijken",
       "contentType": "blog",
       "cluster": "websites",
@@ -1052,7 +1054,18 @@
           "source": "Softora websiteclusteranalyse",
           "observedAt": "2026-07-17",
           "detail": "Prijsfactoren en zelf-maken zijn gedekt, maar kopers missen een checklist voor scope, content, SEO, analytics, beheer en eigenaarschap in offertes."
+        },
+        {
+          "type": "serp-pattern",
+          "source": "Nederlandse SERP; Web2View websitekostenchecklist en Rabobank offertechecklist",
+          "observedAt": "2026-07-18",
+          "detail": "Actuele resultaten benadrukken vergelijkbare doelen en scope, expliciete in- en uitsluitingen, planning, contentverantwoordelijkheid en beheer; een volledige website-specifieke beslismatrix blijft schaars."
         }
+      ],
+      "competitorPatterns": [
+        "Kostenpagina's met een korte offertechecklist",
+        "Algemene offerteartikelen over werkzaamheden, planning en voorwaarden",
+        "Websitegidsen met losse rode vlaggen rond content, SEO en eigenaarschap"
       ],
       "overlap": {
         "checkedAt": "2026-07-17",
@@ -1267,6 +1280,89 @@
         ]
       },
       "nextAction": "Controleer de SERP-intent en werk een concreet maar leveranciersneutraal implementatiepad uit."
+    },
+    {
+      "id": "website-brief-017",
+      "status": "ready",
+      "path": "/blog/website-briefing-maken-mkb",
+      "contentType": "blog",
+      "cluster": "websites",
+      "primaryQuery": "website briefing maken",
+      "intent": "Een complete websitebriefing voorbereiden voordat een bureau offreert",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Opdrachtvoorbereiding vóór leveranciers- en offertekeuze",
+      "demandEvidence": [
+        {
+          "type": "serp-and-cluster-gap",
+          "source": "Nederlandse SERP en Softora websitecontentinventaris",
+          "observedAt": "2026-07-18",
+          "detail": "Actuele websitegidsen vragen kopers vooraf doelen, doelgroep, pagina's, content en budget te beschrijven; Softora heeft een offertecheck maar nog geen volledige briefingroute vóór de aanvraag."
+        }
+      ],
+      "competitorPatterns": [
+        "Downloadbare vragenlijsten voor een nieuwe website",
+        "Algemene stappenplannen met doelgroep, pagina's en budget",
+        "Bureau-intakes die vooral eigen verkoopprocessen ondersteunen"
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-18",
+        "closestPaths": [
+          "/blog/website-offerte-vergelijken",
+          "/blog/website-laten-maken-mkb-paginas",
+          "/blog/website-laten-maken-kosten-2026"
+        ],
+        "decision": "distinct",
+        "rationale": "De briefingpagina helpt vóór offerteaanvragen doelen, doelgroep, content, functies en acceptatie vastleggen; de offertegids beoordeelt ontvangen voorstellen en de andere pagina's behandelen alleen structuur of kosten."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.35,
+      "brief": {
+        "title": "Website briefing maken: praktische aanpak voor het MKB",
+        "metaDescription": "Leg doelgroep, doelen, pagina's, content, functies, SEO, koppelingen, beheer en acceptatie vast vóór je websiteoffertes aanvraagt.",
+        "h1": "Hoe maak je een goede website briefing?",
+        "outline": [
+          "Omschrijf bedrijfsdoel en doelgroep",
+          "Bepaal pagina's, content en bewijs",
+          "Leg functies en koppelingen vast",
+          "Maak SEO, meten en privacy concreet",
+          "Definieer acceptatie, beheer en planning"
+        ],
+        "buyerQuestions": [
+          "Welke informatie heeft een webbureau vooraf nodig?",
+          "Hoe voorkom je onvergelijkbare offertes?",
+          "Wat hoeft nog niet definitief te zijn in een briefing?"
+        ],
+        "incomingLinks": [
+          "/blog/website-offerte-vergelijken",
+          "/blog/website-laten-maken-mkb-paginas"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/pakketten"
+        ],
+        "conversionPath": "Van een bruikbare briefing naar een afgebakend websitegesprek met Softora.",
+        "claimRisk": "Geen garantie op vaste prijs, doorlooptijd, ranking of conversie; behandel juridische voorwaarden niet als advies.",
+        "visualConcepts": [
+          "Websitebriefingcanvas voor doelen, doelgroepen, pagina's, bewijs en acties",
+          "Route van briefing via offerte en prototype naar acceptatie"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer SERP-overlap met offertecheck en schrijf de briefing als invulbaar denkmodel zonder calculator of downloadtool."
     }
   ]
 }

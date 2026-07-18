@@ -562,6 +562,24 @@ test('nieuwe softwareoffertegids gebruikt precies twee eigen inhoudelijke beelde
   assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
 });
 
+test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inkomende links', () => {
+  const item = getSeoContentItem('blog', 'website-offerte-vergelijken');
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const costHtml = buildSeoContentArticleHtml(getSeoContentItem('blog', 'website-laten-maken-kosten-2026'));
+  const comparisonHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('vergelijkingen', 'website-laten-maken-vs-zelf-maken')
+  );
+
+  assert.equal(item.image.src, '/assets/seo-content/website-offerte-vergelijkingsmatrix-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/website-offerte-oplevering-toegang-softora.jpg');
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /href="\/website-laten-maken"/);
+  assert.match(costHtml, /href="\/blog\/website-offerte-vergelijken"/);
+  assert.match(comparisonHtml, /href="\/blog\/website-offerte-vergelijken"/);
+});
+
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
     siteOrigin: 'https://www.softora.nl',
