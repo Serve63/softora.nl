@@ -580,6 +580,27 @@ test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inko
   assert.match(comparisonHtml, /href="\/blog\/website-offerte-vergelijken"/);
 });
 
+test('CRM-kostengids gebruikt precies twee eigen beelden en natuurlijke inkomende links', () => {
+  const item = getSeoContentItem('blog', 'crm-systeem-kosten-mkb');
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const comparisonHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('vergelijkingen', 'crm-op-maat-vs-standaard-crm')
+  );
+  const spreadsheetHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-systeem-op-maat-spreadsheets-vervangen')
+  );
+
+  assert.equal(item.image.src, '/assets/seo-content/crm-totale-kostenopbouw-mkb-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/crm-kostenscenarios-standaard-maatwerk-softora.jpg');
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(comparisonHtml, /href="\/blog\/crm-systeem-kosten-mkb"/);
+  assert.match(spreadsheetHtml, /href="\/blog\/crm-systeem-kosten-mkb"/);
+});
+
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
     siteOrigin: 'https://www.softora.nl',
