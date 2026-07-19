@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-17",
+  "updatedAt": "2026-07-19",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1127,7 +1127,9 @@
     },
     {
       "id": "crm-cost-015",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-07-19",
+      "shippedPath": "/blog/crm-systeem-kosten-mkb",
       "path": "/blog/crm-systeem-kosten-mkb",
       "contentType": "blog",
       "cluster": "software-crm",
@@ -1143,10 +1145,21 @@
           "source": "GSC 28 dagen tot en met 2026-07-15 en Softora contentinventaris",
           "observedAt": "2026-07-16",
           "detail": "CRM op maat had 178 impressies op gemiddelde positie 34.48; de live content vergelijkt CRM-typen maar behandelt totale kosten nog niet afzonderlijk."
+        },
+        {
+          "type": "serp-pattern",
+          "source": "Nederlandse SERP voor CRM systeem kosten en CRM implementatiekosten",
+          "observedAt": "2026-07-19",
+          "detail": "Actuele resultaten behandelen vooral pakketprijzen, implementatie, migratie, training en verborgen kosten. Softora onderscheidt zich met een claim-safe driejaarsscenario en controleerbare aannames zonder vluchtige leveranciersprijzen."
         }
       ],
+      "competitorPatterns": [
+        "Pakketvergelijkingen met prijzen per gebruiker",
+        "Overzichten van implementatie- en migratiekosten",
+        "Artikelen over verborgen kosten en total cost of ownership"
+      ],
       "overlap": {
-        "checkedAt": "2026-07-17",
+        "checkedAt": "2026-07-19",
         "closestPaths": [
           "/vergelijkingen/crm-op-maat-vs-standaard-crm",
           "/blog/crm-systeem-op-maat-spreadsheets-vervangen",
@@ -1363,6 +1376,89 @@
         ]
       },
       "nextAction": "Controleer SERP-overlap met offertecheck en schrijf de briefing als invulbaar denkmodel zonder calculator of downloadtool."
+    },
+    {
+      "id": "crm-adoption-018",
+      "status": "ready",
+      "path": "/blog/crm-adoptie-medewerkers-mkb",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "crm adoptie medewerkers",
+      "intent": "CRM-gebruik invoeren zonder terugval naar spreadsheets en losse notities",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Gebruikersadoptie tussen CRM-keuze en stabiel dagelijks gebruik",
+      "demandEvidence": [
+        {
+          "type": "serp-and-cluster-gap",
+          "source": "Nederlandse CRM-kosten-SERP en Softora CRM-contentinventaris",
+          "observedAt": "2026-07-19",
+          "detail": "Actuele kostenartikelen noemen training en adoptie als aparte kostenpost, terwijl Softora wel CRM-keuze, taken en datakwaliteit behandelt maar geen praktische invoeringsroute voor medewerkers heeft."
+        }
+      ],
+      "competitorPatterns": [
+        "Algemene verandermanagementtips rond CRM",
+        "Leveranciersartikelen over training en ambassadeurs",
+        "Implementatiechecklists waarin adoptie slechts één stap is"
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-19",
+        "closestPaths": [
+          "/blog/crm-taken-reminders-automatiseren-mkb",
+          "/kennisbank/wat-is-crm-datakwaliteit",
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm"
+        ],
+        "decision": "distinct",
+        "rationale": "De kandidaat behandelt rollen, werkafspraken, training, feedback en gebruikscontrole na CRM-keuze; bestaande pagina's behandelen functies, datakwaliteit of leverancierskeuze."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.35,
+      "brief": {
+        "title": "CRM-adoptie in het MKB: zo krijgt je team het systeem werkend",
+        "metaDescription": "Voer CRM-gebruik in met duidelijke rollen, minimale invoer, training, feedback en controle zonder terugval naar spreadsheets.",
+        "h1": "Hoe zorg je dat medewerkers een CRM echt gebruiken?",
+        "outline": [
+          "Maak de dagelijkse CRM-taak kleiner en duidelijker",
+          "Leg fases, eigenaarschap en minimale data vast",
+          "Train per rol met echte werksituaties",
+          "Verwerk feedback zonder de scope te laten ontsporen",
+          "Meet gebruik en herstel terugval vroeg"
+        ],
+        "buyerQuestions": [
+          "Waarom vallen teams terug naar spreadsheets?",
+          "Welke CRM-velden moeten verplicht zijn?",
+          "Hoeveel begeleiding is na livegang nodig?"
+        ],
+        "incomingLinks": [
+          "/blog/crm-systeem-kosten-mkb",
+          "/blog/crm-taken-reminders-automatiseren-mkb"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/kennisbank/wat-is-crm-datakwaliteit"
+        ],
+        "conversionPath": "Van adoptieproblemen naar een CRM-scopegesprek over procesfit, rollen en een beheersbare eerste versie.",
+        "claimRisk": "Geen gegarandeerde adoptie, productiviteitswinst of personeelsbesparing; benoem menselijke verantwoordelijkheid en meetbare gebruikssignalen.",
+        "visualConcepts": [
+          "CRM-werkafspraken per rol met minimale verplichte stappen",
+          "Adoptielus van training, gebruik, feedback en verbetering"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer actuele buyer language en schrijf een praktische adoptieroute zonder generieke verandermanagementclaims."
     }
   ]
 }
