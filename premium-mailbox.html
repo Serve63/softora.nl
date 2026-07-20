@@ -65,7 +65,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .mail-item.active { background: rgba(155,35,85,.05); }
 .unread-dot { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; background: var(--crimson); border-radius: 50%; }
 .mail-item-top { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
-.mail-from { flex: 1; font-size: 14px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mail-from { flex: 1; font-size: 14px; font-weight: 400; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mail-item.unread .mail-from { font-weight: 600; }
 .mail-time { flex-shrink: 0; color: var(--text-light); white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.15; text-align: right; }
 .mail-date-label { font-size: 10px; font-weight: 600; }
 .mail-time-value { font-size: 12px; }
