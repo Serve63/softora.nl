@@ -2,9 +2,9 @@
   'use strict';
 
   const OWNER_OPTIONS = Object.freeze([
-    Object.freeze({ key: 'both', label: 'Beide' }),
-    Object.freeze({ key: 'serve', label: 'Servé' }),
-    Object.freeze({ key: 'martijn', label: 'Martijn' }),
+    Object.freeze({ key: 'serve', label: 'Servé Creusen' }),
+    Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
+    Object.freeze({ key: 'both', label: 'Servé & Martijn' }),
   ]);
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
@@ -49,7 +49,7 @@
 
   function getOwnerLabel(value) {
     const owner = normalizeOwner(value == null ? activeOwner : value);
-    return OWNER_OPTIONS.find((option) => option.key === owner)?.label || 'Beide';
+    return OWNER_OPTIONS.find((option) => option.key === owner)?.label || 'Servé & Martijn';
   }
 
   function filterMessages(messages, value) {

@@ -118,12 +118,12 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
   assert.doesNotMatch(pageSource, /<span class="topbar-mailbox-account" id="topbar-mailbox-account"><\/span>/);
   assert.match(pageSource, /<button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">/);
-  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Beide<\/span>/);
+  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé &amp; Martijn<\/span>/);
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"><\/div>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -181,30 +181,32 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv�
   ];
 
   campaignInboxModule.setOwner('both');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Beide');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé & Martijn');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(0, 9).map((message) => message.id)
   );
 
   campaignInboxModule.setOwner('servé');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé Creusen');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(0, 5).map((message) => message.id)
   );
 
   campaignInboxModule.setOwner('martijn');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn van de Ven');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(5, 9).map((message) => message.id)
   );
 
   const ownerMenu = campaignInboxModule.renderOwnerMenu((value) => String(value));
-  assert.match(ownerMenu, />Beide</);
-  assert.match(ownerMenu, />Servé</);
-  assert.match(ownerMenu, />Martijn</);
+  assert.match(ownerMenu, />Servé Creusen</);
+  assert.match(ownerMenu, />Martijn van de Ven</);
+  assert.match(ownerMenu, />Servé & Martijn</);
+  assert.ok(ownerMenu.indexOf('Servé Creusen') < ownerMenu.indexOf('Martijn van de Ven'));
+  assert.ok(ownerMenu.indexOf('Martijn van de Ven') < ownerMenu.indexOf('Servé & Martijn'));
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('both');
 });
@@ -239,18 +241,14 @@ test('premium mailbox houdt account-dropdown zichtbaar boven de inbox-layout', (
   assert.match(pageSource, /\.topbar-mailbox-pin\.active \{[\s\S]*color:\s*var\(--crimson\);/);
 });
 
-test('premium mailbox inboxbadge volgt de geladen inbox en niet een vast getal', () => {
+test('premium mailbox toont geen interne mappen-sidebar meer', () => {
   const pageSource = readPage();
-  const scriptSource = readScript();
 
-  assert.doesNotMatch(pageSource, /id="badge-inbox">3<\/span>/);
-  assert.match(pageSource, /<span class="folder-badge" id="badge-inbox" hidden>0<\/span>/);
-  assert.match(pageSource, /\.folder-badge\[hidden\] \{\s*display:\s*none;\s*\}/);
-  assert.match(scriptSource, /let inboxUnreadCount = 0;/);
-  assert.match(scriptSource, /function renderInboxBadge\(\) \{[\s\S]*badge\.textContent = String\(count\);[\s\S]*badge\.hidden = count === 0;/);
-  assert.match(scriptSource, /function syncInboxBadgeFromCurrentFolder\(\) \{[\s\S]*if \(activeFolder === 'inbox'\) \{[\s\S]*inboxUnreadCount = mails\.filter\(m => m\.folder === 'inbox' && m\.unread\)\.length;[\s\S]*renderInboxBadge\(\);/);
-  assert.match(scriptSource, /function renderList\(\) \{[\s\S]*syncInboxBadgeFromCurrentFolder\(\);[\s\S]*if \(!list\.length\)/);
-  assert.match(scriptSource, /catch \(error\) \{[\s\S]*mails = \[\];[\s\S]*syncInboxBadgeFromCurrentFolder\(\);/);
+  assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
+  assert.doesNotMatch(pageSource, /class="folder-item/);
+  assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
+  assert.doesNotMatch(pageSource, />Losse mailbox</);
+  assert.doesNotMatch(pageSource, /\.mail-sidebar\s*\{/);
 });
 
 test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderknop', () => {
@@ -453,7 +451,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.doesNotMatch(scriptSource, /onclick=/);
   assert.match(pageSource, /data-mailbox-action="open-compose"/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose"/);
-  assert.match(pageSource, /data-mailbox-action="set-folder" data-mailbox-folder="inbox"/);
+  assert.doesNotMatch(pageSource, /data-mailbox-action="set-folder"/);
   assert.match(scriptSource, /data-mailbox-action="open-mail"/);
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
@@ -519,8 +517,8 @@ test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over all
   const outreachSource = readOutreachScript();
   const campaignInboxSource = readCampaignInboxScript();
 
-  assert.match(pageSource, /data-mailbox-folder="outreach"[\s\S]*Coldmail reacties/);
-  assert.match(pageSource, /<div class="folder-label">Losse mailbox<\/div>/);
+  assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
+  assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
   assert.match(scriptSource, /let activeFolder = 'outreach';/);
   assert.match(scriptSource, /SoftoraMailboxCampaignInbox\?\.load/);
   assert.match(campaignInboxSource, /SoftoraMailboxOutreach\.loadCampaignReplies/);
