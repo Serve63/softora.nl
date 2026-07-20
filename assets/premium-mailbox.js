@@ -28,6 +28,10 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+function formatMailboxDetailSubject(value) {
+  const subject = String(value || '').trim().replace(/^email received\s*-\s*/i, '').trim();
+  return subject || '(Geen onderwerp)';
+}
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
@@ -796,33 +800,43 @@ function openMail(id, options = {}) {
     ? m.body
     : 'Bericht laden…';
   document.getElementById('mail-detail').innerHTML = `
-    <div class="detail-header">
-      <div class="detail-subject">${escapeHtml(m.subject)}</div>
-      <div class="detail-meta">
-        <div class="detail-from-wrap">
-          <div class="detail-avatar" style="background:${getColor(avatarText)}">${escapeHtml(initials(avatarText))}</div>
-          <div>
-            <div class="detail-from">${escapeHtml(detailPrimary)}</div>
-            <div class="detail-email">${escapeHtml(detailSecondary)}</div>${window.SoftoraMailboxCampaignInbox.renderDetailAccount(m, escapeHtml)}
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-          <div class="detail-date">${escapeHtml(m.date)} · ${escapeHtml(m.time)}</div>
-          <div class="detail-actions">
-            <button class="btn-action" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(m.id)}">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
-              Beantwoorden
-            </button>
-            ${window.SoftoraMailboxCampaignInbox.isCampaignMail(m) ? '' : `<button class="btn-action" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-              Verwijderen
-            </button>`}
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="detail-body">
-      <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m })}</div>
+      <article class="detail-mail-block">
+        <div class="detail-header">
+          <div class="detail-subject-row">
+            <div class="detail-subject">${escapeHtml(formatMailboxDetailSubject(m.subject))}</div>
+            <div class="detail-head-tools">
+              <div class="detail-date">${escapeHtml(m.date)}, ${escapeHtml(m.time)}</div>
+              <details class="detail-more">
+                <summary aria-label="Meer opties">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+                </summary>
+                <div class="detail-more-menu">
+                  <button class="detail-more-action" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(m.id)}">Beantwoorden</button>
+                  ${window.SoftoraMailboxCampaignInbox.isCampaignMail(m) ? '' : `<button class="detail-more-action" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}">Verwijderen</button>`}
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="detail-meta">
+            <div class="detail-from-wrap">
+              <div class="detail-avatar" style="background:${getColor(avatarText)}">${escapeHtml(initials(avatarText))}</div>
+              <div>
+                <div class="detail-from">${escapeHtml(detailPrimary)}</div>
+                <div class="detail-email">${escapeHtml(detailSecondary)}</div>${window.SoftoraMailboxCampaignInbox.renderDetailAccount(m, escapeHtml)}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-divider" aria-hidden="true"></div>
+        <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m })}</div>
+        <div class="detail-footer">
+          <button class="detail-reply" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(m.id)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
+            Beantwoorden
+          </button>
+        </div>
+      </article>
     </div>`;
   if (!options.skipBodyFetch && !m.bodyLoaded) {
     void loadMailboxMessageBody(m.id);
@@ -902,7 +916,7 @@ function replyMail(mail) {
   const subjectField = document.getElementById('c-subject');
   if (toField) toField.value = window.SoftoraMailboxDisplay.getReplyToAddress(mail, { activeFolder, account: getMailboxAccount() });
   if (subjectField) {
-    const subject = mail.subject || '';
+    const subject = formatMailboxDetailSubject(mail.subject);
     subjectField.value = /^re:/i.test(subject) ? subject : `Re: ${subject}`;
   }
   openCompose({ keepContext: true });
