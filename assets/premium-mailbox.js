@@ -807,15 +807,6 @@ function openMail(id, options = {}) {
             <div class="detail-subject">${escapeHtml(formatMailboxDetailSubject(m.subject))}</div>
             <div class="detail-head-tools">
               <div class="detail-date">${escapeHtml(m.date)}, ${escapeHtml(m.time)}</div>
-              <details class="detail-more">
-                <summary aria-label="Meer opties">
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-                </summary>
-                <div class="detail-more-menu">
-                  <button class="detail-more-action" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(m.id)}">Beantwoorden</button>
-                  ${window.SoftoraMailboxCampaignInbox.isCampaignMail(m) ? '' : `<button class="detail-more-action" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}">Verwijderen</button>`}
-                </div>
-              </details>
             </div>
           </div>
           <div class="detail-meta">
