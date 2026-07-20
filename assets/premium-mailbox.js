@@ -139,9 +139,9 @@ async function initializeMailboxAccountPreference() {
     });
     const payload = await response.json().catch(() => ({}));
     const session = payload && payload.session ? payload.session : payload;
-    mailboxAccountPreferenceIdentity = resolveMailboxPreferenceIdentity(session);
+    mailboxAccountPreferenceIdentity = resolveMailboxPreferenceIdentity(session); await window.SoftoraMailboxCampaignInbox.initializeOwnerPreference(session, window.SoftoraUiStateClient, mailboxAccountPreferenceIdentity);
   } catch (_) {
-    mailboxAccountPreferenceIdentity = 'anonymous';
+    mailboxAccountPreferenceIdentity = 'anonymous'; await window.SoftoraMailboxCampaignInbox.initializeOwnerPreference({}, window.SoftoraUiStateClient, mailboxAccountPreferenceIdentity);
   }
   mailboxPinPreferences = await readMailboxPinPreferences();
   pinnedMailboxAccount = normalizeMailboxEmail(mailboxPinPreferences[mailboxAccountPreferenceIdentity] || '');
@@ -1129,8 +1129,8 @@ if (mailboxAccountSwitcher) {
 }
 if (mailboxAccountMenu) {
   mailboxAccountMenu.addEventListener('click', function(event) {
-    const ownerButton = event.target.closest('[data-mailbox-owner]');
-    if (ownerButton) { window.SoftoraMailboxCampaignInbox.setOwner(ownerButton.dataset.mailboxOwner); activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); renderList(); return; }
+    const ownerButton = event.target.closest('[data-mailbox-owner], [data-mailbox-pin-owner]');
+    if (ownerButton) { if (ownerButton.dataset.mailboxPinOwner) { event.preventDefault(); event.stopPropagation(); void window.SoftoraMailboxCampaignInbox.pinOwner(ownerButton.dataset.mailboxPinOwner, window.SoftoraUiStateClient).then((result) => { activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); renderList(); toast(result.saved ? `Mailbox vastgepind: ${result.label}` : `Mailbox gekozen: ${result.label}. Vastpinnen opslaan mislukt.`); }); return; } window.SoftoraMailboxCampaignInbox.setOwner(ownerButton.dataset.mailboxOwner); activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); renderList(); return; }
     const pinButton = event.target.closest('[data-mailbox-pin-email]');
     if (pinButton) {
       event.preventDefault();
