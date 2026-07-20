@@ -656,8 +656,8 @@ test('geopende mail staat als één rustig mailblok met antwoordactie onderaan',
   assert.match(scriptSource, /\$\{escapeHtml\(m\.date\)\}, \$\{escapeHtml\(m\.time\)\}/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*background:\s*var\(--card\);/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*max-width:\s*900px;[\s\S]*margin:\s*0 auto;/);
-  assert.match(pageSource, /\.detail-mail-block \{[^}]*min-height:\s*calc\(100vh - 92px\)/);
-  assert.match(pageSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.detail-mail-block \{ min-height:\s*calc\(100vh - 68px\); \}/);
+  assert.match(pageSource, /\.detail-mail-block \{[^}]*min-height:\s*min\(620px,\s*calc\(100vh - 92px\)\)/);
+  assert.match(pageSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.detail-mail-block \{ min-height:\s*min\(560px,\s*calc\(100vh - 68px\)\); \}/);
   assert.match(pageSource, /\.detail-body-text \{[\s\S]*background:\s*var\(--card\);[\s\S]*border:\s*0;[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans, 'Inter', sans-serif\);/);
   assert.match(pageSource, /\.detail-subject \{[\s\S]*font-size:\s*clamp\(19px,\s*1\.5vw,\s*24px\);/);
   assert.match(pageSource, /\.detail-avatar \{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/);
