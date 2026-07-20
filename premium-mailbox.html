@@ -75,17 +75,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .detail-header { background: var(--card); padding: 22px 24px 18px; flex-shrink: 0; min-width: 0; max-width: 100%; }
 .detail-subject-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; min-width: 0; }
 .detail-subject { flex: 1; min-width: 0; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: clamp(19px, 1.5vw, 24px); font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow-wrap: anywhere; }
-.detail-head-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; }
+.detail-head-tools { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; }
 .detail-date { font-size: 12px; color: var(--text-light); white-space: nowrap; }
-.detail-more { position: relative; flex-shrink: 0; }
-.detail-more summary { width: 28px; height: 28px; border: 0; border-radius: 50%; display: grid; place-items: center; color: var(--crimson); cursor: pointer; list-style: none; transition: background .15s ease; }
-.detail-more summary::-webkit-details-marker { display: none; }
-.detail-more summary:hover,
-.detail-more[open] summary { background: rgba(155,35,85,.08); }
-.detail-more summary svg { width: 19px; height: 19px; }
-.detail-more-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 8; width: 170px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: 0 14px 34px rgba(26,26,46,.14); }
-.detail-more-action { width: 100%; border: 0; border-radius: 5px; padding: 10px 11px; background: transparent; color: var(--text-mid); font-family: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-.detail-more-action:hover { background: var(--tag); color: var(--crimson); }
 .detail-meta { display: flex; align-items: center; min-width: 0; margin-top: 18px; }
 .detail-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .detail-from-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -150,7 +141,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   .detail-header { padding: 18px; }
   .detail-subject-row { flex-direction: column; gap: 10px; }
   .detail-subject { font-size: 21px; }
-  .detail-head-tools { width: 100%; justify-content: space-between; }
+  .detail-head-tools { width: 100%; justify-content: flex-end; }
   .detail-meta { margin-top: 16px; }
   .detail-avatar { width: 40px; height: 40px; font-size: 13px; }
   .detail-from-wrap { gap: 11px; }
@@ -418,6 +409,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720f"></script><script src="assets/premium-mailbox-display.js?v=20260720b"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script>
-<script src="assets/premium-mailbox.js?v=20260720g"></script>
+<script src="assets/premium-mailbox.js?v=20260720h"></script>
 </body>
 </html>
