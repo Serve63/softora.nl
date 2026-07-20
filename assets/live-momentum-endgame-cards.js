@@ -27,6 +27,7 @@
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
+    { id: 'sertraline-vrij', title: 'Sertraline vrij' },
     { id: '2030', title: '2030...', type: 'destination' }
   ];
   const ORIGIN_CARD_ID = 'oktober-2024';
