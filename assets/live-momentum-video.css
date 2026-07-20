@@ -113,6 +113,26 @@
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .72);
   overflow: hidden;
 }
+.momentum-video-stage::before {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, .14);
+  border-top-color: rgba(46, 204, 113, .82);
+  border-radius: 50%;
+  content: "";
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  animation: momentum-video-loading 760ms linear infinite;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+.momentum-video-stage.is-ready::before {
+  opacity: 0;
+}
 .momentum-video-stage iframe {
   position: absolute;
   z-index: 1;
@@ -122,11 +142,16 @@
   width: 100%;
   height: 146%;
   border: 0;
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.momentum-video-stage.is-ready iframe {
+  opacity: 1;
 }
 .momentum-video-interaction {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -134,11 +159,13 @@
   border: 0;
   background: transparent;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.momentum-video-interaction:focus-visible {
-  outline: 3px solid rgba(46, 204, 113, .46);
-  outline-offset: -5px;
+@keyframes momentum-video-loading {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 body.momentum-video-open {
   overflow: hidden;

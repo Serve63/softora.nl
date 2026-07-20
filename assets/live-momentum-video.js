@@ -5,18 +5,19 @@
   const closeButton = dialog?.querySelector('.momentum-video-close');
   const player = dialog?.querySelector('[data-momentum-video-player]');
   let iframe = null;
-  let playbackState = 'playing';
+  let revealTimer = null;
 
   if (!trigger || !dialog || !closeButton || !player || typeof dialog.showModal !== 'function') {
     return;
   }
 
   function createPlayer() {
-    const interactionLayer = document.createElement('button');
+    const interactionLayer = document.createElement('div');
     iframe = document.createElement('iframe');
+    player.classList.remove('is-ready');
     const params = new URLSearchParams({
       autoplay: '1',
-      mute: '0',
+      mute: '1',
       controls: '0',
       disablekb: '1',
       enablejsapi: '1',
@@ -36,39 +37,47 @@
     iframe.allow = 'autoplay; encrypted-media';
     iframe.referrerPolicy = 'strict-origin-when-cross-origin';
     interactionLayer.className = 'momentum-video-interaction';
-    interactionLayer.type = 'button';
-    interactionLayer.setAttribute('aria-label', 'Video pauzeren');
-    interactionLayer.addEventListener('click', togglePlayback);
+    interactionLayer.setAttribute('aria-hidden', 'true');
+    interactionLayer.addEventListener('click', activateVideo);
     iframe.addEventListener('load', () => {
-      iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'softora-momentum-player' }), '*');
+      iframe?.contentWindow?.postMessage(JSON.stringify({
+        event: 'listening',
+        id: 'softora-momentum-player'
+      }), '*');
+      scheduleReveal();
     });
     player.replaceChildren(iframe, interactionLayer);
   }
 
   function stopPlayer() {
+    window.clearTimeout(revealTimer);
+    revealTimer = null;
     iframe = null;
-    playbackState = 'playing';
+    player.classList.remove('is-ready');
     player.replaceChildren();
   }
 
-  function sendPlayerCommand(command) {
+  function sendPlayerCommand(command, args = []) {
     iframe?.contentWindow?.postMessage(JSON.stringify({
       event: 'command',
       func: command,
-      args: []
+      args
     }), '*');
   }
 
-  function setPlaybackState(state) {
-    playbackState = state;
-    const interactionLayer = player.querySelector('.momentum-video-interaction');
-    interactionLayer?.setAttribute('aria-label', state === 'playing' ? 'Video pauzeren' : 'Video afspelen');
+  function scheduleReveal() {
+    window.clearTimeout(revealTimer);
+    revealTimer = window.setTimeout(() => {
+      player.classList.add('is-ready');
+    }, 5200);
   }
 
-  function togglePlayback() {
-    const shouldPause = playbackState === 'playing';
-    sendPlayerCommand(shouldPause ? 'pauseVideo' : 'playVideo');
-    setPlaybackState(shouldPause ? 'paused' : 'playing');
+  function activateVideo() {
+    player.classList.remove('is-ready');
+    sendPlayerCommand('playVideo');
+    sendPlayerCommand('unMute');
+    sendPlayerCommand('setVolume', [100]);
+    scheduleReveal();
   }
 
   function openVideo() {
@@ -95,25 +104,5 @@
     stopPlayer();
     document.body.classList.remove('momentum-video-open');
     trigger.focus();
-  });
-  window.addEventListener('message', (event) => {
-    if (!['https://www.youtube-nocookie.com', 'https://www.youtube.com'].includes(event.origin)) {
-      return;
-    }
-    let payload = event.data;
-    try {
-      payload = typeof payload === 'string' ? JSON.parse(payload) : payload;
-    } catch {
-      return;
-    }
-    const playerState = Number(payload?.info);
-    if (payload?.event !== 'onStateChange' || !Number.isFinite(playerState)) {
-      return;
-    }
-    if (playerState === 1) {
-      setPlaybackState('playing');
-    } else if ([0, 2, 5].includes(playerState)) {
-      setPlaybackState('paused');
-    }
   });
 })();
