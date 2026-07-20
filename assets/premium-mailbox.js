@@ -75,7 +75,7 @@ function normalizeMailboxEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 function getMailboxAccountEmails() {
-  return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter(Boolean);
+  return mailboxAccounts.map((account) => normalizeMailboxEmail(account.email)).filter((email) => window.SoftoraMailboxCampaignInbox?.isCampaignAccount(email));
 }
 function hasMailboxAccount(email) {
   const normalized = normalizeMailboxEmail(email);
@@ -498,12 +498,8 @@ function findMailById(id) {
   const key = String(id);
   return mails.find(mail => String(mail.id) === key);
 }
-function getMailboxAccounts() {
-  return getMailboxAccountEmails();
-}
-function getMailboxAccount() {
-  return activeMailboxAccount;
-}
+function getMailboxAccounts() { return getMailboxAccountEmails(); }
+function getMailboxAccount() { return activeMailboxAccount; }
 async function loadMailboxSenderProfile() {
   if (!window.SoftoraCampaignSenderSettings || typeof window.SoftoraCampaignSenderSettings.loadProfileForSender !== 'function') return null;
   try {
@@ -524,8 +520,9 @@ function closeMailboxAccountMenu() {
 function renderMailboxAccountMenu() {
   const menu = document.getElementById('mailbox-account-menu');
   if (!menu) return;
+  if (activeFolder === 'outreach') { menu.innerHTML = window.SoftoraMailboxCampaignInbox.renderOwnerMenu(escapeHtml); return; }
   const activeEmail = getMailboxAccount();
-  const accountsForMenu = mailboxAccounts.slice().sort((a, b) => {
+  const accountsForMenu = mailboxAccounts.filter((account) => window.SoftoraMailboxCampaignInbox.isCampaignAccount(account.email)).sort((a, b) => {
     const aPinned = normalizeMailboxEmail(a.email) === pinnedMailboxAccount;
     const bPinned = normalizeMailboxEmail(b.email) === pinnedMailboxAccount;
     if (aPinned !== bPinned) return aPinned ? -1 : 1;
@@ -549,7 +546,7 @@ function renderMailboxAccountMenu() {
 }
 function setMailboxAccountUi(email) {
   const top = document.getElementById('topbar-mailbox-account');
-  if (top) top.textContent = activeFolder === 'outreach' ? 'Alle campagne-adressen' : email;
+  if (top) top.textContent = activeFolder === 'outreach' ? window.SoftoraMailboxCampaignInbox.getOwnerLabel() : email;
   renderMailboxAccountMenu();
 }
 let mails = [];
@@ -617,7 +614,7 @@ async function loadMailboxAccounts() {
       if (pinnedMailboxAccount && hasMailboxAccount(pinnedMailboxAccount)) {
         activeMailboxAccount = pinnedMailboxAccount;
       } else if (!hasMailboxAccount(activeMailboxAccount)) {
-        activeMailboxAccount = hasMailboxAccount(MAILBOX_ACCOUNT_DEFAULT) ? MAILBOX_ACCOUNT_DEFAULT : mailboxAccounts[0].email;
+        activeMailboxAccount = hasMailboxAccount(MAILBOX_ACCOUNT_DEFAULT) ? MAILBOX_ACCOUNT_DEFAULT : getMailboxAccountEmails()[0];
       }
       renderMailboxAccountMenu();
       setMailboxAccountUi(activeMailboxAccount);
@@ -686,7 +683,7 @@ async function loadMailboxMessages(options = {}) {
 }
 async function applyMailboxAccount(email, options = {}) {
   const normalizedEmail = normalizeMailboxEmail(email);
-  activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (mailboxAccounts[0]?.email || MAILBOX_ACCOUNT_DEFAULT);
+  activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (getMailboxAccountEmails()[0] || MAILBOX_ACCOUNT_DEFAULT);
   activeFolder = String(options.folder || 'inbox').trim().toLowerCase() || 'inbox';
   activeMail = null;
   const searchInput = document.getElementById('search-input');
@@ -714,7 +711,7 @@ function setFolder(folder, el) {
   void loadMailboxMessages();
 }
 function getMailsForFolder(folder) {
-  if (folder === 'outreach') return mails; if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
+  if (folder === 'outreach') return window.SoftoraMailboxCampaignInbox.filterMessages(mails); if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
   if (folder === 'starred') return mails.filter(m => m.starred);
   return mails;
 }
@@ -1134,6 +1131,8 @@ if (mailboxAccountSwitcher) {
 }
 if (mailboxAccountMenu) {
   mailboxAccountMenu.addEventListener('click', function(event) {
+    const ownerButton = event.target.closest('[data-mailbox-owner]');
+    if (ownerButton) { window.SoftoraMailboxCampaignInbox.setOwner(ownerButton.dataset.mailboxOwner); activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); renderList(); return; }
     const pinButton = event.target.closest('[data-mailbox-pin-email]');
     if (pinButton) {
       event.preventDefault();
