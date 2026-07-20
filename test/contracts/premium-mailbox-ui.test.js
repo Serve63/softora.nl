@@ -115,7 +115,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720e"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720f"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -624,11 +624,15 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
 
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
   assert.doesNotMatch(scriptSource, /onclick=/);
-  assert.match(pageSource, /data-mailbox-action="open-compose"/);
+  assert.doesNotMatch(pageSource, /data-mailbox-action="open-compose"/);
+  assert.doesNotMatch(pageSource, /id="search-input"/);
+  assert.doesNotMatch(pageSource, /class="topbar-search"/);
+  assert.doesNotMatch(pageSource, /class="btn-compose"/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose"/);
   assert.doesNotMatch(pageSource, /data-mailbox-action="set-folder"/);
   assert.match(scriptSource, /data-mailbox-action="open-mail"/);
-  assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
+  assert.doesNotMatch(scriptSource, /data-mailbox-action="toggle-star"/);
+  assert.doesNotMatch(scriptSource, />\s*Markeren\s*</);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
   assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
