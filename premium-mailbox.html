@@ -52,19 +52,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 /* LAYOUT */
 .layout { display: flex; flex: 1; min-width: 0; width: 100%; min-height: 0; overflow: hidden; }
 
-/* SIDEBAR */
-.mail-sidebar { width: 190px; min-width: 150px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); padding: 16px 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
-.folder-item { display: flex; align-items: center; gap: 10px; padding: 8px 18px; font-size: 13px; font-weight: 500; color: var(--text-mid); cursor: pointer; transition: all .12s; border-radius: 0; position: relative; }
-.folder-item:hover { background: var(--tag); color: var(--text-dark); }
-.folder-item.active { color: var(--crimson); background: rgba(155,35,85,.06); font-weight: 600; }
-.folder-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--crimson); border-radius:0 2px 2px 0; }
-.folder-icon { width: 15px; height: 15px; opacity: .6; flex-shrink: 0; }
-.folder-item.active .folder-icon { opacity: 1; }
-.folder-badge { margin-left: auto; background: var(--crimson); color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
-.folder-badge[hidden] { display: none; }
-.folder-divider { height: 1px; background: var(--border); margin: 8px 16px; }
-.folder-label { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); padding: 10px 18px 4px; }
-
 /* MAIL LIST */
 .mail-list { width: min(310px, 28vw); min-width: 240px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; background: var(--card); }
 .mail-list-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--tag); }
@@ -390,42 +377,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 
 <!-- LAYOUT -->
 <div class="layout">
-
-  <!-- FOLDERS -->
-  <div class="mail-sidebar">
-    <div class="folder-label">Campagne</div>
-    <div class="folder-item active" data-mailbox-action="set-folder" data-mailbox-folder="outreach" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5.5h18v13H3z"/><path d="m3 7 9 6 9-6"/><path d="M17.5 3.5 20 6l-2.5 2.5"/></svg>
-      Coldmail reacties
-    </div>
-    <div class="folder-divider"></div>
-    <div class="folder-label">Losse mailbox</div>
-    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="inbox" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>
-      Inbox
-      <span class="folder-badge" id="badge-inbox" hidden>0</span>
-    </div>
-    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="starred" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      Gemarkeerd
-    </div>
-    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="sent" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      Verzonden
-    </div>
-    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="drafts" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-      Concepten
-    </div>
-    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="spam" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      Spam
-    </div>
-    <div class="folder-item" data-mailbox-action="set-folder" data-mailbox-folder="trash" role="button" tabindex="0">
-      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
-      Prullenbak
-    </div>
-  </div>
 
   <!-- MAIL LIST -->
   <div class="mail-list">

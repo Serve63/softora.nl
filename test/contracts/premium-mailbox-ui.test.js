@@ -239,18 +239,14 @@ test('premium mailbox houdt account-dropdown zichtbaar boven de inbox-layout', (
   assert.match(pageSource, /\.topbar-mailbox-pin\.active \{[\s\S]*color:\s*var\(--crimson\);/);
 });
 
-test('premium mailbox inboxbadge volgt de geladen inbox en niet een vast getal', () => {
+test('premium mailbox toont geen interne mappen-sidebar meer', () => {
   const pageSource = readPage();
-  const scriptSource = readScript();
 
-  assert.doesNotMatch(pageSource, /id="badge-inbox">3<\/span>/);
-  assert.match(pageSource, /<span class="folder-badge" id="badge-inbox" hidden>0<\/span>/);
-  assert.match(pageSource, /\.folder-badge\[hidden\] \{\s*display:\s*none;\s*\}/);
-  assert.match(scriptSource, /let inboxUnreadCount = 0;/);
-  assert.match(scriptSource, /function renderInboxBadge\(\) \{[\s\S]*badge\.textContent = String\(count\);[\s\S]*badge\.hidden = count === 0;/);
-  assert.match(scriptSource, /function syncInboxBadgeFromCurrentFolder\(\) \{[\s\S]*if \(activeFolder === 'inbox'\) \{[\s\S]*inboxUnreadCount = mails\.filter\(m => m\.folder === 'inbox' && m\.unread\)\.length;[\s\S]*renderInboxBadge\(\);/);
-  assert.match(scriptSource, /function renderList\(\) \{[\s\S]*syncInboxBadgeFromCurrentFolder\(\);[\s\S]*if \(!list\.length\)/);
-  assert.match(scriptSource, /catch \(error\) \{[\s\S]*mails = \[\];[\s\S]*syncInboxBadgeFromCurrentFolder\(\);/);
+  assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
+  assert.doesNotMatch(pageSource, /class="folder-item/);
+  assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
+  assert.doesNotMatch(pageSource, />Losse mailbox</);
+  assert.doesNotMatch(pageSource, /\.mail-sidebar\s*\{/);
 });
 
 test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderknop', () => {
@@ -453,7 +449,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.doesNotMatch(scriptSource, /onclick=/);
   assert.match(pageSource, /data-mailbox-action="open-compose"/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose"/);
-  assert.match(pageSource, /data-mailbox-action="set-folder" data-mailbox-folder="inbox"/);
+  assert.doesNotMatch(pageSource, /data-mailbox-action="set-folder"/);
   assert.match(scriptSource, /data-mailbox-action="open-mail"/);
   assert.match(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
@@ -519,8 +515,8 @@ test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over all
   const outreachSource = readOutreachScript();
   const campaignInboxSource = readCampaignInboxScript();
 
-  assert.match(pageSource, /data-mailbox-folder="outreach"[\s\S]*Coldmail reacties/);
-  assert.match(pageSource, /<div class="folder-label">Losse mailbox<\/div>/);
+  assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
+  assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
   assert.match(scriptSource, /let activeFolder = 'outreach';/);
   assert.match(scriptSource, /SoftoraMailboxCampaignInbox\?\.load/);
   assert.match(campaignInboxSource, /SoftoraMailboxOutreach\.loadCampaignReplies/);

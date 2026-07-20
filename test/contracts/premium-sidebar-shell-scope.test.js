@@ -462,11 +462,14 @@ test('premium vaste lasten centreert bootloader in het zichtbare hoofdvlak', () 
   );
 });
 
-test('premium mailbox behoudt eigen layout en vaste sidebar bij responsive mailweergave', () => {
+test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mailweergave', () => {
   const pageSource = readRepoFile('premium-mailbox.html');
 
   assert.match(pageSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>/);
   assert.match(pageSource, /data-sidebar-key="mailbox"[^>]*>[\s\S]*<span class="sidebar-link-text">Mailbox<\/span>/);
+  assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
+  assert.doesNotMatch(pageSource, /\.mail-sidebar\s*\{/);
+  assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
   assert.match(pageSource, /<main class="main-content is-premium-boot-host">[\s\S]*<div class="mail-page-shell">/);
   assert.match(pageSource, /\.main-content \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
   assert.match(pageSource, /\.mail-page-shell \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
