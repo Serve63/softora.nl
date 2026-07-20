@@ -37,6 +37,7 @@ test('SEO backlog validator blocks duplicate and already-used public paths', () 
   const backlog = clone(loadSeoMachineBacklog());
   backlog.items[1].path = backlog.items[0].path;
   backlog.items[2].path = '/blog/website-laten-maken-kosten-2026';
+  backlog.items[2].status = 'ready';
 
   const result = validateSeoMachineBacklog(backlog);
 
