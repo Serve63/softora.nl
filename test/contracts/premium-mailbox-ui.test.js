@@ -377,7 +377,8 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met
   assert.doesNotMatch(renderListSource, /class="mail-preview"/);
   assert.doesNotMatch(renderListSource, /renderListMeta/);
   assert.doesNotMatch(pageSource, /\.mail-campaign-meta/);
-  assert.doesNotMatch(pageSource, /\.mail-item\.unread \.mail-from/);
+  assert.match(pageSource, /\.mail-from \{[\s\S]*font-weight:\s*400;/);
+  assert.match(pageSource, /\.mail-item\.unread \.mail-from \{\s*font-weight:\s*600;\s*\}/);
   assert.match(pageSource, /\.mail-item \{[\s\S]*min-height:\s*52px;/);
   assert.match(pageSource, /\.unread-dot \{[\s\S]*background:\s*var\(--crimson\);/);
   assert.match(pageSource, /\.mail-items \{[\s\S]*overflow-y:\s*auto;[\s\S]*scrollbar-width:\s*none;[\s\S]*-ms-overflow-style:\s*none;/);
@@ -463,7 +464,7 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   assert.match(scriptSource, /async function persistMailReadState\(mail\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
   assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: window\.SoftoraMailboxCampaignInbox\.getAccount\(mail, activeMailboxAccount\),[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder: window\.SoftoraMailboxCampaignInbox\.getFolder\(mail, activeFolder\),/);
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*mail\.unread = true;[\s\S]*renderList\(\);[\s\S]*toast\(String\(error\?\.message/);
-  assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
+  assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*renderList\(\);[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
 });
 
