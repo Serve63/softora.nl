@@ -297,61 +297,6 @@ async function hydrate(mails) {
   });
 }
 
-function renderQuickbar(mail, helpers) {
-  if (!mail || !mail.outreach) return '';
-  const html = (helpers && helpers.escapeHtml) || escapeHtml;
-  return `
-      <div class="outreach-quickbar">
-        <div class="outreach-quickbar-title">
-          <span>Webdesign-reactie</span>
-          <strong>${html(mail.outreach.company)}</strong>
-        </div>
-        <div class="outreach-quickbar-actions">
-          <button class="outreach-quickbar-btn primary" type="button" data-mailbox-action="outreach-status" data-outreach-status="interesse" data-mailbox-id="${html(mail.id)}">Interesse</button>
-          <button class="outreach-quickbar-btn" type="button" data-mailbox-action="outreach-status" data-outreach-status="geen_interesse" data-mailbox-id="${html(mail.id)}">Geen interesse</button>
-        </div>
-      </div>`;
-}
-
-async function updateStatus(mail, status, helpers) {
-  if (!mail || !mail.outreach) return;
-  const toast = helpers && helpers.toast;
-  try {
-    const response = await fetch('/api/coldmailing/outreach/status', {
-      method: 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        customerId: mail.outreach.customerId,
-        email: mail.outreach.email || mail.email,
-        mailboxId: mail.id,
-        messageId: mail.messageId,
-        status,
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) throw new Error(data.message || 'Outreach-status bijwerken mislukt');
-    mail.outreach = null;
-    if (mail.campaign) {
-      mail.campaign.status = status;
-      mail.campaign.actionRequired = false;
-    }
-    if (toast) toast(status === 'interesse' ? '✓ Interesse opgeslagen' : '✓ Geen interesse opgeslagen');
-    if (helpers && helpers.openMail) helpers.openMail(mail.id);
-    if (helpers && helpers.renderList) helpers.renderList();
-  } catch (error) {
-    if (toast) toast(String(error && error.message || error || 'Outreach-status bijwerken mislukt'));
-  }
-}
-
-function handleAction(actionEl, helpers) {
-  if (!actionEl || actionEl.getAttribute('data-mailbox-action') !== 'outreach-status') return false;
-  const mail = helpers && helpers.findMailById ? helpers.findMailById(actionEl.getAttribute('data-mailbox-id')) : null;
-  void updateStatus(mail, actionEl.getAttribute('data-outreach-status'), helpers || {});
-  return true;
-}
-
 function readIntent(search) {
   try {
     const currentSearch = search == null
@@ -400,11 +345,9 @@ function applyIntentAfterLoad(helpers) {
 
 const mailboxOutreachApi = {
   applyIntentAfterLoad,
-  handleAction,
   hydrate,
   loadCampaignReplies,
   readIntent,
-  renderQuickbar,
 };
 global.SoftoraMailboxOutreach = mailboxOutreachApi;
 if (typeof module !== 'undefined' && module.exports) module.exports = mailboxOutreachApi;

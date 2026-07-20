@@ -115,7 +115,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720e"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720d"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -126,7 +126,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /\/api\/mailbox\/messages\/delete/);
   assert.match(scriptSource, /\/api\/mailbox\/send/);
   assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
-  assert.match(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
+  assert.doesNotMatch(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(options = \{\}\)/);
   assert.match(scriptSource, /let mailboxSyncState = null;/);
@@ -634,23 +634,23 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
   assert.doesNotMatch(linkedCtaHtml, /linkedin\.com/i);
 });
 
-test('premium mailbox toont webdesign outreach acties alleen via databasekoppeling', () => {
+test('premium mailbox houdt databasekoppeling zonder interessebalk in het maildetail', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
   const indexSource = readIndexScript();
   const outreachSource = readOutreachScript();
   const campaignInboxSource = readCampaignInboxScript();
 
-  assert.match(pageSource, /\.outreach-quickbar/);
-  assert.match(pageSource, /premium-mailbox-outreach\.js\?v=20260720a/);
+  assert.doesNotMatch(pageSource, /\.outreach-quickbar/);
+  assert.match(pageSource, /premium-mailbox-outreach\.js\?v=20260720b/);
   assert.match(indexSource, /SoftoraMailboxOutreach\.hydrate/);
-  assert.match(scriptSource, /SoftoraMailboxOutreach\.renderQuickbar/);
-  assert.match(scriptSource, /SoftoraMailboxOutreach\.handleAction/);
+  assert.doesNotMatch(scriptSource, /SoftoraMailboxOutreach\.renderQuickbar/);
+  assert.doesNotMatch(scriptSource, /SoftoraMailboxOutreach\.handleAction/);
   assert.match(outreachSource, /global\.SoftoraMailboxOutreach = mailboxOutreachApi/);
   assert.match(outreachSource, /isWebdesignOutreachCustomer/);
-  assert.match(outreachSource, /data-mailbox-action="outreach-status"/);
-  assert.match(outreachSource, /Interesse/);
-  assert.match(outreachSource, /Geen interesse/);
+  assert.doesNotMatch(outreachSource, /Webdesign-reactie/);
+  assert.doesNotMatch(outreachSource, /data-mailbox-action="outreach-status"/);
+  assert.doesNotMatch(outreachSource, /data-outreach-status/);
   assert.match(outreachSource, /mailMatchesOutreachCustomer/);
   assert.match(outreachSource, /collectCustomerMessageKeys/);
   assert.match(outreachSource, /function shouldSelectFirstMailboxMatch\(value\)/);
@@ -659,6 +659,20 @@ test('premium mailbox toont webdesign outreach acties alleen via databasekoppeli
   assert.match(outreachSource, /intent\.email && mailHasEmail\(mail, intent\.email\)/);
   assert.match(outreachSource, /helpers\.toast\('Geen exacte thread gevonden, ik zoek op e-mailadres'\);/);
   assert.match(outreachSource, /helpers && helpers\.toast && !intent\.selectFirst/);
+});
+
+test('premium mailbox gebruikt Softora Inter voor het onderwerp en toont alleen het campagneadres', () => {
+  const pageSource = readPage();
+  const campaignInboxSource = readCampaignInboxScript();
+  const accountHtml = campaignInboxModule.renderDetailAccount({
+    campaign: { company: 'Rijs Textiles B.V.' },
+    accountEmail: 'serve@softora.nl',
+  }, (value) => String(value));
+
+  assert.match(pageSource, /\.detail-subject \{[\s\S]*font-family:\s*var\(--premium-sidebar-font-sans, 'Inter', sans-serif\);[\s\S]*font-weight:\s*700;[\s\S]*letter-spacing:\s*0;/);
+  assert.doesNotMatch(pageSource, /\.detail-subject \{[^}]*Barlow Condensed/);
+  assert.equal(accountHtml, '<div class="detail-campaign-account">serve@softora.nl</div>');
+  assert.doesNotMatch(campaignInboxSource, /Binnengekomen via/);
 });
 
 test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over alle afzenderaccounts', () => {

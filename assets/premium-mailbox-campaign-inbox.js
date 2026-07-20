@@ -232,7 +232,7 @@
 
   function renderDetailAccount(mail, escapeHtml) {
     if (!isCampaignMail(mail) || !mail.accountEmail || typeof escapeHtml !== 'function') return '';
-    return `<div class="detail-campaign-account">Binnengekomen via ${escapeHtml(mail.accountEmail)}</div>`;
+    return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}</div>`;
   }
 
   async function load(folder, normalizeMessage, fetchImpl) {
