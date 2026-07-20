@@ -521,7 +521,7 @@
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-database") === 0) return "database";
-        if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
+        if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-websitegenerator") === 0) {
             return "websitegenerator";
         }
@@ -596,7 +596,7 @@
     /* Klassiek hangslot: U-beugel + afgeronde kast (herkenbaar op klein formaat) */
     const COMING_SOON_LOCK_SVG =
         '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg>';
-
+    function activateColdmailInboxSidebarLink(sidebar) { const target = sidebar || document.querySelector(".sidebar"); const link = target && target.querySelector('[data-sidebar-key="mailbox"]'); if (!link) return; link.setAttribute("href", "/mailbox"); link.classList.remove("sidebar-link--coming-soon"); link.removeAttribute("aria-disabled"); link.removeAttribute("tabindex"); link.querySelectorAll(".sidebar-link-lock").forEach(function (lock) { lock.remove(); }); const label = link.querySelector(".sidebar-link-text"); if (label) label.textContent = "Coldmail Inbox"; }
     function decorateComingSoonSidebarLinks() {
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
@@ -801,8 +801,8 @@
             getCustomersSidebarLink(),
             {
                 key: "mailbox",
-                href: "/premium-mailbox",
-                label: "Mailbox",
+                href: "/mailbox",
+                label: "Coldmail Inbox",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
             getWebsitePreviewSidebarLink(),
@@ -1135,7 +1135,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
-        syncStaticSidebarActiveState(sidebar, activeKey);
+        syncStaticSidebarActiveState(sidebar, activeKey); activateColdmailInboxSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
         schedulePremiumSidebarStability(sidebar);

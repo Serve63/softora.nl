@@ -66,6 +66,7 @@ async function syncInBackground({ account, folder, loadMessages }) {
 
 async function loadBody({
   id,
+  requestId,
   getMail,
   account,
   folder,
@@ -77,7 +78,7 @@ async function loadBody({
   if (!mail || mail.bodyLoading) return;
   mail.bodyLoading = true;
   try {
-    const params = new URLSearchParams({ account, folder, id: String(id) });
+    const params = new URLSearchParams({ account, folder, id: String(requestId || id) });
     const response = await fetch(`/api/mailbox/message?${params.toString()}`, {
       credentials: 'same-origin',
       cache: 'no-store',

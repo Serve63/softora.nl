@@ -3,6 +3,7 @@
 
 const CUSTOMER_DB_SCOPE = 'premium_customers_database';
 const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+const CAMPAIGN_REPLY_LIMIT = 100;
 let mailboxUrlIntentApplied = false;
 
 function escapeHtml(value) {
@@ -82,6 +83,44 @@ function isDefinitiveOutreachCustomer(customer) {
     ['interesse', 'geen_interesse', 'afgehaakt', 'geen_gehoor', 'klant_geworden'].includes(databaseStatus);
 }
 
+function getCampaignReplyAccount(customer) {
+  return normalizeEmail(
+    customer &&
+      (customer.replyMailboxAccount ||
+        customer.sentFromEmail ||
+        customer.sent_from_email ||
+        customer.outreachSentFromEmail ||
+        customer.lastColdmailSenderEmail)
+  );
+}
+
+function getCampaignReplyMailboxId(customer) {
+  return normalizeText(
+    customer &&
+      (customer.replyMailboxId ||
+        customer.replyThreadId ||
+        customer.reply_thread_id ||
+        customer.replyMessageId ||
+        customer.lastColdmailReplyMessageKey)
+  );
+}
+
+function getCampaignReplyDate(customer) {
+  return normalizeText(
+    customer &&
+      (customer.lastReplyAt ||
+        customer.last_reply_at ||
+        customer.lastColdmailReplyAt ||
+        customer.statusUpdatedAt ||
+        customer.updatedAt)
+  );
+}
+
+function isOwnMailboxCampaignReply(customer) {
+  if (!isWebdesignOutreachCustomer(customer) || !hasOutreachReplySignal(customer)) return false;
+  return normalizeOutreachKey(customer && customer.lastColdmailProvider) !== 'instantly';
+}
+
 function hasOutreachReplySignal(customer) {
   return Boolean(
     customer &&
@@ -123,6 +162,91 @@ async function fetchCustomerState() {
   if (!response.ok) throw new Error('Databasekoppeling laden mislukt');
   const data = await response.json().catch(() => ({}));
   return parseCustomers(readChunkedStateValue(data && data.values, CUSTOMER_DB_KEY));
+}
+
+function buildCampaignReplyOutreach(customer) {
+  if (isDefinitiveOutreachCustomer(customer)) return null;
+  return {
+    customerId: normalizeText(customer && customer.id),
+    company:
+      normalizeText(customer && (customer.bedrijf || customer.company || customer.naam)) ||
+      normalizeEmail(customer && customer.email),
+    email: normalizeEmail(customer && customer.email),
+    status: normalizeOutreachStatus(customer && customer.outreachStatus) || 'reactie_ontvangen',
+  };
+}
+
+function buildCampaignReplyFallback(customer, account, mailboxId, folder) {
+  const company =
+    normalizeText(customer && (customer.bedrijf || customer.company || customer.naam)) ||
+    normalizeEmail(customer && customer.email) ||
+    'Onbekend bedrijf';
+  const preview = normalizeText(
+    customer &&
+      (customer.lastColdmailReplyPreview ||
+        customer.replyPreview ||
+        customer.lastReplyPreview)
+  );
+  const customerId = normalizeText(customer && customer.id);
+  const localKey = [account, mailboxId, customerId, normalizeEmail(customer && customer.email)]
+    .filter(Boolean)
+    .join('|');
+  return {
+    id: `outreach:${localKey || 'unknown'}`,
+    mailboxId,
+    accountEmail: account,
+    folder,
+    from: company,
+    email: normalizeEmail(customer && customer.email),
+    to: account,
+    subject:
+      normalizeText(
+        customer &&
+          (customer.lastColdmailReplySubject ||
+            customer.replySubject ||
+            customer.lastReplySubject)
+      ) || '(Geen onderwerp)',
+    preview,
+    body: mailboxId ? '' : preview,
+    date: getCampaignReplyDate(customer),
+    unread: Boolean(
+      customer &&
+        (customer.actionRequired ||
+          customer.outreachActionRequired ||
+          normalizeOutreachStatus(customer.outreachStatus) === 'reactie_ontvangen')
+    ),
+    starred: false,
+    bodyLoaded: Boolean(!mailboxId && preview),
+    campaign: {
+      company,
+      account,
+      customerId,
+      status: normalizeOutreachStatus(customer && customer.outreachStatus) || 'reactie_ontvangen',
+      actionRequired: !isDefinitiveOutreachCustomer(customer),
+    },
+    outreach: buildCampaignReplyOutreach(customer),
+  };
+}
+
+async function loadCampaignReplies() {
+  const customers = (await fetchCustomerState())
+    .filter(isOwnMailboxCampaignReply)
+    .sort((left, right) => Date.parse(getCampaignReplyDate(right)) - Date.parse(getCampaignReplyDate(left)))
+    .slice(0, CAMPAIGN_REPLY_LIMIT);
+  const replies = customers.map((customer) => {
+    const account = getCampaignReplyAccount(customer);
+    const mailboxId = getCampaignReplyMailboxId(customer);
+    const folder = normalizeText(customer && customer.replyMailboxFolder).toLowerCase() || 'inbox';
+    return buildCampaignReplyFallback(customer, account, mailboxId, folder);
+  });
+  const unique = new Map();
+  replies.forEach((reply) => {
+    const key = `${normalizeEmail(reply.accountEmail)}|${normalizeMessageKey(reply.mailboxId || reply.id)}`;
+    if (!unique.has(key)) unique.set(key, reply);
+  });
+  return Array.from(unique.values()).sort(
+    (left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0)
+  );
 }
 
 function collectCustomerMessageKeys(customer) {
@@ -206,6 +330,10 @@ async function updateStatus(mail, status, helpers) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.ok) throw new Error(data.message || 'Outreach-status bijwerken mislukt');
     mail.outreach = null;
+    if (mail.campaign) {
+      mail.campaign.status = status;
+      mail.campaign.actionRequired = false;
+    }
     if (toast) toast(status === 'interesse' ? '✓ Interesse opgeslagen' : '✓ Geen interesse opgeslagen');
     if (helpers && helpers.openMail) helpers.openMail(mail.id);
     if (helpers && helpers.renderList) helpers.renderList();
@@ -226,14 +354,14 @@ function readIntent() {
     const params = new URLSearchParams(window.location.search || '');
     return {
       account: normalizeEmail(params.get('account') || ''),
-      folder: normalizeText(params.get('folder') || 'inbox').toLowerCase(),
+      folder: normalizeText(params.get('folder') || 'outreach').toLowerCase(),
       message: normalizeText(params.get('message') || params.get('mail') || params.get('thread') || ''),
       email: normalizeEmail(params.get('email') || ''),
       query: normalizeText(params.get('q') || params.get('zoek') || params.get('search') || ''),
       selectFirst: shouldSelectFirstMailboxMatch(params.get('select') || params.get('openFirst') || ''),
     };
   } catch (_) {
-    return { account: '', folder: 'inbox', message: '', email: '', query: '', selectFirst: false };
+    return { account: '', folder: 'outreach', message: '', email: '', query: '', selectFirst: false };
   }
 }
 
@@ -268,6 +396,7 @@ window.SoftoraMailboxOutreach = {
   applyIntentAfterLoad,
   handleAction,
   hydrate,
+  loadCampaignReplies,
   readIntent,
   renderQuickbar,
 };
