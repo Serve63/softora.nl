@@ -115,24 +115,31 @@
     return `<div class="detail-campaign-account">Binnengekomen via ${escapeHtml(mail.accountEmail)}</div>`;
   }
 
-  async function load(folder, normalizeMessage) {
+  async function load(folder, normalizeMessage, fetchImpl) {
     if (folder !== 'outreach') return null;
-    if (
-      !global.SoftoraMailboxOutreach ||
-      typeof global.SoftoraMailboxOutreach.loadCampaignReplies !== 'function'
-    ) {
-      throw new Error('Coldmail Reacties is niet beschikbaar');
+    const request = typeof fetchImpl === 'function'
+      ? fetchImpl
+      : global.fetch.bind(global);
+    const response = await request('/api/mailbox/campaign-replies?limit=100', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
     }
-    const replies = await global.SoftoraMailboxOutreach.loadCampaignReplies();
     return {
-      messages: (Array.isArray(replies) ? replies : []).map(normalizeMessage),
-      sync: {
-        indexed: true,
-        stale: false,
-        source: 'campaign-replies',
-        refreshRecommended: false,
-        warming: false,
-      },
+      messages: (Array.isArray(data.messages) ? data.messages : []).map(normalizeMessage),
+      sync: data?.sync && typeof data.sync === 'object'
+        ? data.sync
+        : {
+            indexed: true,
+            stale: false,
+            source: 'campaign-replies-index',
+            refreshRecommended: false,
+            warming: false,
+          },
     };
   }
 

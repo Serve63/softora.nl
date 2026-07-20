@@ -93,11 +93,83 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
 
   const listMessage = store.normalizeMessageRow(row);
   assert.equal(listMessage.id, 'inbox:42');
+  assert.equal(listMessage.accountEmail, 'info@softora.nl');
   assert.equal(listMessage.body, '');
   assert.equal(listMessage.hasBody, true);
 
   const detailMessage = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(detailMessage.body, 'Volledige tekst');
+});
+
+test('mailbox index store reads campaign inbox messages across selected accounts', async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        eq(column, value) {
+          calls.push(['eq', column, value]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        limit(value) {
+          calls.push(['limit', value]);
+          return Promise.resolve({
+            data: [
+              {
+                account_email: 'serve@softora.nl',
+                folder: 'inbox',
+                uid: 42,
+                provider_id: 'inbox:42',
+                sender_name: 'Studio Noord',
+                sender_email: 'info@studionoord.nl',
+                subject: 'Re: Nieuw webdesign',
+                date: '2026-07-20T10:15:00.000Z',
+              },
+            ],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.listMessagesForAccounts({
+    accountEmails: ['Serve@Softora.nl', 'martijn@softora.nl'],
+    folder: 'INBOX',
+    limit: 2000,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].accountEmail, 'serve@softora.nl');
+  assert.equal(messages[0].email, 'info@studionoord.nl');
+  assert.deepEqual(calls.find((call) => call[0] === 'in'), [
+    'in',
+    'account_email',
+    ['serve@softora.nl', 'martijn@softora.nl'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'inbox']);
+  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 2000]);
 });
 
 test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', async () => {

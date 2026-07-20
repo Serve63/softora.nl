@@ -26,7 +26,10 @@ test('data ops store restores large premium database webdesign job queues', () =
     source,
     /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)/
   );
-  assert.match(source, /forgetReads\('customers', 'customers-snapshot', 'dashboard-customers'\)/);
+  assert.match(
+    source,
+    /forgetReads\('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:\*'\)/
+  );
   assert.match(source, /forgetReads\('design-photo-asset-flags', 'design-photos-signed:\*'\)/);
 });
 
@@ -102,6 +105,69 @@ test('data ops store reads mailbox messages for coldmail bounce stats', async ()
   assert.deepEqual(calls.find((call) => call[0] === 'order'), ['order', 'date', { ascending: false }]);
   assert.equal(calls.some((call) => call[0] === 'or'), false);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 50]);
+});
+
+test('data ops store reads only customers matching campaign reply sender emails', async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        limit(value) {
+          calls.push(['limit', value]);
+          return Promise.resolve({
+            data: [
+              {
+                customer_id: 'customer-1',
+                company: 'Studio Noord',
+                email: 'info@studionoord.nl',
+                database_status: 'gemaild',
+                payload: {
+                  id: 'customer-1',
+                  email: 'info@studionoord.nl',
+                  campaignType: 'webdesign',
+                },
+              },
+            ],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const customers = await store.listCustomersByEmails({
+    emails: ['INFO@STUDIONOORD.NL', 'contact@dekroon.nl'],
+    bypassReadFailureCooldown: true,
+    suppressReadFailureCooldown: true,
+  });
+
+  assert.equal(customers.length, 1);
+  assert.equal(customers[0].bedrijf, 'Studio Noord');
+  assert.equal(customers[0].email, 'info@studionoord.nl');
+  assert.deepEqual(calls.find((call) => call[0] === 'in'), [
+    'in',
+    'email',
+    ['contact@dekroon.nl', 'info@studionoord.nl'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 1000]);
 });
 
 test('data ops store reads bounce candidates per mailbox and filters without a table-wide OR scan', async () => {
