@@ -115,7 +115,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720e"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -344,7 +344,25 @@ test('coldmail inbox toont de ontvangsttijd vast in Europe Amsterdam', () => {
   assert.equal(mail.time, '08:14');
 });
 
-test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en tijdstip', () => {
+test('coldmail inbox zet relatieve datum boven de tijd en oudere mails op dag en maand', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const now = '2026-07-20T12:00:00.000Z';
+  const today = helpers.formatMailDate('2026-07-20T06:14:00.000Z', now);
+  const yesterday = helpers.formatMailDate('2026-07-19T14:57:00.000Z', now);
+  const dayBeforeYesterday = helpers.formatMailDate('2026-07-18T07:28:00.000Z', now);
+  const older = helpers.formatMailDate('2026-07-05T08:21:00.000Z', now);
+
+  assert.equal(today.listDate, '');
+  assert.equal(today.time, '08:14');
+  assert.equal(yesterday.listDate, 'Gisteren');
+  assert.equal(yesterday.time, '16:57');
+  assert.equal(dayBeforeYesterday.listDate, 'Eergisteren');
+  assert.equal(dayBeforeYesterday.time, '09:28');
+  assert.equal(older.listDate, '5 juli');
+  assert.equal(older.time, '10:21');
+});
+
+test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met tijd', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
   const renderListSource = scriptSource.match(/function renderList\(\) \{[\s\S]*?\n\}/)?.[0] || '';
@@ -352,6 +370,8 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en tijdstip'
   assert.match(renderListSource, /class="unread-dot"/);
   assert.match(renderListSource, /class="mail-from"/);
   assert.match(renderListSource, /class="mail-time"/);
+  assert.match(renderListSource, /class="mail-date-label"/);
+  assert.match(renderListSource, /class="mail-time-value"/);
   assert.match(renderListSource, /data-mailbox-received-at/);
   assert.doesNotMatch(renderListSource, /class="mail-subject"/);
   assert.doesNotMatch(renderListSource, /class="mail-preview"/);
@@ -360,6 +380,9 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en tijdstip'
   assert.doesNotMatch(pageSource, /\.mail-item\.unread \.mail-from/);
   assert.match(pageSource, /\.mail-item \{[\s\S]*min-height:\s*52px;/);
   assert.match(pageSource, /\.unread-dot \{[\s\S]*background:\s*var\(--crimson\);/);
+  assert.match(pageSource, /\.mail-items \{[\s\S]*overflow-y:\s*auto;[\s\S]*scrollbar-width:\s*none;[\s\S]*-ms-overflow-style:\s*none;/);
+  assert.match(pageSource, /\.mail-items::\-webkit\-scrollbar \{[\s\S]*display:\s*none;/);
+  assert.match(pageSource, /\.mail-time \{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-end;/);
 });
 
 test('premium mailbox toont bij verzonden mails de ontvanger als hoofdregel', () => {

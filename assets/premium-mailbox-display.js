@@ -1,5 +1,6 @@
 (function (global) {
   const SENDER_CTA_LINKS = Object.freeze({});
+  const MAILBOX_TIME_ZONE = 'Europe/Amsterdam';
 
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
@@ -52,6 +53,38 @@
     ].join(' ').toLowerCase();
   }
 
+  function getAmsterdamDayNumber(value) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      day: '2-digit',
+      month: '2-digit',
+      timeZone: MAILBOX_TIME_ZONE,
+      year: 'numeric',
+    }).formatToParts(value).reduce((result, part) => {
+      if (part.type !== 'literal') result[part.type] = Number(part.value);
+      return result;
+    }, {});
+    return Date.UTC(parts.year, parts.month - 1, parts.day) / 86400000;
+  }
+
+  function formatMailDate(value, nowValue) {
+    const date = value ? new Date(value) : new Date();
+    const now = nowValue ? new Date(nowValue) : new Date();
+    if (!Number.isFinite(date.getTime()) || !Number.isFinite(now.getTime())) return { date: '', listDate: '', time: '' };
+    const dayDifference = getAmsterdamDayNumber(now) - getAmsterdamDayNumber(date);
+    const listDate = dayDifference === 0
+      ? ''
+      : dayDifference === 1
+        ? 'Gisteren'
+        : dayDifference === 2
+          ? 'Eergisteren'
+          : date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', timeZone: MAILBOX_TIME_ZONE });
+    return {
+      date: listDate || 'Vandaag',
+      listDate,
+      time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: MAILBOX_TIME_ZONE }),
+    };
+  }
+
   function getSenderCtaLink(options) {
     const mail = options && options.mail;
     const candidates = [
@@ -87,5 +120,6 @@
     getAvatarText,
     getReplyToAddress,
     buildSearchText,
+    formatMailDate,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
