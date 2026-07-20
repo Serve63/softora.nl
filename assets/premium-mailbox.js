@@ -558,15 +558,8 @@ let composeReplyContext = null;
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
 }
-function formatMailDate(value) {
-  const date = value ? new Date(value) : new Date();
-  if (!Number.isFinite(date.getTime())) return { date: '', time: '' };
-  const today = new Date();
-  const sameDay = date.toDateString() === today.toDateString();
-  return {
-    date: sameDay ? 'Vandaag' : date.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' }),
-    time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }),
-  };
+function formatMailDate(value, nowValue) {
+  return window.SoftoraMailboxDisplay.formatMailDate(value, nowValue);
 }
 function normalizeMailboxApiMessage(message) {
   const when = formatMailDate(message.date);
@@ -590,6 +583,7 @@ function normalizeMailboxApiMessage(message) {
     references: message.references || '',
     time: when.time,
     date: when.date,
+    listDate: when.listDate,
     uid: message.uid,
     unread: Boolean(message.unread),
     starred: Boolean(message.starred),
@@ -748,7 +742,10 @@ function renderList() {
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
       <div class="mail-item-top">
         <div class="mail-from">${escapeHtml(window.SoftoraMailboxDisplay.getListPrimaryText(m, { ...displayOptions, account: m.accountEmail || displayOptions.account }))}</div>
-        <time class="mail-time" datetime="${escapeHtml(m.receivedAt || '')}">${escapeHtml(m.time)}</time>
+        <time class="mail-time" datetime="${escapeHtml(m.receivedAt || '')}">
+          ${m.listDate ? `<span class="mail-date-label">${escapeHtml(m.listDate)}</span>` : ''}
+          <span class="mail-time-value">${escapeHtml(m.time)}</span>
+        </time>
       </div>
     </div>`).join('');
 }
