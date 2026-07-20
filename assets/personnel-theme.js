@@ -596,7 +596,8 @@
     /* Klassiek hangslot: U-beugel + afgeronde kast (herkenbaar op klein formaat) */
     const COMING_SOON_LOCK_SVG =
         '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg>';
-    function activateColdmailInboxSidebarLink(sidebar) { const target = sidebar || document.querySelector(".sidebar"); const link = target && target.querySelector('[data-sidebar-key="mailbox"]'); if (!link) return; link.setAttribute("href", "/mailbox"); link.classList.remove("sidebar-link--coming-soon"); link.removeAttribute("aria-disabled"); link.removeAttribute("tabindex"); link.querySelectorAll(".sidebar-link-lock").forEach(function (lock) { lock.remove(); }); const label = link.querySelector(".sidebar-link-text"); if (label) label.textContent = "Coldmail Inbox"; }
+    function getMailboxSidebarLink() { return { key: "mailbox", href: "/mailbox", label: "Mailbox", icon: '<svg class="sidebar-link-mailbox-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>' }; }
+    function activateMailboxSidebarLink(sidebar) { const target = sidebar || document.querySelector(".sidebar"); const link = target && target.querySelector('[data-sidebar-key="mailbox"]'); if (!link) return; const mailboxLink = getMailboxSidebarLink(); link.setAttribute("href", mailboxLink.href); link.classList.remove("sidebar-link--coming-soon"); link.removeAttribute("aria-disabled"); link.removeAttribute("tabindex"); link.querySelectorAll(".sidebar-link-lock").forEach(function (lock) { lock.remove(); }); if (!link.querySelector(":scope > svg")) link.insertAdjacentHTML("afterbegin", mailboxLink.icon); const label = link.querySelector(".sidebar-link-text"); if (label) label.textContent = mailboxLink.label; }
     function decorateComingSoonSidebarLinks() {
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
@@ -799,12 +800,7 @@
 
         const managementLinks = [
             getCustomersSidebarLink(),
-            {
-                key: "mailbox",
-                href: "/mailbox",
-                label: "Coldmail Inbox",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
-            },
+            getMailboxSidebarLink(),
             getWebsitePreviewSidebarLink(),
             {
                 key: "seo",
@@ -1135,7 +1131,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
-        syncStaticSidebarActiveState(sidebar, activeKey); activateColdmailInboxSidebarLink(sidebar);
+        syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
         schedulePremiumSidebarStability(sidebar);

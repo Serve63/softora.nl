@@ -468,9 +468,14 @@ test('premium vaste lasten centreert bootloader in het zichtbare hoofdvlak', () 
 
 test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mailweergave', () => {
   const pageSource = readRepoFile('premium-mailbox.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
 
   assert.match(pageSource, /<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>/);
   assert.match(pageSource, /data-sidebar-key="mailbox"[^>]*>[\s\S]*<span class="sidebar-link-text">Mailbox<\/span>/);
+  assert.match(themeSource, /function getMailboxSidebarLink\(\)[\s\S]*key:\s*"mailbox",[\s\S]*href:\s*"\/mailbox",[\s\S]*label:\s*"Mailbox",[\s\S]*sidebar-link-mailbox-icon[\s\S]*m3 8 9 6 9-6/);
+  assert.match(themeSource, /function activateMailboxSidebarLink\(sidebar\)[\s\S]*insertAdjacentHTML\("afterbegin", mailboxLink\.icon\)[\s\S]*label\.textContent = mailboxLink\.label/);
+  assert.match(themeSource, /getMailboxSidebarLink\(\),/);
+  assert.doesNotMatch(themeSource, /label:\s*"Coldmail Inbox"/);
   assert.doesNotMatch(pageSource, /class="mail-sidebar"/);
   assert.doesNotMatch(pageSource, /\.mail-sidebar\s*\{/);
   assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
