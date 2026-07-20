@@ -71,7 +71,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .detail-empty p { font-size: 13px; }
 
 .detail-body { flex: 1; min-width: 0; max-width: 100%; overflow-y: auto; overflow-x: hidden; padding: clamp(12px, 1.4vw, 20px); }
-.detail-mail-block { width: min(100%, 900px); max-width: 900px; margin: 0 auto; overflow: hidden; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(26,26,46,.03); font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); }
+.detail-mail-block { width: min(100%, 900px); max-width: 900px; min-height: calc(100vh - 92px); margin: 0 auto; overflow: hidden; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(26,26,46,.03); font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); }
 .detail-header { background: var(--card); padding: 22px 24px 18px; flex-shrink: 0; min-width: 0; max-width: 100%; }
 .detail-subject-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; min-width: 0; }
 .detail-subject { flex: 1; min-width: 0; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: clamp(19px, 1.5vw, 24px); font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow-wrap: anywhere; }
@@ -134,6 +134,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   body { overflow: auto; }
   .main-content { margin-left: 0; width: 100%; }
   .mail-page-shell { min-height: auto; max-height: none; }
+  .detail-mail-block { min-height: calc(100vh - 68px); }
 }
 @media (max-width: 720px) {
   .detail-body { padding: 8px; }
