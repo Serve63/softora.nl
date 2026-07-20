@@ -1521,7 +1521,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720b/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
@@ -1671,13 +1671,17 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /if \(\(hasPhoto && hasPhotoSource\) \|\| \(hasMockup && hasMockupSource\)\) schedulePhotoDropHydration\(\);/);
   assert.match(webdesignActionScriptSource, /const isRestoringPhotos = typeof options\.isRestoringPhotos === "function"/);
   assert.match(webdesignActionScriptSource, /state && state\.photoRestorePending/);
-  assert.match(webdesignActionScriptSource, /const isRestoring = !hasPhoto && !isPending && Boolean\(isRestoringPhotos\(customer\)\);/);
-  assert.match(webdesignActionScriptSource, /const canGenerate = !hasPhoto && !isLoading && Boolean\(resolveCustomerWebsiteUrl\(customer\)\);/);
+  assert.match(webdesignActionScriptSource, /const restoreBlocked = !hasPhoto && !isPending && Boolean\(isRestoringPhotos\(customer\)\);/);
+  assert.match(webdesignActionScriptSource, /const isLoading = isPending;/);
+  assert.match(webdesignActionScriptSource, /const canGenerate = !hasPhoto && !isPending && !restoreBlocked && Boolean\(resolveCustomerWebsiteUrl\(customer\)\);/);
   assert.match(webdesignActionScriptSource, /const isPending = pendingIds\.has\(customer\.id\);/);
   assert.match(webdesignActionScriptSource, /if \(pendingIds\.has\(target\.id\) \|\| isRestoringPhotos\(target\)\) \{/);
+  assert.match(webdesignActionScriptSource, /restoreBlocked \? "Fotodata wordt op de achtergrond gecontroleerd"/);
   assert.match(webdesignActionScriptSource, /schedulePoll\(job\.id, pollDelay\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /Er wordt al een webdesign gemaakt/);
-  assert.match(webdesignActionScriptSource, /photo-drop" \+ \(isLoading \? " is-generating" : ""\) \+ \(isRestoring \? " is-restoring" : ""\)/);
+  assert.match(webdesignActionScriptSource, /photo-drop" \+ \(isLoading \? " is-generating" : ""\) \+ "\\" role/);
+  assert.doesNotMatch(webdesignActionScriptSource, /\+ \(isRestoring \? " is-restoring" : ""\)/);
+  assert.match(pageSource, /isRestoringPhotos: function \(customer\) \{ return Boolean\(state\.photoRestorePending\) && !window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\); \}/);
   assert.match(webdesignActionScriptSource, /class=\\"photo-remove\\"/);
   assert.match(webdesignActionScriptSource, /data-remove-photo-id=\\"/);
   assert.match(webdesignActionScriptSource, /class=\\"lead-delete-button\\"/);
@@ -1770,7 +1774,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1921,7 +1925,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720b/);
   assert.match(webdesignActionScriptSource, /variant: normalizeVariant\(variant\)/);
   assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
@@ -2333,6 +2337,76 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /label: "Status hersteld"/);
   assert.doesNotMatch(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);
   assert.doesNotMatch(pageSource, /Vaste klanten hersteld, statussen bijgewerkt en verkeerde rijen verwijderd\./);
+});
+
+test('premium database webdesign action never presents background photo restore as active generation', async () => {
+  let fetchCalls = 0;
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    fetch: async () => {
+      fetchCalls += 1;
+      return { ok: true, json: async () => ({}) };
+    },
+  });
+  const customer = {
+    id: 'customer-restore',
+    bedrijf: 'Herstel BV',
+    website: 'https://herstel.example/',
+    websitePhoto: '',
+  };
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [customer], photoRestorePending: true },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: () => false,
+    resolveCustomerWebsiteUrl: () => 'https://herstel.example/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  const html = controller.render(customer);
+
+  assert.match(html, /data-can-generate="false"/);
+  assert.match(html, /Fotodata wordt op de achtergrond gecontroleerd/);
+  assert.match(html, /class="photo-generate-icon"/);
+  assert.doesNotMatch(html, /photo-generate-spinner/);
+  assert.doesNotMatch(html, /is-generating|is-restoring/);
+
+  await controller.generateForCustomer(customer.id);
+  assert.equal(fetchCalls, 0);
+});
+
+test('premium database webdesign action keeps snapshot-confirmed available leads immediately usable', () => {
+  const webdesignActionClient = loadDatabaseWebdesignActionClient();
+  const customer = {
+    id: 'customer-available',
+    bedrijf: 'Beschikbaar BV',
+    website: 'https://beschikbaar.example/',
+    websitePhoto: '',
+    availableSnapshot: true,
+  };
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [customer], photoRestorePending: true },
+    escapeHtml: (value) => String(value),
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: () => false,
+    resolveCustomerWebsiteUrl: () => 'https://beschikbaar.example/',
+    isWebdesignPhotoEligible: () => true,
+    isRestoringPhotos: (item) => !item.availableSnapshot,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+
+  const html = controller.render(customer);
+
+  assert.match(html, /data-can-generate="true"/);
+  assert.match(html, /title="Webdesign maken"/);
+  assert.match(html, /class="photo-generate-icon"/);
+  assert.doesNotMatch(html, /photo-generate-spinner|is-generating|is-restoring/);
 });
 
 test('premium database webdesign action keeps loaded photo slots stable across re-renders', () => {
