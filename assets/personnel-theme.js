@@ -1,6 +1,6 @@
 (function () {
     const pathname = (window.location.pathname || "").toLowerCase();
-    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
+    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
     const personnelStorageKey = isPremiumPersonnelContext
         ? "softora_premium_personnel_theme_mode"
         : "softora_software_personnel_theme_mode";
@@ -1296,7 +1296,7 @@
             const targetUrl = new URL(href, window.location.origin);
             if (targetUrl.origin !== window.location.origin) return false;
             if (targetUrl.pathname === window.location.pathname && targetUrl.hash === window.location.hash) return false;
-            return targetUrl.pathname.indexOf("/premium-") === 0;
+            return targetUrl.pathname === "/mailbox" || targetUrl.pathname.indexOf("/premium-") === 0;
         } catch (_) {
             return false;
         }

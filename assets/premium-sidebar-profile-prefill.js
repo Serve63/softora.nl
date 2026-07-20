@@ -56,7 +56,7 @@
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-database") === 0) return "database";
-        if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
+        if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-websitegenerator") === 0 || p.indexOf("/premium-websitepreview") === 0) return "websitegenerator";
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";

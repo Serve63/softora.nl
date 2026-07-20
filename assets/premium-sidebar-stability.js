@@ -3,7 +3,7 @@
     var NAV_STATE_MAX_AGE_SECONDS = 30;
     function isPremiumPath() {
         var path = String(window.location.pathname || "").toLowerCase();
-        return path.indexOf("/premium-") === 0 || path === "/live-momentum" || path === "/live-momentum.html";
+        return path.indexOf("/premium-") === 0 || path === "/mailbox" || path === "/live-momentum" || path === "/live-momentum.html";
     }
 
     function getSidebar() {
