@@ -88,7 +88,7 @@ function loadMailboxHelpersForTest(options = {}) {
   };
   const source = readScript().replace(
     'bindMailboxActions();',
-    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, requestMailboxDeleteConfirmation, display: window.SoftoraMailboxDisplay }; bindMailboxActions();'
+    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, formatMailDate, requestMailboxDeleteConfirmation, display: window.SoftoraMailboxDisplay }; bindMailboxActions();'
   );
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
@@ -114,7 +114,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720d"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -156,15 +156,15 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
 
 test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Servé en Martijn', () => {
   const messages = [
-    { id: 'serve-softora', accountEmail: 'serve@softora.nl' },
-    { id: 'serve-alias', accountEmail: 'servecreusen@softora.nl' },
-    { id: 'serve-gmail', accountEmail: 'servec321@gmail.com' },
-    { id: 'serve-290', accountEmail: 'serve290@gmail.com' },
-    { id: 'serve-7', accountEmail: 'servecreusen7@gmail.com' },
-    { id: 'martijn-softora', accountEmail: 'martijn@softora.nl' },
-    { id: 'martijn-alias', accountEmail: 'martijnvandeven@softora.nl' },
-    { id: 'martijn-gmail', accountEmail: 'martijnven123@gmail.com' },
-    { id: 'martijn-visuals', accountEmail: 'contact.venvisuals@gmail.com' },
+    { id: 'serve-softora', accountEmail: 'serve@softora.nl', receivedAt: '2026-07-20T09:00:00.000Z' },
+    { id: 'serve-alias', accountEmail: 'servecreusen@softora.nl', receivedAt: '2026-07-20T08:00:00.000Z' },
+    { id: 'serve-gmail', accountEmail: 'servec321@gmail.com', receivedAt: '2026-07-20T07:00:00.000Z' },
+    { id: 'serve-290', accountEmail: 'serve290@gmail.com', receivedAt: '2026-07-20T06:00:00.000Z' },
+    { id: 'serve-7', accountEmail: 'servecreusen7@gmail.com', receivedAt: '2026-07-20T05:00:00.000Z' },
+    { id: 'martijn-softora', accountEmail: 'martijn@softora.nl', receivedAt: '2026-07-20T04:00:00.000Z' },
+    { id: 'martijn-alias', accountEmail: 'martijnvandeven@softora.nl', receivedAt: '2026-07-20T03:00:00.000Z' },
+    { id: 'martijn-gmail', accountEmail: 'martijnven123@gmail.com', receivedAt: '2026-07-20T02:00:00.000Z' },
+    { id: 'martijn-visuals', accountEmail: 'contact.venvisuals@gmail.com', receivedAt: '2026-07-20T01:00:00.000Z' },
     { id: 'info', accountEmail: 'info@softora.nl' },
     { id: 'ruben', accountEmail: 'ruben@softora.nl' },
     { id: 'zakelijk-softora', accountEmail: 'zakelijk@softora.nl' },
@@ -200,6 +200,55 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv�
   assert.ok(ownerMenu.indexOf('Martijn van de Ven') < ownerMenu.indexOf('Servé & Martijn'));
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('both');
+});
+
+test('coldmail inbox sorteert na ieder eigenaarfilter op echte ontvangsttijd met nieuwste bovenaan', () => {
+  const messages = [
+    { id: 'oud', accountEmail: 'serve@softora.nl', receivedAt: '2026-07-18T14:00:00.000Z' },
+    { id: 'nieuw', accountEmail: 'martijn@softora.nl', receivedAt: '2026-07-20T08:00:00.000Z' },
+    { id: 'midden', accountEmail: 'servecreusen@softora.nl', receivedAt: '2026-07-19T18:00:00.000Z' },
+  ];
+
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages, 'both').map((message) => message.id),
+    ['nieuw', 'midden', 'oud']
+  );
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages, 'serve').map((message) => message.id),
+    ['midden', 'oud']
+  );
+});
+
+test('coldmail inbox toont de ontvangsttijd vast in Europe Amsterdam', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const mail = helpers.normalizeMailboxApiMessage({
+    id: 'inbox:101',
+    folder: 'inbox',
+    from: 'Rijs Textiles',
+    email: 'support@rijstextiles.com',
+    date: '2026-07-20T06:14:13.000Z',
+  });
+
+  assert.equal(mail.receivedAt, '2026-07-20T06:14:13.000Z');
+  assert.equal(mail.time, '08:14');
+});
+
+test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en tijdstip', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+  const renderListSource = scriptSource.match(/function renderList\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+
+  assert.match(renderListSource, /class="unread-dot"/);
+  assert.match(renderListSource, /class="mail-from"/);
+  assert.match(renderListSource, /class="mail-time"/);
+  assert.match(renderListSource, /data-mailbox-received-at/);
+  assert.doesNotMatch(renderListSource, /class="mail-subject"/);
+  assert.doesNotMatch(renderListSource, /class="mail-preview"/);
+  assert.doesNotMatch(renderListSource, /renderListMeta/);
+  assert.doesNotMatch(pageSource, /\.mail-campaign-meta/);
+  assert.doesNotMatch(pageSource, /\.mail-item\.unread \.mail-from/);
+  assert.match(pageSource, /\.mail-item \{[\s\S]*min-height:\s*52px;/);
+  assert.match(pageSource, /\.unread-dot \{[\s\S]*background:\s*var\(--crimson\);/);
 });
 
 test('premium mailbox toont bij verzonden mails de ontvanger als hoofdregel', () => {

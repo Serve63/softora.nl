@@ -2091,7 +2091,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
           email: 'klant@example.nl',
           date: '2026-07-17T10:00:00.000Z',
         },
-      ],
+      ].reverse(),
     },
     dataOpsStore: {
       listCustomersByEmails: async (options) => {
