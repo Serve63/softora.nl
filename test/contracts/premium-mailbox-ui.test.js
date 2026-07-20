@@ -110,7 +110,7 @@ function renderMailboxBodyForTest(body, images, options) {
   return loadMailboxHelpersForTest().renderMailBody(body, images, options);
 }
 
-test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
+test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
   const indexSource = readIndexScript();
@@ -118,8 +118,8 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
   assert.doesNotMatch(pageSource, /<span class="topbar-mailbox-account" id="topbar-mailbox-account"><\/span>/);
   assert.match(pageSource, /<button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">/);
-  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Alle campagne-adressen<\/span>/);
-  assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
+  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Beide<\/span>/);
+  assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"><\/div>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
@@ -150,6 +150,9 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /async function initializeMailboxAccountPreference\(\)/);
   assert.match(scriptSource, /function getMailboxAccounts\(\) \{\s*return getMailboxAccountEmails\(\);\s*\}/);
   assert.match(scriptSource, /function getMailboxAccount\(\) \{\s*return activeMailboxAccount;\s*\}/);
+  assert.match(scriptSource, /SoftoraMailboxCampaignInbox\.renderOwnerMenu\(escapeHtml\)/);
+  assert.match(scriptSource, /SoftoraMailboxCampaignInbox\.filterMessages\(mails\)/);
+  assert.match(scriptSource, /ownerButton\.dataset\.mailboxOwner/);
   assert.match(scriptSource, /function renderMailboxAccountMenu\(\) \{[\s\S]*data-mailbox-email="\$\{escapeHtml\(email\)\}"/);
   assert.match(scriptSource, /data-mailbox-pin-email="\$\{escapeHtml\(email\)\}"/);
   assert.match(scriptSource, /async function pinMailboxAccount\(email\)/);
@@ -158,6 +161,52 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(scriptSource, /mailboxAccountSwitcher\.addEventListener\('click', function\(event\) \{/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*pinMailboxAccount\(email\);/);
+});
+
+test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Servé en Martijn', () => {
+  const messages = [
+    { id: 'serve-softora', accountEmail: 'serve@softora.nl' },
+    { id: 'serve-alias', accountEmail: 'servecreusen@softora.nl' },
+    { id: 'serve-gmail', accountEmail: 'servec321@gmail.com' },
+    { id: 'serve-290', accountEmail: 'serve290@gmail.com' },
+    { id: 'serve-7', accountEmail: 'servecreusen7@gmail.com' },
+    { id: 'martijn-softora', accountEmail: 'martijn@softora.nl' },
+    { id: 'martijn-alias', accountEmail: 'martijnvandeven@softora.nl' },
+    { id: 'martijn-gmail', accountEmail: 'martijnven123@gmail.com' },
+    { id: 'martijn-visuals', accountEmail: 'contact.venvisuals@gmail.com' },
+    { id: 'info', accountEmail: 'info@softora.nl' },
+    { id: 'ruben', accountEmail: 'ruben@softora.nl' },
+    { id: 'zakelijk-softora', accountEmail: 'zakelijk@softora.nl' },
+    { id: 'impactbox', accountEmail: 'zakelijk@theimpactbox.co' },
+  ];
+
+  campaignInboxModule.setOwner('both');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Beide');
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages).map((message) => message.id),
+    messages.slice(0, 9).map((message) => message.id)
+  );
+
+  campaignInboxModule.setOwner('servé');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé');
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages).map((message) => message.id),
+    messages.slice(0, 5).map((message) => message.id)
+  );
+
+  campaignInboxModule.setOwner('martijn');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn');
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages).map((message) => message.id),
+    messages.slice(5, 9).map((message) => message.id)
+  );
+
+  const ownerMenu = campaignInboxModule.renderOwnerMenu((value) => String(value));
+  assert.match(ownerMenu, />Beide</);
+  assert.match(ownerMenu, />Servé</);
+  assert.match(ownerMenu, />Martijn</);
+  assert.doesNotMatch(ownerMenu, /@/);
+  campaignInboxModule.setOwner('both');
 });
 
 test('premium mailbox toont bij verzonden mails de ontvanger als hoofdregel', () => {
