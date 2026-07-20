@@ -221,6 +221,7 @@ function createMailboxIndexStore(deps = {}) {
       id: normalizeString(row.provider_id) || `${folder}:${uid}`,
       uid,
       folder,
+      accountEmail: normalizeEmail(row.account_email),
       from: normalizeString(row.sender_name) || normalizeString(row.sender_email) || 'Onbekend',
       email: normalizeString(row.sender_email),
       to: normalizeString(row.recipients_text),
@@ -248,6 +249,28 @@ function createMailboxIndexStore(deps = {}) {
           'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated'
         )
         .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizeFolder(folder))
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(safeLimit)
+    );
+    if (!result.ok) return null;
+    return (result.data || []).map((row) => normalizeMessageRow(row));
+  }
+
+  async function listMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = 1000 }) {
+    const normalizedAccounts = Array.from(
+      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
+    );
+    if (!normalizedAccounts.length) return [];
+    const safeLimit = Math.max(1, Math.min(2000, Number(limit) || 1000));
+    const result = await run('list-messages-for-accounts', (client) =>
+      client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .select(
+          'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated'
+        )
+        .in('account_email', normalizedAccounts)
         .eq('folder', normalizeFolder(folder))
         .is('deleted_at', null)
         .order('date', { ascending: false })
@@ -375,6 +398,7 @@ function createMailboxIndexStore(deps = {}) {
     isAvailable,
     isSyncStateStale,
     listMessages,
+    listMessagesForAccounts,
     normalizeMessageRow,
     upsertMessages,
   };

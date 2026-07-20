@@ -2047,6 +2047,112 @@ test('mailbox list response returns stale indexed messages immediately without l
   assert.equal(imapCalls, 0);
 });
 
+test('mailbox campaign replies response joins indexed inbox mail to targeted webdesign customers', async () => {
+  let customerLookup = null;
+  const service = createMailboxService({
+    logger: { error() {} },
+    mailboxIndexStore: {
+      listMessagesForAccounts: async () => [
+        {
+          id: 'inbox:42',
+          accountEmail: 'serve@softora.nl',
+          folder: 'inbox',
+          email: 'info@studionoord.nl',
+          from: 'Studio Noord',
+          subject: 'Re: Nieuw webdesign',
+          preview: 'Kunnen we morgen bellen?',
+          date: '2026-07-20T10:15:00.000Z',
+          unread: true,
+          indexed: true,
+        },
+        {
+          id: 'inbox:77',
+          accountEmail: 'martijn@softora.nl',
+          folder: 'inbox',
+          email: 'contact@dekroon.nl',
+          from: 'Bakkerij De Kroon',
+          subject: 'Re: Nieuw webdesign',
+          preview: 'Geen interesse.',
+          date: '2026-07-19T15:45:00.000Z',
+          unread: false,
+          indexed: true,
+        },
+        {
+          id: 'inbox:80',
+          accountEmail: 'serve@softora.nl',
+          folder: 'inbox',
+          email: 'lead@example.nl',
+          date: '2026-07-18T10:00:00.000Z',
+        },
+        {
+          id: 'inbox:90',
+          accountEmail: 'serve@softora.nl',
+          folder: 'inbox',
+          email: 'klant@example.nl',
+          date: '2026-07-17T10:00:00.000Z',
+        },
+      ],
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async (options) => {
+        customerLookup = options;
+        return [
+          {
+            id: 'softora-pending',
+            bedrijf: 'Studio Noord',
+            email: 'info@studionoord.nl',
+            campaignType: 'webdesign',
+            lastColdmailProvider: 'softora',
+            outreachStatus: 'reactie_ontvangen',
+          },
+          {
+            id: 'softora-handled',
+            bedrijf: 'Bakkerij De Kroon',
+            email: 'contact@dekroon.nl',
+            campaignType: 'website_design',
+            lastColdmailProvider: 'softora',
+            outreachStatus: 'geen_interesse',
+          },
+          {
+            id: 'instantly-reply',
+            bedrijf: 'Instantly Lead',
+            email: 'lead@example.nl',
+            campaignType: 'webdesign',
+            lastColdmailProvider: 'instantly',
+          },
+          {
+            id: 'normal-mail',
+            bedrijf: 'Bestaande klant',
+            email: 'klant@example.nl',
+          },
+        ];
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.campaignRepliesResponse({ query: { limit: '100' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.messages.length, 2);
+  assert.equal(res.body.messages[0].id, 'inbox:42');
+  assert.equal(res.body.messages[0].accountEmail, 'serve@softora.nl');
+  assert.equal(res.body.messages[0].campaign.company, 'Studio Noord');
+  assert.equal(res.body.messages[0].campaign.actionRequired, true);
+  assert.equal(res.body.messages[0].outreach.customerId, 'softora-pending');
+  assert.equal(res.body.messages[1].campaign.actionRequired, false);
+  assert.equal(res.body.messages[1].outreach, null);
+  assert.equal(res.body.sync.source, 'campaign-replies-index');
+  assert.deepEqual(customerLookup.emails.sort(), [
+    'contact@dekroon.nl',
+    'info@studionoord.nl',
+    'klant@example.nl',
+    'lead@example.nl',
+  ]);
+  assert.equal(customerLookup.bypassReadFailureCooldown, true);
+});
+
 test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {
   const routes = [];
   const app = {
@@ -2061,6 +2167,7 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   registerMailboxRoutes(app, {
     coordinator: {
       accountsResponse() {},
+      campaignRepliesResponse() {},
       listMessagesResponse() {},
       markMessageReadResponse() {},
       deleteMessageResponse() {},
@@ -2070,6 +2177,7 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   });
 
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/campaign-replies'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));

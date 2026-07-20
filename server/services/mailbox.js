@@ -7,6 +7,7 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
+const { createMailboxCampaignRepliesService } = require('./mailbox-campaign-replies');
 const {
   buildCustomerIdentityKey,
   parseImageDataUrl,
@@ -517,6 +518,7 @@ function createMailboxService(deps = {}) {
     isSupabaseConfigured = () => false,
     getSupabaseClient = () => null,
     outboundRecipientGuardStore = null,
+    dataOpsStore = null,
     mailboxIndexStore = createMailboxIndexStore({
       isSupabaseConfigured,
       getSupabaseClient,
@@ -525,6 +527,10 @@ function createMailboxService(deps = {}) {
       truncateText,
     }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
+    mailboxCampaignRepliesService = createMailboxCampaignRepliesService({
+      mailboxIndexStore,
+      dataOpsStore,
+    }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
@@ -2570,6 +2576,32 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function campaignRepliesResponse(req, res) {
+    try {
+      const messages = await mailboxCampaignRepliesService.listReplies({
+        limit: Number(req.query?.limit || 100) || 100,
+      });
+      return res.status(200).json({
+        ok: true,
+        messages,
+        sync: {
+          indexed: true,
+          stale: false,
+          source: 'campaign-replies-index',
+          refreshRecommended: false,
+          warming: false,
+        },
+      });
+    } catch (error) {
+      logger.error('[Mailbox][CampaignReplies]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Campagnereacties laden mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   async function getMessageResponse(req, res) {
     try {
       const message = await getMessage({
@@ -2703,6 +2735,7 @@ function createMailboxService(deps = {}) {
 
   return {
     accountsResponse,
+    campaignRepliesResponse,
     getMessageResponse,
     listMessagesResponse,
     sendMessageResponse,

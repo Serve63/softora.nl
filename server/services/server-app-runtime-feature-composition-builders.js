@@ -486,6 +486,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         isSupabaseConfigured: platformRuntime.isSupabaseConfigured,
         getSupabaseClient: platformRuntime.getSupabaseClient,
         outboundRecipientGuardStore,
+        dataOpsStore: uiSeoRuntime.dataOpsStore,
         mailConfig: {
           smtpHost: envConfig.MAIL_SMTP_HOST,
           smtpPort: envConfig.MAIL_SMTP_PORT,

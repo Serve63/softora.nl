@@ -1014,6 +1014,67 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
+  async function listCustomersByEmails(options = {}) {
+    const emails = Array.from(
+      new Set(
+        (Array.isArray(options.emails) ? options.emails : [])
+          .map((email) => normalizeString(email).toLowerCase())
+          .filter(Boolean)
+      )
+    ).sort();
+    if (!emails.length) return [];
+    const cacheKey = `customers-by-email:${emails.join(',')}`;
+    return cachedRead(cacheKey, async () => {
+      const rows = [];
+      for (let index = 0; index < emails.length; index += 100) {
+        const emailChunk = emails.slice(index, index + 100);
+        const result = await run(
+          'list-customers-by-emails',
+          (client) =>
+            client
+              .from(TABLES.customers)
+              .select('customer_id,company,email,database_status,lifecycle_status,payload,updated_at')
+              .is('deleted_at', null)
+              .in('email', emailChunk)
+              .limit(1000),
+          {
+            timeoutMs: dataOpsReadQueryTimeoutMs,
+            bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+            suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+            suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+          }
+        );
+        if (!result.ok) return null;
+        rows.push(...(result.data || []));
+      }
+      const seen = new Set();
+      return rows
+        .filter((row) => {
+          const key = normalizeString(row && row.customer_id);
+          if (key && seen.has(key)) return false;
+          if (key) seen.add(key);
+          return true;
+        })
+        .map((row) => {
+          const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+          return {
+            ...payload,
+            id: normalizeString(payload.id || row.customer_id),
+            bedrijf: normalizeString(
+              payload.bedrijf || payload.company || payload.companyName || row.company
+            ),
+            email: normalizeString(payload.email || payload.contactEmail || row.email),
+            databaseStatus: normalizeString(
+              payload.databaseStatus || row.database_status || row.lifecycle_status
+            ),
+          };
+        });
+    }, {
+      bypassReadCache: options.bypassReadCache,
+      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
+    });
+  }
+
   async function listDashboardCustomers(options = {}) {
     return cachedRead('dashboard-customers', async () => {
       const result = await collectPagedRows('list-dashboard-customers', (client) => {
@@ -1192,7 +1253,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       );
       if (!upsert.ok) return upsert;
     }
-    forgetReads('customers', 'customers-snapshot', 'dashboard-customers');
+    forgetReads('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:*');
     return deleteMissingCustomerIds(missingDeletePlan.data, meta.source);
   }
 
@@ -1211,7 +1272,9 @@ function createSoftoraDataOpsStore(deps = {}) {
       (client) => client.from(TABLES.customers).upsert(rows, { onConflict: 'customer_id' }),
       getWriteOperationOptions()
     );
-    if (upsert.ok) forgetReads('customers', 'customers-snapshot', 'dashboard-customers');
+    if (upsert.ok) {
+      forgetReads('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:*');
+    }
     return upsert.ok ? { ...upsert, upserted: rows.length } : upsert;
   }
 
@@ -1231,7 +1294,9 @@ function createSoftoraDataOpsStore(deps = {}) {
           .in('customer_id', ids),
       getWriteOperationOptions()
     );
-    if (result.ok) forgetReads('customers', 'customers-snapshot', 'dashboard-customers');
+    if (result.ok) {
+      forgetReads('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:*');
+    }
     return result;
   }
 
@@ -2469,6 +2534,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listDesignPhotoAssetFlags,
     listActiveOrders,
     listCustomers,
+    listCustomersByEmails,
     listCustomerIdentityKeys,
     listDesignPhotosWithDataUrls,
     listDesignPhotosWithSignedUrls,

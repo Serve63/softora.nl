@@ -50,6 +50,9 @@ function registerMailboxRoutes(app, deps = {}) {
   }
 
   app.get('/api/mailbox/accounts', requireAdmin, (req, res) => coordinator.accountsResponse(req, res));
+  app.get('/api/mailbox/campaign-replies', requireAdmin, (req, res) =>
+    coordinator.campaignRepliesResponse(req, res)
+  );
   app.get('/api/mailbox/messages', requireAdmin, (req, res) => coordinator.listMessagesResponse(req, res));
   app.get('/api/mailbox/message', requireAdmin, (req, res) => coordinator.getMessageResponse(req, res));
   app.post('/api/mailbox/messages/read', requireAdmin, (req, res) =>
