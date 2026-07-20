@@ -440,7 +440,11 @@ test('ai remote service fails V2 closed when no homepage screenshot becomes avai
       requireReferenceImages: true,
       referenceImageUrls: ['https://s0.wordpress.com/mshots/v1/bliv'],
     }),
-    (error) => error && error.status === 503 && error.retryableOpenAiImage === true
+    (error) =>
+      error &&
+      error.status === 503 &&
+      error.retryableWebdesignReference === true &&
+      error.retryableOpenAiImage !== true
   );
   assert.equal(screenshotFetches, 3);
   assert.equal(generationCalls, 0);

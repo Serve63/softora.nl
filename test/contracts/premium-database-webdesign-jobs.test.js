@@ -61,6 +61,15 @@ function createRetryableOpenAi500Error() {
   return error;
 }
 
+function createRetryableV2ReferenceError() {
+  const error = new Error(
+    'De homepage-screenshot voor V2 was nog niet beschikbaar. De opdracht probeert het automatisch opnieuw.'
+  );
+  error.status = 503;
+  error.retryableWebdesignReference = true;
+  return error;
+}
+
 async function createSideGutterWebdesignDataUrl(options = {}) {
   const sharp = require('sharp');
   const width = Number(options.width) || 1024;
@@ -1627,11 +1636,76 @@ test('premium database webdesign jobs show a safe message after exhausted OpenAI
   }
 
   assert.equal(latest.status, 'error');
-  assert.match(latest.error, /OpenAI-websitegenerator had tijdelijk moeite/i);
+  assert.match(latest.error, /beeldgenerator reageerde tijdelijk niet/i);
+  assert.match(latest.error, /lead is vrijgegeven/i);
   assert.doesNotMatch(JSON.stringify(latest), /req_7d9c|help\.openai\.com|server had an error|Please include/i);
   assert.equal(pipelineCalls, 6);
   assert.equal(persistedJob.error, latest.error);
   assert.doesNotMatch(JSON.stringify({ error: persistedJob.error, retry: persistedJob.retry }), /req_7d9c|help\.openai\.com|server had an error|Please include/i);
+});
+
+test('premium database webdesign jobs never mislabel an exhausted V2 reference error as OpenAI', async () => {
+  let nowMs = 1760000000000;
+  let pipelineCalls = 0;
+  let persistedJob = null;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    now: () => nowMs,
+    retryJitter: false,
+    dataOpsStore: {
+      upsertWebdesignJob: async (job) => {
+        persistedJob = cloneJson(job);
+        return { ok: true };
+      },
+      getWebdesignJob: async (jobId) =>
+        persistedJob && persistedJob.id === jobId ? cloneJson(persistedJob) : null,
+      uploadDesignPhoto: async () => ({ ok: true }),
+    },
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        throw createRetryableV2ReferenceError();
+      },
+    },
+  });
+
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_v2referencesafe',
+        variant: 'v2-visual-dna',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-v2-reference', bedrijf: 'Softora' },
+      },
+    },
+    createResponseRecorder()
+  );
+
+  let latest = null;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const statusRes = createResponseRecorder();
+    await coordinator.getJobResponse(
+      {
+        premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+        params: { jobId: 'job_v2referencesafe' },
+      },
+      statusRes
+    );
+    assert.equal(statusRes.statusCode, 200);
+    latest = statusRes.body.job;
+    if (latest.status === 'error') break;
+    if (latest.status === 'queued' && latest.nextAttemptAt) nowMs = latest.nextAttemptAt + 1;
+  }
+
+  assert.equal(latest.status, 'error');
+  assert.match(latest.error, /V2-bronbeeld kon tijdelijk niet worden geladen/i);
+  assert.match(latest.error, /lead is vrijgegeven/i);
+  assert.doesNotMatch(latest.error, /OpenAI/i);
+  assert.equal(pipelineCalls, 6);
 });
 
 test('premium database webdesign bulk stores safe target errors after exhausted OpenAI 500 retries', async () => {
@@ -1696,7 +1770,8 @@ test('premium database webdesign bulk stores safe target errors after exhausted 
   assert.equal(latest.failed, 1);
   assert.equal(latest.remaining, 0);
   assert.equal(target.status, 'error');
-  assert.match(target.error, /OpenAI-websitegenerator had tijdelijk moeite/i);
+  assert.match(target.error, /beeldgenerator reageerde tijdelijk niet/i);
+  assert.match(target.error, /lead is vrijgegeven/i);
   assert.equal(pipelineCalls, 6);
   assert.doesNotMatch(JSON.stringify({ batch: latest, target }), /req_7d9c|help\.openai\.com|server had an error|Please include/i);
 });

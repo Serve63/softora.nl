@@ -1521,7 +1521,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260718a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720a/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
@@ -1770,7 +1770,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260718a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1921,7 +1921,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260718a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720a/);
   assert.match(webdesignActionScriptSource, /variant: normalizeVariant\(variant\)/);
   assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
@@ -1931,7 +1931,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);
-  assert.doesNotMatch(webdesignActionScriptSource, /setStatusMessage\(message, "error", true\)/);
+  assert.match(webdesignActionScriptSource, /De lead is vrijgegeven/);
+  assert.match(
+    webdesignActionScriptSource,
+    /setStatusMessage\(message, "error", \/De lead is vrijgegeven\/i\.test\(normalizeString\(message\)\) \? true : undefined\)/
+  );
   assert.doesNotMatch(webdesignActionScriptSource, /Geen geldige website gevonden voor " \+ target\.bedrijf \+ "\.", "error", true/);
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /const firstLoad = loadRunningJobs\(\);[\s\S]*void resumeBulkBatch\(\);[\s\S]*return firstLoad;/);
@@ -3116,7 +3120,7 @@ test('premium database webdesign action sends the explicitly selected V2 variant
   assert.equal(postedBody.customer.bedrijf, 'Bliv Makelaardij');
 });
 
-test('premium database webdesign action keeps generation errors visible until the next action', async () => {
+test('premium database webdesign action auto-clears a temporary finished-job error', async () => {
   const messages = [];
   const chargeLabels = [];
   const document = {
@@ -3146,7 +3150,7 @@ test('premium database webdesign action keeps generation errors visible until th
           id: 'job-timeout-1',
           customerId: 'customer-1',
           status: 'error',
-          error: 'Webdesign maken duurde te lang. Probeer opnieuw.',
+          error: 'Het V2-bronbeeld kon tijdelijk niet worden geladen. De lead is vrijgegeven; probeer het webdesign opnieuw.',
         },
       }),
     }),
@@ -3178,8 +3182,11 @@ test('premium database webdesign action keeps generation errors visible until th
 
   const errorMessage = messages.find((item) => item.tone === 'error');
   assert.ok(errorMessage);
-  assert.equal(errorMessage.message, 'Webdesign maken duurde te lang. Probeer opnieuw.');
-  assert.equal(errorMessage.autoClear, undefined);
+  assert.equal(
+    errorMessage.message,
+    'Het V2-bronbeeld kon tijdelijk niet worden geladen. De lead is vrijgegeven; probeer het webdesign opnieuw.'
+  );
+  assert.equal(errorMessage.autoClear, true);
 });
 
 test('premium database webdesign action hides safety-blocked job errors from the banner', async () => {

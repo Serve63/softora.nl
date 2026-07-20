@@ -512,7 +512,7 @@
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
             queueFinishedPhotoRefresh(job.customerId);
-            if (message) setStatusMessage(message, "error");
+            if (message) setStatusMessage(message, "error", /De lead is vrijgegeven/i.test(normalizeString(message)) ? true : undefined);
             if (typeof renderPage === "function") renderPage();
         }
 
