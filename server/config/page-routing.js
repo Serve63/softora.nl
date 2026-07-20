@@ -49,6 +49,9 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   if (map.has('sportschool')) {
     map.set('logboek', map.get('sportschool'));
   }
+  if (map.has('premium-mailbox')) {
+    map.set('mailbox', map.get('premium-mailbox'));
+  }
   return map;
 }
 

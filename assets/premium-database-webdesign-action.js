@@ -1147,7 +1147,7 @@
             if (customer.email) params.set("email", customer.email);
             params.set("q", customer.email || customer.bedrijf || "");
             params.set("select", "first");
-            global.location.href = "/premium-mailbox?" + params.toString();
+            global.location.href = "/mailbox?" + params.toString();
         }
 
         async function updateStatus(customerId, status) {

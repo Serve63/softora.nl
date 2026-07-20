@@ -549,11 +549,11 @@ function renderMailboxAccountMenu() {
 }
 function setMailboxAccountUi(email) {
   const top = document.getElementById('topbar-mailbox-account');
-  if (top) top.textContent = email;
+  if (top) top.textContent = activeFolder === 'outreach' ? 'Alle campagne-adressen' : email;
   renderMailboxAccountMenu();
 }
 let mails = [];
-let activeFolder = 'inbox';
+let activeFolder = 'outreach';
 let activeMail = null;
 let inboxUnreadCount = 0;
 let mailboxSyncState = null;
@@ -598,9 +598,9 @@ function normalizeMailboxApiMessage(message) {
     starred: Boolean(message.starred),
     tags: [],
   };
-  return window.SoftoraMailboxIndex && typeof window.SoftoraMailboxIndex.decorateMessage === 'function'
-    ? window.SoftoraMailboxIndex.decorateMessage(mail, message)
-    : mail;
+  const decoratedMail = window.SoftoraMailboxCampaignInbox?.decorateMessage(mail, message) || mail; return window.SoftoraMailboxIndex && typeof window.SoftoraMailboxIndex.decorateMessage === 'function'
+    ? window.SoftoraMailboxIndex.decorateMessage(decoratedMail, message)
+    : decoratedMail;
 }
 async function loadMailboxAccounts() {
   try {
@@ -638,7 +638,7 @@ async function hydrateMailboxOutreachContextsInBackground() {
   });
 }
 async function syncMailboxInBackground() {
-  if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.syncInBackground !== 'function') return;
+  if (activeFolder === 'outreach' || !window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.syncInBackground !== 'function') return;
   await window.SoftoraMailboxIndex.syncInBackground({
     account: activeMailboxAccount,
     folder: activeFolder,
@@ -646,12 +646,12 @@ async function syncMailboxInBackground() {
   });
 }
 async function loadMailboxMessages(options = {}) {
-  const wrap = document.getElementById('mail-items');
-  const showLoader = options.showLoader !== false;
+  const wrap = document.getElementById('mail-items'); const showLoader = options.showLoader !== false;
   if (wrap && showLoader) {
     wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox laden…</div>`;
   }
-  try {
+  try { const campaignResult = await window.SoftoraMailboxCampaignInbox?.load(activeFolder, normalizeMailboxApiMessage);
+    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = campaignResult.messages; renderList(); window.SoftoraMailboxIndex?.setStatus(''); return; }
     const response = await fetch(`/api/mailbox/messages?account=${encodeURIComponent(activeMailboxAccount)}&folder=${encodeURIComponent(activeFolder)}&limit=50`, {
       credentials: 'same-origin',
       cache: 'no-store',
@@ -709,12 +709,12 @@ function setFolder(folder, el) {
   activeFolder = folder;
   activeMail = null;
   void el;
-  applyMailboxFolderUi(folder);
+  applyMailboxFolderUi(folder); setMailboxAccountUi(activeMailboxAccount);
   resetDetailEmpty();
   void loadMailboxMessages();
 }
 function getMailsForFolder(folder) {
-  if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
+  if (folder === 'outreach') return mails; if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
   if (folder === 'starred') return mails.filter(m => m.starred);
   return mails;
 }
@@ -750,15 +750,15 @@ function renderList() {
     <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" role="button" tabindex="0">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
       <div class="mail-item-top">
-        <div class="mail-from">${escapeHtml(window.SoftoraMailboxDisplay.getListPrimaryText(m, displayOptions))}</div>
+        <div class="mail-from">${escapeHtml(window.SoftoraMailboxDisplay.getListPrimaryText(m, { ...displayOptions, account: m.accountEmail || displayOptions.account }))}</div>
         <div class="mail-time">${escapeHtml(m.time)}</div>
       </div>
       <div class="mail-subject">${escapeHtml(m.subject)}</div>
-      <div class="mail-preview">${escapeHtml(m.preview)}</div>
+      <div class="mail-preview">${escapeHtml(m.preview)}</div>${window.SoftoraMailboxCampaignInbox?.renderListMeta(m, escapeHtml) || ''}
     </div>`).join('');
 }
 async function persistMailReadState(mail) {
-  if (!mail) return;
+  if (!mail) return; const requestId = window.SoftoraMailboxCampaignInbox.getRequestId(mail); if (!requestId || !window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount)) return;
   try {
     const response = await fetch('/api/mailbox/messages/read', {
       method: 'POST',
@@ -766,10 +766,10 @@ async function persistMailReadState(mail) {
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        account: activeMailboxAccount,
-        id: mail.id,
+        account: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
+        id: requestId,
         uid: mail.uid,
-        folder: mail.folder || activeFolder,
+        folder: window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -783,12 +783,12 @@ async function persistMailReadState(mail) {
   }
 }
 async function loadMailboxMessageBody(id) {
-  if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.loadBody !== 'function') return;
+  if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.loadBody !== 'function') return; const mail = findMailById(id); if (!mail) return;
   await window.SoftoraMailboxIndex.loadBody({
-    id,
+    id, requestId: window.SoftoraMailboxCampaignInbox.getRequestId(mail),
     getMail: findMailById,
-    account: activeMailboxAccount,
-    folder: activeFolder,
+    account: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
+    folder: window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
     normalizeBodyImages: normalizeMailboxBodyImages,
     normalizeOptOutUrl: normalizeMailboxOptOutUrl,
     openMail,
@@ -805,7 +805,7 @@ function openMail(id, options = {}) {
   const outreachQuickbar = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.renderQuickbar === 'function'
     ? window.SoftoraMailboxOutreach.renderQuickbar(m, { escapeHtml })
     : '';
-  const displayOptions = { activeFolder, account: getMailboxAccount() };
+  const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
@@ -820,7 +820,7 @@ function openMail(id, options = {}) {
           <div class="detail-avatar" style="background:${getColor(avatarText)}">${escapeHtml(initials(avatarText))}</div>
           <div>
             <div class="detail-from">${escapeHtml(detailPrimary)}</div>
-            <div class="detail-email">${escapeHtml(detailSecondary)}</div>
+            <div class="detail-email">${escapeHtml(detailSecondary)}</div>${window.SoftoraMailboxCampaignInbox.renderDetailAccount(m, escapeHtml)}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
@@ -834,10 +834,10 @@ function openMail(id, options = {}) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
               Beantwoorden
             </button>
-            <button class="btn-action" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}">
+            ${window.SoftoraMailboxCampaignInbox.isCampaignMail(m) ? '' : `<button class="btn-action" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
               Verwijderen
-            </button>
+            </button>`}
           </div>
         </div>
       </div>
@@ -868,10 +868,10 @@ async function deleteMail(id) {
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        account: activeMailboxAccount,
-        id: m.id,
+        account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount),
+        id: window.SoftoraMailboxCampaignInbox.getRequestId(m),
         uid: m.uid,
-        folder: m.folder || activeFolder,
+        folder: window.SoftoraMailboxCampaignInbox.getFolder(m, activeFolder),
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -917,7 +917,7 @@ function setComposeReplyContext(mail) {
         body: mail.body,
         date: mail.date,
         time: mail.time,
-        folder: mail.folder || activeFolder,
+        folder: mail.folder || activeFolder, accountEmail: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
       }
     : null;
 }
@@ -1003,7 +1003,7 @@ async function sendMail() {
   const to = document.getElementById('c-to').value.trim();
   const subject = document.getElementById('c-subject').value.trim();
   if (!to || !subject) { toast('Vul ontvanger en onderwerp in'); return; }
-  const acc = getMailboxAccount();
+  const acc = normalizeMailboxEmail(composeReplyContext && composeReplyContext.accountEmail) || getMailboxAccount();
   const sendBtn = document.querySelector('.btn-send');
   if (sendBtn) sendBtn.disabled = true;
   try {
@@ -1038,7 +1038,7 @@ function applyMailboxFolderUi(folder) {
   const folderEl = Array.from(document.querySelectorAll('[data-mailbox-folder]')).find(item => item.getAttribute('data-mailbox-folder') === folder);
   document.querySelectorAll('.folder-item').forEach(f => f.classList.toggle('active', f === folderEl));
   const folderLabelEl = document.getElementById('folder-label');
-  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
+  const labels = { outreach:'Coldmail reacties', inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
   if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
 }
 function toast(msg) {
@@ -1169,7 +1169,7 @@ window.addEventListener('keydown', (event) => {
     activeMailboxAccount = intent.account;
   }
   await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
-    folder: intent.folder || 'inbox',
+    folder: intent.folder || 'outreach',
     keepSearch: true,
   });
 })();

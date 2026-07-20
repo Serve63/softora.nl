@@ -9,6 +9,9 @@ const scriptPath = path.join(__dirname, '../../assets/premium-mailbox.js');
 const indexScriptPath = path.join(__dirname, '../../assets/premium-mailbox-index.js');
 const displayScriptPath = path.join(__dirname, '../../assets/premium-mailbox-display.js');
 const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-outreach.js');
+const campaignInboxScriptPath = path.join(__dirname, '../../assets/premium-mailbox-campaign-inbox.js');
+const outreachHelpersModule = require('../../assets/premium-mailbox-outreach.js');
+const campaignInboxModule = require('../../assets/premium-mailbox-campaign-inbox.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -28,6 +31,18 @@ function readDisplayScript() {
 
 function readOutreachScript() {
   return fs.readFileSync(outreachScriptPath, 'utf8');
+}
+
+function readCampaignInboxScript() {
+  return fs.readFileSync(campaignInboxScriptPath, 'utf8');
+}
+
+function loadOutreachHelpersForTest(fetchImpl, search = '') {
+  return {
+    ...outreachHelpersModule,
+    loadCampaignReplies: () => outreachHelpersModule.loadCampaignReplies(fetchImpl),
+    readIntent: () => outreachHelpersModule.readIntent(search),
+  };
 }
 
 function loadMailboxHelpersForTest(options = {}) {
@@ -55,6 +70,10 @@ function loadMailboxHelpersForTest(options = {}) {
   const window = {
     addEventListener() {},
     SoftoraMailboxOutreach: null,
+    SoftoraMailboxCampaignInbox: {
+      ...campaignInboxModule,
+      load: async () => null,
+    },
     SoftoraUiStateClient: null,
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
@@ -99,12 +118,12 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
   assert.doesNotMatch(pageSource, /<span class="topbar-mailbox-account" id="topbar-mailbox-account"><\/span>/);
   assert.match(pageSource, /<button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">/);
-  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">info@softora\.nl<\/span>/);
+  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Alle campagne-adressen<\/span>/);
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Mailbox adressen"><\/div>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260519a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260520a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260522a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -221,7 +240,7 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
 
   assert.match(scriptSource, /uid: message\.uid,/);
   assert.match(scriptSource, /async function persistMailReadState\(mail\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
-  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: activeMailboxAccount,[\s\S]*id: mail\.id,[\s\S]*uid: mail\.uid,[\s\S]*folder: mail\.folder \|\| activeFolder,/);
+  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: window\.SoftoraMailboxCampaignInbox\.getAccount\(mail, activeMailboxAccount\),[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder: window\.SoftoraMailboxCampaignInbox\.getFolder\(mail, activeFolder\),/);
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*mail\.unread = true;[\s\S]*renderList\(\);[\s\S]*toast\(String\(error\?\.message/);
   assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
@@ -236,7 +255,7 @@ test('premium mailbox vraagt bevestiging en verwijdert pas na een geslaagde mail
   assert.match(scriptSource, /SoftoraDialogs\.confirm\(message, options\)/);
   assert.match(scriptSource, /window\.confirm\(message\)/);
   assert.match(scriptSource, /method:\s*'POST'/);
-  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: activeMailboxAccount,[\s\S]*id: m\.id,[\s\S]*uid: m\.uid,[\s\S]*folder: m\.folder \|\| activeFolder,/);
+  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: window\.SoftoraMailboxCampaignInbox\.getAccount\(m, activeMailboxAccount\),[\s\S]*id: window\.SoftoraMailboxCampaignInbox\.getRequestId\(m\),[\s\S]*uid: m\.uid,[\s\S]*folder: window\.SoftoraMailboxCampaignInbox\.getFolder\(m, activeFolder\),/);
   assert.match(scriptSource, /mails = mails\.filter\(mail => String\(mail\.id\) !== String\(id\)\);/);
   assert.match(scriptSource, /catch \(error\) \{[\s\S]*toast\(String\(error\?\.message \|\| error \|\| 'Mail verwijderen mislukt'\)\);/);
   assert.match(scriptSource, /case 'delete-mail':[\s\S]*void deleteMail\(id\);/);
@@ -422,13 +441,14 @@ test('premium mailbox toont webdesign outreach acties alleen via databasekoppeli
   const scriptSource = readScript();
   const indexSource = readIndexScript();
   const outreachSource = readOutreachScript();
+  const campaignInboxSource = readCampaignInboxScript();
 
   assert.match(pageSource, /\.outreach-quickbar/);
-  assert.match(pageSource, /premium-mailbox-outreach\.js\?v=20260519a/);
+  assert.match(pageSource, /premium-mailbox-outreach\.js\?v=20260720a/);
   assert.match(indexSource, /SoftoraMailboxOutreach\.hydrate/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.renderQuickbar/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.handleAction/);
-  assert.match(outreachSource, /window\.SoftoraMailboxOutreach/);
+  assert.match(outreachSource, /global\.SoftoraMailboxOutreach = mailboxOutreachApi/);
   assert.match(outreachSource, /isWebdesignOutreachCustomer/);
   assert.match(outreachSource, /data-mailbox-action="outreach-status"/);
   assert.match(outreachSource, /Interesse/);
@@ -441,4 +461,103 @@ test('premium mailbox toont webdesign outreach acties alleen via databasekoppeli
   assert.match(outreachSource, /intent\.email && mailHasEmail\(mail, intent\.email\)/);
   assert.match(outreachSource, /helpers\.toast\('Geen exacte thread gevonden, ik zoek op e-mailadres'\);/);
   assert.match(outreachSource, /helpers && helpers\.toast && !intent\.selectFirst/);
+});
+
+test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over alle afzenderaccounts', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+  const indexSource = readIndexScript();
+  const outreachSource = readOutreachScript();
+  const campaignInboxSource = readCampaignInboxScript();
+
+  assert.match(pageSource, /data-mailbox-folder="outreach"[\s\S]*Coldmail reacties/);
+  assert.match(pageSource, /<div class="folder-label">Losse mailbox<\/div>/);
+  assert.match(scriptSource, /let activeFolder = 'outreach';/);
+  assert.match(scriptSource, /SoftoraMailboxCampaignInbox\?\.load/);
+  assert.match(campaignInboxSource, /SoftoraMailboxOutreach\.loadCampaignReplies/);
+  assert.match(campaignInboxSource, /function getAccount\(mail, fallbackAccount\)/);
+  assert.match(campaignInboxSource, /function getRequestId\(mail\)/);
+  assert.match(campaignInboxSource, /async function load\(folder, normalizeMessage\)/);
+  assert.match(indexSource, /id: String\(requestId \|\| id\)/);
+  assert.match(outreachSource, /function isOwnMailboxCampaignReply\(customer\)/);
+  assert.match(outreachSource, /normalizeOutreachKey\(customer && customer\.lastColdmailProvider\) !== 'instantly'/);
+  assert.match(outreachSource, /function getCampaignReplyAccount\(customer\)/);
+  assert.match(outreachSource, /function getCampaignReplyMailboxId\(customer\)/);
+  assert.match(outreachSource, /async function loadCampaignReplies\(fetchImpl\)/);
+  assert.match(outreachSource, /folder: normalizeText\(params\.get\('folder'\) \|\| 'outreach'\)/);
+});
+
+test('coldmail inbox sluit normale en Instantly-mails uit zonder alle mailboxberichten vooraf op te halen', async () => {
+  const calls = [];
+  const customers = [
+    {
+      id: 'softora-pending',
+      bedrijf: 'Studio Noord',
+      email: 'info@studionoord.nl',
+      campaignType: 'webdesign',
+      lastColdmailProvider: 'softora',
+      replyMailboxAccount: 'serve@softora.nl',
+      replyMailboxId: 'inbox:42',
+      lastReplyAt: '2026-07-20T10:15:00.000Z',
+      lastColdmailReplyPreview: 'Kunnen we morgen bellen?',
+      outreachStatus: 'reactie_ontvangen',
+      actionRequired: true,
+    },
+    {
+      id: 'softora-handled',
+      bedrijf: 'Bakkerij De Kroon',
+      email: 'contact@dekroon.nl',
+      campaignType: 'webdesign',
+      lastColdmailProvider: 'softora',
+      replyMailboxAccount: 'martijn@softora.nl',
+      replyMailboxId: 'inbox:77',
+      lastReplyAt: '2026-07-19T15:45:00.000Z',
+      lastColdmailReplyPreview: 'Geen interesse.',
+      outreachStatus: 'geen_interesse',
+    },
+    {
+      id: 'instantly-reply',
+      bedrijf: 'Instantly Lead',
+      email: 'lead@example.nl',
+      campaignType: 'webdesign',
+      lastColdmailProvider: 'instantly',
+      replyMailboxAccount: 'serve@softora.nl',
+      replyMailboxId: 'inbox:80',
+      lastReplyAt: '2026-07-18T10:00:00.000Z',
+    },
+    {
+      id: 'normal-mail',
+      bedrijf: 'Bestaande klant',
+      email: 'klant@example.nl',
+      replyMailboxAccount: 'serve@softora.nl',
+      replyMailboxId: 'inbox:90',
+      lastReplyAt: '2026-07-17T10:00:00.000Z',
+    },
+  ];
+  const helpers = loadOutreachHelpersForTest(async (url) => {
+    calls.push(String(url));
+    return {
+      ok: true,
+      json: async () => ({
+        values: {
+          softora_customers_premium_v1: JSON.stringify(customers),
+        },
+      }),
+    };
+  });
+
+  const replies = await helpers.loadCampaignReplies();
+
+  assert.equal(replies.length, 2);
+  assert.deepEqual(
+    Array.from(replies, (reply) => reply.accountEmail),
+    ['serve@softora.nl', 'martijn@softora.nl']
+  );
+  assert.equal(replies[0].mailboxId, 'inbox:42');
+  assert.equal(replies[0].campaign.actionRequired, true);
+  assert.equal(replies[1].campaign.actionRequired, false);
+  assert.equal(replies[0].bodyLoaded, false);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /scope=premium_customers_database/);
+  assert.equal(helpers.readIntent().folder, 'outreach');
 });
