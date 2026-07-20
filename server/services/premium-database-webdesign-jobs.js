@@ -20,10 +20,13 @@ const WEBDESIGN_GUTTER_CROP_MAX_PAD = 24;
 const WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE = 'WEBPREVIEW_SAFETY_BLOCKED';
 const WEBDESIGN_JOB_CANCELLED_ERROR = 'Geannuleerd door gebruiker.';
 const WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE =
-  'De OpenAI-websitegenerator had tijdelijk moeite met dit webdesign. Probeer deze lead later opnieuw.';
+  'De beeldgenerator reageerde tijdelijk niet. De lead is vrijgegeven; probeer het webdesign opnieuw.';
+const WEBDESIGN_TRANSIENT_REFERENCE_ERROR_MESSAGE =
+  'Het V2-bronbeeld kon tijdelijk niet worden geladen. De lead is vrijgegeven; probeer het webdesign opnieuw.';
 const WEBDESIGN_TRANSIENT_STORAGE_ERROR_MESSAGE =
-  'De webdesignfoto kon tijdelijk niet veilig worden opgeslagen. Probeer deze lead later opnieuw.';
-const WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE = 'Webdesign maken is mislukt. Probeer deze lead later opnieuw.';
+  'De webdesignfoto kon tijdelijk niet veilig worden opgeslagen. De lead is vrijgegeven; probeer opnieuw.';
+const WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE =
+  'Webdesign maken is mislukt. De lead is vrijgegeven; probeer opnieuw.';
 const WEBDESIGN_VARIANT_V1 = 'v1-prompt-only';
 const WEBDESIGN_VARIANT_V2 = 'v2-visual-dna';
 const SOFTORA_WEBDESIGN_OUTREACH_ROLE = 'WEBDESIGN & SOFTWARE ONTWIKKELING';
@@ -789,6 +792,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   function isRetryableWebdesignError(error) {
     if (error && error.retryableWebdesignStorage === true) return true;
+    if (error && error.retryableWebdesignReference === true) return true;
 
     const status = Number(error && error.status) || 0;
     const message = normalizeString(error && error.message).toLowerCase();
@@ -833,8 +837,15 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function isTransientOpenAiWebdesignErrorText(value) {
     const text = normalizeString(value);
     if (!text || isHardOpenAiWebdesignErrorText(text)) return false;
-    return /OpenAI websitegenerator mislukt \((?:408|429|5\d\d)\)|The server had an error while processing your request|Rate limit reached|Please try again|temporarily unavailable|overloaded|timeout|timed out|duurde te lang/i.test(
+    return /OpenAI websitegenerator mislukt \((?:408|429|5\d\d)\)|OpenAI-websitegenerator had tijdelijk moeite|The server had an error while processing your request|Rate limit reached|Please try again|temporarily unavailable|overloaded|timeout|timed out|duurde te lang/i.test(
       text
+    );
+  }
+
+  function isTransientOpenAiWebdesignError(error) {
+    return Boolean(
+      (error && error.retryableOpenAiImage === true) ||
+        isTransientOpenAiWebdesignErrorText(collectWebdesignErrorDetails(error))
     );
   }
 
@@ -856,7 +867,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function getUserFacingWebdesignErrorFromError(error) {
     if (isOpenAiSafetyBlockedError(error)) return WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE;
     if (error && error.retryableWebdesignStorage === true) return WEBDESIGN_TRANSIENT_STORAGE_ERROR_MESSAGE;
-    if (isRetryableWebdesignError(error)) return WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE;
+    if (error && error.retryableWebdesignReference === true) return WEBDESIGN_TRANSIENT_REFERENCE_ERROR_MESSAGE;
+    if (isTransientOpenAiWebdesignError(error)) return WEBDESIGN_TRANSIENT_OPENAI_ERROR_MESSAGE;
+    if (isRetryableWebdesignError(error)) return WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE;
     const clean = stripOpenAiOperationalBoilerplate(collectWebdesignErrorDetails(error));
     return truncateText(clean || WEBDESIGN_DEFAULT_USER_ERROR_MESSAGE, 500);
   }

@@ -1015,7 +1015,7 @@ function createAiRemoteService(deps = {}) {
         'De homepage-screenshot voor V2 was nog niet beschikbaar. De opdracht probeert het automatisch opnieuw.'
       );
       error.status = 503;
-      error.retryableOpenAiImage = true;
+      error.retryableWebdesignReference = true;
       throw error;
     }
     return referenceImages;
