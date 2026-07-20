@@ -10,6 +10,8 @@ const indexScriptPath = path.join(__dirname, '../../assets/premium-mailbox-index
 const displayScriptPath = path.join(__dirname, '../../assets/premium-mailbox-display.js');
 const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-outreach.js');
 const campaignInboxScriptPath = path.join(__dirname, '../../assets/premium-mailbox-campaign-inbox.js');
+const outreachHelpersModule = require('../../assets/premium-mailbox-outreach.js');
+const campaignInboxModule = require('../../assets/premium-mailbox-campaign-inbox.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -36,19 +38,11 @@ function readCampaignInboxScript() {
 }
 
 function loadOutreachHelpersForTest(fetchImpl, search = '') {
-  const window = {
-    location: { search },
-    SoftoraMailboxOutreach: null,
+  return {
+    ...outreachHelpersModule,
+    loadCampaignReplies: () => outreachHelpersModule.loadCampaignReplies(fetchImpl),
+    readIntent: () => outreachHelpersModule.readIntent(search),
   };
-  const context = {
-    URLSearchParams,
-    console,
-    fetch: fetchImpl,
-    window,
-  };
-  vm.createContext(context);
-  vm.runInContext(readOutreachScript(), context);
-  return window.SoftoraMailboxOutreach;
 }
 
 function loadMailboxHelpersForTest(options = {}) {
@@ -76,6 +70,10 @@ function loadMailboxHelpersForTest(options = {}) {
   const window = {
     addEventListener() {},
     SoftoraMailboxOutreach: null,
+    SoftoraMailboxCampaignInbox: {
+      ...campaignInboxModule,
+      load: async () => null,
+    },
     SoftoraUiStateClient: null,
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
@@ -104,7 +102,6 @@ function loadMailboxHelpersForTest(options = {}) {
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
   vm.runInContext(readIndexScript(), context);
-  vm.runInContext(readCampaignInboxScript(), context);
   vm.runInContext(source, context);
   return context.window.__mailboxTest;
 }
@@ -451,7 +448,7 @@ test('premium mailbox toont webdesign outreach acties alleen via databasekoppeli
   assert.match(indexSource, /SoftoraMailboxOutreach\.hydrate/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.renderQuickbar/);
   assert.match(scriptSource, /SoftoraMailboxOutreach\.handleAction/);
-  assert.match(outreachSource, /window\.SoftoraMailboxOutreach/);
+  assert.match(outreachSource, /global\.SoftoraMailboxOutreach = mailboxOutreachApi/);
   assert.match(outreachSource, /isWebdesignOutreachCustomer/);
   assert.match(outreachSource, /data-mailbox-action="outreach-status"/);
   assert.match(outreachSource, /Interesse/);
@@ -486,7 +483,7 @@ test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over all
   assert.match(outreachSource, /normalizeOutreachKey\(customer && customer\.lastColdmailProvider\) !== 'instantly'/);
   assert.match(outreachSource, /function getCampaignReplyAccount\(customer\)/);
   assert.match(outreachSource, /function getCampaignReplyMailboxId\(customer\)/);
-  assert.match(outreachSource, /async function loadCampaignReplies\(\)/);
+  assert.match(outreachSource, /async function loadCampaignReplies\(fetchImpl\)/);
   assert.match(outreachSource, /folder: normalizeText\(params\.get\('folder'\) \|\| 'outreach'\)/);
 });
 

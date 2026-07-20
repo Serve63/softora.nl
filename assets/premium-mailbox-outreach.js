@@ -1,4 +1,4 @@
-(function () {
+(function (global) {
 "use strict";
 
 const CUSTOMER_DB_SCOPE = 'premium_customers_database';
@@ -153,8 +153,11 @@ function parseCustomers(value) {
   }
 }
 
-async function fetchCustomerState() {
-  const response = await fetch(`/api/ui-state-get?scope=${encodeURIComponent(CUSTOMER_DB_SCOPE)}`, {
+async function fetchCustomerState(fetchImpl) {
+  const request = typeof fetchImpl === 'function'
+    ? fetchImpl
+    : global.fetch.bind(global);
+  const response = await request(`/api/ui-state-get?scope=${encodeURIComponent(CUSTOMER_DB_SCOPE)}`, {
     credentials: 'same-origin',
     cache: 'no-store',
     headers: { Accept: 'application/json' },
@@ -228,8 +231,8 @@ function buildCampaignReplyFallback(customer, account, mailboxId, folder) {
   };
 }
 
-async function loadCampaignReplies() {
-  const customers = (await fetchCustomerState())
+async function loadCampaignReplies(fetchImpl) {
+  const customers = (await fetchCustomerState(fetchImpl))
     .filter(isOwnMailboxCampaignReply)
     .sort((left, right) => Date.parse(getCampaignReplyDate(right)) - Date.parse(getCampaignReplyDate(left)))
     .slice(0, CAMPAIGN_REPLY_LIMIT);
@@ -349,9 +352,12 @@ function handleAction(actionEl, helpers) {
   return true;
 }
 
-function readIntent() {
+function readIntent(search) {
   try {
-    const params = new URLSearchParams(window.location.search || '');
+    const currentSearch = search == null
+      ? String(global.location && global.location.search || '')
+      : String(search || '');
+    const params = new URLSearchParams(currentSearch);
     return {
       account: normalizeEmail(params.get('account') || ''),
       folder: normalizeText(params.get('folder') || 'outreach').toLowerCase(),
@@ -392,7 +398,7 @@ function applyIntentAfterLoad(helpers) {
   }
 }
 
-window.SoftoraMailboxOutreach = {
+const mailboxOutreachApi = {
   applyIntentAfterLoad,
   handleAction,
   hydrate,
@@ -400,4 +406,6 @@ window.SoftoraMailboxOutreach = {
   readIntent,
   renderQuickbar,
 };
-})();
+global.SoftoraMailboxOutreach = mailboxOutreachApi;
+if (typeof module !== 'undefined' && module.exports) module.exports = mailboxOutreachApi;
+})(typeof window !== 'undefined' ? window : globalThis);

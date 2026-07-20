@@ -69,7 +69,7 @@
     };
   }
 
-  global.SoftoraMailboxCampaignInbox = {
+  const campaignInboxApi = {
     decorateMessage,
     getAccount,
     getFolder,
@@ -79,4 +79,6 @@
     renderDetailAccount,
     renderListMeta,
   };
+  global.SoftoraMailboxCampaignInbox = campaignInboxApi;
+  if (typeof module !== 'undefined' && module.exports) module.exports = campaignInboxApi;
 })(typeof window !== 'undefined' ? window : globalThis);
