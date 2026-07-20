@@ -144,6 +144,10 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     /\.dashboard-layout > \.main-content,\s*\.dashboard-layout > main\.main-content/s
   );
   assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
+  assert.match(themeJsSource, /const isPremiumPersonnelContext = [^;]*pathname === "\/mailbox"/);
+  assert.match(themeJsSource, /targetUrl\.pathname === "\/mailbox" \|\| targetUrl\.pathname\.indexOf\("\/premium-"\) === 0/);
+  assert.match(prefillSource, /if \(p === "\/mailbox" \|\| p\.indexOf\("\/premium-mailbox"\) === 0\) return "mailbox";/);
+  assert.match(stabilityJsSource, /path\.indexOf\("\/premium-"\) === 0 \|\| path === "\/mailbox"/);
   assert.doesNotMatch(
     themeJsSource.match(/function buildUnifiedPremiumSidebarHtml\(activeKey\) \{[\s\S]*?function pruneDeprecatedSidebarLinks/)?.[0] || '',
     /key:\s*"coldmailing"/,
