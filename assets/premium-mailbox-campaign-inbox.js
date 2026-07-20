@@ -6,6 +6,8 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Servé & Martijn' }),
   ]);
+  const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
+  const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
     'servecreusen@softora.nl': 'serve',
@@ -18,6 +20,9 @@
     'contact.venvisuals@gmail.com': 'martijn',
   });
   let activeOwner = 'both';
+  let defaultOwner = 'both';
+  let pinnedOwner = '';
+  let preferenceIdentity = 'anonymous';
 
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
@@ -30,8 +35,79 @@
     return 'both';
   }
 
+  function isOwner(value) {
+    const owner = String(value || '').trim().toLowerCase();
+    return owner === 'serve' || owner === 'servé' || owner === 'martijn' || owner === 'both';
+  }
+
   function getOwnerByAccount(value) {
     return ACCOUNT_OWNERS[normalizeEmail(value)] || '';
+  }
+
+  function resolveOwnerForSession(session) {
+    const source = session && typeof session === 'object' ? session : {};
+    const emailOwner = getOwnerByAccount(source.email);
+    if (emailOwner) return emailOwner;
+    const identity = [source.firstName, source.lastName, source.displayName]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .join(' ')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    if (/\bmartijn\b/.test(identity)) return 'martijn';
+    if (/\bserve\b/.test(identity)) return 'serve';
+    return 'both';
+  }
+
+  function getOwnerPinKeyForIdentity(identity) {
+    const normalizedIdentity = String(identity || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9@._-]+/g, '_')
+      .slice(0, 72) || 'anonymous';
+    return `${OWNER_PIN_KEY_PREFIX}${normalizedIdentity}`;
+  }
+
+  async function initializeOwnerPreference(session, uiStateClient, identity) {
+    defaultOwner = resolveOwnerForSession(session);
+    preferenceIdentity = String(identity || '').trim().toLowerCase() || 'anonymous';
+    pinnedOwner = '';
+    try {
+      if (uiStateClient && typeof uiStateClient.get === 'function') {
+        const payload = await uiStateClient.get(OWNER_PIN_SCOPE);
+        const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object'
+          ? payload.values
+          : {};
+        const savedOwner = values[getOwnerPinKeyForIdentity(preferenceIdentity)];
+        if (isOwner(savedOwner)) pinnedOwner = normalizeOwner(savedOwner);
+      }
+    } catch (_) {
+      pinnedOwner = '';
+    }
+    setOwner(pinnedOwner || defaultOwner);
+    return { defaultOwner, pinnedOwner, activeOwner };
+  }
+
+  async function pinOwner(value, uiStateClient) {
+    if (!isOwner(value)) {
+      return { owner: activeOwner, label: getOwnerLabel(), saved: false };
+    }
+    pinnedOwner = normalizeOwner(value);
+    setOwner(pinnedOwner);
+    let saved = false;
+    try {
+      if (uiStateClient && typeof uiStateClient.set === 'function') {
+        await uiStateClient.set(OWNER_PIN_SCOPE, {
+          patch: { [getOwnerPinKeyForIdentity(preferenceIdentity)]: pinnedOwner },
+          source: 'premium-mailbox',
+          actor: preferenceIdentity,
+        });
+        saved = true;
+      }
+    } catch (_) {
+      saved = false;
+    }
+    return { owner: pinnedOwner, label: getOwnerLabel(pinnedOwner), saved };
   }
 
   function isCampaignAccount(value) {
@@ -76,14 +152,41 @@
     );
   }
 
-  function renderOwnerMenu(escapeHtml) {
+  function getOwnerOptionsForMenu(primaryOwner) {
+    const primary = isOwner(primaryOwner) ? normalizeOwner(primaryOwner) : '';
+    const personalOptions = OWNER_OPTIONS.filter((option) => option.key !== 'both');
+    if (primary === 'serve' || primary === 'martijn') {
+      personalOptions.sort((left, right) => {
+        if (left.key === primary) return -1;
+        if (right.key === primary) return 1;
+        return 0;
+      });
+    }
+    return [...personalOptions, OWNER_OPTIONS.find((option) => option.key === 'both')];
+  }
+
+  function renderOwnerMenu(escapeHtml, options) {
     const html = typeof escapeHtml === 'function' ? escapeHtml : String;
-    return OWNER_OPTIONS.map((option) => `
-      <div class="topbar-mailbox-option-row">
+    const settings = options && typeof options === 'object' ? options : {};
+    const menuPinnedOwner = Object.prototype.hasOwnProperty.call(settings, 'pinnedOwner')
+      ? (isOwner(settings.pinnedOwner) ? normalizeOwner(settings.pinnedOwner) : '')
+      : pinnedOwner;
+    const menuDefaultOwner = Object.prototype.hasOwnProperty.call(settings, 'defaultOwner')
+      ? (isOwner(settings.defaultOwner) ? normalizeOwner(settings.defaultOwner) : '')
+      : defaultOwner;
+    const primaryOwner = menuPinnedOwner || menuDefaultOwner;
+    return getOwnerOptionsForMenu(primaryOwner).map((option) => {
+      const isPinned = option.key === menuPinnedOwner;
+      return `
+      <div class="topbar-mailbox-option-row${isPinned ? ' pinned' : ''}">
         <button class="topbar-mailbox-option${option.key === activeOwner ? ' active' : ''}" type="button" data-mailbox-owner="${html(option.key)}" role="menuitemradio" aria-checked="${option.key === activeOwner ? 'true' : 'false'}">
           <span>${html(option.label)}</span>
         </button>
-      </div>`).join('');
+        <button class="topbar-mailbox-pin${isPinned ? ' active' : ''}" type="button" data-mailbox-pin-owner="${html(option.key)}" aria-label="${isPinned ? 'Vastgepinde mailbox' : `${option.label} vastpinnen`}" title="${isPinned ? 'Vastgepinde mailbox' : `${option.label} vastpinnen`}">
+          <svg viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4l6 6-4 1-4.5 4.5L11 20l-7-7 4.5-.5L13 8l1-4z"/><path d="M8.5 15.5 4 20"/></svg>
+        </button>
+      </div>`;
+    }).join('');
   }
 
   function decorateMessage(mail, source) {
@@ -168,13 +271,20 @@
     getOwner,
     getOwnerByAccount,
     getOwnerLabel,
+    getOwnerOptionsForMenu,
+    getOwnerPinKeyForIdentity,
     getRequestId,
+    initializeOwnerPreference,
+    isOwner,
     isCampaignMail,
     isCampaignAccount,
     load,
+    normalizeOwner,
+    pinOwner,
     renderDetailAccount,
     renderListMeta,
     renderOwnerMenu,
+    resolveOwnerForSession,
     setOwner,
     sortMessagesNewestFirst,
   };

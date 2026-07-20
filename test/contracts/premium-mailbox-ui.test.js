@@ -104,6 +104,7 @@ function renderMailboxBodyForTest(body, images, options) {
 test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
+  const campaignInboxSource = readCampaignInboxScript();
   const indexSource = readIndexScript();
 
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
@@ -114,7 +115,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720d"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720e"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720c"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -137,13 +138,18 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /async function sendMail\(\)/);
   assert.match(scriptSource, /const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';/);
   assert.match(scriptSource, /const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';/);
+  assert.match(campaignInboxSource, /const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';/);
   assert.match(scriptSource, /window\.SoftoraUiStateClient/);
   assert.match(scriptSource, /async function initializeMailboxAccountPreference\(\)/);
+  assert.match(scriptSource, /SoftoraMailboxCampaignInbox\.initializeOwnerPreference\(session, window\.SoftoraUiStateClient, mailboxAccountPreferenceIdentity\)/);
   assert.match(scriptSource, /function getMailboxAccounts\(\) \{\s*return getMailboxAccountEmails\(\);\s*\}/);
   assert.match(scriptSource, /function getMailboxAccount\(\) \{\s*return activeMailboxAccount;\s*\}/);
   assert.match(scriptSource, /SoftoraMailboxCampaignInbox\.renderOwnerMenu\(escapeHtml\)/);
   assert.match(scriptSource, /SoftoraMailboxCampaignInbox\.filterMessages\(mails\)/);
   assert.match(scriptSource, /ownerButton\.dataset\.mailboxOwner/);
+  assert.match(campaignInboxSource, /data-mailbox-pin-owner/);
+  assert.match(campaignInboxSource, /async function pinOwner\(value, uiStateClient\)/);
+  assert.match(campaignInboxSource, /patch: \{ \[getOwnerPinKeyForIdentity\(preferenceIdentity\)\]: pinnedOwner \}/);
   assert.match(scriptSource, /function renderMailboxAccountMenu\(\) \{[\s\S]*data-mailbox-email="\$\{escapeHtml\(email\)\}"/);
   assert.match(scriptSource, /data-mailbox-pin-email="\$\{escapeHtml\(email\)\}"/);
   assert.match(scriptSource, /async function pinMailboxAccount\(email\)/);
@@ -152,6 +158,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /mailboxAccountSwitcher\.addEventListener\('click', function\(event\) \{/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*applyMailboxAccount\(email\);/);
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*pinMailboxAccount\(email\);/);
+  assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*SoftoraMailboxCampaignInbox\.pinOwner\(ownerButton\.dataset\.mailboxPinOwner, window\.SoftoraUiStateClient\)/);
 });
 
 test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Servé en Martijn', () => {
@@ -200,6 +207,110 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv�
   assert.ok(ownerMenu.indexOf('Martijn van de Ven') < ownerMenu.indexOf('Servé & Martijn'));
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('both');
+});
+
+test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als standaard', () => {
+  assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'serve@softora.nl' }), 'serve');
+  assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'martijn@softora.nl' }), 'martijn');
+  assert.equal(campaignInboxModule.resolveOwnerForSession({ displayName: 'Servé Creusen' }), 'serve');
+  assert.equal(campaignInboxModule.resolveOwnerForSession({ displayName: 'Martijn van de Ven' }), 'martijn');
+  assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'onbekend@softora.nl' }), 'both');
+
+  const serveMenu = campaignInboxModule.renderOwnerMenu(String, {
+    defaultOwner: 'serve',
+    pinnedOwner: '',
+  });
+  const martijnMenu = campaignInboxModule.renderOwnerMenu(String, {
+    defaultOwner: 'martijn',
+    pinnedOwner: '',
+  });
+  assert.ok(serveMenu.indexOf('Servé Creusen') < serveMenu.indexOf('Martijn van de Ven'));
+  assert.ok(martijnMenu.indexOf('Martijn van de Ven') < martijnMenu.indexOf('Servé Creusen'));
+  assert.ok(serveMenu.indexOf('Servé & Martijn') > serveMenu.indexOf('Martijn van de Ven'));
+  assert.ok(martijnMenu.indexOf('Servé & Martijn') > martijnMenu.indexOf('Servé Creusen'));
+});
+
+test('coldmail eigenaar kan Servé, Martijn of beide persoonlijk vastpinnen', () => {
+  for (const owner of ['serve', 'martijn', 'both']) {
+    const ownerMenu = campaignInboxModule.renderOwnerMenu(String, {
+      defaultOwner: 'serve',
+      pinnedOwner: owner,
+    });
+    assert.match(ownerMenu, new RegExp(`data-mailbox-pin-owner="${owner}"[^>]*[\\s\\S]*?`));
+    assert.match(
+      ownerMenu,
+      new RegExp(`topbar-mailbox-option-row pinned[\\s\\S]*?data-mailbox-pin-owner="${owner}"`)
+    );
+  }
+
+  const martijnPinnedMenu = campaignInboxModule.renderOwnerMenu(String, {
+    defaultOwner: 'serve',
+    pinnedOwner: 'martijn',
+  });
+  assert.ok(martijnPinnedMenu.indexOf('Martijn van de Ven') < martijnPinnedMenu.indexOf('Servé Creusen'));
+
+  const bothPinnedMenu = campaignInboxModule.renderOwnerMenu(String, {
+    defaultOwner: 'serve',
+    pinnedOwner: 'both',
+  });
+  assert.ok(bothPinnedMenu.indexOf('Servé & Martijn') > bothPinnedMenu.indexOf('Martijn van de Ven'));
+});
+
+test('coldmail eigenaarpin gebruikt een aparte server-state sleutel per gebruikersaccount', () => {
+  assert.notEqual(
+    campaignInboxModule.getOwnerPinKeyForIdentity('usr_serve'),
+    campaignInboxModule.getOwnerPinKeyForIdentity('usr_martijn')
+  );
+  assert.equal(
+    campaignInboxModule.getOwnerPinKeyForIdentity('usr_serve'),
+    'softora_mailbox_pinned_owner_v1_usr_serve'
+  );
+  assert.equal(
+    campaignInboxModule.getOwnerPinKeyForIdentity('usr_martijn'),
+    'softora_mailbox_pinned_owner_v1_usr_martijn'
+  );
+});
+
+test('coldmail eigenaarpin leest en schrijft alleen de voorkeur van de actieve gebruiker', async () => {
+  const values = {
+    softora_mailbox_pinned_owner_v1_usr_serve: 'both',
+    softora_mailbox_pinned_owner_v1_usr_martijn: 'martijn',
+  };
+  const writes = [];
+  const client = {
+    async get(scope) {
+      assert.equal(scope, 'premium_mailbox_preferences');
+      return { values };
+    },
+    async set(scope, body) {
+      writes.push({ scope, body });
+      Object.assign(values, body.patch);
+      return { ok: true };
+    },
+  };
+
+  const serveState = await campaignInboxModule.initializeOwnerPreference(
+    { email: 'serve@softora.nl' },
+    client,
+    'usr_serve'
+  );
+  assert.deepEqual(serveState, {
+    defaultOwner: 'serve',
+    pinnedOwner: 'both',
+    activeOwner: 'both',
+  });
+  const result = await campaignInboxModule.pinOwner('serve', client);
+  assert.equal(result.saved, true);
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0], {
+    scope: 'premium_mailbox_preferences',
+    body: {
+      patch: { softora_mailbox_pinned_owner_v1_usr_serve: 'serve' },
+      source: 'premium-mailbox',
+      actor: 'usr_serve',
+    },
+  });
+  assert.equal(values.softora_mailbox_pinned_owner_v1_usr_martijn, 'martijn');
 });
 
 test('coldmail inbox sorteert na ieder eigenaarfilter op echte ontvangsttijd met nieuwste bovenaan', () => {
