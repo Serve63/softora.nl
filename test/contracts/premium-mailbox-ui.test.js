@@ -118,12 +118,12 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
   assert.doesNotMatch(pageSource, /<span class="topbar-mailbox-account" id="topbar-mailbox-account"><\/span>/);
   assert.match(pageSource, /<button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">/);
-  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Beide<\/span>/);
+  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé &amp; Martijn<\/span>/);
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"><\/div>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260522a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -181,30 +181,32 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv�
   ];
 
   campaignInboxModule.setOwner('both');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Beide');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé & Martijn');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(0, 9).map((message) => message.id)
   );
 
   campaignInboxModule.setOwner('servé');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé Creusen');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(0, 5).map((message) => message.id)
   );
 
   campaignInboxModule.setOwner('martijn');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn van de Ven');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(5, 9).map((message) => message.id)
   );
 
   const ownerMenu = campaignInboxModule.renderOwnerMenu((value) => String(value));
-  assert.match(ownerMenu, />Beide</);
-  assert.match(ownerMenu, />Servé</);
-  assert.match(ownerMenu, />Martijn</);
+  assert.match(ownerMenu, />Servé Creusen</);
+  assert.match(ownerMenu, />Martijn van de Ven</);
+  assert.match(ownerMenu, />Servé & Martijn</);
+  assert.ok(ownerMenu.indexOf('Servé Creusen') < ownerMenu.indexOf('Martijn van de Ven'));
+  assert.ok(ownerMenu.indexOf('Martijn van de Ven') < ownerMenu.indexOf('Servé & Martijn'));
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('both');
 });
