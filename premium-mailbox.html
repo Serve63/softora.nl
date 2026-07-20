@@ -59,23 +59,13 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .mail-list-count { font-size: 11px; color: var(--text-light); }
 .mail-sync-status { padding: 8px 16px; border-bottom: 1px solid var(--border); background: rgba(155,35,85,.05); color: var(--crimson); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .mail-items { flex: 1; overflow-y: auto; }
-.mail-item { padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; position: relative; min-width: 0; }
+.mail-item { min-height: 52px; padding: 0 16px 0 28px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; position: relative; display: flex; align-items: center; min-width: 0; }
 .mail-item:hover { background: var(--tag); }
-.mail-item.active { background: rgba(155,35,85,.05); border-left: 3px solid var(--crimson); }
-.mail-item.unread .mail-from { font-weight: 700; color: var(--text-dark); }
-.mail-item.unread .mail-subject { font-weight: 600; color: var(--text-dark); }
-.unread-dot { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; background: var(--crimson); border-radius: 50%; }
-.mail-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-bottom: 3px; }
-.mail-from { font-size: 13px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 180px; }
-.mail-time { font-size: 11px; color: var(--text-light); white-space: nowrap; }
-.mail-subject { font-size: 12px; color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
-.mail-preview { font-size: 11px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mail-campaign-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; color: var(--text-light); font-size: 9px; }
-.mail-campaign-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mail-campaign-meta span:first-child { color: var(--text-mid); font-weight: 600; }
-.mail-campaign-meta strong,.mail-campaign-meta em { margin-left: auto; flex-shrink: 0; border-radius: 999px; padding: 2px 6px; font-family: 'Barlow Condensed',sans-serif; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-.mail-campaign-meta strong { background: rgba(155,35,85,.1); color: var(--crimson); }
-.mail-campaign-meta em { background: #eef4ef; color: #38704b; }
+.mail-item.active { background: rgba(155,35,85,.05); }
+.unread-dot { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; background: var(--crimson); border-radius: 50%; }
+.mail-item-top { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.mail-from { flex: 1; font-size: 14px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mail-time { flex-shrink: 0; font-size: 12px; color: var(--text-light); white-space: nowrap; }
 
 /* MAIL DETAIL */
 .mail-detail { flex: 1; min-width: 0; max-width: 100%; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
@@ -420,7 +410,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720c"></script><script src="assets/premium-mailbox-display.js?v=20260522a"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script>
-<script src="assets/premium-mailbox.js?v=20260720a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720d"></script><script src="assets/premium-mailbox-display.js?v=20260522a"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script>
+<script src="assets/premium-mailbox.js?v=20260720b"></script>
 </body>
 </html>

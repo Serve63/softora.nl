@@ -565,7 +565,7 @@ function formatMailDate(value) {
   const sameDay = date.toDateString() === today.toDateString();
   return {
     date: sameDay ? 'Vandaag' : date.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' }),
-    time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
+    time: date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }),
   };
 }
 function normalizeMailboxApiMessage(message) {
@@ -744,14 +744,12 @@ function renderList() {
     return;
   }
   wrap.innerHTML = list.map(m => `
-    <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" role="button" tabindex="0">
+    <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" data-mailbox-received-at="${escapeHtml(m.receivedAt || '')}" role="button" tabindex="0">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
       <div class="mail-item-top">
         <div class="mail-from">${escapeHtml(window.SoftoraMailboxDisplay.getListPrimaryText(m, { ...displayOptions, account: m.accountEmail || displayOptions.account }))}</div>
-        <div class="mail-time">${escapeHtml(m.time)}</div>
+        <time class="mail-time" datetime="${escapeHtml(m.receivedAt || '')}">${escapeHtml(m.time)}</time>
       </div>
-      <div class="mail-subject">${escapeHtml(m.subject)}</div>
-      <div class="mail-preview">${escapeHtml(m.preview)}</div>${window.SoftoraMailboxCampaignInbox?.renderListMeta(m, escapeHtml) || ''}
     </div>`).join('');
 }
 async function persistMailReadState(mail) {

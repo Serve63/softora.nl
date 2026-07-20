@@ -52,14 +52,28 @@
     return OWNER_OPTIONS.find((option) => option.key === owner)?.label || 'Servé & Martijn';
   }
 
+  function getReceivedTimestamp(mail) {
+    const value = mail && (mail.receivedAt || mail.internalDate || mail.date);
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function sortMessagesNewestFirst(messages) {
+    return (Array.isArray(messages) ? messages : [])
+      .slice()
+      .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left));
+  }
+
   function filterMessages(messages, value) {
     const owner = normalizeOwner(value == null ? activeOwner : value);
-    return (Array.isArray(messages) ? messages : []).filter((mail) => {
-      const accountOwner = getOwnerByAccount(
-        mail && (mail.accountEmail || mail.campaign && mail.campaign.account)
-      );
-      return Boolean(accountOwner && (owner === 'both' || accountOwner === owner));
-    });
+    return sortMessagesNewestFirst(
+      (Array.isArray(messages) ? messages : []).filter((mail) => {
+        const accountOwner = getOwnerByAccount(
+          mail && (mail.accountEmail || mail.campaign && mail.campaign.account)
+        );
+        return Boolean(accountOwner && (owner === 'both' || accountOwner === owner));
+      })
+    );
   }
 
   function renderOwnerMenu(escapeHtml) {
@@ -78,6 +92,9 @@
       ...mail,
       mailboxId: message.mailboxId || message.id,
       accountEmail: normalizeEmail(message.accountEmail),
+      receivedAt: Number.isFinite(Date.parse(message.date || ''))
+        ? new Date(message.date).toISOString()
+        : '',
       campaign: message.campaign || null,
       outreach: message.outreach || null,
     };
@@ -159,6 +176,7 @@
     renderListMeta,
     renderOwnerMenu,
     setOwner,
+    sortMessagesNewestFirst,
   };
   global.SoftoraMailboxCampaignInbox = campaignInboxApi;
   if (typeof module !== 'undefined' && module.exports) module.exports = campaignInboxApi;
