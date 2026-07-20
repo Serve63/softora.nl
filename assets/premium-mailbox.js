@@ -797,9 +797,6 @@ function openMail(id, options = {}) {
   m.unread = false;
   renderList();
   if (wasUnread) void persistMailReadState(m);
-  const outreachQuickbar = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.renderQuickbar === 'function'
-    ? window.SoftoraMailboxOutreach.renderQuickbar(m, { escapeHtml })
-    : '';
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
@@ -839,7 +836,6 @@ function openMail(id, options = {}) {
     </div>
     <div class="detail-body">
       <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m })}</div>
-      ${outreachQuickbar}
     </div>`;
   if (!options.skipBodyFetch && !m.bodyLoaded) {
     void loadMailboxMessageBody(m.id);
@@ -1047,13 +1043,6 @@ function toast(msg) {
 function handleMailboxAction(actionEl) {
   const action = actionEl.getAttribute('data-mailbox-action');
   const id = actionEl.getAttribute('data-mailbox-id');
-  if (
-    window.SoftoraMailboxOutreach &&
-    typeof window.SoftoraMailboxOutreach.handleAction === 'function' &&
-    window.SoftoraMailboxOutreach.handleAction(actionEl, { findMailById, openMail, renderList, toast })
-  ) {
-    return;
-  }
   switch (action) {
     case 'open-compose':
       openCompose();
