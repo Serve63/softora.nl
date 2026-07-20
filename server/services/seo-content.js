@@ -856,6 +856,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         href: '/kennisbank/wat-is-een-sales-pipeline-crm',
         availableFrom: '2026-06-12',
       }),
+      Object.freeze({
+        label: 'CRM-implementatie en doorlooptijd',
+        href: '/blog/crm-implementatie-doorlooptijd-mkb',
+        availableFrom: '2026-07-20',
+      }),
     ]),
   }),
   Object.freeze({
@@ -1805,6 +1810,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         label: 'CRM-kosten voor het MKB',
         href: '/blog/crm-systeem-kosten-mkb',
         availableFrom: '2026-07-19',
+      }),
+      Object.freeze({
+        label: 'CRM-implementatie en doorlooptijd',
+        href: '/blog/crm-implementatie-doorlooptijd-mkb',
+        availableFrom: '2026-07-20',
       }),
       Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
       Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
@@ -2779,8 +2789,141 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
       Object.freeze({ label: 'CRM op maat of standaard CRM', href: '/vergelijkingen/crm-op-maat-vs-standaard-crm' }),
+      Object.freeze({
+        label: 'CRM-implementatie en doorlooptijd',
+        href: '/blog/crm-implementatie-doorlooptijd-mkb',
+        availableFrom: '2026-07-20',
+      }),
       Object.freeze({ label: 'Wanneer vervang je spreadsheets?', href: '/blog/crm-systeem-op-maat-spreadsheets-vervangen' }),
       Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
+      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'crm-implementatie-doorlooptijd-mkb',
+    title: 'CRM implementatie: fasen en doorlooptijd voor het MKB',
+    description:
+      'Lees welke fasen een CRM-implementatie doorloopt, welke keuzes tijd kosten en hoe je met duidelijke acceptatie beheerst live gaat.',
+    category: 'CRM',
+    intent: 'Koopintentie',
+    publishedAt: '2026-07-20',
+    updatedAt: '2026-07-20',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-implementatiefasen-beslismomenten-softora.jpg',
+      alt: 'CRM-implementatieroute van procesinventarisatie en datamigratie tot acceptatietest, gefaseerde livegang en evaluatie.',
+      width: 1600,
+      height: 1000,
+    }),
+    secondaryImage: Object.freeze({
+      src: '/assets/seo-content/crm-implementatie-rollen-acceptatie-softora.jpg',
+      alt: 'Rolverdeling bij een CRM-implementatie tussen proceseigenaar, gebruikers, dataspecialist en softwarebouwer met gezamenlijke acceptatie.',
+      width: 1600,
+      height: 1000,
+      caption: 'Een haalbare planning koppelt iedere fase aan een eigenaar, een controleerbaar resultaat en een besluit om wel of niet door te gaan.',
+    }),
+    summary:
+      'Een CRM-implementatie heeft geen universele doorlooptijd. Scope, datakwaliteit, koppelingen, beslissnelheid en beschikbare interne mensen bepalen samen wanneer een eerste team verantwoord live kan.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Het eerlijke antwoord: de CRM-scope bepaalt de doorlooptijd',
+        paragraphs: Object.freeze([
+          'Een CRM met één pipeline, een klein team en een schone contactenlijst is een ander implementatieproject dan een systeem met meerdere afdelingen, rechten, historische data, offertes, agenda’s en boekhoudkoppelingen. Daarom is een vaste belofte van een aantal weken zonder uitgewerkte scope weinig waard. De planning wordt pas bruikbaar wanneer duidelijk is wat de eerste versie moet ondersteunen en wat bewust later komt.',
+          'Begin met de dagelijkse kernroute: hoe komt een aanvraag binnen, wie beoordeelt hem, welke status volgt, welke gegevens zijn nodig en welke volgende actie mag nooit ontbreken? Koppel daar gebruikers, databronnen, rechten, rapportages en noodzakelijke integraties aan. Een leverancier kan daarna fasen, afhankelijkheden en acceptatiemomenten plannen. Onzekerheden verdwijnen niet, maar worden zichtbaar voordat ze de livegang blokkeren.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Beslis wat gereed moet zijn voordat de implementatieklok start',
+        paragraphs: Object.freeze([
+          'Veel vertraging die aan techniek wordt toegeschreven, begint vóór de bouw. Er is geen proceseigenaar, verschillende teams gebruiken andere statusnamen of niemand kan beslissen welke velden verplicht zijn. Leg daarom vooraf het bedrijfsdoel, de eerste gebruikersgroep, de kernpipeline, de minimale rapportage en de beslissers vast. Beschrijf ook welke bestaande werkwijze na livegang stopt; anders blijft het oude spreadsheet stilletjes het echte systeem.',
+          'Maak daarnaast een lijst van aannames en open vragen. Welke bron bevat de betrouwbaarste klantdata? Moet e-mailhistorie mee? Welke koppeling is noodzakelijk voor de eerste werkdag en welke is alleen handig? Wie mag records verwijderen of financiële informatie zien? Plan onbekende technische punten als korte proef of discovery. Dat is beter dan ze als vanzelfsprekend in een einddatum te verstoppen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Fase 1: inventariseer processen en baken de eerste release af',
+        paragraphs: Object.freeze([
+          'In de eerste fase wordt geen lange wensenlijst verzameld, maar worden echte werksituaties gevolgd. Neem bijvoorbeeld een nieuwe lead, een terugbelafspraak, een offerte die wacht op reactie en een bestaande klant met een vervolgvraag. Noteer per situatie de trigger, eigenaar, benodigde informatie, beslissing en volgende actie. Zo ontstaat een procesmodel dat medewerkers herkennen en dat getest kan worden.',
+          'Vertaal dit model naar een eerste release met duidelijke grenzen. De kern kan bestaan uit klantkaart, pipeline, taken, notities, rollen en één essentiële koppeling. Zet overige dashboards, portalen en automatiseringen op een latere lijst. De uitgang van deze fase is geen vrijblijvende workshop, maar een goedgekeurde scope met acceptatiescenario’s, eigenaren en expliciete uitsluitingen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Fase 2: ontwerp en configureer in korte controleerbare stappen',
+        paragraphs: Object.freeze([
+          'Laat de proceseigenaar en enkele sleutelgebruikers vroeg een werkend prototype zien. Controleer namen van fases, verplichte velden, zichtbaarheid per rol, taakmomenten en uitzonderingen voordat veel details zijn gebouwd. Een scherm kan technisch correct zijn en toch niet aansluiten op het moment waarop een medewerker een beslissing neemt. Vroege feedback voorkomt dat dit pas tijdens training wordt ontdekt.',
+          'Werk vervolgens per afgebakend onderdeel: pipeline en klantkaart, taken en signalen, rechten, rapportage en koppelingen. Iedere stap krijgt een demo en een besluit. Nieuwe wensen worden apart beoordeeld op noodzaak, impact en planning; ze schuiven niet ongemerkt de eerste release in. Daarmee blijft de doorlooptijd bestuurbaar zonder relevante feedback te negeren.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Fase 3: behandel data en koppelingen als kritieke route',
+        paragraphs: Object.freeze([
+          'Datamigratie bestaat niet alleen uit exporteren en importeren. Bronnen moeten worden geïnventariseerd, velden gemapt, dubbele records herkend en onbruikbare historie afgebakend. Voer eerst een proefmigratie uit met herkenbare records. Vergelijk aantallen, controleer belangrijke velden en laat gebruikers zoeken naar klanten die zij goed kennen. Pas na goedkeuring volgt de definitieve migratie.',
+          'Koppelingen hebben dezelfde discipline nodig. Leg vast welk systeem voor elk gegeven leidend is, wanneer synchronisatie plaatsvindt en wat er gebeurt bij een ontbrekend of afgekeurd record. Test normale routes én fouten, zoals een dubbel e-mailadres, ongeldige status of tijdelijke storing. Een integratie die in een demo één record doorstuurt is nog geen beheerste productiekoppeling.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Fase 4: test per rol en laat het interne team echt accepteren',
+        paragraphs: Object.freeze([
+          'Acceptatie is meer dan controleren of knoppen werken. Een verkoper moet een lead kunnen verwerken, een manager moet betrouwbare voortgang zien en een beheerder moet een fout kunnen herkennen en herstellen. Gebruik vooraf beschreven scenario’s met verwachte uitkomsten. Noteer per bevinding of het een defect, onduidelijke afspraak of nieuwe wens is; die drie vragen om een andere beslissing.',
+          'De interne proceseigenaar geeft uiteindelijk akkoord op de werkwijze en data, niet alleen de leverancier. Reserveer daar echte tijd voor. Wanneer sleutelgebruikers alleen aan het einde een drukke testmiddag krijgen, wordt de planning afhankelijk van haast en aannames. Verspreide controles na iedere fase maken het eindbesluit kleiner en beter onderbouwd.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Fase 5: ga gefaseerd live en bewaak de eerste werkweken',
+        paragraphs: Object.freeze([
+          'Start waar mogelijk met een representatieve maar beheersbare gebruikersgroep. Controleer of nieuwe aanvragen aankomen, taken ontstaan, gegevens compleet blijven en medewerkers de afgesproken route volgen. Houd een duidelijk kanaal voor vragen en problemen aan. Niet iedere vraag vereist direct een wijziging; soms ontbreekt een werkinstructie of moet een bestaande afspraak scherper worden gemaakt.',
+          'Schaal pas op wanneer de kernscenario’s stabiel zijn en de verantwoordelijken weten hoe zij afwijkingen behandelen. Leg ook een terugvalbesluit vast voor de migratie of een cruciale koppeling. Dat is geen belofte van een storingsvrije livegang, maar een voorbereiding op het moment dat een controle onverwacht rood wordt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Verdeel de verantwoordelijkheden vóórdat de planning vaststaat',
+        paragraphs: Object.freeze([
+          'De leverancier kan procesvragen stellen, ontwerpen, configureren, bouwen en technische tests uitvoeren. Het bedrijf zelf blijft nodig voor prioriteiten, betekenis van data, toegang tot bronsystemen, gebruikersfeedback en acceptatie. Benoem minimaal een proceseigenaar met beslissingsruimte, sleutelgebruikers per rol en een eigenaar voor data en koppelingen. Eén persoon kan meerdere rollen hebben, zolang de benodigde tijd en beslissingen maar expliciet zijn.',
+          'Plan vaste momenten voor scopebesluiten, prototypefeedback, proefmigratie, acceptatie en livegang. Noteer wie informatie aanlevert en binnen welke termijn een besluit nodig is. “Wachten op klant” en “wachten op leverancier” zijn te vaag om te sturen. Een concreet open punt heeft een eigenaar, gewenste uitkomst en datum waarop de planning opnieuw wordt beoordeeld.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak een realistische CRM-planning met beslispoorten',
+        paragraphs: Object.freeze([
+          'Bouw de planning van resultaten in plaats van alleen activiteiten. Een fase is klaar wanneer de kernflow is goedgekeurd, het prototype de gekozen scenario’s ondersteunt, de proefmigratie controleerbaar klopt of de pilotgroep de dagelijkse route kan uitvoeren. Zet na ieder resultaat een beslispoort: doorgaan, herstellen, scope aanpassen of een onderdeel uitstellen.',
+          'Neem ruimte op voor feedback, toegang tot externe systemen en herstel na tests. Toon daarnaast welke onderdelen parallel kunnen en welke elkaar blokkeren. Training kan bijvoorbeeld worden voorbereid terwijl de laatste rapportage wordt afgerond, maar een definitieve migratie kan niet verantwoord vóór de mapping en proefimport zijn geaccepteerd. Zo ontstaat een planning die uitlegbaar is zonder een gegarandeerde einddatum te suggereren.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Gebruik het scopegesprek om de haalbaarheid te toetsen',
+        paragraphs: Object.freeze([
+          'Vraag een CRM-leverancier niet alleen wanneer het systeem klaar is. Vraag welke scope daarbij hoort, welke interne inzet is aangenomen, welke afhankelijkheden op de kritieke route liggen en welke resultaten per fase worden geaccepteerd. Controleer ook wat na de eerste livegang gebeurt: begeleiding, herstel van defects, beheer, wijzigingen en uitbreiding naar andere teams.',
+          'Softora kan in een CRM-scopegesprek de kernflow, databronnen, rollen, koppelingen en een beheersbare eerste release zichtbaar maken. Daarna kan een planning op concrete aannames worden gebaseerd. Dat garandeert geen vaste doorlooptijd, foutloze migratie of gebruik door iedere medewerker, maar maakt wel duidelijk welke beslissingen nodig zijn om verantwoord vooruit te gaan.',
+        ]),
+      }),
+    ]),
+    faq: Object.freeze([
+      Object.freeze({
+        question: 'Hoe lang duurt een CRM-implementatie voor een MKB-bedrijf?',
+        answer:
+          'Dat hangt af van de eerste scope, gebruikersgroepen, datakwaliteit, koppelingen, beslissnelheid en beschikbare interne tijd. Vraag daarom om een planning per fase en acceptatieresultaat in plaats van een universeel aantal weken.',
+      }),
+      Object.freeze({
+        question: 'Wat moet vóór een CRM-implementatie besloten zijn?',
+        answer:
+          'Leg minimaal het bedrijfsdoel, de eerste gebruikersgroep, de kernpipeline, noodzakelijke gegevens, rollen, databronnen, essentiële koppelingen en interne beslissers vast. Open technische vragen kunnen daarna als proef of discovery worden gepland.',
+      }),
+      Object.freeze({
+        question: 'Hoeveel interne tijd vraagt een CRM-implementatie?',
+        answer:
+          'Het interne team levert proceskennis, ruimt data op, beoordeelt prototypes, test scenario’s en accepteert de live werkwijze. De precieze inzet verschilt per scope, maar deze taken moeten als echte capaciteit in de planning staan.',
+      }),
+      Object.freeze({
+        question: 'Wanneer kan een eerste team veilig met CRM starten?',
+        answer:
+          'Wanneer de afgesproken kernscenario’s zijn getest, rollen en data zijn geaccepteerd, noodzakelijke koppelingen controleerbaar werken en duidelijk is hoe problemen en een eventuele terugval worden behandeld.',
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'CRM-kosten voor het MKB', href: '/blog/crm-systeem-kosten-mkb' }),
+      Object.freeze({ label: 'CRM op maat of standaard CRM', href: '/vergelijkingen/crm-op-maat-vs-standaard-crm' }),
+      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
+      Object.freeze({ label: 'Wat is een CRM-integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
     ]),
   }),

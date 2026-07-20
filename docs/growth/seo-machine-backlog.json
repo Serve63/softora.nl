@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-19",
+  "updatedAt": "2026-07-20",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -176,7 +176,9 @@
     },
     {
       "id": "crm-implementation-003",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-07-20",
+      "shippedPath": "/blog/crm-implementatie-doorlooptijd-mkb",
       "path": "/blog/crm-implementatie-doorlooptijd-mkb",
       "contentType": "blog",
       "cluster": "software-crm",
@@ -192,17 +194,28 @@
           "source": "Softora clusteranalyse CRM",
           "observedAt": "2026-07-17",
           "detail": "De inventaris bevat definities, vergelijking en takenautomatisering, maar geen pagina die fasen, afhankelijkheden en doorlooptijd uitlegt."
+        },
+        {
+          "type": "serp",
+          "source": "Nederlandse SERP voor CRM implementatie doorlooptijd en stappenplan",
+          "observedAt": "2026-07-20",
+          "detail": "Actuele resultaten combineren fasen, data, training en tijdsinschattingen; vaste weekclaims lopen uiteen, waardoor een scopegestuurde MKB-gids met beslispoorten een onderscheidende en claim-veilige rol heeft."
         }
       ],
+      "competitorPatterns": [
+        "Leveranciersgidsen met zeven tot tien generieke implementatiestappen",
+        "Vaste doorlooptijdbandbreedtes zonder uitgewerkte scope of interne capaciteit",
+        "Implementatiepagina's waarin datamigratie, adoptie en nazorg losse eindstappen zijn"
+      ],
       "overlap": {
-        "checkedAt": "2026-07-17",
+        "checkedAt": "2026-07-20",
         "closestPaths": [
           "/vergelijkingen/crm-op-maat-vs-standaard-crm",
-          "/blog/crm-systeem-op-maat-spreadsheets-vervangen",
-          "/kennisbank/wat-is-een-crm-systeem"
+          "/blog/crm-systeem-kosten-mkb",
+          "/kennisbank/wat-is-crm-datakwaliteit"
         ],
         "decision": "distinct",
-        "rationale": "Deze pagina gaat specifiek over implementatiefasen, besluitmomenten en factoren die de doorlooptijd vertragen of versnellen."
+        "rationale": "De vergelijking ondersteunt leverancierskeuze, de kostengids de totale begroting en de kennisbank datakwaliteit; deze pagina behandelt specifiek implementatiefasen, interne verantwoordelijkheden, acceptatie en de scopefactoren achter de doorlooptijd."
       },
       "scores": {
         "businessFit": 5,
@@ -250,7 +263,7 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Onderbouw scenario's zonder vaste levertijdbelofte en koppel naar de migratiebrief."
+      "nextAction": "Meet indexatie en eerste non-branded impressies op 14, 28 en 56 dagen; wijzig de URL niet opnieuw binnen de cooldown zonder aantoonbaar defect."
     },
     {
       "id": "software-proposal-004",
@@ -1459,6 +1472,89 @@
         ]
       },
       "nextAction": "Controleer actuele buyer language en schrijf een praktische adoptieroute zonder generieke verandermanagementclaims."
+    },
+    {
+      "id": "crm-requirements-019",
+      "status": "ready",
+      "path": "/blog/crm-eisen-wensenlijst-mkb",
+      "contentType": "blog",
+      "cluster": "software-crm",
+      "primaryQuery": "crm eisen opstellen",
+      "intent": "CRM-eisen prioriteren vóór pakketselectie of maatwerkofferte",
+      "intentClass": "implementation",
+      "funnelStage": "consideration",
+      "targetMoneyPage": "/crm-systeem-op-maat",
+      "clusterRole": "Programma van eisen tussen procesinventarisatie en leverancierskeuze",
+      "demandEvidence": [
+        {
+          "type": "serp-and-cluster-gap",
+          "source": "Nederlandse SERP voor CRM eisen, wensenlijst en requirements plus Softora CRM-inventaris",
+          "observedAt": "2026-07-20",
+          "detail": "Actuele resultaten behandelen procesinventarisatie, eisenlijsten en checklists; Softora heeft keuze-, kosten- en implementatiecontent maar nog geen praktische methode om must-haves, scenario's en acceptatiecriteria vóór een offerte te prioriteren."
+        }
+      ],
+      "competitorPatterns": [
+        "Lange functionele CRM-checklists zonder koppeling aan dagelijkse scenario's",
+        "Downloadformulieren achter leadgeneratie",
+        "Selectiegidsen die wensen verzamelen maar geen acceptatiecriterium eisen"
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-20",
+        "closestPaths": [
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm",
+          "/blog/crm-implementatie-doorlooptijd-mkb",
+          "/blog/crm-systeem-kosten-mkb"
+        ],
+        "decision": "distinct",
+        "rationale": "De vergelijking helpt een oplossingsroute kiezen, de implementatiegids plant een gekozen scope en de kostengids begroot die scope; deze kandidaat leert kopers eerst toetsbare eisen, prioriteiten en acceptatiescenario's opstellen."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.55,
+      "brief": {
+        "title": "CRM-eisen opstellen: praktische wensenlijst voor het MKB",
+        "metaDescription": "Vertaal CRM-doelen naar processen, rollen, data, koppelingen, must-haves en toetsbare acceptatiecriteria vóór je leveranciers vergelijkt.",
+        "h1": "Hoe stel je goede CRM-eisen op?",
+        "outline": [
+          "Begin met procesproblemen en gewenste uitkomsten",
+          "Schrijf eisen als herkenbare werkscenario's",
+          "Scheid must-haves, randvoorwaarden en latere wensen",
+          "Leg rollen, data, koppelingen en beheer vast",
+          "Maak iedere belangrijke eis toetsbaar"
+        ],
+        "buyerQuestions": [
+          "Wat hoort in een CRM-programma van eisen?",
+          "Hoe voorkom je een eindeloze functiewensenlijst?",
+          "Hoe vergelijk je leveranciers op dezelfde CRM-eisen?"
+        ],
+        "incomingLinks": [
+          "/vergelijkingen/crm-op-maat-vs-standaard-crm",
+          "/blog/crm-implementatie-doorlooptijd-mkb"
+        ],
+        "outgoingLinks": [
+          "/crm-systeem-op-maat",
+          "/blog/crm-systeem-kosten-mkb"
+        ],
+        "conversionPath": "Van een toetsbare CRM-eisenlijst naar een afgebakend scopegesprek over standaard inrichting of CRM op maat.",
+        "claimRisk": "Geen garantie dat een eisenlijst alle risico's voorkomt; geen juridische aanbestedings- of contractuitleg geven.",
+        "visualConcepts": [
+          "CRM-requirementscanvas van procesprobleem naar scenario en acceptatiecriterium",
+          "Prioriteitenmatrix voor must-have, randvoorwaarde, later en afwijzen"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer de actuele SERP-overlap en schrijf de eisenlijst als praktisch denkmodel zonder gated download of calculator."
     }
   ]
 }
