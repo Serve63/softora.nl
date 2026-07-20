@@ -680,8 +680,6 @@ async function applyMailboxAccount(email, options = {}) {
   activeMailboxAccount = hasMailboxAccount(normalizedEmail) ? normalizedEmail : (getMailboxAccountEmails()[0] || MAILBOX_ACCOUNT_DEFAULT);
   activeFolder = String(options.folder || 'inbox').trim().toLowerCase() || 'inbox';
   activeMail = null;
-  const searchInput = document.getElementById('search-input');
-  if (searchInput && !options.keepSearch) searchInput.value = '';
   applyMailboxFolderUi(activeFolder);
   setMailboxAccountUi(activeMailboxAccount);
   resetDetailEmpty();
@@ -709,7 +707,6 @@ function getMailsForFolder(folder) {
   if (folder === 'starred') return mails.filter(m => m.starred);
   return mails;
 }
-function filterMails() { renderList(); }
 function renderInboxBadge() {
   const badge = document.getElementById('badge-inbox');
   if (!badge) return;
@@ -724,11 +721,8 @@ function syncInboxBadgeFromCurrentFolder() {
   renderInboxBadge();
 }
 function renderList() {
-  const searchInput = document.getElementById('search-input');
-  const q = ((searchInput && searchInput.value) || '').toLowerCase();
   let list = getMailsForFolder(activeFolder);
   const displayOptions = { activeFolder, account: getMailboxAccount() };
-  if (q) list = list.filter(m => window.SoftoraMailboxDisplay.buildSearchText(m, displayOptions).includes(q));
   const wrap = document.getElementById('mail-items');
   if (!wrap) return;
   syncInboxBadgeFromCurrentFolder();
@@ -815,10 +809,6 @@ function openMail(id, options = {}) {
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
           <div class="detail-date">${escapeHtml(m.date)} · ${escapeHtml(m.time)}</div>
           <div class="detail-actions">
-            <button class="btn-action" type="button" data-mailbox-action="toggle-star" data-mailbox-id="${escapeHtml(m.id)}">
-              <svg viewBox="0 0 24 24" fill="${m.starred ? '#9b2355' : 'none'}" stroke="${m.starred ? '#9b2355' : 'currentColor'}" stroke-width="1.8" width="12" height="12"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              ${m.starred ? 'Gemarkeerd' : 'Markeren'}
-            </button>
             <button class="btn-action" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(m.id)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
               Beantwoorden
@@ -837,13 +827,6 @@ function openMail(id, options = {}) {
   if (!options.skipBodyFetch && !m.bodyLoaded) {
     void loadMailboxMessageBody(m.id);
   }
-}
-function toggleStar(id) {
-  const m = findMailById(id);
-  if (!m) return;
-  m.starred = !m.starred;
-  openMail(id);
-  renderList();
 }
 async function deleteMail(id) {
   const m = findMailById(id);
@@ -1041,9 +1024,6 @@ function handleMailboxAction(actionEl) {
   const action = actionEl.getAttribute('data-mailbox-action');
   const id = actionEl.getAttribute('data-mailbox-id');
   switch (action) {
-    case 'open-compose':
-      openCompose();
-      break;
     case 'close-compose':
       closeCompose();
       break;
@@ -1058,9 +1038,6 @@ function handleMailboxAction(actionEl) {
       break;
     case 'open-mail':
       openMail(id);
-      break;
-    case 'toggle-star':
-      toggleStar(id);
       break;
     case 'reply-mail': {
       const mail = findMailById(id);
@@ -1089,8 +1066,6 @@ function bindMailboxActions() {
     event.preventDefault();
     handleMailboxAction(actionEl);
   });
-  const searchInput = document.getElementById('search-input');
-  if (searchInput) searchInput.addEventListener('input', filterMails);
   const overlay = document.getElementById('compose-overlay');
   if (overlay) {
     overlay.addEventListener('click', event => {
