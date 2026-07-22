@@ -1,0 +1,87 @@
+.end-game-card-slot {
+  display: flex;
+  flex: 0 0 clamp(190px, 13vw, 220px);
+  flex-direction: column;
+  gap: .65rem;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+.end-game-card-slot > .end-game-goal-card {
+  width: 100%;
+  flex: 1 1 auto;
+}
+.end-game-goal-track {
+  align-items: center;
+}
+.end-game-card-slot--origin,
+.end-game-card-slot--destination {
+  flex-basis: clamp(215px, 14.5vw, 246px);
+  filter: drop-shadow(0 15px 22px rgba(154, 106, 30, .2));
+}
+.end-game-card-slot--origin > .end-game-goal-card,
+.end-game-card-slot--destination > .end-game-goal-card {
+  min-height: clamp(330px, 38vh, 385px);
+  border: 2px solid rgba(218, 175, 89, .88);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 40px rgba(92, 59, 17, .25),
+    0 0 0 2px rgba(255, 235, 176, .22),
+    0 0 24px rgba(218, 175, 89, .18);
+}
+.end-game-card-slot--origin .end-game-card-photo::after,
+.end-game-card-slot--destination .end-game-card-photo::after {
+  border-color: rgba(246, 211, 137, .96);
+  box-shadow:
+    inset 0 0 0 2px rgba(42, 27, 9, .84),
+    inset 0 0 30px rgba(36, 22, 6, .5),
+    0 0 20px rgba(225, 174, 77, .24);
+}
+.end-game-card-slot.is-card-dragging {
+  z-index: 5;
+  cursor: grabbing;
+  transition: none;
+  will-change: transform;
+}
+.end-game-card-slot.is-card-dragging > .end-game-goal-card--mission {
+  box-shadow: 0 20px 42px rgba(17, 19, 30, .34);
+}
+.end-game-card-slot.is-card-settling {
+  transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
+}
+.end-game-card-slot--origin,
+.end-game-card-slot--destination {
+  cursor: default;
+}
+.end-game-card-slot:focus-visible {
+  border-radius: 10px;
+  outline: 3px solid rgba(46, 204, 113, .62);
+  outline-offset: 3px;
+}
+.end-game-card-number {
+  display: block;
+  color: rgba(26, 26, 46, .56);
+  font-family: var(--font-display);
+  font-size: .9rem;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+}
+@media (max-width: 900px) {
+  .end-game-card-slot {
+    flex-basis: min(74vw, 280px);
+  }
+  .end-game-card-slot--origin,
+  .end-game-card-slot--destination {
+    flex-basis: min(80vw, 305px);
+  }
+}
+@media (max-width: 520px) {
+  .end-game-card-slot {
+    flex-basis: min(78vw, 275px);
+  }
+  .end-game-card-slot--origin,
+  .end-game-card-slot--destination {
+    flex-basis: min(84vw, 295px);
+  }
+}
