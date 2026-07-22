@@ -42,6 +42,7 @@
   const habitBoard = document.querySelector('.habit-board');
   const srSummary = document.querySelector('.chart-card .sr-only');
   const endGameGoalTrack = document.querySelector('.end-game-goal-track');
+  const endGameProgress = document.querySelector('[data-end-game-progress]');
   let stateReady = false;
   let stateDirty = false;
   let saveTimer = null;
@@ -53,7 +54,7 @@
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
   let draggedGoalId = '';
-  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !goalActionsApi || !endGameCardsApi) {
+  if (!grid || !chart || !chartViewport || !habitBoard || !endGameGoalTrack || !endGameProgress || !goalActionsApi || !endGameCardsApi) {
     return;
   }
   grid.style.setProperty('--day-count', String(TOTAL_DAYS));
@@ -64,6 +65,7 @@
   const goalActions = goalActionsApi.createController({ grid, getGoalRows });
   const endGameCards = endGameCardsApi.createController({
     track: endGameGoalTrack,
+    progressElement: endGameProgress,
     isReady: () => stateReady,
     onStateChange: markStateChanged
   });

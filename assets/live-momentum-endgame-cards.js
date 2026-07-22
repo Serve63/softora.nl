@@ -193,7 +193,7 @@
     });
   }
 
-  function createController({ track, isReady, onStateChange }) {
+  function createController({ track, progressElement, isReady, onStateChange }) {
     let state = normalizeState();
     const interactions = window.SoftoraMomentumEndGameInteractions?.createController({
       track,
@@ -208,6 +208,19 @@
       }
     });
 
+    function updateProgress() {
+      const missionCards = CARD_CATALOG.filter((card) => (
+        ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(card.id) && !state[card.id].deleted
+      ));
+      const completedCards = missionCards.filter((card) => state[card.id].completed).length;
+      const percentage = missionCards.length ? Math.round((completedCards / missionCards.length) * 100) : 0;
+      progressElement.style.setProperty('--end-game-progress', `${percentage}%`);
+      progressElement.setAttribute('aria-valuenow', String(percentage));
+      progressElement.setAttribute('aria-valuetext', `${completedCards} van ${missionCards.length} missies afgerond`);
+      const value = document.querySelector('[data-end-game-progress-value]');
+      if (value) value.textContent = `${percentage}%`;
+    }
+
     function render(value = state) {
       state = normalizeState(value);
       const fragment = document.createDocumentFragment();
@@ -220,6 +233,7 @@
         fragment.append(createCard(card, state[card.id], missionNumber));
       });
       track.replaceChildren(fragment);
+      updateProgress();
     }
 
     function close(options = {}) {
