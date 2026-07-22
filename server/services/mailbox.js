@@ -1890,6 +1890,53 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function restoreIndexedWebdesignImages(message) {
+    const text = normalizeString(message && message.body);
+    if (!text) return message;
+    const parsed = {
+      subject: normalizeString(message && message.subject),
+      from: {
+        value: [
+          {
+            name: normalizeString(message && message.from),
+            address: normalizeString(message && message.email),
+          },
+        ],
+      },
+      to: {
+        value: normalizeString(message && message.to)
+          .split(',')
+          .map((address) => ({ address: normalizeString(address) }))
+          .filter((entry) => entry.address),
+      },
+    };
+    if (!looksLikeWebdesignOutreach(parsed, text) || looksLikeLinkOnlyWebdesignOutreach(parsed, text)) {
+      return message;
+    }
+
+    const key = `${normalizeFolder(message && message.folder)}:${Number(message && message.uid) || 0}`;
+    const storedImagesByKey = await loadStoredImagesForRecords([
+      {
+        key,
+        parsed,
+        text,
+        primaryBodyImages: [],
+      },
+    ]);
+    const storedImages = storedImagesByKey.get(key) || [];
+    const bodyImages = mergeMailboxBodyImages([], storedImages, text, {
+      allowUnmatchedFallbacks: true,
+    });
+    if (!bodyImages.length) return message;
+
+    return {
+      ...message,
+      body: decorateRecoveredWebdesignImagesText(text, bodyImages),
+      bodyImages,
+      inlineImages: bodyImages.map(bodyImageToInlineImage),
+    };
+  }
+
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
@@ -2223,7 +2270,9 @@ function createMailboxService(deps = {}) {
         folder: normalizedFolder,
         id,
       });
-      if (indexed && indexed.hasBody && indexed.body) return indexed;
+      if (indexed && indexed.hasBody && indexed.body) {
+        return restoreIndexedWebdesignImages(indexed);
+      }
     }
     const live = await fetchMessageFromImapById({ account, folder: normalizedFolder, id });
     if (!live) {
