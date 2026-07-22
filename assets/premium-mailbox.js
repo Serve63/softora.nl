@@ -505,10 +505,14 @@ function renderMailBody(value, images, options) {
     usedImages: new Set()
   };
   const sections = buildMailboxBodySections(value);
+  const replyMailId = String(options && options.replyMailId || '').trim();
+  const replyActionHtml = replyMailId ? `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(replyMailId)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>Beantwoorden</button></div>` : '';
   const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
   const renderedSections = [];
   let injectedImages = false;
+  let insertedReplyAction = false;
   sections.forEach((section) => {
+    if (!insertedReplyAction && replyActionHtml && section && section.type === 'quote') { renderedSections.push(replyActionHtml); insertedReplyAction = true; }
     if (!hasImagePlaceholders && !injectedImages && section && section.type === 'signature') {
       const imagesHtml = renderUnusedMailboxInlineImages(imageState);
       if (imagesHtml) renderedSections.push(imagesHtml);
@@ -520,6 +524,7 @@ function renderMailBody(value, images, options) {
     const imagesHtml = renderUnusedMailboxInlineImages(imageState);
     if (imagesHtml) renderedSections.push(imagesHtml);
   }
+  if (!insertedReplyAction && replyActionHtml) renderedSections.push(replyActionHtml);
   return renderedSections.join('');
 }
 function findMailById(id) {
@@ -847,13 +852,7 @@ function openMail(id, options = {}) {
           </div>
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m })}</div>
-        <div class="detail-footer">
-          <button class="detail-reply" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(m.id)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
-            Beantwoorden
-          </button>
-        </div>
+        <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id })}</div>
       </article>
     </div>`;
 }
