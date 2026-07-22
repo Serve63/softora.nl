@@ -44,7 +44,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .topbar-refresh {
   width: 34px;
   height: 34px;
-  margin-left: auto;
   border: 1px solid transparent;
   border-radius: 50%;
   background: transparent;
@@ -55,6 +54,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   cursor: pointer;
   transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
+.topbar-refresh-wrap { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.topbar-refresh-age { color: var(--text-light); font-size: 11px; line-height: 1; white-space: nowrap; }
 .topbar-refresh:hover { color: var(--crimson); background: rgba(155,35,85,.06); border-color: rgba(155,35,85,.12); }
 .topbar-refresh:focus-visible { outline: 2px solid rgba(155,35,85,.35); outline-offset: 2px; }
 .topbar-refresh:disabled { cursor: wait; }
@@ -382,9 +383,12 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     </button>
     <div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"></div>
   </div>
-  <button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen" title="Mailbox vernieuwen">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11"></path><path d="M17.9 15a7 7 0 0 1-11.7 2.6L4 13"></path></svg>
-  </button>
+  <div class="topbar-refresh-wrap">
+    <button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen" title="Mailbox vernieuwen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11"></path><path d="M17.9 15a7 7 0 0 1-11.7 2.6L4 13"></path></svg>
+    </button>
+    <span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">zojuist</span>
+  </div>
 </div>
 
 <!-- LAYOUT -->
@@ -432,7 +436,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720f"></script><script src="assets/premium-mailbox-display.js?v=20260720b"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script><script src="assets/premium-mailbox-refresh.js?v=20260722a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720f"></script><script src="assets/premium-mailbox-display.js?v=20260720b"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script><script src="assets/premium-mailbox-refresh.js?v=20260722b"></script>
 <script src="assets/premium-mailbox.js?v=20260722c"></script>
 </body>
 </html>
