@@ -101,6 +101,53 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(detailMessage.body, 'Volledige tekst');
 });
 
+test('mailbox index store bewaart gelezen status voor exact account, map en uid', async () => {
+  const calls = [];
+  const query = {
+    update(patch) {
+      calls.push(['update', patch]);
+      return query;
+    },
+    eq(column, value) {
+      calls.push(['eq', column, value]);
+      return query;
+    },
+    is(column, value) {
+      calls.push(['is', column, value]);
+      return query;
+    },
+    then(resolve) {
+      resolve({ data: [], error: null });
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from(table) {
+        calls.push(['from', table]);
+        return query;
+      },
+    }),
+    now: () => new Date('2026-07-22T14:00:00.000Z'),
+  });
+
+  const result = await store.markMessageRead({
+    accountEmail: 'SERVE@SOFTORA.NL',
+    folder: 'INBOX',
+    id: 'inbox:42',
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [
+    ['from', 'softora_mailbox_messages'],
+    ['update', { unread: false, updated_at: '2026-07-22T14:00:00.000Z' }],
+    ['eq', 'account_email', 'serve@softora.nl'],
+    ['eq', 'folder', 'inbox'],
+    ['is', 'deleted_at', null],
+    ['eq', 'uid', 42],
+  ]);
+});
+
 test('mailbox index store reads campaign inbox messages across selected accounts', async () => {
   const calls = [];
   const client = {

@@ -2249,6 +2249,23 @@ function createMailboxService(deps = {}) {
       throw error;
     }
     const messageRef = parseMessageReference({ id, folder, uid });
+    const result = {
+      account: account.email,
+      folder: messageRef.folder,
+      uid: messageRef.uid,
+      unread: false,
+    };
+    if (canUseMailboxIndex() && typeof mailboxIndexStore.markMessageRead === 'function') {
+      await mailboxIndexStore.markMessageRead({
+        accountEmail: account.email,
+        id,
+        folder: messageRef.folder,
+        uid: messageRef.uid,
+      }).catch((error) => {
+        logger.error('[Mailbox][MarkReadIndex]', error?.message || error);
+        return null;
+      });
+    }
     const client = createClient(account);
     try {
       await client.connect();
@@ -2256,12 +2273,7 @@ function createMailboxService(deps = {}) {
       const lock = await client.getMailboxLock(mailboxName);
       try {
         await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
-        return {
-          account: account.email,
-          folder: messageRef.folder,
-          uid: messageRef.uid,
-          unread: false,
-        };
+        return result;
       } finally {
         lock.release();
       }
