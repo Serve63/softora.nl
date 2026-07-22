@@ -861,6 +861,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         href: '/blog/crm-implementatie-doorlooptijd-mkb',
         availableFrom: '2026-07-20',
       }),
+      Object.freeze({
+        label: 'CRM-eisen en wensenlijst opstellen',
+        href: '/blog/crm-eisen-wensenlijst-mkb',
+        availableFrom: '2026-07-22',
+      }),
     ]),
   }),
   Object.freeze({
@@ -1815,6 +1820,11 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         label: 'CRM-implementatie en doorlooptijd',
         href: '/blog/crm-implementatie-doorlooptijd-mkb',
         availableFrom: '2026-07-20',
+      }),
+      Object.freeze({
+        label: 'CRM-eisen en wensenlijst opstellen',
+        href: '/blog/crm-eisen-wensenlijst-mkb',
+        availableFrom: '2026-07-22',
       }),
       Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
       Object.freeze({ label: 'Wat is een CRM systeem?', href: '/kennisbank/wat-is-een-crm-systeem' }),
@@ -2920,11 +2930,144 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({
+        label: 'CRM-eisen en wensenlijst opstellen',
+        href: '/blog/crm-eisen-wensenlijst-mkb',
+        availableFrom: '2026-07-22',
+      }),
       Object.freeze({ label: 'CRM-kosten voor het MKB', href: '/blog/crm-systeem-kosten-mkb' }),
       Object.freeze({ label: 'CRM op maat of standaard CRM', href: '/vergelijkingen/crm-op-maat-vs-standaard-crm' }),
       Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
       Object.freeze({ label: 'Wat is een CRM-integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
+    ]),
+  }),
+  Object.freeze({
+    collection: 'blog',
+    slug: 'crm-eisen-wensenlijst-mkb',
+    title: 'CRM-eisen opstellen: praktische wensenlijst voor het MKB',
+    description:
+      'Vertaal CRM-doelen naar processen, rollen, data, koppelingen, must-haves en toetsbare acceptatiecriteria voordat je leveranciers vergelijkt.',
+    category: 'CRM',
+    intent: 'Koopintentie',
+    publishedAt: '2026-07-22',
+    updatedAt: '2026-07-22',
+    image: Object.freeze({
+      src: '/assets/seo-content/crm-eisen-requirementscanvas-softora.jpg',
+      alt: 'CRM-requirementscanvas dat een procesprobleem vertaalt naar een gebruikersscenario, systeemeis en toetsbaar acceptatiecriterium.',
+      width: 1600,
+      height: 1000,
+    }),
+    secondaryImage: Object.freeze({
+      src: '/assets/seo-content/crm-eisen-prioriteitenmatrix-softora.jpg',
+      alt: 'Prioriteitenmatrix voor CRM-eisen met categorieen voor direct noodzakelijk, randvoorwaarde, later en bewust buiten scope.',
+      width: 1600,
+      height: 1000,
+      caption: 'Een goede CRM-wensenlijst maakt niet alleen zichtbaar wat belangrijk is, maar ook waarom, voor wie en wanneer een eis aantoonbaar is gehaald.',
+    }),
+    summary:
+      'Een bruikbare CRM-eisenlijst is geen catalogus met functies. Hij beschrijft herkenbare werksituaties, prioriteiten, gegevens, rollen en toetsbare uitkomsten waarmee je oplossingen op dezelfde opdracht vergelijkt.',
+    sections: Object.freeze([
+      Object.freeze({
+        heading: 'Begin met het bedrijfsprobleem, niet met CRM-functies',
+        paragraphs: Object.freeze([
+          'Een wensenlijst begint vaak met woorden als dashboard, automatisering, app en rapportage. Zulke termen klinken concreet, maar vertellen nog niet welk probleem het CRM moet oplossen. Een leverancier kan daardoor een functie aanvinken terwijl de dagelijkse werkwijze nog steeds niet klopt. Begin daarom met de huidige situatie: waar raakt opvolging zoek, welke informatie wordt dubbel ingevoerd, welke beslissing komt te laat en welke overdracht is onduidelijk?',
+          'Koppel ieder probleem aan een gewenste uitkomst die medewerkers herkennen. Bijvoorbeeld: iedere nieuwe aanvraag heeft binnen een afgesproken werkproces een eigenaar en volgende actie, of een manager kan zonder handmatig spreadsheet zien welke offertes wachten op reactie. Dit zijn geen garanties over omzet of snelheid. Het zijn bedrijfsdoelen waarmee je later kunt beoordelen of de CRM-inrichting daadwerkelijk bruikbaar is.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Breng eerst gebruikers, processen en beslismomenten in kaart',
+        paragraphs: Object.freeze([
+          'Noteer wie met het CRM werkt en welke verantwoordelijkheid elke rol heeft. Een verkoper registreert andere informatie dan een projectleider, servicemedewerker of beheerder. Beschrijf per rol welke records zichtbaar zijn, welke acties mogen worden uitgevoerd en wie een wijziging of uitzondering beoordeelt. Daarmee voorkom je dat rechten pas na de bouw als losse technische vraag opduiken.',
+          'Loop vervolgens enkele echte scenario’s door: een nieuwe lead, een bestaande klant met een vervolgvraag, een offerte zonder reactie, een contactpersoon die van bedrijf wisselt en een dubbel record. Noteer de trigger, benodigde gegevens, eigenaar, beslissing en verwachte volgende stap. Deze scenario’s vormen de ruggengraat van je CRM-eisen en later van de acceptatietest.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Schrijf iedere belangrijke CRM-eis als een toetsbaar scenario',
+        paragraphs: Object.freeze([
+          'Gebruik een vaste vorm: als een bepaalde rol in een herkenbare situatie een actie uitvoert, moet het systeem een controleerbare uitkomst geven. “Het CRM moet taken ondersteunen” wordt bijvoorbeeld: “Als een verkoper een offerte verstuurt, kan die persoon een opvolgdatum vastleggen en ziet de eigenaar de open taak op de afgesproken dag.” Daarmee wordt duidelijk wie handelt, welke informatie nodig is en wat je tijdens een demo moet kunnen zien.',
+          'Voeg alleen voorwaarden toe die nodig zijn om de uitkomst te beoordelen. Denk aan verplichte velden, toegestane statussen, zichtbaarheid per rol en gedrag bij ontbrekende data. Vermijd tegelijk dat je elk scherm vooraf ontwerpt. Een goede eis legt de gewenste werking vast, terwijl er ruimte blijft om een passende standaardinrichting of maatwerkoplossing voor te stellen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Scheid must-haves, randvoorwaarden en latere wensen',
+        paragraphs: Object.freeze([
+          'Wanneer alles prioriteit één krijgt, kan niets echt richting geven. Deel de lijst daarom minimaal op in direct noodzakelijk, harde randvoorwaarde, later waardevol en bewust buiten de eerste scope. Een must-have ondersteunt een kernproces dat op de eerste werkdag moet functioneren. Een randvoorwaarde begrenst de oplossing, zoals een noodzakelijke gegevensbron, rolverdeling of exportmogelijkheid. Een latere wens mag de eerste release niet blokkeren.',
+          'Noteer bij iedere hoge prioriteit waarom die indeling nodig is. “Moet kunnen koppelen” is onvoldoende. Schrijf met welk systeem, welke gegevens, in welke richting en voor welk proces. Als de onderbouwing ontbreekt, is het vaak een algemene voorkeur in plaats van een harde eis. Door ook uitgesloten onderdelen op te schrijven, voorkom je dat een offerte of implementatie ongemerkt steeds breder wordt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Leg data, eigenaarschap en migratiegrenzen expliciet vast',
+        paragraphs: Object.freeze([
+          'Bepaal welke kerngegevens het CRM moet bevatten, waar ze nu staan en welk systeem voor elk gegeven leidend blijft. Denk aan bedrijven, contactpersonen, aanvragen, offertes, activiteiten en toestemmings- of voorkeurgegevens waar die binnen het echte proces relevant zijn. Benoem wie datakwaliteit controleert en wie een fout record mag aanpassen of samenvoegen.',
+          'Maak ook de migratiegrens zichtbaar. Niet alle historische notities, bijlagen en oude statussen hoeven automatisch mee. Beschrijf welke historie gebruikers werkelijk nodig hebben en hoe je een proefimport controleert op aantallen, belangrijke velden en herkenbare dossiers. Hiermee wordt migratie een toetsbaar onderdeel van de scope, zonder foutloze of volledige overdracht te beloven.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Beschrijf koppelingen als gegevensstromen, niet als pakketnamen',
+        paragraphs: Object.freeze([
+          'Een pakketnaam op een eisenlijst zegt nog niet wat de integratie moet doen. Beschrijf welke gebeurtenis gegevens verstuurt, welke velden meegaan, welk systeem leidend is en wat er gebeurt bij een fout of dubbel record. Voor een websitekoppeling kan dat betekenen dat een geldig formulier een nieuwe aanvraag met bron en eigenaar aanmaakt, terwijl een bestaand contact niet als duplicaat wordt toegevoegd.',
+          'Maak onderscheid tussen een koppeling die noodzakelijk is voor de eerste werkdag en een uitbreiding die later kan volgen. Controleer ook wie toegang, wijzigingen en storingen beheert. Vraag bij leveranciers niet alleen of een integratie bestaat, maar laat het relevante scenario demonstreren en leg vast welke onderdelen standaard, configureerbaar of apart te bouwen zijn.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Neem beheer, toegang en verandering mee in de CRM-eisen',
+        paragraphs: Object.freeze([
+          'De eisen stoppen niet bij livegang. Leg vast wie gebruikers, rollen, pipelines, velden en rapportages kan beheren. Vraag hoe gegevens kunnen worden geëxporteerd, hoe wijzigingen worden aangevraagd en welke onderdelen afhankelijk zijn van een leverancier of externe dienst. Dit zijn praktische continuiteitsvragen, geen belofte dat een systeem altijd beschikbaar of zonder risico is.',
+          'Beschrijf daarnaast hoe nieuwe wensen worden beoordeeld. Een wijziging krijgt een eigenaar, reden, prioriteit, impact en besluit voor nu of later. Zo blijft de eisenlijst na de selectie bruikbaar als scope- en beslisdocument. Zonder die discipline groeit een compacte eerste versie alsnog uit tot een verzameling losse verzoeken waarvan niemand de samenhang bewaakt.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Maak van acceptatiecriteria een eerlijke vergelijkingsmethode',
+        paragraphs: Object.freeze([
+          'Koppel aan iedere kritieke eis één of meer tests met een verwachte uitkomst. Gebruik herkenbare voorbeeldrecords en laat verschillende rollen het scenario uitvoeren. Beoordeel niet alleen het ideale pad, maar ook ontbrekende gegevens, een dubbele klant, een verkeerde status en een gebruiker zonder rechten. Noteer vooraf welk resultaat voldoende is en wie intern akkoord geeft.',
+          'Gebruik dezelfde scenario’s bij iedere leverancier. Vraag om een demo op jouw kernflow in plaats van alleen een standaardpresentatie. Registreer per eis of de oplossing standaard voldoet, configuratie vraagt, een bestaande integratie gebruikt, maatwerk vereist of niet past. Daardoor vergelijk je procesfit en uitvoeringsrisico op dezelfde basis, naast totale kosten en implementatieaanpak.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Bouw een compacte CRM-wensenlijst in negen onderdelen',
+        paragraphs: Object.freeze([
+          'Een praktisch document kan bestaan uit: doel en huidige knelpunten; gebruikers en rollen; kernscenario’s; gegevens en eigenaarschap; functionele eisen; koppelingen; beheer en toegang; prioriteiten en uitsluitingen; acceptatiecriteria en beslissers. Geef iedere eis een stabiel nummer zodat offerte, vragen, demo en acceptatietest naar hetzelfde punt verwijzen.',
+          'Houd per eis een korte toelichting bij met zakelijke reden, prioriteit, eigenaar en bewijs. Een uitgebreid document is niet automatisch beter. De beste lijst maakt de belangrijkste keuzes begrijpelijk voor medewerkers en leveranciers en voorkomt dat algemene wensen als harde scope worden behandeld. Werk hem samen met sleutelgebruikers door en laat verschillen in werkwijze eerst intern beslissen.',
+        ]),
+      }),
+      Object.freeze({
+        heading: 'Gebruik de eisenlijst voor standaard CRM én CRM op maat',
+        paragraphs: Object.freeze([
+          'Dezelfde eisen kunnen aantonen dat een standaardpakket prima past, dat gerichte configuratie nodig is of dat een onderscheidende kernflow maatwerk rechtvaardigt. Stuur niet vooraf op de grootste oplossing. Laat zien welke scenario’s standaard worden gedragen, waar medewerkers hun proces moeten aanpassen en welke afwijkingen structureel omwegen of dubbele invoer zouden veroorzaken.',
+          'Softora kan tijdens een CRM-scopegesprek helpen om processen, rollen, databronnen, koppelingen en acceptatiescenario’s scherp te krijgen. Dat garandeert niet dat ieder risico verdwijnt of iedere leverancier hetzelfde antwoord geeft. Het levert wel een controleerbare opdracht op voor een passend standaard CRM of een afgebakend CRM op maat, met een duidelijke route naar begroting en implementatie.',
+        ]),
+      }),
+    ]),
+    faq: Object.freeze([
+      Object.freeze({
+        question: 'Wat hoort minimaal in een CRM-programma van eisen?',
+        answer:
+          'Neem doelen, gebruikersrollen, kernscenario’s, gegevens, koppelingen, beheer, prioriteiten, uitgesloten scope en toetsbare acceptatiecriteria op. Noteer bij kritieke eisen ook de eigenaar en zakelijke reden.',
+      }),
+      Object.freeze({
+        question: 'Hoe voorkom je een eindeloze CRM-functiewensenlijst?',
+        answer:
+          'Begin bij echte werkscenario’s en verplicht voor iedere hoge prioriteit een duidelijke reden en verwachte uitkomst. Deel wensen op in direct nodig, randvoorwaarde, later en buiten scope.',
+      }),
+      Object.freeze({
+        question: 'Hoe vergelijk je CRM-leveranciers op dezelfde eisen?',
+        answer:
+          'Geef iedere leverancier dezelfde scenario’s en laat zien of een eis standaard, configureerbaar, via integratie, als maatwerk of niet wordt ondersteund. Gebruik dezelfde acceptatietests naast kosten en implementatieaanpak.',
+      }),
+      Object.freeze({
+        question: 'Wanneer is een CRM-eis toetsbaar?',
+        answer:
+          'Wanneer duidelijk is welke rol in welke situatie handelt, welke gegevens nodig zijn, wat het systeem moet opleveren en welk zichtbaar resultaat intern als voldoende wordt geaccepteerd.',
+      }),
+    ]),
+    relatedLinks: Object.freeze([
+      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
+      Object.freeze({ label: 'CRM op maat of standaard CRM', href: '/vergelijkingen/crm-op-maat-vs-standaard-crm' }),
+      Object.freeze({ label: 'CRM-implementatie en doorlooptijd', href: '/blog/crm-implementatie-doorlooptijd-mkb' }),
+      Object.freeze({ label: 'CRM-kosten voor het MKB', href: '/blog/crm-systeem-kosten-mkb' }),
+      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
+      Object.freeze({ label: 'Wat is een CRM-integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
     ]),
   }),
 ]);
