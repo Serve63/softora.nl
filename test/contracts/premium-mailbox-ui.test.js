@@ -108,7 +108,7 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722d/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722e/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -180,7 +180,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722e"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -767,8 +767,9 @@ test('geopende mail staat als één rustig mailblok met antwoordactie onderaan',
   const pageSource = readPage();
   const scriptSource = readScript();
 
-  assert.match(scriptSource, /const detailBody = m\.bodyLoaded\s*\? m\.body\s*:\s*'Bericht laden…';/);
-  assert.doesNotMatch(scriptSource, /const detailBody = m\.bodyLoaded \|\| m\.body/);
+  assert.match(scriptSource, /if \(!m\.bodyLoaded && !options\.skipBodyFetch\) \{[\s\S]*void loadMailboxMessageBody\(m\.id\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(scriptSource, /const detailBody = m\.body;/);
+  assert.doesNotMatch(scriptSource, /Bericht laden…/);
 
   assert.match(scriptSource, /<article class="detail-mail-block">/);
   assert.match(scriptSource, /<div class="detail-subject-row">/);

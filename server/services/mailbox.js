@@ -1967,51 +1967,56 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function restoreIndexedWebdesignImages(message) {
-    const text = normalizeString(message && message.body);
-    if (!text) return message;
-    const parsed = {
-      subject: normalizeString(message && message.subject),
-      from: {
-        value: [
-          {
-            name: normalizeString(message && message.from),
-            address: normalizeString(message && message.email),
-          },
-        ],
-      },
-      to: {
-        value: normalizeString(message && message.to)
-          .split(',')
-          .map((address) => ({ address: normalizeString(address) }))
-          .filter((entry) => entry.address),
-      },
-    };
-    if (!looksLikeWebdesignOutreach(parsed, text) || looksLikeLinkOnlyWebdesignOutreach(parsed, text)) {
-      return message;
-    }
-
-    const key = `${normalizeFolder(message && message.folder)}:${Number(message && message.uid) || 0}`;
-    const storedImagesByKey = await loadStoredImagesForRecords([
-      {
-        key,
+  async function restoreIndexedWebdesignImagesForMessages(messages) {
+    const source = Array.isArray(messages) ? messages : [];
+    const records = source.map((message, index) => {
+      const text = normalizeString(message && message.body);
+      const parsed = {
+        subject: normalizeString(message && message.subject),
+        from: {
+          value: [
+            {
+              name: normalizeString(message && message.from),
+              address: normalizeString(message && message.email),
+            },
+          ],
+        },
+        to: {
+          value: normalizeString(message && message.to)
+            .split(',')
+            .map((address) => ({ address: normalizeString(address) }))
+            .filter((entry) => entry.address),
+        },
+      };
+      return {
+        key: `${normalizeString(message && message.accountEmail)}|${normalizeFolder(message && message.folder)}:${Number(message && message.uid) || index}`,
         parsed,
         text,
-        primaryBodyImages: [],
-      },
-    ]);
-    const storedImages = storedImagesByKey.get(key) || [];
-    const bodyImages = mergeMailboxBodyImages([], storedImages, text, {
-      allowUnmatchedFallbacks: true,
+        primaryBodyImages: Array.isArray(message && message.bodyImages) ? message.bodyImages : [],
+      };
     });
-    if (!bodyImages.length) return message;
+    const storedImagesByKey = await loadStoredImagesForRecords(records);
+    return source.map((message, index) => {
+      const record = records[index];
+      const primaryBodyImages = record.primaryBodyImages;
+      const storedImages = storedImagesByKey.get(record.key) || [];
+      const bodyImages = mergeMailboxBodyImages(primaryBodyImages, storedImages, record.text, {
+        allowUnmatchedFallbacks: true,
+      });
+      if (!bodyImages.length) return message;
+      return {
+        ...message,
+        body: storedImages.length && !primaryBodyImages.length
+          ? decorateRecoveredWebdesignImagesText(record.text, bodyImages)
+          : record.text,
+        bodyImages,
+        inlineImages: bodyImages.map(bodyImageToInlineImage),
+      };
+    });
+  }
 
-    return {
-      ...message,
-      body: decorateRecoveredWebdesignImagesText(text, bodyImages),
-      bodyImages,
-      inlineImages: bodyImages.map(bodyImageToInlineImage),
-    };
+  async function restoreIndexedWebdesignImages(message) {
+    return (await restoreIndexedWebdesignImagesForMessages([message]))[0] || message;
   }
 
   function toClientMessage(parsed, message, folder, account, options = {}) {
@@ -2739,9 +2744,10 @@ function createMailboxService(deps = {}) {
 
   async function campaignRepliesResponse(req, res) {
     try {
-      const messages = await mailboxCampaignRepliesService.listReplies({
+      const replies = await mailboxCampaignRepliesService.listReplies({
         limit: Number(req.query?.limit || 100) || 100,
       });
+      const messages = await restoreIndexedWebdesignImagesForMessages(replies);
       return res.status(200).json({
         ok: true,
         messages,
