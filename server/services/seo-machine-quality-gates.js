@@ -535,6 +535,19 @@ function isTrackedWhatsappButton(button) {
   );
 }
 
+function isTrackedWebsiteIntakeButton(button) {
+  const attrs = String(button?.attrs || '');
+  return (
+    hasCompleteConversionTracking(attrs, 'website-intake') &&
+    getAttrValue(attrs, 'data-softora-intake-action').toLowerCase() === 'submit' &&
+    getAttrValue(attrs, 'data-softora-intake-endpoint') === '/api/public-contact'
+  );
+}
+
+function isTrackedLeadButton(button) {
+  return isTrackedWhatsappButton(button) || isTrackedWebsiteIntakeButton(button);
+}
+
 function auditConversionCtas({ pages = [] } = {}) {
   const issues = [];
 
@@ -546,14 +559,14 @@ function auditConversionCtas({ pages = [] } = {}) {
     const conversionLinks = anchors.filter((anchor) => isConversionHref(anchor.href));
     const annotatedLinks = conversionLinks.filter((anchor) => hasCompleteConversionTracking(anchor.attrs));
     const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
-    const trackedWhatsappButtons = leadCtaButtons.filter(isTrackedWhatsappButton);
+    const trackedLeadButtons = leadCtaButtons.filter(isTrackedLeadButton);
     const whatsappChannelLabels = [
       ...conversionLinks.filter((anchor) => hasVisibleWhatsappCtaLabel(anchor.label)),
       ...leadCtaButtons.filter((button) => hasVisibleWhatsappCtaLabel(button.label)),
       ...extractCtaHelperTextEntries(html).filter((entry) => hasVisibleWhatsappCtaLabel(entry.label)),
     ];
 
-    if (conversionLinks.length === 0 && trackedWhatsappButtons.length === 0) {
+    if (conversionLinks.length === 0 && trackedLeadButtons.length === 0) {
       issues.push({ type: 'missing-conversion-link', path: pathName, message: `${pathName} heeft geen meetbare CTA-route.` });
     }
     if (whatsappChannelLabels.length > 0) {
@@ -602,12 +615,12 @@ function auditConversionCtas({ pages = [] } = {}) {
         message: `${pathName} heeft een leadknop die niet naar Martijns WhatsApp leidt.`,
       });
     }
-    const nonWhatsappLeadButtons = leadCtaButtons.filter((button) => !isTrackedWhatsappButton(button));
-    if (nonWhatsappLeadButtons.length > 0) {
+    const untrackedLeadButtons = leadCtaButtons.filter((button) => !isTrackedLeadButton(button));
+    if (untrackedLeadButtons.length > 0) {
       issues.push({
-        type: 'lead-button-not-whatsapp',
+        type: 'lead-button-not-measurable',
         path: pathName,
-        message: `${pathName} heeft een zichtbare leadknop zonder meetbare WhatsApp-route naar Martijn.`,
+        message: `${pathName} heeft een zichtbare leadknop zonder goedgekeurde meetbare conversieroute.`,
       });
     }
     if (annotatedLinks.length !== conversionLinks.length) {

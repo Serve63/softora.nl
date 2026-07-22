@@ -2,9 +2,19 @@ const GOOGLE_ADS_SCOPE = 'premium_google_ads';
 const MACHINE_STATE_KEY = 'softora_google_ads_machine_v1';
 const CONVERSION_LEDGER_KEY = 'softora_google_ads_conversion_ledger_v1';
 const MAX_CONVERSION_EVENTS = 250;
+const ALLOWED_PUBLIC_CONVERSION_TARGETS = new Set(['whatsapp', 'website-intake']);
 const { buildGoogleAdsEditorAssetsCsv, buildGoogleAdsLaunchPack } = require('./google-ads-launch-pack');
 
 const CAMPAIGN_BLUEPRINT = Object.freeze([
+  {
+    id: 'search-groeiwebsite-vaste-prijs',
+    name: 'Search | Groeiwebsite | Vaste prijs',
+    intent: 'Dienstverlenend MKB dat actief een zakelijke website zoekt',
+    landingPage: '/website-laten-maken',
+    matchTypes: ['exact', 'phrase'],
+    themes: ['website laten maken', 'professionele website laten maken', 'zakelijke website laten maken'],
+    status: 'draft-paused',
+  },
   {
     id: 'search-bedrijfssoftware-op-maat',
     name: 'Search | Bedrijfssoftware op maat',
@@ -102,7 +112,9 @@ function sanitizeAttribution(payload = {}) {
     at: clean(payload.at, 80),
   };
 
-  if (!event.id || !event.name || !event.page || event.target !== 'whatsapp') return null;
+  if (!event.id || !event.name || !event.page || !ALLOWED_PUBLIC_CONVERSION_TARGETS.has(event.target)) {
+    return null;
+  }
   return event;
 }
 

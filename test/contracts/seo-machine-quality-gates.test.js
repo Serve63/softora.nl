@@ -513,7 +513,7 @@ test('leadknoppen mogen niet meer naar dode contactroutes of niet-veilige WhatsA
   ]);
 });
 
-test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gemarkeerd zijn', () => {
+test('zichtbare contactform-buttons moeten expliciet als goedgekeurde conversie gemarkeerd zijn', () => {
   const buttons = extractButtonEntries(
     '<button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur bericht</button>'
   );
@@ -532,6 +532,11 @@ test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gema
           '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/formulier-met-whatsapp" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur bericht</button></form>',
       },
       {
+        path: '/formulier-met-eigen-intake',
+        html:
+          '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/formulier-met-eigen-intake" data-softora-conversion-target="website-intake" data-softora-intake-action="submit" data-softora-intake-endpoint="/api/public-contact">Verstuur intake</button></form>',
+      },
+      {
         path: '/formulier-zonder-expliciete-whatsapp-url',
         html:
           '<form><button type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/formulier-zonder-expliciete-whatsapp-url" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit">Verstuur bericht</button></form>',
@@ -542,9 +547,9 @@ test('zichtbare contactform-buttons moeten expliciet als WhatsApp-conversie gema
   assert.deepEqual(
     issues.map((issue) => `${issue.path}:${issue.type}`).sort(),
     [
-      '/formulier-zonder-whatsapp:lead-button-not-whatsapp',
+      '/formulier-zonder-whatsapp:lead-button-not-measurable',
       '/formulier-zonder-whatsapp:missing-conversion-link',
-      '/formulier-zonder-expliciete-whatsapp-url:lead-button-not-whatsapp',
+      '/formulier-zonder-expliciete-whatsapp-url:lead-button-not-measurable',
       '/formulier-zonder-expliciete-whatsapp-url:missing-conversion-link',
     ].sort()
   );
@@ -570,7 +575,7 @@ test('WhatsApp-conversies tellen pas met pagina, target en submit-route', () => 
     issues.map((issue) => `${issue.path}:${issue.type}`).sort(),
     [
       '/half-gemeten-link:public-cta-visible-whatsapp-label',
-      '/half-gemeten-formulier:lead-button-not-whatsapp',
+      '/half-gemeten-formulier:lead-button-not-measurable',
       '/half-gemeten-formulier:missing-conversion-link',
       '/half-gemeten-link:untracked-conversion-link',
     ].sort()
@@ -607,7 +612,7 @@ test('button-like lead controls zonder WhatsApp-route worden geblokkeerd', () =>
     ],
   });
 
-  assert.deepEqual(issues.map((issue) => issue.type).sort(), ['lead-button-not-whatsapp', 'public-cta-visible-whatsapp-label'].sort());
+  assert.deepEqual(issues.map((issue) => issue.type).sort(), ['lead-button-not-measurable', 'public-cta-visible-whatsapp-label'].sort());
 });
 
 test('invisible of icon-only leadlinks zonder WhatsApp-route worden geblokkeerd', () => {

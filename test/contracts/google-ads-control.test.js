@@ -41,7 +41,7 @@ test('Google Ads control blijft fail-closed en bouwt uitsluitend gepauzeerde Sea
   assert.equal(status.spendCents, 0);
 
   const blueprint = service.getBlueprint();
-  assert.equal(blueprint.campaigns.length, 3);
+  assert.equal(blueprint.campaigns.length, 4);
   assert.equal(blueprint.campaigns.every((campaign) => campaign.status === 'draft-paused'), true);
   assert.equal(blueprint.network, 'Google Search only; Display-partners uit in het concept.');
   assert.ok(blueprint.sharedNegativeKeywords.includes('gratis'));
@@ -78,7 +78,11 @@ test('first-party conversieledger bewaart click ids, dedupliceert en bewaart gee
   assert.equal((await service.getStatus()).conversionCount, 1);
 });
 
-test('conversiesanitizer weigert onvolledige en niet-WhatsApp events', () => {
+test('conversiesanitizer accepteert website-intake en weigert onbekende targets', () => {
+  assert.equal(
+    sanitizeAttribution({ id: '2', name: 'website-intake-complete', page: '/website-laten-maken', target: 'website-intake' }).target,
+    'website-intake'
+  );
   assert.equal(sanitizeAttribution({ id: '1', name: 'x', page: '/', target: 'email' }), null);
   assert.equal(sanitizeAttribution({ name: 'x', page: '/', target: 'whatsapp' }), null);
 });
@@ -161,7 +165,7 @@ test('launch-pack is import-ready, deterministic en blijft binnen Google Ads ass
   assert.equal(pack.validation.valid, true);
   assert.equal(pack.accountDefaults.dailyBudgetCents, 0);
   assert.equal(pack.tracking.finalUrlSuffix, FINAL_URL_SUFFIX);
-  assert.equal(pack.campaigns.length, 3);
+  assert.equal(pack.campaigns.length, 4);
   assert.equal(pack.landingPages.every((page) => page.ready), true);
   assert.equal(pack.campaigns.every((campaign) => campaign.status === 'draft-paused'), true);
   assert.equal(pack.campaigns.every((campaign) => campaign.advertisingChannelType === 'SEARCH'), true);
@@ -196,8 +200,9 @@ test('Google Ads Editor CSV bevat alleen gepauzeerde assets, Engelse headers en 
   assert.match(csv, /Headline 15/);
   assert.match(csv, /Description 4/);
   assert.match(csv, /Search \| CRM op maat,Kernintentie,Paused/);
+  assert.match(csv, /Search \| Groeiwebsite \| Vaste prijs,Kernintentie,Paused/);
   assert.match(csv, /crm systeem op maat,Exact/);
   assert.match(csv, /utm_source=google/);
   assert.doesNotMatch(csv, /Enabled|Campaign daily budget|Daily budget/);
-  assert.equal(csv.trim().split(/\r?\n/).length, 22);
+  assert.equal(csv.trim().split(/\r?\n/).length, 29);
 });

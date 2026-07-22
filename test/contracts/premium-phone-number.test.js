@@ -26,7 +26,6 @@ test("premium pagina's tonen het uniforme telefoonnummer van WhatsApp", () => {
 test('premium telefoonnummer links gebruiken het juiste WhatsApp-nummer', () => {
   const files = [
     'premium-bedrijfssoftware.html',
-    'premium-websites.html',
     'premium-over-softora.html',
     'premium-chatbot.html',
     'premium-voicesoftware.html',
@@ -37,4 +36,9 @@ test('premium telefoonnummer links gebruiken het juiste WhatsApp-nummer', () => 
     assert.match(source, /https:\/\/wa\.me\/31643262792/, `${file} heeft geen juiste WhatsApp-link meer.`);
     assert.doesNotMatch(source, /href="tel:/, `${file} mag geen tel-link meer als primaire CTA gebruiken.`);
   }
+
+  const websiteSource = fs.readFileSync(path.join(repoRoot, 'premium-websites.html'), 'utf8');
+  assert.match(websiteSource, /id="growth-website-intake"/);
+  assert.match(websiteSource, /data-softora-conversion-target="website-intake"/);
+  assert.doesNotMatch(websiteSource, /https:\/\/wa\.me\//, 'De vaste website-intake mag niet terugvallen op handmatige WhatsApp-opvolging.');
 });

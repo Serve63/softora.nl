@@ -230,6 +230,38 @@ nav {
 .cta-tel { font-size: 14px; color: rgba(255,255,255,.4); }
 .cta-tel a { color: var(--crimson); text-decoration: none; font-weight: 600; }
 
+/* VASTE GROEIWEBSITE */
+.growth-offer-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 28px; margin-top: 48px; align-items: stretch; }
+.growth-offer-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 32px; box-shadow: 0 18px 50px rgba(26,26,46,.06); }
+.growth-offer-card.is-primary { background: var(--dark); color: #fff; border-color: var(--dark); }
+.growth-offer-label { color: var(--crimson); font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
+.growth-offer-price { font-family: 'Oswald', sans-serif; font-size: clamp(42px, 6vw, 72px); font-weight: 800; line-height: 1; letter-spacing: -2px; }
+.growth-offer-price small { display: block; margin-top: 10px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; color: rgba(255,255,255,.55); }
+.growth-offer-copy { margin-top: 22px; color: rgba(255,255,255,.68); font-size: 14px; line-height: 1.75; }
+.growth-scope-list { list-style: none; display: grid; gap: 12px; }
+.growth-scope-list li { position: relative; padding-left: 24px; font-size: 14px; line-height: 1.55; color: var(--mid); }
+.growth-scope-list li::before { content: '✓'; position: absolute; left: 0; color: var(--crimson); font-weight: 800; }
+.growth-exclusions { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--light); font-size: 12px; line-height: 1.65; }
+.growth-intake-form { width: min(760px, 100%); margin: 34px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: left; }
+.growth-intake-field { display: grid; gap: 7px; }
+.growth-intake-field.is-wide { grid-column: 1 / -1; }
+.growth-intake-field label { color: rgba(255,255,255,.66); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.growth-intake-field input,
+.growth-intake-field select,
+.growth-intake-field textarea { width: 100%; border: 1px solid rgba(255,255,255,.18); border-radius: 7px; padding: 13px 14px; background: rgba(255,255,255,.08); color: #fff; font: inherit; outline: none; }
+.growth-intake-field input:focus,
+.growth-intake-field select:focus,
+.growth-intake-field textarea:focus { border-color: var(--clight); box-shadow: 0 0 0 3px rgba(196,52,106,.16); }
+.growth-intake-field select option { color: var(--dark); }
+.growth-intake-field textarea { min-height: 112px; resize: vertical; }
+.growth-intake-consent { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 10px; color: rgba(255,255,255,.62); font-size: 12px; line-height: 1.55; }
+.growth-intake-consent input { margin-top: 3px; }
+.growth-intake-consent a { color: #fff; }
+.growth-intake-submit { grid-column: 1 / -1; justify-self: center; border: 0; cursor: pointer; }
+.growth-intake-submit:disabled { opacity: .6; cursor: wait; }
+.growth-intake-status { grid-column: 1 / -1; min-height: 22px; color: rgba(255,255,255,.72); font-size: 13px; text-align: center; }
+.growth-intake-status.is-error { color: #ffb1c9; }
+
 /* FOOTER */
 /* SCROLL REVEAL */
 .reveal,
@@ -351,6 +383,13 @@ nav {
   }
   .process-grid::before { display: none; }
   .cta-block { padding: 64px 20px; }
+  .growth-offer-grid,
+  .growth-intake-form { grid-template-columns: 1fr; }
+  .growth-intake-field.is-wide,
+  .growth-intake-consent,
+  .growth-intake-submit,
+  .growth-intake-status { grid-column: 1; }
+  .growth-offer-card { padding: 24px; }
 }
 </style>
 </head>
@@ -359,7 +398,7 @@ nav {
 <nav>
   <a class="nav-logo" href="/">SOFTORA.NL</a>
   <div class="nav-links">
-    <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792" class="nav-start-btn">Start Project</a>
+    <a href="#growth-website-intake" class="nav-start-btn">Start intake</a>
   </div>
 </nav>
 
@@ -368,15 +407,15 @@ nav {
   <div class="hero-inner">
     <div class="hero-eyebrow">Website laten maken</div>
     <h1 class="hero-title">Een website <br><em>voor meer aanvragen</em></h1>
-    <div class="hero-sub">Softora.nl bouwt snelle, SEO-vriendelijke websites met duidelijke dienstenpagina's, sterke call-to-actions en een structuur die Google en klanten meteen begrijpen.</div>
+    <div class="hero-sub">Een complete groeiwebsite voor dienstverlenend MKB: zeven sterke pagina's, copy, technische SEO en leadflow voor een vaste € 3.950 excl. btw.</div>
     <div class="hero-btns">
-      <a rel="noopener noreferrer" target="_blank" class="btn-primary" href="https://wa.me/31643262792">
+      <a class="btn-primary" href="#growth-website-intake">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        Contact
+        Start vaste intake
       </a>
-      <a rel="noopener noreferrer" target="_blank" class="btn-ghost" href="https://wa.me/31643262792">
+      <a class="btn-ghost" href="#vaste-scope">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6z"/></svg>
-        +31 6 43 26 27 92
+        Bekijk vaste scope
       </a>
     </div>
   </div>
@@ -384,10 +423,36 @@ nav {
 
 <!-- STATS -->
 <div class="stats-strip">
-  <div class="stat-item"><div class="stat-num">SEO</div><div class="stat-label">Basis ingericht</div></div>
-  <div class="stat-item"><div class="stat-num">2-6</div><div class="stat-label">Weken tot livegang</div></div>
-  <div class="stat-item"><div class="stat-num">Core</div><div class="stat-label">Snelheid & structuur</div></div>
-  <div class="stat-item"><div class="stat-num">Leads</div><div class="stat-label">CTA's en formulieren</div></div>
+  <div class="stat-item"><div class="stat-num">€3.950</div><div class="stat-label">Vaste prijs excl. btw</div></div>
+  <div class="stat-item"><div class="stat-num">10</div><div class="stat-label">Werkdagen tot eerste versie</div></div>
+  <div class="stat-item"><div class="stat-num">7</div><div class="stat-label">Complete pagina's</div></div>
+  <div class="stat-item"><div class="stat-num">1</div><div class="stat-label">Gebundelde revisieronde</div></div>
+</div>
+
+<!-- VASTE SCOPE -->
+<div class="section reveal" id="vaste-scope">
+  <div class="section-eyebrow">Softora Groeiwebsite</div>
+  <div class="section-title">Geen vaag traject.<br>Een vaste zakelijke website.</div>
+  <div class="section-sub">Gebouwd voor dienstverlenende bedrijven die een professionele website nodig hebben zonder maandenlange offertegesprekken of open-eindemeerwerk.</div>
+  <div class="growth-offer-grid">
+    <article class="growth-offer-card is-primary">
+      <div class="growth-offer-label">Vaste investering</div>
+      <div class="growth-offer-price">€ 3.950<small>excl. btw · 50% bij start, 50% vóór livegang</small></div>
+      <p class="growth-offer-copy">Na een complete intake levert Softora binnen tien werkdagen een eerste complete versie. Betaling twee loopt pas wanneer die versie volgens de afgesproken scope klaarstaat.</p>
+    </article>
+    <article class="growth-offer-card">
+      <div class="growth-offer-label">Inbegrepen</div>
+      <ul class="growth-scope-list">
+        <li>Homepage, vier dienstenpagina's, over-ons en contact</li>
+        <li>Structuur en zakelijke Nederlandstalige copy</li>
+        <li>Responsive bouw, snelheid en technische SEO-basis</li>
+        <li>Leadformulier, analytics en conversiemeting</li>
+        <li>Overname van bruikbare content uit de bestaande site</li>
+        <li>Eén gebundelde revisieronde en 30 dagen foutherstel</li>
+      </ul>
+      <p class="growth-exclusions">Niet inbegrepen: webshop, meertaligheid, maatwerksoftware, complexe koppelingen, fotografie, huisstijlontwikkeling, onbeperkte revisies of gereguleerde/speciale persoonsgegevens.</p>
+    </article>
+  </div>
 </div>
 
 <!-- WAT KAN IK VOOR JE DOEN -->
@@ -626,20 +691,28 @@ nav {
 
 <!-- CTA -->
 <div class="cta-block reveal">
-  <div class="cta-block-inner">
-    <div class="cta-eyebrow">Klaar voor een website die aanvragen oplevert?</div>
-    <div class="cta-title">Start met jouw<br>SEO-basis</div>
-    <div class="cta-sub">Vertel wat je verkoopt en in welke regio je wilt groeien. Wij komen met een concreet websitevoorstel.</div>
-    <a rel="noopener noreferrer" target="_blank" class="btn-primary" href="https://wa.me/31643262792" style="margin:0 auto;display:inline-flex">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      Start gesprek
-    </a>
-    <div class="cta-contact">
-      <div class="cta-tel">Of neem direct contact op: <a rel="noopener noreferrer" target="_blank" href="https://wa.me/31643262792">+31 6 43 26 27 92</a></div>
-    </div>
+  <div class="cta-block-inner" id="growth-website-intake-section">
+    <div class="cta-eyebrow">Vaste scope · € 3.950 excl. btw</div>
+    <div class="cta-title">Toets jouw bedrijf<br>aan de Groeiwebsite</div>
+    <div class="cta-sub">Geen vrijblijvend verkoopgesprek nodig. Vul de vaste intake in; Softora controleert of de opdracht binnen scope valt.</div>
+    <form class="growth-intake-form" id="growth-website-intake" novalidate>
+      <div class="growth-intake-field"><label for="growth-name">Naam</label><input id="growth-name" name="name" autocomplete="name" minlength="2" required></div>
+      <div class="growth-intake-field"><label for="growth-company">Bedrijf</label><input id="growth-company" name="company" autocomplete="organization" minlength="2" required></div>
+      <div class="growth-intake-field"><label for="growth-email">Zakelijk e-mailadres</label><input id="growth-email" name="email" type="email" autocomplete="email" required></div>
+      <div class="growth-intake-field"><label for="growth-phone">Telefoonnummer</label><input id="growth-phone" name="phone" type="tel" autocomplete="tel"></div>
+      <div class="growth-intake-field is-wide"><label for="growth-website">Bestaande website of domein</label><input id="growth-website" name="website" type="url" placeholder="https://"></div>
+      <div class="growth-intake-field"><label for="growth-goal">Belangrijkste doel</label><select id="growth-goal" name="goal" required><option value="">Kies één doel</option><option>Meer offerteaanvragen</option><option>Professioneler vertrouwen</option><option>Beter lokaal gevonden worden</option><option>Bestaande website vervangen</option></select></div>
+      <div class="growth-intake-field"><label for="growth-timing">Gewenste start</label><select id="growth-timing" name="timing" required><option value="">Kies een periode</option><option>Binnen 2 weken</option><option>Binnen 1 maand</option><option>Binnen 3 maanden</option></select></div>
+      <div class="growth-intake-field is-wide"><label for="growth-decision">Ben jij beslissingsbevoegd?</label><select id="growth-decision" name="decisionMaker" required><option value="">Kies één antwoord</option><option>Ja, ik kan zelf akkoord geven</option><option>Ja, samen met één andere beslisser</option><option>Nee</option></select></div>
+      <div class="growth-intake-field is-wide"><label for="growth-details">Wat verkoopt het bedrijf en aan wie?</label><textarea id="growth-details" name="details" minlength="20" maxlength="1800" required></textarea></div>
+      <label class="growth-intake-consent"><input type="checkbox" required> <span>Ik heb de <a href="/algemene-voorwaarden" target="_blank" rel="noopener noreferrer">algemene voorwaarden</a>, vaste scope en het <a href="/privacybeleid" target="_blank" rel="noopener noreferrer">privacybeleid</a> gelezen.</span></label>
+      <button class="btn-primary growth-intake-submit" type="submit" data-softora-conversion="public-form-submit" data-softora-conversion-page="/website-laten-maken" data-softora-conversion-target="website-intake" data-softora-intake-action="submit" data-softora-intake-endpoint="/api/public-contact">Verstuur vaste intake</button>
+      <p class="growth-intake-status" id="growth-website-intake-status" aria-live="polite"></p>
+    </form>
   </div>
 </div>
 
 <!-- FOOTER -->
+<script src="/assets/public-website-intake.js?v=20260722a" defer></script>
 </body>
 </html>

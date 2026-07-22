@@ -9,7 +9,7 @@ test('premium websites verbergt de header startknop op mobiel', () => {
 
   assert.match(
     source,
-    /<a rel="noopener noreferrer" target="_blank" href="https:\/\/wa\.me\/31643262792" class="nav-start-btn">Start Project<\/a>/
+    /<a href="#growth-website-intake" class="nav-start-btn">Start intake<\/a>/
   );
   assert.match(
     source,

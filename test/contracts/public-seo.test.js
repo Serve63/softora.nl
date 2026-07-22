@@ -328,6 +328,26 @@ test('public seo pages load first-party conversion tracking once', () => {
   }
 });
 
+test('website money page owns the fixed-scope intake and conversion contract', () => {
+  const pageSource = fs.readFileSync(path.join(root, 'premium-websites.html'), 'utf8');
+  const intakeSource = fs.readFileSync(path.join(root, 'assets/public-website-intake.js'), 'utf8');
+
+  assert.match(pageSource, /Softora Groeiwebsite/);
+  assert.match(pageSource, /€ 3\.950/);
+  assert.match(pageSource, /50% bij start, 50% vóór livegang/);
+  assert.equal((pageSource.match(/id="growth-website-intake"/g) || []).length, 1);
+  assert.match(pageSource, /\/assets\/public-website-intake\.js\?v=20260722a/);
+  assert.match(pageSource, /href="\/algemene-voorwaarden"/);
+  assert.match(pageSource, /href="\/privacybeleid"/);
+  assert.match(pageSource, /data-softora-conversion-target="website-intake"/);
+  assert.match(pageSource, /data-softora-intake-endpoint="\/api\/public-contact"/);
+  assert.match(intakeSource, /fetch\('\/api\/public-contact'/);
+  assert.match(intakeSource, /target: 'website-intake'/);
+  assert.match(intakeSource, /fetch\('\/api\/public-conversion'/);
+  assert.match(intakeSource, /SoftoraGoogleAdsConsent\.recordConversion\(eventData\)/);
+  assert.doesNotMatch(intakeSource, /localStorage|sessionStorage|wa\.me|MARTIJN_WHATSAPP/);
+});
+
 test('public conversion tracker measures bare Martijn WhatsApp links as fallback', () => {
   const result = runPublicConversionTracker({ trigger: 'click' });
 

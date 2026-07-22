@@ -14,54 +14,102 @@ his operational input after one initial setup session. Operating contribution
 means cash received minus lead acquisition, delivery, hosting/API and refund
 costs, before VAT and income/corporate tax.
 
+## Capability boundary
+
+Codex can independently inspect live demand and account state, operate the
+Softora repository, build and test sites and workflows, read and write through
+connected Gmail, Supabase, GitHub and Vercel surfaces, monitor evidence and
+continue a long-running goal. It can therefore run qualification, written
+sales, production, delivery and proof collection after setup.
+
+Codex cannot truthfully replace Servé for identity checks, phone verification,
+bank ownership, legal authority or permission to create new costs. It also
+cannot prove future revenue from forecasts. Proof requires real third-party
+cash and accepted deliveries.
+
+## Falsification findings on 22 July 2026
+
+- Google Search Console recorded 9 clicks and 1,726 impressions in the latest
+  28-day window. Organic traffic is growing in impressions but is not yet a
+  revenue engine.
+- Gmail contained no `Nieuwe contactaanvraag via Softora.nl` messages in 2026.
+  The former website page hid price and routed primary calls to Martijn's
+  WhatsApp, so it was not autonomous.
+- Offerti's latest 97 public requests contained no current app/software job and
+  only one website request. Its public app examples were mostly from 2016-2017.
+  Buying 360 Offerti credits is therefore rejected.
+- Softora's current coldmail stats showed 1,717 sends, 27 reliable bounces and
+  two interested records. No external EUR 2,500+ paid order was evidenced. The
+  existing coldmail alone is not proof.
+- The live Google Ads draft for website intent estimated 79 clicks per week at
+  EUR 2.51 average CPC and EUR 198.24 weekly cost. This is the only current
+  demand signal with enough estimated volume for a controlled validation.
+- Published Dutch competitors currently place complete custom sites around EUR
+  3,750 to EUR 4,500, while low-end template sites start below EUR 800. A fixed
+  EUR 3,950 offer is in the observable custom-site band without competing at
+  the commodity bottom.
+
+These findings reject the former Offerti/software plan. They do not prove the
+new offer; they define the smallest live experiment capable of proving or
+rejecting it.
+
 ## Chosen offer
 
-Softora sells one narrowly scoped internal planning, CRM or workflow app for
-EUR 4,950 excluding VAT, delivered within ten working days.
+Softora sells one productized Groeiwebsite for EUR 3,950 excluding VAT. A first
+complete version is delivered within ten working days after complete intake.
 
 Included:
 
-- one business workflow;
-- at most three user roles;
-- one structured data import;
-- one external integration;
-- responsive web delivery;
+- seven pages: home, four services, about and contact;
+- information architecture and Dutch business copy;
+- responsive web delivery, performance and technical SEO foundation;
+- lead form, analytics and conversion measurement;
+- migration of usable content from the existing site;
+- one bundled revision round;
 - 30 days of defect repair;
-- optional support and continuous improvement at EUR 149 per month.
 
-Reject requests requiring physical presence, regulated or special-category
-personal data, native app stores, open-ended integrations, unlimited revisions
-or an unbounded scope.
+Reject ecommerce, multilingual delivery, custom software, complex integrations,
+photography, brand identity work, unlimited revisions, regulated or
+special-category personal data and any unbounded scope.
 
 ## Acquisition channel
 
-The primary pilot channel is Offerti because the requester explicitly asks for
-offers. No scraped or unsolicited coldmail address may be used by this pilot.
+The primary proof channel is one Google Search campaign for current website
+intent. It remains paused until advertiser verification, offer approval and one
+exact maximum pilot authorization are complete. It uses exact and phrase match,
+Google Search only, no Search Partners, no Display and a dedicated intake as
+the primary conversion.
 
 Pilot limits:
 
-- at most 12 paid proposals per calendar month;
-- at most 30 Offerti credits per proposal;
-- at most 360 prepaid credits, equal to EUR 468 excluding VAT at the published
-  standard credit price;
-- no Premium account and no automatic credit purchase or refill;
-- stop immediately when the prepaid balance is exhausted;
-- stop and reject the channel after 12 paid proposals without a contract.
+- total lifetime validation spend: at most EUR 3,000 after one explicit approval;
+- first stage: at most EUR 500 over 28 days;
+- do not release the remaining amount unless stage one produces at least three
+  qualified intakes or one accepted contract;
+- hard pause after 100 clicks without a valid intake;
+- hard pause when cost per valid intake exceeds EUR 250 after at least three
+  valid intakes;
+- never purchase, refill or raise budget automatically;
+- Google Ads' average daily budget is not treated as a lifetime cap; the Softora
+  ledger must stop the campaign before the authorized cumulative ceiling.
 
-Every accepted lead must be remote, commercially identifiable, concrete enough
-to quote, and realistically deliverable inside the fixed scope.
+The already-paid coldmail system may be measured as a secondary zero-incremental
+cost channel only after Servé approves the fixed offer and exact message. It may
+not be counted as causal proof without traceable lead, acceptance and cash
+evidence.
 
 ## Unit economics
 
 | Item | EUR |
 | --- | ---: |
-| One collected project | 4,950 |
-| Maximum lead spend | -468 |
+| One collected project | 3,950 |
+| Maximum monthly Google Ads spend at current estimate | -861 |
 | Maximum delivery, hosting and API spend | -350 |
-| Expected operating contribution | 4,132 |
+| Operating contribution with one collected project | 2,739 |
 
-The economic hypothesis therefore needs one sale per 12 selected requests, or
-an 8.33% win rate. This is a testable hypothesis, not assumed proof.
+At the current draft estimate this means roughly 343 clicks per month. The
+hypothesis needs one collected project per month, equal to about 0.29% of paid
+clicks. This is a testable threshold, not assumed proof.
 
 ## Evidence chain
 
@@ -78,7 +126,8 @@ Every paid order must contain all seven autonomous evidence events:
 Lead, proposal, contract and delivery evidence must be written through the
 admin-protected event route with:
 
-- a stable external event ID such as an Offerti request or Gmail message ID;
+- a stable external event ID such as a Google click ID, contact message ID or
+  Gmail message ID;
 - a SHA-256 evidence hash;
 - a non-empty automation run ID;
 - `autonomous=true` set server-side.
@@ -118,16 +167,19 @@ active order or self-authored status assertion never counts as revenue proof.
 - The feature fails closed when disabled, unconfigured, sent from an untrusted
   IP or presented with an invalid secret.
 - Codex must never buy or refill credits, create paid API usage, upgrade a plan
-  or enable chargeable overages. Existing prepaid balances may be consumed only
-  inside the explicit pilot limits.
+  or enable chargeable overages. Google Ads stays paused until Servé gives one
+  new explicit instruction authorizing the exact EUR 3,000 maximum for this one
+  gated validation. No amount may be inferred from this document.
 
 ## Required one-time setup by Servé
 
-1. Create the Offerti professional account, select Website/Apps, accept the
-   current terms and enable daily request emails.
-2. Buy exactly 360 credits once if Servé accepts the EUR 468 excluding VAT
-   pilot risk. Codex does not perform this purchase.
-3. Approve the fixed offer, fixed scope, standard terms and rejection rules.
+1. Complete the open Google advertiser identity step with Servé's own phone,
+   mobile-provider account and matching address. Codex may not submit identity
+   or OTP data on Servé's behalf.
+2. Approve or reject one exact maximum of EUR 3,000 for the gated Google Search
+   validation. Codex performs no paid request before that explicit instruction.
+3. Approve the EUR 3,950 fixed offer, two 50% payment moments, scope, standard
+   terms, rejection rules and authority for autonomous written sales replies.
 4. Configure a dedicated high-entropy `BUNQ_REVENUE_WEBHOOK_SECRET`.
 5. Register the HTTPS `PAYMENT` notification target in bunq while Servé is
    present, then remove all bunq API credentials from the Softora runtime.
@@ -155,7 +207,11 @@ delivery, proof recording and monitoring must not require Servé.
   https://wetten.overheid.nl/BWBR0009950/2026-07-01/0?labelid=2780664
 - ACM spam guidance:
   https://www.acm.nl/nl/verkoop-aan-consumenten/reclame-en-verleiden/spam-voorkomen-uw-reclame
-- Offerti professional and credit model:
+- Google Ads average daily and monthly spending limits:
+  https://support.google.com/google-ads/answer/6385083
+- Google advertiser verification:
+  https://support.google.com/adspolicy/answer/9703665?hl=nl
+- Offerti request and credit model, retained as rejected-channel evidence:
   https://offerti.nl/veelgestelde-vragen
 - bunq callback categories, source range and retry behavior:
   https://doc.bunq.com/basics/callbacks-webhooks
