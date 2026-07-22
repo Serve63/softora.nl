@@ -508,6 +508,17 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   let snapshotMediaRefreshPromise = null;
   let durableSnapshotReadPromise = null;
   let snapshotInvalidated = false;
+  let snapshotMutationPromise = Promise.resolve();
+
+  function wait(delayMs) {
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(delayMs) || 0)));
+  }
+
+  function enqueueSnapshotMutation(operation) {
+    const result = snapshotMutationPromise.catch(() => undefined).then(operation);
+    snapshotMutationPromise = result.then(() => undefined, () => undefined);
+    return result;
+  }
 
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
@@ -970,6 +981,95 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     return true;
   }
 
+  async function markCustomersMailReadyAfterAssetUpsertUnsafe(customerIds = []) {
+    const promotedIds = Array.from(new Set(
+      (Array.isArray(customerIds) ? customerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    ));
+    if (!promotedIds.length) return true;
+
+    snapshotInvalidated = true;
+    const pendingWork = [snapshotDataPromise, snapshotMediaRefreshPromise].filter(Boolean);
+    if (pendingWork.length) await Promise.allSettled(pendingWork);
+
+    const durableData = await readDurableSnapshotData();
+    const cachedData = snapshotDataCache && snapshotDataCache.data;
+    const baseData = getSnapshotGeneratedAtMs(durableData) > getSnapshotGeneratedAtMs(cachedData)
+      ? durableData
+      : cachedData || durableData;
+    if (!baseData) {
+      invalidate();
+      return Boolean(await startSnapshotRefresh());
+    }
+
+    const readyCustomers = Array.isArray(baseData.customers) ? baseData.customers : [];
+    const availableCustomers = Array.isArray(baseData.availableCustomers) ? baseData.availableCustomers : [];
+    const sourceById = new Map(
+      readyCustomers.concat(availableCustomers).map((customer) => [normalizeString(customer && customer.id), customer])
+    );
+    if (promotedIds.some((customerId) => !sourceById.has(customerId))) {
+      invalidate();
+      return Boolean(await startSnapshotRefresh());
+    }
+
+    let signedRows = await readBootstrapSignedMedia(promotedIds);
+    if (signedRows.length < promotedIds.length) {
+      await wait(350);
+      signedRows = await readBootstrapSignedMedia(promotedIds);
+    }
+    const signedById = new Map(
+      signedRows.map((row) => [normalizeString(row && row.customerId), row])
+    );
+    const promotedCustomers = promotedIds.map((customerId) => {
+      const source = sourceById.get(customerId);
+      const signed = signedById.get(customerId);
+      const enriched = signed ? enrichSnapshotCustomersWithSignedMedia([source], [signed])[0] : source;
+      return {
+        ...enriched,
+        hasPhoto: true,
+        hasMockup: true,
+        websitePhotoAssetReady: true,
+        websiteMockupAssetReady: true,
+        mailReady: true,
+        mailReadySnapshot: true,
+        availableSnapshot: false,
+        updatedAt: normalizeString(enriched && enriched.updatedAt) || now().toISOString(),
+      };
+    });
+    const promotedById = new Map(promotedCustomers.map((customer) => [normalizeString(customer.id), customer]));
+    const promotedIdSet = new Set(promotedIds);
+    const nextReadyCustomers = readyCustomers
+      .map((customer) => promotedById.get(normalizeString(customer && customer.id)) || customer)
+      .concat(promotedCustomers.filter((customer) => !readyCustomers.some((ready) => normalizeString(ready && ready.id) === normalizeString(customer.id))));
+    const nextData = {
+      ...baseData,
+      generatedAt: now().toISOString(),
+      customers: nextReadyCustomers,
+      availableCustomers: availableCustomers.filter((customer) => !promotedIdSet.has(normalizeString(customer && customer.id))),
+    };
+    nextData.total = nextData.customers.length;
+    nextData.availableTotal = nextData.availableCustomers.length;
+
+    let persisted = false;
+    for (let attempt = 0; attempt < 3 && !persisted; attempt += 1) {
+      if (attempt > 0) await wait(250 * attempt);
+      persisted = await persistDurableSnapshotData(nextData);
+    }
+    if (!persisted) {
+      invalidate();
+      return false;
+    }
+    snapshotDataCache = { cachedAtMs: nowMs(), data: nextData };
+    snapshotInvalidated = false;
+    durableSnapshotReadPromise = null;
+    return true;
+  }
+
+  function markCustomersMailReadyAfterAssetUpsert(customerIds = []) {
+    return enqueueSnapshotMutation(() => markCustomersMailReadyAfterAssetUpsertUnsafe(customerIds));
+  }
+
   async function buildMailReadySnapshot(options = {}) {
     const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
     const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
@@ -1017,6 +1117,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   return {
     buildMailReadySnapshot,
     invalidate,
+    markCustomersMailReadyAfterAssetUpsert,
     markCustomersAvailableAfterAssetRemoval,
     removeCustomers,
     sendMailReadySnapshotResponse,

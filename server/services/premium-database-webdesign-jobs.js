@@ -558,6 +558,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     now = () => Date.now(),
     random = Math.random,
     retryJitter = true,
+    mailReadySnapshotService: initialMailReadySnapshotService = null,
   } = deps;
 
   const jobs = new Map();
@@ -582,6 +583,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   let processingWakeTimer = null;
   let processingWakeAt = 0;
   const inlineProcessingJobIds = new Set();
+  let mailReadySnapshotService = initialMailReadySnapshotService;
 
   function pruneJobs() {
     const currentTime = now();
@@ -1282,6 +1284,27 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
 
     await persistGeneratedPhoto(job, payload && payload.image);
+    if (
+      mailReadySnapshotService &&
+      typeof mailReadySnapshotService.markCustomersMailReadyAfterAssetUpsert === 'function'
+    ) {
+      try {
+        const snapshotUpdated = await mailReadySnapshotService.markCustomersMailReadyAfterAssetUpsert([job.customer.id]);
+        if (!snapshotUpdated && typeof logger.warn === 'function') {
+          logger.warn('[PremiumDatabaseWebdesignJobs][mail-ready-snapshot]', `Snapshot niet direct bijgewerkt voor ${job.customer.id}.`);
+        }
+      } catch (error) {
+        if (typeof logger.warn === 'function') {
+          logger.warn('[PremiumDatabaseWebdesignJobs][mail-ready-snapshot]', error && error.message ? error.message : error);
+        }
+        if (typeof mailReadySnapshotService.invalidate === 'function') mailReadySnapshotService.invalidate();
+      }
+    }
+  }
+
+  function setMailReadySnapshotService(service) {
+    mailReadySnapshotService = service || null;
+    return mailReadySnapshotService;
   }
 
   function withJobProcessTimeout(job, promise) {
@@ -2628,6 +2651,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     listJobsResponse,
     runBatchWorker,
     runBatchWorkerResponse,
+    setMailReadySnapshotService,
     startBatchResponse,
     startJob,
     startJobResponse,

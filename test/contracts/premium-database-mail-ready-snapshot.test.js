@@ -473,6 +473,110 @@ test('premium database mail-ready snapshot moves removed webdesign assets to ava
   assert.deepEqual(bootstrapSnapshot.availableCustomers.map((customer) => customer.id), ['removed-assets']);
 });
 
+test('premium database mail-ready snapshot promotes a generated webdesign atomically in both durable caches', async () => {
+  const { service, calls } = createService({
+    durableSnapshot: {
+      version: 2,
+      generatedAt: '2026-06-16T11:59:30.000Z',
+      total: 0,
+      customers: [],
+      availableTotal: 1,
+      availableCustomers: [{
+        id: 'generated-assets',
+        bedrijf: 'Demo BV',
+        email: 'info@demo.nl',
+        website: 'demo.nl',
+        hasPhoto: false,
+        hasMockup: false,
+        mailReady: false,
+        availableSnapshot: true,
+      }],
+    },
+    signedPhotos: [{
+      customerId: 'generated-assets',
+      websitePhotoUrl: 'https://assets.softora.test/demo.png',
+      websiteMockupUrl: 'https://assets.softora.test/demo-mockup.png',
+      fileName: 'demo.png',
+      websiteMockupName: 'demo-mockup.png',
+      signedUrlExpiresAt: '2026-06-17T12:00:00.000Z',
+    }],
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+  });
+
+  assert.equal(await service.markCustomersMailReadyAfterAssetUpsert(['generated-assets']), true);
+  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['generated-assets']);
+  assert.deepEqual(payload.availableCustomers, []);
+  assert.equal(payload.customers[0].websitePhoto, 'https://assets.softora.test/demo.png');
+  assert.equal(payload.customers[0].websiteMockup, 'https://assets.softora.test/demo-mockup.png');
+  assert.equal(payload.customers[0].websitePhotoAssetReady, true);
+  assert.equal(payload.customers[0].websiteMockupAssetReady, true);
+  assert.equal(payload.customers[0].mailReady, true);
+  assert.equal(payload.customers[0].mailReadySnapshot, true);
+  assert.equal(payload.customers[0].availableSnapshot, false);
+  const cacheWrites = calls.filter((call) => Array.isArray(call) && call[0] === 'ui-state-write');
+  const fullSnapshot = JSON.parse(cacheWrites.find((call) => call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE)[2][MAIL_READY_SNAPSHOT_CACHE_KEY]);
+  const bootstrapSnapshot = JSON.parse(cacheWrites.find((call) => call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE)[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]);
+  assert.deepEqual(fullSnapshot.customers.map((customer) => customer.id), ['generated-assets']);
+  assert.deepEqual(fullSnapshot.availableCustomers, []);
+  assert.deepEqual(bootstrapSnapshot.customers.map((customer) => customer.id), ['generated-assets']);
+  assert.deepEqual(bootstrapSnapshot.availableCustomers, []);
+  const signedRead = calls.find((call) => Array.isArray(call) && call[0] === 'signed-photos');
+  assert.deepEqual(signedRead[1].customerIds, ['generated-assets']);
+  assert.equal(signedRead[1].maxMatches, 1);
+});
+
+test('premium database mail-ready snapshot serializes concurrent generated webdesign promotions', async () => {
+  let durableSnapshot = {
+    version: 2,
+    generatedAt: '2026-06-16T11:59:30.000Z',
+    total: 0,
+    customers: [],
+    availableTotal: 2,
+    availableCustomers: [
+      { id: 'generated-a', bedrijf: 'A BV', availableSnapshot: true },
+      { id: 'generated-b', bedrijf: 'B BV', availableSnapshot: true },
+    ],
+  };
+  let nowTick = 0;
+  const service = createPremiumDatabaseMailReadySnapshotService({
+    dataOpsStore: {
+      async listDesignPhotosWithSignedUrls(options) {
+        return options.customerIds.map((customerId) => ({
+          customerId,
+          websitePhotoUrl: `https://assets.softora.test/${customerId}.png`,
+          websiteMockupUrl: `https://assets.softora.test/${customerId}-mockup.png`,
+        }));
+      },
+    },
+    async getUiStateValues(scope) {
+      if (scope !== MAIL_READY_SNAPSHOT_CACHE_SCOPE) return { values: {} };
+      return { values: { [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify(durableSnapshot) } };
+    },
+    async setUiStateValues(scope, values) {
+      if (scope === MAIL_READY_SNAPSHOT_CACHE_SCOPE) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        durableSnapshot = JSON.parse(values[MAIL_READY_SNAPSHOT_CACHE_KEY]);
+      }
+      return { values };
+    },
+    now: () => new Date(Date.parse('2026-06-16T12:00:00.000Z') + nowTick++),
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z') + nowTick,
+    logger: { warn() {} },
+  });
+
+  const results = await Promise.all([
+    service.markCustomersMailReadyAfterAssetUpsert(['generated-a']),
+    service.markCustomersMailReadyAfterAssetUpsert(['generated-b']),
+  ]);
+  const payload = await service.buildMailReadySnapshot({ limit: 10 });
+
+  assert.deepEqual(results, [true, true]);
+  assert.deepEqual(payload.customers.map((customer) => customer.id).sort(), ['generated-a', 'generated-b']);
+  assert.deepEqual(payload.availableCustomers, []);
+});
+
 test('premium database mail-ready snapshot persists compact full and bootstrap caches', async () => {
   const customers = Array.from({ length: 120 }, (_, index) => ({
     customer_id: `ready-${index + 1}`,

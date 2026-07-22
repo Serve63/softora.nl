@@ -105,6 +105,12 @@ function registerFeatureRoutes(app, deps = {}) {
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
   });
   if (
+    premiumDatabaseWebdesignJobsCoordinator &&
+    typeof premiumDatabaseWebdesignJobsCoordinator.setMailReadySnapshotService === 'function'
+  ) {
+    premiumDatabaseWebdesignJobsCoordinator.setMailReadySnapshotService(premiumDatabaseMailReadySnapshotService);
+  }
+  if (
     coldmailing &&
     coldmailing.coldmailCampaignService &&
     typeof coldmailing.coldmailCampaignService.setMailReadySnapshotService === 'function'
