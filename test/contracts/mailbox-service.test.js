@@ -24,6 +24,10 @@ function createResponseRecorder() {
       this.body = payload;
       return this;
     },
+    send(payload) {
+      this.body = payload;
+      return this;
+    },
   };
 }
 
@@ -2614,7 +2618,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   assert.equal(snapshotWrite.scope, 'premium_mailbox_campaign_snapshot');
   assert.equal(snapshotWrite.meta.source, 'mailbox-campaign-replies');
   const persistedSnapshot = JSON.parse(
-    snapshotWrite.values.softora_mailbox_campaign_snapshot_v1
+    snapshotWrite.values.softora_mailbox_campaign_snapshot_v2
   );
   assert.equal(persistedSnapshot.messages[0].from, 'Studio Noord');
   assert.equal(persistedSnapshot.messages[0].body, 'Volledige inhoud voor inbox:42');
@@ -2636,6 +2640,8 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
       accountsResponse() {},
       campaignRepliesResponse() {},
       listMessagesResponse() {},
+      getMessageResponse() {},
+      getMessageImageResponse() {},
       markMessageReadResponse() {},
       deleteMessageResponse() {},
       sendMessageResponse() {},
@@ -2646,10 +2652,49 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/campaign-replies'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
+  assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/message-image'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
+});
+
+test('mailbox image response serves a recovered image with durable private browser cache', async () => {
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      getMessage: async () => ({
+        id: 'inbox:42',
+        folder: 'inbox',
+        accountEmail: 'serve@softora.nl',
+        hasBody: true,
+        body: 'Bericht met afbeelding',
+        bodyImages: [{
+          alt: 'Ontwerp',
+          dataUrl: `data:image/png;base64,${Buffer.from('mailbox-image').toString('base64')}`,
+        }],
+      }),
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.getMessageImageResponse({
+    query: { account: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', index: '0' },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['content-type'], 'image/png');
+  assert.equal(response.headers['cache-control'], 'private, max-age=31536000, immutable');
+  assert.equal(response.headers['x-content-type-options'], 'nosniff');
+  assert.equal(Buffer.isBuffer(response.body), true);
+  assert.equal(response.body.toString(), 'mailbox-image');
 });
 
 test('mailbox cron sync route requires CRON_SECRET bearer access', () => {

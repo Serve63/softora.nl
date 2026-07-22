@@ -1,6 +1,11 @@
 const MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE = 'premium_mailbox_campaign_snapshot';
-const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v1';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 1;
+const {
+  buildMailboxMessageImageUrl,
+  isMailboxMessageImageUrl,
+} = require('./mailbox-message-image');
+
+const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 2;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -33,10 +38,23 @@ function sanitizeOutreach(value) {
   };
 }
 
-function sanitizeBodyImage(value) {
+function sanitizeBodyImage(value, options = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const dataUrl = String(value.dataUrl || value.src || '').trim();
   if (!dataUrl || !/^(?:data:image\/|https?:\/\/|\/)/i.test(dataUrl)) return null;
+  const proxyUrl = buildMailboxMessageImageUrl(options.message, options.imageIndex);
+  if (/^data:image\//i.test(dataUrl) && proxyUrl) {
+    return {
+      alt: text(value.alt || value.name || 'Afbeelding', 300),
+      dataUrl: proxyUrl,
+    };
+  }
+  if (isMailboxMessageImageUrl(dataUrl)) {
+    return {
+      alt: text(value.alt || value.name || 'Afbeelding', 300),
+      dataUrl,
+    };
+  }
   if (dataUrl.length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS) return null;
   return {
     alt: text(value.alt || value.name || 'Afbeelding', 300),
@@ -49,7 +67,7 @@ function sanitizeMessage(value, options = {}) {
   const rawBody = String(source.body || '');
   const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
   const bodyImages = (options.includeImages === false ? [] : sourceBodyImages)
-    .map(sanitizeBodyImage)
+    .map((image, imageIndex) => sanitizeBodyImage(image, { message: source, imageIndex }))
     .filter(Boolean)
     .slice(0, 2);
   const body = options.includeBody === false
@@ -94,6 +112,7 @@ function fitSnapshotToBudget(snapshot) {
   if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
 
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    if (snapshot.messages[index].bodyImages.length) snapshot.messages[index].bodyImagesTruncated = true;
     snapshot.messages[index].bodyImages = [];
     if (index > 0 && snapshot.messages[index].body) {
       snapshot.messages[index].body = '';
@@ -104,6 +123,7 @@ function fitSnapshotToBudget(snapshot) {
   }
 
   if (snapshot.messages[0]) {
+    if (snapshot.messages[0].bodyImages.length) snapshot.messages[0].bodyImagesTruncated = true;
     snapshot.messages[0].bodyImages = [];
     snapshot.messages[0].body = text(snapshot.messages[0].body, 20_000);
     snapshot.messages[0].bodyTruncated = true;

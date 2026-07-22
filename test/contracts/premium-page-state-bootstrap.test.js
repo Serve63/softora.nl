@@ -124,7 +124,17 @@ test('mailbox-bootstrap levert sessie en berichten direct mee en hergebruikt het
         mailboxReads += 1;
         return {
           ok: true,
-          messages: [{ id: 'reply-1', from: 'Studio Noord' }],
+          messages: [{
+            id: 'inbox:reply-1',
+            folder: 'inbox',
+            accountEmail: 'serve@softora.nl',
+            from: 'Studio Noord',
+            body: 'Bericht met direct beschikbare afbeelding',
+            bodyImages: [{
+              alt: 'Ontwerp',
+              dataUrl: `data:image/png;base64,${'a'.repeat(120_000)}`,
+            }],
+          }],
           sync: { source: 'campaign-replies-index' },
         };
       },
@@ -145,8 +155,13 @@ test('mailbox-bootstrap levert sessie en berichten direct mee en hergebruikt het
   const first = await service.buildPageStateBootstrapPayload('premium-mailbox.html', { session });
   const second = await service.buildPageStateBootstrapPayload('premium-mailbox.html', { session });
 
-  assert.equal(first.mailbox.messages[0].id, 'reply-1');
-  assert.equal(first.mailbox.sync.source, 'campaign-replies-index');
+  assert.equal(first.mailbox.messages[0].id, 'inbox:reply-1');
+  assert.equal(first.mailbox.sync.source, 'campaign-replies-snapshot');
+  assert.deepEqual(first.mailbox.messages[0].bodyImages, [{
+    alt: 'Ontwerp',
+    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3Areply-1&index=0',
+  }]);
+  assert.equal(first.mailbox.messages[0].bodyImagesTruncated, false);
   assert.equal(first.session.email, 'serve@softora.nl');
   assert.equal(first.session.canManageUsers, true);
   assert.equal(Object.hasOwn(first.session, 'token'), false);

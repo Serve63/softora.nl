@@ -31,6 +31,12 @@
     return String(value || '').trim().toLowerCase();
   }
 
+  function isSafeImageSource(value) {
+    const source = String(value || '').trim();
+    if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(source)) return true;
+    return source.startsWith('/api/mailbox/message-image?') && !/[\s"'<>]/.test(source);
+  }
+
   function normalizeOwner(value) {
     const owner = String(value || '').trim().toLowerCase();
     if (owner === 'serve' || owner === 'servé') return 'serve';
@@ -275,10 +281,15 @@
     if (!cache || !cacheKey || !data || !Array.isArray(data.messages)) return false;
     const messages = data.messages.slice(0, 100).map((message) => {
       const source = message && typeof message === 'object' ? message : {};
+      const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
+      const bodyImages = sourceBodyImages.filter((image) => {
+        const dataUrl = String(image && image.dataUrl || '').trim();
+        return dataUrl.startsWith('/api/mailbox/message-image?') && isSafeImageSource(dataUrl);
+      });
       return {
         ...source,
-        bodyImagesTruncated: Boolean(source.bodyImagesTruncated || (Array.isArray(source.bodyImages) && source.bodyImages.length)),
-        bodyImages: [],
+        bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
+        bodyImages,
         inlineImages: [],
       };
     });
@@ -359,6 +370,7 @@
     getRequestId,
     initializeOwnerPreference,
     isOwner,
+    isSafeImageSource,
     isCampaignMail,
     isCampaignAccount,
     load,

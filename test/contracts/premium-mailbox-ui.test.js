@@ -11,8 +11,10 @@ const displayScriptPath = path.join(__dirname, '../../assets/premium-mailbox-dis
 const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-outreach.js');
 const campaignInboxScriptPath = path.join(__dirname, '../../assets/premium-mailbox-campaign-inbox.js');
 const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-refresh.js');
+const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
 const campaignInboxModule = require('../../assets/premium-mailbox-campaign-inbox.js');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
+const composeModule = require('../../assets/premium-mailbox-compose.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -40,6 +42,10 @@ function readCampaignInboxScript() {
 
 function readRefreshScript() {
   return fs.readFileSync(refreshScriptPath, 'utf8');
+}
+
+function readComposeScript() {
+  return fs.readFileSync(composeScriptPath, 'utf8');
 }
 
 test('mailbox gebruikt de juiste browsertitel', () => {
@@ -80,6 +86,7 @@ function loadMailboxHelpersForTest(options = {}) {
       ...campaignInboxModule,
       load: async () => null,
     },
+    SoftoraMailboxCompose: composeModule,
     SoftoraUiStateClient: null,
     SoftoraCampaignSenderSettings: null,
     SoftoraDialogs: options.SoftoraDialogs || null,
@@ -117,8 +124,8 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722h/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260722c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260722b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -191,7 +198,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722h"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -555,6 +562,33 @@ test('premium mailbox kan vanuit de mailcontext een voorgestelde reactie schrijv
   assert.match(scriptSource, /if \(!draft && !isSuggestedReply\)/);
   assert.match(scriptSource, /Reactie voorgesteld/);
   assert.match(scriptSource, /bodyField\.value = rewritten;/);
+  assert.match(scriptSource, /SoftoraMailboxCompose\.reset\(Boolean\(composeReplyContext\)\)/);
+  assert.match(scriptSource, /SoftoraMailboxCompose\.complete\(rewriteBtn\)/);
+  assert.match(scriptSource, /SoftoraMailboxCompose\.finish\(/);
+  assert.match(scriptSource, /SoftoraMailboxCompose\.isUsed\(\)/);
+  assert.match(readComposeScript(), /let rewriteUsed = false;/);
+  assert.match(readComposeScript(), /rewriteUsed = true;[\s\S]*button\.hidden = true;/);
+});
+
+test('voorgestelde reactie is per composevenster maar één keer beschikbaar', () => {
+  const button = { hidden: true, disabled: true, textContent: '' };
+  const documentRef = { querySelector: () => button };
+
+  composeModule.reset(true, documentRef);
+  assert.equal(button.hidden, false);
+  assert.equal(button.textContent, 'Voorgestelde reactie');
+  assert.equal(composeModule.isUsed(), false);
+
+  composeModule.complete(button);
+  composeModule.finish(button, 'Voorgestelde reactie');
+  assert.equal(button.hidden, true);
+  assert.equal(button.disabled, true);
+  assert.equal(composeModule.isUsed(), true);
+
+  composeModule.reset(true, documentRef);
+  assert.equal(button.hidden, false);
+  assert.equal(button.disabled, false);
+  assert.equal(composeModule.isUsed(), false);
 });
 
 test('premium mailbox bewaart gelezen status via de mailbox API', () => {
@@ -747,6 +781,13 @@ test('premium mailbox behoudt mail-enters en vervangt image placeholders inline'
   assert.doesNotMatch(html, />https:\/\/www\.softora\.nl\/afmelden/);
   assert.ok(html.indexOf('0629917185') < html.indexOf('<figure class="detail-mail-image">'));
   assert.ok(html.indexOf('detail-mail-optout-link') > html.lastIndexOf('<figure class="detail-mail-image">'));
+
+  const proxiedImageHtml = renderMailboxBodyForTest('[image: Ontwerp]', [{
+    alt: 'Ontwerp',
+    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A42&index=0',
+  }]);
+  assert.match(proxiedImageHtml, /src="\/api\/mailbox\/message-image\?account=serve%40softora\.nl&amp;folder=inbox&amp;id=inbox%3A42&amp;index=0"/);
+  assert.match(proxiedImageHtml, /loading="eager" decoding="async" fetchpriority="high"/);
 
   const labelOnlyHtml = renderMailboxBodyForTest(
     'Geen webdesign willen ontvangen? Laat het me weten!',
