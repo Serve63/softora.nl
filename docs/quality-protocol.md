@@ -35,6 +35,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Na merge/deploy controleert de agent dat `www.softora.nl` exact op de nieuwste `origin/main` draait; bij afwijking eerst branch, bron en Vercel-deployment vergelijken.
 
 ## Verboden vervuiling
+- Geen exports, backups, bedrijfssnapshots of andere operationele datasets in Git of ingebed in HTML; `npm run check:public-data` blokkeert dit.
 - Geen nieuwe businesshelpers in `server.js` of in runtime-compositiebestanden.
 - Geen stille response-shape wijzigingen op bestaande routes.
 - Geen nieuwe ad-hoc mappen onder `server/`.
@@ -59,6 +60,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Productiegedrag krijgt of behoudt contract- of smoke-testdekking.
 - `npm run check:guardrails` blijft groen.
 - `npm run check:repo-hygiene` blijft groen; lokale rommel kan worden opgeschoond met `npm run clean:local`.
+- `npm run check:public-data` blijft groen; publieke broncode bevat geen exports of operationele datasets.
 - `npm run check:quality-lock` blijft groen; CI-bypasses, testverzwakking en premium sidebar asset-drift worden geblokkeerd.
 - `npm run verify:critical` is groen voor afronding.
 - De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.

@@ -13,6 +13,7 @@
     "test:smoke": "node --test test/smoke/*.test.js",
     "test:e2e:website-video": "node --test test/e2e/company-website-video.e2e.test.js",
     "check:secrets": "node scripts/check-tracked-secrets.js",
+    "check:public-data": "node scripts/check-public-data-exposure.js",
     "check:guardrails": "node scripts/check-agent-guardrails.js",
     "check:repo-hygiene": "bash scripts/check-repo-hygiene.sh",
     "check:quality-lock": "node scripts/check-quality-lock.js",

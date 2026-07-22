@@ -4,9 +4,19 @@ node_modules/
 .vercel
 *.bak
 output/
+outputs/
+exports/
+research/
 backups/*.json
 reports/seo-agent/
 reports/*.md
+*.csv
+*.tsv
+*.ndjson
+*.xlsx
+*.xls
+*.sqlite
+*.db
 
 # Xcode local state
 DerivedData/

@@ -44,15 +44,11 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
 
   assert.match(pageSource, /<title>Softora Database \| Bedrijven Scraper<\/title>/);
   assert.match(pageSource, /<meta name="robots" content="noindex,nofollow">/);
-  assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">/);
+  assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
+  assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
   assert.match(pageSource, /id="companies-treated"/);
-  assert.match(pageSource, /"companies_found":1123744/);
-  assert.match(pageSource, /"with_website":239/);
-  assert.match(pageSource, /"unusable":877/);
-  assert.match(pageSource, /"all":1123744/);
-  assert.match(pageSource, /"usable":263/);
-  assert.match(pageSource, /"bedrijfsnaam":"Scouting St\. Joris Haaren"/);
+  assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.match(pageSource, /id="planning-search-input"/);
   assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
   assert.match(pageSource, /id="latest-treated-table-frame"/);
@@ -109,7 +105,7 @@ test('kvk database hides the page scrollbar without disabling scrolling', () => 
   assert.doesNotMatch(styleSource, /body\{[^}]*overflow:hidden/);
 });
 
-test('kvk database page loads a live snapshot before using embedded fallback data', () => {
+test('kvk database page loads its protected live snapshot with an empty embedded bootstrap', () => {
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
 
   assert.match(scriptSource, /activeSnapshot=embeddedSnapshot/);

@@ -191,6 +191,7 @@ function getQualityBaselineViolations() {
 
   const requiredScripts = {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
+    'check:public-data': 'node scripts/check-public-data-exposure.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
     'clean:local': 'bash scripts/clean-local-artifacts.sh',
@@ -207,10 +208,18 @@ function getQualityBaselineViolations() {
     }
   });
 
+  if (packageJson?.engines?.node !== '22.x') {
+    violations.push('package.json engines.node moet 22.x blijven');
+  }
+  if (readRepoFile('.nvmrc').trim() !== '22') {
+    violations.push('.nvmrc moet Node 22 vastzetten');
+  }
+
   const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
   [
     'check:guardrails',
     'check:repo-hygiene',
+    'check:public-data',
     'check:quality-lock',
     'test:contracts',
     'test:smoke',
@@ -225,11 +234,15 @@ function getQualityBaselineViolations() {
   const workflowExpectations = [
     {
       filePath: '.github/workflows/agent-guardrails.yml',
-      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /npm run check:guardrails/],
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /node-version:\s*22\b/, /npm run check:guardrails/],
     },
     {
       filePath: '.github/workflows/verify-critical.yml',
-      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /npm run verify:critical/],
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /node-version:\s*22\b/, /npm run verify:critical/],
+    },
+    {
+      filePath: '.github/workflows/live-production-version.yml',
+      required: [/push:/, /branches:[\s\S]*-\s+main/, /node-version:\s*22\b/, /npm run check:live-production-version:wait/],
     },
     {
       filePath: '.github/workflows/repo-hygiene.yml',
@@ -258,6 +271,7 @@ function getQualityBaselineViolations() {
         /npm run verify:critical/,
         /Commit en push elke succesvolle wijziging/,
         /npm run check:guardrails/,
+        /npm run check:public-data/,
         /npm run check:quality-lock/,
         /allerlaatste actuele `origin\/main`/,
         /Deploy nooit vanuit een oude lokale kopie/,
@@ -269,6 +283,7 @@ function getQualityBaselineViolations() {
       required: [
         /Definition Of Done/,
         /npm run verify:critical/,
+        /check:public-data/,
         /check:guardrails/,
         /check:quality-lock/,
         /direct gecommit en gepusht/,
