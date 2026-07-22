@@ -1034,6 +1034,71 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(client.isSnapshotAvailableCustomer(merged[2]), false);
 });
 
+test('mail-ready snapshot client preserves valid rows when a response has a count without category rows', async () => {
+  const warnings = [];
+  const client = loadDatabaseMailReadySnapshotClient({ console: { warn: (...args) => warnings.push(args) } });
+  const readyCustomer = { id: 'ready-current', mailReady: true, mailReadySnapshot: true };
+  const state = {
+    klanten: [readyCustomer],
+    mailReadySnapshotLoaded: true,
+    mailReadySnapshotStale: false,
+    mailReadySnapshotFailed: false,
+    mailReadySnapshotPending: false,
+    mailReadySnapshotTotal: 1,
+    mailReadySnapshotCustomers: [readyCustomer],
+    availableSnapshotLoaded: true,
+    availableSnapshotTotal: 1,
+    availableSnapshotCustomers: [{ id: 'available-current', availableSnapshot: true }],
+    activeStatus: 'benaderbaar',
+  };
+  const applied = [];
+
+  const loaded = await client.load({
+    state,
+    normalizeCustomer: (raw) => ({ ...raw }),
+    applyCustomerList: (customers) => applied.push(customers),
+    fetchJsonWithTimeout: async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        generatedAt: '2026-07-23T00:50:00.000Z',
+        total: 408,
+        customers: [],
+        availableTotal: 1,
+        availableCustomers: [{ id: 'magnivita', availableSnapshot: true }],
+      }),
+    }),
+  });
+
+  assert.equal(loaded, false);
+  assert.equal(state.mailReadySnapshotTotal, 1);
+  assert.deepEqual(state.mailReadySnapshotCustomers.map((customer) => customer.id), ['ready-current']);
+  assert.deepEqual(applied, []);
+  assert.equal(warnings.length, 1);
+  assert.match(String(warnings[0][1]), /onvolledig/);
+  state.mailReadySnapshotTotal = 408;
+  state.mailReadySnapshotCustomers = [];
+  assert.equal(client.getDisplayCount(state, 0), 0);
+});
+
+test('premium database fast bootstrap requires rows for every non-zero category count', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+
+  assert.equal(client.isBootstrapSnapshotPayloadCoherent({
+    mailReadySnapshotTotal: 408,
+    availableSnapshotTotal: 1,
+    customers: [{ id: 'magnivita', availableSnapshot: true }],
+  }), false);
+  assert.equal(client.isBootstrapSnapshotPayloadCoherent({
+    mailReadySnapshotTotal: 1,
+    availableSnapshotTotal: 1,
+    customers: [
+      { id: 'ready', mailReady: true, mailReadySnapshot: true },
+      { id: 'magnivita', availableSnapshot: true },
+    ],
+  }), true);
+});
+
 test('mail-ready snapshot client moves a removed webdesign from mail-ready to available immediately', () => {
   const client = loadDatabaseMailReadySnapshotClient();
   const readyCustomer = {
@@ -1195,7 +1260,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260722a/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260723a/);
   assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);

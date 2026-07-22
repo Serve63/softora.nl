@@ -1,7 +1,11 @@
 const {
   MAIL_READY_BOOTSTRAP_CACHE_KEY,
   MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  MAIL_READY_BOOTSTRAP_ROW_LIMIT,
+  MAIL_READY_SNAPSHOT_CACHE_KEY,
+  MAIL_READY_SNAPSHOT_CACHE_SCOPE,
   SNAPSHOT_CACHE_TTL_MS,
+  isMailReadySnapshotCoherent,
   parseMailReadySnapshotCacheValue,
 } = require('./premium-database-mail-ready-snapshot');
 
@@ -919,8 +923,31 @@ function createCustomersPageBootstrapService(deps = {}) {
     )));
     const databaseBootstrapState = buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState);
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
-    const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
-    if (!snapshot) return { ...unavailable, ...databaseBootstrapState };
+    let snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
+    let usedFullSnapshotFallback = false;
+    if (!snapshot || !isMailReadySnapshotCoherent(snapshot)) {
+      const fallbackState = await resolveBootstrapReadWithTimeout(
+        readBootstrapUiState(MAIL_READY_SNAPSHOT_CACHE_SCOPE, {
+          ...readOptions,
+          readFailureCooldownScope: MAIL_READY_SNAPSHOT_CACHE_SCOPE,
+        }),
+        timeoutMs,
+        buildUnavailableBootstrapState(new Error(`${MAIL_READY_SNAPSHOT_CACHE_SCOPE} bootstrapcache timeout`))
+      );
+      const fallbackValues = fallbackState && fallbackState.values && typeof fallbackState.values === 'object'
+        ? fallbackState.values
+        : {};
+      const fullSnapshot = parseMailReadySnapshotCacheValue(fallbackValues[MAIL_READY_SNAPSHOT_CACHE_KEY]);
+      if (!fullSnapshot || !isMailReadySnapshotCoherent(fullSnapshot)) {
+        return { ...unavailable, ...databaseBootstrapState };
+      }
+      snapshot = {
+        ...fullSnapshot,
+        customers: fullSnapshot.customers.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT),
+        availableCustomers: fullSnapshot.availableCustomers.slice(0, MAIL_READY_BOOTSTRAP_ROW_LIMIT),
+      };
+      usedFullSnapshotFallback = true;
+    }
     const snapshotGeneratedAtMs = Date.parse(normalizeString(snapshot.generatedAt));
     const snapshotAgeMs = now().getTime() - snapshotGeneratedAtMs;
     if (!Number.isFinite(snapshotGeneratedAtMs)) {
@@ -930,6 +957,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       ok: true,
       loadedAt: new Date().toISOString(),
       source: 'mail-ready-snapshot-cache',
+      snapshotFallback: usedFullSnapshotFallback,
       stale: snapshotAgeMs > SNAPSHOT_CACHE_TTL_MS,
       generatedAt: snapshot.generatedAt || null,
       customers: snapshot.customers.concat(snapshot.availableCustomers),

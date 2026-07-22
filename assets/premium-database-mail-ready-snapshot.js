@@ -17,6 +17,25 @@
         return Boolean(customer && customer.availableSnapshot === true && customer.mailReady !== true);
     }
 
+    function isSnapshotCategoryCoherent(totalRaw, rowsRaw) {
+        const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
+        const total = Math.max(0, Number(totalRaw) || 0);
+        return total === 0 || rows.length > 0;
+    }
+
+    function isSnapshotPayloadCoherent(payload) {
+        if (!payload || typeof payload !== "object") return false;
+        return isSnapshotCategoryCoherent(payload.total, payload.customers) &&
+            isSnapshotCategoryCoherent(payload.availableTotal, payload.availableCustomers);
+    }
+
+    function isBootstrapSnapshotPayloadCoherent(payload) {
+        if (!payload || typeof payload !== "object") return false;
+        const rows = Array.isArray(payload.customers) ? payload.customers : [];
+        return isSnapshotCategoryCoherent(payload.mailReadySnapshotTotal, rows.filter(isSnapshotMailReadyCustomer)) &&
+            isSnapshotCategoryCoherent(payload.availableSnapshotTotal, rows.filter(isSnapshotAvailableCustomer));
+    }
+
     function normalizeSnapshotCustomer(raw, index, normalizeCustomer) {
         const normalized = typeof normalizeCustomer === "function" ? normalizeCustomer(raw, "mail-ready-snapshot-" + index) : Object.assign({}, raw || {});
         return Object.assign({}, normalized, {
@@ -170,8 +189,8 @@
         const count = Math.max(0, Number(currentCount) || 0);
         if (state && String(state.query || "").trim()) return count;
         if (!state) return count;
-        if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded && Number.isFinite(Number(state.mailReadySnapshotTotal))) return Math.max(0, Number(state.mailReadySnapshotTotal));
-        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && Number.isFinite(Number(state.availableSnapshotTotal))) return Math.max(0, Number(state.availableSnapshotTotal));
+        if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded && Number.isFinite(Number(state.mailReadySnapshotTotal)) && isSnapshotCategoryCoherent(state.mailReadySnapshotTotal, state.mailReadySnapshotCustomers)) return Math.max(0, Number(state.mailReadySnapshotTotal));
+        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && Number.isFinite(Number(state.availableSnapshotTotal)) && isSnapshotCategoryCoherent(state.availableSnapshotTotal, state.availableSnapshotCustomers)) return Math.max(0, Number(state.availableSnapshotTotal));
         return count;
     }
 
@@ -207,6 +226,7 @@
         if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
         const payload = await response.json().catch(function () { return {}; });
         if (!payload || payload.ok !== true) throw new Error(String(payload && (payload.detail || payload.error) || "Mailklare snapshot gaf geen geldige data terug."));
+        if (offset === 0 && !isSnapshotPayloadCoherent(payload)) throw new Error("Mailklare snapshot was onvolledig; laatste geldige tabel blijft actief.");
         const rows = Array.isArray(payload.customers) ? payload.customers : [];
         const total = Math.max(rows.length + offset, Number(payload.total) || 0);
         return { payload: payload, rows: rows, total: total, generatedAt: String(payload.generatedAt || "").trim() };
@@ -220,6 +240,7 @@
 
     function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, generatedAt, pending) {
         const state = config.state;
+        if (!isSnapshotCategoryCoherent(total, snapshotCustomers) || !isSnapshotCategoryCoherent(availableTotal, availableCustomers)) return false;
         const incomingGeneratedAtMs = Date.parse(String(generatedAt || "").trim()) || 0;
         const currentGeneratedAtMs = Math.max(0, Number(state.mailReadySnapshotGeneratedAtMs) || 0);
         if (incomingGeneratedAtMs && currentGeneratedAtMs && incomingGeneratedAtMs < currentGeneratedAtMs) return false;
@@ -307,5 +328,5 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
 })(window);

@@ -324,6 +324,20 @@ function parseMailReadySnapshotCacheValue(raw) {
   }
 }
 
+function isMailReadySnapshotCategoryCoherent(totalRaw, rowsRaw) {
+  const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
+  const total = Math.max(0, Number(totalRaw) || 0);
+  return total === 0 || rows.length > 0;
+}
+
+function isMailReadySnapshotCoherent(snapshot = {}) {
+  return Boolean(
+    snapshot &&
+    isMailReadySnapshotCategoryCoherent(snapshot.total, snapshot.customers) &&
+    isMailReadySnapshotCategoryCoherent(snapshot.availableTotal, snapshot.availableCustomers)
+  );
+}
+
 function serializeMailReadySnapshotCache(data = {}, rowLimit = MAX_LIMIT) {
   const customers = (Array.isArray(data.customers) ? data.customers : [])
     .slice(0, Math.max(1, Math.min(MAX_LIMIT, Number(rowLimit) || MAX_LIMIT)));
@@ -756,9 +770,30 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   function startSnapshotRefresh() {
     if (!snapshotDataPromise) {
+      const refreshWasInvalidated = snapshotInvalidated;
       snapshotDataPromise = loadMailReadySnapshotData()
         .then(async (data) => {
           const latestDurableData = await readDurableSnapshotData();
+          const freshRowsAreUnexpectedlyEmpty =
+            !refreshWasInvalidated &&
+            latestDurableData &&
+            Array.isArray(data && data.customers) &&
+            data.customers.length === 0 &&
+            Array.isArray(data.availableCustomers) &&
+            data.availableCustomers.length === 0 &&
+            ((Array.isArray(latestDurableData.customers) && latestDurableData.customers.length > 0) ||
+              (Array.isArray(latestDurableData.availableCustomers) && latestDurableData.availableCustomers.length > 0));
+          if (freshRowsAreUnexpectedlyEmpty) {
+            if (logger && typeof logger.warn === 'function') {
+              logger.warn('[PremiumDatabaseMailReadySnapshot][empty-regression]', 'Lege refresh genegeerd; laatste geldige snapshot blijft actief.');
+            }
+            snapshotDataCache = {
+              cachedAtMs: getSnapshotGeneratedAtMs(latestDurableData) || nowMs(),
+              data: latestDurableData,
+            };
+            snapshotInvalidated = false;
+            return latestDurableData;
+          }
           if (getSnapshotGeneratedAtMs(latestDurableData) > getSnapshotGeneratedAtMs(data)) {
             snapshotDataCache = {
               cachedAtMs: getSnapshotGeneratedAtMs(latestDurableData) || nowMs(),
@@ -1002,6 +1037,7 @@ module.exports = {
   createPremiumDatabaseMailReadySnapshotService,
   isBasicMailReadyCandidate,
   isBasicMailLeadEligible,
+  isMailReadySnapshotCoherent,
   legacyGuardEntriesToKeySet,
   parseMailReadySnapshotCacheValue,
 };

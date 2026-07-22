@@ -1,4 +1,7 @@
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
+const {
+  normalizeWebsitePreviewReferenceImage: normalizeWebsitePreviewReferenceImageDefault,
+} = require('./ai-reference-image');
 
 function createAiRemoteService(deps = {}) {
   const {
@@ -35,6 +38,8 @@ function createAiRemoteService(deps = {}) {
     }),
     waitForWebsitePreviewScreenshotRetry = () =>
       new Promise((resolve) => setTimeout(resolve, 1600)),
+    normalizeWebsitePreviewReferenceImage = normalizeWebsitePreviewReferenceImageDefault,
+    logger = console,
     fetchImpl = fetch,
     extractOpenAiTextContent = () => '',
     extractAnthropicTextContent = () => '',
@@ -956,6 +961,7 @@ function createAiRemoteService(deps = {}) {
     const isHomepageScreenshot = referenceMode === 'homepage-screenshot';
     const maxImages = isHomepageScreenshot ? 1 : 3;
     const maxFetchAttempts = isHomepageScreenshot ? 3 : 1;
+    const rejectionDiagnostics = [];
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (rawImages.length >= maxImages) break;
@@ -964,6 +970,7 @@ function createAiRemoteService(deps = {}) {
 
       for (let attempt = 0; attempt < maxFetchAttempts; attempt += 1) {
         let accepted = false;
+        let rejectionReason = 'unknown';
         try {
           const safeUrl = await assertWebsitePreviewUrlIsPublic(candidateUrl);
           const { response, bytes } = await fetchBinaryWithTimeout(
@@ -973,32 +980,54 @@ function createAiRemoteService(deps = {}) {
               redirect: 'follow',
               headers: buildWebsitePreviewImageHeaders(pageUrl),
             },
-            15000
+            isHomepageScreenshot && /image\.thum\.io/i.test(safeUrl) ? 25000 : 15000
           );
           if (response?.ok) {
             const finalUrl = await assertWebsitePreviewFetchedUrlIsPublic(response, safeUrl);
             const contentType =
               normalizeString(extractResponseHeader(response, 'content-type') || '').split(';')[0] ||
               guessImageMimeTypeFromUrl(finalUrl);
-            if (
-              isSupportedWebsitePreviewReferenceMimeType(contentType) &&
-              Buffer.isBuffer(bytes) &&
-              bytes.length >= 1024 &&
-              bytes.length <= 2 * 1024 * 1024 &&
-              totalBytes + bytes.length <= 4 * 1024 * 1024
-            ) {
-              rawImages.push({
-                name: inferWebsitePreviewReferenceFileName(finalUrl, index, contentType),
-                dataUrl: `data:${contentType};base64,${bytes.toString('base64')}`,
+            if (!isSupportedWebsitePreviewReferenceMimeType(contentType)) {
+              rejectionReason = `mime:${contentType || 'missing'}`;
+            } else if (!Buffer.isBuffer(bytes) || bytes.length < 1024) {
+              rejectionReason = `bytes:${Buffer.isBuffer(bytes) ? bytes.length : 0}`;
+            } else {
+              const normalizedImage = await normalizeWebsitePreviewReferenceImage({
+                bytes,
+                contentType,
+                maxBytes: 2 * 1024 * 1024,
+                maxInputBytes: 12 * 1024 * 1024,
               });
-              totalBytes += bytes.length;
-              accepted = true;
+              if (!normalizedImage) {
+                rejectionReason = `normalize:${bytes.length}`;
+              } else if (totalBytes + normalizedImage.bytes.length > 4 * 1024 * 1024) {
+                rejectionReason = `total-bytes:${totalBytes + normalizedImage.bytes.length}`;
+              } else {
+                rawImages.push({
+                  name: inferWebsitePreviewReferenceFileName(finalUrl, index, normalizedImage.contentType),
+                  dataUrl: `data:${normalizedImage.contentType};base64,${normalizedImage.bytes.toString('base64')}`,
+                });
+                totalBytes += normalizedImage.bytes.length;
+                accepted = true;
+              }
             }
+          } else {
+            rejectionReason = `http:${Number(response?.status || 0) || 0}`;
           }
-        } catch (_) {
+        } catch (error) {
+          rejectionReason = `error:${normalizeString(error?.name || 'Error').slice(0, 40)}`;
           /* Retry screenshot warming below; optional references may still fall back to prompt-only. */
         }
         if (accepted) break;
+        if (attempt === maxFetchAttempts - 1) {
+          let provider = 'unknown';
+          try {
+            provider = new URL(candidateUrl).hostname;
+          } catch (_error) {
+            provider = 'invalid-url';
+          }
+          rejectionDiagnostics.push({ provider, reason: rejectionReason });
+        }
         if (attempt < maxFetchAttempts - 1) {
           await waitForWebsitePreviewScreenshotRetry();
         }
@@ -1011,6 +1040,9 @@ function createAiRemoteService(deps = {}) {
       maxTotalBytes: 4 * 1024 * 1024,
     });
     if (requireReferenceImages && referenceImages.length === 0) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[AiRemote][website-reference-unavailable]', rejectionDiagnostics);
+      }
       const error = new Error(
         'De homepage-screenshot voor V2 was nog niet beschikbaar. De opdracht probeert het automatisch opnieuw.'
       );
