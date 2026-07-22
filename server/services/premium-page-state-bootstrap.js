@@ -1,3 +1,9 @@
+const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  parseMailboxCampaignSnapshot,
+} = require('./mailbox-campaign-snapshot');
+
 const PAGE_STATE_SCOPES = Object.freeze({
   'live-momentum.html': Object.freeze(['premium_live_momentum']),
   'premium-actieve-opdrachten.html': Object.freeze(['premium_assignment_filters']),
@@ -130,6 +136,28 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     }
   }
 
+  async function readPersistedMailboxSnapshot() {
+    try {
+      const result = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
+        uiStateReadTimeoutMs: Math.max(100, Math.min(1000, Number(readTimeoutMs) || 1000)),
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressReadFailureLog: true,
+        preferSupabaseRestRead: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      });
+      const snapshot = parseMailboxCampaignSnapshot(
+        result && result.values && result.values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]
+      );
+      if (!snapshot) return null;
+      mailboxCache = { snapshot, cachedAt: Date.now() };
+      return snapshot;
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function refreshMailboxSnapshot() {
     if (!mailboxRefreshPromise) {
       mailboxRefreshPromise = fetchMailboxSnapshot().finally(() => {
@@ -148,6 +176,11 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     if (mailboxCache && cacheAgeMs <= Math.max(0, Number(staleCacheMs) || 0)) {
       void refreshMailboxSnapshot();
       return mailboxCache.snapshot;
+    }
+    const persistedSnapshot = await readPersistedMailboxSnapshot();
+    if (persistedSnapshot) {
+      void refreshMailboxSnapshot();
+      return persistedSnapshot;
     }
     return refreshMailboxSnapshot();
   }
