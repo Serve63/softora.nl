@@ -10,8 +10,8 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
-const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = 10;
-const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 1;
+const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
+const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
@@ -111,9 +111,10 @@ function fitSnapshotToBudget(snapshot) {
   let serialized = serialize(snapshot);
   if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
 
+  // Proxy image URLs are tiny and let the browser render images immediately.
+  // Drop the much larger bodies from the oldest messages first, so the newest
+  // complete messages and image references survive within the fixed budget.
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
-    if (snapshot.messages[index].bodyImages.length) snapshot.messages[index].bodyImagesTruncated = true;
-    snapshot.messages[index].bodyImages = [];
     if (index > 0 && snapshot.messages[index].body) {
       snapshot.messages[index].body = '';
       snapshot.messages[index].bodyTruncated = true;
@@ -122,9 +123,16 @@ function fitSnapshotToBudget(snapshot) {
     if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
   }
 
+  // Only sacrifice image references if metadata plus all proxy URLs still do
+  // not fit. In normal mailbox snapshots this fallback should not be needed.
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    if (snapshot.messages[index].bodyImages.length) snapshot.messages[index].bodyImagesTruncated = true;
+    snapshot.messages[index].bodyImages = [];
+    serialized = serialize(snapshot);
+    if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
+  }
+
   if (snapshot.messages[0]) {
-    if (snapshot.messages[0].bodyImages.length) snapshot.messages[0].bodyImagesTruncated = true;
-    snapshot.messages[0].bodyImages = [];
     snapshot.messages[0].body = text(snapshot.messages[0].body, 20_000);
     snapshot.messages[0].bodyTruncated = true;
   }

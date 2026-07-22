@@ -444,7 +444,7 @@ function renderMailboxInlineImage(image) {
   const dataUrl = String(image && image.dataUrl || '').trim();
   if (!window.SoftoraMailboxCampaignInbox.isSafeImageSource(dataUrl)) return '';
   const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
-  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="eager" decoding="async" fetchpriority="high"></figure>`;
+  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="eager" decoding="async" fetchpriority="high" data-mailbox-inline-image></figure>`;
 }
 function renderMailboxBodySection(section, imageState) {
   if (!section || !Array.isArray(section.lines)) {
@@ -1105,7 +1105,7 @@ function bindMailboxActions() {
     });
   }
 }
-bindMailboxActions();
+bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody });
 window.SoftoraMailboxRefresh?.create({ getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, loadMessages: loadMailboxMessages, toast });
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');

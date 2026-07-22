@@ -124,9 +124,9 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723b/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723c/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260722b/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -198,7 +198,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723c"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -833,6 +833,7 @@ test('premium mailbox behoudt mail-enters en vervangt image placeholders inline'
   }]);
   assert.match(proxiedImageHtml, /src="\/api\/mailbox\/message-image\?account=serve%40softora\.nl&amp;folder=inbox&amp;id=inbox%3A42&amp;index=0"/);
   assert.match(proxiedImageHtml, /loading="eager" decoding="async" fetchpriority="high"/);
+  assert.match(proxiedImageHtml, /data-mailbox-inline-image/);
 
   const labelOnlyHtml = renderMailboxBodyForTest(
     'Geen webdesign willen ontvangen? Laat het me weten!',
@@ -910,6 +911,8 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.doesNotMatch(scriptSource, />\s*Markeren\s*</);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
   assert.match(scriptSource, /function escapeHtml\(value\)/);
+  assert.match(readIndexScript(), /function bindImageRecovery\([\s\S]*document\.addEventListener\('error',[\s\S]*\[data-mailbox-inline-image\][\s\S]*mail\.imageRecoveryAttempted = true;[\s\S]*void loadMessageBody\(mail\.id\);[\s\S]*, true\);/);
+  assert.match(scriptSource, /SoftoraMailboxIndex\?\.bindImageRecovery\(\{ getActiveMail: \(\) => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody \}\)/);
   assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
   assert.match(scriptSource, /renderLinkedMailboxText\(value, options\)/);
   assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id \}\)\}<\/div>/);
