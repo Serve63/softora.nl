@@ -61,6 +61,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - `npm run check:guardrails` blijft groen.
 - `npm run check:repo-hygiene` blijft groen; lokale rommel kan worden opgeschoond met `npm run clean:local`.
 - `npm run check:public-data` blijft groen; publieke broncode bevat geen exports of operationele datasets.
+- `npm run check:deps` blijft groen; de kritieke poort accepteert geen bekende productie-afhankelijkheidskwetsbaarheden.
 - `npm run check:quality-lock` blijft groen; CI-bypasses, testverzwakking en premium sidebar asset-drift worden geblokkeerd.
 - `npm run verify:critical` is groen voor afronding.
 - De kwaliteitsbaseline blijft intact: guardrails, contracttests, smoke-tests en secrets-checks blijven onderdeel van `verify:critical`.
