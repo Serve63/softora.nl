@@ -1,8 +1,7 @@
 (function () {
 "use strict";
 const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
-const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings';
-const MAILBOX_SENDER_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
+const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings', MAILBOX_SENDER_SETTINGS_KEY = 'softora_coldmailing_settings_v1';
 const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';
 const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';
 let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT, pinnedMailboxAccount = '', mailboxAccountPreferenceIdentity = 'anonymous', mailboxPinPreferences = Object.create(null);
@@ -1089,6 +1088,7 @@ function bindMailboxActions() {
   }
 }
 bindMailboxActions();
+window.SoftoraMailboxRefresh?.create({ getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, loadMessages: loadMailboxMessages, toast });
 const mailboxAccountSwitcher = document.getElementById('mailbox-account-switcher');
 const mailboxAccountMenu = document.getElementById('mailbox-account-menu');
 if (mailboxAccountSwitcher) {
