@@ -1196,6 +1196,7 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
       },
     ]),
     getUiStateValues: async (scope) => {
+      if (scope === 'premium_customers_database') return { values: {} };
       assert.equal(scope, 'premium_database_photos');
       return {
         values: {
@@ -1316,6 +1317,206 @@ test('mailbox service restores webdesign photos when an indexed reply is opened'
   assert.match(message.body, /\[image: De Vyldre webdesign\]/);
   assert.match(message.body, /\[image: De Vyldre device mockup\]/);
   assert.equal(message.inlineImages.length, 2);
+});
+
+test('mailbox service prioritizes the matched recipient design over stale indexed image labels', async () => {
+  const requestedCustomerIds = [];
+  const customerId = 'nicole-vintage-fashion';
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      getMessage: async () => ({
+        id: 'inbox:45',
+        uid: 45,
+        folder: 'inbox',
+        from: 'Nicole Pennings',
+        email: 'info@nicolevintagefashion.com',
+        to: 'serve@softora.nl',
+        subject: 'Re: Kleine vraag over jullie website',
+        body: [
+          'Dank voor de moeite.',
+          '',
+          'Afgelopen week kwam ik jullie website nicolevintagefashion.com tegen.',
+          'Uit enthousiasme heb ik een fris webdesign gemaakt.',
+          '',
+          '[image: www.dejavu-kapsalon.nl-preview]',
+          '[image: www.dejavu-kapsalon.nl-preview-device-mockup-v8]',
+        ].join('\n'),
+        hasBody: true,
+        indexed: true,
+      }),
+    },
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              'deja-vu': {
+                id: 'deja-vu',
+                websitePhoto: TINY_PNG_DATA_URL,
+                websitePhotoName: 'www.dejavu-kapsalon.nl-preview.png',
+                websiteMockup: TINY_PNG_DATA_URL,
+                websiteMockupName: 'www.dejavu-kapsalon.nl-preview-device-mockup-v8.jpg',
+              },
+            }),
+          },
+        };
+      }
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: 'deja-vu',
+                bedrijf: 'Deja Vu Hairdressers',
+                dom: 'dejavu-kapsalon.nl',
+                email: 'info@dejavu-kapsalon.nl',
+              },
+              {
+                id: customerId,
+                bedrijf: 'Nicole Vintage Fashion',
+                dom: 'nicolevintagefashion.com',
+                email: 'info@nicolevintagefashion.com',
+                websitePhoto: 'https://expired.example/nicole.png',
+                websiteMockup: 'https://expired.example/nicole-mockup.png',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    dataOpsStore: {
+      listDesignPhotosWithSignedUrls: async (options) => {
+        requestedCustomerIds.push(...options.customerIds);
+        return [
+          {
+            customerId,
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+            websiteMockupUrl: TINY_PNG_DATA_URL,
+            fileName: 'nicolevintagefashion.com-preview.png',
+            websiteMockupName: 'nicolevintagefashion.com-preview-device-mockup.jpg',
+          },
+        ];
+      },
+    },
+    createImapClient: () => {
+      throw new Error('De volledige mailbox hoeft niet opnieuw via IMAP te worden opgehaald');
+    },
+  });
+
+  const message = await service.getMessage({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    id: 'inbox:45',
+  });
+
+  assert.deepEqual(requestedCustomerIds, [customerId]);
+  assert.deepEqual(
+    message.bodyImages.map((image) => image.alt),
+    ['nicolevintagefashion.com-preview', 'nicolevintagefashion.com-preview-device-mockup']
+  );
+  assert.equal(message.bodyImages.some((image) => /dejavu/i.test(image.alt)), false);
+});
+
+test('mailbox service never falls back to another company design for a matched recipient', async () => {
+  const customerId = 'nicole-vintage-fashion';
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      getMessage: async () => ({
+        id: 'inbox:46',
+        uid: 46,
+        folder: 'inbox',
+        from: 'Nicole Pennings',
+        email: 'info@nicolevintagefashion.com',
+        to: 'serve@softora.nl',
+        subject: 'Re: Kleine vraag over jullie website',
+        body: [
+          'Dank voor de moeite.',
+          '',
+          'Afgelopen week kwam ik jullie website nicolevintagefashion.com tegen.',
+          'Uit enthousiasme heb ik een fris webdesign gemaakt.',
+          '',
+          '[image: www.dejavu-kapsalon.nl-preview]',
+          '[image: www.dejavu-kapsalon.nl-preview-device-mockup-v8]',
+        ].join('\n'),
+        hasBody: true,
+        indexed: true,
+      }),
+    },
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              'deja-vu': {
+                id: 'deja-vu',
+                websitePhoto: TINY_PNG_DATA_URL,
+                websitePhotoName: 'www.dejavu-kapsalon.nl-preview.png',
+                websiteMockup: TINY_PNG_DATA_URL,
+                websiteMockupName: 'www.dejavu-kapsalon.nl-preview-device-mockup-v8.jpg',
+              },
+            }),
+          },
+        };
+      }
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: 'deja-vu',
+                bedrijf: 'Deja Vu Hairdressers',
+                dom: 'dejavu-kapsalon.nl',
+                email: 'info@dejavu-kapsalon.nl',
+              },
+              {
+                id: customerId,
+                bedrijf: 'Nicole Vintage Fashion',
+                dom: 'nicolevintagefashion.com',
+                email: 'info@nicolevintagefashion.com',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    dataOpsStore: {
+      listDesignPhotosWithSignedUrls: async () => [],
+    },
+    createImapClient: () => {
+      throw new Error('De volledige mailbox hoeft niet opnieuw via IMAP te worden opgehaald');
+    },
+  });
+
+  const message = await service.getMessage({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    id: 'inbox:46',
+  });
+
+  assert.equal((message.bodyImages || []).length, 0);
+  assert.equal((message.inlineImages || []).length, 0);
 });
 
 test('mailbox service keeps link-only webdesign sends free of recovered image placeholders', async () => {

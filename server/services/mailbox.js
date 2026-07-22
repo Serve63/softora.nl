@@ -1119,17 +1119,27 @@ function createMailboxService(deps = {}) {
   }
 
   function findCustomerRowsForMail(parsed, text, rows) {
-    const toEmails = new Set(getParsedAddressEmails(parsed && parsed.to));
-    const domains = new Set(extractMailDomains(parsed, text));
-    const matches = [];
-    (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+    const customerRows = Array.isArray(rows) ? rows : [];
+    const participantEmails = new Set([
+      ...getParsedAddressEmails(parsed && parsed.from),
+      ...getParsedAddressEmails(parsed && parsed.to),
+    ]);
+    const emailMatches = [];
+    customerRows.forEach((row, index) => {
       const email = getCustomerEmail(row);
-      const domain = getCustomerDomain(row);
-      if ((email && toEmails.has(email)) || (domain && domains.has(domain))) {
-        matches.push({ row, index });
-      }
+      if (email && participantEmails.has(email)) emailMatches.push({ row, index });
     });
-    return matches.slice(0, 2);
+    if (emailMatches.length) return emailMatches.slice(0, 2);
+
+    const domains = extractMailDomains(parsed, text);
+    for (const domain of domains) {
+      const domainMatches = [];
+      customerRows.forEach((row, index) => {
+        if (getCustomerDomain(row) === domain) domainMatches.push({ row, index });
+      });
+      if (domainMatches.length) return domainMatches.slice(0, 2);
+    }
+    return [];
   }
 
   function buildMailboxWebdesignOutboundIdentity({ to, parsed, text, matchedRow, matchedMeta, matchedId } = {}) {
@@ -1344,9 +1354,13 @@ function createMailboxService(deps = {}) {
     const identity = buildCustomerIdentityKey(row).toLowerCase();
     const stored = (id && photoMap[id]) || (identity && photoByIdentity.get(identity)) || null;
     const rowMeta = row && typeof row === 'object' ? row : {};
+    const storedPhotoSource = getPhotoSource(stored);
+    const storedMockupSource = getPhotoSource(stored, { mockup: true });
     return {
-      ...(stored && typeof stored === 'object' ? stored : {}),
       ...rowMeta,
+      ...(stored && typeof stored === 'object' ? stored : {}),
+      ...(storedPhotoSource ? { websitePhoto: storedPhotoSource } : {}),
+      ...(storedMockupSource ? { websiteMockup: storedMockupSource } : {}),
       id: normalizeString((stored && stored.id) || rowMeta.id || id),
       identityKey: normalizeString((stored && stored.identityKey) || buildCustomerIdentityKey(rowMeta)),
     };
@@ -1359,6 +1373,47 @@ function createMailboxService(deps = {}) {
       if (identity && !byIdentity.has(identity)) byIdentity.set(identity, meta);
     });
     return byIdentity;
+  }
+
+  async function loadTargetedPhotoMap(customerIds = []) {
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') return {};
+    const ids = Array.from(new Set(
+      (Array.isArray(customerIds) ? customerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    )).slice(0, 500);
+    if (!ids.length) return {};
+    try {
+      const entries = await dataOpsStore.listDesignPhotosWithSignedUrls({
+        customerIds: ids,
+        maxMatches: ids.length,
+        expiresInSeconds: 60 * 60,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: true,
+        suppressStaleReadCacheLog: true,
+      });
+      return (Array.isArray(entries) ? entries : []).reduce((map, entry) => {
+        const customerId = normalizeString(entry && (entry.customerId || entry.id));
+        if (!customerId) return map;
+        const websitePhotoUrl = normalizeString(entry && (entry.websitePhotoUrl || entry.signedUrl || entry.publicUrl));
+        const websiteMockupUrl = normalizeString(entry && (entry.websiteMockupUrl || entry.mockupUrl));
+        map[customerId] = {
+          id: customerId,
+          customerId,
+          identityKey: normalizeString(entry && entry.identityKey),
+          websitePhoto: websitePhotoUrl,
+          websitePhotoUrl,
+          websiteMockup: websiteMockupUrl,
+          websiteMockupUrl,
+          websitePhotoName: normalizeString(entry && (entry.fileName || entry.websitePhotoName)),
+          websiteMockupName: normalizeString(entry && (entry.websiteMockupName || entry.mockupFileName)),
+        };
+        return map;
+      }, {});
+    } catch (error) {
+      logger.warn('[Mailbox][targeted-body-images]', error && error.message ? error.message : error);
+      return {};
+    }
   }
 
   function getPhotoSource(meta, options = {}) {
@@ -1829,15 +1884,32 @@ function createMailboxService(deps = {}) {
     try {
       const [photoState, customerState] = await Promise.all([
         getUiStateValues(customerPhotoScope),
-        candidates.some((record) => !extractBodyImageLabels(record.text).length && looksLikeWebdesignOutreach(record.parsed, record.text))
+        candidates.some((record) => looksLikeWebdesignOutreach(record.parsed, record.text))
           ? getUiStateValues(customerDbScope)
           : Promise.resolve(null),
       ]);
       const photoValues = photoState && photoState.values && typeof photoState.values === 'object' ? photoState.values : {};
       const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
-      const photoMap = safeParseJsonObject(photoValues[customerPhotoKey]);
-      const photoByIdentity = buildPhotoByIdentity(photoMap);
+      const basePhotoMap = safeParseJsonObject(photoValues[customerPhotoKey]);
       const customerRows = parseCustomerRows(customerValues);
+      const matchesByRecordKey = new Map();
+      const targetedCustomerIds = new Set();
+      candidates.forEach((record) => {
+        const matches = looksLikeWebdesignOutreach(record.parsed, record.text)
+          ? findCustomerRowsForMail(record.parsed, record.text, customerRows)
+          : [];
+        matchesByRecordKey.set(record.key, matches);
+        matches.forEach(({ row, index }) => {
+          const id = getCustomerId(row, index);
+          if (id) targetedCustomerIds.add(id);
+        });
+      });
+      const targetedPhotoMap = await loadTargetedPhotoMap(Array.from(targetedCustomerIds));
+      const photoMap = {
+        ...basePhotoMap,
+        ...targetedPhotoMap,
+      };
+      const photoByIdentity = buildPhotoByIdentity(photoMap);
       const result = new Map();
 
       for (const record of candidates) {
@@ -1852,27 +1924,31 @@ function createMailboxService(deps = {}) {
           });
         };
 
-        const labels = extractBodyImageLabels(record.text);
-        for (const label of labels) {
-          for (const [id, meta] of Object.entries(photoMap)) {
-            const aliases = [id, meta && meta.id, meta && meta.websitePhotoName, meta && meta.fileName].filter(Boolean);
-            if (!aliases.some((alias) => photoLabelMatches(alias, label))) continue;
-            addImages(await imagesFromPhotoMeta(photoValues, meta, label));
-          }
-        }
-
-        if (!images.length && looksLikeWebdesignOutreach(record.parsed, record.text)) {
-          const matches = findCustomerRowsForMail(record.parsed, record.text, customerRows);
+        const matches = matchesByRecordKey.get(record.key) || [];
+        const hasRecipientMatch = matches.length > 0;
+        if (hasRecipientMatch) {
           for (const { row, index } of matches) {
             addImages(await imagesFromPhotoMeta(
               photoValues,
               getPhotoMetaForRow(row, index, photoMap, photoByIdentity),
               `${getCustomerDomain(row) || 'Webdesign'} webdesign`
             ));
+            if (images.length) break;
           }
         }
 
-        if (!images.length && looksLikeWebdesignOutreach(record.parsed, record.text)) {
+        if (!images.length && !hasRecipientMatch) {
+          const labels = extractBodyImageLabels(record.text);
+          for (const label of labels) {
+            for (const [id, meta] of Object.entries(photoMap)) {
+              const aliases = [id, meta && meta.id, meta && meta.websitePhotoName, meta && meta.fileName].filter(Boolean);
+              if (!aliases.some((alias) => photoLabelMatches(alias, label))) continue;
+              addImages(await imagesFromPhotoMeta(photoValues, meta, label));
+            }
+          }
+        }
+
+        if (!images.length && !hasRecipientMatch && looksLikeWebdesignOutreach(record.parsed, record.text)) {
           for (const [id, meta] of Object.entries(photoMap)) {
             if (!directPhotoMetaMatchesMail(id, meta, record.parsed, record.text)) continue;
             addImages(await imagesFromPhotoMeta(photoValues, meta, meta && meta.websitePhotoName));
