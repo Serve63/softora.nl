@@ -1,13 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-
-const source = fs.readFileSync(
-  path.join(__dirname, '../../assets/premium-page-bootstrap-session.js'),
-  'utf8'
-);
+const {
+  createPageBootstrapSession,
+} = require('../../assets/premium-page-bootstrap-session');
 
 test('pagina-bootstrap deelt de bevestigde serversessie zonder extra API-request', () => {
   const window = {
@@ -23,7 +18,7 @@ test('pagina-bootstrap deelt de bevestigde serversessie zonder extra API-request
     },
   };
 
-  vm.runInNewContext(source, { window });
+  window.SoftoraPageBootstrapSession = createPageBootstrapSession(window);
 
   assert.equal(window.SoftoraPageBootstrapSession.get().email, 'serve@softora.nl');
   assert.equal(Object.isFrozen(window.SoftoraPageBootstrapSession), true);
@@ -38,7 +33,7 @@ test('pagina-bootstrap faalt stil bij ongeldige JSON', () => {
     },
   };
 
-  vm.runInNewContext(source, { window });
+  window.SoftoraPageBootstrapSession = createPageBootstrapSession(window);
 
   assert.equal(window.SoftoraPageBootstrapSession.get(), null);
 });

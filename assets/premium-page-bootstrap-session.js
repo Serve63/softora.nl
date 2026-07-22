@@ -10,8 +10,8 @@
     'softoraColdcallingDashboardBootstrap',
   ];
 
-  function readSession() {
-    const doc = global && global.document;
+  function readSession(target) {
+    const doc = target && target.document;
     if (!doc || typeof doc.getElementById !== 'function') return null;
     for (const id of BOOTSTRAP_IDS) {
       const element = doc.getElementById(id);
@@ -26,8 +26,15 @@
     return null;
   }
 
-  const session = readSession();
-  global.SoftoraPageBootstrapSession = Object.freeze({
-    get: function () { return session; },
-  });
-}(window));
+  function createPageBootstrapSession(target) {
+    const session = readSession(target);
+    return Object.freeze({
+      get: function () { return session; },
+    });
+  }
+
+  global.SoftoraPageBootstrapSession = createPageBootstrapSession(global);
+  if (typeof module === 'object' && module.exports) {
+    module.exports = { createPageBootstrapSession };
+  }
+}(typeof window !== 'undefined' ? window : globalThis));
