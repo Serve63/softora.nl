@@ -216,7 +216,7 @@ test('ai tools coordinator gives V2 ordered homepage screenshot providers', asyn
   assert.equal(capturedScan.requireReferenceImages, true);
   assert.equal(capturedScan.referenceImageFidelity, 'high');
   assert.deepEqual(capturedScan.referenceImageUrls, [
-    'https://image.thum.io/get/width/1200/crop/1600/noanimate/https://www.bliv.nl/',
+    'https://image.thum.io/get/width/1200/crop/1600/allowJPG/noanimate/https://www.bliv.nl/',
     'https://s0.wordpress.com/mshots/v1/https%3A%2F%2Fwww.bliv.nl%2F?w=1280&h=1600',
   ]);
 });

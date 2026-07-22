@@ -345,6 +345,30 @@ test('premium database mail-ready snapshot refreshes an expired durable snapshot
   assert.equal(calls.includes('customers-snapshot'), true);
 });
 
+test('premium database mail-ready snapshot keeps the last durable rows when a background refresh regresses to empty', async () => {
+  const durableSnapshot = {
+    version: 2,
+    generatedAt: '2026-06-16T10:00:00.000Z',
+    total: 1,
+    customers: [{ id: 'ready-cached', mailReady: true, mailReadySnapshot: true }],
+    availableTotal: 1,
+    availableCustomers: [{ id: 'available-cached', availableSnapshot: true }],
+  };
+  const { service, calls } = createService({
+    durableSnapshot,
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+    customers: [],
+    photoFlags: [],
+  });
+
+  const payload = await service.buildMailReadySnapshot({ limit: 3000 });
+
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-cached']);
+  assert.deepEqual(payload.availableCustomers.map((customer) => customer.id), ['available-cached']);
+  assert.equal(calls.includes('customers-snapshot'), true);
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write'), false);
+});
+
 test('an older in-flight refresh cannot overwrite a newer durable snapshot generation', async () => {
   const durableSnapshots = [
     {

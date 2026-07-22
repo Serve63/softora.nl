@@ -75,6 +75,9 @@ function createService(overrides = {}) {
       }),
     waitForWebsitePreviewScreenshotRetry:
       overrides.waitForWebsitePreviewScreenshotRetry || (async () => {}),
+    normalizeWebsitePreviewReferenceImage:
+      overrides.normalizeWebsitePreviewReferenceImage || (async ({ bytes, contentType }) => ({ bytes, contentType })),
+    logger: overrides.logger || { warn() {} },
     extractOpenAiTextContent:
       overrides.extractOpenAiTextContent ||
       ((content) => {
@@ -150,10 +153,11 @@ function createService(overrides = {}) {
       overrides.parseImageDataUrl ||
       ((value) => {
         const raw = String(value || '');
-        if (!raw.startsWith('data:image/png;base64,')) return null;
+        const match = raw.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
+        if (!match) return null;
         return {
-          mimeType: 'image/png',
-          base64Payload: raw.slice('data:image/png;base64,'.length),
+          mimeType: match[1],
+          base64Payload: match[2],
         };
       }),
     estimateOpenAiUsageCost:
@@ -465,12 +469,56 @@ test('ai remote service falls back to the next V2 screenshot provider and still 
   assert.equal(result.referenceImageCount, 1);
 });
 
+test('ai remote service normalizes an oversized valid V2 screenshot before sending it', async () => {
+  const generationCalls = [];
+  const normalizedInputs = [];
+  const { service } = createService({
+    sanitizeReferenceImages: (images) => images,
+    fetchBinaryWithTimeout: async (url) => ({
+      response: {
+        ok: true,
+        status: 200,
+        url,
+        headers: { get: () => 'image/png' },
+      },
+      bytes: Buffer.alloc(3 * 1024 * 1024, 1),
+    }),
+    normalizeWebsitePreviewReferenceImage: async (input) => {
+      normalizedInputs.push(input);
+      return { bytes: Buffer.alloc(200 * 1024, 2), contentType: 'image/jpeg' };
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      generationCalls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: [{ b64_json: 'YWJjZA==' }] },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({
+    host: 'www.bliv.nl',
+    sourceUrl: 'https://www.bliv.nl/',
+    referenceImageMode: 'homepage-screenshot',
+    requireReferenceImages: true,
+    referenceImageUrls: ['https://image.thum.io/get/bliv'],
+  });
+
+  assert.equal(normalizedInputs.length, 1);
+  assert.equal(normalizedInputs[0].bytes.length, 3 * 1024 * 1024);
+  assert.equal(generationCalls.length, 1);
+  assert.equal(generationCalls[0].options.body.getAll('image[]')[0].type, 'image/jpeg');
+  assert.equal(result.referenceImageCount, 1);
+});
+
 test('ai remote service fails V2 closed when no homepage screenshot becomes available', async () => {
   let generationCalls = 0;
   let screenshotFetches = 0;
+  const warnings = [];
   const { service } = createService({
     waitForWebsitePreviewScreenshotRetry: async () => {},
     sanitizeReferenceImages: (images) => images,
+    logger: { warn: (...args) => warnings.push(args) },
     fetchBinaryWithTimeout: async () => {
       screenshotFetches += 1;
       return {
@@ -504,6 +552,9 @@ test('ai remote service fails V2 closed when no homepage screenshot becomes avai
   );
   assert.equal(screenshotFetches, 3);
   assert.equal(generationCalls, 0);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], '[AiRemote][website-reference-unavailable]');
+  assert.deepEqual(warnings[0][1], [{ provider: 's0.wordpress.com', reason: 'mime:image/gif' }]);
 });
 
 test('ai remote service retries the smaller image size when the primary image request aborts', async () => {

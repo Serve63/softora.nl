@@ -7,6 +7,8 @@ const {
 const {
   MAIL_READY_BOOTSTRAP_CACHE_KEY,
   MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+  MAIL_READY_SNAPSHOT_CACHE_KEY,
+  MAIL_READY_SNAPSHOT_CACHE_SCOPE,
 } = require('../../server/services/premium-database-mail-ready-snapshot');
 
 test('customers page bootstrap prefers stored customer database rows', async () => {
@@ -204,6 +206,91 @@ test('premium database bootstrap renders an expired valid snapshot while fresh d
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['stale-ready', 'stale-deleted']);
   assert.equal(payload.mailReadySnapshotTotal, 740);
   assert.equal(payload.availableSnapshotTotal, 1);
+});
+
+test('premium database bootstrap repairs a category-incomplete compact cache from the full durable snapshot', async () => {
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-07-23T00:50:20.000Z'),
+    getUiStateValues: async (scope) => {
+      if (scope === MAIL_READY_BOOTSTRAP_CACHE_SCOPE) {
+        return {
+          source: 'supabase',
+          values: {
+            [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify({
+              version: 2,
+              generatedAt: '2026-07-23T00:50:00.000Z',
+              total: 408,
+              customers: [],
+              availableTotal: 2,
+              availableCustomers: [{ id: 'magnivita', availableSnapshot: true }],
+            }),
+          },
+        };
+      }
+      if (scope === MAIL_READY_SNAPSHOT_CACHE_SCOPE) {
+        return {
+          source: 'supabase',
+          values: {
+            [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify({
+              version: 2,
+              generatedAt: '2026-07-23T00:50:01.000Z',
+              total: 408,
+              customers: [{ id: 'mail-ready-1', mailReady: true, mailReadySnapshot: true }],
+              availableTotal: 2,
+              availableCustomers: [
+                { id: 'magnivita', availableSnapshot: true },
+                { id: 'bliv', availableSnapshot: true },
+              ],
+            }),
+          },
+        };
+      }
+      return { source: 'supabase', values: {} };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.source, 'mail-ready-snapshot-cache');
+  assert.equal(payload.snapshotFallback, true);
+  assert.equal(payload.mailReadySnapshotTotal, 408);
+  assert.equal(payload.availableSnapshotTotal, 2);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'magnivita', 'bliv']);
+});
+
+test('premium database bootstrap never publishes category counts when both snapshot caches are incomplete', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      seenScopes.push(scope);
+      const key = scope === MAIL_READY_BOOTSTRAP_CACHE_SCOPE
+        ? MAIL_READY_BOOTSTRAP_CACHE_KEY
+        : MAIL_READY_SNAPSHOT_CACHE_KEY;
+      if (![MAIL_READY_BOOTSTRAP_CACHE_SCOPE, MAIL_READY_SNAPSHOT_CACHE_SCOPE].includes(scope)) {
+        return { source: 'supabase', values: {} };
+      }
+      return {
+        source: 'supabase',
+        values: {
+          [key]: JSON.stringify({
+            generatedAt: '2026-07-23T00:50:00.000Z',
+            total: 408,
+            customers: [],
+            availableTotal: 1,
+            availableCustomers: [{ id: 'magnivita', availableSnapshot: true }],
+          }),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.source, 'deferred');
+  assert.equal(payload.mailReadySnapshotTotal, null);
+  assert.equal(payload.availableSnapshotTotal, null);
+  assert.deepEqual(payload.customers, []);
+  assert.equal(seenScopes.includes(MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
 });
 
 test('premium database bootstrap still rejects a snapshot without a valid generation time', async () => {

@@ -67,7 +67,7 @@ function createAiToolsCoordinator(deps = {}) {
     const targetUrl = normalizeString(value || '');
     if (!targetUrl) return [];
     return [
-      `https://image.thum.io/get/width/1200/crop/1600/noanimate/${targetUrl}`,
+      `https://image.thum.io/get/width/1200/crop/1600/allowJPG/noanimate/${targetUrl}`,
       `https://s0.wordpress.com/mshots/v1/${encodeURIComponent(targetUrl)}?w=1280&h=1600`,
     ];
   }
