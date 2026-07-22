@@ -2372,3 +2372,111 @@ test('data ops store passes resilient read policy into Supabase client reads and
     },
   ]);
 });
+
+test('data ops store keeps the last valid webdesign job list during a transient Supabase failure', async () => {
+  let currentTimeMs = Date.parse('2026-07-23T00:00:00.000Z');
+  let shouldFail = false;
+  const clientOptions = [];
+  const row = {
+    job_id: 'job-stable-123',
+    owner_key: 'owner@softora.nl::owner',
+    customer_id: 'customer-stable',
+    website_url: 'https://stable.test',
+    status: 'queued',
+    error: null,
+    payload: { customer: { id: 'customer-stable', bedrijf: 'Stable B.V.' }, variant: 'v2-visual-dna' },
+    created_at: '2026-07-22T23:59:00.000Z',
+    started_at: null,
+    finished_at: null,
+  };
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_webdesign_jobs');
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        in() { return query; },
+        order() { return query; },
+        limit() {
+          return Promise.resolve(shouldFail
+            ? { data: null, error: new Error('Supabase fetch failed') }
+            : { data: [row], error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient(options) {
+      clientOptions.push(options || {});
+      return client;
+    },
+    dataOpsReadQueryTimeoutMs: 25,
+    dataOpsReadCacheTtlMs: 10,
+    now: () => new Date(currentTimeMs),
+    logger: { error() {}, warn() {} },
+  });
+
+  const first = await store.listVisibleWebdesignJobs('owner@softora.nl::owner');
+  shouldFail = true;
+  currentTimeMs += 1000;
+  const stale = await store.listVisibleWebdesignJobs('owner@softora.nl::owner');
+
+  assert.equal(first.length, 1);
+  assert.equal(first[0].id, 'job-stable-123');
+  assert.deepEqual(stale, first);
+  assert.deepEqual(clientOptions, [
+    { timeoutMs: 25, ignoreFailureCooldown: true, suppressFailureCooldown: true },
+    { timeoutMs: 25, ignoreFailureCooldown: true, suppressFailureCooldown: true },
+  ]);
+});
+
+test('data ops store fails a first webdesign job list read instead of reporting a false empty queue', async () => {
+  const query = {
+    select() { return query; },
+    eq() { return query; },
+    in() { return query; },
+    order() { return query; },
+    limit() { return Promise.resolve({ data: null, error: new Error('Supabase timeout') }); },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => query }),
+    dataOpsReadQueryTimeoutMs: 25,
+    logger: { error() {}, warn() {} },
+  });
+
+  await assert.rejects(
+    store.listVisibleWebdesignJobs('owner@softora.nl::owner'),
+    (error) => error && error.webdesignJobStatusUnavailable === true && error.statusCode === 503
+  );
+});
+
+test('data ops store never uses an old empty webdesign queue as fallback after a failed refresh', async () => {
+  let shouldFail = false;
+  const query = {
+    select() { return query; },
+    eq() { return query; },
+    in() { return query; },
+    order() { return query; },
+    limit() {
+      return Promise.resolve(shouldFail
+        ? { data: null, error: new Error('Supabase timeout') }
+        : { data: [], error: null });
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => query }),
+    dataOpsReadQueryTimeoutMs: 25,
+    logger: { error() {}, warn() {} },
+  });
+
+  assert.deepEqual(await store.listVisibleWebdesignJobs('owner@softora.nl::owner'), []);
+  shouldFail = true;
+  await assert.rejects(
+    store.listVisibleWebdesignJobs('owner@softora.nl::owner'),
+    (error) => error && error.webdesignJobStatusUnavailable === true
+  );
+});

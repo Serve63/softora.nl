@@ -296,6 +296,18 @@ function createSoftoraDataOpsStore(deps = {}) {
     };
   }
 
+  function getWebdesignStatusReadOptions(overrides = {}) {
+    return {
+      operationType: 'read',
+      timeoutMs: Math.max(1, Number(dataOpsReadQueryTimeoutMs) || DEFAULT_READ_QUERY_TIMEOUT_MS),
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      ignoreSupabaseRestFailureCooldown: true,
+      suppressSupabaseRestFailureCooldown: true,
+      ...(overrides && typeof overrides === 'object' ? overrides : {}),
+    };
+  }
+
   function isRunReadOperation(options = {}) {
     if (options.operationType === 'write') return false;
     if (options.operationType === 'read') return true;
@@ -2375,11 +2387,13 @@ function createSoftoraDataOpsStore(deps = {}) {
     if (!row.job_id || !row.owner_key) {
       return { ok: false, unavailable: false, error: new Error('Ongeldige webdesign-job') };
     }
-    return run(
+    const result = await run(
       'upsert-webdesign-job',
       (client) => client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' }),
       getWriteOperationOptions()
     );
+    if (result.ok) forgetReads('webdesign-jobs:*');
+    return result;
   }
 
   async function upsertWebdesignBatch(batch) {
@@ -2387,11 +2401,13 @@ function createSoftoraDataOpsStore(deps = {}) {
     if (!row.job_id || !row.owner_key) {
       return { ok: false, unavailable: false, error: new Error('Ongeldige webdesign-batch') };
     }
-    return run(
+    const result = await run(
       'upsert-webdesign-batch',
       (client) => client.from(TABLES.webdesignJobs).upsert(row, { onConflict: 'job_id' }),
       getWriteOperationOptions()
     );
+    if (result.ok) forgetReads('webdesign-batches:*');
+    return result;
   }
 
   async function upsertWebdesignBatchChunk(chunk) {
@@ -2426,7 +2442,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         .from(TABLES.webdesignJobs)
         .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
         .eq('job_id', normalizeString(jobId))
-        .maybeSingle()
+        .maybeSingle(),
+      getWebdesignStatusReadOptions()
     );
     if (!result.ok) throw createWebdesignJobStatusReadError(result);
     if (!result.data || !isRegularWebdesignJobRow(result.data)) return null;
@@ -2441,7 +2458,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         .eq('job_id', normalizeString(batchId))
         .eq('owner_key', normalizeString(ownerKey))
         .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
-        .maybeSingle()
+        .maybeSingle(),
+      getWebdesignStatusReadOptions()
     );
     if (!result.ok) throw createWebdesignJobStatusReadError(result);
     if (!result.data) return null;
@@ -2456,7 +2474,8 @@ function createSoftoraDataOpsStore(deps = {}) {
         .eq('owner_key', normalizeString(ownerKey))
         .eq('customer_id', buildWebdesignBatchChunkCustomerId(batchId))
         .order('created_at', { ascending: true })
-        .limit(10000)
+        .limit(10000),
+      getWebdesignStatusReadOptions()
     );
     if (!result.ok) throw createWebdesignJobStatusReadError(result);
     return (result.data || []).map(normalizeWebdesignBatchChunkRow).sort((left, right) => left.index - right.index);
@@ -2472,25 +2491,39 @@ function createSoftoraDataOpsStore(deps = {}) {
         .in('status', ['queued', 'running'])
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle()
+        .maybeSingle(),
+      getWebdesignStatusReadOptions()
     );
-    if (!result.ok || !result.data || !isRegularWebdesignJobRow(result.data)) return null;
+    if (!result.ok) throw createWebdesignJobStatusReadError(result);
+    if (!result.data || !isRegularWebdesignJobRow(result.data)) return null;
     return normalizeWebdesignJobRow(result.data);
   }
 
   async function listVisibleWebdesignBatches(ownerKey) {
+    const normalizedOwnerKey = normalizeString(ownerKey);
+    const cacheKey = `webdesign-batches:${normalizedOwnerKey}`;
     const result = await run('list-webdesign-batches', (client) =>
       client
         .from(TABLES.webdesignJobs)
         .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
-        .eq('owner_key', normalizeString(ownerKey))
+        .eq('owner_key', normalizedOwnerKey)
         .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
         .in('status', ['queued', 'running', 'done', 'error'])
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(5),
+      getWebdesignStatusReadOptions()
     );
-    if (!result.ok) return null;
-    return (result.data || []).map(normalizeWebdesignBatchRow);
+    if (!result.ok) {
+      const staleRows = getAnyCachedRead(cacheKey);
+      if (Array.isArray(staleRows) && staleRows.length) {
+        if (typeof logger.warn === 'function') logger.warn(`[DataOps][cache-stale] ${cacheKey}`);
+        return staleRows;
+      }
+      throw createWebdesignJobStatusReadError(result);
+    }
+    const rows = (result.data || []).map(normalizeWebdesignBatchRow);
+    rememberRead(cacheKey, rows);
+    return rows;
   }
 
   async function listRunnableWebdesignBatches(limit = 5) {
@@ -2502,24 +2535,37 @@ function createSoftoraDataOpsStore(deps = {}) {
         .eq('customer_id', WEBDESIGN_BATCH_CUSTOMER_ID)
         .eq('status', 'running')
         .order('updated_at', { ascending: true })
-        .limit(safeLimit)
+        .limit(safeLimit),
+      getWebdesignStatusReadOptions()
     );
     if (!result.ok) return null;
     return (result.data || []).map(normalizeWebdesignBatchRow);
   }
 
   async function listVisibleWebdesignJobs(ownerKey) {
+    const normalizedOwnerKey = normalizeString(ownerKey);
+    const cacheKey = `webdesign-jobs:${normalizedOwnerKey}`;
     const result = await run('list-webdesign-jobs', (client) =>
       client
         .from(TABLES.webdesignJobs)
         .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
-        .eq('owner_key', normalizeString(ownerKey))
+        .eq('owner_key', normalizedOwnerKey)
         .in('status', ['queued', 'running'])
         .order('created_at', { ascending: true })
-        .limit(5000)
+        .limit(5000),
+      getWebdesignStatusReadOptions()
     );
-    if (!result.ok) return null;
-    return (result.data || []).filter(isRegularWebdesignJobRow).map(normalizeWebdesignJobRow);
+    if (!result.ok) {
+      const staleRows = getAnyCachedRead(cacheKey);
+      if (Array.isArray(staleRows) && staleRows.length) {
+        if (typeof logger.warn === 'function') logger.warn(`[DataOps][cache-stale] ${cacheKey}`);
+        return staleRows;
+      }
+      throw createWebdesignJobStatusReadError(result);
+    }
+    const rows = (result.data || []).filter(isRegularWebdesignJobRow).map(normalizeWebdesignJobRow);
+    rememberRead(cacheKey, rows);
+    return rows;
   }
 
   return {

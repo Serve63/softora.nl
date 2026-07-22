@@ -140,6 +140,7 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   };
   const windowObject = {
     document,
+    SoftoraDatabaseWebdesignJobRestore: require('../../assets/premium-database-webdesign-job-restore'),
     SoftoraDatabaseWebdesignVariantPicker: Object.prototype.hasOwnProperty.call(options, 'SoftoraDatabaseWebdesignVariantPicker')
       ? options.SoftoraDatabaseWebdesignVariantPicker
       : { choose: async () => 'v2-visual-dna' },
@@ -180,6 +181,10 @@ function loadDatabaseWebdesignBulkClient(options = {}) {
   };
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseWebdesignBulk;
+}
+
+function loadDatabaseWebdesignJobRestoreClient() {
+  return require('../../assets/premium-database-webdesign-job-restore');
 }
 
 function loadDatabaseLeadDeleteClient(options = {}) {
@@ -1591,7 +1596,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260722b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723a/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
@@ -1844,7 +1849,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260722b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1995,7 +2000,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260722b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723a/);
   assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
   assert.match(webdesignActionScriptSource, /Keuze tussen V1 en V2 kon niet worden geladen/);
   assert.doesNotMatch(webdesignActionScriptSource, /DEFAULT_SINGLE_VARIANT/);
@@ -2013,7 +2018,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.doesNotMatch(webdesignActionScriptSource, /Geen geldige website gevonden voor " \+ target\.bedrijf \+ "\.", "error", true/);
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
-  assert.match(webdesignActionScriptSource, /const firstLoad = loadRunningJobs\(\);[\s\S]*void resumeBulkBatch\(\);[\s\S]*return firstLoad;/);
+  assert.match(webdesignActionScriptSource, /const firstLoad = jobRestoreController \? jobRestoreController\.run\(\) : loadRunningJobs\(\)\.catch/);
   assert.doesNotMatch(webdesignActionScriptSource, /setTimeout\(resumeBulkBatch/);
   assert.match(webdesignActionScriptSource, /return firstLoad;/);
   assert.match(webdesignActionScriptSource, /async function loadRunningJobs\(\)/);
@@ -2030,6 +2035,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.doesNotMatch(webdesignActionScriptSource, /sessionStorage/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-job-restore\.js\?v=20260723a/);
+  assert.match(webdesignActionScriptSource, /queueFinishedPhotoRefresh\(pendingJob\.customerId\)/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignMockup\.createController\(\{/);
   assert.match(pageSource, /ensureMockupForCustomer: function \(customerId, ensureOptions\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
@@ -2068,7 +2075,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /void webdesignMockupController\.ensureVisibleMockups\(getSortedCustomers\(getFilteredCustomers\(\)\), 12\)\.catch/);
   assert.doesNotMatch(pageSource, /window\.setTimeout\(function \(\) \{ resolve\(false\); \}, 850\);/);
   assert.doesNotMatch(pageSource, /releaseDatabaseBootShell\(\); void webdesignActionController\.preloadPhotoImages/);
-  assert.match(pageSource, /void webdesignActionController\.resumePendingJobs\(\)\.catch/);
+  assert.match(pageSource, /const databasePendingJobsPromise = webdesignActionController\.resumePendingJobs\(\);/);
+  assert.match(pageSource, /void databasePendingJobsPromise\.catch/);
   assert.doesNotMatch(pageSource, /void bootstrapCustomers\(\)\.catch\(function \(error\) \{ console\.error\("Database sync na snelle boot mislukt:", error\); \}\);/);
   assert.match(pageSource, /function refreshCustomerStateSilently\(\)/);
   assert.match(pageSource, /window\.setInterval\(function \(\) \{[\s\S]*void refreshCustomerStateSilently\(\);[\s\S]*\}, CUSTOMER_DB_SYNC_INTERVAL_MS\);/);
@@ -2962,6 +2970,41 @@ test('premium database webdesign action restores large running job lists without
   assert.equal(renderCount, 1);
   assert.ok(timers.some((timer) => Number(timer.delay) === 0), 'restored jobs should still start polling quickly');
   assert.ok(timers.length <= 1, `restored jobs should share one poll pump timer, saw ${timers.length}`);
+});
+
+test('premium database webdesign job restore retries a temporary status failure without parallel requests', async () => {
+  const timers = [];
+  let attempts = 0;
+  const restoreClient = loadDatabaseWebdesignJobRestoreClient();
+  const controller = restoreClient.createController({
+    setTimeout(callback, delay) {
+      const timer = { callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      const index = timers.indexOf(timer);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    async load() {
+      attempts += 1;
+      if (attempts === 1) throw new Error('tijdelijk niet bereikbaar');
+      return ['hersteld'];
+    },
+  });
+
+  const first = controller.run();
+  assert.equal(controller.run(), first, 'concurrent restore calls should share one request');
+  assert.equal(await first, null);
+  assert.equal(attempts, 1);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 2000);
+
+  const retryTimer = timers.shift();
+  retryTimer.callback();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(attempts, 2);
+  assert.equal(timers.length, 0);
 });
 
 test('premium database webdesign bulk restores the progress bar from the running server batch list', async () => {
