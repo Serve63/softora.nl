@@ -898,7 +898,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       activeOrdersState: buildBootstrapStateSnapshot(null),
     };
     const readOptions = {
-      uiStateReadTimeoutMs: Math.max(100, Math.min(1200, Number(options.readTimeoutMs) || 650)),
+      uiStateReadTimeoutMs: Math.max(100, Math.min(1500, Number(options.readTimeoutMs) || 1200)),
       bypassReadFailureCooldown: true,
       suppressReadFailureCooldown: true,
       suppressReadFailureLog: true,
@@ -906,7 +906,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       suppressSupabaseRestFailureCooldown: true,
       readFailureCooldownScope: MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
     };
-    const timeoutMs = Math.max(150, Math.min(1500, Number(options.timeoutMs) || 750));
+    const timeoutMs = Math.max(150, Math.min(1800, Number(options.timeoutMs) || 1400));
     const [state, statsState, roiState, autopilotState] = await Promise.all([
       MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
       DATABASE_MAIL_STATS_CACHE_SCOPE,
@@ -923,13 +923,14 @@ function createCustomersPageBootstrapService(deps = {}) {
     if (!snapshot) return { ...unavailable, ...databaseBootstrapState };
     const snapshotGeneratedAtMs = Date.parse(normalizeString(snapshot.generatedAt));
     const snapshotAgeMs = now().getTime() - snapshotGeneratedAtMs;
-    if (!Number.isFinite(snapshotGeneratedAtMs) || snapshotAgeMs > SNAPSHOT_CACHE_TTL_MS) {
+    if (!Number.isFinite(snapshotGeneratedAtMs)) {
       return { ...unavailable, ...databaseBootstrapState };
     }
     return {
       ok: true,
       loadedAt: new Date().toISOString(),
       source: 'mail-ready-snapshot-cache',
+      stale: snapshotAgeMs > SNAPSHOT_CACHE_TTL_MS,
       generatedAt: snapshot.generatedAt || null,
       customers: snapshot.customers.concat(snapshot.availableCustomers),
       mailReadySnapshotTotal: snapshot.total,

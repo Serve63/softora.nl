@@ -159,6 +159,7 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
 
   assert.equal(payload.ok, true);
   assert.equal(payload.source, 'mail-ready-snapshot-cache');
+  assert.equal(payload.stale, false);
   assert.equal(payload.mailReadySnapshotTotal, 1013);
   assert.equal(payload.availableSnapshotTotal, 113);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
@@ -171,11 +172,11 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
     'premium_database_mail_roi',
     'premium_coldmail_autopilot',
   ]);
-  assert.equal(seenReads.every((read) => read.options.uiStateReadTimeoutMs === 650), true);
+  assert.equal(seenReads.every((read) => read.options.uiStateReadTimeoutMs === 1200), true);
   assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
 });
 
-test('premium database bootstrap rejects an expired snapshot instead of flashing stale rows', async () => {
+test('premium database bootstrap renders an expired valid snapshot while fresh data loads in the background', async () => {
   const service = createCustomersPageBootstrapService({
     now: () => new Date('2026-07-10T12:02:00.000Z'),
     getUiStateValues: async (scope) => {
@@ -198,11 +199,36 @@ test('premium database bootstrap rejects an expired snapshot instead of flashing
 
   const payload = await service.buildMailReadySnapshotBootstrapPayload();
 
+  assert.equal(payload.source, 'mail-ready-snapshot-cache');
+  assert.equal(payload.stale, true);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), ['stale-ready', 'stale-deleted']);
+  assert.equal(payload.mailReadySnapshotTotal, 740);
+  assert.equal(payload.availableSnapshotTotal, 1);
+});
+
+test('premium database bootstrap still rejects a snapshot without a valid generation time', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => ({
+      source: 'supabase',
+      values: scope === MAIL_READY_BOOTSTRAP_CACHE_SCOPE
+        ? {
+            [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify({
+              generatedAt: 'ongeldig',
+              total: 1,
+              customers: [{ id: 'invalid-ready', mailReadySnapshot: true }],
+              availableTotal: 0,
+              availableCustomers: [],
+            }),
+          }
+        : {},
+    }),
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
   assert.equal(payload.source, 'deferred');
   assert.equal(payload.deferred, true);
   assert.deepEqual(payload.customers, []);
-  assert.equal(payload.mailReadySnapshotTotal, null);
-  assert.equal(payload.availableSnapshotTotal, null);
 });
 
 test('premium database bootstrap never turns a missing cache into fake zero totals', async () => {
