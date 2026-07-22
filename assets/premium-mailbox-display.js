@@ -6,6 +6,72 @@
     return String(value || '').trim().toLowerCase();
   }
 
+  function formatDetailSubject(value) {
+    const subject = String(value || '').trim().replace(/^email received\s*-\s*/i, '').trim();
+    return subject || '(Geen onderwerp)';
+  }
+
+  function normalizeComparableMailUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+      const path = parsed.pathname.replace(/\/+$/, '');
+      return `${host}${path}${parsed.search}${parsed.hash}`.toLowerCase();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function isLabelledUrlMatch(label, url) {
+    if (/^deze link$/i.test(String(label || '').trim())) return true;
+    const normalizedLabel = normalizeComparableMailUrl(label);
+    return Boolean(normalizedLabel && normalizedLabel === normalizeComparableMailUrl(url));
+  }
+
+  function isGmailSignatureAssetUrl(value) {
+    try {
+      const parsed = new URL(String(value || '').trim().replace(/^\[|\]$/g, ''));
+      return /(^|\.)googleusercontent\.com$/i.test(parsed.hostname) && /^\/mail-sig\//i.test(parsed.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function collapseDuplicateAnnotations(line) {
+    return String(line || '').replace(
+      /\b([a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,})\s+\[(?:mailto:)?([^\]\s]+)\]/gi,
+      (match, label, target) => normalizeEmail(label) === normalizeEmail(target) ? label : match
+    );
+  }
+
+  function normalizeRepeatedLine(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  function removeDuplicateSignatureLeadLines(lines) {
+    const result = Array.isArray(lines) ? lines.slice() : [];
+    for (let index = 0; index < result.length; index += 1) {
+      if (String(result[index] || '').trim() !== '--') continue;
+      let previousIndex = index - 1;
+      while (previousIndex >= 0 && !String(result[previousIndex] || '').trim()) previousIndex -= 1;
+      let nextIndex = index + 1;
+      while (nextIndex < result.length && !String(result[nextIndex] || '').trim()) nextIndex += 1;
+      const previous = normalizeRepeatedLine(result[previousIndex]);
+      const next = normalizeRepeatedLine(result[nextIndex]);
+      if (!previous || previous !== next) continue;
+      result.splice(previousIndex, 1);
+      index -= 1;
+    }
+    return result;
+  }
+
   function isSentMessage(mail, options) {
     return String(mail && (mail.folder || (options && options.activeFolder)) || '').toLowerCase() === 'sent';
   }
@@ -113,7 +179,12 @@
 
   global.SoftoraMailboxDisplay = {
     applySenderCtaLinks,
+    collapseDuplicateAnnotations,
+    formatDetailSubject,
     isSentMessage,
+    isGmailSignatureAssetUrl,
+    isLabelledUrlMatch,
+    removeDuplicateSignatureLeadLines,
     getListPrimaryText,
     getDetailPrimaryText,
     getDetailSecondaryText,
