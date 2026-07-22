@@ -461,7 +461,7 @@
             if (finishedPhotoRefreshRunning) return finishedPhotoRefreshPromise;
             finishedPhotoRefreshRunning = true; if (finishedPhotoRefreshTimer && typeof global.clearTimeout === "function") global.clearTimeout(finishedPhotoRefreshTimer); finishedPhotoRefreshTimer = null;
             const customerIds = Array.from(finishedPhotoRefreshIds); finishedPhotoRefreshIds.clear();
-            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); }
+            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); if (customerIds.length && typeof setStatusMessage === "function") setStatusMessage(customerIds.length === 1 ? "Webdesign klaar. De lead staat nu bij Mailklaar." : customerIds.length + " webdesigns klaar en naar Mailklaar verplaatst.", "success", true); }
             finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh(""); }
         }
 

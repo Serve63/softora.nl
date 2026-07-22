@@ -391,6 +391,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
     softora_database_photos_removed_v1: JSON.stringify(['customer-1']),
   };
   const pipelineCalls = [];
+  const snapshotPromotions = [];
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
     logger: { error() {} },
     normalizeString: (value) => String(value || '').trim(),
@@ -412,6 +413,12 @@ test('premium database webdesign jobs generate and persist a customer photo in t
     setUiStateValues: async (_scope, nextValues) => {
       values = nextValues;
       return { values };
+    },
+    mailReadySnapshotService: {
+      async markCustomersMailReadyAfterAssetUpsert(customerIds) {
+        snapshotPromotions.push(customerIds.slice());
+        return true;
+      },
     },
   });
 
@@ -456,6 +463,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
   assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
   assert.equal(pipelineCalls[0].options.body.source, 'premium-database');
+  assert.deepEqual(snapshotPromotions, [['customer-1']]);
   assert.deepEqual(pipelineCalls[0].options.body.softoraOutreachProfile, {
     name: 'Servé Creusen',
     roleLabel: 'WEBDESIGN & SOFTWARE ONTWIKKELING',
