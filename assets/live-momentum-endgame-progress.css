@@ -1,0 +1,56 @@
+.end-game-heading {
+  position: relative;
+  z-index: 1;
+  width: max-content;
+  margin: clamp(3.5rem, 7vh, 6rem) auto 0;
+}
+
+.end-game-heading .end-game-title {
+  margin: 0;
+}
+
+.end-game-progress {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  margin-top: .8rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(26, 26, 46, .1);
+}
+
+.end-game-progress-fill {
+  display: block;
+  width: var(--end-game-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1fa65a, #32cd77);
+  box-shadow: 0 0 10px rgba(31, 166, 90, .22);
+  transition: width .42s cubic-bezier(.22, 1, .36, 1);
+}
+
+.end-game-progress-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: .35rem;
+  color: rgba(92, 94, 111, .66);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.end-game-progress-scale strong {
+  color: var(--good);
+  font-size: .62rem;
+}
+
+@media (max-width: 760px) {
+  .end-game-heading {
+    margin-top: 3.1rem;
+  }
+
+  .end-game-heading .end-game-title {
+    margin-top: 0;
+  }
+}
