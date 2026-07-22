@@ -859,7 +859,9 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   assert.match(pageSource, /\.detail-avatar \{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/);
   assert.match(pageSource, /\.detail-body-text \{[\s\S]*font-size:\s*14px;[\s\S]*line-height:\s*1\.75;/);
   assert.match(pageSource, /\.detail-footer \{[^}]*margin:\s*0;[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*1px solid var\(--border\);/);
-  assert.match(pageSource, /\.detail-reply \{[\s\S]*color:\s*var\(--crimson\);/);
+  assert.match(pageSource, /\.detail-reply \{[^}]*border:\s*1px solid rgba\(155,35,85,\.34\);[^}]*border-radius:\s*6px;[^}]*padding:\s*8px 14px;[^}]*background:\s*var\(--card\);[^}]*color:\s*var\(--crimson\);/);
+  assert.match(pageSource, /\.detail-reply:hover \{[^}]*border-color:\s*var\(--crimson\);[^}]*background:\s*rgba\(155,35,85,\.06\);/);
+  assert.match(pageSource, /\.detail-reply:focus-visible \{[^}]*outline:\s*2px solid rgba\(155,35,85,\.32\);/);
 });
 
 test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
