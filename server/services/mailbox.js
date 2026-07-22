@@ -20,6 +20,7 @@ const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplySystemPrompt,
+  enforceMailboxReplySignature,
   inferMailboxReplyFirstName,
 } = require('./mailbox-reply-prompt');
 const {
@@ -2506,7 +2507,7 @@ function createMailboxService(deps = {}) {
     };
   }
 
-  function buildRewritePromptPayload({ accountEmail, to, subject, body, context, senderProfile, isReply }) {
+  function buildRewritePromptPayload({ accountEmail, senderName, to, subject, body, context, senderProfile, isReply }) {
     const original = context && typeof context === 'object'
       ? {
           from: cleanPromptText(context.from, 240),
@@ -2531,6 +2532,10 @@ function createMailboxService(deps = {}) {
     };
     if (isReply) {
       payload.antwoordContext = { aanhefNaam: inferMailboxReplyFirstName(original) };
+      payload.afzenderContext = {
+        accountEmail: normalizeEmail(accountEmail),
+        naam: cleanPromptText(senderName, 120),
+      };
     } else {
       payload.afzenderProfiel = normalizeSenderProfile(senderProfile);
     }
@@ -2556,13 +2561,16 @@ function createMailboxService(deps = {}) {
     }
 
     const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
-    const senderName = cleanPromptText(getAccount(accountEmail)?.name, 120) || normalizeEmail(accountEmail);
+    const contextAccountEmail = normalizeEmail(context && context.accountEmail);
+    const resolvedAccountEmail = getAccount(contextAccountEmail) ? contextAccountEmail : normalizeEmail(accountEmail);
+    const senderName = cleanPromptText(getAccount(resolvedAccountEmail)?.name, 120) || resolvedAccountEmail;
     const systemPrompt = hasReplyContext
       ? buildMailboxReplySystemPrompt({ senderName, hasDraft: Boolean(draft) })
       : buildMailboxDraftRewriteSystemPrompt({ senderName });
 
     const payload = buildRewritePromptPayload({
-      accountEmail,
+      accountEmail: resolvedAccountEmail,
+      senderName,
       to,
       subject,
       body: draft,
@@ -2600,7 +2608,10 @@ function createMailboxService(deps = {}) {
     }
 
     const content = data?.choices?.[0]?.message?.content;
-    const text = truncateText(normalizeString(extractOpenAiTextContent(content)), 8000);
+    const generatedText = truncateText(normalizeString(extractOpenAiTextContent(content)), 8000);
+    const text = hasReplyContext
+      ? truncateText(enforceMailboxReplySignature(generatedText, senderName), 8000)
+      : generatedText;
     if (!text) {
       const error = new Error('OpenAI gaf geen verbeterde tekst terug.');
       error.status = 502;
