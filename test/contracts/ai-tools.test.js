@@ -182,7 +182,7 @@ test('ai tools coordinator forwards database preview generation controls to the 
   });
 });
 
-test('ai tools coordinator gives V2 exactly one homepage screenshot reference', async () => {
+test('ai tools coordinator gives V2 ordered homepage screenshot providers', async () => {
   let capturedScan = null;
   const { coordinator } = createFixture({
     fetchWebsitePreviewScanFromUrl: async () => ({
@@ -216,6 +216,7 @@ test('ai tools coordinator gives V2 exactly one homepage screenshot reference', 
   assert.equal(capturedScan.requireReferenceImages, true);
   assert.equal(capturedScan.referenceImageFidelity, 'high');
   assert.deepEqual(capturedScan.referenceImageUrls, [
+    'https://image.thum.io/get/width/1200/crop/1600/noanimate/https://www.bliv.nl/',
     'https://s0.wordpress.com/mshots/v1/https%3A%2F%2Fwww.bliv.nl%2F?w=1280&h=1600',
   ]);
 });
