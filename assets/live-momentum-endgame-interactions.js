@@ -6,6 +6,8 @@
   const MAX_EDGE_SCROLL_STEP = 18;
   const WHEEL_EASING = 0.16;
   const MAX_WHEEL_STEP = 48;
+  const WHEEL_EDGE_EPSILON = 0.5;
+  const WHEEL_SETTLE_EPSILON = 2;
 
   const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -15,6 +17,7 @@
     let suppressClickUntil = 0;
     let wheelTarget = scrollContainer?.scrollLeft || 0;
     let wheelFrame = 0;
+    let lastWheelDirection = 0;
 
     const getCards = () => Array.from(track.querySelectorAll('[data-end-game-card-id]'));
     const getVisibleCardIds = () => getCards().map((card) => card.dataset.endGameCardId).filter(Boolean);
@@ -23,6 +26,7 @@
       if (wheelFrame) window.cancelAnimationFrame(wheelFrame);
       wheelFrame = 0;
       wheelTarget = scrollContainer?.scrollLeft || 0;
+      lastWheelDirection = 0;
       scrollContainer?.classList.remove('is-wheel-scrolling');
     }
 
@@ -163,9 +167,10 @@
     function animateWheelScroll() {
       if (!scrollContainer) return;
       const distance = wheelTarget - scrollContainer.scrollLeft;
-      if (prefersReducedMotion || Math.abs(distance) < 0.75) {
+      if (prefersReducedMotion || Math.abs(distance) < WHEEL_SETTLE_EPSILON) {
         scrollContainer.scrollLeft = wheelTarget;
         wheelFrame = 0;
+        lastWheelDirection = 0;
         scrollContainer.classList.remove('is-wheel-scrolling');
         return;
       }
@@ -175,14 +180,25 @@
     }
 
     scrollContainer?.addEventListener('wheel', (event) => {
-      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      if (event.ctrlKey || Math.abs(event.deltaY) < WHEEL_EDGE_EPSILON) return;
       const maximum = Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
+      const direction = Math.sign(event.deltaY);
+      if (lastWheelDirection && direction !== lastWheelDirection) cancelWheelScroll();
+      const current = clamp(scrollContainer.scrollLeft, 0, maximum);
+      const canMove = direction < 0
+        ? current > WHEEL_EDGE_EPSILON
+        : current < maximum - WHEEL_EDGE_EPSILON;
+      if (!canMove) {
+        scrollContainer.scrollLeft = direction < 0 ? 0 : maximum;
+        wheelTarget = scrollContainer.scrollLeft;
+        lastWheelDirection = 0;
+        return;
+      }
+      event.preventDefault();
       const base = wheelFrame ? wheelTarget : scrollContainer.scrollLeft;
       const nextTarget = clamp(base + event.deltaY, 0, maximum);
-      const canMove = Math.abs(nextTarget - scrollContainer.scrollLeft) > 0.5;
-      if (!canMove) return;
-      event.preventDefault();
       wheelTarget = nextTarget;
+      lastWheelDirection = direction;
       if (!wheelFrame) {
         scrollContainer.classList.add('is-wheel-scrolling');
         wheelFrame = window.requestAnimationFrame(animateWheelScroll);

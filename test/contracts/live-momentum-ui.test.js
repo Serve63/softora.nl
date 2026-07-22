@@ -36,7 +36,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
@@ -309,13 +309,19 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /window\.SoftoraMomentumEndGameCards/);
   assert.match(endGameInteractionsJs, /const DRAG_THRESHOLD = 8/);
   assert.match(endGameInteractionsJs, /const MAX_WHEEL_STEP = 48/);
+  assert.match(endGameInteractionsJs, /const WHEEL_EDGE_EPSILON = 0\.5/);
+  assert.match(endGameInteractionsJs, /const WHEEL_SETTLE_EPSILON = 2/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointerdown'/);
   assert.match(endGameInteractionsJs, /card\.dataset\.endGameCardFixed === 'true'/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointermove'/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointerup', finishDrag\)/);
   assert.match(endGameInteractionsJs, /onOrderChange\(getVisibleCardIds\(\)\)/);
+  assert.match(endGameInteractionsJs, /direction < 0[\s\S]*current > WHEEL_EDGE_EPSILON[\s\S]*current < maximum - WHEEL_EDGE_EPSILON/);
+  assert.match(endGameInteractionsJs, /if \(!canMove\)[\s\S]*scrollContainer\.scrollLeft = direction < 0 \? 0 : maximum/);
+  assert.match(endGameInteractionsJs, /if \(lastWheelDirection && direction !== lastWheelDirection\) cancelWheelScroll\(\)/);
   assert.match(endGameInteractionsJs, /event\.preventDefault\(\);[\s\S]*wheelTarget = nextTarget/);
   assert.match(endGameInteractionsJs, /clamp\(distance \* WHEEL_EASING, -MAX_WHEEL_STEP, MAX_WHEEL_STEP\)/);
+  assert.match(endGameInteractionsJs, /Math\.abs\(distance\) < WHEEL_SETTLE_EPSILON/);
   assert.match(endGameInteractionsJs, /addEventListener\('pointerdown', cancelWheelScroll\)/);
   assert.match(endGameInteractionsJs, /\{ passive: false \}/);
   assert.match(endGameInteractionsJs, /window\.SoftoraMomentumEndGameInteractions/);
