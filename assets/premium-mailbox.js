@@ -821,7 +821,7 @@ function openMail(id, options = {}) {
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
-  const detailBody = m.bodyLoaded || m.body
+  const detailBody = m.bodyLoaded
     ? m.body
     : 'Bericht laden…';
   document.getElementById('mail-detail').innerHTML = `
