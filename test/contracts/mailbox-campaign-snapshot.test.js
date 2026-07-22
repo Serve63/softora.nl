@@ -41,8 +41,11 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.equal(parsed.messages.length, 100);
   assert.match(parsed.messages[0].body, /^Volledige inhoud 0/);
   assert.equal(parsed.messages[0].campaign.company, 'Bedrijf 0');
-  assert.deepEqual(parsed.messages[0].bodyImages, []);
-  assert.equal(parsed.messages[0].bodyImagesTruncated, true);
+  assert.deepEqual(parsed.messages[0].bodyImages, [{
+    alt: 'Ontwerp',
+    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A100&index=0',
+  }]);
+  assert.equal(parsed.messages[0].bodyImagesTruncated, false);
   assert.equal(parsed.messages.at(-1).body, '');
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
 });
@@ -54,6 +57,8 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
     ok: true,
     messages: [{
       id: 'inbox:1',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
       body: 'Bericht met afbeeldingen',
       bodyImages: [
         { alt: 'Klein ontwerp', dataUrl: smallImage },
@@ -63,13 +68,23 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
   });
   const [message] = parseMailboxCampaignSnapshot(serialized).messages;
 
-  assert.deepEqual(message.bodyImages, [{ alt: 'Klein ontwerp', dataUrl: smallImage }]);
-  assert.equal(message.bodyImagesTruncated, true);
+  assert.deepEqual(message.bodyImages, [
+    {
+      alt: 'Klein ontwerp',
+      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=0',
+    },
+    {
+      alt: 'Grote mockup',
+      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=1',
+    },
+  ]);
+  assert.equal(message.bodyImagesTruncated, false);
+  assert.doesNotMatch(serialized, new RegExp(smallImage.slice(0, 100)));
   assert.doesNotMatch(serialized, new RegExp(oversizedImage.slice(0, 80_000)));
 });
 
 test('mailbox campaign snapshot weigert lege en ongeldige data', () => {
   assert.equal(serializeMailboxCampaignSnapshot({ ok: true, messages: [] }), '');
   assert.equal(parseMailboxCampaignSnapshot('{kapot'), null);
-  assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 1, messages: [] })), null);
+  assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 2, messages: [] })), null);
 });

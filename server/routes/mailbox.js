@@ -55,6 +55,9 @@ function registerMailboxRoutes(app, deps = {}) {
   );
   app.get('/api/mailbox/messages', requireAdmin, (req, res) => coordinator.listMessagesResponse(req, res));
   app.get('/api/mailbox/message', requireAdmin, (req, res) => coordinator.getMessageResponse(req, res));
+  app.get('/api/mailbox/message-image', requireAdmin, (req, res) =>
+    coordinator.getMessageImageResponse(req, res)
+  );
   app.post('/api/mailbox/messages/read', requireAdmin, (req, res) =>
     coordinator.markMessageReadResponse(req, res)
   );

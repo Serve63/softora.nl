@@ -14,6 +14,10 @@ const {
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 const {
+  MAILBOX_MESSAGE_IMAGE_MAX_INDEX,
+  decodeMailboxMessageImage,
+} = require('./mailbox-message-image');
+const {
   buildCustomerIdentityKey,
   parseImageDataUrl,
   readChunkedStateValue,
@@ -2853,6 +2857,42 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function getMessageImageResponse(req, res) {
+    try {
+      const imageIndex = Number(req.query?.index);
+      if (!Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex > MAILBOX_MESSAGE_IMAGE_MAX_INDEX) {
+        const error = new Error('Mailboxafbeelding niet gevonden.');
+        error.status = 404;
+        throw error;
+      }
+      const message = await getMessage({
+        accountEmail: req.query?.account,
+        folder: normalizeFolder(req.query?.folder || 'inbox'),
+        id: req.query?.id || req.query?.message || '',
+      });
+      const image = decodeMailboxMessageImage(
+        Array.isArray(message && message.bodyImages) ? message.bodyImages[imageIndex] : null
+      );
+      if (!image) {
+        const error = new Error('Mailboxafbeelding niet gevonden.');
+        error.status = 404;
+        throw error;
+      }
+      res.setHeader('Content-Type', image.contentType);
+      res.setHeader('Content-Length', String(image.content.length));
+      res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.status(200).send(image.content);
+    } catch (error) {
+      logger.error('[Mailbox][MessageImage]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Mailboxafbeelding laden mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
   async function syncMailboxResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -2970,6 +3010,7 @@ function createMailboxService(deps = {}) {
     accountsResponse,
     campaignRepliesResponse,
     getMessageResponse,
+    getMessageImageResponse,
     listMessagesResponse,
     sendMessageResponse,
     markMessageReadResponse,

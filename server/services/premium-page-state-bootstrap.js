@@ -2,6 +2,7 @@ const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   parseMailboxCampaignSnapshot,
+  serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 
 const PAGE_STATE_SCOPES = Object.freeze({
@@ -129,8 +130,11 @@ function createPremiumPageStateBootstrapService(deps = {}) {
         messages: Array.isArray(result && result.messages) ? result.messages : [],
         sync: result && result.sync && typeof result.sync === 'object' ? result.sync : null,
       };
-      mailboxCache = { snapshot, cachedAt: Date.now() };
-      return snapshot;
+      const compactSnapshot = snapshot.messages.length
+        ? parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot(snapshot))
+        : snapshot;
+      mailboxCache = { snapshot: compactSnapshot, cachedAt: Date.now() };
+      return compactSnapshot;
     } catch (_error) {
       return mailboxCache ? mailboxCache.snapshot : null;
     }

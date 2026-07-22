@@ -442,9 +442,9 @@ function renderMailboxParagraphs(lines, options) {
 }
 function renderMailboxInlineImage(image) {
   const dataUrl = String(image && image.dataUrl || '').trim();
-  if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(dataUrl)) return '';
+  if (!window.SoftoraMailboxCampaignInbox.isSafeImageSource(dataUrl)) return '';
   const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
-  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></figure>`;
+  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="eager" decoding="async" fetchpriority="high"></figure>`;
 }
 function renderMailboxBodySection(section, imageState) {
   if (!section || !Array.isArray(section.lines)) {
@@ -494,7 +494,7 @@ function normalizeMailboxBodyImages(images) {
       alt: String(image && image.alt || '').trim(),
       dataUrl: String(image && image.dataUrl || '').trim(),
     }))
-    .filter((image) => image.alt && /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(image.dataUrl));
+    .filter((image) => image.alt && window.SoftoraMailboxCampaignInbox.isSafeImageSource(image.dataUrl));
 }
 function renderMailBody(value, images, options) {
   const imageState = {
@@ -935,6 +935,7 @@ function replyMail(mail) {
 }
 function openCompose(options = {}) {
   if (!options.keepContext) setComposeReplyContext(null);
+  window.SoftoraMailboxCompose.reset(Boolean(composeReplyContext));
   const overlay = document.getElementById('compose-overlay');
   if (overlay) overlay.classList.add('open');
 }
@@ -942,12 +943,14 @@ function closeCompose() {
   const overlay = document.getElementById('compose-overlay');
   if (overlay) overlay.classList.remove('open');
   setComposeReplyContext(null);
+  window.SoftoraMailboxCompose.reset(false);
   ['c-to','c-subject','c-body'].forEach(id => {
     const field = document.getElementById(id);
     if (field) field.value = '';
   });
 }
 async function rewriteComposeBody() {
+  if (window.SoftoraMailboxCompose.isUsed()) return;
   const bodyField = document.getElementById('c-body');
   const draft = String(bodyField?.value || '').trim();
   const isSuggestedReply = Boolean(composeReplyContext);
@@ -987,14 +990,15 @@ async function rewriteComposeBody() {
     const rewritten = String(data?.text || data?.result?.text || '').trim();
     if (!rewritten) throw new Error('Geen verbeterde tekst ontvangen');
     bodyField.value = rewritten;
+    window.SoftoraMailboxCompose.complete(rewriteBtn);
     toast(isSuggestedReply ? 'Reactie voorgesteld' : 'Tekst verbeterd');
   } catch (error) {
     toast(String(error?.message || error || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt')));
   } finally {
-    if (rewriteBtn) {
-      rewriteBtn.disabled = false;
-      rewriteBtn.textContent = originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter');
-    }
+    window.SoftoraMailboxCompose.finish(
+      rewriteBtn,
+      originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter')
+    );
     if (sendBtn) sendBtn.disabled = false;
   }
 }
