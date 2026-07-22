@@ -47,6 +47,11 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   }]);
   assert.equal(parsed.messages[0].bodyImagesTruncated, false);
   assert.equal(parsed.messages.at(-1).body, '');
+  assert.deepEqual(parsed.messages.at(-1).bodyImages, [{
+    alt: 'Ontwerp',
+    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=0',
+  }]);
+  assert.equal(parsed.messages.at(-1).bodyImagesTruncated, false);
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
 });
 

@@ -108,7 +108,23 @@ async function loadBody({
   }
 }
 
+function bindImageRecovery({ getActiveMail, getMail, loadMessageBody }) {
+  document.addEventListener('error', (event) => {
+    const image = event.target;
+    if (!image || !image.matches || !image.matches('[data-mailbox-inline-image]')) return;
+    const figure = image.closest && image.closest('.detail-mail-image');
+    if (figure) figure.hidden = true;
+    const mail = getMail(getActiveMail());
+    if (!mail || mail.bodyLoading || mail.imageRecoveryAttempted) return;
+    mail.imageRecoveryAttempted = true;
+    mail.bodyLoaded = false;
+    mail.bodyImagesTruncated = true;
+    void loadMessageBody(mail.id);
+  }, true);
+}
+
 window.SoftoraMailboxIndex = {
+  bindImageRecovery,
   decorateMessage,
   hydrateOutreachContexts,
   isSyncInFlight: () => syncInFlight,
