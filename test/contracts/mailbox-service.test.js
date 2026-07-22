@@ -2472,8 +2472,13 @@ test('mailbox list response returns stale indexed messages immediately without l
 test('mailbox campaign replies response joins indexed inbox mail to targeted webdesign customers', async () => {
   let customerLookup = null;
   let hydratedReplyIds = [];
+  let snapshotWrite = null;
   const service = createMailboxService({
     logger: { error() {} },
+    setUiStateValues: async (scope, values, meta) => {
+      snapshotWrite = { scope, values, meta };
+      return { values };
+    },
     mailboxIndexStore: {
       listMessagesForAccounts: async () => [
         {
@@ -2584,6 +2589,13 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   ]);
   assert.equal(customerLookup.bypassReadFailureCooldown, true);
   assert.deepEqual(hydratedReplyIds, ['inbox:42', 'inbox:77']);
+  assert.equal(snapshotWrite.scope, 'premium_mailbox_campaign_snapshot');
+  assert.equal(snapshotWrite.meta.source, 'mailbox-campaign-replies');
+  const persistedSnapshot = JSON.parse(
+    snapshotWrite.values.softora_mailbox_campaign_snapshot_v1
+  );
+  assert.equal(persistedSnapshot.messages[0].from, 'Studio Noord');
+  assert.equal(persistedSnapshot.messages[0].body, 'Volledige inhoud voor inbox:42');
 });
 
 test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {

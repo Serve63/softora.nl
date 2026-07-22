@@ -9,6 +9,11 @@ const {
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxCampaignRepliesService } = require('./mailbox-campaign-replies');
 const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  serializeMailboxCampaignSnapshot,
+} = require('./mailbox-campaign-snapshot');
+const {
   buildCustomerIdentityKey,
   parseImageDataUrl,
   readChunkedStateValue,
@@ -501,6 +506,7 @@ function createMailboxService(deps = {}) {
     mailConfig = {},
     mailboxAccountsRaw = '',
     getUiStateValues = async () => null,
+    setUiStateValues = async () => null,
     customerPhotoScope = DEFAULT_CUSTOMER_PHOTO_SCOPE,
     customerPhotoKey = DEFAULT_CUSTOMER_PHOTO_KEY,
     customerDbScope = DEFAULT_CUSTOMER_DB_SCOPE,
@@ -2747,7 +2753,7 @@ function createMailboxService(deps = {}) {
       limit: Number(limit || 100) || 100,
     });
     const messages = await restoreIndexedWebdesignImagesForMessages(replies);
-    return {
+    const result = {
       ok: true,
       messages,
       sync: {
@@ -2758,6 +2764,19 @@ function createMailboxService(deps = {}) {
         warming: false,
       },
     };
+    const serializedSnapshot = serializeMailboxCampaignSnapshot(result);
+    if (serializedSnapshot) {
+      try {
+        await setUiStateValues(
+          MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+          { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serializedSnapshot },
+          { source: 'mailbox-campaign-replies', actor: 'Mailbox index' }
+        );
+      } catch (error) {
+        logger.warn('[Mailbox][CampaignSnapshot]', error?.message || error);
+      }
+    }
+    return result;
   }
 
   async function campaignRepliesResponse(req, res) {
