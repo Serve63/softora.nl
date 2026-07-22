@@ -27,10 +27,10 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260722d"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260722b"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
-  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260722b"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
@@ -174,12 +174,14 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*padding:\s*0;[\s\S]*border:\s*0;/);
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*backdrop-filter:\s*none;[\s\S]*contain:\s*paint;/);
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*cursor:\s*grab;[\s\S]*touch-action:\s*pan-y;[\s\S]*user-select:\s*none;/);
+  assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*box-shadow:\s*none;/);
   assert.match(css, /\.end-game-goals\.is-card-reordering\s*\{[\s\S]*cursor:\s*grabbing;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*flex-direction:\s*column;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot\.is-card-dragging\s*\{[\s\S]*will-change:\s*transform;/);
   assert.match(endGameNumbersCss, /\.end-game-card-number\s*\{[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*text-align:\s*center;/);
-  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin,[\s\S]*\.end-game-card-slot--destination\s*\{[\s\S]*flex-basis:\s*clamp\(215px, 14\.5vw, 246px\);[\s\S]*drop-shadow/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin,[\s\S]*\.end-game-card-slot--destination\s*\{[\s\S]*flex-basis:\s*clamp\(215px, 14\.5vw, 246px\);[\s\S]*filter:\s*none;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot--origin > \.end-game-goal-card,[\s\S]*min-height:\s*clamp\(330px, 38vh, 385px\);[\s\S]*border:\s*2px solid rgba\(218, 175, 89, \.88\)/);
+  assert.doesNotMatch(endGameNumbersCss, /drop-shadow|0 18px 40px|0 0 24px/);
   assert.match(endGameNumbersCss, /@media \(max-width:\s*900px\)[\s\S]*flex-basis:\s*min\(74vw, 280px\);/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
