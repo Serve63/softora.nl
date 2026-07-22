@@ -1467,7 +1467,13 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       };
     }
 
-    const existing = await findRunningJobForCustomer(ownerKey, customer.id);
+    let existing = null;
+    try {
+      existing = await findRunningJobForCustomer(ownerKey, customer.id);
+    } catch (error) {
+      logPersistentJobLoadError(error);
+      return createWebdesignJobStatusUnavailableResult();
+    }
     if (existing) {
       return {
         ok: true,
@@ -1619,9 +1625,18 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
     if (!processJobsInline) queueProcessing();
 
+    let visibleJobs;
+    try {
+      visibleJobs = await getVisibleJobsForOwner(ownerKey);
+    } catch (error) {
+      logPersistentJobLoadError(error);
+      const result = createWebdesignJobStatusUnavailableResult();
+      return res.status(result.statusCode).json(result);
+    }
+
     return res.status(200).json({
       ok: true,
-      jobs: (await getVisibleJobsForOwner(ownerKey)).map(serializeJob),
+      jobs: visibleJobs.map(serializeJob),
     });
   }
 

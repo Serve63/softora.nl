@@ -1215,6 +1215,74 @@ test('premium database webdesign jobs keep transient status read failures retrya
   assert.notEqual(statusRes.body.error, 'Job niet gevonden');
 });
 
+test('premium database webdesign jobs never turn a failed queue read into an empty success response', async () => {
+  const readError = new Error('Supabase queue read timeout');
+  readError.webdesignJobStatusUnavailable = true;
+  readError.statusCode = 503;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: {
+      listVisibleWebdesignJobs: async () => {
+        throw readError;
+      },
+    },
+  });
+
+  const listRes = createResponseRecorder();
+  await coordinator.listJobsResponse(
+    { premiumAuth: { email: 'owner@softora.nl', userId: 'owner' } },
+    listRes
+  );
+
+  assert.equal(listRes.statusCode, 503);
+  assert.equal(listRes.body.ok, false);
+  assert.equal(listRes.body.retryable, true);
+  assert.equal(listRes.body.jobs, undefined);
+});
+
+test('premium database webdesign jobs fail closed when duplicate-job status cannot be checked', async () => {
+  const readError = new Error('Supabase duplicate check timeout');
+  readError.webdesignJobStatusUnavailable = true;
+  readError.statusCode = 503;
+  let persisted = 0;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: {
+      findRunningWebdesignJob: async () => {
+        throw readError;
+      },
+      upsertWebdesignJob: async () => {
+        persisted += 1;
+        return { ok: true };
+      },
+    },
+  });
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'job_duplicate_guard_123',
+        websiteUrl: 'https://softora.nl',
+        customer: { id: 'customer-duplicate-guard', bedrijf: 'Softora' },
+      },
+    },
+    startRes
+  );
+
+  assert.equal(startRes.statusCode, 503);
+  assert.equal(startRes.body.retryable, true);
+  assert.equal(persisted, 0);
+  assert.equal(coordinator._jobs.size, 0);
+});
+
 test('premium database webdesign jobs store trimmed webdesign photos before mockup creation', async () => {
   const dataUrl = await createSideGutterWebdesignDataUrl();
   const uploadedPhotos = [];

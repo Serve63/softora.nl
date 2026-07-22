@@ -444,7 +444,7 @@
             };
         }
 
-        let bulkController = null;
+        let bulkController = null, jobRestoreController = null;
         function getBulkController(){const factory=global.SoftoraDatabaseWebdesignBulk&&global.SoftoraDatabaseWebdesignBulk.createController;if(typeof factory!=="function")return null;if(!bulkController)bulkController=factory({normalizeString:normalizeString,escapeHtml:escapeHtml,buildJobPayload:buildJobPayload,refreshPhotos:refreshPhotos,renderPage:renderPage,onCancel:function(result){const ids=new Set((Array.isArray(result&&result.cancelledJobIds)?result.cancelledJobIds:[]).map(normalizeString).filter(Boolean));let cleared=0;readPendingJobs().forEach(function(job){const shouldClear=ids.size?ids.has(normalizeString(job.jobId)):isRestoredPendingJob(job);if(!shouldClear)return;clearPollTimer(job.jobId);removePendingJob(job.customerId);cleared+=1;});if(cleared&&typeof renderPage==="function")renderPage();},refreshDelayMs:FINISHED_PHOTO_REFRESH_DELAY_MS});return bulkController;}
         async function startBulkBatchForCustomers(customers){const controller=getBulkController();if(!controller)throw new Error("Webdesign-bulk script is niet geladen.");return controller.startBulkBatchForCustomers(customers);}
         function resumeBulkBatch(){const controller=getBulkController();if(controller&&typeof controller.loadLatestBatch==="function")void controller.loadLatestBatch();}
@@ -566,38 +566,34 @@
         }
 
         async function loadRunningJobs() {
-            try {
-                const response = await fetch(JOB_ENDPOINT, {
-                    method: "GET",
-                    credentials: "same-origin",
-                    cache: "no-store",
-                    headers: { Accept: "application/json" }
-                });
-                const payload = await response.json().catch(function () {
-                    return {};
-                });
-                const jobs = Array.isArray(payload && payload.jobs) ? payload.jobs : [];
-                if (!response.ok) return;
-                const activeRestoredJobIds = new Set();
-                let restoredCount = 0, clearedCount = pruneExpiredPendingJobs();
-                jobs.forEach(function (job) {
-                    if (!job || (job.status !== "queued" && job.status !== "running")) return;
-                    const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), variant: normalizeVariant(job.variant), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
-                    if (!isPendingJobFresh(pendingJob)) return;
-                    activeRestoredJobIds.add(pendingJob.jobId); setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
-                });
-                readPendingJobs().forEach(function (pendingJob) {
-                    if (!isRestoredPendingJob(pendingJob) || activeRestoredJobIds.has(pendingJob.jobId)) return;
-                    clearPollTimer(pendingJob.jobId); removePendingJob(pendingJob.customerId); clearedCount += 1;
-                });
-                if ((restoredCount || clearedCount) && typeof renderPage === "function") renderPage();
-            } catch (error) {
-                /* The next page load or poll will pick up running server jobs again. */
-            }
+            const response = await fetch(JOB_ENDPOINT, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { Accept: "application/json" }
+            });
+            const payload = await response.json().catch(function () { return {}; });
+            if (!response.ok) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-status laden is mislukt.");
+            const jobs = Array.isArray(payload && payload.jobs) ? payload.jobs : [];
+            const activeRestoredJobIds = new Set();
+            let restoredCount = 0, clearedCount = pruneExpiredPendingJobs();
+            jobs.forEach(function (job) {
+                if (!job || (job.status !== "queued" && job.status !== "running")) return;
+                const pendingJob = { customerId: normalizeString(job.customerId), jobId: normalizeString(job.id), variant: normalizeVariant(job.variant), startedAt: Math.max(0, Number(job.createdAt) || now()), restored: true };
+                if (!isPendingJobFresh(pendingJob)) return;
+                activeRestoredJobIds.add(pendingJob.jobId); setPendingJob(pendingJob, { deferRender: true }); schedulePoll(pendingJob.jobId, (restoredCount % 80) * BATCH_POLL_STAGGER_MS); restoredCount += 1;
+            });
+            readPendingJobs().forEach(function (pendingJob) {
+                if (!isRestoredPendingJob(pendingJob) || activeRestoredJobIds.has(pendingJob.jobId)) return;
+                clearPollTimer(pendingJob.jobId); removePendingJob(pendingJob.customerId); queueFinishedPhotoRefresh(pendingJob.customerId); clearedCount += 1;
+            });
+            if ((restoredCount || clearedCount) && typeof renderPage === "function") renderPage();
         }
 
         function resumePendingJobs() {
-            const firstLoad = loadRunningJobs();
+            const restoreFactory = global.SoftoraDatabaseWebdesignJobRestore && global.SoftoraDatabaseWebdesignJobRestore.createController;
+            if (!jobRestoreController && typeof restoreFactory === "function") jobRestoreController = restoreFactory({ load: loadRunningJobs });
+            const firstLoad = jobRestoreController ? jobRestoreController.run() : loadRunningJobs().catch(function () { return null; });
             void resumeBulkBatch();
             return firstLoad;
         }
@@ -747,10 +743,8 @@
                 if (!response.ok || !job || !job.id) {
                     throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign starten is mislukt.");
                 }
-                if (job.id !== jobId) {
-                    clearPollTimer(jobId);
-                    setPendingJob({ customerId: target.id, jobId: job.id, variant: normalizeVariant(job.variant || variant), startedAt: now() }, { deferRender: deferRender });
-                }
+                if (job.id !== jobId) clearPollTimer(jobId);
+                setPendingJob({ customerId: target.id, jobId: job.id, variant: normalizeVariant(job.variant || variant), startedAt: Math.max(0, Number(job.createdAt) || now()) }, { deferRender: true });
                 if (job.status === "done") {
                     await finishPendingJob({ customerId: target.id, jobId: job.id }, "");
                     return { started: true, done: true, jobId: job.id };
