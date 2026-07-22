@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-20",
+  "updatedAt": "2026-07-22",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -1475,7 +1475,9 @@
     },
     {
       "id": "crm-requirements-019",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-07-22",
+      "shippedPath": "/blog/crm-eisen-wensenlijst-mkb",
       "path": "/blog/crm-eisen-wensenlijst-mkb",
       "contentType": "blog",
       "cluster": "software-crm",
@@ -1554,7 +1556,90 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Controleer de actuele SERP-overlap en schrijf de eisenlijst als praktisch denkmodel zonder gated download of calculator."
+      "nextAction": "Volg indexatie en de eerste niet-merkgebonden impressies op de reviewmomenten."
+    },
+    {
+      "id": "website-maintenance-020",
+      "status": "ready",
+      "path": "/blog/website-onderhoud-kosten-mkb",
+      "contentType": "blog",
+      "cluster": "websites",
+      "primaryQuery": "website onderhoud kosten",
+      "intent": "Doorlopende onderhoudskosten en scope na de livegang van een zakelijke website",
+      "intentClass": "cost",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/website-laten-maken",
+      "clusterRole": "Total-cost-verdieping na bouwkosten en voor leverancierskeuze",
+      "demandEvidence": [
+        {
+          "type": "serp-and-cluster-gap",
+          "source": "Nederlandse SERP voor website onderhoud kosten en Softora website-inventaris",
+          "observedAt": "2026-07-22",
+          "detail": "Actuele resultaten behandelen maandkosten, updates, hosting, support en performance; Softora heeft bouwkosten en offertecategorieen, maar nog geen aparte gids die onderhoudsscope, verantwoordelijkheden en terugkerende kosten claim-safe vergelijkt."
+        }
+      ],
+      "competitorPatterns": [
+        "Prijsbandbreedtes zonder gelijke afbakening van onderhoud en support",
+        "Onderhoudspakketten waarin hosting, content en doorontwikkeling door elkaar lopen",
+        "Risicoclaims over veiligheid of ranking zonder technische context"
+      ],
+      "overlap": {
+        "checkedAt": "2026-07-22",
+        "closestPaths": [
+          "/blog/website-laten-maken-kosten-2026",
+          "/blog/website-offerte-vergelijken",
+          "/vergelijkingen/website-laten-maken-vs-zelf-maken"
+        ],
+        "decision": "distinct",
+        "rationale": "De kostengids behandelt de bouwinvestering, de offertegids de eerste leveranciersscope en de vergelijking de maakroute; deze kandidaat behandelt uitsluitend terugkerend technisch beheer, support, contentwerk en wijzigingen na livegang."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 5,
+        "attainability": 3,
+        "uniqueness": 4,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.25,
+      "brief": {
+        "title": "Website onderhoud kosten voor het MKB: wat hoort erbij?",
+        "metaDescription": "Vergelijk website-onderhoud op hosting, updates, monitoring, support, content, performance en wijzigingen zonder ongelijke pakketten naast elkaar te zetten.",
+        "h1": "Wat kost website onderhoud voor het MKB?",
+        "outline": [
+          "Scheid hosting, technisch onderhoud en contentbeheer",
+          "Welke complexiteit en koppelingen de inzet bepalen",
+          "Reactief support versus gepland beheer",
+          "Eigenaarschap, toegang en wijzigingen vastleggen",
+          "Onderhoudsvoorstellen op dezelfde scope vergelijken"
+        ],
+        "buyerQuestions": [
+          "Wat valt normaal onder website onderhoud?",
+          "Welke kosten zijn vast en welke variabel?",
+          "Hoe vergelijk je onderhoudspakketten eerlijk?"
+        ],
+        "incomingLinks": [
+          "/blog/website-laten-maken-kosten-2026",
+          "/blog/website-offerte-vergelijken"
+        ],
+        "outgoingLinks": [
+          "/website-laten-maken",
+          "/vergelijkingen/website-laten-maken-vs-zelf-maken"
+        ],
+        "conversionPath": "Van total-cost-vraag naar een gesprek over bouwscope, beheer en eigenaarschap van een zakelijke website.",
+        "claimRisk": "Geen vaste prijs, hackvrije website, permanente beschikbaarheid of rankingbehoud beloven; prijsbanden alleen gebruiken met geverifieerde Softora-bron.",
+        "visualConcepts": [
+          "Onderhoudsmodel met hosting, updates, monitoring, support en wijzigingen",
+          "Vergelijkingsmatrix voor vast beheer, incidentwerk en doorontwikkeling"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Controleer actuele buyer questions en werk zonder ongeverifieerde prijsbanden uit wat ieder onderhoudsonderdeel aantoonbaar omvat."
     }
   ]
 }

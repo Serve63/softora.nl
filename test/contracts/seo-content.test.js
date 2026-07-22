@@ -622,6 +622,27 @@ test('CRM-implementatiegids gebruikt twee eigen procesbeelden, FAQ en inkomende 
   assert.match(definitionHtml, /href="\/blog\/crm-implementatie-doorlooptijd-mkb"/);
 });
 
+test('CRM-eisengids gebruikt twee eigen procesbeelden, FAQ en natuurlijke inkomende links', () => {
+  const item = getSeoContentItem('blog', 'crm-eisen-wensenlijst-mkb');
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const comparisonHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('vergelijkingen', 'crm-op-maat-vs-standaard-crm')
+  );
+  const implementationHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'crm-implementatie-doorlooptijd-mkb')
+  );
+
+  assert.equal(item.image.src, '/assets/seo-content/crm-eisen-requirementscanvas-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/crm-eisen-prioriteitenmatrix-softora.jpg');
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(comparisonHtml, /href="\/blog\/crm-eisen-wensenlijst-mkb"/);
+  assert.match(implementationHtml, /href="\/blog\/crm-eisen-wensenlijst-mkb"/);
+});
+
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
     siteOrigin: 'https://www.softora.nl',
