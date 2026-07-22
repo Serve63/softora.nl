@@ -27,12 +27,8 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-function formatMailboxDetailSubject(value) {
-  const subject = String(value || '').trim().replace(/^email received\s*-\s*/i, '').trim();
-  return subject || '(Geen onderwerp)';
-}
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
-const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link)\s*\[(https?:\/\/[^\]\s<>"']+)\]/gi;
+const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[(https?:\/\/[^\]\s<>"']+)\]/gi;
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
 }
@@ -81,10 +77,10 @@ function renderLinkedMailboxText(value, options) {
   let lastIndex = 0;
   text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, url, offset) => {
     html += renderMailboxUrls(text.slice(lastIndex, offset));
-    if (isSafeMailBodyUrl(url)) {
+    if (isSafeMailBodyUrl(url) && window.SoftoraMailboxDisplay.isLabelledUrlMatch(label, url)) {
       html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
     } else {
-      html += escapeHtml(match);
+      html += renderMailboxUrls(match);
     }
     lastIndex = offset + match.length;
     return match;
@@ -228,11 +224,11 @@ function isMailboxStandaloneAssetUrl(value) {
     (host === 'cdn.openai.com' && /(?:logo|asset|image|header)/i.test(path));
 }
 function isMailboxTechnicalUrl(value, options) {
-  if (isMailboxTrackingUrl(value)) return true;
+  if (isMailboxTrackingUrl(value) || window.SoftoraMailboxDisplay.isGmailSignatureAssetUrl(value)) return true;
   return Boolean(options && options.standalone && isMailboxStandaloneAssetUrl(value));
 }
 function cleanMailboxText(value) {
-  return String(value || '')
+  const lines = String(value || '')
     .replace(/\r\n?/g, '\n')
     .replace(/\u200B/g, '')
     .split('\n')
@@ -241,6 +237,7 @@ function cleanMailboxText(value) {
       .replace(/<((?:https?:\/\/)[^>\s]+)>/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
       .replace(/\s{2,}/g, ' ')
       .trimEnd())
+    .map((line) => window.SoftoraMailboxDisplay.collapseDuplicateAnnotations(line))
     .filter((line) => {
       const value = String(line || '').trim();
       const url = value.match(/^\[(https?:\/\/[^\]]+)\]$/i)?.[1] ||
@@ -248,7 +245,8 @@ function cleanMailboxText(value) {
         value.match(/^(https?:\/\/\S+)$/i)?.[1] ||
         '';
       return !(url && isMailboxTechnicalUrl(url, { standalone: true }));
-    })
+    });
+  return window.SoftoraMailboxDisplay.removeDuplicateSignatureLeadLines(lines)
     .join('\n')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -376,7 +374,7 @@ function buildMailboxBodySections(value) {
         pushSection();
         currentType = 'signature';
       }
-      currentLines.push(rawLine);
+      if (trimmed !== '--') currentLines.push(rawLine);
       return;
     }
     if (signatureStarted) {
@@ -836,7 +834,7 @@ function openMail(id, options = {}) {
       <article class="detail-mail-block">
         <div class="detail-header">
           <div class="detail-subject-row">
-            <div class="detail-subject">${escapeHtml(formatMailboxDetailSubject(m.subject))}</div>
+            <div class="detail-subject">${escapeHtml(window.SoftoraMailboxDisplay.formatDetailSubject(m.subject))}</div>
             <div class="detail-head-tools">
               <div class="detail-date">${escapeHtml(m.date)}, ${escapeHtml(m.time)}</div>
             </div>
@@ -930,7 +928,7 @@ function replyMail(mail) {
   const subjectField = document.getElementById('c-subject');
   if (toField) toField.value = window.SoftoraMailboxDisplay.getReplyToAddress(mail, { activeFolder, account: getMailboxAccount() });
   if (subjectField) {
-    const subject = formatMailboxDetailSubject(mail.subject);
+    const subject = window.SoftoraMailboxDisplay.formatDetailSubject(mail.subject);
     subjectField.value = /^re:/i.test(subject) ? subject : `Re: ${subject}`;
   }
   openCompose({ keepContext: true });

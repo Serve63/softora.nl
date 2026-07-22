@@ -455,8 +455,14 @@ function isStandaloneAssetUrl(rawUrl) {
   return false;
 }
 
+function isGmailSignatureAssetUrl(rawUrl) {
+  const parsed = safeUrl(rawUrl);
+  if (!parsed) return false;
+  return /(^|\.)googleusercontent\.com$/i.test(parsed.hostname) && /^\/mail-sig\//i.test(parsed.pathname);
+}
+
 function isTechnicalMailUrl(rawUrl, options = {}) {
-  if (isTrackingUrl(rawUrl)) return true;
+  if (isTrackingUrl(rawUrl) || isGmailSignatureAssetUrl(rawUrl)) return true;
   return Boolean(options.standalone && isStandaloneAssetUrl(rawUrl));
 }
 
@@ -478,15 +484,50 @@ function isStandaloneTechnicalUrlLine(line) {
   return Boolean(url && isTechnicalMailUrl(url, { standalone: true }));
 }
 
+function collapseDuplicateMailboxAnnotations(line) {
+  return String(line || '').replace(
+    /\b([a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,})\s+\[(?:mailto:)?([^\]\s]+)\]/gi,
+    (match, label, target) => String(label).toLowerCase() === String(target).toLowerCase() ? label : match
+  );
+}
+
+function normalizeMailboxRepeatedLine(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function removeDuplicateMailboxSignatureLeadLines(lines) {
+  const result = Array.isArray(lines) ? lines.slice() : [];
+  for (let index = 0; index < result.length; index += 1) {
+    if (String(result[index] || '').trim() !== '--') continue;
+    let previousIndex = index - 1;
+    while (previousIndex >= 0 && !String(result[previousIndex] || '').trim()) previousIndex -= 1;
+    let nextIndex = index + 1;
+    while (nextIndex < result.length && !String(result[nextIndex] || '').trim()) nextIndex += 1;
+    const previous = normalizeMailboxRepeatedLine(result[previousIndex]);
+    const next = normalizeMailboxRepeatedLine(result[nextIndex]);
+    if (!previous || previous !== next) continue;
+    result.splice(previousIndex, 1);
+    index -= 1;
+  }
+  return result;
+}
+
 function sanitizeMailboxDisplayText(value) {
   const raw = String(value || '');
   const source = /<\/?[a-z][\s\S]*>/i.test(raw) ? htmlToReadableText(raw) : decodeBasicHtmlEntities(raw);
-  const normalized = source
+  const lines = source
     .replace(/\r\n?/g, '\n')
     .replace(/\u200B/g, '')
     .split('\n')
     .map((line) => stripInlineTechnicalUrls(line))
-    .filter((line) => !isStandaloneTechnicalUrlLine(line))
+    .map((line) => collapseDuplicateMailboxAnnotations(line))
+    .filter((line) => !isStandaloneTechnicalUrlLine(line));
+  const normalized = removeDuplicateMailboxSignatureLeadLines(lines)
     .join('\n')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

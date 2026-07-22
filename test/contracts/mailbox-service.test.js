@@ -2133,6 +2133,28 @@ Bekijk normale link: [https://softora.nl/voorbeelddesign1]
   assert.doesNotMatch(clean, /sendgrid\.net/);
 });
 
+test('mailbox service removes Gmail signature artifacts before indexing Martijn replies', () => {
+  const clean = sanitizeMailboxDisplayText(`
+[https://ci3.googleusercontent.com/mail-sig/AIorK4xO039AXHNmO6ZlXuH8i0cEctngV0Ftl-cF9usjh8mD9halM4-1NEbcTR5bMI4_9hVevZAMmacdAxt5]
+
+Muziekschool Pedro van Meel
+
+--
+
+Muziekschool Pedro van Meel
+Piano & Keyboarddocent
+[https://ci3.googleusercontent.com/mail-sig/AIorK4xD5yVpdOdHdlYOPUiaBdnN7zb6OBxpDoq6jOp8n3vcDIsyFUcejkDgWeaiviNV0rt7OOXeynE]
+E-mail: keyboardpianoleraar@gmail.com [keyboardpianoleraar@gmail.com]
+Website: www.pianokeyboardleraar.nl [http://www.pianokeyboardleraar.nl]
+Tel: 06-54967032
+`);
+
+  assert.doesNotMatch(clean, /googleusercontent\.com/i);
+  assert.doesNotMatch(clean, /keyboardpianoleraar@gmail\.com\s*\[keyboardpianoleraar@gmail\.com\]/i);
+  assert.equal((clean.match(/Muziekschool Pedro van Meel/g) || []).length, 1);
+  assert.match(clean, /Website: www\.pianokeyboardleraar\.nl \[http:\/\/www\.pianokeyboardleraar\.nl\]/);
+});
+
 test('mailbox service rejects invalid mark-read message references', async () => {
   const service = createMailboxService({
     logger: { error() {} },
