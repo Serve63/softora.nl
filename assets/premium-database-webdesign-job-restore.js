@@ -5,22 +5,24 @@
 
     function createController(options) {
         const load = options && typeof options.load === "function" ? options.load : async function () {};
+        const setTimeoutImpl = options && typeof options.setTimeout === "function" ? options.setTimeout : global.setTimeout;
+        const clearTimeoutImpl = options && typeof options.clearTimeout === "function" ? options.clearTimeout : global.clearTimeout;
         let retryTimer = null;
         let retryAttempt = 0;
         let inFlightPromise = null;
 
         function clearRetry() {
-            if (retryTimer && typeof global.clearTimeout === "function") global.clearTimeout(retryTimer);
+            if (retryTimer && typeof clearTimeoutImpl === "function") clearTimeoutImpl(retryTimer);
             retryTimer = null;
             retryAttempt = 0;
         }
 
         function scheduleRetry() {
-            if (retryTimer || typeof global.setTimeout !== "function") return;
+            if (retryTimer || typeof setTimeoutImpl !== "function") return;
             const delay = RETRY_DELAYS_MS[retryAttempt];
             if (!Number.isFinite(Number(delay))) return;
             retryAttempt += 1;
-            retryTimer = global.setTimeout(function () {
+            retryTimer = setTimeoutImpl(function () {
                 retryTimer = null;
                 void run();
             }, delay);
@@ -47,5 +49,7 @@
         return { run: run };
     }
 
-    global.SoftoraDatabaseWebdesignJobRestore = { createController: createController };
+    const api = { createController: createController };
+    global.SoftoraDatabaseWebdesignJobRestore = api;
+    if (typeof module !== "undefined" && module && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

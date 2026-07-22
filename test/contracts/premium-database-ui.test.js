@@ -130,10 +130,8 @@ function loadDatabaseColdmailGuardClient() {
 
 function loadDatabaseWebdesignActionClient(options = {}) {
   const previewScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-preview.js');
-  const restoreScriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-job-restore.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-action.js');
   const previewSource = fs.readFileSync(previewScriptPath, 'utf8');
-  const restoreSource = fs.readFileSync(restoreScriptPath, 'utf8');
   const source = fs.readFileSync(scriptPath, 'utf8');
   const document = options.document || {
     getElementById: () => null,
@@ -142,6 +140,7 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   };
   const windowObject = {
     document,
+    SoftoraDatabaseWebdesignJobRestore: require('../../assets/premium-database-webdesign-job-restore'),
     SoftoraDatabaseWebdesignVariantPicker: Object.prototype.hasOwnProperty.call(options, 'SoftoraDatabaseWebdesignVariantPicker')
       ? options.SoftoraDatabaseWebdesignVariantPicker
       : { choose: async () => 'v2-visual-dna' },
@@ -154,7 +153,6 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   };
   const sandbox = { window: windowObject, fetch: windowObject.fetch };
   vm.runInNewContext(previewSource, sandbox);
-  vm.runInNewContext(restoreSource, sandbox);
   vm.runInNewContext(source, sandbox);
   return sandbox.window.SoftoraDatabaseWebdesignAction;
 }
@@ -185,15 +183,8 @@ function loadDatabaseWebdesignBulkClient(options = {}) {
   return sandbox.window.SoftoraDatabaseWebdesignBulk;
 }
 
-function loadDatabaseWebdesignJobRestoreClient(options = {}) {
-  const scriptPath = path.join(__dirname, '../../assets/premium-database-webdesign-job-restore.js');
-  const source = fs.readFileSync(scriptPath, 'utf8');
-  const windowObject = {
-    setTimeout: options.setTimeout || setTimeout,
-    clearTimeout: options.clearTimeout || clearTimeout,
-  };
-  vm.runInNewContext(source, { window: windowObject });
-  return windowObject.SoftoraDatabaseWebdesignJobRestore;
+function loadDatabaseWebdesignJobRestoreClient() {
+  return require('../../assets/premium-database-webdesign-job-restore');
 }
 
 function loadDatabaseLeadDeleteClient(options = {}) {
@@ -2984,7 +2975,8 @@ test('premium database webdesign action restores large running job lists without
 test('premium database webdesign job restore retries a temporary status failure without parallel requests', async () => {
   const timers = [];
   let attempts = 0;
-  const restoreClient = loadDatabaseWebdesignJobRestoreClient({
+  const restoreClient = loadDatabaseWebdesignJobRestoreClient();
+  const controller = restoreClient.createController({
     setTimeout(callback, delay) {
       const timer = { callback, delay };
       timers.push(timer);
@@ -2994,8 +2986,6 @@ test('premium database webdesign job restore retries a temporary status failure 
       const index = timers.indexOf(timer);
       if (index >= 0) timers.splice(index, 1);
     },
-  });
-  const controller = restoreClient.createController({
     async load() {
       attempts += 1;
       if (attempts === 1) throw new Error('tijdelijk niet bereikbaar');
