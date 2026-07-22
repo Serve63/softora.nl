@@ -2480,7 +2480,10 @@ function createMailboxService(deps = {}) {
 
   async function rewriteDraft({ accountEmail, to, subject, body, context, senderProfile }) {
     const draft = cleanPromptText(body, 8000);
-    if (!draft) {
+    const hasReplyContext = Boolean(
+      context && typeof context === 'object' && (cleanPromptText(context.body, 6000) || cleanPromptText(context.preview, 600))
+    );
+    if (!draft && !hasReplyContext) {
       const error = new Error('Typ eerst je mailtekst.');
       error.status = 400;
       throw error;
@@ -2494,17 +2497,27 @@ function createMailboxService(deps = {}) {
     }
 
     const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
+    const senderName = cleanPromptText(getAccount(accountEmail)?.name, 120) || normalizeEmail(accountEmail);
     const systemPrompt = [
-      'Je bent de mailherschrijver van Softora.',
-      'Herschrijf alleen het conceptantwoord van de medewerker.',
-      'Maak de tekst duidelijker, netter en professioneler, maar behoud exact de bedoeling.',
-      'Gebruik de context van de originele mail om toon en inhoud passend te houden.',
+      'Je bent de antwoordassistent van Softora en schrijft een direct verstuurbare e-mailreactie.',
+      `Schrijf namens ${senderName}. Gebruik nooit de naam of ondertekening van een andere afzender.`,
+      'Beantwoord de nieuwste ontvangen boodschap in origineleMail. Gebruik eerder geciteerde berichten alleen als achtergrondcontext.',
+      draft
+        ? 'Gebruik conceptAntwoord als inhoudelijke aanwijzing en verbeter het waar nodig.'
+        : 'Schrijf zelfstandig de best passende reactie; er is nog geen conceptAntwoord.',
+      'Schrijf kort, menselijk, vriendelijk, ontspannen, enthousiast, direct en helder. Niet corporate, glad, afstandelijk, overdreven formeel of lang.',
+      'Spreek de ontvanger altijd aan met je en nooit met jullie.',
+      'Herhaal geen verkooppraat of zinnen uit de oorspronkelijke coldmail.',
+      'Laat exact één keer 😁 natuurlijk in de reactie terugkomen.',
+      'Bij interesse of een verzoek om de preview: reageer warm en enthousiast en deel of noem de preview alleen als de echte URL in de context staat.',
+      'Bij een prijsvraag: verzin geen prijs. Leg menselijk uit dat de prijs afhangt van wat de ontvanger precies wil en stuur subtiel aan op kort samen kijken op locatie.',
+      'Een voorstel om langs te komen moet behulpzaam voelen: samen kort naar het ontwerp kijken en een eerlijke prijsinschatting geven, niet verkopen of beoordelen.',
+      'Gebruik nooit het woord laagdrempelig en schrijf niets over kansen, verbeterpunten of wat er beter moet.',
+      'Bij geen interesse, afwijzing of een negatieve reactie: antwoord netjes, kort en respectvol, zonder nieuwe verkooppoging.',
       'Gebruik afzenderProfiel.aiInstructions en afzenderProfiel.toneStyle als persoonlijke schrijfinstructies van het geselecteerde afzenderadres.',
-      'Als afzenderProfiel.signature of afzenderProfiel.bodyTemplate een afsluiting bevat, behoud die afzender/afsluiting en gebruik geen naam van een ander mailadres.',
+      `Sluit altijd exact af met: Met vriendelijke groet,\n${senderName}`,
       'Verzin geen feiten, beloftes, bedragen, datums, namen, afspraken, URLs of voorwaarden.',
-      'Wijzig belangrijke gegevens niet.',
-      'Maak het niet overdreven formeel als dat niet nodig is.',
-      'Geef alleen de verbeterde mailtekst terug, zonder uitleg, markdown of extra analyse.',
+      'Geef uitsluitend de exacte mailtekst terug, zonder onderwerpregel, labels, uitleg, markdown of analyse.',
     ].join('\n');
 
     const payload = buildRewritePromptPayload({ accountEmail, to, subject, body: draft, context, senderProfile });

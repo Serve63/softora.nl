@@ -1928,10 +1928,55 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
   assert.match(calls[0].payload.messages[0].content, /afzenderProfiel\.aiInstructions/);
+  assert.match(calls[0].payload.messages[0].content, /Schrijf namens Servé Creusen/);
+  assert.match(calls[0].payload.messages[0].content, /exact één keer 😁/);
+  assert.match(calls[0].payload.messages[0].content, /nooit met jullie/);
+  assert.match(calls[0].payload.messages[0].content, /zonder nieuwe verkooppoging/);
+  assert.match(calls[0].payload.messages[0].content, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
   assert.match(calls[0].payload.messages[1].content, /Kan dit voor vrijdag/);
   assert.match(calls[0].payload.messages[1].content, /hoi ik stuur dit ff/);
   assert.match(calls[0].payload.messages[1].content, /Groetjes[\s\S]*Servé/);
   assert.match(calls[0].payload.messages[1].content, /Informeel & persoonlijk/);
+});
+
+test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de ontvangen mail', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    openAiModel: 'gpt-test',
+    fetchJsonWithTimeout: async (_url, options) => {
+      calls.push(JSON.parse(options.body));
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          model: 'gpt-test',
+          choices: [{ message: { content: 'Hoi Lisa,\n\nDankjewel voor je reactie! 😁\n\nMet vriendelijke groet,\nMartijn van de Ven' } }],
+        },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+
+  const result = await service.rewriteDraft({
+    accountEmail: 'martijn@softora.nl',
+    to: 'lisa@example.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    body: '',
+    context: {
+      from: 'Lisa',
+      email: 'lisa@example.nl',
+      subject: 'Re: Kleine vraag over jullie website',
+      body: 'Hoi Martijn, stuur de online preview maar door. Wat kost zoiets?',
+    },
+  });
+
+  assert.match(result.text, /Martijn van de Ven/);
+  assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
+  assert.match(calls[0].messages[0].content, /Schrijf namens Martijn van de Ven/);
+  assert.match(calls[0].messages[0].content, /verzin geen prijs/i);
+  assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
+  assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
 });
 
 test('mailbox service refuses rewrite without OpenAI key', async () => {
