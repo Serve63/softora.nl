@@ -23,6 +23,7 @@
   let defaultOwner = 'both';
   let pinnedOwner = '';
   let preferenceIdentity = 'anonymous';
+  let pageBootstrapConsumed = false;
 
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
@@ -235,8 +236,56 @@
     return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}</div>`;
   }
 
-  async function load(folder, normalizeMessage, fetchImpl) {
+  function readPageBootstrapPayload() {
+    if (!global.document) return null;
+    const element = global.document.getElementById('softoraPageStateBootstrap');
+    if (!element) return null;
+    try {
+      const payload = JSON.parse(String(element.textContent || '{}'));
+      return payload && typeof payload === 'object' ? payload : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function readPageBootstrap() {
+    if (pageBootstrapConsumed) return null;
+    const mailbox = readPageBootstrapPayload()?.mailbox;
+    return mailbox && mailbox.ok !== false && Array.isArray(mailbox.messages) ? mailbox : null;
+  }
+
+  function getPageBootstrapSession() {
+    const session = readPageBootstrapPayload()?.session;
+    return session && session.authenticated ? session : null;
+  }
+
+  function hasPageBootstrap(folder) {
+    return folder === 'outreach' && Boolean(readPageBootstrap());
+  }
+
+  function normalizeLoadResult(data, normalizeMessage, fromBootstrap) {
+    return {
+      messages: (Array.isArray(data && data.messages) ? data.messages : []).map(normalizeMessage),
+      sync: data?.sync && typeof data.sync === 'object'
+        ? data.sync
+        : {
+            indexed: true,
+            stale: false,
+            source: 'campaign-replies-index',
+            refreshRecommended: false,
+            warming: false,
+          },
+      fromBootstrap: Boolean(fromBootstrap),
+    };
+  }
+
+  async function load(folder, normalizeMessage, fetchImpl, options) {
     if (folder !== 'outreach') return null;
+    const bootstrap = !(options && options.skipBootstrap) ? readPageBootstrap() : null;
+    if (bootstrap) {
+      pageBootstrapConsumed = true;
+      return normalizeLoadResult(bootstrap, normalizeMessage, true);
+    }
     const request = typeof fetchImpl === 'function'
       ? fetchImpl
       : global.fetch.bind(global);
@@ -249,18 +298,7 @@
     if (!response.ok || !data?.ok) {
       throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
     }
-    return {
-      messages: (Array.isArray(data.messages) ? data.messages : []).map(normalizeMessage),
-      sync: data?.sync && typeof data.sync === 'object'
-        ? data.sync
-        : {
-            indexed: true,
-            stale: false,
-            source: 'campaign-replies-index',
-            refreshRecommended: false,
-            warming: false,
-          },
-    };
+    return normalizeLoadResult(data, normalizeMessage, false);
   }
 
   const campaignInboxApi = {
@@ -268,11 +306,13 @@
     filterMessages,
     getAccount,
     getFolder,
+    hasPageBootstrap,
     getOwner,
     getOwnerByAccount,
     getOwnerLabel,
     getOwnerOptionsForMenu,
     getOwnerPinKeyForIdentity,
+    getPageBootstrapSession,
     getRequestId,
     initializeOwnerPreference,
     isOwner,

@@ -349,10 +349,10 @@ function applyWebsiteGeneratorAuthState() {
 
 async function loadWebsiteGeneratorAuthState(force = false) {
   if (websiteGeneratorAuthPromise && !force) return websiteGeneratorAuthPromise;
-
   websiteGeneratorAuthPromise = (async function () {
     try {
-      const response = await fetch('/api/auth/session', {
+      const bootstrappedSession = !force ? window.SoftoraPageBootstrapSession?.get?.() : null;
+      const response = bootstrappedSession ? null : await fetch('/api/auth/session', {
         method: 'GET',
         credentials: 'same-origin',
         cache: 'no-store',
@@ -360,10 +360,10 @@ async function loadWebsiteGeneratorAuthState(force = false) {
           Accept: 'application/json',
         },
       });
-      const payload = await response.json().catch(() => ({}));
+      const payload = bootstrappedSession || await response.json().catch(() => ({}));
       websiteGeneratorAuthState = {
         loaded: true,
-        authenticated: Boolean(response.ok && payload && payload.authenticated),
+        authenticated: Boolean((bootstrappedSession || response.ok) && payload && payload.authenticated),
       };
     } catch (_) {
       websiteGeneratorAuthState = {

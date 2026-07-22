@@ -57,7 +57,8 @@
     }
 
     async function loadInitialValue() {
-        setStatus("Notities laden...", "");
+        var bootstrappedState = getUiStateClient().peek && getUiStateClient().peek(REMOTE_SCOPE);
+        if (!bootstrappedState) setStatus("Notities laden...", "");
         try {
             var state = await loadRemoteStateWithRetry();
             var values = state && state.values ? state.values : {};

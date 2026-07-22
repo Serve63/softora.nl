@@ -114,6 +114,10 @@ function createPremiumHtmlPageAccessController(options = {}) {
         };
       }
 
+      // De HTML-renderer gebruikt dezelfde bevestigde sessie om serverdata direct
+      // in de eerste pagina te plaatsen; zo is geen tweede sessieverzoek nodig.
+      req.premiumAuth = authState;
+
       if (!isPremiumAdminIpAllowed(req)) {
         appendSecurityAuditEvent(
           {

@@ -153,13 +153,13 @@ async function writePinnedMailboxAccount(email) {
 }
 async function initializeMailboxAccountPreference() {
   try {
-    const response = await fetch('/api/auth/session', {
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-    });
-    const payload = await response.json().catch(() => ({}));
-    const session = payload && payload.session ? payload.session : payload;
+    const bootstrappedSession = window.SoftoraMailboxCampaignInbox?.getPageBootstrapSession?.();
+    let session = bootstrappedSession;
+    if (!session) {
+      const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => ({}));
+      session = payload && payload.session ? payload.session : payload;
+    }
     mailboxAccountPreferenceIdentity = resolveMailboxPreferenceIdentity(session); await window.SoftoraMailboxCampaignInbox.initializeOwnerPreference(session, window.SoftoraUiStateClient, mailboxAccountPreferenceIdentity);
   } catch (_) {
     mailboxAccountPreferenceIdentity = 'anonymous'; await window.SoftoraMailboxCampaignInbox.initializeOwnerPreference({}, window.SoftoraUiStateClient, mailboxAccountPreferenceIdentity);
@@ -665,12 +665,9 @@ async function syncMailboxInBackground() {
   });
 }
 async function loadMailboxMessages(options = {}) {
-  const wrap = document.getElementById('mail-items'); const showLoader = options.showLoader !== false;
-  if (wrap && showLoader) {
-    wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox laden…</div>`;
-  }
-  try { const campaignResult = await window.SoftoraMailboxCampaignInbox?.load(activeFolder, normalizeMailboxApiMessage);
-    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = campaignResult.messages; renderList({ openLatest: options.openLatest !== false }); window.SoftoraMailboxIndex?.setStatus(''); return; }
+  const wrap = document.getElementById('mail-items'); if (wrap) wrap.setAttribute('aria-busy', 'true');
+  try { const campaignResult = await window.SoftoraMailboxCampaignInbox?.load(activeFolder, normalizeMailboxApiMessage, null, { skipBootstrap: options.skipPageBootstrap === true });
+    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = campaignResult.messages; renderList({ openLatest: options.openLatest !== false }); window.SoftoraMailboxIndex?.setStatus(''); if (wrap) wrap.setAttribute('aria-busy', 'false'); if (campaignResult.fromBootstrap) void loadMailboxMessages({ skipPageBootstrap: true, skipBackgroundSync: true, openLatest: false, preserveOnError: true }); return; }
     const response = await fetch(`/api/mailbox/messages?account=${encodeURIComponent(activeMailboxAccount)}&folder=${encodeURIComponent(activeFolder)}&limit=50`, {
       credentials: 'same-origin',
       cache: 'no-store',
@@ -692,12 +689,15 @@ async function loadMailboxMessages(options = {}) {
     } else if (!window.SoftoraMailboxIndex || !window.SoftoraMailboxIndex.isSyncInFlight()) {
       window.SoftoraMailboxIndex?.setStatus('');
     }
+    if (wrap) wrap.setAttribute('aria-busy', 'false');
   } catch (error) {
+    if (options.preserveOnError && mails.length) { window.SoftoraMailboxIndex?.setStatus(''); if (wrap) wrap.setAttribute('aria-busy', 'false'); return; }
     mailboxSyncState = null;
     mails = [];
     window.SoftoraMailboxIndex?.setStatus('');
     syncInboxBadgeFromCurrentFolder();
     if (wrap) {
+      wrap.setAttribute('aria-busy', 'false');
       wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${escapeHtml(error?.message || error || 'Mailbox laden mislukt')}</div>`;
     }
     toast(String(error?.message || error || 'Mailbox laden mislukt'));
@@ -1154,6 +1154,14 @@ window.addEventListener('keydown', (event) => {
     ? window.SoftoraMailboxOutreach.readIntent()
     : {};
   if (intent.account) activeMailboxAccount = intent.account;
+  const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
+  if (initialFolder === 'outreach') {
+    activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder);
+    setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
+    await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
+    void loadMailboxAccounts();
+    return;
+  }
   await loadMailboxAccounts();
   if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
     activeMailboxAccount = intent.account;

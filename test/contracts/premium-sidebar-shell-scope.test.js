@@ -111,7 +111,7 @@ test('gezondheidsdossier krijgt een eigen actief sidebar-item onder Extra', () =
 test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
   const source = readRepoFile('premium-opdracht-dossier.html');
   const asideEnd = source.indexOf('</aside>');
-  const editorScriptIndex = source.indexOf('assets/premium-opdracht-dossier.js?v=20260629a');
+  const editorScriptIndex = source.indexOf('assets/premium-opdracht-dossier.js?v=20260722a');
   const editorStyleIndex = source.indexOf('assets/premium-opdracht-dossier-editor.css?v=20260629a');
 
   assert.ok(asideEnd > 0, 'opdrachtdossier hoort de statische sidebar te behouden');
@@ -362,7 +362,7 @@ test('premium dashboard keeps its first-paint boot overlay in the shell contract
   assert.match(pageSource, /data-dashboard-boot-loader="true"/);
   assert.match(pageSource, /releasePremiumDashboardBootShell\(\);\s*if \(!hadPremiumDashboardCustomers \|\| !hadPremiumDashboardOrders\) void refreshPremiumDashboard\(true, true\);/s);
   assert.doesNotMatch(pageSource, /await refreshPremiumDashboard\(true\)/);
-  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 1000;/);
+  assert.match(coreSource, /const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 0;/);
   assert.match(coreSource, /removeAttribute\('data-dashboard-boot-loading'\)/);
   assert.match(coreSource, /getElementById\('dashboardHardBootLoader'\)/);
   assert.match(coreSource, /function showPremiumDashboardBootShellForMinimum\(minimumMs = PREMIUM_DASHBOARD_BOOT_MINIMUM_MS\) \{/);
@@ -489,7 +489,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*margin:\s*0 auto;/);
   assert.match(pageSource, /\.detail-mail-block \{[^}]*min-height:\s*min\(620px,\s*calc\(100vh - 92px\)\)/);
   assert.doesNotMatch(pageSource, /\.detail-more/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722e"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722f"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {

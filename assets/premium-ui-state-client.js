@@ -5,6 +5,71 @@
     var GET_CACHE_TTL_MS = 15000;
     var readCache = Object.create(null);
 
+    function getBootstrapDocument() {
+        return global && global.document && typeof global.document.getElementById === "function"
+            ? global.document
+            : null;
+    }
+
+    function normalizeStateSnapshot(value) {
+        var snapshot = value && typeof value === "object" ? value : {};
+        return {
+            values: snapshot.values && typeof snapshot.values === "object" ? snapshot.values : {},
+            source: String(snapshot.source || "bootstrap"),
+            updatedAt: snapshot.updatedAt || null
+        };
+    }
+
+    function primeUiState(scope, value, options) {
+        var cacheKey = String(scope || "");
+        if (!cacheKey) return false;
+        readCache[cacheKey] = {
+            data: normalizeStateSnapshot(value),
+            time: Math.max(0, Number(options && options.time) || Date.now()),
+            bootstrap: Boolean(options && options.bootstrap)
+        };
+        return true;
+    }
+
+    function readPageStateBootstrap() {
+        var doc = getBootstrapDocument();
+        if (!doc) return 0;
+        var primedScopes = Object.create(null);
+        var ids = [
+            "softoraPageStateBootstrap",
+            "softoraCustomersBootstrap",
+            "softoraActiveOrdersBootstrap",
+            "softoraAgendaBootstrap",
+            "softoraLeadsBootstrap",
+            "softoraColdcallingDashboardBootstrap"
+        ];
+        return ids.reduce(function (total, id) {
+            var element = doc.getElementById(id);
+            if (!element) return total;
+            try {
+                var payload = JSON.parse(String(element.textContent || "{}"));
+                var scopes = payload && payload.scopes && typeof payload.scopes === "object"
+                    ? payload.scopes
+                    : payload && payload.pageStateScopes && typeof payload.pageStateScopes === "object"
+                        ? payload.pageStateScopes
+                        : {};
+                return total + Object.keys(scopes).reduce(function (count, scope) {
+                    if (primedScopes[scope]) return count;
+                    var primed = primeUiState(scope, scopes[scope], {
+                        bootstrap: true,
+                        // De server heeft deze data al voor de huidige navigatie opgehaald.
+                        // Start daarom een verse client-TTL, ongeacht de klok op de server.
+                        time: Date.now()
+                    });
+                    if (primed) primedScopes[scope] = true;
+                    return primed ? count + 1 : count;
+                }, 0);
+            } catch (_error) {
+                return total;
+            }
+        }, 0);
+    }
+
     function normalizeScope(scope) {
         return encodeURIComponent(String(scope || ""));
     }
@@ -129,8 +194,18 @@
         return data;
     }
 
+    function peekUiState(scope) {
+        var cached = readCache[String(scope || "")];
+        return cached && cached.data ? cached.data : null;
+    }
+
+    var bootstrappedScopeCount = readPageStateBootstrap();
+
     global.SoftoraUiStateClient = {
         get: getUiState,
-        set: setUiState
+        set: setUiState,
+        peek: peekUiState,
+        prime: primeUiState,
+        bootstrappedScopeCount: bootstrappedScopeCount
     };
 })(window);

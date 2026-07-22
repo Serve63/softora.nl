@@ -28,7 +28,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
+    <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260722a"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -2084,7 +2084,7 @@
         </section>
     </div>
 
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-dashboard-core.js?v=20260710a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script><script src="assets/premium-dashboard-core.js?v=20260722a"></script><script src="assets/premium-dashboard-data-status.js?v=20260710b"></script>
     <script>
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -2587,13 +2587,13 @@
         }
 
         async function fetchPremiumUiState(scope) {
+            if (window.SoftoraUiStateClient?.get) return window.SoftoraUiStateClient.get(scope);
             const encodedScope = encodeURIComponent(String(scope || ''));
             const urls = [
                 `/api/ui-state-get?scope=${encodedScope}`,
                 `/api/ui-state/${encodedScope}`
             ];
             let lastError = null;
-
             for (const url of urls) {
                 try {
                     const res = await fetchPremiumDashboardJson(url, { method: 'GET', cache: 'no-store' });
@@ -2608,13 +2608,13 @@
         }
 
         async function fetchPremiumUiStateSet(scope, values) {
+            if (window.SoftoraUiStateClient?.set) return window.SoftoraUiStateClient.set(scope, { values: values && typeof values === 'object' ? values : {} });
             const encodedScope = encodeURIComponent(String(scope || ''));
             const urls = [
                 `/api/ui-state-set?scope=${encodedScope}`,
                 `/api/ui-state/${encodedScope}`
             ];
             let lastError = null;
-
             for (const url of urls) {
                 try {
                     const res = await fetchPremiumDashboardJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: values && typeof values === 'object' ? values : {} }) });

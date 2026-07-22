@@ -90,6 +90,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     activeOrdersCoordinator,
     aiDashboardCoordinator,
     aiToolsCoordinator,
+    mailboxCoordinator,
   };
 }
 

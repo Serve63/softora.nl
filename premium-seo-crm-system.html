@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><!-- SOFTORA_PAGE_STATE_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script>
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -27,7 +27,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260502a"></script>
+    <script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260722a"></script>
     <script src="assets/custom-selects.js?v=20260511a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -1515,22 +1515,18 @@
         let remoteUiStateSaveTimer = null;
         let remoteUiStateSaveInFlight = false;
 
-        function preloadRemoteUiStateSync() {
-            try {
-                const xhr = new XMLHttpRequest();
-                xhr.open('GET', `/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, false);
-                xhr.send(null);
-                if (xhr.status < 200 || xhr.status >= 300) return;
-                const data = safeJsonParse(xhr.responseText, null);
-                if (!data || !data.ok || !data.values || typeof data.values !== 'object') return;
-                const next = {};
-                Object.entries(data.values).forEach(([k, v]) => {
-                    next[String(k)] = String(v ?? '');
-                });
-                remoteUiStateCache = next;
-            } catch (_) {
-                // Silent fallback; page blijft werken zonder preload.
-            }
+        function preloadRemoteUiStateFromPage() {
+            const client = window.SoftoraUiStateClient;
+            const data = client && typeof client.peek === 'function'
+                ? client.peek(REMOTE_UI_STATE_SCOPE)
+                : null;
+            if (!data || !data.values || typeof data.values !== 'object') return false;
+            const next = {};
+            Object.entries(data.values).forEach(([k, v]) => {
+                next[String(k)] = String(v ?? '');
+            });
+            remoteUiStateCache = next;
+            return true;
         }
 
         function flushRemoteUiStateSave() {
@@ -1541,15 +1537,16 @@
 
             remoteUiStatePendingPatch = {};
             remoteUiStateSaveInFlight = true;
-            fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    patch,
-                    source: 'premium-seo-crm-system',
-                    actor: 'browser'
-                })
-            }).catch(() => {
+            const client = window.SoftoraUiStateClient;
+            const body = { patch, source: 'premium-seo-crm-system', actor: 'browser' };
+            const request = client && typeof client.set === 'function'
+                ? client.set(REMOTE_UI_STATE_SCOPE, body)
+                : fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+            Promise.resolve(request).catch(() => {
                 keys.forEach((key) => {
                     remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
                 });
@@ -1581,7 +1578,7 @@
             scheduleRemoteUiStateSave();
         }
 
-        preloadRemoteUiStateSync();
+        preloadRemoteUiStateFromPage();
 
         function loadStore(key, fallback) {
             return safeJsonParse(remoteUiStateCache[key] || '', fallback);

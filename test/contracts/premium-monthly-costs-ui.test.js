@@ -40,11 +40,10 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /#last-updated\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*font-size:\s*0\.72rem;/);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*position:\s*relative;/);
-  assert.match(pageSource, /<main class="main-content">[\s\S]*id="monthly-costs-boot-loader"/);
-  assert.match(pageSource, /id="monthly-costs-boot-loader"/);
+  assert.doesNotMatch(pageSource, /id="monthly-costs-boot-loader"/);
   assert.match(pageSource, /\.monthly-costs-boot-loader\s*\{[\s\S]*position:\s*fixed;[\s\S]*left:\s*280px;[\s\S]*min-height:\s*100dvh;/);
   assert.match(pageSource, /@media \(max-width: 1100px\) \{[\s\S]*\.monthly-costs-boot-loader\s*\{[\s\S]*left:\s*0;/);
-  assert.match(pageSource, /<div class="monthly-costs-spinner"[^>]*>[\s\S]*softora-dossier-loader__orbit--outer/);
+  assert.doesNotMatch(pageSource, /<div class="monthly-costs-spinner"/);
   const themePath = path.join(__dirname, '../../assets/personnel-theme.css');
   const themeSource = fs.readFileSync(themePath, 'utf8');
   assert.match(themeSource, /@import url\('softora-dossier-loader\.css'\)/);
@@ -54,10 +53,12 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(loaderSource, /\.monthly-costs-spinner/);
   assert.match(
     pageSource,
-    /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
+    /<div class="monthly-costs-boot-shell" id="monthly-costs-boot-shell" aria-busy="false">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260616a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260722a"><\/script>/);
   assert.doesNotMatch(pageSource, /let data = \{/);
   assert.match(
     combinedSource,
@@ -116,7 +117,7 @@ test('premium terugkerende kosten verbergt coldcalling en api kosten uit de stan
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
-  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260616a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260722a"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260521d" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
@@ -149,7 +150,9 @@ test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(combinedSource, /async function bootstrapMonthlyCostsPage\(\) \{/);
   assert.match(combinedSource, /let monthlyCostsBootstrapDone = false;/);
   assert.match(combinedSource, /function setTotalsLoading\(\) \{/);
-  assert.match(combinedSource, /const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 1000;/);
+  assert.match(combinedSource, /const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 0;/);
+  assert.match(combinedSource, /function hydrateMonthlyCostsFromPageBootstrap\(\) \{/);
+  assert.match(combinedSource, /client\.peek\(MONTHLY_COSTS_REMOTE_SCOPE\)/);
   assert.match(combinedSource, /function applyMonthlyCostsStageBooting\(isBooting\) \{[\s\S]*getElementById\('monthly-costs-boot-shell'\)/);
   assert.match(combinedSource, /function setMonthlyCostsStageBooting\(isBooting\) \{[\s\S]*MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS - elapsedMs/);
   assert.match(combinedSource, /if \(!monthlyCostsBootstrapDone\) \{\s*setTotalsLoading\(\);/);
