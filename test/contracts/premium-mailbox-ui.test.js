@@ -42,6 +42,11 @@ function readRefreshScript() {
   return fs.readFileSync(refreshScriptPath, 'utf8');
 }
 
+test('mailbox gebruikt de juiste browsertitel', () => {
+  assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
+  assert.doesNotMatch(readPage(), /Coldmail Inbox/);
+});
+
 function loadMailboxHelpersForTest(options = {}) {
   const element = {
     innerHTML: '',
