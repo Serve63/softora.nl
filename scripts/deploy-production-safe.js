@@ -16,10 +16,10 @@ const EXPECTED_VERCEL_PROJECT = Object.freeze({
 const vercelProjectPath = path.join(process.cwd(), '.vercel', 'project.json');
 const vercelOutputFunctionsPath = path.join(process.cwd(), '.vercel', 'output', 'functions');
 const SHARP_LINUX_PACKAGES = Object.freeze([
-  { name: '@img/sharp-linux-x64', version: '0.34.5', tarball: 'img-sharp-linux-x64-0.34.5.tgz' },
-  { name: '@img/sharp-libvips-linux-x64', version: '1.2.4', tarball: 'img-sharp-libvips-linux-x64-1.2.4.tgz' },
-  { name: '@img/sharp-linux-arm64', version: '0.34.5', tarball: 'img-sharp-linux-arm64-0.34.5.tgz' },
-  { name: '@img/sharp-libvips-linux-arm64', version: '1.2.4', tarball: 'img-sharp-libvips-linux-arm64-1.2.4.tgz' },
+  { name: '@img/sharp-linux-x64', version: '0.35.3', tarball: 'img-sharp-linux-x64-0.35.3.tgz' },
+  { name: '@img/sharp-libvips-linux-x64', version: '1.3.2', tarball: 'img-sharp-libvips-linux-x64-1.3.2.tgz' },
+  { name: '@img/sharp-linux-arm64', version: '0.35.3', tarball: 'img-sharp-linux-arm64-0.35.3.tgz' },
+  { name: '@img/sharp-libvips-linux-arm64', version: '1.3.2', tarball: 'img-sharp-libvips-linux-arm64-1.3.2.tgz' },
 ]);
 
 function readVercelProjectLink() {

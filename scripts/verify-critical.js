@@ -6,6 +6,7 @@ const steps = [
   ['run', 'check:guardrails'],
   ['run', 'check:repo-hygiene'],
   ['run', 'check:public-data'],
+  ['run', 'check:deps'],
   ['run', 'check:quality-lock'],
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],

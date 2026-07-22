@@ -17,7 +17,7 @@ const {
 } = require('../../server/routes/premium-database-webdesign-jobs');
 
 const TINY_PNG_DATA_URL =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==';
 
 function createResponseRecorder() {
   return {
@@ -120,13 +120,13 @@ test('premium database webdesign jobs keep Vercel sharp linux installs explicit'
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
 
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.34.5');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.2.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.2');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.2');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
+    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.3 @img/sharp-linux-arm64@0.35.3 @img/sharp-libvips-linux-arm64@1.3.2'
   );
   Object.values(vercelConfig.functions).forEach((functionConfig) => {
     assert.equal(
@@ -440,7 +440,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(res.body.job.variant, 'v1-prompt-only');
 
   const job = await waitForJobDone(coordinator, 'job_1234567890123');
-  assert.equal(job.status, 'done');
+  assert.equal(job.status, 'done', job.error || 'webdesign job did not finish');
 
   const photoMap = JSON.parse(values.softora_database_photos_v1);
   assert.equal(photoMap['customer-1'].id, 'customer-1');

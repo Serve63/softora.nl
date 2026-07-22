@@ -453,6 +453,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const liveWorkflowSource = readRepoFile('.github/workflows/live-production-version.yml');
   const guardrailWorkflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
   const verifyWorkflowSource = readRepoFile('.github/workflows/verify-critical.yml');
+  const repoHygieneWorkflowSource = readRepoFile('.github/workflows/repo-hygiene.yml');
   const dependabotSource = readRepoFile('.github/dependabot.yml');
   const gitignoreSource = readRepoFile('.gitignore');
   const agentsSource = readRepoFile('AGENTS.md');
@@ -464,6 +465,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
     instantlyRoutesSource.match(/async function handleSync[\s\S]*?async function handleStatus/)?.[0] || '';
 
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
+  assert.equal(packageJson.scripts['check:deps'], 'npm audit --omit=dev');
   assert.equal(packageJson.scripts['check:public-data'], 'node scripts/check-public-data-exposure.js');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
@@ -482,14 +484,15 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.engines.node, '22.x');
   assert.equal(nvmrcSource.trim(), '22');
   assert.equal(packageJson.dependencies.nodemailer, '^9.0.1');
-  assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.2.4');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.34.5');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.2.4');
+  assert.equal(packageJson.dependencies.mailparser, '^3.9.14');
+  assert.equal(packageJson.dependencies.sharp, '^0.35.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.2');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.2');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.34.5 @img/sharp-linux-arm64@0.34.5 @img/sharp-libvips-linux-arm64@1.2.4'
+    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.3 @img/sharp-linux-arm64@0.35.3 @img/sharp-libvips-linux-arm64@1.3.2'
   );
   Object.values(vercelConfig.functions).forEach((functionConfig) => {
     assert.equal(
@@ -499,6 +502,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   });
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:public-data'\]/);
+  assert.match(verifyCriticalSource, /\['run', 'check:deps'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
   assert.match(publicDataSource, /MAX_EMBEDDED_JSON_BYTES/);
   assert.match(publicDataSource, /BLOCKED_DATA_EXTENSIONS/);
@@ -538,7 +542,14 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(liveWorkflowSource, /node-version:\s*22/);
   assert.match(guardrailWorkflowSource, /node-version:\s*22/);
   assert.match(verifyWorkflowSource, /node-version:\s*22/);
+  [liveWorkflowSource, guardrailWorkflowSource, verifyWorkflowSource, repoHygieneWorkflowSource].forEach(
+    (workflowSource) => assert.match(workflowSource, /uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./)
+  );
+  [liveWorkflowSource, guardrailWorkflowSource, verifyWorkflowSource].forEach(
+    (workflowSource) => assert.match(workflowSource, /uses:\s*actions\/setup-node@[0-9a-f]{40}\s*#\s*v7\./)
+  );
   assert.match(dependabotSource, /package-ecosystem:\s*npm/);
+  assert.match(dependabotSource, /package-ecosystem:\s*github-actions/);
   assert.match(dependabotSource, /interval:\s*weekly/);
   assert.match(gitignoreSource, /reports\/\*\.md/);
   assert.match(gitignoreSource, /outputs\//);
@@ -557,6 +568,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-x64/);
   assert.match(safeDeploySource, /@img\/sharp-linux-arm64/);
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-arm64/);
+  assert.match(safeDeploySource, /version: '0\.35\.3'/);
+  assert.match(safeDeploySource, /version: '1\.3\.2'/);
   assert.match(safeDeploySource, /check:live-production-version/);
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
   assert.match(agentsSource, /check:live-production-version/);

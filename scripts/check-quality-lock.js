@@ -135,6 +135,7 @@ function listQualityLockViolations(options = {}) {
 
   const expectedScripts = {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
+    'check:deps': 'npm audit --omit=dev',
     'check:public-data': 'node scripts/check-public-data-exposure.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
@@ -169,9 +170,28 @@ function listQualityLockViolations(options = {}) {
     }
   });
 
+  [
+    '.github/workflows/agent-guardrails.yml',
+    '.github/workflows/live-production-version.yml',
+    '.github/workflows/repo-hygiene.yml',
+    '.github/workflows/verify-critical.yml',
+  ].forEach((filePath) => {
+    if (!trackedFileSet.has(filePath)) return;
+    const source = readFile(filePath);
+    if (!/uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./.test(source)) {
+      violations.push(`[quality-lock] ${filePath} moet actions/checkout v7 aan een commit-SHA vastzetten.`);
+    }
+    if (
+      filePath !== '.github/workflows/repo-hygiene.yml' &&
+      !/uses:\s*actions\/setup-node@[0-9a-f]{40}\s*#\s*v7\./.test(source)
+    ) {
+      violations.push(`[quality-lock] ${filePath} moet actions/setup-node v7 aan een commit-SHA vastzetten.`);
+    }
+  });
+
   if (trackedFileSet.has('scripts/verify-critical.js')) {
     const verifyCriticalSource = readFile('scripts/verify-critical.js');
-    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:quality-lock', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
+    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:deps', 'check:quality-lock', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
       (scriptName) => {
         const pattern = new RegExp(`\\['run',\\s*'${scriptName.replace(':', '\\:')}'\\]`);
         if (!pattern.test(verifyCriticalSource)) {
@@ -244,7 +264,7 @@ function listQualityLockViolations(options = {}) {
     'i'
   );
   const qualityCommandBypassPattern =
-    /npm\s+run\s+(?:verify:critical|check:guardrails|check:repo-hygiene|check:public-data|check:quality-lock)[^\n]*(?:\|\|\s*true|;\s*exit\s+0)/i;
+    /npm\s+run\s+(?:verify:critical|check:guardrails|check:repo-hygiene|check:public-data|check:deps|check:quality-lock)[^\n]*(?:\|\|\s*true|;\s*exit\s+0)/i;
 
   trackedFiles
     .filter((filePath) => /^\.github\/workflows\/.+\.ya?ml$/i.test(filePath))

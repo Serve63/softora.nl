@@ -191,6 +191,7 @@ function getQualityBaselineViolations() {
 
   const requiredScripts = {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
+    'check:deps': 'npm audit --omit=dev',
     'check:public-data': 'node scripts/check-public-data-exposure.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
@@ -220,6 +221,7 @@ function getQualityBaselineViolations() {
     'check:guardrails',
     'check:repo-hygiene',
     'check:public-data',
+    'check:deps',
     'check:quality-lock',
     'test:contracts',
     'test:smoke',
@@ -234,19 +236,19 @@ function getQualityBaselineViolations() {
   const workflowExpectations = [
     {
       filePath: '.github/workflows/agent-guardrails.yml',
-      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /node-version:\s*22\b/, /npm run check:guardrails/],
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./, /uses:\s*actions\/setup-node@[0-9a-f]{40}\s*#\s*v7\./, /node-version:\s*22\b/, /npm run check:guardrails/],
     },
     {
       filePath: '.github/workflows/verify-critical.yml',
-      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /node-version:\s*22\b/, /npm run verify:critical/],
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./, /uses:\s*actions\/setup-node@[0-9a-f]{40}\s*#\s*v7\./, /node-version:\s*22\b/, /npm run verify:critical/],
     },
     {
       filePath: '.github/workflows/live-production-version.yml',
-      required: [/push:/, /branches:[\s\S]*-\s+main/, /node-version:\s*22\b/, /npm run check:live-production-version:wait/],
+      required: [/push:/, /branches:[\s\S]*-\s+main/, /uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./, /uses:\s*actions\/setup-node@[0-9a-f]{40}\s*#\s*v7\./, /node-version:\s*22\b/, /npm run check:live-production-version:wait/],
     },
     {
       filePath: '.github/workflows/repo-hygiene.yml',
-      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /bash scripts\/check-repo-hygiene\.sh/],
+      required: [/push:/, /pull_request:/, /branches:[\s\S]*-\s+main/, /uses:\s*actions\/checkout@[0-9a-f]{40}\s*#\s*v7\./, /bash scripts\/check-repo-hygiene\.sh/],
     },
   ];
 
@@ -271,6 +273,7 @@ function getQualityBaselineViolations() {
         /npm run verify:critical/,
         /Commit en push elke succesvolle wijziging/,
         /npm run check:guardrails/,
+        /npm run check:deps/,
         /npm run check:public-data/,
         /npm run check:quality-lock/,
         /allerlaatste actuele `origin\/main`/,
@@ -283,6 +286,7 @@ function getQualityBaselineViolations() {
       required: [
         /Definition Of Done/,
         /npm run verify:critical/,
+        /check:deps/,
         /check:public-data/,
         /check:guardrails/,
         /check:quality-lock/,

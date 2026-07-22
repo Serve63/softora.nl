@@ -47,6 +47,7 @@ Gebruik voor deze domeinen altijd eerst:
 - [scripts/check-quality-lock.js](../scripts/check-quality-lock.js): vergrendelt de kwaliteitsbaseline tegen CI-bypasses, testverzwakking en premium sidebar asset-drift.
 - [scripts/check-repo-hygiene.sh](../scripts/check-repo-hygiene.sh): bewaakt machine-specifieke paden en lokale rommel.
 - [scripts/check-public-data-exposure.js](../scripts/check-public-data-exposure.js): blokkeert tracked exports, grote ingebedde JSON-snapshots en herkenbare bedrijfsdatasets.
+- `npm run check:deps`: controleert de actuele productie-afhankelijkheden tegen de npm advisory-database.
 - [scripts/clean-local-artifacts.sh](../scripts/clean-local-artifacts.sh): ruimt lokale build-cache, debuglogs en OS-bestanden op.
 - [scripts/verify-critical.js](../scripts/verify-critical.js): draait de minimale kritieke verificatieset.
 - [test/contracts](../test/contracts): API- en schema-contracten.
