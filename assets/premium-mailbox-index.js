@@ -22,9 +22,10 @@ function decorateMessage(mail, source) {
   return {
     ...mail,
     hasBody: Boolean(message.hasBody || message.body),
-    bodyLoaded: Boolean(message.body),
+    bodyLoaded: Boolean(message.body) && !message.bodyTruncated && !message.bodyImagesTruncated,
     bodyLoading: false,
     bodyTruncated: Boolean(message.bodyTruncated),
+    bodyImagesTruncated: Boolean(message.bodyImagesTruncated),
     indexed: Boolean(message.indexed),
   };
 }
@@ -95,9 +96,12 @@ async function loadBody({
     mail.bodyLoaded = true;
     mail.hasBody = Boolean(data.message.hasBody || body);
     mail.bodyTruncated = Boolean(data.message.bodyTruncated);
+    mail.bodyImagesTruncated = false;
   } catch (error) {
-    mail.body = String(error?.message || error || 'Bericht laden mislukt');
-    mail.bodyLoaded = true;
+    if (!mail.body) {
+      mail.body = String(error?.message || error || 'Bericht laden mislukt');
+      mail.bodyLoaded = true;
+    }
   } finally {
     mail.bodyLoading = false;
     openMail(id, { skipBodyFetch: true });
