@@ -124,8 +124,8 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260722b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -198,7 +198,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -299,6 +299,35 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv√
   assert.ok(ownerMenu.indexOf('Martijn van de Ven') < ownerMenu.indexOf('Serv√© & Martijn'));
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('both');
+});
+
+test('coldmail berichten met hetzelfde IMAP-id blijven per mailboxaccount uniek', () => {
+  const serveMail = campaignInboxModule.decorateMessage(
+    { id: 'inbox:42' },
+    {
+      id: 'inbox:42',
+      accountEmail: 'servecreusen@softora.nl',
+      date: '2026-07-20T07:34:00.000Z',
+    }
+  );
+  const martijnMail = campaignInboxModule.decorateMessage(
+    { id: 'inbox:42' },
+    {
+      id: 'inbox:42',
+      accountEmail: 'martijn@softora.nl',
+      date: '2026-07-20T08:11:00.000Z',
+    }
+  );
+
+  assert.equal(serveMail.id, 'servecreusen@softora.nl|inbox:42');
+  assert.equal(martijnMail.id, 'martijn@softora.nl|inbox:42');
+  assert.notEqual(serveMail.id, martijnMail.id);
+  assert.equal(campaignInboxModule.getRequestId(serveMail), 'inbox:42');
+  assert.equal(campaignInboxModule.getRequestId(martijnMail), 'inbox:42');
+  assert.deepEqual(
+    campaignInboxModule.filterMessages([serveMail, martijnMail], 'martijn').map((mail) => mail.id),
+    ['martijn@softora.nl|inbox:42']
+  );
 });
 
 test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als standaard', () => {
@@ -445,6 +474,22 @@ test('coldmail inbox toont de ontvangsttijd vast in Europe Amsterdam', () => {
 
   assert.equal(mail.receivedAt, '2026-07-20T06:14:13.000Z');
   assert.equal(mail.time, '08:14');
+});
+
+test('coldmail tabcache behoudt de echte ontvangsttijd en valt niet terug op middernacht', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const mail = helpers.normalizeMailboxApiMessage({
+    id: 'servecreusen@softora.nl|inbox:42',
+    mailboxId: 'inbox:42',
+    accountEmail: 'servecreusen@softora.nl',
+    date: '20 juli',
+    receivedAt: '2026-07-20T07:34:00.000Z',
+  });
+
+  assert.equal(mail.id, 'servecreusen@softora.nl|inbox:42');
+  assert.equal(mail.mailboxId, 'inbox:42');
+  assert.equal(mail.receivedAt, '2026-07-20T07:34:00.000Z');
+  assert.equal(mail.time, '09:34');
 });
 
 test('coldmail inbox zet relatieve datum boven de tijd en oudere mails op dag en maand', () => {

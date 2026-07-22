@@ -593,7 +593,7 @@ function formatMailDate(value, nowValue) {
   return window.SoftoraMailboxDisplay.formatMailDate(value, nowValue);
 }
 function normalizeMailboxApiMessage(message) {
-  const when = formatMailDate(message.date);
+  const when = formatMailDate(message.receivedAt || message.date);
   const body = cleanMailboxText(message.body || message.preview || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);

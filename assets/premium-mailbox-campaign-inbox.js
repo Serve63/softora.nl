@@ -200,12 +200,16 @@
 
   function decorateMessage(mail, source) {
     const message = source && typeof source === 'object' ? source : {};
+    const mailboxId = String(message.mailboxId || message.id || mail && mail.id || '').trim();
+    const accountEmail = normalizeEmail(message.accountEmail || mail && mail.accountEmail);
+    const receivedAtValue = message.receivedAt || message.date || mail && mail.receivedAt;
     return {
       ...mail,
-      mailboxId: message.mailboxId || message.id,
-      accountEmail: normalizeEmail(message.accountEmail),
-      receivedAt: Number.isFinite(Date.parse(message.date || ''))
-        ? new Date(message.date).toISOString()
+      id: accountEmail && mailboxId ? `${accountEmail}|${mailboxId}` : (mail && mail.id) || mailboxId,
+      mailboxId,
+      accountEmail,
+      receivedAt: Number.isFinite(Date.parse(receivedAtValue || ''))
+        ? new Date(receivedAtValue).toISOString()
         : '',
       campaign: message.campaign || null,
       outreach: message.outreach || null,
