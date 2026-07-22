@@ -8,6 +8,8 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies';
+  const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
     'servecreusen@softora.nl': 'serve',
@@ -254,17 +256,52 @@
     return mailbox && mailbox.ok !== false && Array.isArray(mailbox.messages) ? mailbox : null;
   }
 
+  function getMailboxTabCacheKey() {
+    const session = getPageBootstrapSession();
+    const identity = normalizeEmail(session && (session.userId || session.email));
+    return identity ? `${MAILBOX_SESSION_CACHE_KEY}:${identity}` : '';
+  }
+
+  function readSessionMailboxSnapshot() {
+    const cache = global.SoftoraPageBootstrapSession?.cache;
+    const cacheKey = getMailboxTabCacheKey();
+    const mailbox = cache?.read?.(cacheKey, MAILBOX_SESSION_CACHE_MAX_AGE_MS);
+    return mailbox && Array.isArray(mailbox.messages) ? mailbox : null;
+  }
+
+  function writeSessionMailboxSnapshot(data) {
+    const cache = global.SoftoraPageBootstrapSession?.cache;
+    const cacheKey = getMailboxTabCacheKey();
+    if (!cache || !cacheKey || !data || !Array.isArray(data.messages)) return false;
+    const messages = data.messages.slice(0, 100).map((message) => ({
+      ...(message && typeof message === 'object' ? message : {}),
+      bodyImages: [],
+      inlineImages: [],
+    }));
+    return cache.write(cacheKey, {
+      ok: data.ok !== false,
+      messages,
+      sync: data.sync && typeof data.sync === 'object' ? data.sync : null,
+    });
+  }
+
+  function readInitialMailboxSnapshot() {
+    return readPageBootstrap() || readSessionMailboxSnapshot();
+  }
+
   function getPageBootstrapSession() {
+    const sharedSession = global.SoftoraPageBootstrapSession?.get?.();
+    if (sharedSession && sharedSession.authenticated) return sharedSession;
     const session = readPageBootstrapPayload()?.session;
     return session && session.authenticated ? session : null;
   }
 
   function hasPageBootstrap(folder) {
-    return folder === 'outreach' && Boolean(readPageBootstrap());
+    return folder === 'outreach' && Boolean(readInitialMailboxSnapshot());
   }
 
   function normalizeLoadResult(data, normalizeMessage, fromBootstrap) {
-    return {
+    const result = {
       messages: (Array.isArray(data && data.messages) ? data.messages : []).map(normalizeMessage),
       sync: data?.sync && typeof data.sync === 'object'
         ? data.sync
@@ -277,11 +314,13 @@
           },
       fromBootstrap: Boolean(fromBootstrap),
     };
+    writeSessionMailboxSnapshot({ ...data, messages: result.messages, sync: result.sync });
+    return result;
   }
 
   async function load(folder, normalizeMessage, fetchImpl, options) {
     if (folder !== 'outreach') return null;
-    const bootstrap = !(options && options.skipBootstrap) ? readPageBootstrap() : null;
+    const bootstrap = !(options && options.skipBootstrap) ? readInitialMailboxSnapshot() : null;
     if (bootstrap) {
       pageBootstrapConsumed = true;
       return normalizeLoadResult(bootstrap, normalizeMessage, true);

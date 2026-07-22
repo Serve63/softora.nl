@@ -8,6 +8,7 @@ const {
   countAddedServerJsFunctions,
   countDiffLines,
   isBehaviorChangePath,
+  isApprovedBrowserStoragePath,
   isFrontendProductionPath,
   isHighRiskPath,
   isPremiumAuthUsersWriteScanPath,
@@ -389,6 +390,7 @@ const serverJsDiffText = serverJsDiffArgs ? tryRunGit(serverJsDiffArgs) : '';
 const serverJsCounts = countDiffLines(serverJsDiffText);
 const browserStorageViolations = changedFiles
   .filter(isFrontendProductionPath)
+  .filter((filePath) => !isApprovedBrowserStoragePath(filePath))
   .map((filePath) => {
     const diffArgs = getDiffArgsForPath(filePath);
     const diffText = diffArgs ? tryRunGit(diffArgs) : '';

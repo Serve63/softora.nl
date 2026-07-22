@@ -8,6 +8,7 @@ const {
   countAddedServerJsFunctions,
   countDiffLines,
   isAllowedNewServerPath,
+  isApprovedBrowserStoragePath,
   isFrontendProductionPath,
   isHighRiskPath,
   isPremiumAuthUsersWriteScanPath,
@@ -185,6 +186,13 @@ test('agent guardrails detect newly added browser storage in production frontend
 
   assert.equal(violations.length, 1);
   assert.match(violations[0], /Nieuwe browser-opslag in productiecode gedetecteerd/i);
+});
+
+test('agent guardrails allow browser storage only in central premium cache helpers', () => {
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-page-bootstrap-session.js'), true);
+  assert.equal(isApprovedBrowserStoragePath('assets/personnel-theme.js'), true);
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-sidebar-profile-prefill.js'), true);
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-campaign-inbox.js'), false);
 });
 
 test('agent guardrails block large inline scripts in html pages', () => {

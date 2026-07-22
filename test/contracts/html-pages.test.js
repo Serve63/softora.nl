@@ -507,7 +507,7 @@ test('html page coordinator caps dashboard bootstrap reads without late error lo
   assert.match(res.body, /id="kpiTotalClients">--<script>/);
   assert.match(res.body, /Actieve opdrachten tijdelijk niet geladen/);
   assert.match(res.body, /id="softoraCustomersBootstrap" type="application\/json">/);
-  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722a/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722b/);
   assert.match(res.body, /"source":"unavailable"/);
   assert.match(res.body, /<span class="chart-label">Jan<\/span>/);
   assert.doesNotMatch(res.body, /SOFTORA_DASHBOARD_TOTAL_REVENUE/);
@@ -583,13 +583,60 @@ test('html page coordinator gives protected premium bootstrap enough time for Su
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /€1\.234/);
   assert.match(res.body, /id="softoraCustomersBootstrap"/);
-  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722a/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722b/);
   assert.equal(
     loggerInfos.some(
       (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'
     ),
     false
   );
+});
+
+test('html page coordinator houdt een koude premium pagina niet vast en levert de sessie als fallback', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-cold-bootstrap-'));
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-mailbox.html'),
+    '<!DOCTYPE html><html><head><title>Mailbox</title></head><body><!-- SOFTORA_PAGE_STATE_BOOTSTRAP --><main>Mailbox</main></body></html>'
+  );
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    logger: { info() {}, error() {} },
+    protectedPageBootstrapWaitMs: 25,
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-mailbox.html' ? 'premium-mailbox.html' : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: {
+        authenticated: true,
+        email: 'serve@softora.nl',
+        role: 'admin',
+        isAdmin: true,
+        token: 'nooit-in-html',
+      },
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () => new Promise((resolve) => setTimeout(resolve, 250)),
+  });
+  const res = createResponseRecorder();
+  const startedAt = Date.now();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/mailbox' },
+    res,
+    () => {},
+    'premium-mailbox.html'
+  );
+
+  assert.ok(Date.now() - startedAt < 180, 'koude serverdata mag de eerste HTML niet blokkeren');
+  assert.match(res.body, /id="softoraPageStateBootstrap"/);
+  assert.match(res.body, /"email":"serve@softora\.nl"/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722b/);
+  assert.doesNotMatch(res.body, /nooit-in-html/);
 });
 
 test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
