@@ -63,10 +63,13 @@ function createAiToolsCoordinator(deps = {}) {
     'Deze websitepreview is door de AI-veiligheidscheck overgeslagen. Probeer opnieuw met een andere website of input.';
   const HOMEPAGE_SCREENSHOT_REFERENCE_MODE = 'homepage-screenshot';
 
-  function buildHomepageScreenshotReferenceUrl(value) {
+  function buildHomepageScreenshotReferenceUrls(value) {
     const targetUrl = normalizeString(value || '');
-    if (!targetUrl) return '';
-    return `https://s0.wordpress.com/mshots/v1/${encodeURIComponent(targetUrl)}?w=1280&h=1600`;
+    if (!targetUrl) return [];
+    return [
+      `https://image.thum.io/get/width/1200/crop/1600/noanimate/${targetUrl}`,
+      `https://s0.wordpress.com/mshots/v1/${encodeURIComponent(targetUrl)}?w=1280&h=1600`,
+    ];
   }
 
   function collectErrorText(value, out = []) {
@@ -183,9 +186,9 @@ function createAiToolsCoordinator(deps = {}) {
       if (usesHomepageScreenshot && [400, 401, 403, 422].includes(Number(error && error.status))) throw error;
       fetched = buildDatabasePreviewFallbackScan(inputUrl, body);
     }
-    const homepageScreenshotUrl = usesHomepageScreenshot
-      ? buildHomepageScreenshotReferenceUrl(fetched.finalUrl || fetched.normalizedUrl || inputUrl)
-      : '';
+    const homepageScreenshotUrls = usesHomepageScreenshot
+      ? buildHomepageScreenshotReferenceUrls(fetched.finalUrl || fetched.normalizedUrl || inputUrl)
+      : [];
     const generationScan = {
       ...fetched.scan,
       imageSize: normalizeString(options.imageSize || ''),
@@ -194,7 +197,7 @@ function createAiToolsCoordinator(deps = {}) {
       requireReferenceImages: options.requireReferenceImages === true,
       referenceImageFidelity: usesHomepageScreenshot ? 'high' : '',
       ...(usesHomepageScreenshot
-        ? { referenceImageUrls: homepageScreenshotUrl ? [homepageScreenshotUrl] : [] }
+        ? { referenceImageUrls: homepageScreenshotUrls }
         : {}),
       ...(softoraOutreachProfile ? { softoraOutreachProfile } : {}),
     };

@@ -409,6 +409,62 @@ test('ai remote service waits for a required V2 homepage screenshot before image
   assert.equal(result.referenceImageCount, 1);
 });
 
+test('ai remote service falls back to the next V2 screenshot provider and still sends one image', async () => {
+  const generationCalls = [];
+  const screenshotUrls = [];
+  const primaryUrl = 'https://image.thum.io/get/width/1200/crop/1600/noanimate/https://www.bliv.nl/';
+  const fallbackUrl = 'https://s0.wordpress.com/mshots/v1/bliv';
+  const { service } = createService({
+    waitForWebsitePreviewScreenshotRetry: async () => {},
+    sanitizeReferenceImages: (images) => images,
+    fetchBinaryWithTimeout: async (url) => {
+      screenshotUrls.push(url);
+      if (url === primaryUrl) {
+        return {
+          response: {
+            ok: false,
+            status: 503,
+            url,
+            headers: { get: () => 'text/html' },
+          },
+          bytes: Buffer.from(''),
+        };
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url,
+          headers: { get: () => 'image/png' },
+        },
+        bytes: Buffer.alloc(4096, 1),
+      };
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      generationCalls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: [{ b64_json: 'YWJjZA==' }] },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({
+    host: 'www.bliv.nl',
+    sourceUrl: 'https://www.bliv.nl/',
+    referenceImageMode: 'homepage-screenshot',
+    referenceImageFidelity: 'high',
+    requireReferenceImages: true,
+    referenceImageUrls: [primaryUrl, fallbackUrl],
+  });
+
+  assert.deepEqual(screenshotUrls, [primaryUrl, primaryUrl, primaryUrl, fallbackUrl]);
+  assert.equal(generationCalls.length, 1);
+  assert.equal(generationCalls[0].url, 'https://api.openai.test/v1/images/edits');
+  assert.equal(generationCalls[0].options.body.getAll('image[]').length, 1);
+  assert.equal(result.referenceImageCount, 1);
+});
+
 test('ai remote service fails V2 closed when no homepage screenshot becomes available', async () => {
   let generationCalls = 0;
   let screenshotFetches = 0;
