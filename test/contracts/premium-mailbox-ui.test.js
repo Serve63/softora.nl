@@ -47,6 +47,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
 });
 
+test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
+  assert.match(readPage(), /\.topbar-mailbox-switcher-label\s*\{[^}]*color:\s*var\(--text-dark\)/s);
+});
+
 function loadMailboxHelpersForTest(options = {}) {
   const element = {
     innerHTML: '',
