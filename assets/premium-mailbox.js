@@ -817,7 +817,7 @@ function openMail(id, options = {}) {
   if (!m) return;
   if (!m.bodyLoaded && !options.skipBodyFetch) {
     void loadMailboxMessageBody(m.id);
-    return;
+    if (!m.body) return;
   }
   const wasUnread = m.unread;
   activeMail = m.id;

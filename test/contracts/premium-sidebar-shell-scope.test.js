@@ -489,7 +489,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*margin:\s*0 auto;/);
   assert.match(pageSource, /\.detail-mail-block \{[^}]*min-height:\s*min\(620px,\s*calc\(100vh - 92px\)\)/);
   assert.doesNotMatch(pageSource, /\.detail-more/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722h"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722h"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {

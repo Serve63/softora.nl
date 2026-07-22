@@ -273,11 +273,15 @@
     const cache = global.SoftoraPageBootstrapSession?.cache;
     const cacheKey = getMailboxTabCacheKey();
     if (!cache || !cacheKey || !data || !Array.isArray(data.messages)) return false;
-    const messages = data.messages.slice(0, 100).map((message) => ({
-      ...(message && typeof message === 'object' ? message : {}),
-      bodyImages: [],
-      inlineImages: [],
-    }));
+    const messages = data.messages.slice(0, 100).map((message) => {
+      const source = message && typeof message === 'object' ? message : {};
+      return {
+        ...source,
+        bodyImagesTruncated: Boolean(source.bodyImagesTruncated || (Array.isArray(source.bodyImages) && source.bodyImages.length)),
+        bodyImages: [],
+        inlineImages: [],
+      };
+    });
     return cache.write(cacheKey, {
       ok: data.ok !== false,
       messages,

@@ -35,8 +35,9 @@ function sanitizeOutreach(value) {
 
 function sanitizeBodyImage(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const dataUrl = text(value.dataUrl || value.src, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS);
+  const dataUrl = String(value.dataUrl || value.src || '').trim();
   if (!dataUrl || !/^(?:data:image\/|https?:\/\/|\/)/i.test(dataUrl)) return null;
+  if (dataUrl.length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS) return null;
   return {
     alt: text(value.alt || value.name || 'Afbeelding', 300),
     dataUrl,
@@ -46,6 +47,11 @@ function sanitizeBodyImage(value) {
 function sanitizeMessage(value, options = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const rawBody = String(source.body || '');
+  const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
+  const bodyImages = (options.includeImages === false ? [] : sourceBodyImages)
+    .map(sanitizeBodyImage)
+    .filter(Boolean)
+    .slice(0, 2);
   const body = options.includeBody === false
     ? ''
     : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS);
@@ -71,13 +77,11 @@ function sanitizeMessage(value, options = {}) {
     starred: Boolean(source.starred),
     hasBody: Boolean(source.hasBody || rawBody),
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
+    bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     indexed: source.indexed !== false,
     campaign: sanitizeCampaign(source.campaign),
     outreach: sanitizeOutreach(source.outreach),
-    bodyImages: (options.includeImages === false ? [] : (Array.isArray(source.bodyImages) ? source.bodyImages : []))
-      .map(sanitizeBodyImage)
-      .filter(Boolean)
-      .slice(0, 2),
+    bodyImages,
   };
 }
 
