@@ -41,6 +41,26 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 /* TOP BAR */
 .topbar { height: 52px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; min-width: 0; overflow: visible; position: relative; z-index: 40; }
 .topbar-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); margin-right: 8px; }
+.topbar-refresh {
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.topbar-refresh:hover { color: var(--crimson); background: rgba(155,35,85,.06); border-color: rgba(155,35,85,.12); }
+.topbar-refresh:focus-visible { outline: 2px solid rgba(155,35,85,.35); outline-offset: 2px; }
+.topbar-refresh:disabled { cursor: wait; }
+.topbar-refresh svg { width: 17px; height: 17px; }
+.topbar-refresh.is-refreshing svg { animation: mailbox-refresh-spin .8s linear infinite; }
+@keyframes mailbox-refresh-spin { to { transform: rotate(360deg); } }
 
 /* LAYOUT */
 .layout { display: flex; flex: 1; min-width: 0; width: 100%; min-height: 0; overflow: hidden; }
@@ -362,6 +382,9 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     </button>
     <div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"></div>
   </div>
+  <button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen" title="Mailbox vernieuwen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11"></path><path d="M17.9 15a7 7 0 0 1-11.7 2.6L4 13"></path></svg>
+  </button>
 </div>
 
 <!-- LAYOUT -->
@@ -409,7 +432,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </main>
 </div>
 
-<script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720f"></script><script src="assets/premium-mailbox-display.js?v=20260720b"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script>
-<script src="assets/premium-mailbox.js?v=20260722a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260605a"></script><script src="assets/premium-campaign-sender-settings.js?v=20260612a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260720f"></script><script src="assets/premium-mailbox-display.js?v=20260720b"></script><script src="assets/premium-mailbox-index.js?v=20260720a"></script><script src="assets/premium-mailbox-refresh.js?v=20260722a"></script>
+<script src="assets/premium-mailbox.js?v=20260722b"></script>
 </body>
 </html>
