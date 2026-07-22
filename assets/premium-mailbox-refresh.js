@@ -2,12 +2,15 @@
   'use strict';
 
   const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-  const REFRESH_AGE_UPDATE_INTERVAL_MS = 30 * 1000;
+  const REFRESH_AGE_UPDATE_INTERVAL_MS = 1000;
 
   function formatRefreshAge(lastRefreshAt, currentTime = Date.now()) {
     const elapsedMs = Math.max(0, Number(currentTime) - Number(lastRefreshAt));
+    const elapsedSeconds = Math.floor(elapsedMs / 1000);
+    if (elapsedSeconds < 60) {
+      return elapsedSeconds === 1 ? '1 sec geleden' : elapsedSeconds + ' sec geleden';
+    }
     const elapsedMinutes = Math.floor(elapsedMs / 60_000);
-    if (elapsedMinutes < 1) return 'zojuist';
     if (elapsedMinutes < 60) return `${elapsedMinutes} min geleden`;
     const elapsedHours = Math.floor(elapsedMinutes / 60);
     return elapsedHours === 1 ? '1 uur geleden' : `${elapsedHours} uur geleden`;
