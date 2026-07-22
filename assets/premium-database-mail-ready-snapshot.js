@@ -224,6 +224,7 @@
         const currentGeneratedAtMs = Math.max(0, Number(state.mailReadySnapshotGeneratedAtMs) || 0);
         if (incomingGeneratedAtMs && currentGeneratedAtMs && incomingGeneratedAtMs < currentGeneratedAtMs) return false;
         state.mailReadySnapshotLoaded = true;
+        state.mailReadySnapshotStale = false;
         state.mailReadySnapshotFailed = false;
         state.mailReadySnapshotPending = Boolean(pending);
         if (incomingGeneratedAtMs) state.mailReadySnapshotGeneratedAtMs = incomingGeneratedAtMs;

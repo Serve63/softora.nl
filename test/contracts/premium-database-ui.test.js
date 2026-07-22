@@ -281,6 +281,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
     pageSource,
     /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\),[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; state\.remoteCustomersLoaded = !databaseHasFastSnapshotBootstrap;[\s\S]*state\.mailReadySnapshotTotal = [\s\S]*state\.availableSnapshotTotal = [\s\S]*renderPage\(\);/
   );
+  assert.match(pageSource, /state\.mailReadySnapshotStale = customersBootstrapPayload\.stale === true;/);
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
   assert.match(pageSource, /function isDerivedOrderPlaceholderCustomer\(customer\)/);
@@ -978,7 +979,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
 
 test('mail-ready snapshot client loads compact rows before full database restore', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('snapshot should not warn'); } } });
-  const state = { mailReadySnapshotLoaded: false, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotTotal: null, mailReadySnapshotCustomers: [], availableSnapshotLoaded: false, availableSnapshotTotal: null, availableSnapshotCustomers: [], dataUnavailable: true, remoteCustomersLoaded: false, activeStatus: 'benaderbaar' };
+  const state = { mailReadySnapshotLoaded: false, mailReadySnapshotStale: true, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotTotal: null, mailReadySnapshotCustomers: [], availableSnapshotLoaded: false, availableSnapshotTotal: null, availableSnapshotCustomers: [], dataUnavailable: true, remoteCustomersLoaded: false, activeStatus: 'benaderbaar' };
   const applied = [];
   const requests = [];
 
@@ -1000,6 +1001,7 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(requests[0][2], 6000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0']);
   assert.equal(state.mailReadySnapshotLoaded, true);
+  assert.equal(state.mailReadySnapshotStale, false);
   assert.equal(state.mailReadySnapshotFailed, false);
   assert.equal(state.mailReadySnapshotPending, false);
   assert.equal(state.mailReadySnapshotTotal, 1);
@@ -1192,14 +1194,15 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /catch \(error\) \{[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);[\s\S]*state\.dataUnavailable = !hadBootstrapCustomers;/);
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
-  assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260718a/);
+  assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260722a/);
   assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
   assert.match(snapshotSource, /fetchSnapshotPage\(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS\)/);
   assert.match(snapshotSource, /fetchRemainingPages\(config, firstPage\.total, firstPage\.rows\)/);
   assert.match(snapshotSource, /global\.SoftoraDatabaseMailReadySnapshot =/);
+  assert.match(snapshotSource, /state\.mailReadySnapshotStale = false;/);
   assert.match(snapshotSource, /state\.mailReadySnapshotCustomers = snapshotCustomers;/);
   assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers, availableSnapshotCustomers\)/);
   assert.match(snapshotSource, /function moveCustomerToAvailable\(state, customer\)/);
