@@ -27,7 +27,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
-  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717f"/);
+  assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260722c"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260717a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260722b"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
@@ -190,8 +190,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.bar\.is-warning\s*\{[\s\S]*var\(--warning\)/);
   assert.match(css, /\.bar\.is-danger\s*\{[\s\S]*var\(--danger\)/);
   assert.match(css, /\.status\.is-today-end\s*\{[\s\S]*border-bottom:\s*2px solid var\(--good-line\);/);
-  assert.match(css, /\.status\.is-untracked::before\s*\{[\s\S]*background:\s*#d4d9df;/);
-  assert.match(css, /\.status\.is-untracked\.is-empty::before\s*\{[\s\S]*width:\s*18px;[\s\S]*border:\s*2px solid #e1e0e5;[\s\S]*background:\s*#fff;/);
+  assert.match(css, /\.status\.is-untracked::before,\s*\.status\.is-untracked\.is-empty::before\s*\{[\s\S]*width:\s*18px;[\s\S]*height:\s*18px;[\s\S]*border:\s*2px solid #e1e0e5;[\s\S]*background:\s*#fff;/);
+  assert.doesNotMatch(css, /\.status\.is-untracked::before\s*\{[\s\S]*width:\s*6px;/);
   assert.match(css, /\.status\.is-missed::before\s*\{[\s\S]*background-color:\s*var\(--danger\);/);
   assert.doesNotMatch(css, /\.status\.is-soft|is-soft::before/);
   assert.match(css, /\.habit-label:focus\s*\{[\s\S]*box-shadow:\s*0 0 0 2px rgba\(86, 196, 134, \.34\);/);

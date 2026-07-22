@@ -1061,16 +1061,12 @@ button {
   background: #fff;
   transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
 }
-.status.is-untracked::before {
-  width: 6px;
-  height: 6px;
-  border: 0;
-  background: #d4d9df;
-}
+.status.is-untracked::before,
 .status.is-untracked.is-empty::before {
   width: 18px;
   height: 18px;
   border: 2px solid #e1e0e5;
+  border-radius: 999px;
   background: #fff;
 }
 .status.is-done::before,
