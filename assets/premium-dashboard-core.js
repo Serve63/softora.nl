@@ -152,7 +152,7 @@ function formatMoneyEUR(amount) {
 
     const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;
     const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;
-    const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 1000;
+    const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 0;
     let premiumDashboardBootWatchdog = null;
     let premiumDashboardBootReleased = false;
     let premiumDashboardBootFailSafeInstalled = false;
@@ -277,7 +277,7 @@ function formatMoneyEUR(amount) {
             hardLoader.style.opacity = '';
             hardLoader.style.visibility = '';
         }
-        const safeMinimumMs = Math.max(450, Math.min(2500, Number(minimumMs) || PREMIUM_DASHBOARD_BOOT_MINIMUM_MS));
+        const safeMinimumMs = Math.max(0, Math.min(2500, Number(minimumMs) || 0));
         timerRoot.setTimeout(releasePremiumDashboardBootShell, safeMinimumMs);
     }
 

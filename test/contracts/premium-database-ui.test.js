@@ -1983,7 +1983,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /await webdesignMockupController\.ensureForCustomer\(context\.customerId\)/);
   assert.match(pageSource, /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\), databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
   assert.match(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
-  assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 1000\)/);
+  assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
   assert.match(webdesignActionScriptSource, /markPhotoKeyLoaded\(loadKey\)/);
@@ -2059,7 +2059,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710c"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710c"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);

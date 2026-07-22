@@ -16,8 +16,8 @@ test('premium kladblok gebruikt dezelfde layout-ruggengraat en titelmaat als das
   assert.match(pageSource, /\.page-subtitle\s*\{[\s\S]*font-size:\s*0\.9rem;[\s\S]*color:\s*var\(--text-tertiary\);/s);
   assert.match(pageSource, /<h1 class="page-title">Kladblok<\/h1>/);
   assert.match(pageSource, /<p class="page-subtitle">Typ hier je losse notities\.<\/p>/);
-  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260605a/);
-  assert.match(pageSource, /assets\/premium-notepad\.js\?v=20260519a/);
+  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260722b/);
+  assert.match(pageSource, /assets\/premium-notepad\.js\?v=20260722a/);
   assert.match(pageSource, /<p id="notepadStatus" class="notepad-status" role="status" aria-live="polite">Notities laden\.\.\.<\/p>/);
   assert.match(pageSource, /id="notepadEditor"[\s\S]*contenteditable="false"/);
   assert.doesNotMatch(pageSource, /softora_premium_notepad_html_v1|fetchUiStateGet|editor\.innerHTML/);

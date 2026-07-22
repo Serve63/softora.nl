@@ -1041,7 +1041,8 @@ mountExtraSettingsCategory();
 
 (async function bootstrapPersoneelManager() {
   try {
-    var session = await fetchJson('/api/auth/session', { method: 'GET' });
+    var session = window.SoftoraPageBootstrapSession?.get?.()
+      || await fetchJson('/api/auth/session', { method: 'GET' });
     canManageUsers = Boolean(session.canManageUsers);
     if (canManageUsers) {
       await refreshTeam();

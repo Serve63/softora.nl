@@ -151,6 +151,8 @@
 
   async function fetchAuthenticatedPreferredSenderEmail() {
     try {
+      const bootstrappedSession = global.SoftoraPageBootstrapSession?.get?.();
+      if (bootstrappedSession) return resolveAuthenticatedSenderEmail(bootstrappedSession, getAvailableSenderEmails());
       const response = await fetch("/api/auth/session", {
         credentials: "same-origin",
         cache: "no-store",

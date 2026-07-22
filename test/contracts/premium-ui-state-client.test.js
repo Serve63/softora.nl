@@ -10,6 +10,14 @@ test('premium ui-state client centraliseert gedeelde read/write fallback routes'
   assert.match(source, /global\.SoftoraUiStateClient = \{/);
   assert.match(source, /get: getUiState/);
   assert.match(source, /set: setUiState/);
+  assert.match(source, /peek: peekUiState/);
+  assert.match(source, /prime: primeUiState/);
+  assert.match(source, /"softoraPageStateBootstrap"/);
+  assert.match(source, /"softoraCustomersBootstrap"/);
+  assert.match(source, /payload\.pageStateScopes/);
+  assert.match(source, /var primedScopes = Object\.create\(null\);/);
+  assert.match(source, /var bootstrappedScopeCount = readPageStateBootstrap\(\);/);
+  assert.match(source, /time: Date\.now\(\)/);
   assert.match(source, /"\/api\/ui-state-get\?scope=" \+ encodedScope/);
   assert.match(source, /"\/api\/ui-state\/" \+ encodedScope/);
   assert.match(source, /"\/api\/ui-state-set\?scope=" \+ encodedScope/);

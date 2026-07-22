@@ -117,7 +117,7 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722e/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722f/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -189,7 +189,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722e"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722f"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -893,7 +893,7 @@ test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over all
   assert.match(campaignInboxSource, /\/api\/mailbox\/campaign-replies\?limit=100/);
   assert.match(campaignInboxSource, /function getAccount\(mail, fallbackAccount\)/);
   assert.match(campaignInboxSource, /function getRequestId\(mail\)/);
-  assert.match(campaignInboxSource, /async function load\(folder, normalizeMessage, fetchImpl\)/);
+  assert.match(campaignInboxSource, /async function load\(folder, normalizeMessage, fetchImpl, options\)/);
   assert.match(indexSource, /id: String\(requestId \|\| id\)/);
   assert.doesNotMatch(campaignInboxSource, /ui-state-get/);
   assert.match(outreachSource, /folder: normalizeText\(params\.get\('folder'\) \|\| 'outreach'\)/);
@@ -970,4 +970,45 @@ test('coldmail inbox laadt echte gekoppelde mailboxberichten via de campagne-rep
   assert.equal(calls[0].options.cache, 'no-store');
   assert.doesNotMatch(calls[0].url, /ui-state-get/);
   assert.equal(await campaignInboxModule.load('inbox', (message) => message), null);
+});
+
+test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste client-request', async () => {
+  const previousDocument = globalThis.document;
+  let fetchCalls = 0;
+  globalThis.document = {
+    getElementById(id) {
+      if (id !== 'softoraPageStateBootstrap') return null;
+      return {
+        textContent: JSON.stringify({
+          session: {
+            authenticated: true,
+            email: 'serve@softora.nl',
+            displayName: 'Servé Creusen',
+          },
+          mailbox: {
+            ok: true,
+            messages: [{ id: 'reply-bootstrap', from: 'Direct zichtbaar' }],
+            sync: { source: 'campaign-replies-index' },
+          },
+        }),
+      };
+    },
+  };
+  try {
+    assert.equal(campaignInboxModule.hasPageBootstrap('outreach'), true);
+    assert.equal(campaignInboxModule.getPageBootstrapSession().email, 'serve@softora.nl');
+    const result = await campaignInboxModule.load('outreach', (message) => message, async () => {
+      fetchCalls += 1;
+      throw new Error('bootstrap hoort de request over te slaan');
+    });
+    assert.equal(result.messages[0].id, 'reply-bootstrap');
+    assert.equal(result.fromBootstrap, true);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  assert.doesNotMatch(readScript(), />Mailbox laden…</);
+  assert.match(readScript(), /preserveOnError:\s*true/);
+  assert.match(readScript(), /getPageBootstrapSession/);
 });

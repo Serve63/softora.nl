@@ -89,6 +89,8 @@
         if (currentSessionPromise) return currentSessionPromise;
 
         currentSessionPromise = (async () => {
+            const bootstrappedSession = root.SoftoraPageBootstrapSession?.get?.();
+            if (bootstrappedSession) return bootstrappedSession;
             if (root.SoftoraPersonnelTheme && typeof root.SoftoraPersonnelTheme.refreshPremiumSession === 'function') {
                 try {
                     const refreshed = await root.SoftoraPersonnelTheme.refreshPremiumSession();
@@ -140,11 +142,9 @@
 
         currentPreferencePromise = (async () => {
             try {
-                const payload = await requestJsonWithFallback(
-                    getUiStateReadUrls(FILTER_SCOPE),
-                    { method: 'GET', cache: 'no-store' },
-                    'Persoonlijke filter laden'
-                );
+                const payload = root.SoftoraUiStateClient && typeof root.SoftoraUiStateClient.get === 'function'
+                    ? await root.SoftoraUiStateClient.get(FILTER_SCOPE)
+                    : await requestJsonWithFallback(getUiStateReadUrls(FILTER_SCOPE), { method: 'GET', cache: 'no-store' }, 'Persoonlijke filter laden');
                 const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object'
                     ? payload.values
                     : {};

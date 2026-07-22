@@ -34,7 +34,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
+  assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);

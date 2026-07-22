@@ -199,7 +199,7 @@ function setTotalsLoading() {
   document.getElementById('totaal-posten').textContent = '...';
 }
 
-const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 1000;
+const MONTHLY_COSTS_BOOT_MIN_VISIBLE_MS = 0;
 let monthlyCostsBootStartedAt = Date.now();
 let monthlyCostsBootReleaseTimer = null;
 
@@ -242,6 +242,34 @@ function setMonthlyCostsStageBooting(isBooting) {
     return;
   }
   releaseMonthlyCostsStageBooting();
+}
+
+function hydrateMonthlyCostsFromPageBootstrap() {
+  const client = window.SoftoraUiStateClient;
+  const state = client && typeof client.peek === 'function'
+    ? client.peek(MONTHLY_COSTS_REMOTE_SCOPE)
+    : null;
+  const serializedEntries = normalizeString(
+    state && state.values && state.values[MONTHLY_COSTS_REMOTE_KEY]
+  );
+  if (!state) return false;
+  if (!serializedEntries) {
+    applyStoredMonthlyCostItems([]);
+    monthlyCostsLoaded = true;
+    monthlyCostsBootstrapDone = true;
+    return true;
+  }
+
+  try {
+    const parsedEntries = JSON.parse(serializedEntries);
+    if (!Array.isArray(parsedEntries)) return false;
+    applyStoredMonthlyCostItems(parsedEntries);
+    monthlyCostsLoaded = true;
+    monthlyCostsBootstrapDone = true;
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function appendCostTextElement(parent, tagName, className, text) {
@@ -425,6 +453,9 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
 }
 
 async function fetchUiStateGetWithFallback(scope) {
+  if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === 'function') {
+    return window.SoftoraUiStateClient.get(scope);
+  }
   const encodedScope = encodeURIComponent(String(scope || ''));
   const urls = [`/api/ui-state-get?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
   let lastError = null;
@@ -452,6 +483,9 @@ async function fetchUiStateGetWithFallback(scope) {
 }
 
 async function fetchUiStateSetWithFallback(scope, body) {
+  if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
+    return window.SoftoraUiStateClient.set(scope, body, { timeoutMs: 12000 });
+  }
   const encodedScope = encodeURIComponent(String(scope || ''));
   const urls = [`/api/ui-state-set?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
   let lastError = null;
@@ -610,9 +644,11 @@ async function bootstrapMonthlyCostsPage() {
     };
 
     try {
-      setMonthlyCostsStageBooting(true);
-      setTotalsLoading();
-      render();
+      if (!monthlyCostsBootstrapDone) {
+        setMonthlyCostsStageBooting(true);
+        setTotalsLoading();
+        render();
+      }
       await ensureMonthlyCostEntriesLoaded();
       monthlyCostsBootstrapDone = true;
       render();
@@ -829,8 +865,9 @@ window.softoraMonthlyCostsHelpers = {
 };
 
 syncNextId();
-setMonthlyCostsStageBooting(true);
-setTotalsLoading();
+const monthlyCostsHadPageBootstrap = hydrateMonthlyCostsFromPageBootstrap();
+setMonthlyCostsStageBooting(false);
+if (!monthlyCostsHadPageBootstrap) setTotalsLoading();
 render();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {

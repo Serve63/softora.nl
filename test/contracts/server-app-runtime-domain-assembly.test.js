@@ -45,6 +45,7 @@ test('server app runtime domain assembly keeps late-bound refs and page bootstra
       sendPublishedWebsiteLinkResponse: () => null,
     },
   });
+  const mailboxCoordinator = { listCampaignReplies: async () => ({ ok: true, messages: [] }) };
 
   const result = assembleServerAppRuntimeDomainsWithFactories(
     {
@@ -126,7 +127,7 @@ test('server app runtime domain assembly keeps late-bound refs and page bootstra
           }),
         };
       },
-      createServerAppFeatureWiringImpl: () => ({}),
+      createServerAppFeatureWiringImpl: () => ({ mailboxCoordinator }),
       createServerAppAgendaWiringImpl: (context) => {
         captured.agendaWiringContext = context;
         return {
@@ -162,6 +163,7 @@ test('server app runtime domain assembly keeps late-bound refs and page bootstra
   );
   assert.equal(result.runtimeSyncRuntime, runtimeSyncRuntime);
   assert.equal(result.seedDemoConfirmationTaskForUiTesting(), 'seeded');
+  assert.equal(captured.agendaWiringContext.mailboxCoordinator, mailboxCoordinator);
   assert.equal(
     captured.agendaWiringContext.shared.normalizeAbsoluteHttpUrl('https://softora.test'),
     'https://softora.test'

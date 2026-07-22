@@ -216,19 +216,21 @@ function createHtmlPageCoordinator(options = {}) {
         ? bootstrapData.serialized
         : escapeJsonForInlineHtml(bootstrapData.data);
     const scriptTag = `<script id="${scriptId}" type="application/json">${serialized}</script>`;
+    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260722a"></script>';
+    const bootstrapHtml = `${scriptTag}${sessionBootstrapTag}`;
 
     if (marker) {
       const markerToken = `<!-- ${marker} -->`;
       if (sourceHtml.includes(markerToken)) {
-        return sourceHtml.replace(markerToken, scriptTag);
+        return sourceHtml.replace(markerToken, bootstrapHtml);
       }
     }
 
     if (/<\/body>/i.test(sourceHtml)) {
-      return sourceHtml.replace(/<\/body>/i, `${scriptTag}\n</body>`);
+      return sourceHtml.replace(/<\/body>/i, `${bootstrapHtml}\n</body>`);
     }
 
-    return `${sourceHtml}\n${scriptTag}`;
+    return `${sourceHtml}\n${bootstrapHtml}`;
   }
 
   function injectHtmlMarkerReplacements(html, bootstrapData) {
