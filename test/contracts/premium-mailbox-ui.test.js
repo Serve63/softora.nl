@@ -108,6 +108,7 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722c/);
   const requests = [];
   const loads = [];
   const toasts = [];
@@ -159,7 +160,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722c"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -786,6 +787,20 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
   const linkedCtaHtml = renderMailboxBodyForTest('💼 Mijn LinkedIn 👈', [], { senderEmail: 'martijn@softora.nl' });
   assert.match(linkedCtaHtml, /💼 Mijn LinkedIn 👈/);
   assert.doesNotMatch(linkedCtaHtml, /linkedin\.com/i);
+});
+
+test('premium mailbox verbergt een technische webdesign-url achter deze link', () => {
+  const url = 'https://www.softora.nl/webdesign/de-vyldre?cid=safe-dedupe-20260615-row-1891-d84e3e0cb2&sender=serve';
+  const html = renderMailboxBodyForTest(
+    `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link [${url}] bekijken 🎨`
+  );
+
+  assert.match(
+    html,
+    /via <a href="https:\/\/www\.softora\.nl\/webdesign\/de-vyldre\?cid=safe-dedupe-20260615-row-1891-d84e3e0cb2&amp;sender=serve" target="_blank" rel="noopener noreferrer">deze link<\/a> bekijken 🎨/
+  );
+  assert.doesNotMatch(html, />https:\/\/www\.softora\.nl\/webdesign\/de-vyldre/);
+  assert.doesNotMatch(html, /\[https:\/\//);
 });
 
 test('premium mailbox houdt databasekoppeling zonder interessebalk in het maildetail', () => {
