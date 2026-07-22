@@ -32,6 +32,7 @@ function formatMailboxDetailSubject(value) {
   return subject || '(Geen onderwerp)';
 }
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link)\s*\[(https?:\/\/[^\]\s<>"']+)\]/gi;
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
 }
@@ -56,7 +57,7 @@ function isSafeMailBodyUrl(value) {
     return false;
   }
 }
-function renderLinkedMailboxText(value, options) {
+function renderMailboxUrls(value) {
   const text = String(value == null ? '' : value);
   let html = '';
   let lastIndex = 0;
@@ -72,6 +73,23 @@ function renderLinkedMailboxText(value, options) {
     return match;
   });
   html += escapeHtml(text.slice(lastIndex));
+  return html;
+}
+function renderLinkedMailboxText(value, options) {
+  const text = String(value == null ? '' : value);
+  let html = '';
+  let lastIndex = 0;
+  text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, url, offset) => {
+    html += renderMailboxUrls(text.slice(lastIndex, offset));
+    if (isSafeMailBodyUrl(url)) {
+      html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    } else {
+      html += escapeHtml(match);
+    }
+    lastIndex = offset + match.length;
+    return match;
+  });
+  html += renderMailboxUrls(text.slice(lastIndex));
   return window.SoftoraMailboxDisplay.applySenderCtaLinks(html, text, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl });
 }
 function normalizeMailboxEmail(value) {
@@ -803,7 +821,7 @@ function openMail(id, options = {}) {
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
-  const detailBody = m.bodyLoaded || m.body
+  const detailBody = m.bodyLoaded
     ? m.body
     : 'Bericht laden…';
   document.getElementById('mail-detail').innerHTML = `

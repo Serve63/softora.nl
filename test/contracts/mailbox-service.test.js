@@ -1228,6 +1228,96 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
   assert.equal(messages[0].inlineImages[0].contentBase64, TINY_PNG_DATA_URL.split(',')[1]);
 });
 
+test('mailbox service restores webdesign photos when an indexed reply is opened', async () => {
+  let imapCalls = 0;
+  const customerId = 'devyldre';
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      getMessage: async () => ({
+        id: 'inbox:44',
+        uid: 44,
+        folder: 'inbox',
+        from: 'De Vyldre',
+        email: 'info@devyldre.com',
+        to: 'serve@softora.nl',
+        subject: 'Re: Kleine vraag over jullie website',
+        body: [
+          'Dankjewel voor je mail.',
+          '',
+          'Op 20 jul 2026 om 07:12 heeft Servé Creusen het volgende geschreven:',
+          '',
+          'Afgelopen week kwam ik jullie website devyldre.com tegen.',
+          'Uit enthousiasme heb ik een fris webdesign gemaakt.',
+          'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.',
+        ].join('\n'),
+        hasBody: true,
+        indexed: true,
+      }),
+    },
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_database_photos') {
+        return {
+          values: {
+            softora_database_photos_v1: JSON.stringify({
+              [customerId]: {
+                id: customerId,
+                websitePhoto: TINY_PNG_DATA_URL,
+                websitePhotoName: 'De Vyldre webdesign.png',
+                websiteMockup: TINY_PNG_DATA_URL,
+                websiteMockupName: 'De Vyldre device mockup.png',
+              },
+            }),
+          },
+        };
+      }
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: customerId,
+                bedrijf: 'De Vyldre',
+                dom: 'devyldre.com',
+                email: 'info@devyldre.com',
+              },
+            ]),
+          },
+        };
+      }
+      return { values: {} };
+    },
+    createImapClient: () => {
+      imapCalls += 1;
+      throw new Error('De volledige mailbox hoeft niet opnieuw via IMAP te worden opgehaald');
+    },
+  });
+
+  const message = await service.getMessage({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    id: 'inbox:44',
+  });
+
+  assert.equal(imapCalls, 0);
+  assert.deepEqual(
+    message.bodyImages.map((image) => image.alt),
+    ['De Vyldre webdesign', 'De Vyldre device mockup']
+  );
+  assert.match(message.body, /\[image: De Vyldre webdesign\]/);
+  assert.match(message.body, /\[image: De Vyldre device mockup\]/);
+  assert.equal(message.inlineImages.length, 2);
+});
+
 test('mailbox service keeps link-only webdesign sends free of recovered image placeholders', async () => {
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX/Verstuurd' }],
@@ -1918,7 +2008,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     },
   });
 
-  assert.equal(result.text, 'Beste klant,\n\nVerbeterde tekst.');
+  assert.equal(result.text, 'Beste klant,\n\nVerbeterde tekst.\n\nMet vriendelijke groet,\nServé Creusen');
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
@@ -1982,6 +2072,44 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
   assert.match(calls[0].messages[1].content, /"aanhefNaam":"Lisa"/);
   assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
+});
+
+test('mailbox service laat replycontext de afzender bepalen en corrigeert een verkeerde AI-signatuur', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    openAiModel: 'gpt-test',
+    fetchJsonWithTimeout: async (_url, options) => {
+      calls.push(JSON.parse(options.body));
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [{ message: { content: 'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen' } }],
+        },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+
+  const result = await service.rewriteDraft({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Re: Vraag',
+    body: '',
+    context: {
+      accountEmail: 'martijn@softora.nl',
+      from: 'Klant',
+      email: 'klant@example.nl',
+      subject: 'Vraag',
+      body: 'Bedankt voor je mail.',
+    },
+  });
+
+  assert.match(calls[0].messages[0].content, /Schrijf namens Martijn van de Ven/);
+  assert.match(calls[0].messages[1].content, /"accountEmail":"martijn@softora.nl"/);
+  assert.match(calls[0].messages[1].content, /"naam":"Martijn van de Ven"/);
+  assert.equal(result.text, 'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
 });
 
 test('mailbox service bewaart coldmailprofiel alleen bij een los concept zonder replycontext', async () => {
