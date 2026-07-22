@@ -504,10 +504,10 @@ function findMailById(id) {
 }
 function getMailboxAccounts() { return getMailboxAccountEmails(); }
 function getMailboxAccount() { return activeMailboxAccount; }
-async function loadMailboxSenderProfile() {
+async function loadMailboxSenderProfile(senderEmail = getMailboxAccount()) {
   if (!window.SoftoraCampaignSenderSettings || typeof window.SoftoraCampaignSenderSettings.loadProfileForSender !== 'function') return null;
   try {
-    return await window.SoftoraCampaignSenderSettings.loadProfileForSender(getMailboxAccount(), {
+    return await window.SoftoraCampaignSenderSettings.loadProfileForSender(senderEmail, {
       scope: MAILBOX_SENDER_SETTINGS_SCOPE,
       key: MAILBOX_SENDER_SETTINGS_KEY,
     });
@@ -930,7 +930,8 @@ function closeCompose() {
 async function rewriteComposeBody() {
   const bodyField = document.getElementById('c-body');
   const draft = String(bodyField?.value || '').trim();
-  if (!draft) {
+  const isSuggestedReply = Boolean(composeReplyContext);
+  if (!draft && !isSuggestedReply) {
     toast('Typ eerst je mailtekst');
     return;
   }
@@ -943,14 +944,15 @@ async function rewriteComposeBody() {
   }
   if (sendBtn) sendBtn.disabled = true;
   try {
-    const senderProfile = await loadMailboxSenderProfile();
+    const replyAccount = normalizeMailboxEmail(composeReplyContext && composeReplyContext.accountEmail) || getMailboxAccount();
+    const senderProfile = await loadMailboxSenderProfile(replyAccount);
     const response = await fetch('/api/mailbox/rewrite', {
       method: 'POST',
       credentials: 'same-origin',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        account: getMailboxAccount(),
+        account: replyAccount,
         to: getComposeFieldValue('c-to'),
         subject: getComposeFieldValue('c-subject'),
         body: draft,
@@ -960,18 +962,18 @@ async function rewriteComposeBody() {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.ok) {
-      throw new Error(data?.detail || data?.error || 'Mailtekst verbeteren mislukt');
+      throw new Error(data?.detail || data?.error || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt'));
     }
     const rewritten = String(data?.text || data?.result?.text || '').trim();
     if (!rewritten) throw new Error('Geen verbeterde tekst ontvangen');
     bodyField.value = rewritten;
-    toast('Tekst verbeterd');
+    toast(isSuggestedReply ? 'Reactie voorgesteld' : 'Tekst verbeterd');
   } catch (error) {
-    toast(String(error?.message || error || 'Mailtekst verbeteren mislukt'));
+    toast(String(error?.message || error || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt')));
   } finally {
     if (rewriteBtn) {
       rewriteBtn.disabled = false;
-      rewriteBtn.textContent = originalLabel || 'Verwoord dit beter';
+      rewriteBtn.textContent = originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter');
     }
     if (sendBtn) sendBtn.disabled = false;
   }

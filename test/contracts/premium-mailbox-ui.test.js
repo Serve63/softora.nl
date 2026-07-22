@@ -443,28 +443,32 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /\.compose-head \{[\s\S]*background:\s*var\(--crimson\);/);
   assert.match(pageSource, /\.compose-footer \{[\s\S]*justify-content:\s*space-between;/);
   assert.match(pageSource, /\.btn-rewrite-compose \{[\s\S]*color:\s*var\(--crimson\);/);
-  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Verwoord dit beter<\/button>/);
+  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie<\/button>/);
   assert.match(pageSource, /<button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×<\/button>/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
 
-test('premium mailbox kan conceptantwoord met mailcontext laten herschrijven', () => {
+test('premium mailbox kan vanuit de mailcontext een voorgestelde reactie schrijven', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
 
-  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Verwoord dit beter<\/button>/);
+  assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie<\/button>/);
   assert.match(scriptSource, /let composeReplyContext = null;/);
   assert.match(scriptSource, /function buildComposeRewriteContext\(\)/);
   assert.match(scriptSource, /async function rewriteComposeBody\(\)/);
   assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
-  assert.match(scriptSource, /function loadMailboxSenderProfile\(\)/);
+  assert.match(scriptSource, /function loadMailboxSenderProfile\(senderEmail = getMailboxAccount\(\)\)/);
   assert.match(scriptSource, /SoftoraCampaignSenderSettings\.loadProfileForSender/);
-  assert.match(scriptSource, /const senderProfile = await loadMailboxSenderProfile\(\);/);
+  assert.match(scriptSource, /const replyAccount = normalizeMailboxEmail\(composeReplyContext && composeReplyContext\.accountEmail\) \|\| getMailboxAccount\(\);/);
+  assert.match(scriptSource, /const senderProfile = await loadMailboxSenderProfile\(replyAccount\);/);
+  assert.match(scriptSource, /account: replyAccount,/);
   assert.match(scriptSource, /senderProfile,/);
   assert.match(scriptSource, /context: buildComposeRewriteContext\(\)/);
   assert.match(scriptSource, /case 'rewrite-compose':[\s\S]*void rewriteComposeBody\(\);/);
   assert.match(scriptSource, /function replyMail\(mail\) \{[\s\S]*setComposeReplyContext\(mail\);/);
+  assert.match(scriptSource, /if \(!draft && !isSuggestedReply\)/);
+  assert.match(scriptSource, /Reactie voorgesteld/);
   assert.match(scriptSource, /bodyField\.value = rewritten;/);
 });
 
