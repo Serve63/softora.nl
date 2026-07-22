@@ -127,7 +127,7 @@
     if (['origin', 'destination'].includes(card.type)) {
       const specialLabel = document.createElement('span');
       specialLabel.className = `end-game-card-special-label end-game-card-${card.type}-label`;
-      specialLabel.textContent = card.type === 'origin' ? 'HIER BEGON HET' : 'WIE BEN IK DAN?';
+      specialLabel.textContent = card.type === 'origin' ? 'HIER BEGON HET' : 'UITGESPEELD..';
       artwork.classList.add(`end-game-card-photo--${card.type}`);
       artwork.append(image, shade, top, title, specialLabel);
     } else {
@@ -162,7 +162,7 @@
       slot.setAttribute('role', 'img');
       slot.setAttribute('aria-label', isOrigin
         ? 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.'
-        : 'Eindpunt: 2030. Wie ben ik dan? Deze kaart staat vast op de laatste positie.');
+        : 'Eindpunt: 2030. Uitgespeeld. Deze kaart staat vast op de laatste positie.');
     } else {
       slot.tabIndex = 0;
       slot.setAttribute('role', 'button');

@@ -29,7 +29,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717f"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260717a"/);
-  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260722a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260722b"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
@@ -37,7 +37,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260722a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260722b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260717c" defer><\/script>/);
@@ -168,6 +168,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(endGameNumbersCss, /\.end-game-card-slot\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*flex-direction:\s*column;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot\.is-card-dragging\s*\{[\s\S]*will-change:\s*transform;/);
   assert.match(endGameNumbersCss, /\.end-game-card-number\s*\{[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*text-align:\s*center;/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin,[\s\S]*\.end-game-card-slot--destination\s*\{[\s\S]*flex-basis:\s*clamp\(215px, 14\.5vw, 246px\);[\s\S]*drop-shadow/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin > \.end-game-goal-card,[\s\S]*min-height:\s*clamp\(330px, 38vh, 385px\);[\s\S]*border:\s*2px solid rgba\(218, 175, 89, \.88\)/);
   assert.match(endGameNumbersCss, /@media \(max-width:\s*900px\)[\s\S]*flex-basis:\s*min\(74vw, 280px\);/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
@@ -291,7 +293,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.requestedOrder, \.\.\.remainingOrder, DESTINATION_CARD_ID\]/);
   assert.match(endGameCardsJs, /dataset\.endGameCardFixed = 'true'/);
   assert.match(endGameCardsJs, /card\.type === 'destination' \? 'EINDPUNT' : 'END GAME'/);
-  assert.match(endGameCardsJs, /card\.type === 'origin' \? 'HIER BEGON HET' : 'WIE BEN IK DAN\?'/);
+  assert.match(endGameCardsJs, /card\.type === 'origin' \? 'HIER BEGON HET' : 'UITGESPEELD\.\.'/);
+  assert.doesNotMatch(endGameCardsJs, /WIE BEN IK DAN/);
   assert.match(endGameCardsJs, /if \(!isFixed\) article\.append\(createCompletionOverlay\(\), createActions\(card, state\.completed\)\)/);
   assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
   [
