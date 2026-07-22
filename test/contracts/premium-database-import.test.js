@@ -1570,6 +1570,7 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /createPremiumDatabaseMailReadySnapshotService\(\{[\s\S]*dataOpsStore: deps\.dataOpsStore/);
   assert.match(featureRoutesSource, /getUiStateValues: deps\.getUiStateValues/);
   assert.match(featureRoutesSource, /mailReadySnapshotService: premiumDatabaseMailReadySnapshotService/);
+  assert.match(featureRoutesSource, /premiumDatabaseWebdesignJobsCoordinator\.setMailReadySnapshotService\(premiumDatabaseMailReadySnapshotService\)/);
   assert.match(featureRoutesSource, /requirePremiumApiAccess: premiumRouteRuntime\?\.requirePremiumApiAccess/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/sync-spreadsheet'/);

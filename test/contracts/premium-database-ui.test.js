@@ -1596,7 +1596,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
@@ -1849,7 +1849,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -2000,7 +2000,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
   assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
   assert.match(webdesignActionScriptSource, /Keuze tussen V1 en V2 kon niet worden geladen/);
   assert.doesNotMatch(webdesignActionScriptSource, /DEFAULT_SINGLE_VARIANT/);
@@ -2040,6 +2040,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignMockup\.createController\(\{/);
   assert.match(pageSource, /ensureMockupForCustomer: function \(customerId, ensureOptions\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
+  assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
+  assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
+  assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
   assert.match(pageSource, /function getCustomerSearchHaystack\(customer\)/);
@@ -2063,6 +2067,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
   assert.match(pageSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\)/);
   assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
+  assert.match(pageSource, /if \(!\(state\.mailReadySnapshotLoaded && state\.availableSnapshotLoaded\)\) \{[\s\S]*loadCustomerPhotoMap\(enrichedCustomers/);
   assert.match(pageSource, /state\.photoRestoreFailed = true;[\s\S]*console\.warn\("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error\);/);
   assert.match(pageSource, /state\.photoRestoreFailed = true; applyCustomerList\(window\.SoftoraDatabaseMailReadySnapshot\.mergeAssetFlags\(state\.klanten, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\), false\); console\.warn\("Databasefoto's laden voor boot tijdelijk overgeslagen:", error\);/);
   assert.doesNotMatch(pageSource, /Foto- en mockupdata tijdelijk niet volledig geladen; mailklare teller wordt voorzichtig lager gehouden\./);
