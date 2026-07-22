@@ -115,7 +115,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260720h"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260612a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260720f"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -330,6 +330,17 @@ test('coldmail inbox sorteert na ieder eigenaarfilter op echte ontvangsttijd met
   );
 });
 
+test('mailbox opent bij eerste paginalaad automatisch de meest recente zichtbare mail', () => {
+  const scriptSource = readScript();
+  const renderListSource = scriptSource.match(/function renderList\(options = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '';
+
+  assert.match(renderListSource, /const hasVisibleActiveMail = activeMail != null && list\.some/);
+  assert.match(renderListSource, /if \(!hasVisibleActiveMail\) activeMail = null;/);
+  assert.match(renderListSource, /if \(!activeMail && options\.openLatest !== false\) openMail\(list\[0\]\.id\);/);
+  assert.match(scriptSource, /renderList\(\{ openLatest: options\.openLatest !== false \}\)/);
+  assert.match(scriptSource, /openLatest: !\(intent\.message \|\| intent\.email \|\| intent\.query\)/);
+});
+
 test('coldmail inbox toont de ontvangsttijd vast in Europe Amsterdam', () => {
   const helpers = loadMailboxHelpersForTest();
   const mail = helpers.normalizeMailboxApiMessage({
@@ -365,7 +376,7 @@ test('coldmail inbox zet relatieve datum boven de tijd en oudere mails op dag en
 test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met tijd', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
-  const renderListSource = scriptSource.match(/function renderList\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const renderListSource = scriptSource.match(/function renderList\(options = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '';
 
   assert.match(renderListSource, /class="unread-dot"/);
   assert.match(renderListSource, /class="mail-from"/);
