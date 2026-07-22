@@ -189,7 +189,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722f"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722f"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -1011,4 +1011,44 @@ test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste cli
   assert.doesNotMatch(readScript(), />Mailbox laden…</);
   assert.match(readScript(), /preserveOnError:\s*true/);
   assert.match(readScript(), /getPageBootstrapSession/);
+});
+
+test('mailbox toont de laatst bekende tabdata direct wanneer de server koud start', async () => {
+  const previousDocument = globalThis.document;
+  const previousBootstrapSession = globalThis.SoftoraPageBootstrapSession;
+  const previousApi = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  globalThis.document = { getElementById() { return null; } };
+  globalThis.SoftoraPageBootstrapSession = {
+    get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
+    cache: {
+      read(key) {
+        assert.equal(key, 'mailbox_campaign_replies:usr_serve');
+        return {
+          ok: true,
+          messages: [{ id: 'reply-session-cache', from: 'Direct uit tabcache' }],
+          sync: { source: 'tab-session-cache' },
+        };
+      },
+      write() { return true; },
+    },
+  };
+  delete require.cache[modulePath];
+  const freshCampaignInboxModule = require(modulePath);
+  let fetchCalls = 0;
+
+  try {
+    const result = await freshCampaignInboxModule.load('outreach', (message) => message, async () => {
+      fetchCalls += 1;
+      throw new Error('tabcache hoort de eerste request over te slaan');
+    });
+    assert.equal(result.messages[0].id, 'reply-session-cache');
+    assert.equal(result.fromBootstrap, true);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraPageBootstrapSession = previousBootstrapSession;
+    globalThis.SoftoraMailboxCampaignInbox = previousApi;
+  }
 });

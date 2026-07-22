@@ -63,6 +63,12 @@ const DISALLOWED_BROWSER_STORAGE_PATTERNS = Object.freeze([
   },
 ]);
 
+const APPROVED_BROWSER_STORAGE_PATHS = Object.freeze([
+  'assets/personnel-theme.js',
+  'assets/premium-sidebar-profile-prefill.js',
+  'assets/premium-page-bootstrap-session.js',
+]);
+
 const TEST_WEAKENING_PATTERNS = Object.freeze([
   {
     label: 'only-test',
@@ -120,6 +126,10 @@ function isBehaviorChangePath(filePath) {
 function isFrontendProductionPath(filePath) {
   const normalized = normalizeRepoPath(filePath);
   return normalized.startsWith('assets/') || /^[^/]+\.html$/i.test(normalized);
+}
+
+function isApprovedBrowserStoragePath(filePath) {
+  return APPROVED_BROWSER_STORAGE_PATHS.includes(normalizeRepoPath(filePath));
 }
 
 function isPremiumAuthUsersWriteScanPath(filePath) {
@@ -548,6 +558,7 @@ module.exports = {
   isAllowedNewServerPath,
   isBehaviorChangePath,
   isFrontendProductionPath,
+  isApprovedBrowserStoragePath,
   isHighRiskPath,
   isPremiumAuthUsersWriteScanPath,
   isProtectedFrontendShellPath,

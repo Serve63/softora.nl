@@ -144,7 +144,7 @@ function createHtmlPageCoordinator(options = {}) {
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
     publicPageDependencyWaitMs = 350,
-    protectedPageBootstrapWaitMs = 5500,
+    protectedPageBootstrapWaitMs = 1200,
     dashboardPageBootstrapWaitMs = 1500,
     isProduction = process.env.NODE_ENV === 'production',
   } = options;
@@ -216,7 +216,7 @@ function createHtmlPageCoordinator(options = {}) {
         ? bootstrapData.serialized
         : escapeJsonForInlineHtml(bootstrapData.data);
     const scriptTag = `<script id="${scriptId}" type="application/json">${serialized}</script>`;
-    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260722a"></script>';
+    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260722b"></script>';
     const bootstrapHtml = `${scriptTag}${sessionBootstrapTag}`;
 
     if (marker) {
@@ -293,6 +293,43 @@ function createHtmlPageCoordinator(options = {}) {
         SOFTORA_DASHBOARD_RECURRING_REVENUE: '--',
         SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardUnavailableChartHtml(),
         SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardUnavailableActiveOrdersScript()}`,
+      },
+    };
+  }
+
+  function buildSafeBootstrapSession(authState) {
+    if (!authState || !authState.authenticated) return null;
+    return {
+      authenticated: true,
+      email: String(authState.email || '').trim().toLowerCase(),
+      userId: String(authState.userId || '').trim(),
+      role: String(authState.role || '').trim().toLowerCase(),
+      firstName: String(authState.firstName || '').trim(),
+      lastName: String(authState.lastName || '').trim(),
+      displayName: String(authState.displayName || '').trim(),
+      avatarDataUrl: String(authState.avatarDataUrl || '').trim(),
+      canManageUsers: Boolean(authState.canManageUsers || authState.isAdmin),
+      expiresAt: authState.expiresAt || null,
+    };
+  }
+
+  function buildProtectedPageBootstrapTimeoutFallback(fileName, authState) {
+    const session = buildSafeBootstrapSession(authState);
+    const dashboardFallback = buildDashboardBootstrapTimeoutFallback(fileName);
+    if (dashboardFallback) {
+      if (session) dashboardFallback.data.session = session;
+      return dashboardFallback;
+    }
+    if (!session) return null;
+    return {
+      marker: 'SOFTORA_PAGE_STATE_BOOTSTRAP',
+      scriptId: 'softoraPageStateBootstrap',
+      data: {
+        ok: true,
+        loadedAt: new Date().toISOString(),
+        page: String(fileName || '').trim().toLowerCase(),
+        scopes: {},
+        session,
       },
     };
   }
@@ -618,7 +655,10 @@ function createHtmlPageCoordinator(options = {}) {
                 fileName,
                 label: 'Bootstrap',
                 timeoutMs: bootstrapTimeoutMs,
-                fallbackValue: buildDashboardBootstrapTimeoutFallback(fileName),
+                fallbackValue: buildProtectedPageBootstrapTimeoutFallback(
+                  fileName,
+                  premiumPageAccess?.authState || req?.premiumAuth || null
+                ),
               })
             : await getPageBootstrapData(req, fileName)
           : null;
