@@ -117,7 +117,7 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722f/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260722g/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -189,7 +189,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722f"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260722b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260720a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260722g"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -641,7 +641,7 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
   assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m \}\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id \}\)\}<\/div>/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
 
@@ -661,6 +661,31 @@ test('premium mailbox zet een eerdere eigen mail als apart geciteerd blok neer',
   assert.match(html, /Op 20 jul 2026 om 07:12 heeft Servé Creusen het volgende geschreven:/);
   assert.ok(html.indexOf('Bedankt voor je bericht') < html.indexOf('detail-mail-section-quote'));
   assert.ok(html.indexOf('Goedendag') > html.indexOf('detail-mail-section-quote'));
+});
+
+test('premium mailbox zet beantwoorden direct onder de ontvangen mail en voor de eerdere mail', () => {
+  const html = renderMailboxBodyForTest([
+    'Bedankt voor je bericht, maar we hebben geen interesse.',
+    '',
+    'Kind regards,',
+    'Daffy de Vyldre',
+    '',
+    'Op 20 jul 2026 om 07:12 heeft Servé Creusen het volgende geschreven:',
+    '',
+    'Goedendag,',
+  ].join('\n'), [], { replyMailId: 'mail-123' });
+
+  assert.equal((html.match(/data-mailbox-action="reply-mail"/g) || []).length, 1);
+  assert.ok(html.indexOf('Daffy de Vyldre') < html.indexOf('data-mailbox-action="reply-mail"'));
+  assert.ok(html.indexOf('data-mailbox-action="reply-mail"') < html.indexOf('detail-mail-section-quote'));
+  assert.match(html, /data-mailbox-id="mail-123"/);
+});
+
+test('premium mailbox zet beantwoorden onderaan als er geen eerdere mail is', () => {
+  const html = renderMailboxBodyForTest('Alleen het ontvangen bericht.', [], { replyMailId: 'mail-456' });
+
+  assert.ok(html.indexOf('Alleen het ontvangen bericht.') < html.indexOf('data-mailbox-action="reply-mail"'));
+  assert.doesNotMatch(html, /detail-mail-section-quote/);
 });
 
 test('premium mailbox houdt een geciteerde mail van een andere afzender neutraal', () => {
@@ -769,10 +794,10 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /function escapeHtml\(value\)/);
   assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
   assert.match(scriptSource, /renderLinkedMailboxText\(value, options\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m \}\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id \}\)\}<\/div>/);
 });
 
-test('geopende mail staat als één rustig mailblok met antwoordactie onderaan', () => {
+test('geopende mail staat als één rustig mailblok met antwoordactie na het ontvangen bericht', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
 
@@ -788,7 +813,8 @@ test('geopende mail staat als één rustig mailblok met antwoordactie onderaan',
   assert.doesNotMatch(scriptSource, /detail-more|Meer opties/);
   assert.doesNotMatch(pageSource, /\.detail-more/);
   assert.match(scriptSource, /<div class="detail-divider" aria-hidden="true"><\/div>/);
-  assert.match(scriptSource, /<div class="detail-footer">[\s\S]*class="detail-reply"[\s\S]*Beantwoorden/);
+  assert.match(scriptSource, /const replyActionHtml = replyMailId \? `<div class="detail-footer"><button class="detail-reply"[\s\S]*Beantwoorden/);
+  assert.match(scriptSource, /section && section\.type === 'quote'[\s\S]*renderedSections\.push\(replyActionHtml\)/);
   assert.match(scriptSource, /\$\{escapeHtml\(m\.date\)\}, \$\{escapeHtml\(m\.time\)\}/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*background:\s*var\(--card\);/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*max-width:\s*900px;[\s\S]*margin:\s*0 auto;/);
@@ -798,7 +824,7 @@ test('geopende mail staat als één rustig mailblok met antwoordactie onderaan',
   assert.match(pageSource, /\.detail-subject \{[\s\S]*font-size:\s*clamp\(19px,\s*1\.5vw,\s*24px\);/);
   assert.match(pageSource, /\.detail-avatar \{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/);
   assert.match(pageSource, /\.detail-body-text \{[\s\S]*font-size:\s*14px;[\s\S]*line-height:\s*1\.75;/);
-  assert.match(pageSource, /\.detail-footer \{[\s\S]*border-top:\s*1px solid var\(--border\);/);
+  assert.match(pageSource, /\.detail-footer \{[^}]*margin:\s*0;[^}]*border-top:\s*1px solid var\(--border\);/);
   assert.match(pageSource, /\.detail-reply \{[\s\S]*color:\s*var\(--crimson\);/);
 });
 
