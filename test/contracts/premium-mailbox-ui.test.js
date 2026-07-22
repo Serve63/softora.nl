@@ -474,7 +474,8 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   assert.match(scriptSource, /uid: message\.uid,/);
   assert.match(scriptSource, /async function persistMailReadState\(mail\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
   assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: window\.SoftoraMailboxCampaignInbox\.getAccount\(mail, activeMailboxAccount\),[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder: window\.SoftoraMailboxCampaignInbox\.getFolder\(mail, activeFolder\),/);
-  assert.match(scriptSource, /catch \(error\) \{[\s\S]*mail\.unread = true;[\s\S]*renderList\(\);[\s\S]*toast\(String\(error\?\.message/);
+  assert.match(scriptSource, /catch \(error\) \{[\s\S]*toast\(String\(error\?\.message/);
+  assert.doesNotMatch(scriptSource, /catch \(error\) \{[\s\S]{0,120}mail\.unread = true;/);
   assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*renderList\(\);[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
 });

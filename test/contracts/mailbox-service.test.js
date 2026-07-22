@@ -1724,6 +1724,14 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
       },
       logout: async () => calls.push(['logout']),
     }),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      markMessageRead: async (input) => {
+        calls.push(['indexRead', input]);
+        return { ok: true };
+      },
+    },
   });
   const res = createResponseRecorder();
 
@@ -1746,6 +1754,7 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
     unread: false,
   });
   assert.deepEqual(calls, [
+    ['indexRead', { accountEmail: 'serve@softora.nl', id: 'inbox:42', folder: 'inbox', uid: 42 }],
     ['connect', 'serve@softora.nl'],
     ['lock', 'INBOX'],
     ['flagsAdd', [42], ['\\Seen'], { uid: true }],

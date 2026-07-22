@@ -770,8 +770,6 @@ async function persistMailReadState(mail) {
       throw new Error(data?.detail || data?.error || 'Gelezen status opslaan mislukt');
     }
   } catch (error) {
-    mail.unread = true;
-    renderList();
     toast(String(error?.message || error || 'Gelezen status opslaan mislukt'));
   }
 }

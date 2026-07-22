@@ -311,6 +311,22 @@ function createMailboxIndexStore(deps = {}) {
     return { ...result, upserted: rows.length };
   }
 
+  async function markMessageRead({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    return run('mark-message-read', (client) => {
+      const query = client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .update({ unread: false, updated_at: isoNow() })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) return query.eq('uid', parsedUid);
+      return query.eq('provider_id', normalizedId);
+    });
+  }
+
   async function getSyncState({ accountEmail, folder = 'inbox' }) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const result = await run('get-sync-state', (client) =>
@@ -399,6 +415,7 @@ function createMailboxIndexStore(deps = {}) {
     isSyncStateStale,
     listMessages,
     listMessagesForAccounts,
+    markMessageRead,
     normalizeMessageRow,
     upsertMessages,
   };
