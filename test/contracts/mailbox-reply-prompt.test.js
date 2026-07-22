@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplySystemPrompt,
+  enforceMailboxReplySignature,
   inferMailboxReplyFirstName,
 } = require('../../server/services/mailbox-reply-prompt');
 
@@ -42,6 +43,23 @@ test('Malik reply prompt dwingt een informele en contextspecifieke reactie af', 
   assert.match(prompt, /Ik zal je niet meer mailen/);
   assert.match(prompt, /je gegevens niet verder mailen/);
   assert.match(prompt, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
+});
+
+test('Malik reply prompt gebruikt de echte afzender ook in het stijlvoorbeeld', () => {
+  const prompt = buildMailboxReplySystemPrompt({ senderName: 'Martijn van de Ven' });
+
+  assert.match(prompt, /Met vriendelijke groet,[\s\S]*Martijn van de Ven/);
+  assert.doesNotMatch(prompt, /Servé Creusen/);
+});
+
+test('mailbox reply vervangt een verkeerde AI-ondertekening door de echte afzender', () => {
+  assert.equal(
+    enforceMailboxReplySignature(
+      'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen',
+      'Martijn van de Ven'
+    ),
+    'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven'
+  );
 });
 
 test('los concept houdt de gewone herschrijfprompt', () => {

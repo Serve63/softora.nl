@@ -2008,7 +2008,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     },
   });
 
-  assert.equal(result.text, 'Beste klant,\n\nVerbeterde tekst.');
+  assert.equal(result.text, 'Beste klant,\n\nVerbeterde tekst.\n\nMet vriendelijke groet,\nServé Creusen');
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
@@ -2072,6 +2072,44 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
   assert.match(calls[0].messages[1].content, /"aanhefNaam":"Lisa"/);
   assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
+});
+
+test('mailbox service laat replycontext de afzender bepalen en corrigeert een verkeerde AI-signatuur', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    openAiModel: 'gpt-test',
+    fetchJsonWithTimeout: async (_url, options) => {
+      calls.push(JSON.parse(options.body));
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [{ message: { content: 'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen' } }],
+        },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+
+  const result = await service.rewriteDraft({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Re: Vraag',
+    body: '',
+    context: {
+      accountEmail: 'martijn@softora.nl',
+      from: 'Klant',
+      email: 'klant@example.nl',
+      subject: 'Vraag',
+      body: 'Bedankt voor je mail.',
+    },
+  });
+
+  assert.match(calls[0].messages[0].content, /Schrijf namens Martijn van de Ven/);
+  assert.match(calls[0].messages[1].content, /"accountEmail":"martijn@softora.nl"/);
+  assert.match(calls[0].messages[1].content, /"naam":"Martijn van de Ven"/);
+  assert.equal(result.text, 'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
 });
 
 test('mailbox service bewaart coldmailprofiel alleen bij een los concept zonder replycontext', async () => {

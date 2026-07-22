@@ -63,11 +63,23 @@ function buildMailboxReplySystemPrompt({ senderName, hasDraft = false } = {}) {
     'Vermijd stijve formuleringen zoals "ik respecteer je keuze volledig", "je gegevens niet verder mailen", "vriendelijke woorden" en "dank voor uw reactie".',
     'Houd de kern meestal tussen 35 en 80 woorden, exclusief afsluiting. Schrijf niet langer dan nodig.',
     'Stijlvoorbeeld bij een afwijzing omdat iemand al een goede partij heeft:',
-    'Hoi Daffy,\n\nDankjewel voor je duidelijke reactie. Helemaal begrijpelijk, en fijn dat je al een goede partij hebt waar je tevreden mee bent 😁\n\nIk zal je niet meer mailen.\n\nMet vriendelijke groet,\nServé Creusen',
+    'Hoi Daffy,\n\nDankjewel voor je duidelijke reactie. Helemaal begrijpelijk, en fijn dat je al een goede partij hebt waar je tevreden mee bent 😁\n\nIk zal je niet meer mailen.\n\nMet vriendelijke groet,\n' + safeSenderName,
     `Sluit altijd exact af met: Met vriendelijke groet,\n${safeSenderName}`,
     'Verzin geen feiten, beloftes, bedragen, datums, namen, afspraken, URLs of voorwaarden.',
     'Geef uitsluitend de exacte mailtekst terug, zonder onderwerpregel, labels, uitleg, markdown of analyse.',
   ].join('\n');
+}
+
+function enforceMailboxReplySignature(value, senderName) {
+  const text = String(value || '').replace(/\r\n?/g, '\n').trim();
+  const safeSenderName = cleanLine(senderName) || 'Softora';
+  if (!text) return text;
+  const closing = 'Met vriendelijke groet,\n' + safeSenderName;
+  const signaturePattern = /(?:\n{2,}|^)(?:met\svriendelijke\sgroet|vriendelijke\sgroet|groetjes|groet|mvg)[,!]?\s*\n+[^\n]+\s*$/i;
+  if (signaturePattern.test(text)) {
+    return text.replace(signaturePattern, (match) => (match.startsWith('\n') ? '\n\n' : '') + closing);
+  }
+  return text + '\n\n' + closing;
 }
 
 function buildMailboxDraftRewriteSystemPrompt({ senderName } = {}) {
@@ -86,5 +98,6 @@ function buildMailboxDraftRewriteSystemPrompt({ senderName } = {}) {
 module.exports = {
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplySystemPrompt,
+  enforceMailboxReplySignature,
   inferMailboxReplyFirstName,
 };
