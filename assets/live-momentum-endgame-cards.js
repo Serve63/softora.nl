@@ -140,32 +140,57 @@
     return artwork;
   }
 
-  function createCard(card, state) {
+  function createMissionNumber(number) {
+    const label = document.createElement('span');
+    label.className = 'end-game-card-number';
+    label.textContent = String(number);
+    label.setAttribute('aria-hidden', 'true');
+    return label;
+  }
+
+  function createCard(card, state, missionNumber) {
+    const slot = document.createElement('div');
     const article = document.createElement('article');
     const isOrigin = card.type === 'origin';
     const isDestination = card.type === 'destination';
     const isFixed = isOrigin || isDestination;
+    slot.className = `end-game-card-slot${isOrigin ? ' end-game-card-slot--origin' : ''}${isDestination ? ' end-game-card-slot--destination' : ''}`;
+    slot.dataset.endGameCardId = card.id;
     article.className = `end-game-goal-card end-game-goal-card--mission${isOrigin ? ' end-game-goal-card--origin' : ''}${isDestination ? ' end-game-goal-card--destination' : ''}`;
-    article.dataset.endGameCardId = card.id;
     if (isFixed) {
-      article.dataset.endGameCardFixed = 'true';
-      article.setAttribute('role', 'img');
-      article.setAttribute('aria-label', isOrigin
+      slot.dataset.endGameCardFixed = 'true';
+      slot.setAttribute('role', 'img');
+      slot.setAttribute('aria-label', isOrigin
         ? 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.'
         : 'Eindpunt: 2030. Wie ben ik dan? Deze kaart staat vast op de laatste positie.');
     } else {
-      article.tabIndex = 0;
-      article.setAttribute('role', 'button');
-      article.setAttribute('aria-haspopup', 'menu');
-      article.setAttribute('aria-expanded', 'false');
-      article.setAttribute('aria-label', state.completed
-        ? `Missie: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
-        : `Missie: ${card.title}. Sleep om te verplaatsen of klik voor acties.`);
+      slot.tabIndex = 0;
+      slot.setAttribute('role', 'button');
+      slot.setAttribute('aria-haspopup', 'menu');
+      slot.setAttribute('aria-expanded', 'false');
+      slot.setAttribute('aria-label', state.completed
+        ? `Missie ${missionNumber}: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
+        : `Missie ${missionNumber}: ${card.title}. Sleep om te verplaatsen of klik voor acties.`);
     }
     article.classList.toggle('is-completed', state.completed);
     article.append(createCardArtwork(card));
     if (!isFixed) article.append(createCompletionOverlay(), createActions(card, state.completed));
-    return article;
+    slot.append(article);
+    if (!isFixed) slot.append(createMissionNumber(missionNumber));
+    return slot;
+  }
+
+  function updateMissionNumbers(track) {
+    let missionNumber = 0;
+    track.querySelectorAll('[data-end-game-card-id]').forEach((slot) => {
+      if (slot.dataset.endGameCardFixed === 'true') return;
+      missionNumber += 1;
+      const number = slot.querySelector('.end-game-card-number');
+      const card = CARD_CATALOG.find((item) => item.id === slot.dataset.endGameCardId);
+      if (number) number.textContent = String(missionNumber);
+      if (card) slot.setAttribute('aria-label', slot.getAttribute('aria-label')
+        .replace(/^Missie \d+:/, `Missie ${missionNumber}:`));
+    });
   }
 
   function createController({ track, isReady, onStateChange }) {
@@ -175,6 +200,7 @@
       scrollContainer: track.closest('.end-game-goals'),
       isReady,
       onOrderChange(visibleOrder) {
+        updateMissionNumbers(track);
         const visibleIds = new Set(visibleOrder);
         const hiddenOrder = state.__order.filter((id) => !visibleIds.has(id));
         state = { ...state, __order: normalizeOrder(visibleOrder.concat(hiddenOrder)) };
@@ -185,10 +211,13 @@
     function render(value = state) {
       state = normalizeState(value);
       const fragment = document.createDocumentFragment();
+      let missionNumber = 0;
       state.__order.forEach((cardId) => {
         const card = CARD_CATALOG.find((item) => item.id === cardId);
         if (!card) return;
-        if (!state[card.id].deleted) fragment.append(createCard(card, state[card.id]));
+        if (state[card.id].deleted) return;
+        if (![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(card.id)) missionNumber += 1;
+        fragment.append(createCard(card, state[card.id], missionNumber));
       });
       track.replaceChildren(fragment);
     }

@@ -1,0 +1,53 @@
+.end-game-card-slot {
+  display: flex;
+  flex: 0 0 clamp(190px, 13vw, 220px);
+  flex-direction: column;
+  gap: .65rem;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+.end-game-card-slot > .end-game-goal-card {
+  width: 100%;
+  flex: 1 1 auto;
+}
+.end-game-card-slot.is-card-dragging {
+  z-index: 5;
+  cursor: grabbing;
+  transition: none;
+  will-change: transform;
+}
+.end-game-card-slot.is-card-dragging > .end-game-goal-card--mission {
+  box-shadow: 0 20px 42px rgba(17, 19, 30, .34);
+}
+.end-game-card-slot.is-card-settling {
+  transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
+}
+.end-game-card-slot--origin,
+.end-game-card-slot--destination {
+  cursor: default;
+}
+.end-game-card-slot:focus-visible {
+  border-radius: 10px;
+  outline: 3px solid rgba(46, 204, 113, .62);
+  outline-offset: 3px;
+}
+.end-game-card-number {
+  display: block;
+  color: rgba(26, 26, 46, .56);
+  font-family: var(--font-display);
+  font-size: .9rem;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+}
+@media (max-width: 900px) {
+  .end-game-card-slot {
+    flex-basis: min(74vw, 280px);
+  }
+}
+@media (max-width: 520px) {
+  .end-game-card-slot {
+    flex-basis: min(78vw, 275px);
+  }
+}

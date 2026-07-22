@@ -29,14 +29,15 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260717f"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260717a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260717b"/);
   assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260717c" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260717c" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260717b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260717c" defer><\/script>/);
@@ -99,6 +100,7 @@ test('live momentum page renders the requested dashboard surface', () => {
 test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const css = read('assets/live-momentum.css');
   const mobileCss = read('assets/live-momentum-mobile.css');
+  const endGameNumbersCss = read('assets/live-momentum-endgame-numbers.css');
   const videoCss = read('assets/live-momentum-video.css');
 
   assert.match(css, /--page-bg:\s*#f8f7f4;/);
@@ -163,7 +165,10 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*backdrop-filter:\s*none;[\s\S]*contain:\s*paint;/);
   assert.match(css, /\.end-game-goal-card--mission\s*\{[\s\S]*cursor:\s*grab;[\s\S]*touch-action:\s*pan-y;[\s\S]*user-select:\s*none;/);
   assert.match(css, /\.end-game-goals\.is-card-reordering\s*\{[\s\S]*cursor:\s*grabbing;/);
-  assert.match(css, /\.end-game-goal-card--mission\.is-card-dragging\s*\{[\s\S]*will-change:\s*transform;/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*flex-direction:\s*column;/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot\.is-card-dragging\s*\{[\s\S]*will-change:\s*transform;/);
+  assert.match(endGameNumbersCss, /\.end-game-card-number\s*\{[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*text-align:\s*center;/);
+  assert.match(endGameNumbersCss, /@media \(max-width:\s*900px\)[\s\S]*flex-basis:\s*min\(74vw, 280px\);/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-photo-image\s*\{[\s\S]*position:\s*absolute;[\s\S]*object-fit:\s*cover;/);
   assert.match(css, /\.end-game-card-name\s*\{[\s\S]*text-transform:\s*uppercase;/);
@@ -263,6 +268,12 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /normalized\.__order = normalizeOrder\(value\?\.__order\)/);
   assert.match(endGameCardsJs, /__order:\s*\[\.\.\.state\.__order\]/);
   assert.match(endGameCardsJs, /onOrderChange\(visibleOrder\)/);
+  assert.match(endGameCardsJs, /function createMissionNumber\(number\)/);
+  assert.match(endGameCardsJs, /label\.className = 'end-game-card-number'/);
+  assert.match(endGameCardsJs, /if \(!isFixed\) slot\.append\(createMissionNumber\(missionNumber\)\)/);
+  assert.match(endGameCardsJs, /if \(!\[ORIGIN_CARD_ID, DESTINATION_CARD_ID\]\.includes\(card\.id\)\) missionNumber \+= 1/);
+  assert.match(endGameCardsJs, /updateMissionNumbers\(track\)/);
+  assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
   assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.id\}\.png\?v=20260717c/);

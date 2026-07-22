@@ -49,7 +49,7 @@
       if (!draggedCard) return;
       const siblings = getCards().filter((card) => card !== draggedCard);
       const movableSiblings = siblings.filter((card) => card.dataset.endGameCardFixed !== 'true');
-      const fixedEndCard = siblings.find((card) => card.classList.contains('end-game-goal-card--destination')) || null;
+      const fixedEndCard = siblings.find((card) => card.classList.contains('end-game-card-slot--destination')) || null;
       const insertBefore = movableSiblings.find((card) => (
         clientX < card.getBoundingClientRect().left + (card.offsetWidth / 2)
       )) || fixedEndCard;
