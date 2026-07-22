@@ -1521,7 +1521,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260722a/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
@@ -1774,7 +1774,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260722a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -1925,9 +1925,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260720b/);
-  assert.match(webdesignActionScriptSource, /variant: normalizeVariant\(variant\)/);
-  assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260722a/);
+  assert.match(webdesignActionScriptSource, /const DEFAULT_SINGLE_VARIANT = "v2-visual-dna";/);
+  assert.match(webdesignActionScriptSource, /variant: DEFAULT_SINGLE_VARIANT/);
+  assert.doesNotMatch(webdesignActionScriptSource, /picker\.choose/);
   assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
@@ -3119,8 +3120,9 @@ test('premium database webdesign bulk retries restore after a temporary batch li
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/run'));
 });
 
-test('premium database webdesign action sends the explicitly selected V2 variant', async () => {
+test('premium database webdesign action starts the recommended V2 variant in one click', async () => {
   let postedBody = null;
+  let pickerCalls = 0;
   const chargeLabels = [];
   const document = {
     getElementById: () => null,
@@ -3143,7 +3145,10 @@ test('premium database webdesign action sends the explicitly selected V2 variant
   const webdesignActionClient = loadDatabaseWebdesignActionClient({
     document,
     SoftoraDatabaseWebdesignVariantPicker: {
-      choose: async () => 'v2-visual-dna',
+      choose: async () => {
+        pickerCalls += 1;
+        return 'v1-prompt-only';
+      },
     },
     setTimeout(callback) {
       callback();
@@ -3190,6 +3195,7 @@ test('premium database webdesign action sends the explicitly selected V2 variant
 
   await controller.generateForCustomer('customer-v2');
 
+  assert.equal(pickerCalls, 0);
   assert.equal(postedBody.variant, 'v2-visual-dna');
   assert.equal(postedBody.customer.bedrijf, 'Bliv Makelaardij');
 });
