@@ -216,6 +216,11 @@ test('server app runtime composition builders preserve feature wiring groups and
       SUPABASE_PROJECT_REF: 'softora-ref',
       SUPABASE_MONTHLY_BASE_COST_EUR: '25',
       SUPABASE_MAINTENANCE_TOKEN: 'maintenance-token',
+      REVENUE_PROOF_ENABLED: 'true',
+      BUNQ_REVENUE_WEBHOOK_SECRET: 'revenue-webhook-secret',
+      BUNQ_REVENUE_REQUIRE_TRUSTED_IP: 'true',
+      REVENUE_PROOF_MONTHLY_TARGET_EUR: '2750',
+      REVENUE_PROOF_REQUIRED_MONTHS: '4',
       CRON_SECRET: 'cron-secret',
       MAILBOX_ACCOUNTS: JSON.stringify([{ email: 'servec321@gmail.com' }]),
       VERCEL: '1',
@@ -285,6 +290,7 @@ test('server app runtime composition builders preserve feature wiring groups and
     },
     platformRuntime: {
       getOpenAiApiKey: () => 'openai',
+      getSupabaseClient: () => ({ from: () => ({}) }),
       getAnthropicApiKey: () => 'anthropic',
       getWebsiteGenerationProvider: () => 'anthropic',
       getWebsiteAnthropicModel: () => 'claude-site',
@@ -518,6 +524,13 @@ test('server app runtime composition builders preserve feature wiring groups and
   assert.equal(context.featureRouteOptions.supabaseMaintenance.supabaseProjectRef, 'softora-ref');
   assert.equal(context.featureRouteOptions.supabaseMaintenance.supabaseMaintenanceToken, 'maintenance-token');
   assert.equal(typeof context.featureRouteOptions.supabaseMaintenance.fetchJsonWithTimeout, 'function');
+  assert.equal(context.featureRouteOptions.revenueProof.enabled, 'true');
+  assert.equal(context.featureRouteOptions.revenueProof.webhookSecret, 'revenue-webhook-secret');
+  assert.equal(context.featureRouteOptions.revenueProof.requireTrustedBunqIp, 'true');
+  assert.equal(context.featureRouteOptions.revenueProof.targetEur, 2750);
+  assert.equal(context.featureRouteOptions.revenueProof.requiredMonths, 4);
+  assert.equal(typeof context.featureRouteOptions.revenueProof.getSupabaseClient, 'function');
+  assert.equal(typeof context.featureRouteOptions.revenueProof.getClientIpFromRequest, 'function');
   assert.equal(context.featureRouteOptions.coldmailing.coldmailCampaignService.isSmtpMailConfigured(), true);
   assert.ok(
     context.featureRouteOptions.coldmailing.coldmailCampaignService

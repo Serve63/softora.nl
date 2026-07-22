@@ -134,6 +134,10 @@ test('request security context exempts safe methods and webhook paths', () => {
 
   const getReq = createRequest({ method: 'GET', originalUrl: '/api/custom-action' });
   const webhookReq = createRequest({ method: 'POST', originalUrl: '/api/retell/webhook' });
+  const revenueWebhookReq = createRequest({
+    method: 'POST',
+    originalUrl: '/api/revenue-proof/bunq-webhook?token=redacted',
+  });
   const retellFunctionReq = createRequest({
     method: 'POST',
     originalUrl: '/api/retell/functions/agenda/availability',
@@ -164,6 +168,7 @@ test('request security context exempts safe methods and webhook paths', () => {
 
   assert.equal(context.isSameOriginApiRequest(getReq), true);
   assert.equal(context.isSameOriginApiRequest(webhookReq), true);
+  assert.equal(context.isSameOriginApiRequest(revenueWebhookReq), true);
   assert.equal(context.isSameOriginApiRequest(retellFunctionReq), true);
   assert.equal(context.isSameOriginApiRequest(coldmailUnsubscribeReq), true);
   assert.equal(context.isSameOriginApiRequest(instantlyWebhookReq), true);

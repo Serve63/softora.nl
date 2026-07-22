@@ -87,6 +87,7 @@ test('server app runtime option builders keep feature route coordinators and gua
   const activeOrdersCoordinator = {};
   const runtimeOpsCoordinator = {};
   const runtimeDebugOpsCoordinator = {};
+  const revenueProof = { enabled: false };
 
   const options = buildFeatureRoutesOptions({
     handleTwilioInboundVoice: () => null,
@@ -105,6 +106,7 @@ test('server app runtime option builders keep feature route coordinators and gua
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
+    revenueProof,
     requireRuntimeDebugAccess,
     seoReadCoordinator: {},
     seoWriteCoordinator: {},
@@ -123,6 +125,7 @@ test('server app runtime option builders keep feature route coordinators and gua
   assert.equal(options.activeOrdersCoordinator, activeOrdersCoordinator);
   assert.equal(options.runtimeOpsCoordinator, runtimeOpsCoordinator);
   assert.equal(options.runtimeDebugOpsCoordinator, runtimeDebugOpsCoordinator);
+  assert.equal(options.revenueProof, revenueProof);
   assert.equal(options.requireRuntimeDebugAccess, requireRuntimeDebugAccess);
 });
 

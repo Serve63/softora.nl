@@ -26,6 +26,7 @@ const { registerSupabaseCostRoutes } = require('../routes/supabase-costs');
 const { registerSupabaseMaintenanceRoutes } = require('../routes/supabase-maintenance');
 const { registerMailboxRoutes } = require('../routes/mailbox');
 const { registerPublicContactRoutes } = require('../routes/public-contact');
+const { registerRevenueProofRoutes } = require('../routes/revenue-proof');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerPremiumDatabaseImportRoutes } = require('../routes/premium-database-import');
 const { registerKvkDatabaseRoutes } = require('../routes/kvk-database');
@@ -61,6 +62,7 @@ const {
 const { createGoogleHealthSheetService } = require('./google-health-sheet');
 const { createWhoopHealthService } = require('./whoop-health');
 const { createGoogleAdsControlService } = require('./google-ads-control');
+const { createRevenueProofService } = require('./revenue-proof');
 
 function registerFeatureRoutes(app, deps = {}) {
   const {
@@ -92,6 +94,7 @@ function registerFeatureRoutes(app, deps = {}) {
     seoWriteCoordinator,
     kvkDatabaseSnapshot,
     whoopHealth = {},
+    revenueProof = {},
   } = deps;
   const premiumDatabaseMailReadySnapshotService = createPremiumDatabaseMailReadySnapshotService({
     dataOpsStore: deps.dataOpsStore,
@@ -143,6 +146,7 @@ function registerFeatureRoutes(app, deps = {}) {
     setUiStateValues: deps.setUiStateValues,
     env: deps.env || process.env,
   });
+  const revenueProofService = createRevenueProofService(revenueProof);
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -151,6 +155,11 @@ function registerFeatureRoutes(app, deps = {}) {
   });
 
   registerPublicContactRoutes(app, { coordinator: publicContactCoordinator });
+
+  registerRevenueProofRoutes(app, {
+    service: revenueProofService,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
 
   registerSupabaseMaintenanceRoutes(app, {
     ...(supabaseMaintenance || {}),

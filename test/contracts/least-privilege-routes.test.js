@@ -16,6 +16,7 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   const coldcallingRoutes = readRepoFile('server/routes/coldcalling.js');
   const coldmailingRoutes = readRepoFile('server/routes/coldmailing.js');
   const instantlyRoutes = readRepoFile('server/routes/instantly.js');
+  const revenueProofRoutes = readRepoFile('server/routes/revenue-proof.js');
 
   assert.match(featureRoutes, /requirePremiumAdminApiAccess: premiumRouteRuntime\?\.requirePremiumAdminApiAccess/);
   assert.match(mailboxRoutes, /app\.get\('\/api\/mailbox\/accounts', requireAdmin,/);
@@ -41,6 +42,9 @@ test('least privilege routes keep mailbox, costs and recordings admin-only', () 
   assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/sync', requirePremiumAdminApiAccess,/);
   assert.match(instantlyRoutes, /app\.get\('\/api\/instantly\/status', requirePremiumAdminApiAccess,/);
   assert.match(instantlyRoutes, /app\.post\('\/api\/instantly\/webhook', async \(req, res\)/);
+  assert.match(revenueProofRoutes, /app\.post\('\/api\/revenue-proof\/events', requireAdmin,/);
+  assert.match(revenueProofRoutes, /app\.get\('\/api\/revenue-proof\/status', requireAdmin,/);
+  assert.match(revenueProofRoutes, /app\.post\('\/api\/revenue-proof\/bunq-webhook', \(req, res, next\)/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/recording-proxy', requireAdmin,/);
   assert.match(coldcallingRoutes, /app\.get\('\/api\/coldcalling\/cost-summary', requireAdmin,/);
 });

@@ -534,6 +534,20 @@ function buildServerAppFeatureWiringRuntimeContext({
           spreadsheetId: env.GOOGLE_HEALTH_SHEET_ID || '',
         },
       },
+      revenueProof: {
+        enabled: env.REVENUE_PROOF_ENABLED || '',
+        webhookSecret: env.BUNQ_REVENUE_WEBHOOK_SECRET || '',
+        requireTrustedBunqIp:
+          env.BUNQ_REVENUE_REQUIRE_TRUSTED_IP === undefined
+            ? true
+            : env.BUNQ_REVENUE_REQUIRE_TRUSTED_IP,
+        orderReferencePrefix: env.REVENUE_PROOF_ORDER_REFERENCE_PREFIX || 'SOFTORA',
+        targetEur: Number(env.REVENUE_PROOF_MONTHLY_TARGET_EUR || 2500),
+        requiredMonths: Number(env.REVENUE_PROOF_REQUIRED_MONTHS || 3),
+        timeZone: env.REVENUE_PROOF_TIME_ZONE || 'Europe/Amsterdam',
+        getSupabaseClient: platformRuntime.getSupabaseClient,
+        getClientIpFromRequest: shared.getClientIpFromRequest,
+      },
       kvkDatabaseSnapshot: {
         fetchSupabaseRowByKeyViaRest: platformRuntime.fetchSupabaseRowByKeyViaRest,
         upsertSupabaseRowViaRest: platformRuntime.upsertSupabaseRowViaRest,

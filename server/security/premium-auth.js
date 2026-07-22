@@ -13,6 +13,7 @@ const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/coldmailing/open.gif',
   '/api/coldmailing/unsubscribe',
   '/api/instantly/webhook',
+  '/api/revenue-proof/bunq-webhook',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
   '/retell/webhook',
