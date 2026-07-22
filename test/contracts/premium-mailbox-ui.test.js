@@ -824,7 +824,7 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   assert.match(pageSource, /\.detail-subject \{[\s\S]*font-size:\s*clamp\(19px,\s*1\.5vw,\s*24px\);/);
   assert.match(pageSource, /\.detail-avatar \{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/);
   assert.match(pageSource, /\.detail-body-text \{[\s\S]*font-size:\s*14px;[\s\S]*line-height:\s*1\.75;/);
-  assert.match(pageSource, /\.detail-footer \{[^}]*margin:\s*0;[^}]*border-top:\s*1px solid var\(--border\);/);
+  assert.match(pageSource, /\.detail-footer \{[^}]*margin:\s*0;[^}]*padding:\s*2px 0 16px;[^}]*border-bottom:\s*1px solid var\(--border\);/);
   assert.match(pageSource, /\.detail-reply \{[\s\S]*color:\s*var\(--crimson\);/);
 });
 
