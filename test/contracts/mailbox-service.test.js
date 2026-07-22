@@ -1927,7 +1927,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(calls[0].timeout, 65000);
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
-  assert.match(calls[0].payload.messages[0].content, /afzenderProfiel\.aiInstructions/);
+  assert.match(calls[0].payload.messages[0].content, /Je bent Malik Mailing/);
   assert.match(calls[0].payload.messages[0].content, /Schrijf namens Servé Creusen/);
   assert.match(calls[0].payload.messages[0].content, /exact één keer 😁/);
   assert.match(calls[0].payload.messages[0].content, /nooit met jullie/);
@@ -1935,8 +1935,10 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.match(calls[0].payload.messages[0].content, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
   assert.match(calls[0].payload.messages[1].content, /Kan dit voor vrijdag/);
   assert.match(calls[0].payload.messages[1].content, /hoi ik stuur dit ff/);
-  assert.match(calls[0].payload.messages[1].content, /Groetjes[\s\S]*Servé/);
-  assert.match(calls[0].payload.messages[1].content, /Informeel & persoonlijk/);
+  assert.doesNotMatch(calls[0].payload.messages[1].content, /Groetjes[\s\S]*Servé/);
+  assert.doesNotMatch(calls[0].payload.messages[1].content, /Informeel & persoonlijk/);
+  assert.doesNotMatch(calls[0].payload.messages[1].content, /afzenderProfiel/);
+  assert.match(calls[0].payload.messages[1].content, /antwoordContext/);
 });
 
 test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de ontvangen mail', async () => {
@@ -1974,9 +1976,46 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.match(result.text, /Martijn van de Ven/);
   assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
   assert.match(calls[0].messages[0].content, /Schrijf namens Martijn van de Ven/);
+  assert.match(calls[0].messages[0].content, /Je bent Malik Mailing/);
   assert.match(calls[0].messages[0].content, /verzin geen prijs/i);
   assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
   assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
+  assert.match(calls[0].messages[1].content, /"aanhefNaam":"Lisa"/);
+  assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
+});
+
+test('mailbox service bewaart coldmailprofiel alleen bij een los concept zonder replycontext', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    openAiModel: 'gpt-test',
+    fetchJsonWithTimeout: async (_url, options) => {
+      calls.push(JSON.parse(options.body));
+      return {
+        response: { ok: true, status: 200 },
+        data: { choices: [{ message: { content: 'Hoi,\n\nNettere tekst.' } }] },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+
+  await service.rewriteDraft({
+    accountEmail: 'serve@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Los bericht',
+    body: 'maak dit ff beter',
+    senderProfile: {
+      toneStyle: 'Informeel & persoonlijk',
+      aiInstructions: 'Houd het kort.',
+      body: 'Met vriendelijke groet,\nServé',
+    },
+  });
+
+  assert.match(calls[0].messages[0].content, /mailherschrijver van Softora/);
+  assert.doesNotMatch(calls[0].messages[0].content, /Malik Mailing/);
+  assert.match(calls[0].messages[1].content, /afzenderProfiel/);
+  assert.match(calls[0].messages[1].content, /Houd het kort/);
 });
 
 test('mailbox service refuses rewrite without OpenAI key', async () => {
