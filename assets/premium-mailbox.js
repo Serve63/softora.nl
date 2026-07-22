@@ -812,6 +812,10 @@ async function loadMailboxMessageBody(id) {
 function openMail(id, options = {}) {
   const m = findMailById(id);
   if (!m) return;
+  if (!m.bodyLoaded && !options.skipBodyFetch) {
+    void loadMailboxMessageBody(m.id);
+    return;
+  }
   const wasUnread = m.unread;
   activeMail = m.id;
   m.unread = false;
@@ -821,9 +825,7 @@ function openMail(id, options = {}) {
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
-  const detailBody = m.bodyLoaded
-    ? m.body
-    : 'Bericht laden…';
+  const detailBody = m.body;
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-body">
       <article class="detail-mail-block">
@@ -854,9 +856,6 @@ function openMail(id, options = {}) {
         </div>
       </article>
     </div>`;
-  if (!options.skipBodyFetch && !m.bodyLoaded) {
-    void loadMailboxMessageBody(m.id);
-  }
 }
 async function deleteMail(id) {
   const m = findMailById(id);

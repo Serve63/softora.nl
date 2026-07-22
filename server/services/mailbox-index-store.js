@@ -280,6 +280,47 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row));
   }
 
+  async function hydrateMessageBodies({ messages = [] } = {}) {
+    const source = Array.isArray(messages) ? messages : [];
+    const messageKeys = Array.from(
+      new Set(
+        source
+          .map((message) => {
+            const uid = Number(message && message.uid) || 0;
+            if (!uid) return '';
+            return buildMessageKey(message.accountEmail, message.folder, uid);
+          })
+          .filter(Boolean)
+      )
+    ).slice(0, 100);
+    if (!messageKeys.length) return source;
+
+    const result = await run('hydrate-message-bodies', (client) =>
+      client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .select('message_key,body_text,has_body,body_truncated')
+        .in('message_key', messageKeys)
+        .is('deleted_at', null)
+    );
+    if (!result.ok) return source;
+
+    const bodyByMessageKey = new Map(
+      (result.data || []).map((row) => [normalizeString(row.message_key), row])
+    );
+    return source.map((message) => {
+      const uid = Number(message && message.uid) || 0;
+      const messageKey = uid ? buildMessageKey(message.accountEmail, message.folder, uid) : '';
+      const row = bodyByMessageKey.get(messageKey);
+      if (!row) return message;
+      return {
+        ...message,
+        body: normalizeString(row.body_text),
+        hasBody: Boolean(row.has_body),
+        bodyTruncated: Boolean(row.body_truncated),
+      };
+    });
+  }
+
   async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
     const normalizedFolder = normalizeFolder(folder);
     const uid = Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
@@ -411,6 +452,7 @@ function createMailboxIndexStore(deps = {}) {
     finishSync,
     getMessage,
     getSyncState,
+    hydrateMessageBodies,
     isAvailable,
     isSyncStateStale,
     listMessages,

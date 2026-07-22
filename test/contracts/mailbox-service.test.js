@@ -2270,6 +2270,7 @@ test('mailbox list response returns stale indexed messages immediately without l
 
 test('mailbox campaign replies response joins indexed inbox mail to targeted webdesign customers', async () => {
   let customerLookup = null;
+  let hydratedReplyIds = [];
   const service = createMailboxService({
     logger: { error() {} },
     mailboxIndexStore: {
@@ -2313,6 +2314,14 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
           date: '2026-07-17T10:00:00.000Z',
         },
       ].reverse(),
+      hydrateMessageBodies: async ({ messages }) => {
+        hydratedReplyIds = messages.map((message) => message.id);
+        return messages.map((message) => ({
+          ...message,
+          body: `Volledige inhoud voor ${message.id}`,
+          hasBody: true,
+        }));
+      },
     },
     dataOpsStore: {
       listCustomersByEmails: async (options) => {
@@ -2362,6 +2371,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   assert.equal(res.body.messages[0].campaign.company, 'Studio Noord');
   assert.equal(res.body.messages[0].campaign.actionRequired, true);
   assert.equal(res.body.messages[0].outreach.customerId, 'softora-pending');
+  assert.equal(res.body.messages[0].body, 'Volledige inhoud voor inbox:42');
   assert.equal(res.body.messages[1].campaign.actionRequired, false);
   assert.equal(res.body.messages[1].outreach, null);
   assert.equal(res.body.sync.source, 'campaign-replies-index');
@@ -2372,6 +2382,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
     'lead@example.nl',
   ]);
   assert.equal(customerLookup.bypassReadFailureCooldown, true);
+  assert.deepEqual(hydratedReplyIds, ['inbox:42', 'inbox:77']);
 });
 
 test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {

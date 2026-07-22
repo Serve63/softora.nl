@@ -164,7 +164,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
-    return messages
+    const replies = messages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
         return customer ? buildCampaignReply(message, customer) : null;
@@ -172,6 +172,10 @@ function createMailboxCampaignRepliesService(deps = {}) {
       .filter(Boolean)
       .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
       .slice(0, safeLimit);
+
+    if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') return replies;
+    const hydratedReplies = await mailboxIndexStore.hydrateMessageBodies({ messages: replies });
+    return Array.isArray(hydratedReplies) ? hydratedReplies : replies;
   }
 
   return {

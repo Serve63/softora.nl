@@ -219,6 +219,64 @@ test('mailbox index store reads campaign inbox messages across selected accounts
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 2000]);
 });
 
+test('mailbox index store hydrates only selected message bodies in one query', async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      calls.push(['from', table]);
+      return {
+        select(columns) {
+          calls.push(['select', columns]);
+          return this;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return this;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return Promise.resolve({
+            data: [{
+              message_key: 'serve@softora.nl|inbox|42',
+              body_text: 'Dit is de volledige reactie.',
+              has_body: true,
+              body_truncated: false,
+            }],
+            error: null,
+          });
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.hydrateMessageBodies({
+    messages: [{
+      id: 'inbox:42',
+      uid: 42,
+      accountEmail: 'serve@softora.nl',
+      folder: 'inbox',
+      preview: 'Dit is de korte preview.',
+    }],
+  });
+
+  assert.equal(messages[0].body, 'Dit is de volledige reactie.');
+  assert.equal(messages[0].hasBody, true);
+  assert.deepEqual(calls.find((call) => call[0] === 'select'), [
+    'select',
+    'message_key,body_text,has_body,body_truncated',
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'in'), [
+    'in',
+    'message_key',
+    ['serve@softora.nl|inbox|42'],
+  ]);
+});
+
 test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', async () => {
   const client = createMailboxIndexClient();
   const store = createMailboxIndexStore({
