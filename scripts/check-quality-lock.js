@@ -8,6 +8,7 @@ const PREMIUM_SIDEBAR_THEME_VERSION = '20260519b';
 
 const REQUIRED_QUALITY_FILES = Object.freeze([
   'AGENTS.md',
+  '.nvmrc',
   '.github/pull_request_template.md',
   '.github/workflows/agent-guardrails.yml',
   '.github/workflows/live-production-version.yml',
@@ -17,6 +18,7 @@ const REQUIRED_QUALITY_FILES = Object.freeze([
   'docs/operations-checklist.md',
   'docs/repo-map.md',
   'scripts/check-agent-guardrails.js',
+  'scripts/check-public-data-exposure.js',
   'scripts/check-quality-lock.js',
   'scripts/check-repo-hygiene.sh',
   'scripts/deploy-production-safe.js',
@@ -133,6 +135,7 @@ function listQualityLockViolations(options = {}) {
 
   const expectedScripts = {
     'check:guardrails': 'node scripts/check-agent-guardrails.js',
+    'check:public-data': 'node scripts/check-public-data-exposure.js',
     'check:repo-hygiene': 'bash scripts/check-repo-hygiene.sh',
     'check:quality-lock': 'node scripts/check-quality-lock.js',
     'check:production-deploy-source': 'node scripts/guard-production-deploy-source.js',
@@ -149,9 +152,26 @@ function listQualityLockViolations(options = {}) {
     }
   });
 
+  if (packageJson?.engines?.node !== '22.x') {
+    violations.push('[quality-lock] package.json engines.node moet 22.x blijven.');
+  }
+  if (!trackedFileSet.has('.nvmrc') || readFile('.nvmrc').trim() !== '22') {
+    violations.push('[quality-lock] .nvmrc moet Node 22 vastzetten.');
+  }
+
+  [
+    '.github/workflows/agent-guardrails.yml',
+    '.github/workflows/live-production-version.yml',
+    '.github/workflows/verify-critical.yml',
+  ].forEach((filePath) => {
+    if (trackedFileSet.has(filePath) && !/node-version:\s*22\b/.test(readFile(filePath))) {
+      violations.push(`[quality-lock] ${filePath} moet Node 22 gebruiken.`);
+    }
+  });
+
   if (trackedFileSet.has('scripts/verify-critical.js')) {
     const verifyCriticalSource = readFile('scripts/verify-critical.js');
-    ['check:guardrails', 'check:repo-hygiene', 'check:quality-lock', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
+    ['check:guardrails', 'check:repo-hygiene', 'check:public-data', 'check:quality-lock', 'test:contracts', 'test:smoke', 'check:secrets'].forEach(
       (scriptName) => {
         const pattern = new RegExp(`\\['run',\\s*'${scriptName.replace(':', '\\:')}'\\]`);
         if (!pattern.test(verifyCriticalSource)) {
@@ -224,7 +244,7 @@ function listQualityLockViolations(options = {}) {
     'i'
   );
   const qualityCommandBypassPattern =
-    /npm\s+run\s+(?:verify:critical|check:guardrails|check:repo-hygiene|check:quality-lock)[^\n]*(?:\|\|\s*true|;\s*exit\s+0)/i;
+    /npm\s+run\s+(?:verify:critical|check:guardrails|check:repo-hygiene|check:public-data|check:quality-lock)[^\n]*(?:\|\|\s*true|;\s*exit\s+0)/i;
 
   trackedFiles
     .filter((filePath) => /^\.github\/workflows\/.+\.ya?ml$/i.test(filePath))

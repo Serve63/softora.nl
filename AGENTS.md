@@ -15,6 +15,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Behandel agenda, leads, call-insights en auth als hoog-risico domeinen.
 - Laat `npm run check:guardrails` groen blijven; die check draait ook mee in `verify:critical`.
 - Laat `npm run check:repo-hygiene` groen blijven; ruim lokale build-cache en OS-bestanden op met `npm run clean:local`.
+- Laat `npm run check:public-data` groen blijven; exports, snapshots en operationele datasets mogen nooit in Git of publieke HTML belanden.
 - Laat `npm run check:quality-lock` groen blijven; deze check bewaakt dat CI, tests en premium sidebar-assets niet stilletjes verzwakken.
 - Verzwak tests nooit met `.only`, `.skip` of `todo` in vaste testbestanden; de guardrails blokkeren dit.
 - Beschouw workflows, verificatiescripts en protocoldocs als beschermde kwaliteitscode.
@@ -76,6 +77,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 
 ## Security
 - Secrets nooit in tracked files.
+- Contactexports, KVK-snapshots, runtime-backups en andere operationele datasets nooit tracken; laad zulke data alleen uit beschermde server-side opslag.
 - Service-role keys alleen server-side.
 - State-changing routes moeten uiteindelijk via expliciete validatie en role checks lopen.
 - Nieuwe debug of admin routes altijd achter bestaande admin/debug toegang.

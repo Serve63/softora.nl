@@ -31,6 +31,7 @@ const PROTECTED_FRONTEND_SHELL_PATHS = Object.freeze([
 
 const PROTECTED_QUALITY_GATE_PATHS = Object.freeze([
   '.github/workflows/agent-guardrails.yml',
+  '.github/workflows/live-production-version.yml',
   '.github/workflows/repo-hygiene.yml',
   '.github/workflows/verify-critical.yml',
   'AGENTS.md',
@@ -39,6 +40,7 @@ const PROTECTED_QUALITY_GATE_PATHS = Object.freeze([
   'docs/repo-map.md',
   'package.json',
   'scripts/check-agent-guardrails.js',
+  'scripts/check-public-data-exposure.js',
   'scripts/check-quality-lock.js',
   'scripts/check-repo-hygiene.sh',
   'scripts/clean-local-artifacts.sh',

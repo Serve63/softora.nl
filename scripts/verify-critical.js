@@ -5,6 +5,7 @@ const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const steps = [
   ['run', 'check:guardrails'],
   ['run', 'check:repo-hygiene'],
+  ['run', 'check:public-data'],
   ['run', 'check:quality-lock'],
   ['run', 'test:contracts'],
   ['run', 'test:smoke'],

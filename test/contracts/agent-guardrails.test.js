@@ -437,9 +437,11 @@ test('agent guardrails block broad behavior changes in one step', () => {
 
 test('agent guardrails keep local cleanliness checks in the critical path', () => {
   const packageJson = JSON.parse(readRepoFile('package.json'));
+  const nvmrcSource = readRepoFile('.nvmrc');
   const vercelConfig = JSON.parse(readRepoFile('vercel.json'));
   const verifyCriticalSource = readRepoFile('scripts/verify-critical.js');
   const hygieneSource = readRepoFile('scripts/check-repo-hygiene.sh');
+  const publicDataSource = readRepoFile('scripts/check-public-data-exposure.js');
   const cleanSource = readRepoFile('scripts/clean-local-artifacts.sh');
   const guardrailsSource = readRepoFile('scripts/check-agent-guardrails.js');
   const deployGuardSource = readRepoFile('scripts/guard-production-deploy-source.js');
@@ -449,6 +451,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   const safeDeploySource = readRepoFile('scripts/deploy-production-safe.js');
   const coldmailGuardBackfillSource = readRepoFile('scripts/backfill-coldmail-outbound-guards.js');
   const liveWorkflowSource = readRepoFile('.github/workflows/live-production-version.yml');
+  const guardrailWorkflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
+  const verifyWorkflowSource = readRepoFile('.github/workflows/verify-critical.yml');
   const dependabotSource = readRepoFile('.github/dependabot.yml');
   const gitignoreSource = readRepoFile('.gitignore');
   const agentsSource = readRepoFile('AGENTS.md');
@@ -460,6 +464,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
     instantlyRoutesSource.match(/async function handleSync[\s\S]*?async function handleStatus/)?.[0] || '';
 
   assert.equal(packageJson.scripts['check:repo-hygiene'], 'bash scripts/check-repo-hygiene.sh');
+  assert.equal(packageJson.scripts['check:public-data'], 'node scripts/check-public-data-exposure.js');
   assert.equal(packageJson.scripts['check:quality-lock'], 'node scripts/check-quality-lock.js');
   assert.equal(packageJson.scripts['check:production-deploy-source'], 'node scripts/guard-production-deploy-source.js');
   assert.equal(packageJson.scripts['check:live-production-version'], 'node scripts/check-live-production-version.js');
@@ -475,6 +480,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['deploy:production'], 'node scripts/deploy-production-safe.js');
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.equal(packageJson.engines.node, '22.x');
+  assert.equal(nvmrcSource.trim(), '22');
   assert.equal(packageJson.dependencies.nodemailer, '^9.0.1');
   assert.match(packageJson.dependencies.sharp, /^\^0\.34\./);
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.34.5');
@@ -492,7 +498,11 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
     );
   });
   assert.match(verifyCriticalSource, /\['run', 'check:repo-hygiene'\]/);
+  assert.match(verifyCriticalSource, /\['run', 'check:public-data'\]/);
   assert.match(verifyCriticalSource, /\['run', 'check:quality-lock'\]/);
+  assert.match(publicDataSource, /MAX_EMBEDDED_JSON_BYTES/);
+  assert.match(publicDataSource, /BLOCKED_DATA_EXTENSIONS/);
+  assert.match(publicDataSource, /git', \['ls-files', '-z'\]/);
   assert.match(hygieneSource, /\.vercel\/output/);
   assert.match(hygieneSource, /npm run clean:local/);
   assert.match(cleanSource, /\.vercel\/output/);
@@ -525,9 +535,15 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(liveWaitSource, /assertLiveProductionVersion/);
   assert.match(liveWorkflowSource, /push:\s*[\s\S]*branches:\s*[\s\S]*main/);
   assert.match(liveWorkflowSource, /npm run check:live-production-version:wait/);
+  assert.match(liveWorkflowSource, /node-version:\s*22/);
+  assert.match(guardrailWorkflowSource, /node-version:\s*22/);
+  assert.match(verifyWorkflowSource, /node-version:\s*22/);
   assert.match(dependabotSource, /package-ecosystem:\s*npm/);
   assert.match(dependabotSource, /interval:\s*weekly/);
   assert.match(gitignoreSource, /reports\/\*\.md/);
+  assert.match(gitignoreSource, /outputs\//);
+  assert.match(gitignoreSource, /research\//);
+  assert.match(gitignoreSource, /\*\.csv/);
   assert.match(coldmailGuardBackfillSource, /mailbox-sent-webdesign-backfill-2026-06-08/);
   assert.match(coldmailGuardBackfillSource, /central_outbound_guard_missing_monitor_2026_06_08/);
   assert.match(coldmailGuardBackfillSource, /--pause-on-missing/);
@@ -589,10 +605,12 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isProtectedFrontendShellPath('assets/personnel-theme.js'), true);
   assert.equal(isProtectedFrontendShellPath('assets/coldcalling-dashboard.js'), false);
   assert.equal(isProtectedQualityGatePath('scripts/check-agent-guardrails.js'), true);
+  assert.equal(isProtectedQualityGatePath('scripts/check-public-data-exposure.js'), true);
   assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
   assert.equal(isProtectedQualityGatePath('AGENTS.md'), true);
   assert.equal(isProtectedQualityGatePath('package.json'), true);
   assert.equal(isProtectedQualityGatePath('.github/workflows/repo-hygiene.yml'), true);
+  assert.equal(isProtectedQualityGatePath('.github/workflows/live-production-version.yml'), true);
   assert.equal(isProtectedQualityGatePath('docs/quality-protocol.md'), true);
   assert.equal(isProtectedQualityGatePath('docs/repo-map.md'), true);
   assert.equal(isProtectedQualityGatePath('scripts/clean-local-artifacts.sh'), true);
