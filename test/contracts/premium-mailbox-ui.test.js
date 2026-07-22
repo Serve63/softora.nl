@@ -525,6 +525,7 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
 
   assert.match(scriptSource, /function cleanMailboxText\(value\)/);
   assert.match(scriptSource, /function isMailboxReplyHeaderLine\(line\)/);
+  assert.match(scriptSource, /function isMailboxOwnReplyHeaderLine\(line\)/);
   assert.match(scriptSource, /function buildMailboxBodySections\(value\)/);
   assert.match(scriptSource, /function renderMailboxInlineImage\(image\)/);
   assert.match(scriptSource, /function renderMailboxTextLine\(line, options\)/);
@@ -553,11 +554,43 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /sendgrid\\\.net/);
   assert.match(scriptSource, /cdn\.openai\.com/);
   assert.match(scriptSource, /Eerdere mail/);
+  assert.match(scriptSource, /Jouw eerdere mail/);
   assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
   assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
   assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, m\.bodyImages, \{ optOutUrl: m\.optOutUrl, mail: m \}\)\}<\/div>/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
+});
+
+test('premium mailbox zet een eerdere eigen mail als apart geciteerd blok neer', () => {
+  const html = renderMailboxBodyForTest([
+    'Bedankt voor je bericht, maar we hebben geen interesse.',
+    '',
+    'Op 20 jul 2026 om 07:12 heeft Servé Creusen het volgende geschreven:',
+    '',
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website devyldre.com tegen.',
+  ].join('\n'));
+
+  assert.equal((html.match(/detail-mail-section-quote/g) || []).length, 1);
+  assert.match(html, /<div class="detail-mail-section-label">Jouw eerdere mail<\/div>/);
+  assert.match(html, /Op 20 jul 2026 om 07:12 heeft Servé Creusen het volgende geschreven:/);
+  assert.ok(html.indexOf('Bedankt voor je bericht') < html.indexOf('detail-mail-section-quote'));
+  assert.ok(html.indexOf('Goedendag') > html.indexOf('detail-mail-section-quote'));
+});
+
+test('premium mailbox houdt een geciteerde mail van een andere afzender neutraal', () => {
+  const html = renderMailboxBodyForTest([
+    'Mijn antwoord staat hierboven.',
+    '',
+    'On 20 Jul 2026, John Example wrote:',
+    '',
+    'Original message.',
+  ].join('\n'));
+
+  assert.match(html, /<div class="detail-mail-section-label">Eerdere mail<\/div>/);
+  assert.doesNotMatch(html, /Jouw eerdere mail/);
 });
 
 test('premium mailbox behoudt mail-enters en vervangt image placeholders inline', () => {

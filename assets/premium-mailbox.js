@@ -163,11 +163,14 @@ const MAILBOX_IMAGE_ASSET_EXTENSIONS = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg
 const MAILBOX_COLDMAIL_OPT_OUT_LABEL = 'Geen webdesign willen ontvangen? Laat het me weten!';
 const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 const MAILBOX_REPLY_HEADER_PATTERNS = [
+  /^op .+\bheeft\s+.+\s+het volgende geschreven\s*:\s*$/i,
+  /^op .+\bschreef\b.+:\s*$/i,
   /^op .+\bschreef\b[:\s]*$/i,
   /^on .+\bwrote\b[:\s]*$/i,
   /^van:\s.+$/i,
   /^from:\s.+$/i,
 ];
+const MAILBOX_OWN_REPLY_AUTHOR_PATTERN = /\b(?:serv[eé]\s+creusen|martijn\s+van\s+de\s+ven|serv[eé]@softora\.nl|martijn@softora\.nl)\b/i;
 const MAILBOX_SIGNATURE_START_PATTERNS = [
   /^met vriendelijke groet[,!]*$/i,
   /^vriendelijke groet(?:en)?[,!]*$/i,
@@ -237,6 +240,9 @@ function cleanMailboxText(value) {
 function isMailboxReplyHeaderLine(line) {
   const value = String(line || '').trim();
   return MAILBOX_REPLY_HEADER_PATTERNS.some((pattern) => pattern.test(value));
+}
+function isMailboxOwnReplyHeaderLine(line) {
+  return isMailboxReplyHeaderLine(line) && MAILBOX_OWN_REPLY_AUTHOR_PATTERN.test(String(line || ''));
 }
 function isMailboxSignatureStartLine(line) {
   const value = String(line || '').trim();
@@ -432,11 +438,12 @@ function renderMailboxBodySection(section, imageState) {
   if (section.type === 'quote') {
     const firstLine = String(section.lines[0] || '').trim();
     const hasMeta = isMailboxReplyHeaderLine(firstLine);
+    const quoteLabel = hasMeta && isMailboxOwnReplyHeaderLine(firstLine) ? 'Jouw eerdere mail' : 'Eerdere mail';
     const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
     const quoteLines = hasMeta ? section.lines.slice(1) : section.lines;
     return `
       <section class="detail-mail-section detail-mail-section-quote">
-        <div class="detail-mail-section-label">Eerdere mail</div>
+        <div class="detail-mail-section-label">${quoteLabel}</div>
         ${quoteMeta}
         <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, optOutUrl: imageState.optOutUrl, senderEmail: imageState.senderEmail, usedImages: imageState.usedImages })}</div>
       </section>`;
