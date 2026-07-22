@@ -411,7 +411,7 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
   assert.doesNotMatch(html, /data-order-filter="open_leads"/, 'Openstaande leads-tab hoort niet meer zichtbaar te zijn.');
   assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
-  assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260510a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
+  assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260722a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
   assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
   assert.doesNotMatch(html, /assets\/premium-active-order-open-leads\.js/, 'Openstaande leads asset mag niet in de eerste laadroute staan.');
   assert.doesNotMatch(html, /assets\/premium-active-order-manual-open-leads\.js/, 'Handmatige openstaande leads asset mag niet in de eerste laadroute staan.');
@@ -425,7 +425,7 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op openstaande opdrachten te staan.');
-  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260710a"><\/script>/, 'Bootstrap hoort direct te starten.');
+  assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260722a"><\/script>/, 'Bootstrap hoort direct te starten.');
   assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script>/, 'Opdrachten-script hoort direct te starten.');
 });
 

@@ -69,7 +69,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle \{[\s\S]*border:\s*1px solid rgba\(139, 34, 82, 0\.2\);[\s\S]*background:\s*rgba\(255, 255, 255, 0\.78\);/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\] \{[\s\S]*border:\s*1\.5px solid rgba\(139, 34, 82, 0\.36\);[\s\S]*background:\s*#fff;/);
   assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\]::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;[\s\S]*transform:\s*rotate\(45deg\) scale\(0\);/);
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-active-orders-boot\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260722a"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260722a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260710a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260629a"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260510a"><\/script>/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-open-leads\.js/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-manual-open-leads\.js/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
@@ -245,11 +245,11 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.doesNotMatch(source, /SoftoraActiveOrdersLeadTab/);
 });
 
-test('premium actieve opdrachten start snel met server-bootstrap en korte boot-loader', () => {
+test('premium actieve opdrachten start direct met server-bootstrap zonder kunstmatige wachttijd', () => {
   const { bootScriptSource, scriptSource } = readActiveOrdersSources();
 
   assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';/);
-  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 550;/);
+  assert.match(bootScriptSource, /const ACTIVE_ORDERS_BOOT_MIN_MS = 0;/);
   assert.match(bootScriptSource, /function readChunkedStateValue\(values, baseKey\) \{/);
   assert.match(bootScriptSource, /function hydrateRemoteUiStateFromBootstrap\(currentCache, setCache\) \{/);
   assert.match(bootScriptSource, /root\.SoftoraPremiumBoot\.setShellBooting\(false\)/);
@@ -299,7 +299,8 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
 test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus opnieuw genereert', () => {
   const { pageSource, combinedSource: source } = readOrderDossierSources();
 
-  assert.match(pageSource, /assets\/premium-opdracht-dossier\.js\?v=20260629a/);
+  assert.match(pageSource, /assets\/premium-opdracht-dossier\.js\?v=20260722a/);
+  assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
   assert.match(pageSource, /assets\/premium-opdracht-dossier-editor\.css\?v=20260629a/);
   assert.match(source, /const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';/);
   assert.match(source, /const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';/);

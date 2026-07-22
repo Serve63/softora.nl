@@ -2742,23 +2742,29 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function listCampaignReplies({ limit = 100 } = {}) {
+    const replies = await mailboxCampaignRepliesService.listReplies({
+      limit: Number(limit || 100) || 100,
+    });
+    const messages = await restoreIndexedWebdesignImagesForMessages(replies);
+    return {
+      ok: true,
+      messages,
+      sync: {
+        indexed: true,
+        stale: false,
+        source: 'campaign-replies-index',
+        refreshRecommended: false,
+        warming: false,
+      },
+    };
+  }
+
   async function campaignRepliesResponse(req, res) {
     try {
-      const replies = await mailboxCampaignRepliesService.listReplies({
+      return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
-      });
-      const messages = await restoreIndexedWebdesignImagesForMessages(replies);
-      return res.status(200).json({
-        ok: true,
-        messages,
-        sync: {
-          indexed: true,
-          stale: false,
-          source: 'campaign-replies-index',
-          refreshRecommended: false,
-          warming: false,
-        },
-      });
+      }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);
       return res.status(error.status || 500).json({
@@ -2911,6 +2917,7 @@ function createMailboxService(deps = {}) {
     rewriteDraftResponse,
     getAccounts,
     getMessage,
+    listCampaignReplies,
     listMessages,
     listMessagesWithMeta,
     syncMailboxResponse,

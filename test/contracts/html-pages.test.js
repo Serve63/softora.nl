@@ -507,6 +507,7 @@ test('html page coordinator caps dashboard bootstrap reads without late error lo
   assert.match(res.body, /id="kpiTotalClients">--<script>/);
   assert.match(res.body, /Actieve opdrachten tijdelijk niet geladen/);
   assert.match(res.body, /id="softoraCustomersBootstrap" type="application\/json">/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722a/);
   assert.match(res.body, /"source":"unavailable"/);
   assert.match(res.body, /<span class="chart-label">Jan<\/span>/);
   assert.doesNotMatch(res.body, /SOFTORA_DASHBOARD_TOTAL_REVENUE/);
@@ -582,6 +583,7 @@ test('html page coordinator gives protected premium bootstrap enough time for Su
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /€1\.234/);
   assert.match(res.body, /id="softoraCustomersBootstrap"/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722a/);
   assert.equal(
     loggerInfos.some(
       (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'

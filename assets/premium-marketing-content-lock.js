@@ -15,6 +15,12 @@
   var error = document.getElementById('contentLockError');
   var remoteUnlocked = false;
 
+  function readBootstrappedUnlockFlag() {
+    var client = getUiStateClient();
+    var state = client && typeof client.peek === 'function' ? client.peek(remoteScope) : null;
+    return Boolean(state && state.values && state.values[REMOTE_UNLOCK_KEY] === '1');
+  }
+
   function isOpenGoogleAdsView() {
     var path = String(window.location.pathname || '').toLowerCase();
     var hash = String(window.location.hash || '').replace(/^#/, '').toLowerCase();
@@ -92,6 +98,7 @@
   }
 
   function bindContentLock() {
+    remoteUnlocked = readBootstrappedUnlockFlag();
     syncOverlayVisibility();
     void readRemoteUnlockFlag().then(function (isUnlocked) {
       remoteUnlocked = isUnlocked;

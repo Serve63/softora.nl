@@ -12,6 +12,9 @@ const { createAgendaPageBootstrapService } = require('./agenda-page-bootstrap');
 const { createCustomersPageBootstrapService } = require('./customers-page-bootstrap');
 const { createLeadsPageBootstrapService } = require('./leads-page-bootstrap');
 const { createColdcallingDashboardBootstrapService } = require('./coldcalling-dashboard-bootstrap');
+const {
+  createPremiumPageStateBootstrapService,
+} = require('./premium-page-state-bootstrap');
 
 function normalizePostCallStatus(value, normalizeString, truncateText) {
   const raw = normalizeString(value).toLowerCase();
@@ -462,6 +465,11 @@ function createAgendaRuntime(deps = {}) {
     normalizeString,
   });
 
+  const premiumPageStateBootstrapService = createPremiumPageStateBootstrapService({
+    getUiStateValues,
+    mailboxCoordinator: deps.mailboxCoordinator,
+  });
+
   const agendaRetellCoordinator = createAgendaRetellCoordinator({
     isSupabaseConfigured,
     getSupabaseStateHydrated: () => runtimeStateSyncState.supabaseStateHydrated,
@@ -476,20 +484,37 @@ function createAgendaRuntime(deps = {}) {
     normalizeTimeHhMm,
   });
 
-  async function buildRuntimeHtmlPageBootstrapData(_req, fileName) {
+  async function buildRuntimeHtmlPageBootstrapData(req, fileName) {
+    const pageStatePromise = () =>
+      premiumPageStateBootstrapService.buildPageStateBootstrapPayload(fileName, {
+        session: req && req.premiumAuth,
+      });
+    const mergePageState = (payload, pageState) => ({
+      ...(payload && typeof payload === 'object' ? payload : {}),
+      ...(pageState?.scopes ? { pageStateScopes: pageState.scopes } : {}),
+      ...(pageState?.session ? { session: pageState.session } : {}),
+    });
     if (fileName === 'premium-personeel-agenda.html') {
+      const [agendaPayload, pageState] = await Promise.all([
+        agendaPageBootstrapService.buildAgendaBootstrapPayload({ limit: 250 }),
+        pageStatePromise(),
+      ]);
       return {
         marker: 'SOFTORA_AGENDA_BOOTSTRAP',
         scriptId: 'softoraAgendaBootstrap',
-        data: await agendaPageBootstrapService.buildAgendaBootstrapPayload({ limit: 250 }),
+        data: mergePageState(agendaPayload, pageState),
       };
     }
 
     if (fileName === 'premium-actieve-opdrachten.html') {
+      const [ordersPayload, pageState] = await Promise.all([
+        customersPageBootstrapService.buildActiveOrdersPageBootstrapPayload(),
+        pageStatePromise(),
+      ]);
       return {
         marker: 'SOFTORA_ACTIVE_ORDERS_BOOTSTRAP',
         scriptId: 'softoraActiveOrdersBootstrap',
-        data: await customersPageBootstrapService.buildActiveOrdersPageBootstrapPayload(),
+        data: mergePageState(ordersPayload, pageState),
       };
     }
 
@@ -500,12 +525,16 @@ function createAgendaRuntime(deps = {}) {
     ) {
       const isPremiumDashboard = fileName === 'premium-personeel-dashboard.html';
       const isPremiumDatabase = fileName === 'premium-database.html';
-      const dashboardPayload = isPremiumDatabase
-        ? await customersPageBootstrapService.buildMailReadySnapshotBootstrapPayload()
-        : await customersPageBootstrapService.buildCustomersBootstrapPayload({
-            includeCustomers: true,
-            preferDashboardCustomers: isPremiumDashboard,
-          });
+      const [dashboardPayloadRaw, pageState] = await Promise.all([
+        isPremiumDatabase
+          ? customersPageBootstrapService.buildMailReadySnapshotBootstrapPayload()
+          : customersPageBootstrapService.buildCustomersBootstrapPayload({
+              includeCustomers: true,
+              preferDashboardCustomers: isPremiumDashboard,
+            }),
+        pageStatePromise(),
+      ]);
+      const dashboardPayload = mergePageState(dashboardPayloadRaw, pageState);
       const bootstrapData = {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
         scriptId: 'softoraCustomersBootstrap',
@@ -524,7 +553,11 @@ function createAgendaRuntime(deps = {}) {
     }
 
     if (fileName === 'premium-ai-coldmailing.html') {
-      const leadsPayload = await leadsPageBootstrapService.buildLeadsBootstrapPayload();
+      const [leadsPayloadRaw, pageState] = await Promise.all([
+        leadsPageBootstrapService.buildLeadsBootstrapPayload(),
+        pageStatePromise(),
+      ]);
+      const leadsPayload = mergePageState(leadsPayloadRaw, pageState);
       return {
         marker: 'SOFTORA_LEADS_BOOTSTRAP',
         scriptId: 'softoraLeadsBootstrap',
@@ -534,7 +567,11 @@ function createAgendaRuntime(deps = {}) {
     }
 
     if (fileName === 'premium-ai-lead-generator.html') {
-      const dashboardPayload = await coldcallingDashboardBootstrapService.buildBootstrapPayload();
+      const [dashboardPayloadRaw, pageState] = await Promise.all([
+        coldcallingDashboardBootstrapService.buildBootstrapPayload(),
+        pageStatePromise(),
+      ]);
+      const dashboardPayload = mergePageState(dashboardPayloadRaw, pageState);
       return {
         marker: 'SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP',
         scriptId: 'softoraColdcallingDashboardBootstrap',
@@ -542,6 +579,15 @@ function createAgendaRuntime(deps = {}) {
         htmlReplacements: coldcallingDashboardBootstrapService.buildDashboardHtmlReplacements(
           dashboardPayload
         ),
+      };
+    }
+
+    const pageStatePayload = await pageStatePromise();
+    if (pageStatePayload) {
+      return {
+        marker: 'SOFTORA_PAGE_STATE_BOOTSTRAP',
+        scriptId: 'softoraPageStateBootstrap',
+        data: pageStatePayload,
       };
     }
 

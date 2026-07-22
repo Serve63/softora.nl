@@ -1,7 +1,8 @@
 (function (root) {
   'use strict';
 
-  const DEFAULT_MINIMUM_MS = 1000;
+  // Legacy bestandsnaam: premium pagina's mogen nooit kunstmatig op een loader wachten.
+  const DEFAULT_MINIMUM_MS = 0;
   let startedAt = Date.now();
   let releaseTimer = null;
 
@@ -43,7 +44,10 @@
 
   function releaseShellAfterMinimum(customStartedAt, customMinimumMs) {
     const safeStartedAt = Number(customStartedAt) || startedAt || Date.now();
-    const safeMinimumMs = Math.max(0, Number(customMinimumMs) || DEFAULT_MINIMUM_MS);
+    const requestedMinimumMs = Math.max(0, Number(customMinimumMs) || 0);
+    const safeMinimumMs = DEFAULT_MINIMUM_MS > 0
+      ? Math.min(requestedMinimumMs || DEFAULT_MINIMUM_MS, DEFAULT_MINIMUM_MS)
+      : 0;
     const remainingMs = Math.max(0, safeMinimumMs - (Date.now() - safeStartedAt));
     clearReleaseTimer();
     releaseTimer = root.setTimeout(function () {

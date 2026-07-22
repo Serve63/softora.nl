@@ -31,7 +31,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /\.reg-title\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*font-size:\s*3rem;/s);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/s);
   assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260427a/);
+  assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260722a/);
   assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260516a/);
   assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260509b/);
   assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);

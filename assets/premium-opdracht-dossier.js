@@ -63,7 +63,6 @@
         const d = new Date(raw);
         return Number.isNaN(d.getTime()) ? raw : d.toLocaleString('nl-NL');
     }
-
     function formatDateOnly(value) {
         const raw = String(value || '').trim();
         if (!raw) return new Date().toLocaleDateString('nl-NL');
@@ -75,14 +74,16 @@
         const d = new Date(raw);
         return Number.isNaN(d.getTime()) ? new Date().toLocaleDateString('nl-NL') : d.toLocaleDateString('nl-NL');
     }
-
     async function fetchUiStateValues(scope) {
+        if (window.SoftoraUiStateClient?.get) {
+            const data = await window.SoftoraUiStateClient.get(scope);
+            return data?.ok !== false && data?.values && typeof data.values === 'object' ? data.values : {};
+        }
         const encoded = encodeURIComponent(String(scope || ''));
         const endpoints = [
             `/api/ui-state-get?scope=${encoded}`,
             `/api/ui-state/${encoded}`
         ];
-
         for (const endpoint of endpoints) {
             try {
                 const response = await fetch(endpoint, { cache: 'no-store' });
@@ -97,14 +98,13 @@
         }
         return {};
     }
-
     async function fetchUiStateSetWithFallback(scope, body) {
+        if (window.SoftoraUiStateClient?.set) return window.SoftoraUiStateClient.set(scope, body);
         const encoded = encodeURIComponent(String(scope || ''));
         const endpoints = [
             `/api/ui-state-set?scope=${encoded}`,
             `/api/ui-state/${encoded}`
         ];
-
         for (const endpoint of endpoints) {
             try {
                 const response = await fetch(endpoint, {

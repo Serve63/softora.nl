@@ -460,7 +460,7 @@
     <a href="/premium-actieve-opdrachten">Terug naar Actieve Opdrachten</a>
   </div>
 
-  <script>
+  <!-- SOFTORA_PAGE_STATE_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260722b"></script><script>
     (function () {
       document.documentElement.setAttribute('data-preview-loading', 'true');
 
@@ -548,7 +548,7 @@
         });
       }
 
-      async function fetchUiStateGetWithFallback(scope) {
+      async function fetchUiStateGetWithFallback(scope) { if (window.SoftoraUiStateClient?.get) return window.SoftoraUiStateClient.get(scope);
         const encodedScope = encodeURIComponent(String(scope || ''));
         const urls = [
           '/api/ui-state-get?scope=' + encodedScope,
@@ -572,7 +572,7 @@
         throw lastError || new Error('UI-state GET mislukt');
       }
 
-      async function fetchUiStateSetWithFallback(scope, body) {
+      async function fetchUiStateSetWithFallback(scope, body) { if (window.SoftoraUiStateClient?.set) return window.SoftoraUiStateClient.set(scope, body);
         const encodedScope = encodeURIComponent(String(scope || ''));
         const urls = [
           '/api/ui-state-set?scope=' + encodedScope,

@@ -361,6 +361,7 @@ function buildAgendaAppRuntimeOptions({
   parseIntSafe,
   hasNegativeInterestSignal,
   hasPositiveInterestSignal,
+  mailboxCoordinator,
 }) {
   return {
     dismissedInterestedLeadCallIds,
@@ -461,6 +462,7 @@ function buildAgendaAppRuntimeOptions({
     parseIntSafe,
     hasNegativeInterestSignal,
     hasPositiveInterestSignal,
+    mailboxCoordinator,
   };
 }
 

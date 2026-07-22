@@ -141,6 +141,9 @@
   }
 
   async function fetchUiStateGetWithFallback(scope) {
+    if (global.SoftoraUiStateClient && typeof global.SoftoraUiStateClient.get === "function") {
+      return global.SoftoraUiStateClient.get(scope);
+    }
     var encodedScope = encodeURIComponent(String(scope || ""));
     var urls = ["/api/ui-state-get?scope=" + encodedScope, "/api/ui-state/" + encodedScope];
     var lastError = null;
@@ -166,6 +169,9 @@
   }
 
   async function fetchUiStateSetWithFallback(scope, body) {
+    if (global.SoftoraUiStateClient && typeof global.SoftoraUiStateClient.set === "function") {
+      return global.SoftoraUiStateClient.set(scope, body, { timeoutMs: 12000 });
+    }
     var encodedScope = encodeURIComponent(String(scope || ""));
     var urls = ["/api/ui-state-set?scope=" + encodedScope, "/api/ui-state/" + encodedScope];
     var lastError = null;

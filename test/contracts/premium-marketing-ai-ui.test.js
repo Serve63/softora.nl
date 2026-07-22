@@ -16,8 +16,9 @@ test('premium advertenties is een dedicated Google Ads dry-run commandocentrale'
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.match(pageSource, /<title>Google Ads – Softora\.nl<\/title>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-google-ads\.css\?v=20260716b">/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260427a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
+  assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260722a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260716b" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_advertenties_content_lock"/);
   assert.match(pageSource, /data-content-lock-input/);
@@ -41,6 +42,7 @@ test('premium advertenties is een dedicated Google Ads dry-run commandocentrale'
   assert.match(lockAssetSource, /document\.documentElement\.removeAttribute\('data-google-ads-open'\)/);
   assert.match(lockAssetSource, /remoteUnlocked \|\| googleAdsOpen/);
   assert.match(lockAssetSource, /client\.get\(remoteScope\)/);
+  assert.match(lockAssetSource, /client\.peek\(remoteScope\)/);
   assert.match(lockAssetSource, /client\.set\(remoteScope,/);
   assert.match(lockAssetSource, /submitButton\.addEventListener\('click', unlockContent\)/);
   assert.match(lockAssetSource, /event\.key === 'Enter'/);
@@ -64,8 +66,9 @@ test('premium socialmedia toont een aparte AI beheer workspace boven de personee
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
   assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-marketing-management\.css\?v=20260423a">/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260605a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260427a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
+  assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260722a" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-management\.js\?v=20260423a" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_socialmedia_content_lock"/);
   assert.match(pageSource, /data-content-lock-input/);

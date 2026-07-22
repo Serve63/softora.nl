@@ -281,7 +281,7 @@ function assembleServerAppRuntimeDomainsWithFactories(
     })
   );
 
-  createServerAppFeatureWiringImpl(
+  const featureWiring = createServerAppFeatureWiringImpl(
     buildServerAppFeatureWiringRuntimeContextImpl({
       app,
       env,
@@ -332,6 +332,7 @@ function assembleServerAppRuntimeDomainsWithFactories(
       agendaLeadDetailService,
       uiSeoRuntime,
       aiHelpers,
+      mailboxCoordinator: featureWiring && featureWiring.mailboxCoordinator,
       getEffectivePublicBaseUrl,
       queueRuntimeStatePersist,
       buildRuntimeStateSnapshotPayload,

@@ -304,6 +304,8 @@ test('protected premium pages allow authenticated users from approved admin ips'
   const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'premium-personeel-agenda.html');
 
   assert.equal(result.handled, false);
+  assert.equal(req.premiumAuth?.authenticated, true);
+  assert.equal(req.premiumAuth?.email, 'admin@softora.nl');
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.headers['X-Robots-Tag'], 'noindex');
   assert.equal(res.redirectCode, null);

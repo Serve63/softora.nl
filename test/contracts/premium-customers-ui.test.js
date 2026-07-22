@@ -19,7 +19,7 @@ test('premium customers page bootstraps customer rows before async sync runs', (
   );
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /const customersBootStartedAt = Date\.now\(\), customersHadBootstrap = initialBootstrapCustomers\.length > 0, releaseCustomersBootShell =/);
-  assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(customersBootStartedAt, 1000\)/);
+  assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(customersBootStartedAt, 0\)/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
 });
 

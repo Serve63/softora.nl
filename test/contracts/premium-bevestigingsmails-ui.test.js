@@ -33,6 +33,8 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /<p>Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit/);
   assert.match(pageSource, /<button class="btn-start" id="start-campaign-btn" onclick="startCampagne\(\)" data-secure-mail-send-pin>/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
+  assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
+  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260722b/);
 });
 
 test('premium bevestigingsmails laadt geen coldmail teller per afzender', () => {
@@ -534,7 +536,7 @@ test('premium bevestigingsmails bewaart settings dropdowns via Supabase ui-state
   assert.match(pageSource, /const COLDMAILING_SETTINGS_KEY = 'softora_coldmailing_settings_v1';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_SCOPE = 'premium_ai_lead_generator_settings';/);
   assert.match(pageSource, /const LEAD_GENERATOR_SETTINGS_KEY = 'softora_ai_lead_generator_settings_v1';/);
-  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260612a/);
+  assert.match(pageSource, /assets\/premium-campaign-sender-settings\.js\?v=20260722a/);
   assert.match(pageSource, /<select class="mf-sel" id="ai-tone-style">/);
   assert.match(senderSettingsSource, /"martijnven123@gmail\.com": DEFAULT_WEBDESIGN_BODY/);
   assert.match(senderSettingsSource, /"contact\.venvisuals@gmail\.com": DEFAULT_WEBDESIGN_BODY/);

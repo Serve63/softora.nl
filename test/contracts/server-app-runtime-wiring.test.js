@@ -103,6 +103,7 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
     'function'
   );
   assert.ok(capturedRouteOptions.mailboxCoordinator);
+  assert.equal(result.mailboxCoordinator, capturedRouteOptions.mailboxCoordinator);
   assert.equal(typeof capturedRouteOptions.mailboxCoordinator.accountsResponse, 'function');
   assert.ok(capturedRouteOptions.publicContactCoordinator);
   assert.equal(typeof capturedRouteOptions.publicContactCoordinator.submitResponse, 'function');

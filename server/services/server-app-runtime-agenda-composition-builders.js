@@ -201,6 +201,7 @@ function buildServerAppAgendaWiringRuntimeContext({
   agendaLeadDetailService,
   uiSeoRuntime,
   aiHelpers,
+  mailboxCoordinator,
   getEffectivePublicBaseUrl,
   queueRuntimeStatePersist,
   buildRuntimeStateSnapshotPayload,
@@ -349,6 +350,7 @@ function buildServerAppAgendaWiringRuntimeContext({
       getOpenAiTranscriptionModelCandidates:
         agendaLeadDetailService.getOpenAiTranscriptionModelCandidates,
       parseJsonLoose: aiHelpers.parseJsonLoose,
+      mailboxCoordinator,
       demoConfirmationTaskEnabled: envConfig.DEMO_CONFIRMATION_TASK_ENABLED,
       ensureDismissedLeadsFreshFromSupabase:
         runtimeSyncRuntime.ensureDismissedLeadsFreshFromSupabase,
