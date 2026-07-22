@@ -17,6 +17,7 @@
     const PHOTO_LOAD_RETRY_AFTER_MS = 30000;
     const PHOTO_LOAD_CACHE_PROPERTY = "__SoftoraDatabasePhotoLoadCacheV1";
     const PHOTO_LOAD_CACHE_LIMIT = 2500;
+    const DEFAULT_SINGLE_VARIANT = "v2-visual-dna";
     const LIGHTNING_ICON = "<svg class=\"photo-generate-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M13.25 2.25 4.9 13.35a.75.75 0 0 0 .6 1.2h5.08l-1.84 7.02a.75.75 0 0 0 1.33.62l8.95-11.55a.75.75 0 0 0-.6-1.21h-5.21l1.45-6.54a.75.75 0 0 0-1.41-.64Z\"/></svg>";
     const MOCKUP_ICON = "<svg class=\"photo-mockup-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6.5h10.5v7H4zM3 16h13M17 8h3.5v8H17zM18.75 18h.01\"/></svg>";
     const LOADING_ICON = "<span class=\"photo-generate-spinner\" aria-hidden=\"true\"></span>";
@@ -768,7 +769,7 @@
             }
         }
 
-        async function generateForCustomer(customerId) { const target = getCustomerById(customerId), picker = global.SoftoraDatabaseWebdesignVariantPicker; let variant = "v1-prompt-only"; if (picker && typeof picker.choose === "function") { variant = await picker.choose({ company: normalizeString(target && target.bedrijf) }); if (!variant) return { started: false, cancelled: true }; } return startJobForTarget(target, { quiet: false, deferRender: false, pollDelay: 0, variant: normalizeVariant(variant) }); }
+        async function generateForCustomer(customerId) { return startJobForTarget(getCustomerById(customerId), { quiet: false, deferRender: false, pollDelay: 0, variant: DEFAULT_SINGLE_VARIANT }); }
 
         async function generateBatchForCustomers(customers, batchOptions) {
             const targets = (Array.isArray(customers) ? customers : []).filter(Boolean), total = targets.length;
