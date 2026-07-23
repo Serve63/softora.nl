@@ -46,6 +46,18 @@ function parseMessageDate(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getMessageTimestamp(message) {
+  return parseMessageDate(message && (
+    message.receivedAt ||
+    message.internalDate ||
+    message.date
+  ));
+}
+
+function getConversationTimestamp(message) {
+  return parseMessageDate(message && message.activityAt) || getMessageTimestamp(message);
+}
+
 function messageReferencesId(message, messageId) {
   if (!messageId) return false;
   return getMessageReferenceIds(message).includes(messageId);
@@ -202,14 +214,14 @@ function attachSentThreadMessages(replies, sentMessages) {
     .map(([conversationId, groupedReplies]) => {
       const sortedReplies = groupedReplies
         .slice()
-        .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
+        .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
       const primaryReply = sortedReplies[0];
       const primaryIdentity = getMessageIdentity(primaryReply);
       const seen = new Set(primaryIdentity ? [primaryIdentity] : []);
-      const threadMessages = [
+      const threadMessages = dedupeCampaignMessages([
         ...sortedReplies.slice(1),
         ...(sentByConversation.get(conversationId) || []),
-      ]
+      ])
         .filter((message) => {
           const identity = getMessageIdentity(message);
           if (!identity) return true;
@@ -217,15 +229,22 @@ function attachSentThreadMessages(replies, sentMessages) {
           seen.add(identity);
           return true;
         })
-        .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
+        .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
+      const latestActivity = [primaryReply, ...threadMessages]
+        .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0];
       return {
         ...primaryReply,
         conversationId,
+        activityAt: normalizeText(latestActivity && (
+          latestActivity.receivedAt ||
+          latestActivity.internalDate ||
+          latestActivity.date
+        )),
         unread: sortedReplies.some((reply) => Boolean(reply && reply.unread)),
         threadMessages,
       };
     })
-    .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
+    .sort((left, right) => getConversationTimestamp(right) - getConversationTimestamp(left));
 }
 
 function normalizeClassifierText(value) {

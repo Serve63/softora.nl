@@ -154,6 +154,7 @@ test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () =
       replyMailId: 'inbox:91',
       mail: {
         accountEmail: 'martijnven123@gmail.com',
+        receivedAt: '2026-07-22T15:36:03.000Z',
         threadMessages: [{
           id: 'sent:102',
           folder: 'sent',
@@ -168,13 +169,15 @@ test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () =
   assert.match(html, /Jouw antwoord/);
   assert.match(html, /Martijn van de Ven/);
   assert.match(html, /Ik bouw onze websites met maatwerk\./);
-  assert.doesNotMatch(
-    html.slice(html.indexOf('Jouw antwoord'), html.indexOf('Jouw eerdere mail')),
-    /Welke techniek gebruik je/
+  const sentSection = html.match(
+    /<section class="detail-mail-section detail-mail-section-sent">([\s\S]*?)<\/section>/
   );
+  assert.ok(sentSection);
+  assert.doesNotMatch(sentSection[1], /Welke techniek gebruik je/);
   assert.match(html, /class="detail-mail-section detail-mail-section-sent"/);
-  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw antwoord'));
-  assert.ok(html.indexOf('Jouw antwoord') < html.indexOf('Jouw eerdere mail'));
+  assert.ok(html.indexOf('Jouw antwoord') < html.indexOf('Welke techniek gebruik je?'));
+  assert.ok(html.indexOf('Welke techniek gebruik je?') < html.indexOf('Beantwoorden'));
+  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw eerdere mail'));
 });
 
 test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conversatie', () => {
@@ -185,6 +188,7 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
       replyMailId: 'inbox:37476',
       mail: {
         accountEmail: 'martijnven123@gmail.com',
+        receivedAt: '2026-07-23T09:21:00.000Z',
         threadMessages: [{
           id: 'inbox:37467',
           folder: 'inbox',
@@ -204,9 +208,106 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
   assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Eerder ontvangen'));
 });
 
+test('mailbox houdt Outlook-citaten buiten Jouw antwoord en bouwt Ralphs tijdlijn nieuwste eerst op', () => {
+  const html = renderMailboxBodyForTest(
+    [
+      'Hi Martijn,',
+      '',
+      'Dank voor je bericht.',
+      'Ik heb via Claude Design zelf mijn website vernieuwd.',
+      '',
+      'Op ma 15 jun 2026 om 15:48 schreef Martijn van de Ven:',
+      '> Goededag,',
+    ].join('\n'),
+    [],
+    {
+      replyMailId: 'inbox:23',
+      mail: {
+        accountEmail: 'martijn@softora.nl',
+        receivedAt: '2026-06-15T13:58:18.000Z',
+        threadMessages: [
+          {
+            id: 'sent:149',
+            folder: 'sent',
+            accountEmail: 'martijn@softora.nl',
+            date: '2026-06-23T11:32:58.000Z',
+            body: [
+              'Hoi Ralph,',
+              '',
+              'Misschien heb je mijn mailtje gemist.',
+              '',
+              '________________________________',
+              'Van: Martijn van de Ven',
+              'Verzonden: dinsdag 16 juni 2026 14:31',
+              'Aan: Ralph Ruyters',
+              'Onderwerp: Re: Kleine vraag over jullie website',
+              '',
+              'Hoi Ralph,',
+              'Dankjewel voor je reactie.',
+            ].join('\n'),
+          },
+          {
+            id: 'sent:111',
+            folder: 'sent',
+            accountEmail: 'martijn@softora.nl',
+            date: '2026-06-16T12:31:32.000Z',
+            body: [
+              'Hoi Ralph,',
+              '',
+              'Dankjewel voor je reactie! Dat klinkt goed 😁',
+              '',
+              '________________________________',
+              'Van: Ralph Ruyters',
+              'Verzonden: maandag 15 juni 2026 15:58',
+              'Aan: martijn@softora.nl',
+              'Onderwerp: Re: Kleine vraag over jullie website',
+              '',
+              'Hi Martijn,',
+              'Ik heb via Claude Design zelf mijn website vernieuwd.',
+            ].join('\n'),
+          },
+        ],
+      },
+    }
+  );
+
+  const sentSections = Array.from(html.matchAll(
+    /<section class="detail-mail-section detail-mail-section-sent">([\s\S]*?)<\/section>/g
+  )).map((match) => match[1]);
+  assert.equal(sentSections.length, 2);
+  assert.match(sentSections[0], /Misschien heb je mijn mailtje gemist\./);
+  assert.match(sentSections[1], /Dankjewel voor je reactie! Dat klinkt goed/);
+  sentSections.forEach((section) => {
+    assert.doesNotMatch(section, /Van: Ralph Ruyters|Verzonden:|Claude Design/);
+  });
+  assert.ok(html.indexOf('Misschien heb je mijn mailtje gemist.') < html.indexOf('Dankjewel voor je reactie!'));
+  assert.ok(html.indexOf('Dankjewel voor je reactie!') < html.indexOf('Hi Martijn,'));
+  assert.ok(html.indexOf('Hi Martijn,') < html.indexOf('Beantwoorden'));
+});
+
+test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af', () => {
+  const html = campaignInboxModule.renderThreadMessages(
+    {
+      receivedAt: '2026-06-15T13:58:18.000Z',
+      accountEmail: 'martijn@softora.nl',
+      threadMessages: [{
+        folder: 'sent',
+        accountEmail: 'martijn@softora.nl',
+        date: '2026-06-16T12:31:32.000Z',
+        body: 'Hoi Ralph,\n\nVan: onze kant ziet het voorstel er goed uit.',
+      }],
+    },
+    (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+    () => ({ date: '16 juni', time: '14:31' }),
+    { position: 'newer' }
+  );
+
+  assert.match(html, /Van: onze kant ziet het voorstel er goed uit\./);
+});
+
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723l/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723i/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723m/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723j/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -280,7 +381,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723i"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723j"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723m"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -683,6 +784,31 @@ test('coldmail inbox toont de ontvangsttijd vast in Europe Amsterdam', () => {
 
   assert.equal(mail.receivedAt, '2026-07-20T06:14:13.000Z');
   assert.equal(mail.time, '08:14');
+});
+
+test('coldmail rij gebruikt laatste gespreksactiviteit terwijl het geopende bericht zijn eigen datum houdt', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const mail = helpers.normalizeMailboxApiMessage({
+    id: 'inbox:ralph',
+    folder: 'inbox',
+    from: 'Ralph Ruyters',
+    email: 'rruyters@road2value.com',
+    receivedAt: '2026-06-15T13:58:18.000Z',
+    activityAt: '2026-06-23T11:32:58.000Z',
+  });
+  const row = listModule.renderItem(mail, {
+    activeMail: '',
+    escapeHtml: String,
+    display: helpers.display,
+    displayOptions: { activeFolder: 'outreach', account: 'martijn@softora.nl' },
+  });
+
+  assert.equal(mail.date, '15 juni');
+  assert.equal(mail.time, '15:58');
+  assert.equal(mail.activityDate, '23 juni');
+  assert.equal(mail.activityTime, '13:32');
+  assert.match(row, /<span class="mail-date-label">23 juni<\/span>/);
+  assert.match(row, /<span class="mail-time-value">13:32<\/span>/);
 });
 
 test('coldmail tabcache behoudt de echte ontvangsttijd en valt niet terug op middernacht', () => {
