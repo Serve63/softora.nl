@@ -206,7 +206,7 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723l/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723g/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723h/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -280,7 +280,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723h"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -1604,6 +1604,55 @@ test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste cli
   assert.doesNotMatch(readScript(), />Mailbox laden…</);
   assert.match(readScript(), /preserveOnError:\s*true/);
   assert.match(readScript(), /getPageBootstrapSession/);
+});
+
+test('mailbox leest complete unicode gespreksdata uit de veilige base64-bootstrap', async () => {
+  const previousDocument = globalThis.document;
+  const previousApi = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  const payload = {
+    session: {
+      authenticated: true,
+      email: 'martijn@softora.nl',
+      displayName: 'Martijn van de Ven',
+    },
+    mailbox: {
+      ok: true,
+      messages: [{
+        id: 'ralph-conversation',
+        from: 'Ralph Ruyters',
+        threadMessages: [
+          { id: 'sent-1', folder: 'sent', body: 'Eerste antwoord' },
+          { id: 'sent-2', folder: 'sent', body: 'Vervolg met € en emoji 😁' },
+        ],
+      }],
+      sync: { source: 'campaign-replies-index' },
+    },
+  };
+  globalThis.document = {
+    getElementById(id) {
+      if (id !== 'softoraPageStateBootstrap') return null;
+      return {
+        textContent: Buffer.from(JSON.stringify(payload), 'utf8').toString('base64'),
+        getAttribute(name) {
+          return name === 'data-softora-encoding' ? 'base64' : null;
+        },
+      };
+    },
+  };
+  delete require.cache[modulePath];
+  const freshCampaignInboxModule = require(modulePath);
+
+  try {
+    const result = await freshCampaignInboxModule.load('outreach', (message) => message);
+    assert.equal(result.messages[0].threadMessages.length, 2);
+    assert.equal(result.messages[0].threadMessages[1].body, 'Vervolg met € en emoji 😁');
+    assert.equal(freshCampaignInboxModule.getPageBootstrapSession().displayName, 'Martijn van de Ven');
+  } finally {
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraMailboxCampaignInbox = previousApi;
+  }
 });
 
 test('mailbox toont de laatst bekende tabdata direct wanneer de server koud start', async () => {

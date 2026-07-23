@@ -11,6 +11,33 @@
   ];
   const TAB_CACHE_PREFIX = 'softora_premium_page_cache_v1:';
 
+  function readBootstrapText(element, target) {
+    const raw = String(element && element.textContent || '');
+    if (
+      !element ||
+      typeof element.getAttribute !== 'function' ||
+      element.getAttribute('data-softora-encoding') !== 'base64'
+    ) {
+      return raw;
+    }
+    const decodeBase64 = target && typeof target.atob === 'function'
+      ? target.atob.bind(target)
+      : typeof atob === 'function'
+        ? atob
+        : null;
+    if (!decodeBase64) return '';
+    const binary = decodeBase64(raw.trim());
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const Decoder = target && target.TextDecoder
+      ? target.TextDecoder
+      : typeof TextDecoder === 'function'
+        ? TextDecoder
+        : null;
+    return Decoder
+      ? new Decoder('utf-8').decode(bytes)
+      : decodeURIComponent(escape(binary));
+  }
+
   function readSession(target) {
     const doc = target && target.document;
     if (!doc || typeof doc.getElementById !== 'function') return null;
@@ -18,7 +45,7 @@
       const element = doc.getElementById(id);
       if (!element) continue;
       try {
-        const payload = JSON.parse(String(element.textContent || '{}'));
+        const payload = JSON.parse(readBootstrapText(element, target) || '{}');
         if (payload?.session?.authenticated) return payload.session;
       } catch (_) {
         // Een ongeldige bootstrap mag nooit de pagina blokkeren.

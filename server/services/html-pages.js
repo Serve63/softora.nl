@@ -210,6 +210,13 @@ function createHtmlPageCoordinator(options = {}) {
       .replace(/\u2029/g, '\\u2029');
   }
 
+  function encodePageStateBootstrap(value) {
+    const serialized = typeof value === 'string'
+      ? value
+      : JSON.stringify(value === undefined ? null : value);
+    return Buffer.from(serialized, 'utf8').toString('base64');
+  }
+
   function injectPageBootstrapHtml(html, bootstrapData) {
     const sourceHtml = String(html || '');
     if (!bootstrapData || typeof bootstrapData !== 'object') return sourceHtml;
@@ -218,12 +225,24 @@ function createHtmlPageCoordinator(options = {}) {
     if (!scriptId) return sourceHtml;
 
     const marker = normalizeString(bootstrapData.marker || '');
-    const serialized =
-      typeof bootstrapData.serialized === 'string'
+    const isEncodedMailboxBootstrap =
+      scriptId === 'softoraPageStateBootstrap' &&
+      normalizeString(bootstrapData.data && bootstrapData.data.page).toLowerCase() ===
+        'premium-mailbox.html';
+    const serialized = isEncodedMailboxBootstrap
+      ? encodePageStateBootstrap(
+          typeof bootstrapData.serialized === 'string'
+            ? bootstrapData.serialized
+            : bootstrapData.data
+        )
+      : typeof bootstrapData.serialized === 'string'
         ? bootstrapData.serialized
         : escapeJsonForInlineHtml(bootstrapData.data);
-    const scriptTag = `<script id="${scriptId}" type="application/json">${serialized}</script>`;
-    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260722b"></script>';
+    const encodingAttribute = isEncodedMailboxBootstrap
+      ? ' data-softora-encoding="base64"'
+      : '';
+    const scriptTag = `<script id="${scriptId}" type="application/json"${encodingAttribute}>${serialized}</script>`;
+    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260723c"></script>';
     const bootstrapHtml = `${scriptTag}${sessionBootstrapTag}`;
 
     if (marker) {

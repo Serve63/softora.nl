@@ -20,6 +20,25 @@
         };
     }
 
+    function readBootstrapText(element) {
+        var raw = String(element && element.textContent || "");
+        if (
+            !element ||
+            typeof element.getAttribute !== "function" ||
+            element.getAttribute("data-softora-encoding") !== "base64"
+        ) {
+            return raw;
+        }
+        if (!global || typeof global.atob !== "function") return "";
+        var binary = global.atob(raw.trim());
+        var bytes = Uint8Array.from(binary, function (character) {
+            return character.charCodeAt(0);
+        });
+        return typeof global.TextDecoder === "function"
+            ? new global.TextDecoder("utf-8").decode(bytes)
+            : decodeURIComponent(escape(binary));
+    }
+
     function primeUiState(scope, value, options) {
         var cacheKey = String(scope || "");
         if (!cacheKey) return false;
@@ -47,7 +66,7 @@
             var element = doc.getElementById(id);
             if (!element) return total;
             try {
-                var payload = JSON.parse(String(element.textContent || "{}"));
+                var payload = JSON.parse(readBootstrapText(element) || "{}");
                 var scopes = payload && payload.scopes && typeof payload.scopes === "object"
                     ? payload.scopes
                     : payload && payload.pageStateScopes && typeof payload.pageStateScopes === "object"
