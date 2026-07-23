@@ -4,7 +4,6 @@
   const OWNER_OPTIONS = Object.freeze([
     Object.freeze({ key: 'serve', label: 'Servé Creusen' }),
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
-    Object.freeze({ key: 'both', label: 'Servé & Martijn' }),
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
@@ -22,8 +21,8 @@
     'martijnven123@gmail.com': 'martijn',
     'contact.venvisuals@gmail.com': 'martijn',
   });
-  let activeOwner = 'both';
-  let defaultOwner = 'both';
+  let activeOwner = 'serve';
+  let defaultOwner = 'serve';
   let pinnedOwner = '';
   let preferenceIdentity = 'anonymous';
   let pageBootstrapConsumed = false;
@@ -48,6 +47,7 @@
       mail && mail.body,
     ].filter(Boolean).join(' '));
     const automatedSubjectPatterns = [
+      /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
       /\bautomatisch antwoord\b/,
       /\bautomatische (?:e-?mail|mail|reactie|ontvangstbevestiging)\b/,
       /\bontvangstbevestiging\b/,
@@ -81,12 +81,12 @@
     const owner = String(value || '').trim().toLowerCase();
     if (owner === 'serve' || owner === 'servé') return 'serve';
     if (owner === 'martijn') return 'martijn';
-    return 'both';
+    return 'serve';
   }
 
   function isOwner(value) {
     const owner = String(value || '').trim().toLowerCase();
-    return owner === 'serve' || owner === 'servé' || owner === 'martijn' || owner === 'both';
+    return owner === 'serve' || owner === 'servé' || owner === 'martijn';
   }
 
   function getOwnerByAccount(value) {
@@ -106,7 +106,7 @@
       .toLowerCase();
     if (/\bmartijn\b/.test(identity)) return 'martijn';
     if (/\bserve\b/.test(identity)) return 'serve';
-    return 'both';
+    return 'serve';
   }
 
   function getOwnerPinKeyForIdentity(identity) {
@@ -174,7 +174,7 @@
 
   function getOwnerLabel(value) {
     const owner = normalizeOwner(value == null ? activeOwner : value);
-    return OWNER_OPTIONS.find((option) => option.key === owner)?.label || 'Servé & Martijn';
+    return OWNER_OPTIONS.find((option) => option.key === owner)?.label || 'Servé Creusen';
   }
 
   function getReceivedTimestamp(mail) {
@@ -276,14 +276,14 @@
         const accountOwner = getOwnerByAccount(
           mail && (mail.accountEmail || mail.campaign && mail.campaign.account)
         );
-        return Boolean(accountOwner && (owner === 'both' || accountOwner === owner));
+        return Boolean(accountOwner && accountOwner === owner);
       })
     );
   }
 
   function getOwnerOptionsForMenu(primaryOwner) {
     const primary = isOwner(primaryOwner) ? normalizeOwner(primaryOwner) : '';
-    const personalOptions = OWNER_OPTIONS.filter((option) => option.key !== 'both');
+    const personalOptions = OWNER_OPTIONS.slice();
     if (primary === 'serve' || primary === 'martijn') {
       personalOptions.sort((left, right) => {
         if (left.key === primary) return -1;
@@ -291,7 +291,7 @@
         return 0;
       });
     }
-    return [...personalOptions, OWNER_OPTIONS.find((option) => option.key === 'both')];
+    return personalOptions;
   }
 
   function renderOwnerMenu(escapeHtml, options) {

@@ -121,6 +121,15 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
     body: 'We hebben uw email in goede orde ontvangen en proberen uw email binnen 24 uur te beantwoorden.',
   }), true);
   assert.equal(isAutomatedCampaignReply({
+    subject: 'Automatisch antwoorden: Nieuw webdesign gemaakt!',
+    preview: 'Hartelijk dank voor je email.',
+    body: 'Ik streef er naar om deze binnen 2 werkdagen te beantwoorden.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Vraag over automatisch antwoorden in Gmail',
+    preview: 'Kun je uitleggen hoe ik dit zelf instel?',
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
     subject: 'Re: Kleine vraag over jullie website',
     preview: 'Dank voor je mail. De automatische e-mail op onze website werkt inderdaad nog niet goed.',
   }), false);

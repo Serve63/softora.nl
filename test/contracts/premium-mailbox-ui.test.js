@@ -586,7 +586,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723n/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723o/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723p/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -660,7 +660,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723o"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723n"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723p"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723n"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -715,7 +715,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /mailboxAccountMenu\.addEventListener\('click', function\(event\) \{[\s\S]*SoftoraMailboxCampaignInbox\.pinOwner\(ownerButton\.dataset\.mailboxPinOwner, window\.SoftoraUiStateClient\)/);
 });
 
-test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Servé en Martijn', () => {
+test('coldmail eigenaarfilter houdt de negen campagneadressen gescheiden tussen Servé en Martijn', () => {
   const messages = [
     { id: 'serve-softora', accountEmail: 'serve@softora.nl', receivedAt: '2026-07-20T09:00:00.000Z' },
     { id: 'serve-alias', accountEmail: 'servecreusen@softora.nl', receivedAt: '2026-07-20T08:00:00.000Z' },
@@ -731,13 +731,6 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv�
     { id: 'zakelijk-softora', accountEmail: 'zakelijk@softora.nl' },
     { id: 'impactbox', accountEmail: 'zakelijk@theimpactbox.co' },
   ];
-
-  campaignInboxModule.setOwner('both');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé & Martijn');
-  assert.deepEqual(
-    campaignInboxModule.filterMessages(messages).map((message) => message.id),
-    messages.slice(0, 9).map((message) => message.id)
-  );
 
   campaignInboxModule.setOwner('servé');
   assert.equal(campaignInboxModule.getOwnerLabel(), 'Servé Creusen');
@@ -756,11 +749,10 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan Serv�
   const ownerMenu = campaignInboxModule.renderOwnerMenu((value) => String(value));
   assert.match(ownerMenu, />Servé Creusen</);
   assert.match(ownerMenu, />Martijn van de Ven</);
-  assert.match(ownerMenu, />Servé & Martijn</);
+  assert.doesNotMatch(ownerMenu, />Servé & Martijn</);
   assert.ok(ownerMenu.indexOf('Servé Creusen') < ownerMenu.indexOf('Martijn van de Ven'));
-  assert.ok(ownerMenu.indexOf('Martijn van de Ven') < ownerMenu.indexOf('Servé & Martijn'));
   assert.doesNotMatch(ownerMenu, /@/);
-  campaignInboxModule.setOwner('both');
+  campaignInboxModule.setOwner('serve');
 });
 
 test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessiecache', () => {
@@ -802,6 +794,20 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       body: 'Dank voor je mail. De automatische e-mail op onze website werkt inderdaad nog niet goed.',
       receivedAt: '2026-07-23T13:00:00.000Z',
     },
+    {
+      id: 'dietist-auto',
+      accountEmail: 'serve@softora.nl',
+      subject: 'Automatisch antwoorden: Nieuw webdesign gemaakt!',
+      body: 'Hartelijk dank voor je email. Ik streef er naar om deze binnen 2 werkdagen te beantwoorden.',
+      receivedAt: '2026-07-23T14:00:00.000Z',
+    },
+    {
+      id: 'human-automation-question',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Vraag over automatisch antwoorden in Gmail',
+      body: 'Kun je uitleggen hoe ik dit zelf instel?',
+      receivedAt: '2026-07-23T15:00:00.000Z',
+    },
   ];
 
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[0]), false);
@@ -809,9 +815,11 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[2]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[3]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[4]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[5]), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[6]), false);
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
-    ['human-about-automation', 'human']
+    ['human-automation-question', 'human-about-automation', 'human']
   );
 });
 
@@ -924,7 +932,7 @@ test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als stand
   assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'martijn@softora.nl' }), 'martijn');
   assert.equal(campaignInboxModule.resolveOwnerForSession({ displayName: 'Servé Creusen' }), 'serve');
   assert.equal(campaignInboxModule.resolveOwnerForSession({ displayName: 'Martijn van de Ven' }), 'martijn');
-  assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'onbekend@softora.nl' }), 'both');
+  assert.equal(campaignInboxModule.resolveOwnerForSession({ email: 'onbekend@softora.nl' }), 'serve');
 
   const serveMenu = campaignInboxModule.renderOwnerMenu(String, {
     defaultOwner: 'serve',
@@ -936,12 +944,12 @@ test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als stand
   });
   assert.ok(serveMenu.indexOf('Servé Creusen') < serveMenu.indexOf('Martijn van de Ven'));
   assert.ok(martijnMenu.indexOf('Martijn van de Ven') < martijnMenu.indexOf('Servé Creusen'));
-  assert.ok(serveMenu.indexOf('Servé & Martijn') > serveMenu.indexOf('Martijn van de Ven'));
-  assert.ok(martijnMenu.indexOf('Servé & Martijn') > martijnMenu.indexOf('Servé Creusen'));
+  assert.doesNotMatch(serveMenu, /Servé & Martijn/);
+  assert.doesNotMatch(martijnMenu, /Servé & Martijn/);
 });
 
-test('coldmail eigenaar kan Servé, Martijn of beide persoonlijk vastpinnen', () => {
-  for (const owner of ['serve', 'martijn', 'both']) {
+test('coldmail eigenaar kan alleen Servé of Martijn persoonlijk vastpinnen', () => {
+  for (const owner of ['serve', 'martijn']) {
     const ownerMenu = campaignInboxModule.renderOwnerMenu(String, {
       defaultOwner: 'serve',
       pinnedOwner: owner,
@@ -959,11 +967,12 @@ test('coldmail eigenaar kan Servé, Martijn of beide persoonlijk vastpinnen', ()
   });
   assert.ok(martijnPinnedMenu.indexOf('Martijn van de Ven') < martijnPinnedMenu.indexOf('Servé Creusen'));
 
-  const bothPinnedMenu = campaignInboxModule.renderOwnerMenu(String, {
+  const legacyCombinedMenu = campaignInboxModule.renderOwnerMenu(String, {
     defaultOwner: 'serve',
     pinnedOwner: 'both',
   });
-  assert.ok(bothPinnedMenu.indexOf('Servé & Martijn') > bothPinnedMenu.indexOf('Martijn van de Ven'));
+  assert.doesNotMatch(legacyCombinedMenu, /Servé & Martijn/);
+  assert.doesNotMatch(legacyCombinedMenu, /topbar-mailbox-option-row pinned/);
 });
 
 test('coldmail eigenaarpin gebruikt een aparte server-state sleutel per gebruikersaccount', () => {
@@ -1006,8 +1015,8 @@ test('coldmail eigenaarpin leest en schrijft alleen de voorkeur van de actieve g
   );
   assert.deepEqual(serveState, {
     defaultOwner: 'serve',
-    pinnedOwner: 'both',
-    activeOwner: 'both',
+    pinnedOwner: '',
+    activeOwner: 'serve',
   });
   const result = await campaignInboxModule.pinOwner('serve', client);
   assert.equal(result.saved, true);
@@ -1031,12 +1040,12 @@ test('coldmail inbox sorteert na ieder eigenaarfilter op echte ontvangsttijd met
   ];
 
   assert.deepEqual(
-    campaignInboxModule.filterMessages(messages, 'both').map((message) => message.id),
-    ['nieuw', 'midden', 'oud']
-  );
-  assert.deepEqual(
     campaignInboxModule.filterMessages(messages, 'serve').map((message) => message.id),
     ['midden', 'oud']
+  );
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
+    ['nieuw']
   );
 });
 
