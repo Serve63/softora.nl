@@ -498,7 +498,7 @@ function renderMailBody(value, images, options) {
     optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl), senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount),
     usedImages: new Set()
   };
-  const sections = buildMailboxBodySections(value);
+  const sections = buildMailboxBodySections(value).filter((section) => !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxOwnReplyHeaderLine));
   const replyMailId = String(options && options.replyMailId || '').trim();
   const replyActionHtml = replyMailId ? `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(replyMailId)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>Beantwoorden</button></div>` : '';
   const [newerThreadMessagesHtml, olderThreadMessagesHtml] = ['newer', 'older'].map((position) => window.SoftoraMailboxCampaignInbox?.renderThreadMessages(options && options.mail, escapeHtml, formatMailDate, { position }) || '');
