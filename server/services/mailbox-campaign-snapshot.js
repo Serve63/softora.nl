@@ -248,10 +248,37 @@ function parseMailboxCampaignSnapshot(rawValue) {
   }
 }
 
+function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options = {}) {
+  const snapshot = parseMailboxCampaignSnapshot(rawValue);
+  if (!snapshot) return { changed: false, serialized: String(rawValue || '') };
+  const accountEmail = text(identity.accountEmail, 320).toLowerCase();
+  const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
+  const uid = Number(identity.uid) || 0;
+  const id = text(identity.id, 500);
+  const messages = snapshot.messages.filter((message) => {
+    if (message.accountEmail !== accountEmail || message.folder !== folder) return true;
+    if (uid > 0 && Number(message.uid) > 0) return Number(message.uid) !== uid;
+    return message.mailboxId !== id && message.id !== id;
+  });
+  if (messages.length === snapshot.messages.length) {
+    return { changed: false, serialized: String(rawValue || '') };
+  }
+  return {
+    changed: true,
+    serialized: messages.length
+      ? serializeMailboxCampaignSnapshot(
+          { ok: snapshot.ok, messages, sync: snapshot.sync },
+          { savedAt: options.savedAt || new Date().toISOString() }
+        )
+      : '',
+  };
+}
+
 module.exports = {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
   parseMailboxCampaignSnapshot,
+  removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
 };

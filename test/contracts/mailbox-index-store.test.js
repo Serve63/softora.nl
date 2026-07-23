@@ -149,6 +149,28 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
   ]);
 });
 
+test('mailbox index store meldt het als een tombstone geen bericht raakt', async () => {
+  const query = {
+    update() { return query; },
+    eq() { return query; },
+    select() { return query; },
+    then(resolve) { resolve({ data: [], error: null }); },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: () => query }),
+  });
+
+  const result = await store.markMessageDeleted({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    uid: 42,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'MAILBOX_INDEX_MESSAGE_NOT_FOUND');
+});
+
 test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder sync-resurrectie', async () => {
   const calls = [];
   const query = {
@@ -160,12 +182,12 @@ test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder syn
       calls.push(['eq', column, value]);
       return query;
     },
-    is(column, value) {
-      calls.push(['is', column, value]);
+    select(columns) {
+      calls.push(['select', columns]);
       return query;
     },
     then(resolve) {
-      resolve({ data: [], error: null });
+      resolve({ data: [{ message_key: 'serve@softora.nl|inbox|42' }], error: null });
     },
   };
   const store = createMailboxIndexStore({
@@ -194,8 +216,8 @@ test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder syn
     }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
-    ['is', 'deleted_at', null],
     ['eq', 'uid', 42],
+    ['select', 'message_key'],
   ]);
 });
 

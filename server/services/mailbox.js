@@ -2478,7 +2478,7 @@ function createMailboxService(deps = {}) {
     resolveMailboxName,
     canUseMailboxIndex,
     mailboxIndexStore,
-    refreshCampaignSnapshot: listCampaignReplies,
+    getUiStateValues, setUiStateValues,
     logger,
   });
 

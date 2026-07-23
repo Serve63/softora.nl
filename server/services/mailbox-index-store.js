@@ -374,17 +374,22 @@ function createMailboxIndexStore(deps = {}) {
     const normalizedFolder = normalizeFolder(folder);
     const normalizedId = normalizeString(id);
     const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
-    return run('mark-message-deleted', (client) => {
+    const result = await run('mark-message-deleted', (client) => {
       const deletedAt = isoNow();
       const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
         .update({ deleted_at: deletedAt, updated_at: deletedAt })
         .eq('account_email', normalizeEmail(accountEmail))
-        .eq('folder', normalizedFolder)
-        .is('deleted_at', null);
-      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) return query.eq('uid', parsedUid);
-      return query.eq('provider_id', normalizedId);
+        .eq('folder', normalizedFolder);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
+        return query.eq('uid', parsedUid).select('message_key');
+      }
+      return query.eq('provider_id', normalizedId).select('message_key');
     });
+    if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
+    const error = new Error('Mailboxbericht ontbreekt in de duurzame index.');
+    error.code = 'MAILBOX_INDEX_MESSAGE_NOT_FOUND';
+    return { ok: false, unavailable: false, data: [], error };
   }
 
   async function getSyncState({ accountEmail, folder = 'inbox' }) {
