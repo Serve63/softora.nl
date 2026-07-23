@@ -380,7 +380,7 @@
       const content = String(line || '').trim();
       return (
         /^>/.test(content) ||
-        /^(?:on .+ wrote:|op .+ (?:schreef|heeft .+ geschreven):)$/i.test(content) ||
+        /^(?:on .+\bwrote\b|op .+\bschreef\b.*|op .+\bheeft\s+.+\s+geschreven)\s*:\s*$/i.test(content) ||
         /^-{2,}\s*(?:original message|oorspronkelijk bericht)/i.test(content)
       );
     });
