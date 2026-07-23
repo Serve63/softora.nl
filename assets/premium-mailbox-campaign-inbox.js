@@ -422,6 +422,31 @@
     return (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim();
   }
 
+  function normalizeThreadMatchText(value) {
+    return String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function isDuplicateStructuredOwnQuote(section, mail, isOwnReplyHeaderLine) {
+    if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
+    const firstLine = String(section.lines[0] || '').trim();
+    if (typeof isOwnReplyHeaderLine !== 'function' || !isOwnReplyHeaderLine(firstLine)) return false;
+    const quotedText = normalizeThreadMatchText(section.lines.slice(1).join('\n'));
+    if (!quotedText) return false;
+    return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : []).some((message) => {
+      if (String(message && message.folder || '').trim().toLowerCase() !== 'sent') return false;
+      const authoredText = normalizeThreadMatchText(stripQuotedReply(
+        message && (message.body || message.text || message.preview)
+      ));
+      if (authoredText.length < 8) return false;
+      return quotedText === authoredText || quotedText.startsWith(`${authoredText} `);
+    });
+  }
+
   function renderThreadMessages(mail, escapeHtml, formatDate, options = {}) {
     if (!mail || typeof escapeHtml !== 'function') return '';
     const rootTimestamp = getMessageTimestamp(mail);
@@ -699,6 +724,7 @@
     groupConversationMessages,
     initializeOwnerPreference,
     isAutomatedCampaignReply,
+    isDuplicateStructuredOwnQuote,
     isOwner,
     isSafeImageSource,
     isCampaignMail,
