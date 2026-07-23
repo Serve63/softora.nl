@@ -583,7 +583,6 @@
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "leads", "coldcalling", "qr_code",
-        "ads_facebook",
         "ads_linkedin",
         "ads_pinterest",
         "ads_twitter",
@@ -598,6 +597,7 @@
         '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg>';
     function getMailboxSidebarLink() { return { key: "mailbox", href: "/mailbox", label: "Mailbox", icon: '<svg class="sidebar-link-mailbox-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>' }; }
     function activateMailboxSidebarLink(sidebar) { const target = sidebar || document.querySelector(".sidebar"); const link = target && target.querySelector('[data-sidebar-key="mailbox"]'); if (!link) return; const mailboxLink = getMailboxSidebarLink(); link.setAttribute("href", mailboxLink.href); link.classList.remove("sidebar-link--coming-soon"); link.removeAttribute("aria-disabled"); link.removeAttribute("tabindex"); link.querySelectorAll(".sidebar-link-lock").forEach(function (lock) { lock.remove(); }); if (!link.querySelector(":scope > svg")) link.insertAdjacentHTML("afterbegin", mailboxLink.icon); const label = link.querySelector(".sidebar-link-text"); if (label) label.textContent = mailboxLink.label; }
+    function activateFacebookAdsSidebarLink(sidebar) { const target = sidebar || document.querySelector(".sidebar"); const link = target && target.querySelector('[data-sidebar-key="ads_facebook"]'); if (!link) return; link.setAttribute("href", "/premium-advertenties#facebook"); link.classList.remove("sidebar-link--coming-soon"); link.removeAttribute("aria-disabled"); link.removeAttribute("tabindex"); link.querySelectorAll(".sidebar-link-lock").forEach(function (lock) { lock.remove(); }); if (!link.querySelector(":scope > svg")) link.insertAdjacentHTML("afterbegin", '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z"></path></svg>'); }
     function decorateComingSoonSidebarLinks() {
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
@@ -1131,7 +1131,7 @@
 
     function stabilizePremiumStaticSidebar(sidebar, activeKey) {
         if (!sidebar) return;
-        syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar);
+        syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar); activateFacebookAdsSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
         schedulePremiumSidebarStability(sidebar);

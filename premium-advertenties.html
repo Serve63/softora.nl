@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
 <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
-<title>Google Ads – Softora.nl</title>
+<title>Advertenties – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
 <link rel="stylesheet" href="assets/premium-google-ads.css?v=20260716b">
+<link rel="stylesheet" href="assets/premium-facebook-ads.css?v=20260723a">
 <script>
   (function () {
     document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -31,8 +32,9 @@
       document.documentElement.setAttribute("data-theme", "light");
       document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
       var adsHash = String(window.location.hash || "").replace(/^#/, "").toLowerCase();
-      if (window.location.pathname.toLowerCase().indexOf("/premium-advertenties") === 0 && (!adsHash || adsHash === "google")) {
-        document.documentElement.setAttribute("data-google-ads-open", "true");
+      if (window.location.pathname.toLowerCase().indexOf("/premium-advertenties") === 0 && (!adsHash || adsHash === "google" || adsHash === "facebook")) {
+        document.documentElement.setAttribute("data-advertising-workspace-open", "true");
+        document.documentElement.setAttribute("data-advertising-channel", adsHash === "facebook" ? "facebook" : "google");
       }
     } catch (_) {
       /* ignore */
@@ -130,7 +132,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   text-align: center;
   min-height: 16px;
 }
-html[data-google-ads-open="true"] .content-lock-overlay { display: none; }
+html[data-advertising-workspace-open="true"] .content-lock-overlay { display: none; }
 
 .page-title { font-family: 'Oswald', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
 .page-sub { font-size: 13px; color: var(--text-light); margin-bottom: 36px; }
@@ -289,11 +291,78 @@ html[data-google-ads-open="true"] .content-lock-overlay { display: none; }
     </div>
   </div>
 </main>
+<main class="main-content" id="facebook">
+  <div class="google-ads-shell">
+    <header class="google-ads-header">
+      <div>
+        <div class="google-ads-kicker">Acquisitie · Paid social</div>
+        <h1>Facebook Ads</h1>
+        <p>Een eigen Meta-werkruimte voor doelgroepen, creatives, plaatsingen en conversiemeting — volledig voorbereid zonder campagne of budget te activeren.</p>
+      </div>
+      <div class="google-ads-mode"><span></span><strong>Dry-run</strong><small>€0 uitgaven · mutaties geblokkeerd</small></div>
+    </header>
+
+    <section class="google-ads-kpis" aria-label="Facebook Ads kerncijfers">
+      <article><span>Uitgaven</span><strong id="facebookAdsSpend">€ 0,00</strong><small>Hard vergrendeld</small></article>
+      <article><span>Live campagnes</span><strong id="facebookAdsLiveCampaigns">0</strong><small>Geen campagne actief</small></article>
+      <article><span>Creatives voorbereid</span><strong id="facebookAdsCreativeCount">—</strong><small>Copy + formats</small></article>
+      <article><span>Readiness</span><strong id="facebookAdsReadiness">—</strong><small id="facebookAdsReadinessNote">Status laden…</small></article>
+    </section>
+
+    <section class="google-ads-safety">
+      <div class="google-ads-safety-icon">€</div>
+      <div><strong>Kostenslot actief</strong><p>Deze werkruimte kan analyseren en voorbereiden, maar bevat bewust geen endpoint voor campagne-activatie, budgetwijzigingen of betaalde Meta-mutaties.</p></div>
+      <span>LOCKED</span>
+    </section>
+
+    <div class="google-ads-layout">
+      <section class="google-ads-panel google-ads-machine">
+        <div class="google-ads-panel-head"><div><span>Voorbereidingsmachine</span><h2>Volgende veiligste actie</h2></div><button id="facebookAdsDryRun" type="button">Draai dry-run</button></div>
+        <div class="google-ads-machine-result" id="facebookAdsMachineResult">
+          <span>Nog niet gedraaid</span>
+          <strong>De machine controleert eerst Meta-account, API, Pixel, CAPI en consent.</strong>
+          <p>Er wordt niets bij Meta aangemaakt of gewijzigd.</p>
+        </div>
+      </section>
+
+      <aside class="google-ads-panel">
+        <div class="google-ads-panel-head"><div><span>Launch gate</span><h2>Technische readiness</h2></div></div>
+        <div class="google-ads-checklist" id="facebookAdsReadinessList" aria-live="polite"><p>Status laden…</p></div>
+      </aside>
+    </div>
+
+    <section class="google-ads-panel google-ads-blueprint">
+      <div class="google-ads-panel-head"><div><span>Campagnestructuur</span><h2>Meta-blueprint</h2></div><div class="google-ads-chip">Alle concepten gepauzeerd</div></div>
+      <div class="google-ads-campaigns" id="facebookAdsCampaigns"><p>Blueprint laden…</p></div>
+    </section>
+
+    <section class="google-ads-panel google-ads-assets-panel">
+      <div class="google-ads-panel-head">
+        <div><span>Creative launch-pack</span><h2>Copy, formats en URL-tracking</h2></div>
+        <div class="google-ads-download-actions"><button class="google-ads-secondary-button" id="facebookAdsDownloadPack" type="button" disabled>Download JSON</button></div>
+      </div>
+      <div class="google-ads-pack-status" id="facebookAdsPackStatus">Advertentie-assets valideren…</div>
+      <div class="google-ads-ad-assets" id="facebookAdsAdAssets"></div>
+    </section>
+
+    <div class="google-ads-layout google-ads-layout-bottom">
+      <section class="google-ads-panel">
+        <div class="google-ads-panel-head"><div><span>Doelgroephygiëne</span><h2>Uitsluitingen vóór livegang</h2></div></div>
+        <div class="google-ads-negatives" id="facebookAdsExclusions"></div>
+      </section>
+      <aside class="google-ads-panel google-ads-measurement">
+        <div class="google-ads-panel-head"><div><span>Meetfundament</span><h2>Conversiepad</h2></div></div>
+        <ol><li><b>1</b><span>UTM en click context first-party vastleggen</span></li><li><b>2</b><span>Pixel en Conversions API pas na consent activeren</span></li><li><b>3</b><span>Geen campagne live zonder geldige testconversie</span></li></ol>
+      </aside>
+    </div>
+  </div>
+</main>
 </div>
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
 <script src="assets/premium-ui-state-client.js?v=20260722b"></script>
-<script src="assets/premium-marketing-content-lock.js?v=20260722a" defer></script>
+<script src="assets/premium-marketing-content-lock.js?v=20260723b" defer></script>
 <script src="assets/premium-google-ads.js?v=20260716b" defer></script>
+<script src="assets/premium-facebook-ads.js?v=20260723a" defer></script>
 </body>
 </html>

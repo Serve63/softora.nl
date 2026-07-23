@@ -239,6 +239,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.ok(comingSoonSetMatch, 'coming soon set hoort expliciet te blijven bestaan');
   assert.doesNotMatch(comingSoonSetMatch[1], /"seo"/);
   assert.match(comingSoonSetMatch[1], /"qr_code"/);
+  assert.doesNotMatch(comingSoonSetMatch[1], /"ads_facebook"/);
+  assert.match(themeJsSource, /function activateFacebookAdsSidebarLink\(sidebar\)/);
+  assert.match(themeJsSource, /activateFacebookAdsSidebarLink\(sidebar\)/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
