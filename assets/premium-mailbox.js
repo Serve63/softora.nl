@@ -584,7 +584,7 @@ let inboxUnreadCount = 0;
 let mailboxSyncState = null;
 let composeReplyContext = null;
 const mailboxDeleteController = window.SoftoraMailboxDelete.create({
-  fetch,
+  fetch: (...args) => window.fetch(...args),
   getDialogs: () => window.SoftoraDialogs,
   confirm: (message) => typeof window.confirm === 'function' && window.confirm(message),
   getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
