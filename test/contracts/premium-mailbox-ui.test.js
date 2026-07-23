@@ -206,7 +206,7 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723l/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723f/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723g/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -280,7 +280,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -461,6 +461,36 @@ test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespre
   assert.equal(grouped[0].threadMessages.length, 1);
   assert.equal(grouped[0].threadMessages[0].mailboxId, 'inbox:37467');
   assert.equal(grouped[0].threadMessages[0].folder, 'inbox');
+});
+
+test('coldmail lijst bewaart meer dan tien berichten in dezelfde conversatie', () => {
+  const threadMessages = Array.from({ length: 12 }, (_, index) => ({
+    id: `sent:${index + 1}`,
+    uid: index + 1,
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    to: 'rruyters@road2value.com',
+    date: new Date(Date.UTC(2026, 5, 23, 12, 0, 0) - index * 60_000).toISOString(),
+    messageId: `<sent-${index + 1}@example.test>`,
+  }));
+  const grouped = campaignInboxModule.filterMessages([{
+    id: 'inbox:23',
+    mailboxId: 'inbox:23',
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'rruyters@road2value.com',
+    conversationId: 'conversation:martijn@softora.nl|contact:rruyters@road2value.com',
+    receivedAt: '2026-06-15T13:58:18.000Z',
+    campaign: { account: 'martijn@softora.nl' },
+    threadMessages,
+  }], 'martijn');
+
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].threadMessages.length, 12);
+  assert.deepEqual(
+    grouped[0].threadMessages.map((message) => message.id),
+    threadMessages.map((message) => message.id)
+  );
 });
 
 test('coldmail berichten met hetzelfde IMAP-id blijven per mailboxaccount uniek', () => {
