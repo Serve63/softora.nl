@@ -88,6 +88,36 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
 });
 
+test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberichten', () => {
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:37476',
+      folder: 'inbox',
+      accountEmail: 'martijnven123@gmail.com',
+      subject: 'Re: Kleine vraag over jullie website',
+      date: '2026-07-23T09:31:11.000Z',
+      conversationId: 'conversation:martijnven123@gmail.com|campaign-start@example.test',
+      threadMessages: [{
+        id: 'inbox:37467',
+        folder: 'inbox',
+        accountEmail: 'martijnven123@gmail.com',
+        subject: 'Re: Kleine vraag over jullie website',
+        body: 'Het eerdere ontvangen bericht.',
+        date: '2026-07-22T15:36:03.000Z',
+      }],
+    }],
+  });
+  const [message] = parseMailboxCampaignSnapshot(serialized).messages;
+
+  assert.equal(
+    message.conversationId,
+    'conversation:martijnven123@gmail.com|campaign-start@example.test'
+  );
+  assert.equal(message.threadMessages[0].folder, 'inbox');
+  assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
+});
+
 test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
   const smallImage = `data:image/png;base64,${'a'.repeat(120)}`;
   const oversizedImage = `data:image/jpeg;base64,${'b'.repeat(90_000)}`;

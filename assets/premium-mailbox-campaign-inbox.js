@@ -179,15 +179,89 @@
     return Number.isFinite(timestamp) ? timestamp : 0;
   }
 
+  function normalizeMessageId(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^<+|>+$/g, '');
+  }
+
+  function getMessageReferenceIds(mail) {
+    return Array.from(new Set([
+      mail && mail.references,
+      mail && mail.inReplyTo,
+    ]
+      .flatMap((value) => String(value || '').trim().toLowerCase().split(/\s+/))
+      .map(normalizeMessageId)
+      .filter(Boolean)));
+  }
+
+  function getConversationId(mail) {
+    const explicitId = String(mail && mail.conversationId || '').trim();
+    if (explicitId) return explicitId;
+    const account = normalizeEmail(mail && (mail.accountEmail || mail.campaign && mail.campaign.account));
+    const referenceIds = getMessageReferenceIds(mail);
+    if (account && referenceIds.length) return `conversation:${account}|${referenceIds[0]}`;
+    const messageId = normalizeMessageId(mail && mail.messageId);
+    if (account && messageId) return `conversation:${account}|${messageId}`;
+    const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
+    if (account && mailboxId) return `conversation:${account}|mailbox:${mailboxId}`;
+    return '';
+  }
+
+  function getMessageIdentity(mail) {
+    const account = normalizeEmail(mail && mail.accountEmail);
+    const messageId = normalizeMessageId(mail && mail.messageId);
+    if (account && messageId) return `${account}|message:${messageId}`;
+    const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
+    return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
+  }
+
   function sortMessagesNewestFirst(messages) {
     return (Array.isArray(messages) ? messages : [])
       .slice()
       .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left));
   }
 
+  function groupConversationMessages(messages) {
+    const groups = new Map();
+    sortMessagesNewestFirst(messages).forEach((mail) => {
+      const conversationId = getConversationId(mail) || getMessageIdentity(mail);
+      if (!groups.has(conversationId)) groups.set(conversationId, []);
+      groups.get(conversationId).push(mail);
+    });
+    return Array.from(groups.entries()).map(([conversationId, groupedMessages]) => {
+      const primary = groupedMessages[0];
+      const primaryIdentity = getMessageIdentity(primary);
+      const seen = new Set(primaryIdentity ? [primaryIdentity] : []);
+      const threadMessages = [
+        ...(Array.isArray(primary.threadMessages) ? primary.threadMessages : []),
+        ...groupedMessages.slice(1).flatMap((message) => [
+          { ...message, folder: String(message && message.folder || 'inbox').toLowerCase() },
+          ...(Array.isArray(message && message.threadMessages) ? message.threadMessages : []),
+        ]),
+      ]
+        .filter((message) => {
+          const identity = getMessageIdentity(message);
+          if (!identity) return true;
+          if (seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        })
+        .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left))
+        .slice(0, 10);
+      return {
+        ...primary,
+        conversationId,
+        unread: groupedMessages.some((message) => Boolean(message && message.unread)),
+        threadMessages,
+      };
+    });
+  }
+
   function filterMessages(messages, value) {
     const owner = normalizeOwner(value == null ? activeOwner : value);
-    return sortMessagesNewestFirst(
+    return groupConversationMessages(
       (Array.isArray(messages) ? messages : []).filter((mail) => {
         if (isAutomatedCampaignReply(mail)) return false;
         const accountOwner = getOwnerByAccount(
@@ -250,6 +324,7 @@
         : '',
       campaign: message.campaign || null,
       outreach: message.outreach || null,
+      conversationId: String(message.conversationId || mail && mail.conversationId || '').trim(),
       threadMessages: Array.isArray(message.threadMessages) ? message.threadMessages : [],
     };
   }
@@ -306,7 +381,9 @@
       const body = stripQuotedReply(message && (message.body || message.preview));
       if (!body) return '';
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
-      const owner = getOwnerLabel(getOwnerByAccount(message.accountEmail));
+      const folder = String(message && message.folder || 'sent').trim().toLowerCase();
+      const sent = folder === 'sent';
+      const owner = sent ? getOwnerLabel(getOwnerByAccount(message.accountEmail)) : '';
       const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
       const meta = [dateLabel, owner].filter(Boolean).join(' · ');
       const lines = body.split('\n').map((line) => {
@@ -316,7 +393,7 @@
       }).join('');
       return `
         <section class="detail-mail-section detail-mail-section-sent">
-          <div class="detail-mail-section-label">Jouw antwoord</div>
+          <div class="detail-mail-section-label">${sent ? 'Jouw antwoord' : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
           <div class="detail-mail-lines">${lines}</div>
         </section>`;
@@ -475,6 +552,7 @@
     decorateMessage,
     filterMessages,
     getAccount,
+    getConversationId,
     getFolder,
     hasPageBootstrap,
     getOwner,
@@ -484,6 +562,7 @@
     getOwnerPinKeyForIdentity,
     getPageBootstrapSession,
     getRequestId,
+    groupConversationMessages,
     initializeOwnerPreference,
     isAutomatedCampaignReply,
     isOwner,

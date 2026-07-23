@@ -49,14 +49,86 @@ function parseMessageDate(value) {
 
 function messageReferencesId(message, messageId) {
   if (!messageId) return false;
-  const references = [
-    message && message.inReplyTo,
+  return getMessageReferenceIds(message).includes(messageId);
+}
+
+function getMessageReferenceIds(message) {
+  return Array.from(new Set([
     message && message.references,
-  ].map((value) => normalizeText(value).toLowerCase());
-  return references.some((value) => value
-    .split(/\s+/)
+    message && message.inReplyTo,
+  ]
+    .flatMap((value) => normalizeText(value).toLowerCase().split(/\s+/))
     .map(normalizeMessageId)
-    .includes(messageId));
+    .filter(Boolean)));
+}
+
+function getMessageIdentity(message) {
+  const account = normalizeEmail(message && message.accountEmail);
+  const messageId = normalizeMessageId(message && message.messageId);
+  if (account && messageId) return `${account}|message:${messageId}`;
+  const mailboxId = normalizeText(message && (message.mailboxId || message.id));
+  return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
+}
+
+function createConversationDisjointSet(messages) {
+  const parents = new Map();
+
+  function find(value) {
+    const key = normalizeText(value);
+    if (!key) return '';
+    if (!parents.has(key)) parents.set(key, key);
+    const parent = parents.get(key);
+    if (parent === key) return key;
+    const root = find(parent);
+    parents.set(key, root);
+    return root;
+  }
+
+  function union(left, right) {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (!leftRoot || !rightRoot || leftRoot === rightRoot) return;
+    const root = leftRoot < rightRoot ? leftRoot : rightRoot;
+    const child = root === leftRoot ? rightRoot : leftRoot;
+    parents.set(child, root);
+  }
+
+  (Array.isArray(messages) ? messages : []).forEach((message) => {
+    const account = normalizeEmail(message && message.accountEmail);
+    if (!account) return;
+    const messageId = normalizeMessageId(message && message.messageId);
+    const referenceIds = getMessageReferenceIds(message);
+    const nodes = [messageId, ...referenceIds]
+      .filter(Boolean)
+      .map((value) => `${account}|${value}`);
+    if (!nodes.length) return;
+    nodes.forEach((node) => find(node));
+    nodes.slice(1).forEach((node) => union(nodes[0], node));
+  });
+
+  return { find };
+}
+
+function getCampaignConversationId(message, disjointSet) {
+  const account = normalizeEmail(message && message.accountEmail);
+  if (!account) return getMessageIdentity(message);
+  const messageId = normalizeMessageId(message && message.messageId);
+  const referenceIds = getMessageReferenceIds(message);
+  const node = [messageId, ...referenceIds].find(Boolean);
+  if (node) {
+    const resolved = disjointSet && typeof disjointSet.find === 'function'
+      ? disjointSet.find(`${account}|${node}`)
+      : `${account}|${referenceIds[0] || messageId}`;
+    return resolved ? `conversation:${resolved}` : '';
+  }
+  const mailboxId = normalizeText(message && (message.mailboxId || message.id));
+  if (mailboxId) return `conversation:${account}|mailbox:${mailboxId}`;
+  return [
+    'conversation',
+    account,
+    normalizeEmail(message && message.email),
+    normalizeSubject(message && message.subject),
+  ].join(':');
 }
 
 function isSentReplyForMessage(sentMessage, inboxMessage) {
@@ -88,57 +160,62 @@ function attachSentThreadMessages(replies, sentMessages) {
   const sourceReplies = Array.isArray(replies) ? replies : [];
   const candidates = dedupeCampaignMessages(sentMessages)
     .filter((message) => normalizeText(message && message.folder).toLowerCase() === 'sent');
-  const messagesByReply = new Map(sourceReplies.map((reply) => [reply, []]));
-  const repliesByMessageId = new Map();
-  const repliesByFallbackKey = new Map();
+  const disjointSet = createConversationDisjointSet([...sourceReplies, ...candidates]);
+  const replyGroups = new Map();
+
   sourceReplies.forEach((reply) => {
-    const messageId = normalizeMessageId(reply && reply.messageId);
-    if (messageId) {
-      repliesByMessageId.set(`${normalizeEmail(reply && reply.accountEmail)}|${messageId}`, reply);
-    }
-    const fallbackKey = [
-      normalizeEmail(reply && reply.accountEmail),
-      normalizeEmail(reply && reply.email),
-      normalizeSubject(reply && reply.subject),
-    ].join('|');
-    if (!repliesByFallbackKey.has(fallbackKey)) repliesByFallbackKey.set(fallbackKey, []);
-    repliesByFallbackKey.get(fallbackKey).push(reply);
+    const conversationId = getCampaignConversationId(reply, disjointSet);
+    if (!replyGroups.has(conversationId)) replyGroups.set(conversationId, []);
+    replyGroups.get(conversationId).push(reply);
   });
-  repliesByFallbackKey.forEach((repliesForKey) => {
-    repliesForKey.sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
-  });
+
+  const sentByConversation = new Map();
   candidates.forEach((message) => {
-    const referenceIds = [
-      message && message.inReplyTo,
-      message && message.references,
-    ]
-      .flatMap((value) => normalizeText(value).toLowerCase().split(/\s+/))
-      .map(normalizeMessageId)
-      .filter(Boolean);
-    const directReply = referenceIds
-      .map((messageId) => repliesByMessageId.get(
-        `${normalizeEmail(message && message.accountEmail)}|${messageId}`
-      ))
-      .find(Boolean);
-    const recipients = extractEmailAddresses(message && message.to);
-    const fallbackReplies = recipients.flatMap((recipient) => (
-      repliesByFallbackKey.get([
-        normalizeEmail(message && message.accountEmail),
-        recipient,
-        normalizeSubject(message && message.subject),
-      ].join('|')) || []
-    ));
-    const reply = directReply || fallbackReplies.find((candidate) => isSentReplyForMessage(message, candidate));
-    if (!reply) return;
-    const threadMessages = messagesByReply.get(reply);
-    threadMessages.push(message);
+    const directConversationId = getCampaignConversationId(message, disjointSet);
+    const directReplies = replyGroups.get(directConversationId) || [];
+    let conversationId = directReplies.some((reply) => isSentReplyForMessage(message, reply))
+      ? directConversationId
+      : '';
+    if (!conversationId) {
+      const fallbackGroup = Array.from(replyGroups.entries()).find(([, groupedReplies]) => (
+        groupedReplies.some((reply) => isSentReplyForMessage(message, reply))
+      ));
+      conversationId = fallbackGroup ? fallbackGroup[0] : '';
+    }
+    if (!conversationId) return;
+    if (!sentByConversation.has(conversationId)) sentByConversation.set(conversationId, []);
+    sentByConversation.get(conversationId).push(message);
   });
-  return sourceReplies.map((reply) => ({
-    ...reply,
-    threadMessages: messagesByReply.get(reply)
-      .sort((left, right) => parseMessageDate(left && left.date) - parseMessageDate(right && right.date))
-      .slice(-CAMPAIGN_THREAD_MESSAGE_LIMIT),
-  }));
+
+  return Array.from(replyGroups.entries())
+    .map(([conversationId, groupedReplies]) => {
+      const sortedReplies = groupedReplies
+        .slice()
+        .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
+      const primaryReply = sortedReplies[0];
+      const primaryIdentity = getMessageIdentity(primaryReply);
+      const seen = new Set(primaryIdentity ? [primaryIdentity] : []);
+      const threadMessages = [
+        ...sortedReplies.slice(1),
+        ...(sentByConversation.get(conversationId) || []),
+      ]
+        .filter((message) => {
+          const identity = getMessageIdentity(message);
+          if (!identity) return true;
+          if (seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        })
+        .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date))
+        .slice(0, CAMPAIGN_THREAD_MESSAGE_LIMIT);
+      return {
+        ...primaryReply,
+        conversationId,
+        unread: sortedReplies.some((reply) => Boolean(reply && reply.unread)),
+        threadMessages,
+      };
+    })
+    .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
 }
 
 function normalizeClassifierText(value) {
@@ -356,6 +433,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
+    const candidateLimit = Math.min(CAMPAIGN_REPLY_LIMIT, safeLimit * 2);
     let replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
@@ -363,7 +441,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
         return buildCampaignReply(message, customer || null);
       })
       .filter(Boolean)
-      .slice(0, safeLimit);
+      .slice(0, candidateLimit);
 
     const sentMessagesResult = await mailboxIndexStore.listMessagesForAccounts({
       accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
@@ -372,7 +450,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
     }).catch(() => []);
     const sentMessages = Array.isArray(sentMessagesResult) ? sentMessagesResult : [];
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') {
-      return attachSentThreadMessages(replies, sentMessages);
+      return attachSentThreadMessages(replies, sentMessages).slice(0, safeLimit);
     }
     const hydratedReplies = await mailboxIndexStore.hydrateMessageBodies({ messages: replies });
     replies = (Array.isArray(hydratedReplies) ? hydratedReplies : replies)
@@ -386,7 +464,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: batch });
       hydratedSentMessages.push(...(Array.isArray(hydrated) ? hydrated : batch));
     }
-    return attachSentThreadMessages(replies, hydratedSentMessages);
+    return attachSentThreadMessages(replies, hydratedSentMessages).slice(0, safeLimit);
   }
 
   return {
@@ -404,6 +482,8 @@ module.exports = {
   buildCampaignReply,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
+  getCampaignConversationId,
+  getMessageReferenceIds,
   isAutomatedCampaignReply,
   isCampaignReplySubject,
   isSentReplyForMessage,

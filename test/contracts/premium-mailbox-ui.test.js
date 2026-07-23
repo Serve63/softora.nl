@@ -167,9 +167,34 @@ test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () =
   assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw eerdere mail'));
 });
 
+test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conversatie', () => {
+  const html = renderMailboxBodyForTest(
+    'Dank voor je antwoord. Kun je ons daar meer over vertellen?',
+    [],
+    {
+      replyMailId: 'inbox:37476',
+      mail: {
+        accountEmail: 'martijnven123@gmail.com',
+        threadMessages: [{
+          id: 'inbox:37467',
+          folder: 'inbox',
+          accountEmail: 'martijnven123@gmail.com',
+          date: '2026-07-22T15:36:03.000Z',
+          body: 'Mag ik vragen waar jij het liefst je sites mee bouwt?',
+        }],
+      },
+    }
+  );
+
+  assert.match(html, /Eerder ontvangen/);
+  assert.match(html, /Mag ik vragen waar jij het liefst je sites mee bouwt\?/);
+  assert.doesNotMatch(html, /Jouw antwoord/);
+  assert.ok(html.indexOf('Eerder ontvangen') < html.indexOf('Beantwoorden'));
+});
+
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723j/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723d/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723e/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -243,7 +268,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723j"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723j"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -379,6 +404,51 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
     campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
     ['human']
   );
+});
+
+test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespreksvak', () => {
+  const originalMessageId = '<campaign-start@example.test>';
+  const firstReplyMessageId = '<first-reply@example.test>';
+  const messages = [
+    {
+      id: 'martijnven123@gmail.com|inbox:37476',
+      mailboxId: 'inbox:37476',
+      folder: 'inbox',
+      accountEmail: 'martijnven123@gmail.com',
+      from: 'Seats 2 Meet Station Den Bosch',
+      email: 'info@seats2meetstationdenbosch.nl',
+      subject: 'Re: Kleine vraag over jullie website',
+      messageId: '<latest-reply@example.test>',
+      inReplyTo: '<martijn-answer@example.test>',
+      references: `${originalMessageId} ${firstReplyMessageId} <martijn-answer@example.test>`,
+      receivedAt: '2026-07-23T09:31:11.000Z',
+      unread: true,
+      campaign: { account: 'martijnven123@gmail.com' },
+    },
+    {
+      id: 'martijnven123@gmail.com|inbox:37467',
+      mailboxId: 'inbox:37467',
+      folder: 'inbox',
+      accountEmail: 'martijnven123@gmail.com',
+      from: 'Seats 2 Meet Station Den Bosch',
+      email: 'info@seats2meetstationdenbosch.nl',
+      subject: 'Re: Kleine vraag over jullie website',
+      messageId: firstReplyMessageId,
+      inReplyTo: originalMessageId,
+      references: originalMessageId,
+      receivedAt: '2026-07-22T15:36:03.000Z',
+      campaign: { account: 'martijnven123@gmail.com' },
+    },
+  ];
+
+  const grouped = campaignInboxModule.filterMessages(messages, 'martijn');
+
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].mailboxId, 'inbox:37476');
+  assert.equal(grouped[0].unread, true);
+  assert.equal(grouped[0].threadMessages.length, 1);
+  assert.equal(grouped[0].threadMessages[0].mailboxId, 'inbox:37467');
+  assert.equal(grouped[0].threadMessages[0].folder, 'inbox');
 });
 
 test('coldmail berichten met hetzelfde IMAP-id blijven per mailboxaccount uniek', () => {
