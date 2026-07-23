@@ -116,45 +116,30 @@ function loadMailboxHelpersForTest(options = {}) {
   };
   const context = {
     URL,
+    URLSearchParams,
     console,
     document,
     window,
     clearTimeout() {},
     setTimeout() { return 0; },
-    fetch: async () => ({
+    fetch: options.fetch || (async () => ({
       ok: true,
       json: async () => ({
         ok: true,
         accounts: [{ email: 'serve@softora.nl', imapConfigured: true, smtpConfigured: true }],
         messages: [],
       }),
-    }),
+    })),
   };
   const source = readScript().replace(
     'bindMailboxActions();',
-    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, formatMailDate, display: window.SoftoraMailboxDisplay, openMail, setMails(value) { mails = value; }, getActiveMail() { return activeMail; }, getElement(id) { return document.getElementById(id); } }; bindMailboxActions();'
+    'window.__mailboxTest = { renderMailBody, normalizeMailboxApiMessage, formatMailDate, display: window.SoftoraMailboxDisplay, index: window.SoftoraMailboxIndex, openMail, setMails(value) { mails = value; }, getActiveMail() { return activeMail; }, getElement(id) { return document.getElementById(id); } }; bindMailboxActions();'
   );
   vm.createContext(context);
   vm.runInContext(readDisplayScript(), context);
   vm.runInContext(readIndexScript(), context);
   vm.runInContext(source, context);
   return context.window.__mailboxTest;
-}
-
-function loadMailboxIndexForTest(fetchImpl) {
-  const statusElement = { hidden: false, textContent: '' };
-  const context = {
-    URLSearchParams,
-    document: {
-      addEventListener() {},
-      getElementById() { return statusElement; },
-    },
-    fetch: fetchImpl,
-    window: {},
-  };
-  vm.createContext(context);
-  vm.runInContext(readIndexScript(), context);
-  return context.window.SoftoraMailboxIndex;
 }
 
 function renderMailboxBodyForTest(body, images, options) {
@@ -1205,7 +1190,18 @@ test('premium mailbox vervangt het oude detail direct wanneer een nieuwe mail no
 test('premium mailbox laat een late body-response nooit een nieuwere selectie overschrijven', async () => {
   let resolveResponse;
   const response = new Promise((resolve) => { resolveResponse = resolve; });
-  const mailboxIndex = loadMailboxIndexForTest(() => response);
+  const mailbox = loadMailboxHelpersForTest({
+    fetch: async (url) => String(url).startsWith('/api/mailbox/message?')
+      ? response
+      : {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            accounts: [{ email: 'serve@softora.nl', imapConfigured: true, smtpConfigured: true }],
+            messages: [],
+          }),
+        },
+  });
   const mail = {
     id: 'serve:inbox:1',
     preview: 'Voorbeeld',
@@ -1216,7 +1212,7 @@ test('premium mailbox laat een late body-response nooit een nieuwere selectie ov
   };
   let activeMail = mail.id;
   const opened = [];
-  const loading = mailboxIndex.loadBody({
+  const loading = mailbox.index.loadBody({
     id: mail.id,
     requestId: '1',
     getMail: () => mail,
