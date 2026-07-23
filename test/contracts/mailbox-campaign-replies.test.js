@@ -42,6 +42,15 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
   }), true);
   assert.equal(isAutomatedCampaignReply({
     subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dit is een automatisch email van info@sushidetoren.com.',
+    body: 'We hebben uw email in goede orde ontvangen en proberen uw email binnen 24 uur te beantwoorden.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dank voor je mail. De automatische e-mail op onze website werkt inderdaad nog niet goed.',
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Re: Kleine vraag over jullie website',
     preview: 'Dank voor je ontwerp. Wij werken al met een andere partij en hebben geen interesse.',
   }), false);
 });

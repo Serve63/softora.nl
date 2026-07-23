@@ -245,6 +245,8 @@ function isAutomatedCampaignReply(message) {
 
   const automatedSubjectPatterns = [
     /\bautomatisch antwoord\b/,
+    /\bautomatische (?:e-?mail|mail|reactie|ontvangstbevestiging)\b/,
+    /\bontvangstbevestiging\b/,
     /\bautomatic (?:reply|response)\b/,
     /\bauto[ -]?reply\b/,
     /\bout[ -]?of[ -]?office\b/,
@@ -259,7 +261,8 @@ function isAutomatedCampaignReply(message) {
   ];
   const automatedContentPatterns = [
     /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
-    /\bdit is een automatisch bericht\b/,
+    /\bdit is (?:een )?automatisch(?:e)? (?:e-?mail|mail|bericht|antwoord|reactie|ontvangstbevestiging)\b/,
+    /\bthis is an automated (?:e-?mail|mail|message|reply|response)\b/,
     /\bwe would like to acknowledge that we have received your request\b/,
     /\bis ons kantoor gesloten\b/,
     /\bop dit moment ben ik op vakantie\b/,
