@@ -2,6 +2,13 @@ const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   normalizeWebsitePreviewReferenceImage: normalizeWebsitePreviewReferenceImageDefault,
 } = require('./ai-reference-image');
+const {
+  inferWebsitePreviewReferenceFileName,
+  isLikelyUsefulReferenceImageUrl,
+  isRetryableReferenceHttpStatus,
+  resolveHomepageScreenshotCandidateCount,
+  resolveReferenceFetchAttempts,
+} = require('./ai-reference-fetch');
 
 function createAiRemoteService(deps = {}) {
   const {
@@ -909,33 +916,6 @@ function createAiRemoteService(deps = {}) {
     return '';
   }
 
-  function isLikelyUsefulReferenceImageUrl(urlRaw) {
-    const url = normalizeString(urlRaw || '').toLowerCase();
-    if (!url) return false;
-    if (/^data:|^blob:|^javascript:/i.test(url)) return false;
-    if (/\.(?:svg|ico)(?:[?#].*)?$/i.test(url)) return false;
-    return /^https?:\/\//i.test(url);
-  }
-
-  function inferWebsitePreviewReferenceFileName(urlRaw, index, mimeTypeRaw) {
-    const mimeType = normalizeString(mimeTypeRaw || '').toLowerCase();
-    const extension =
-      mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-    let base = '';
-    try {
-      const parsed = new URL(String(urlRaw || ''));
-      base = normalizeString(parsed.pathname.split('/').filter(Boolean).pop() || '')
-        .replace(/\.[a-z0-9]+$/i, '')
-        .replace(/[^a-z0-9._-]+/gi, '-')
-        .replace(/-{2,}/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 80);
-    } catch {
-      base = '';
-    }
-    return `${base || `website-reference-${index + 1}`}.${extension}`;
-  }
-
   async function fetchWebsitePreviewReferenceImages(scan = {}) {
     const referenceMode = normalizeString(
       scan.referenceImageMode || scan.websitePreviewReferenceMode || ''
@@ -960,17 +940,29 @@ function createAiRemoteService(deps = {}) {
     const pageUrl = normalizeString(scan.sourceUrl || scan.url || '');
     const isHomepageScreenshot = referenceMode === 'homepage-screenshot';
     const maxImages = isHomepageScreenshot ? 1 : 3;
-    const maxFetchAttempts = isHomepageScreenshot ? 3 : 1;
+    const screenshotCandidateCount = resolveHomepageScreenshotCandidateCount({
+      candidateCount: candidates.length,
+      configuredCount: scan.homepageScreenshotReferenceUrlCount,
+      isHomepageScreenshot,
+    });
     const rejectionDiagnostics = [];
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (rawImages.length >= maxImages) break;
       const candidateUrl = candidates[index];
       if (!isLikelyUsefulReferenceImageUrl(candidateUrl)) continue;
+      const maxFetchAttempts = resolveReferenceFetchAttempts({
+        index,
+        isHomepageScreenshot,
+        screenshotCandidateCount,
+      });
+      let finalRejectionReason = 'unknown';
+      let acceptedCandidate = false;
 
       for (let attempt = 0; attempt < maxFetchAttempts; attempt += 1) {
         let accepted = false;
         let rejectionReason = 'unknown';
+        let retryableRejection = true;
         try {
           const safeUrl = await assertWebsitePreviewUrlIsPublic(candidateUrl);
           const { response, bytes } = await fetchBinaryWithTimeout(
@@ -1012,25 +1004,32 @@ function createAiRemoteService(deps = {}) {
               }
             }
           } else {
-            rejectionReason = `http:${Number(response?.status || 0) || 0}`;
+            const status = Number(response?.status || 0) || 0;
+            rejectionReason = `http:${status}`;
+            retryableRejection = isRetryableReferenceHttpStatus(status);
           }
         } catch (error) {
           rejectionReason = `error:${normalizeString(error?.name || 'Error').slice(0, 40)}`;
           /* Retry screenshot warming below; optional references may still fall back to prompt-only. */
         }
-        if (accepted) break;
-        if (attempt === maxFetchAttempts - 1) {
-          let provider = 'unknown';
-          try {
-            provider = new URL(candidateUrl).hostname;
-          } catch (_error) {
-            provider = 'invalid-url';
-          }
-          rejectionDiagnostics.push({ provider, reason: rejectionReason });
+        finalRejectionReason = rejectionReason;
+        if (accepted) {
+          acceptedCandidate = true;
+          break;
         }
+        if (!retryableRejection) break;
         if (attempt < maxFetchAttempts - 1) {
           await waitForWebsitePreviewScreenshotRetry();
         }
+      }
+      if (!acceptedCandidate) {
+        let provider = 'unknown';
+        try {
+          provider = new URL(candidateUrl).hostname;
+        } catch (_error) {
+          provider = 'invalid-url';
+        }
+        rejectionDiagnostics.push({ provider, reason: finalRejectionReason });
       }
     }
 

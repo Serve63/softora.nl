@@ -434,6 +434,7 @@ function createSeoCore(deps = {}) {
     if (!url) return false;
     if (/^data:|^blob:|^javascript:/i.test(url)) return false;
     if (/\.(?:svg|ico)(?:[?#].*)?$/i.test(url)) return false;
+    if (/(?:^|[\/_.-])(?:no[-_]?image|placeholder|spacer|blank|tracking[-_]?pixel)(?:[\/_.?#-]|$)/i.test(url)) return false;
     return /^https?:\/\//i.test(url);
   }
 
