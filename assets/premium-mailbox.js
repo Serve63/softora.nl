@@ -331,7 +331,7 @@ function buildMailboxBodySections(value) {
     sections.push({ type: currentType, lines: currentLines.slice() });
     currentLines = [];
   }
-  lines.forEach((line) => {
+  window.SoftoraMailboxDisplay.joinBrokenWebdesignLinkLines(lines).forEach((line) => {
     const rawLine = String(line || '');
     const trimmed = rawLine.trim();
     const isReplyHeader = isMailboxReplyHeaderLine(trimmed);

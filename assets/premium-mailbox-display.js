@@ -99,6 +99,34 @@
     return [received, quoted].filter(Boolean).join('\n\n');
   }
 
+  function joinBrokenWebdesignLinkLines(lines) {
+    const source = (Array.isArray(lines) ? lines : []).map((line) => String(line || ''));
+    const result = [];
+    for (let index = 0; index < source.length; index += 1) {
+      const current = source[index].trim();
+      if (!/^deze link\s*\[https?:\/\/[^\]]+\]$/i.test(current)) {
+        result.push(source[index]);
+        continue;
+      }
+      let nextIndex = index + 1;
+      while (nextIndex < source.length && !source[nextIndex].trim()) nextIndex += 1;
+      if (!/^bekijken(?:\s*🎨)?$/i.test(source[nextIndex] || '')) {
+        result.push(source[index]);
+        continue;
+      }
+      while (result.length && !result[result.length - 1].trim()) result.pop();
+      const linkedCopy = `${current} ${source[nextIndex].trim()}`;
+      const previousIndex = result.length - 1;
+      if (previousIndex >= 0 && /\bvia\s*$/i.test(result[previousIndex].trim())) {
+        result[previousIndex] = `${result[previousIndex].trimEnd()} ${linkedCopy}`;
+      } else {
+        result.push(linkedCopy);
+      }
+      index = nextIndex;
+    }
+    return result;
+  }
+
   function trimOwnQuotedMailLines(lines, ownAuthorPattern) {
     const source = (Array.isArray(lines) ? lines : []).map((line) => String(line || ''));
     const separatorIndex = source.findIndex((line) => line.trim() === '--');
@@ -223,6 +251,7 @@
     isSentMessage,
     isGmailSignatureAssetUrl,
     isLabelledUrlMatch,
+    joinBrokenWebdesignLinkLines,
     normalizeCollapsedReplyStructure,
     trimOwnQuotedMailLines,
     removeDuplicateSignatureLeadLines,
