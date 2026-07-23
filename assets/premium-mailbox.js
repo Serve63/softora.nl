@@ -9,14 +9,10 @@ let mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
 ];
 const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
-const getColor = str => {
-  const value = String(str || '?');
-  return avatarColors[value.charCodeAt(0) % avatarColors.length];
-};
+const getColor = str => avatarColors[String(str || '?').charCodeAt(0) % avatarColors.length];
 const initials = name => {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  const value = parts.map(word => word[0]).join('').toUpperCase();
-  return value || '?';
+  return parts.map(word => word[0]).join('').toUpperCase() || '?';
 };
 let toastTimer = 0;
 function escapeHtml(value) {
@@ -670,7 +666,7 @@ async function syncMailboxInBackground() {
 async function loadMailboxMessages(options = {}) {
   const wrap = document.getElementById('mail-items'); if (wrap) wrap.setAttribute('aria-busy', 'true');
   try { const campaignResult = await window.SoftoraMailboxCampaignInbox?.load(activeFolder, normalizeMailboxApiMessage, null, { skipBootstrap: options.skipPageBootstrap === true });
-    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = campaignResult.messages; renderList({ openLatest: options.openLatest !== false }); window.SoftoraMailboxIndex?.setStatus(''); if (wrap) wrap.setAttribute('aria-busy', 'false'); if (campaignResult.fromBootstrap) void loadMailboxMessages({ skipPageBootstrap: true, skipBackgroundSync: true, openLatest: false, preserveOnError: true }); return; }
+    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = campaignResult.messages; window.SoftoraMailboxImages?.prewarm?.(mails); renderList({ openLatest: options.openLatest !== false }); window.SoftoraMailboxIndex?.setStatus(''); if (wrap) wrap.setAttribute('aria-busy', 'false'); if (campaignResult.fromBootstrap) void loadMailboxMessages({ skipPageBootstrap: true, skipBackgroundSync: true, openLatest: false, preserveOnError: true }); return; }
     const response = await fetch(`/api/mailbox/messages?account=${encodeURIComponent(activeMailboxAccount)}&folder=${encodeURIComponent(activeFolder)}&limit=50`, {
       credentials: 'same-origin',
       cache: 'no-store',
@@ -682,6 +678,7 @@ async function loadMailboxMessages(options = {}) {
     }
     mailboxSyncState = data?.sync && typeof data.sync === 'object' ? data.sync : null;
     mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
+    window.SoftoraMailboxImages?.prewarm?.(mails);
     renderList({ openLatest: options.openLatest !== false });
     void hydrateMailboxOutreachContextsInBackground().catch(() => {});
     if (mailboxSyncState?.warming) {
@@ -816,6 +813,7 @@ function openMail(id, options = {}) {
   m.unread = false;
   renderList();
   if (wasUnread) void persistMailReadState(m);
+  if (!options.imagesPrepared && window.SoftoraMailboxImages?.stage?.(m.bodyImages, () => String(activeMail) === String(m.id), () => openMail(m.id, { skipBodyFetch: true, imagesPrepared: true }))) return;
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
