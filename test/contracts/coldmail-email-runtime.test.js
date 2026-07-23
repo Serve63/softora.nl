@@ -20,20 +20,23 @@ test('production mail runtime uses direct source without loader monkey patches',
     assert.doesNotMatch(source, /coldmail-email-hotfix|Module\._extensions/);
   }
 
+  const configSource = read('server/config/coldmail-campaign.js');
+  assert.match(configSource, /website \{\{website\}\} tegen/);
+  assert.doesNotMatch(configSource, /website, \{\{website\}\}, tegen/);
+  assert.match(configSource, /Je vindt het ontwerp in de bijlage bij deze e-mail\./);
+
   const source = read('server/services/coldmail-campaign.js');
-  assert.match(source, /website \{\{website\}\} tegen/);
-  assert.doesNotMatch(source, /website, \{\{website\}\}, tegen/);
   assert.match(source, /font-weight:400/);
   assert.match(source, /return renderTextWithUnlinkedWebsiteDomain\(cleanLine, options\.websiteDomain\)/);
   assert.match(source, /includeMockup: true/);
   assert.match(source, /attachments\.length !== 2/);
   assert.match(source, /'Mockup'/);
   assert.match(source, /'Webdesign'/);
-  assert.match(source, /Je vindt het ontwerp in de bijlage bij deze e-mail\./);
   assert.match(source, /max-width:600px/);
   assert.doesNotMatch(source, /renderColdmailDomainToken|softora-desktop-nowrap/);
 
   for (const relativePath of [
+    'server/config/coldmail-campaign.js',
     'server/services/coldmail-campaign.js',
     'server/services/mailbox.js',
     'server/services/instantly-outreach.js',

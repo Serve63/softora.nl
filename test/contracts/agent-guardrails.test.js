@@ -9,6 +9,7 @@ const {
   countDiffLines,
   isAllowedNewServerPath,
   isApprovedBrowserStoragePath,
+  isBackendProductionPath,
   isFrontendProductionPath,
   isHighRiskPath,
   isPremiumAuthUsersWriteScanPath,
@@ -273,6 +274,44 @@ test('agent guardrails prevent oversized frontend files from growing further', (
   assert.equal(coveredException.length, 0);
 });
 
+test('agent guardrails prevent oversized backend modules from growing further', () => {
+  const violations = buildGuardrailViolations({
+    changedFiles: ['server/services/coldmail-campaign.js', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['server/services/coldmail-campaign.js'],
+    oversizedBackendGrowthViolations: [
+      'server/services/coldmail-campaign.js (9620 regels; netto +9; limiet 1200 regels en max +0)',
+    ],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 25,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /Grote backendmodule groeide verder/i);
+
+  const coveredException = buildGuardrailViolations({
+    changedFiles: ['server/services/coldmail-campaign.js', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['server/services/coldmail-campaign.js'],
+    oversizedBackendGrowthViolations: [
+      'server/services/coldmail-campaign.js (9620 regels; netto +9; limiet 1200 regels en max +0)',
+    ],
+    allowOversizedBackendGrowth: true,
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 25,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(coveredException.length, 0);
+});
+
 test('agent guardrails require targeted tests for protected quality gates and sidebar shell', () => {
   const workflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
   const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
@@ -527,6 +566,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(guardrailsSource, /\['merge-base', baseRef, 'HEAD'\]/);
   assert.match(guardrailsSource, /\['diff', '--name-only', '--diff-filter=ACMR', branchDiffBase, '--'\]/);
   assert.match(guardrailsSource, /\['diff', '--unified=0', branchDiffBase, '--', filePath\]/);
+  assert.match(guardrailsSource, /GUARDRAILS_MAX_BACKEND_FILE_LINES/);
+  assert.match(guardrailsSource, /ALLOW_OVERSIZED_BACKEND_GROWTH/);
   assert.match(guardrailsSource, /function getOutboundDuplicateSafetyViolations\(\)/);
   assert.match(guardrailsSource, /body\.limit niet doorgeven aan legacy Instantly sync-routes/);
   assert.match(guardrailsSource, /Instantly \/leads\/add mag niet bereikbaar zijn zonder centrale outbound-reservering/);
@@ -586,6 +627,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(agentsSource, /allerlaatste actuele `origin\/main`/);
   assert.match(agentsSource, /Deploy nooit vanuit een oude lokale kopie/);
   assert.match(agentsSource, /recente live wijzigingen behouden blijven/);
+  assert.match(agentsSource, /Backendmodules boven 1200 regels mogen standaard niet netto groeien/);
   assert.match(agentsSource, /## Instantly-leads toevoegen/);
   assert.match(agentsSource, /POST \/api\/outreach\/provider-upload/);
   assert.match(agentsSource, /Maak nooit handmatig een losse CSV/);
@@ -614,11 +656,17 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(protocolSource, /allerlaatste actuele `origin\/main`/);
   assert.match(protocolSource, /Oude lokale kopieen/);
   assert.match(protocolSource, /Recente live wijzigingen mogen niet verdwijnen/);
+  assert.match(protocolSource, /Oversized backendmodules mogen standaard niet netto groeien/);
 });
 
 test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isAllowedNewServerPath('server/services/new-service.js'), true);
   assert.equal(isAllowedNewServerPath('server/helpers/new-helper.js'), false);
+  assert.equal(isBackendProductionPath('server/services/ui-state.js'), true);
+  assert.equal(isBackendProductionPath('api/_app-handler.js'), true);
+  assert.equal(isBackendProductionPath('lib/premium-users-store.js'), true);
+  assert.equal(isBackendProductionPath('assets/coldcalling-dashboard.js'), false);
+  assert.equal(isBackendProductionPath('server.js'), false);
   assert.equal(isFrontendProductionPath('premium-ai-coldmailing.html'), true);
   assert.equal(isFrontendProductionPath('assets/coldcalling-dashboard.js'), true);
   assert.equal(isFrontendProductionPath('server/services/ui-state.js'), false);

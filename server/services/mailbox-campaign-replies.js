@@ -48,6 +48,10 @@ function isAutomatedCampaignReply(message) {
     /\bauto[ -]?reply\b/,
     /\bout[ -]?of[ -]?office\b/,
     /\bafwezigheid(?:sbericht|melding)?\b/,
+    /\breturned mail\b/,
+    /\bundeliverable\b/,
+    /\bmail delivery (?:failure|failed)\b/,
+    /\bdelivery status notification\b/,
     /^email received\b/,
     /^bericht ontvangen\b/,
   ];
@@ -61,6 +65,14 @@ function isAutomatedCampaignReply(message) {
   return (
     automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
     automatedContentPatterns.some((pattern) => pattern.test(content))
+  );
+}
+
+function isCampaignReplySubject(message) {
+  const subject = normalizeClassifierText(message && message.subject);
+  return (
+    subject.includes('kleine vraag over jullie website') ||
+    subject.includes('nieuw webdesign')
   );
 }
 
@@ -128,9 +140,10 @@ function isDefinitiveOutreachCustomer(customer) {
   return definitive.includes(outreachStatus) || definitive.includes(databaseStatus);
 }
 
-function getCustomerCompany(customer, fallbackEmail) {
+function getCustomerCompany(customer, fallbackName, fallbackEmail) {
   return (
     normalizeText(customer && (customer.bedrijf || customer.company || customer.companyName || customer.naam)) ||
+    normalizeText(fallbackName) ||
     normalizeEmail(fallbackEmail) ||
     'Onbekend bedrijf'
   );
@@ -139,7 +152,7 @@ function getCustomerCompany(customer, fallbackEmail) {
 function buildCampaignReply(message, customer) {
   const account = normalizeEmail(message && message.accountEmail);
   const email = normalizeEmail(message && message.email);
-  const company = getCustomerCompany(customer, email);
+  const company = getCustomerCompany(customer, message && message.from, email);
   const customerId = normalizeText(customer && (customer.id || customer.customerId));
   const status = normalizeOutreachStatus(customer && customer.outreachStatus) || 'reactie_ontvangen';
   const actionRequired = !isDefinitiveOutreachCustomer(customer);
@@ -154,7 +167,7 @@ function buildCampaignReply(message, customer) {
       status,
       actionRequired,
     },
-    outreach: actionRequired
+    outreach: actionRequired && customerId
       ? {
           customerId,
           company,
@@ -229,7 +242,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
     const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
-        return customer ? buildCampaignReply(message, customer) : null;
+        if (!customer && !isCampaignReplySubject(message)) return null;
+        return buildCampaignReply(message, customer || null);
       })
       .filter(Boolean)
       .slice(0, safeLimit);
@@ -253,6 +267,7 @@ module.exports = {
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
+  isCampaignReplySubject,
   isOwnMailboxCampaignCustomer,
   isWebdesignCampaignCustomer,
   normalizeOutreachStatus,

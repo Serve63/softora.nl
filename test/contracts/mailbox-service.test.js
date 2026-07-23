@@ -35,11 +35,13 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   let activeMailbox = '';
   const appendedMessages = [];
   const movedMessages = [];
+  const searchQueries = [];
   return {
     usable: true,
     lockedMailboxes: [],
     appendedMessages,
     movedMessages,
+    searchQueries,
     async connect() {},
     async list() {
       return boxes;
@@ -52,7 +54,8 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
       }
       return { release() {} };
     },
-    async search() {
+    async search(query) {
+      searchQueries.push(query);
       return (messagesByMailbox[activeMailbox] || []).map((message) => message.uid);
     },
     fetch(uids) {
@@ -969,6 +972,8 @@ test('mailbox service resolves sent folders through IMAP special-use metadata', 
   const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
 
   assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
+  // ImapFlow compiles this object to SEARCH ALL; the old array input produced an empty query.
+  assert.deepEqual(client.searchQueries, [{ all: true }]);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].subject, 'Verzonden bericht');
   assert.equal(messages[0].from, 'Serve');
@@ -2545,6 +2550,26 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
           email: 'klant@example.nl',
           date: '2026-07-17T10:00:00.000Z',
         },
+        {
+          id: 'inbox:91',
+          accountEmail: 'servecreusen7@gmail.com',
+          folder: 'inbox',
+          email: 'persoonlijk.antwoord@example.nl',
+          from: 'Marie-José',
+          subject: 'Re: Kleine vraag over jullie website',
+          preview: 'Bedankt voor je ontwerp.',
+          date: '2026-07-21T10:00:00.000Z',
+        },
+        {
+          id: 'inbox:92',
+          accountEmail: 'servecreusen7@gmail.com',
+          folder: 'inbox',
+          email: 'postmaster@example.nl',
+          from: 'Postmaster',
+          subject: 'Undeliverable: Kleine vraag over jullie website',
+          preview: 'Delivery failed.',
+          date: '2026-07-22T10:00:00.000Z',
+        },
       ].reverse(),
       hydrateMessageBodies: async ({ messages }) => {
         hydratedReplyIds = messages.map((message) => message.id);
@@ -2597,31 +2622,38 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
-  assert.equal(res.body.messages.length, 2);
-  assert.equal(res.body.messages[0].id, 'inbox:42');
-  assert.equal(res.body.messages[0].accountEmail, 'serve@softora.nl');
-  assert.equal(res.body.messages[0].campaign.company, 'Studio Noord');
+  assert.equal(res.body.messages.length, 3);
+  assert.equal(res.body.messages[0].id, 'inbox:91');
+  assert.equal(res.body.messages[0].campaign.company, 'Marie-José');
+  assert.equal(res.body.messages[0].campaign.customerId, '');
   assert.equal(res.body.messages[0].campaign.actionRequired, true);
-  assert.equal(res.body.messages[0].outreach.customerId, 'softora-pending');
-  assert.equal(res.body.messages[0].body, 'Volledige inhoud voor inbox:42');
-  assert.equal(res.body.messages[1].campaign.actionRequired, false);
-  assert.equal(res.body.messages[1].outreach, null);
+  assert.equal(res.body.messages[0].outreach, null);
+  assert.equal(res.body.messages[1].id, 'inbox:42');
+  assert.equal(res.body.messages[1].accountEmail, 'serve@softora.nl');
+  assert.equal(res.body.messages[1].campaign.company, 'Studio Noord');
+  assert.equal(res.body.messages[1].campaign.actionRequired, true);
+  assert.equal(res.body.messages[1].outreach.customerId, 'softora-pending');
+  assert.equal(res.body.messages[1].body, 'Volledige inhoud voor inbox:42');
+  assert.equal(res.body.messages[2].campaign.actionRequired, false);
+  assert.equal(res.body.messages[2].outreach, null);
   assert.equal(res.body.sync.source, 'campaign-replies-index');
   assert.deepEqual(customerLookup.emails.sort(), [
     'contact@dekroon.nl',
     'info@studionoord.nl',
     'klant@example.nl',
     'lead@example.nl',
+    'persoonlijk.antwoord@example.nl',
   ]);
   assert.equal(customerLookup.bypassReadFailureCooldown, true);
-  assert.deepEqual(hydratedReplyIds, ['inbox:42', 'inbox:77']);
+  assert.deepEqual(hydratedReplyIds, ['inbox:91', 'inbox:42', 'inbox:77']);
   assert.equal(snapshotWrite.scope, 'premium_mailbox_campaign_snapshot');
   assert.equal(snapshotWrite.meta.source, 'mailbox-campaign-replies');
   const persistedSnapshot = JSON.parse(
     snapshotWrite.values.softora_mailbox_campaign_snapshot_v2
   );
-  assert.equal(persistedSnapshot.messages[0].from, 'Studio Noord');
-  assert.equal(persistedSnapshot.messages[0].body, 'Volledige inhoud voor inbox:42');
+  assert.equal(persistedSnapshot.messages[0].from, 'Marie-José');
+  assert.equal(persistedSnapshot.messages[1].from, 'Studio Noord');
+  assert.equal(persistedSnapshot.messages[1].body, 'Volledige inhoud voor inbox:42');
 });
 
 test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {

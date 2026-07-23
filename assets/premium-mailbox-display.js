@@ -99,6 +99,18 @@
     return [received, quoted].filter(Boolean).join('\n\n');
   }
 
+  function trimOwnQuotedMailLines(lines, ownAuthorPattern) {
+    const source = (Array.isArray(lines) ? lines : []).map((line) => String(line || ''));
+    const separatorIndex = source.findIndex((line) => line.trim() === '--');
+    if (separatorIndex < 0 || !(ownAuthorPattern instanceof RegExp)) return source;
+    const ownMailBeforeSeparator = source.slice(0, separatorIndex).join('\n');
+    ownAuthorPattern.lastIndex = 0;
+    if (!ownAuthorPattern.test(ownMailBeforeSeparator)) return source;
+    const trimmed = source.slice(0, separatorIndex);
+    while (trimmed.length && !trimmed[trimmed.length - 1].trim()) trimmed.pop();
+    return trimmed;
+  }
+
   function isSentMessage(mail, options) {
     return String(mail && (mail.folder || (options && options.activeFolder)) || '').toLowerCase() === 'sent';
   }
@@ -212,6 +224,7 @@
     isGmailSignatureAssetUrl,
     isLabelledUrlMatch,
     normalizeCollapsedReplyStructure,
+    trimOwnQuotedMailLines,
     removeDuplicateSignatureLeadLines,
     getListPrimaryText,
     getDetailPrimaryText,

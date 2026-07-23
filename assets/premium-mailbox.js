@@ -455,7 +455,7 @@ function renderMailboxBodySection(section, imageState) {
     const hasMeta = isMailboxReplyHeaderLine(firstLine);
     const quoteLabel = hasMeta && isMailboxOwnReplyHeaderLine(firstLine) ? 'Jouw eerdere mail' : 'Eerdere mail';
     const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
-    const quoteLines = hasMeta ? section.lines.slice(1) : section.lines;
+    const quoteLines = window.SoftoraMailboxDisplay.trimOwnQuotedMailLines(hasMeta ? section.lines.slice(1) : section.lines, quoteLabel === 'Jouw eerdere mail' ? MAILBOX_OWN_REPLY_AUTHOR_PATTERN : null);
     return `
       <section class="detail-mail-section detail-mail-section-quote">
         <div class="detail-mail-section-label">${quoteLabel}</div>
