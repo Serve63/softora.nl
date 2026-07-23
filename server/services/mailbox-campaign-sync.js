@@ -1,19 +1,55 @@
 const { CAMPAIGN_MAILBOX_ACCOUNTS } = require('./mailbox-campaign-replies');
 const { CAMPAIGN_HISTORY_SUBJECT_TERMS } = require('./mailbox-campaign-history-sync');
 
+const PERSONAL_MAILBOX_DOMAINS = new Set([
+  'aol.com',
+  'gmail.com',
+  'googlemail.com',
+  'hotmail.com',
+  'icloud.com',
+  'live.com',
+  'mac.com',
+  'me.com',
+  'msn.com',
+  'outlook.com',
+  'proton.me',
+  'protonmail.com',
+  'tuta.com',
+  'tutamail.com',
+  'yahoo.com',
+  'ymail.com',
+]);
+
+function isCampaignSubject(message = {}) {
+  const subject = String(message?.subject || '').toLowerCase();
+  return CAMPAIGN_HISTORY_SUBJECT_TERMS.some((term) => subject.includes(term.toLowerCase()));
+}
+
 function collectCampaignThreadReferenceIds(messages = []) {
-  const subjectTerms = CAMPAIGN_HISTORY_SUBJECT_TERMS.map((term) => term.toLowerCase());
   return Array.from(
     new Set(
       (Array.isArray(messages) ? messages : [])
-        .filter((message) => {
-          const subject = String(message?.subject || '').toLowerCase();
-          return subjectTerms.some((term) => subject.includes(term));
-        })
+        .filter(isCampaignSubject)
         .map((message) => String(message?.messageId || '').trim())
         .filter(Boolean)
     )
   );
+}
+
+function collectCampaignThreadRecipientTerms(messages = []) {
+  const terms = new Set();
+  (Array.isArray(messages) ? messages : []).filter(isCampaignSubject).forEach((message) => {
+    const emailMatch = String(message?.senderEmail || '')
+      .trim()
+      .toLowerCase()
+      .match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+    const email = emailMatch ? emailMatch[0] : '';
+    if (!email) return;
+    terms.add(email);
+    const domain = email.split('@')[1] || '';
+    if (domain && !PERSONAL_MAILBOX_DOMAINS.has(domain)) terms.add(domain);
+  });
+  return Array.from(terms);
 }
 
 function selectMailboxSyncAccounts({
@@ -76,6 +112,7 @@ function createMailboxSyncService({
             })
           : 0;
       let threadReferenceIds = [];
+      let threadRecipientTerms = [];
       let indexedUids = [];
       if (
         campaignOnly &&
@@ -93,6 +130,7 @@ function createMailboxSyncService({
             folder: 'sent',
           })) || [];
         threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
+        threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
         indexedUids = indexedSentMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
       }
       const messages = await fetchMessagesFromImap({
@@ -102,6 +140,7 @@ function createMailboxSyncService({
         campaignHistory: campaignOnly,
         oldestIndexedCampaignUid,
         threadReferenceIds,
+        threadRecipientTerms,
         indexedUids,
       });
       const saved = await mailboxIndexStore.upsertMessages({
@@ -129,6 +168,7 @@ function createMailboxSyncService({
         historyBackfill: Boolean(campaignOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
         targetedThreadReferences: threadReferenceIds.length,
+        targetedThreadRecipients: threadRecipientTerms.length,
       };
     } catch (error) {
       await mailboxIndexStore.finishSync({
@@ -193,6 +233,7 @@ function createMailboxSyncService({
 }
 
 module.exports = {
+  collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,
   selectMailboxSyncAccounts,
