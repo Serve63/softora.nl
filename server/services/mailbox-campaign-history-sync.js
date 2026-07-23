@@ -105,7 +105,8 @@ function selectMailboxSyncUids({
   const indexedUidSet = new Set(normalizeUidList(indexedUids));
   const missingPriorityUids = normalizeUidList(priorityUids)
     .filter((uid) => !indexedUidSet.has(uid))
-    .slice(0, TARGETED_THREAD_HISTORY_LIMIT);
+    .slice(-TARGETED_THREAD_HISTORY_LIMIT)
+    .reverse();
   if (!normalizedCampaign.length && !missingPriorityUids.length) {
     return normalizedAll.slice(-safeLimit).reverse();
   }
