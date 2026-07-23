@@ -307,6 +307,7 @@ test('ai remote service uses OpenAI image edits with fetched website reference i
   assert.equal(calls[0].timeoutMs, 540000);
   assert.equal(calls[0].options.body.get('prompt'), 'Preview met 1 referentie');
   assert.equal(calls[0].options.body.getAll('image[]').length, 1);
+  assert.equal(calls[0].options.body.get('input_fidelity'), null);
 });
 
 test('ai remote service skips reference image edits when prompt-only previews are requested', async () => {
@@ -362,6 +363,7 @@ test('ai remote service waits for a required V2 homepage screenshot before image
   const generationCalls = [];
   let screenshotFetches = 0;
   const { service } = createService({
+    openAiImageModel: 'gpt-image-1.5',
     waitForWebsitePreviewScreenshotRetry: async () => {},
     sanitizeReferenceImages: (images) => images,
     fetchBinaryWithTimeout: async (url) => {
@@ -408,6 +410,7 @@ test('ai remote service waits for a required V2 homepage screenshot before image
   assert.equal(screenshotFetches, 2);
   assert.equal(generationCalls.length, 1);
   assert.equal(generationCalls[0].url, 'https://api.openai.test/v1/images/edits');
+  assert.equal(generationCalls[0].options.body.get('model'), 'gpt-image-1.5');
   assert.equal(generationCalls[0].options.body.getAll('image[]').length, 1);
   assert.equal(generationCalls[0].options.body.get('input_fidelity'), 'high');
   assert.equal(result.referenceImageCount, 1);

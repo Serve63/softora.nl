@@ -9,6 +9,12 @@ const {
   resolveHomepageScreenshotCandidateCount,
   resolveReferenceFetchAttempts,
 } = require('./ai-reference-fetch');
+const {
+  isSupportedOpenAiImageModel,
+  requiresLegacyOpenAiImageResponseFormat,
+  supportsOpenAiInputFidelity,
+  supportsOpenAiReferenceImageEdits,
+} = require('./openai-image-model-capabilities');
 
 function createAiRemoteService(deps = {}) {
   const {
@@ -869,28 +875,6 @@ function createAiRemoteService(deps = {}) {
       .slice(0, 5);
   }
 
-  function isSupportedOpenAiImageModel(modelRaw) {
-    const model = normalizeString(modelRaw || '').toLowerCase();
-    return (
-      /^gpt-image-(?:1(?:\.5)?|1-mini|2)$/.test(model) ||
-      model === 'chatgpt-image-latest' ||
-      /^dall-e-[23]$/.test(model)
-    );
-  }
-
-  function isGptImageGenerationModel(modelRaw) {
-    const model = normalizeString(modelRaw || '').toLowerCase();
-    return /^gpt-image-/i.test(model) || model === 'chatgpt-image-latest';
-  }
-
-  function requiresLegacyOpenAiImageResponseFormat(modelRaw) {
-    return /^dall-e-[23]$/i.test(normalizeString(modelRaw || ''));
-  }
-
-  function supportsOpenAiReferenceImageEdits(modelRaw) {
-    return isGptImageGenerationModel(modelRaw);
-  }
-
   function resolveOpenAiWebsitePreviewImageQuality(scan = {}) {
     const raw = normalizeString(
       scan.imageQuality ||
@@ -1097,7 +1081,10 @@ function createAiRemoteService(deps = {}) {
       body.set('prompt', prompt);
       body.set('size', imageSize);
       body.set('quality', imageQuality);
-      if (normalizeString(inputFidelity).toLowerCase() === 'high') {
+      if (
+        normalizeString(inputFidelity).toLowerCase() === 'high' &&
+        supportsOpenAiInputFidelity(imageModel)
+      ) {
         body.set('input_fidelity', 'high');
       }
       referenceImages.forEach((item) => {
