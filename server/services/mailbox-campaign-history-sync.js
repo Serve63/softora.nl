@@ -64,7 +64,7 @@ async function searchThreadReplyUids({
   }
   for (let offset = 0; offset < recipientTerms.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = recipientTerms.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
-    const alternatives = batch.map((term) => ({ header: { to: term } }));
+    const alternatives = batch.map((term) => ({ to: term }));
     const query =
       alternatives.length === 1
         ? {

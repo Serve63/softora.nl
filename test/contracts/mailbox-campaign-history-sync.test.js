@@ -7,6 +7,29 @@ const {
   resolveMailboxSyncUids,
   selectMailboxSyncUids,
 } = require('../../server/services/mailbox-campaign-history-sync');
+const {
+  collectCampaignThreadRecipientTerms,
+} = require('../../server/services/mailbox-campaign-sync');
+
+test('campaign history sync derives sent-recipient searches from normalized indexed messages', () => {
+  assert.deepEqual(
+    collectCampaignThreadRecipientTerms([
+      {
+        email: 'info@joeyscardetailing.nl',
+        subject: 'Re: Kleine vraag over jullie website',
+      },
+      {
+        email: 'contact@gmail.com',
+        subject: 'Re: Nieuw webdesign',
+      },
+    ]),
+    [
+      'info@joeyscardetailing.nl',
+      'joeyscardetailing.nl',
+      'contact@gmail.com',
+    ]
+  );
+});
 
 test('campaign history sync reserves capacity for newest and older campaign mail', () => {
   const selected = selectMailboxSyncUids({
@@ -94,8 +117,8 @@ test('campaign history sync prioritizes missing sent replies linked by thread he
   assert.deepEqual(queries[4], {
     since: CAMPAIGN_HISTORY_SINCE,
     or: [
-      { header: { to: 'info@vangestelsteigerbouw.nl' } },
-      { header: { to: 'vangestelsteigerbouw.nl' } },
+      { to: 'info@vangestelsteigerbouw.nl' },
+      { to: 'vangestelsteigerbouw.nl' },
     ],
   });
 });
