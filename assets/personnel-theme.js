@@ -1379,7 +1379,7 @@
     }
 
     function buildSidebarProfileRenderKey(session) {
-        const displayName = String((session && session.displayName) || "Softora Premium").trim() || "Softora Premium";
+        const displayName = String((session && (session.displayName || session.firstName || session.email)) || "Softora Premium").trim() || "Softora Premium";
         const role = String((session && session.role) || "admin").trim().toLowerCase() || "admin";
         const avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
         return [displayName, role, avatarDataUrl].join("\u0001");

@@ -41,9 +41,12 @@ function createPremiumUserManagementCoordinator(deps = {}) {
 
   async function resolveStoredUserForAuthState(authState) {
     const { users } = await loadPremiumUsers({ force: true });
+    const cachedUsers = premiumUsersStore.getCachedUsers();
     return (
       premiumUsersStore.findUserById(users, authState.userId) ||
       premiumUsersStore.findUserByEmail(users, authState.email) ||
+      premiumUsersStore.findUserById(cachedUsers, authState.userId) ||
+      premiumUsersStore.findUserByEmail(cachedUsers, authState.email) ||
       authState.user ||
       null
     );

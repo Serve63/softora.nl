@@ -136,10 +136,23 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
   }
 
   async function sendSessionResponse(req, res) {
-    const authState = await getResolvedPremiumAuthState(req, {
+    let authState = await getResolvedPremiumAuthState(req, {
       allowAnonymousWithoutHydration: true,
       allowTokenFallbackWithoutHydration: true,
     });
+    if (authState?.authenticated && authState?.tokenFallback) {
+      const refreshedAuthState = await getResolvedPremiumAuthState(req, {
+        allowAnonymousWithoutHydration: true,
+        allowTokenFallbackWithoutHydration: false,
+      });
+      if (
+        refreshedAuthState?.revoked ||
+        refreshedAuthState?.expired ||
+        (refreshedAuthState?.authenticated && refreshedAuthState?.user)
+      ) {
+        authState = refreshedAuthState;
+      }
+    }
     res.setHeader('Cache-Control', 'no-store, private');
     if (authState.revoked) {
       clearPremiumSessionCookie(req, res);

@@ -252,6 +252,45 @@ test('premium user coordinator refreshes profile payload from stored user when s
   assert.equal(res.body.session.avatarDataUrl, 'data:image/png;base64,abcd');
 });
 
+test('premium user coordinator keeps a cached profile when a forced refresh is unavailable', async () => {
+  const fixture = createCoordinatorFixture([
+    {
+      id: 'usr_admin',
+      email: 'admin@softora.nl',
+      firstName: 'Servé',
+      lastName: 'Creusen',
+      role: 'admin',
+      status: 'active',
+      avatarDataUrl: 'data:image/png;base64,abcd',
+    },
+  ]);
+  fixture.premiumUsersStore.ensureUsersHydrated = async () => ({
+    source: 'unavailable',
+    users: [],
+  });
+  const req = createRequest({
+    originalUrl: '/api/auth/profile',
+    premiumAuth: {
+      authenticated: true,
+      email: 'admin@softora.nl',
+      userId: 'usr_admin',
+      role: 'admin',
+      user: null,
+      displayName: '',
+      avatarDataUrl: '',
+    },
+  });
+  const res = createResponseRecorder();
+
+  await fixture.coordinator.getProfileResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user.firstName, 'Servé');
+  assert.equal(res.body.user.lastName, 'Creusen');
+  assert.equal(res.body.session.displayName, 'Servé Creusen');
+  assert.equal(res.body.session.avatarDataUrl, 'data:image/png;base64,abcd');
+});
+
 test('premium user coordinator rejects invalid avatar updates on profile edits', async () => {
   const { coordinator } = createCoordinatorFixture([
     {

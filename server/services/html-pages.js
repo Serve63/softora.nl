@@ -188,10 +188,17 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   function buildPremiumSidebarProfileRenderKey(authState) {
-    const displayName = String((authState && authState.displayName) || 'Softora Premium').trim() || 'Softora Premium';
+    const displayName = String(
+      (authState && (authState.displayName || authState.firstName || authState.email)) ||
+        'Softora Premium'
+    ).trim() || 'Softora Premium';
     const role = String((authState && authState.role) || 'admin').trim().toLowerCase() || 'admin';
     const avatarDataUrl = String((authState && authState.avatarDataUrl) || '').trim();
     return [displayName, role, avatarDataUrl].join('\u0001');
+  }
+
+  function buildPremiumSidebarProfileUserKey(authState) {
+    return String((authState && (authState.userId || authState.email)) || '').trim().toLowerCase();
   }
 
   function escapeJsonForInlineHtml(value) {
@@ -469,6 +476,7 @@ function createHtmlPageCoordinator(options = {}) {
       'Softora Premium';
     const roleLabelRaw = buildPremiumSidebarRoleLabel(authState.role);
     const renderKey = escapeHtml(buildPremiumSidebarProfileRenderKey(authState));
+    const profileUserKey = escapeHtml(buildPremiumSidebarProfileUserKey(authState));
     const loggedInAriaLabel = escapeHtml(`Ingelogd als ${displayNameRaw}`);
     const avatarDataUrl = String(authState.avatarDataUrl || '').trim();
     const avatarHtml = avatarDataUrl
@@ -478,8 +486,13 @@ function createHtmlPageCoordinator(options = {}) {
     renderedHtml = renderedHtml.replace(
       /<aside([^>]*\bclass="sidebar\b[^"]*"[^>]*)>/i,
       (match, attrs) => {
-        const normalizedAttrs = String(attrs || '').replace(/\sdata-sidebar-profile-render-key="[^"]*"/i, '');
-        return `<aside${normalizedAttrs} data-sidebar-profile-render-key="${renderKey}">`;
+        const normalizedAttrs = String(attrs || '')
+          .replace(/\sdata-sidebar-profile-render-key="[^"]*"/i, '')
+          .replace(/\sdata-sidebar-profile-user-key="[^"]*"/i, '');
+        const profileUserAttribute = profileUserKey
+          ? ` data-sidebar-profile-user-key="${profileUserKey}"`
+          : '';
+        return `<aside${normalizedAttrs} data-sidebar-profile-render-key="${renderKey}"${profileUserAttribute}>`;
       }
     );
     renderedHtml = renderedHtml.replace(
