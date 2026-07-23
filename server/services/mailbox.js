@@ -9,7 +9,10 @@ const {
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxDeleteMessage } = require('./mailbox-delete-message');
 const { createMailboxCampaignRepliesService } = require('./mailbox-campaign-replies');
-const { selectMailboxSyncAccounts } = require('./mailbox-campaign-sync');
+const {
+  resolveMailboxSyncUids,
+} = require('./mailbox-campaign-history-sync');
+const { createMailboxSyncService } = require('./mailbox-campaign-sync');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -2135,7 +2138,7 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0 }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
 
@@ -2150,12 +2153,23 @@ function createMailboxService(deps = {}) {
           ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
           : null;
         if (!selectedUids) {
-          const allUids = await client.search({ all: true });
-          selectedUids = (Array.isArray(allUids) ? allUids : []).slice(-safeLimit).reverse();
+          selectedUids = await resolveMailboxSyncUids({
+            client,
+            limit: safeLimit,
+            campaignHistory,
+            oldestIndexedCampaignUid,
+            logger,
+            accountEmail: account.email,
+            folder: normalizedFolder,
+          });
         }
         if (!selectedUids.length) return [];
         const records = [];
-        for await (const message of client.fetch(selectedUids, { uid: true, flags: true, internalDate: true, source: true })) {
+        for await (const message of client.fetch(
+          selectedUids,
+          { uid: true, flags: true, internalDate: true, source: true },
+          { uid: true }
+        )) {
           const parsed = await parseMailSource(message.source);
           const text = sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
           const primaryBodyImages = buildMailboxBodyImages(parsed);
@@ -2227,87 +2241,19 @@ function createMailboxService(deps = {}) {
     };
   }
 
-  async function syncMailboxFolder({ accountEmail, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, force = false } = {}) {
-    const account = assertReadableAccount(accountEmail);
-    const normalizedFolder = normalizeFolder(folder);
-    if (!canUseMailboxIndex()) {
-      return { ok: false, skipped: true, reason: 'mailbox_index_unavailable' };
-    }
-    const lock = await mailboxIndexStore.acquireSyncLock({
-      accountEmail: account.email,
-      folder: normalizedFolder,
-      force,
-    });
-    if (!lock.ok) {
-      return { ok: true, skipped: true, reason: lock.locked ? 'locked' : 'lock_failed' };
-    }
-
-    try {
-      const messages = await fetchMessagesFromImap({
-        account,
-        folder: normalizedFolder,
-        limit: getSafeLimit(limit),
-      });
-      const saved = await mailboxIndexStore.upsertMessages({
-        accountEmail: account.email,
-        folder: normalizedFolder,
-        messages,
-      });
-      if (!saved || saved.ok === false) {
-        throw saved?.error || new Error('Mailbox-index opslaan mislukt');
-      }
-      const lastUid = messages.reduce((max, message) => Math.max(max, Number(message.uid) || 0), 0);
-      await mailboxIndexStore.finishSync({
-        accountEmail: account.email,
-        folder: normalizedFolder,
-        lockToken: lock.lockToken,
-        messageCount: messages.length,
-        lastUid,
-      });
-      return {
-        ok: true,
-        account: account.email,
-        folder: normalizedFolder,
-        synced: messages.length,
-        upserted: saved.upserted || messages.length,
-      };
-    } catch (error) {
-      await mailboxIndexStore.finishSync({
-        accountEmail: account.email,
-        folder: normalizedFolder,
-        lockToken: lock.lockToken,
-        error: error?.message || error,
-      }).catch(() => null);
-      throw error;
-    }
-  }
-
-  async function syncMailbox({ accountEmail = '', folders = DEFAULT_SYNC_FOLDERS, limit = DEFAULT_SYNC_LIMIT, force = false, campaignOnly = false } = {}) {
-    const accounts = selectMailboxSyncAccounts({ accountEmail, accounts: getAccounts(), assertReadableAccount, normalizeEmail, campaignOnly });
-    const folderList = Array.from(
-      new Set((Array.isArray(folders) && folders.length ? folders : DEFAULT_SYNC_FOLDERS).map(normalizeFolder))
-    );
-    const results = [];
-    for (const account of accounts) {
-      for (const folder of folderList) {
-        try {
-          results.push(await syncMailboxFolder({ accountEmail: account.email, folder, limit, force }));
-        } catch (error) {
-          logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
-          results.push({
-            ok: false,
-            account: account.email,
-            folder,
-            error: String(error?.message || error || 'Mailbox sync mislukt'),
-          });
-        }
-      }
-    }
-    return {
-      ok: results.every((result) => result.ok !== false),
-      results,
-    };
-  }
+  const { syncMailbox, syncMailboxFolder } = createMailboxSyncService({
+    mailboxIndexStore,
+    assertReadableAccount,
+    canUseMailboxIndex,
+    fetchMessagesFromImap,
+    getSafeLimit,
+    getAccounts,
+    normalizeEmail,
+    normalizeFolder,
+    logger,
+    defaultFolders: DEFAULT_SYNC_FOLDERS,
+    defaultLimit: DEFAULT_SYNC_LIMIT,
+  });
 
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);

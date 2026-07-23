@@ -42,12 +42,16 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   const appendedMessages = [];
   const movedMessages = [];
   const searchQueries = [];
+  const searchOptions = [];
+  const fetchOptions = [];
   return {
     usable: true,
     lockedMailboxes: [],
     appendedMessages,
     movedMessages,
     searchQueries,
+    searchOptions,
+    fetchOptions,
     async connect() {},
     async list() {
       return boxes;
@@ -60,11 +64,13 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
       }
       return { release() {} };
     },
-    async search(query) {
+    async search(query, options) {
       searchQueries.push(query);
+      searchOptions.push(options);
       return (messagesByMailbox[activeMailbox] || []).map((message) => message.uid);
     },
-    fetch(uids) {
+    fetch(uids, query, options) {
+      fetchOptions.push({ query, options });
       const messages = messagesByMailbox[activeMailbox] || [];
       return (async function* fetchMessages() {
         for (const uid of uids) {
@@ -2979,4 +2985,92 @@ test('mailbox cron sync indexes a lightweight sent batch by default', async () =
   assert.equal(response.body.ok, true);
   assert.deepEqual(upsertedCounts, [30]);
   assert.equal(response.body.results[0].synced, 30);
+});
+
+test('campaign mailbox sync combines newest mail with missing historical conversation messages', async () => {
+  const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
+    uid: index + 1,
+    flags: ['\\Seen'],
+    internalDate: new Date(Date.UTC(2026, 5, 15, 8, index % 60, 0)),
+    source: Buffer.from(`Subject: Re: Kleine vraag over jullie website\r\nFrom: Servé <serve290@gmail.com>\r\nTo: joey@vangestelsteigerbouw.nl\r\n\r\nTest ${index + 1}`),
+  }));
+  const client = createFakeImapClient({
+    boxes: [{ path: 'Sent', specialUse: '\\Sent' }],
+    messagesByMailbox: { Sent: sentMessages },
+  });
+  let oldestLookup = null;
+  let upsertedUids = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve290@gmail.com',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve290@gmail.com',
+        imapPass: 'secret',
+      },
+    ]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => ({
+      subject: 'Re: Kleine vraag over jullie website',
+      text: source.toString(),
+      from: { value: [{ address: 'serve290@gmail.com', name: 'Servé' }] },
+      to: { value: [{ address: 'joey@vangestelsteigerbouw.nl', name: 'Joey' }] },
+      date: new Date('2026-06-15T08:00:00.000Z'),
+      attachments: [],
+    }),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-history' }),
+      getOldestMatchingMessageUid: async (options) => {
+        oldestLookup = options;
+        return 91;
+      },
+      upsertMessages: async ({ messages }) => {
+        upsertedUids = messages.map((message) => message.uid);
+        return { ok: true, upserted: messages.length };
+      },
+      finishSync: async () => ({ ok: true }),
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse(
+    {
+      method: 'POST',
+      query: {},
+      body: {
+        account: 'serve290@gmail.com',
+        folder: 'sent',
+        campaignOnly: true,
+        limit: 30,
+      },
+    },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(oldestLookup, {
+    accountEmail: 'serve290@gmail.com',
+    folder: 'sent',
+    subjectTerms: ['Kleine vraag over jullie website', 'Nieuw webdesign'],
+  });
+  assert.deepEqual(upsertedUids.slice(0, 10), [120, 119, 118, 117, 116, 115, 114, 113, 112, 111]);
+  assert.deepEqual(upsertedUids.slice(10), [
+    90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
+    80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
+  ]);
+  assert.equal(client.searchQueries.length, 3);
+  assert.deepEqual(client.searchQueries[0], { all: true });
+  assert.deepEqual(client.searchOptions, [{ uid: true }, { uid: true }, { uid: true }]);
+  assert.deepEqual(client.fetchOptions, [
+    {
+      query: { uid: true, flags: true, internalDate: true, source: true },
+      options: { uid: true },
+    },
+  ]);
+  assert.equal(response.body.results[0].historyBackfill, true);
+  assert.equal(response.body.results[0].historyBeforeUid, 91);
 });

@@ -105,6 +105,66 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(detailMessage.body, 'Volledige tekst');
 });
 
+test('mailbox index store vindt de oudste campagne-uid zonder verwijderde historie uit te sluiten', async () => {
+  const calls = [];
+  const uidsByTerm = new Map([
+    ['%Kleine vraag over jullie website%', 42],
+    ['%Nieuw webdesign%', 19],
+  ]);
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from(table) {
+        const filters = {};
+        const query = {
+          select(columns) {
+            calls.push(['select', table, columns]);
+            return query;
+          },
+          eq(column, value) {
+            filters[column] = value;
+            calls.push(['eq', column, value]);
+            return query;
+          },
+          ilike(column, value) {
+            filters[column] = value;
+            calls.push(['ilike', column, value]);
+            return query;
+          },
+          order(column, options) {
+            calls.push(['order', column, options]);
+            return query;
+          },
+          limit(value) {
+            calls.push(['limit', value]);
+            return Promise.resolve({
+              data: [{ uid: uidsByTerm.get(filters.subject) }],
+              error: null,
+            });
+          },
+        };
+        return query;
+      },
+    }),
+  });
+
+  const uid = await store.getOldestMatchingMessageUid({
+    accountEmail: 'SERVE290@GMAIL.COM',
+    folder: 'SENT',
+    subjectTerms: ['Kleine vraag over jullie website', 'Nieuw webdesign'],
+  });
+
+  assert.equal(uid, 19);
+  assert.equal(calls.some((call) => call[0] === 'is' && call[1] === 'deleted_at'), false);
+  assert.deepEqual(
+    calls.filter((call) => call[0] === 'ilike'),
+    [
+      ['ilike', 'subject', '%Kleine vraag over jullie website%'],
+      ['ilike', 'subject', '%Nieuw webdesign%'],
+    ]
+  );
+});
+
 test('mailbox index store bewaart gelezen status voor exact account, map en uid', async () => {
   const calls = [];
   const query = {
