@@ -30,6 +30,12 @@ const DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION = Object.freeze({
   regio: 1100,
 });
 
+const DEFAULT_ORIGINALITY_THRESHOLDS = Object.freeze({
+  maximumAverageTemplateShare: 0.35,
+  maximumRepeatedParagraphShare: 0.1,
+  maximumNearestPageJaccard: 0.72,
+});
+
 const DEFAULT_UNSUPPORTED_CLAIM_RULES = Object.freeze([
   Object.freeze({
     type: 'guaranteed-seo-or-business-result',
@@ -153,13 +159,141 @@ function countWords(valueRaw) {
   return String(valueRaw || '').trim().split(/\s+/).filter(Boolean).length;
 }
 
+function collectItemParagraphs(item) {
+  return [
+    String(item && item.summary ? item.summary : ''),
+    ...(Array.isArray(item && item.sections)
+      ? item.sections.flatMap((section) => Array.isArray(section.paragraphs)
+        ? section.paragraphs.map((paragraph) => paragraph && typeof paragraph === 'object' ? paragraph.text : paragraph)
+        : [])
+      : []),
+    ...(Array.isArray(item && item.faq)
+      ? item.faq.flatMap((entry) => [entry.question, entry.answer])
+      : []),
+  ].map((value) => normalizeCorpusText(value)).filter(Boolean);
+}
+
+function normalizeCorpusText(valueRaw) {
+  return String(valueRaw || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function itemCorpusKey(item) {
+  return `${String(item && item.collection || '')}/${String(item && item.slug || '')}`;
+}
+
+function tokenSetForItem(item) {
+  return new Set(collectItemParagraphs(item).join(' ').split(/\s+/).filter((token) => token.length > 2));
+}
+
+function jaccardSimilarity(left, right) {
+  if (!(left instanceof Set) || !(right instanceof Set) || (!left.size && !right.size)) return 0;
+  let intersection = 0;
+  for (const token of left) if (right.has(token)) intersection += 1;
+  const union = left.size + right.size - intersection;
+  return union ? intersection / union : 0;
+}
+
+function buildContentOriginalityReport({
+  sourceItems = [],
+  renderedItems = [],
+  thresholds = DEFAULT_ORIGINALITY_THRESHOLDS,
+} = {}) {
+  const sourceByKey = new Map(sourceItems.map((item) => [itemCorpusKey(item), item]));
+  const rendered = Array.isArray(renderedItems) ? renderedItems : [];
+  const paragraphPages = new Map();
+  let paragraphOccurrences = 0;
+  let totalSourceWords = 0;
+  let totalRenderedWords = 0;
+  let totalTemplateShare = 0;
+
+  const pages = rendered.map((item) => {
+    const key = itemCorpusKey(item);
+    const sourceItem = sourceByKey.get(key) || item;
+    const sourceWords = getItemWordCount(sourceItem);
+    const renderedWords = getItemWordCount(item);
+    const templateShare = renderedWords > 0 ? Math.max(0, 1 - sourceWords / renderedWords) : 0;
+    totalSourceWords += sourceWords;
+    totalRenderedWords += renderedWords;
+    totalTemplateShare += templateShare;
+    for (const paragraph of new Set(collectItemParagraphs(item))) {
+      paragraphOccurrences += 1;
+      if (!paragraphPages.has(paragraph)) paragraphPages.set(paragraph, new Set());
+      paragraphPages.get(paragraph).add(key);
+    }
+    return {
+      key,
+      path: normalizeInternalPath(`/${item.collection || ''}/${item.slug || ''}`),
+      sourceWords,
+      renderedWords,
+      templateShare: Math.round(templateShare * 1000) / 1000,
+      tokens: tokenSetForItem(item),
+    };
+  });
+
+  let nearestPair = { left: '', right: '', jaccard: 0 };
+  for (let leftIndex = 0; leftIndex < pages.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < pages.length; rightIndex += 1) {
+      const similarity = jaccardSimilarity(pages[leftIndex].tokens, pages[rightIndex].tokens);
+      if (similarity > nearestPair.jaccard) {
+        nearestPair = {
+          left: pages[leftIndex].path,
+          right: pages[rightIndex].path,
+          jaccard: Math.round(similarity * 1000) / 1000,
+        };
+      }
+    }
+  }
+
+  const duplicateOccurrences = [...paragraphPages.values()].reduce(
+    (total, paths) => total + Math.max(0, paths.size - 1),
+    0
+  );
+  const repeatedParagraphShare = paragraphOccurrences
+    ? Math.round((duplicateOccurrences / paragraphOccurrences) * 1000) / 1000
+    : 0;
+  const averageTemplateShare = pages.length
+    ? Math.round((totalTemplateShare / pages.length) * 1000) / 1000
+    : 0;
+  const reasons = [];
+  if (averageTemplateShare > thresholds.maximumAverageTemplateShare) reasons.push('template_share');
+  if (repeatedParagraphShare > thresholds.maximumRepeatedParagraphShare) reasons.push('repeated_paragraphs');
+  if (nearestPair.jaccard > thresholds.maximumNearestPageJaccard) reasons.push('nearest_page_overlap');
+
+  return {
+    status: reasons.length ? 'quality_recovery' : 'healthy',
+    thresholds,
+    reasons,
+    pageCount: pages.length,
+    averageSourceWords: pages.length ? Math.round(totalSourceWords / pages.length) : 0,
+    averageRenderedWords: pages.length ? Math.round(totalRenderedWords / pages.length) : 0,
+    averageTemplateShare,
+    paragraphOccurrences,
+    duplicateOccurrences,
+    repeatedParagraphShare,
+    nearestPair,
+    highestTemplatePages: pages
+      .sort((a, b) => b.templateShare - a.templateShare || a.path.localeCompare(b.path))
+      .slice(0, 10)
+      .map(({ tokens, ...page }) => page),
+  };
+}
+
 function getItemWordCount(item) {
   if (Number.isFinite(Number(item.wordCount)) && Number(item.wordCount) > 0) {
     return Number(item.wordCount);
   }
   return (item.sections || []).reduce((total, section) => {
     const headingWords = countWords(section.heading);
-    const paragraphWords = (section.paragraphs || []).reduce((sum, paragraph) => sum + countWords(paragraph), 0);
+    const paragraphWords = (section.paragraphs || []).reduce(
+      (sum, paragraph) => sum + countWords(paragraph && typeof paragraph === 'object' ? paragraph.text : paragraph),
+      0
+    );
     return total + headingWords + paragraphWords;
   }, countWords(item.summary)) + (item.faq || []).reduce((total, entry) => total + countWords(entry.question) + countWords(entry.answer), 0);
 }
@@ -187,7 +321,9 @@ function collectContentItemClaimText(item) {
     ...(Array.isArray(item.sections)
       ? item.sections.flatMap((section) => [
           section.heading,
-          ...(Array.isArray(section.paragraphs) ? section.paragraphs : []),
+          ...(Array.isArray(section.paragraphs)
+            ? section.paragraphs.map((paragraph) => paragraph && typeof paragraph === 'object' ? paragraph.text : paragraph)
+            : []),
         ])
       : []),
     ...(Array.isArray(item.faq)
@@ -298,20 +434,31 @@ function auditContentQuality({ items = [], clusters = [], commercialTargets = DE
     if ((item.sections || []).length < 3) {
       issues.push({ type: 'thin-sections', path: pathName, message: `${pageLabel} heeft minder dan drie inhoudsblokken.` });
     }
-    const wordCount = getItemWordCount(item);
-    const minWordCount = getMinimumContentWordCount(item);
-    if (wordCount < minWordCount) {
-      issues.push({
-        type: 'thin-body',
-        path: pathName,
-        message: `${pageLabel} heeft ${wordCount} woorden; minimaal ${minWordCount} verwacht voor deze contentlaag.`,
-      });
-    }
+    const usesNativeQuality = Number(item.qualityVersion) >= 2;
     if (!item.author || !item.reviewedBy) {
       issues.push({ type: 'missing-eeat', path: pathName, message: `${pageLabel} mist auteur of inhoudelijke controle.` });
     }
-    if (!Array.isArray(item.faq) || item.faq.length < 3) {
+    if (!usesNativeQuality && (!Array.isArray(item.faq) || item.faq.length < 3)) {
       issues.push({ type: 'missing-faq-depth', path: pathName, message: `${pageLabel} mist FAQ-verdieping.` });
+    }
+    if (usesNativeQuality) {
+      const contextualLinks = (item.sections || []).flatMap((section) => (section.paragraphs || []).flatMap(
+        (paragraph) => paragraph && typeof paragraph === 'object' && Array.isArray(paragraph.links)
+          ? paragraph.links
+          : []
+      ));
+      if (String(item.informationGain || '').trim().length < 80) {
+        issues.push({ type: 'missing-information-gain', path: pathName, message: `${pageLabel} bewijst geen unieke informatiewinst.` });
+      }
+      if (!Array.isArray(item.sources) || item.sources.length === 0) {
+        issues.push({ type: 'missing-content-sources', path: pathName, message: `${pageLabel} mist een controleerbaar bronplan.` });
+      }
+      if (contextualLinks.length < 2) {
+        issues.push({ type: 'missing-contextual-links', path: pathName, message: `${pageLabel} mist contextuele links in de hoofdtekst.` });
+      }
+      if (!contextualLinks.some((link) => targetSet.has(normalizeInternalPath(link.href)))) {
+        issues.push({ type: 'missing-contextual-money-link', path: pathName, message: `${pageLabel} mist een contextuele route naar een money page.` });
+      }
     }
     if (relatedLinks.length < 3) {
       issues.push({ type: 'weak-related-links', path: pathName, message: `${pageLabel} heeft te weinig interne links.` });
@@ -732,12 +879,14 @@ module.exports = {
   DEFAULT_COMMERCIAL_TARGETS,
   DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION,
   DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS,
+  DEFAULT_ORIGINALITY_THRESHOLDS,
   DEFAULT_UNSUPPORTED_CLAIM_RULES,
   auditClaimSafety,
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
   auditSeoImages,
+  buildContentOriginalityReport,
   isMartijnWhatsappHref,
   isLeadCtaLabel,
   buildSeoLinkGraph,
@@ -746,4 +895,5 @@ module.exports = {
   extractImageEntriesFromHtml,
   extractInternalLinksFromHtml,
   normalizeInternalPath,
+  jaccardSimilarity,
 };

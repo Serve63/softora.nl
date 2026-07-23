@@ -90,7 +90,54 @@ test('seo agent snapshot queries current and previous pages, queries, page-query
   assert.equal(snapshot.dateWindows.current.endDate, '2026-05-18');
   assert.equal(snapshot.dateWindows.previous.startDate, '2026-03-24');
   assert.equal(snapshot.dateWindows.previous.endDate, '2026-04-20');
-  assert.deepEqual(calls.map((call) => call.dimensions.join(',')), ['page', 'page', 'query', 'query', 'page,query']);
+  assert.deepEqual(calls.map((call) => call.dimensions.join(',')), ['', '', 'page', 'page', 'query', 'query', 'page,query']);
+  assert.equal(snapshot.totalsCurrent[0].clicks, 1);
+});
+
+test('seo agent keeps property totals separate from visible and unclassified query rows', () => {
+  const report = buildSearchConsoleAgentReport({
+    totalsCurrent: [{ keys: [], clicks: 23, impressions: 1972, ctr: 23 / 1972, position: 49.61 }],
+    totalsPrevious: [{ keys: [], clicks: 18, impressions: 1600, ctr: 18 / 1600, position: 51 }],
+    queriesCurrent: [
+      { keys: ['softora'], clicks: 9, impressions: 17, ctr: 9 / 17, position: 1 },
+      { keys: ['bedrijfssoftware laten maken'], clicks: 0, impressions: 1709, ctr: 0, position: 55.49 },
+    ],
+    queriesPrevious: [],
+    pagesCurrent: [],
+    pagesPrevious: [],
+    pageQueryCurrent: [],
+    sitemaps: [],
+  });
+
+  assert.equal(report.totals.current.clicks, 23);
+  assert.equal(report.totals.current.impressions, 1972);
+  assert.equal(report.segments.visibleQueries.clicks, 9);
+  assert.equal(report.segments.unclassified.clicks, 14);
+  assert.equal(report.segments.unclassified.impressions, 246);
+  assert.equal(report.segments.unclassified.position, null);
+  assert.match(formatAgentMarkdown(report), /Niet classificeerbaar: 14 klikken, 246 vertoningen/);
+});
+
+test('seo agent preserves sitemap download freshness and supports URL Inspection', async () => {
+  const calls = [];
+  const client = createSearchConsoleClient({
+    config: { siteUrl: 'sc-domain:softora.nl', accessToken: 'token' },
+    fetchImpl: async (url, options = {}) => {
+      calls.push({ url: String(url), options });
+      return jsonResponse({
+        inspectionResult: { indexStatusResult: { verdict: 'PASS', coverageState: 'Submitted and indexed' } },
+      });
+    },
+  });
+  const inspection = await client.inspectUrl('https://www.softora.nl/crm-systeem-op-maat');
+
+  assert.equal(inspection.inspectionResult.indexStatusResult.verdict, 'PASS');
+  assert.match(calls[0].url, /urlInspection\/index:inspect$/);
+  assert.match(calls[0].options.body, /crm-systeem-op-maat/);
+  const normalized = require('../../scripts/lib/search-console-agent-report').normalizeSitemaps([
+    { path: 'https://www.softora.nl/sitemap.xml', lastDownloaded: '2026-07-22T08:00:00Z' },
+  ]);
+  assert.equal(normalized[0].lastDownloaded, '2026-07-22T08:00:00Z');
 });
 
 test('seo agent report ranks low CTR, striking distance and declining page actions', () => {

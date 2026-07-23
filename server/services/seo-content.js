@@ -3182,10 +3182,20 @@ function countWords(valueRaw) {
     .filter(Boolean).length;
 }
 
+function getSeoParagraphText(paragraph) {
+  if (paragraph && typeof paragraph === 'object' && !Array.isArray(paragraph)) {
+    return String(paragraph.text || '');
+  }
+  return String(paragraph || '');
+}
+
 function countSeoContentWords(item) {
   if (!item) return 0;
   const sectionWords = (item.sections || []).reduce((total, section) => {
-    const paragraphWords = (section.paragraphs || []).reduce((sum, paragraph) => sum + countWords(paragraph), 0);
+    const paragraphWords = (section.paragraphs || []).reduce(
+      (sum, paragraph) => sum + countWords(getSeoParagraphText(paragraph)),
+      0
+    );
     return total + countWords(section.heading) + paragraphWords;
   }, 0);
   const faqWords = (item.faq || []).reduce((total, entry) => total + countWords(entry.question) + countWords(entry.answer), 0);
@@ -3404,12 +3414,17 @@ function filterSeoContentRelatedLinks(linksRaw, nowMs) {
 
 function enrichSeoContentItem(item, { nowMs = Date.now() } = {}) {
   if (!item) return item;
-  const sections = Object.freeze([
-    ...(item.sections || []),
-    ...buildSeoContentDepthSections(item),
-    ...buildSeoContentPerformanceSections(item),
-  ]);
-  const faq = item.faq ? Object.freeze([...(item.faq || [])]) : buildSeoContentFaq(item);
+  const usesNativeQuality = Number(item.qualityVersion) >= 2;
+  const sections = Object.freeze(usesNativeQuality
+    ? [...(item.sections || [])]
+    : [
+        ...(item.sections || []),
+        ...buildSeoContentDepthSections(item),
+        ...buildSeoContentPerformanceSections(item),
+      ]);
+  const faq = item.faq
+    ? Object.freeze([...(item.faq || [])])
+    : (usesNativeQuality ? Object.freeze([]) : buildSeoContentFaq(item));
   const base = Object.freeze({
     ...item,
     author: item.author || SEO_CONTENT_AUTHOR,
@@ -3951,6 +3966,34 @@ function renderSecondaryImage(item) {
   ].filter(Boolean).join('\n');
 }
 
+function renderSeoParagraph(paragraph) {
+  if (!paragraph || typeof paragraph !== 'object' || Array.isArray(paragraph)) {
+    return escapeHtml(paragraph);
+  }
+  const text = getSeoParagraphText(paragraph);
+  const links = Array.isArray(paragraph.links) ? paragraph.links : [];
+  if (!links.length) return escapeHtml(text);
+  const matches = [];
+  for (const link of links) {
+    const anchor = String(link && link.anchor || '').trim();
+    const href = String(link && link.href || '').trim();
+    const index = anchor ? text.indexOf(anchor) : -1;
+    if (index < 0 || !/^\/[a-z0-9][a-z0-9/-]*$/i.test(href)) continue;
+    matches.push({ anchor, href, index });
+  }
+  matches.sort((a, b) => a.index - b.index);
+  const output = [];
+  let cursor = 0;
+  for (const match of matches) {
+    if (match.index < cursor) continue;
+    output.push(escapeHtml(text.slice(cursor, match.index)));
+    output.push(`<a href="${escapeHtml(match.href)}">${escapeHtml(match.anchor)}</a>`);
+    cursor = match.index + match.anchor.length;
+  }
+  output.push(escapeHtml(text.slice(cursor)));
+  return output.join('');
+}
+
 function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   if (!item) return '';
   const collection = getSeoContentCollection(item.collection);
@@ -4033,7 +4076,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     ...item.sections.map((section) =>
       [
         `    <h2>${escapeHtml(section.heading)}</h2>`,
-        ...section.paragraphs.map((paragraph) => `    <p>${escapeHtml(paragraph)}</p>`),
+        ...section.paragraphs.map((paragraph) => `    <p>${renderSeoParagraph(paragraph)}</p>`),
       ].join('\n')
     ),
     renderSecondaryImage(item),
@@ -4066,6 +4109,7 @@ module.exports = {
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
   countSeoContentWords,
+  enrichSeoContentItem,
   getSeoContentClusterForItem,
   getSeoContentClusters,
   getSeoContentCollection,
@@ -4079,4 +4123,5 @@ module.exports = {
   getSeoContentPublicationPlan,
   getSeoContentPublicPaths,
   getSeoContentSitemapEntries,
+  renderSeoParagraph,
 };
