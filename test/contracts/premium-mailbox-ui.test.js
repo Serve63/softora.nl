@@ -782,6 +782,37 @@ test('premium mailbox zet een eerdere eigen mail als apart geciteerd blok neer',
   assert.ok(html.indexOf('Goedendag') > html.indexOf('detail-mail-section-quote'));
 });
 
+test('premium mailbox toont geen handtekening van de ontvanger in Jouw eerdere mail', () => {
+  const html = renderMailboxBodyForTest([
+    'Bedankt voor je bericht, maar we hebben geen interesse.',
+    '',
+    'Op di 30 jun 2026 om 07:18 schreef Servé Creusen:',
+    '',
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website denbosch.wereldwinkels.nl tegen.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '📍 ’s-Hertogenbosch',
+    '',
+    '--',
+    'Met vriendelijke groet,',
+    'Wereldwinkel ’s-Hertogenbosch',
+    'Hinthamerstraat 105',
+    '5211 MH',
+    'tel 073 689 40 68',
+    '*www.wereldwinkel-webshop.nl*',
+  ].join('\n'));
+
+  assert.match(html, /<div class="detail-mail-section-label">Jouw eerdere mail<\/div>/);
+  assert.match(html, /Servé Creusen/);
+  assert.match(html, /📍 ’s-Hertogenbosch/);
+  assert.doesNotMatch(html, /Wereldwinkel ’s-Hertogenbosch/);
+  assert.doesNotMatch(html, /Hinthamerstraat 105/);
+  assert.doesNotMatch(html, /wereldwinkel-webshop\.nl/);
+});
+
 test('premium mailbox zet beantwoorden direct onder de ontvangen mail en voor de eerdere mail', () => {
   const html = renderMailboxBodyForTest([
     'Bedankt voor je bericht, maar we hebben geen interesse.',

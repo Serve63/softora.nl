@@ -35,11 +35,13 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
   let activeMailbox = '';
   const appendedMessages = [];
   const movedMessages = [];
+  const searchQueries = [];
   return {
     usable: true,
     lockedMailboxes: [],
     appendedMessages,
     movedMessages,
+    searchQueries,
     async connect() {},
     async list() {
       return boxes;
@@ -52,7 +54,8 @@ function createFakeImapClient({ boxes = [], messagesByMailbox = {} }) {
       }
       return { release() {} };
     },
-    async search() {
+    async search(query) {
+      searchQueries.push(query);
       return (messagesByMailbox[activeMailbox] || []).map((message) => message.uid);
     },
     fetch(uids) {
@@ -969,6 +972,8 @@ test('mailbox service resolves sent folders through IMAP special-use metadata', 
   const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
 
   assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
+  // ImapFlow compiles this object to SEARCH ALL; the old array input produced an empty query.
+  assert.deepEqual(client.searchQueries, [{ all: true }]);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].subject, 'Verzonden bericht');
   assert.equal(messages[0].from, 'Serve');
