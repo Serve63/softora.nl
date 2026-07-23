@@ -89,6 +89,29 @@ function sanitizeThreadMessage(value, options = {}) {
   };
 }
 
+function resolveMessageActivityAt(source) {
+  const candidates = [
+    source.activityAt,
+    source.receivedAt,
+    source.internalDate,
+    source.date,
+    ...(Array.isArray(source.threadMessages)
+      ? source.threadMessages.flatMap((message) => [
+          message && message.activityAt,
+          message && message.receivedAt,
+          message && message.internalDate,
+          message && message.date,
+        ])
+      : []),
+  ];
+  const latestTimestamp = candidates.reduce((latest, value) => {
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) && timestamp > latest ? timestamp : latest;
+  }, 0);
+  if (latestTimestamp > 0) return new Date(latestTimestamp).toISOString();
+  return text(source.activityAt || source.receivedAt || source.internalDate || source.date, 100);
+}
+
 function sanitizeMessage(value, options = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const rawBody = String(source.body || '');
@@ -115,7 +138,7 @@ function sanitizeMessage(value, options = {}) {
     optOutUrl: text(source.optOutUrl, 4000),
     date: text(source.date, 100),
     receivedAt: text(source.receivedAt || source.date, 100),
-    activityAt: text(source.activityAt || source.receivedAt || source.date, 100),
+    activityAt: resolveMessageActivityAt(source),
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
