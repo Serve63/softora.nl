@@ -2148,7 +2148,7 @@ function createMailboxService(deps = {}) {
           ? uids.map(Number).filter((uid) => Number.isFinite(uid) && uid > 0)
           : null;
         if (!selectedUids) {
-          const allUids = await client.search(['ALL']);
+          const allUids = await client.search({ all: true });
           selectedUids = (Array.isArray(allUids) ? allUids : []).slice(-safeLimit).reverse();
         }
         if (!selectedUids.length) return [];
