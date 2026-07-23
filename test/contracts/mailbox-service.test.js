@@ -3125,6 +3125,7 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
                 uid: 2429,
                 subject: 'Re: Kleine vraag over jullie website',
                 messageId: indexedInboxMessageId,
+                senderEmail: 'info@vangestelsteigerbouw.nl',
               },
             ]
           : Array.from({ length: 7 }, (_item, index) => ({ uid: 114 + index })),
@@ -3155,12 +3156,20 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.results[0].targetedThreadReferences, 1);
+  assert.equal(response.body.results[0].targetedThreadRecipients, 2);
   assert.equal(upsertedUids[7], 42);
   assert.deepEqual(client.searchQueries[3], {
     since: new Date('2026-05-01T00:00:00.000Z'),
     or: [
       { header: { references: indexedInboxMessageId } },
       { header: { 'in-reply-to': indexedInboxMessageId } },
+    ],
+  });
+  assert.deepEqual(client.searchQueries[4], {
+    since: new Date('2026-05-01T00:00:00.000Z'),
+    or: [
+      { header: { to: 'info@vangestelsteigerbouw.nl' } },
+      { header: { to: 'vangestelsteigerbouw.nl' } },
     ],
   });
 });

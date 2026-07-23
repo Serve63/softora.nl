@@ -29,11 +29,13 @@ function normalizeMessageIdList(values) {
 async function searchThreadReplyUids({
   client,
   threadReferenceIds = [],
+  threadRecipientTerms = [],
   logger = console,
   accountEmail = '',
   folder = '',
 } = {}) {
   const referenceIds = normalizeMessageIdList(threadReferenceIds);
+  const recipientTerms = normalizeMessageIdList(threadRecipientTerms);
   const replyUids = [];
   for (let offset = 0; offset < referenceIds.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
     const batch = referenceIds.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
@@ -53,6 +55,32 @@ async function searchThreadReplyUids({
     } catch (error) {
       logger.warn?.(
         '[Mailbox][ThreadReplySearch]',
+        accountEmail,
+        folder,
+        `batch-${offset / THREAD_REFERENCE_SEARCH_BATCH_SIZE + 1}`,
+        error?.message || error
+      );
+    }
+  }
+  for (let offset = 0; offset < recipientTerms.length; offset += THREAD_REFERENCE_SEARCH_BATCH_SIZE) {
+    const batch = recipientTerms.slice(offset, offset + THREAD_REFERENCE_SEARCH_BATCH_SIZE);
+    const alternatives = batch.map((term) => ({ header: { to: term } }));
+    const query =
+      alternatives.length === 1
+        ? {
+            since: CAMPAIGN_HISTORY_SINCE,
+            ...alternatives[0],
+          }
+        : {
+            since: CAMPAIGN_HISTORY_SINCE,
+            or: alternatives,
+          };
+    try {
+      const found = await client.search(query, { uid: true });
+      replyUids.push(...(Array.isArray(found) ? found : []));
+    } catch (error) {
+      logger.warn?.(
+        '[Mailbox][ThreadRecipientSearch]',
         accountEmail,
         folder,
         `batch-${offset / THREAD_REFERENCE_SEARCH_BATCH_SIZE + 1}`,
@@ -107,6 +135,7 @@ async function resolveMailboxSyncUids({
   campaignHistory = false,
   oldestIndexedCampaignUid = 0,
   threadReferenceIds = [],
+  threadRecipientTerms = [],
   indexedUids = [],
   logger = console,
   accountEmail = '',
@@ -139,6 +168,7 @@ async function resolveMailboxSyncUids({
   const threadReplyUids = await searchThreadReplyUids({
     client,
     threadReferenceIds,
+    threadRecipientTerms,
     logger,
     accountEmail,
     folder,

@@ -69,6 +69,7 @@ test('campaign history sync prioritizes missing sent replies linked by thread he
     threadReferenceIds: [
       '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>',
     ],
+    threadRecipientTerms: ['info@vangestelsteigerbouw.nl', 'vangestelsteigerbouw.nl'],
     indexedUids: [115],
   });
 
@@ -90,4 +91,11 @@ test('campaign history sync prioritizes missing sent replies linked by thread he
   });
   assert.equal(selected.filter((uid) => uid === 42).length, 1);
   assert.equal(selected.filter((uid) => uid === 115).length, 1);
+  assert.deepEqual(queries[4], {
+    since: CAMPAIGN_HISTORY_SINCE,
+    or: [
+      { header: { to: 'info@vangestelsteigerbouw.nl' } },
+      { header: { to: 'vangestelsteigerbouw.nl' } },
+    ],
+  });
 });
