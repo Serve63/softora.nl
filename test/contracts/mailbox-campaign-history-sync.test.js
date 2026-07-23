@@ -46,6 +46,21 @@ test('campaign history sync reserves capacity for newest and older campaign mail
   ]);
 });
 
+test('campaign history sync imports the newest missing targeted replies first', () => {
+  const selected = selectMailboxSyncUids({
+    allUids: Array.from({ length: 300 }, (_item, index) => index + 1),
+    priorityUids: Array.from({ length: 200 }, (_item, index) => index + 1),
+    indexedUids: [200],
+    limit: 20,
+  });
+
+  assert.equal(selected.includes(200), false);
+  assert.equal(selected.includes(199), true);
+  assert.equal(selected.includes(100), true);
+  assert.equal(selected.includes(99), false);
+  assert.ok(selected.indexOf(199) < selected.indexOf(100));
+});
+
 test('campaign history sync searches both coldmail subjects from campaign start', async () => {
   const queries = [];
   const options = [];
