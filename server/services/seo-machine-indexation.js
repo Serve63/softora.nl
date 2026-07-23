@@ -36,7 +36,11 @@ function classifyIndexationState(indexStatus = {}) {
   const robots = String(indexStatus.robotsTxtState || '').toLowerCase();
   const indexing = String(indexStatus.indexingState || '').toLowerCase();
   if (verdict === 'PASS') return 'indexed';
-  if (coverage.includes('unknown to google') || coverage.includes('niet bekend bij google')) return 'unknown';
+  if (
+    coverage.includes('unknown to google')
+    || coverage.includes('niet bekend bij google')
+    || coverage.includes('onbekend bij google')
+  ) return 'unknown';
   if (
     (coverage.includes('crawled') || coverage.includes('gecrawld'))
     && (coverage.includes('not indexed') || coverage.includes('niet geïndexeerd') || coverage.includes('niet geindexeerd'))
