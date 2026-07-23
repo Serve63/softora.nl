@@ -64,6 +64,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Productiecodewijzigingen horen samen te gaan met contract- of smoke-testupdates.
 - Grote productiewijzigingen moeten worden opgeknipt; `check:guardrails` blokkeert brede diffs boven de ingestelde limiet.
 - Grote nieuwe inline scripts in HTML zijn niet toegestaan; verplaats paginalogica naar `assets/*`.
+- Backendmodules boven 1200 regels mogen standaard niet netto groeien; trek nieuwe logica eerst uit naar een gerichte module.
 - Wijzigingen aan premium shell/sidebar bestanden vragen een gerichte update in `test/contracts/premium-sidebar-shell-scope.test.js`.
 - Wijzigingen aan guardrail- of verificatiescripts vragen een gerichte update in `test/contracts/agent-guardrails.test.js`.
 - Wijzigingen aan CI-workflows, protocoldocs of kwaliteitschecks mogen de baseline niet verlagen: `verify:critical`, `check:guardrails`, contracttests, smoke-tests en secrets-checks moeten onderdeel blijven van de automatische poort.

@@ -128,6 +128,11 @@ function isFrontendProductionPath(filePath) {
   return normalized.startsWith('assets/') || /^[^/]+\.html$/i.test(normalized);
 }
 
+function isBackendProductionPath(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  return /^(?:api|lib|server)\/.+\.(?:cjs|js|mjs)$/i.test(normalized);
+}
+
 function isApprovedBrowserStoragePath(filePath) {
   return APPROVED_BROWSER_STORAGE_PATHS.includes(normalizeRepoPath(filePath));
 }
@@ -396,6 +401,7 @@ function buildGuardrailViolations(options = {}) {
     testWeakeningViolations = [],
     largeInlineScriptViolations = [],
     oversizedFrontendGrowthViolations = [],
+    oversizedBackendGrowthViolations = [],
     protectedFrontendShellFiles = [],
     protectedQualityGateFiles = [],
     qualityBaselineViolations = [],
@@ -411,6 +417,7 @@ function buildGuardrailViolations(options = {}) {
     allowTestWeakening = false,
     allowLargeInlineScript = false,
     allowOversizedFrontendGrowth = false,
+    allowOversizedBackendGrowth = false,
     allowUntestedShellChange = false,
     allowUntestedQualityGateChange = false,
     allowLargeBehaviorChange = false,
@@ -509,6 +516,12 @@ function buildGuardrailViolations(options = {}) {
     );
   }
 
+  if (!allowOversizedBackendGrowth && oversizedBackendGrowthViolations.length > 0) {
+    violations.push(
+      `[guardrails] Grote backendmodule groeide verder: ${oversizedBackendGrowthViolations.join(', ')}. Splits nieuwe logica eerst naar een gerichte servermodule of gebruik ALLOW_OVERSIZED_BACKEND_GROWTH=1 voor een bewuste uitzondering.`
+    );
+  }
+
   const hasSidebarShellTest = changedTests.includes('test/contracts/premium-sidebar-shell-scope.test.js');
   if (!allowUntestedShellChange && protectedFrontendShellFiles.length > 0 && !hasSidebarShellTest) {
     violations.push(
@@ -556,6 +569,7 @@ module.exports = {
   formatAgeMs,
   getAddedLineNumbersFromDiff,
   isAllowedNewServerPath,
+  isBackendProductionPath,
   isBehaviorChangePath,
   isFrontendProductionPath,
   isApprovedBrowserStoragePath,

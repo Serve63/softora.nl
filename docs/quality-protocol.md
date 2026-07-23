@@ -17,6 +17,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Nieuwe routes horen in `server/routes/*`, validatie in `server/schemas/*`, beveiligingscontrole in `server/security/*`.
 - Root-level HTML mag kleine bootstrap bevatten, maar grotere paginalogica hoort in `assets/*`.
 - Frontend-bestanden boven de guardrail-limiet mogen niet verder groeien; nieuwe logica hoort eerst in kleinere modules of in een bewuste, genoteerde uitzondering.
+- Backendmodules boven de guardrail-limiet mogen niet verder groeien; nieuwe logica hoort eerst in een kleinere service, repository, route, schema, security- of configmodule.
 - Database of formele repositories zijn leidend zodra een pad is gemigreerd; voeg geen tweede bron van waarheid toe.
 - Voor klanten, actieve opdrachten, order-runtime, database-designfoto's en webdesign-jobs is [docs/data-ops-storage.md](data-ops-storage.md) leidend: oude `ui_state:*` JSON is daar alleen tijdelijke compat/fallback.
 
@@ -71,6 +72,7 @@ Dit protocol houdt de codebase stabiel, veilig en agent-vriendelijk terwijl we g
 - Elke push/merge naar `main` hoort automatisch via Vercel productie te worden; `.github/workflows/live-production-version.yml` wacht op die automatische deploy en faalt als live productie niet exact op `origin/main` staat.
 - Grote wijzigingen landen in kleine stappen; brede productiediffs en grote inline scripts worden door guardrails geblokkeerd tenzij bewust overruled.
 - Oversized frontend-bestanden mogen standaard niet netto groeien; splits eerst op of noteer bewust waarom `ALLOW_OVERSIZED_FRONTEND_GROWTH` nodig is.
+- Oversized backendmodules mogen standaard niet netto groeien; splits eerst op of noteer bewust waarom `ALLOW_OVERSIZED_BACKEND_GROWTH` nodig is.
 - Premium shell/sidebar wijzigingen houden `test/contracts/premium-sidebar-shell-scope.test.js` actueel.
 - Quality-gate wijzigingen houden `test/contracts/agent-guardrails.test.js` actueel.
 - Tests worden niet verzwakt met `.only`, `.skip` of `todo`.
