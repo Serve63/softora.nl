@@ -284,6 +284,7 @@ function isAutomatedCampaignReply(message) {
   ].filter(Boolean).join(' '));
 
   const automatedSubjectPatterns = [
+    /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
     /\bautomatisch antwoord\b/,
     /\bautomatische (?:e-?mail|mail|reactie|ontvangstbevestiging)\b/,
     /\bontvangstbevestiging\b/,
