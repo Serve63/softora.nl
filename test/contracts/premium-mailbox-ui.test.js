@@ -160,11 +160,12 @@ test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () =
   assert.match(html, /Martijn van de Ven/);
   assert.match(html, /Ik bouw onze websites met maatwerk\./);
   assert.doesNotMatch(
-    html.slice(html.indexOf('Jouw antwoord'), html.indexOf('Beantwoorden')),
+    html.slice(html.indexOf('Jouw antwoord'), html.indexOf('Jouw eerdere mail')),
     /Welke techniek gebruik je/
   );
-  assert.ok(html.indexOf('Jouw antwoord') < html.indexOf('Beantwoorden'));
-  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw eerdere mail'));
+  assert.match(html, /class="detail-mail-section detail-mail-section-sent"/);
+  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw antwoord'));
+  assert.ok(html.indexOf('Jouw antwoord') < html.indexOf('Jouw eerdere mail'));
 });
 
 test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conversatie', () => {
@@ -189,12 +190,14 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
   assert.match(html, /Eerder ontvangen/);
   assert.match(html, /Mag ik vragen waar jij het liefst je sites mee bouwt\?/);
   assert.doesNotMatch(html, /Jouw antwoord/);
-  assert.ok(html.indexOf('Eerder ontvangen') < html.indexOf('Beantwoorden'));
+  assert.match(html, /class="detail-mail-section detail-mail-section-received"/);
+  assert.doesNotMatch(html, /detail-mail-section-received[^>]*detail-mail-section-sent/);
+  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Eerder ontvangen'));
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723j/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723e/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723k/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723f/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -268,7 +271,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723j"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723k"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
