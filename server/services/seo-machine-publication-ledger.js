@@ -1,4 +1,4 @@
-const { getSeoContentPublicationPlan } = require('./seo-content');
+const { getSeoMachinePublicationPlan } = require('./seo-machine-publication-plan');
 
 const DEFAULT_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_HEALTH_PATH = '/api/health/baseline';
@@ -8,6 +8,11 @@ const DAILY_TARGET = 1;
 const WEEKLY_MINIMUM = 5;
 const WEEKLY_TARGET_MAXIMUM = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const PUBLICATION_KINDS = Object.freeze({
+  NEW_URL: 'new_url',
+  SUBSTANTIAL_REFRESH: 'substantial_refresh',
+  OTHER_GROWTH_ACTION: 'other_growth_action',
+});
 
 function normalizeOrigin(value) {
   return String(value || DEFAULT_ORIGIN).trim().replace(/\/+$/g, '');
@@ -71,6 +76,11 @@ function extractDatePublished(htmlRaw) {
   return match ? match[1] : '';
 }
 
+function extractDateModified(htmlRaw) {
+  const match = String(htmlRaw || '').match(/"dateModified"\s*:\s*"(\d{4}-\d{2}-\d{2})(?:[^"]*)"/i);
+  return match ? match[1] : '';
+}
+
 function hasVisiblePublishedDate(htmlRaw, publishedAt) {
   const date = escapeRegExp(String(publishedAt || ''));
   if (!date) return false;
@@ -117,13 +127,30 @@ function isPublicationInWindow(publishedAt, now, days) {
   return publishedMs >= cutoffMs && publishedMs <= todayMs;
 }
 
+function resolvePublicationKind(item = {}) {
+  return Object.values(PUBLICATION_KINDS).includes(item.publicationKind)
+    ? item.publicationKind
+    : PUBLICATION_KINDS.NEW_URL;
+}
+
+function resolvePublicationEventAt(item = {}) {
+  return String(item.eventAt || item.publishedAt || '').trim();
+}
+
 function buildPublicationCandidates({ publicationPlan, now = new Date(), maximumDays = 28 } = {}) {
   const plan = Array.isArray(publicationPlan)
     ? publicationPlan
-    : getSeoContentPublicationPlan({ now });
+    : getSeoMachinePublicationPlan({ now });
   return plan
-    .filter((item) => item && item.status === 'live' && isPublicationInWindow(item.publishedAt, now, maximumDays))
-    .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)) || a.path.localeCompare(b.path));
+    .filter((item) => item && item.status === 'live' && isPublicationInWindow(
+      resolvePublicationEventAt(item),
+      now,
+      maximumDays
+    ))
+    .sort((a, b) => (
+      resolvePublicationEventAt(b).localeCompare(resolvePublicationEventAt(a))
+      || a.path.localeCompare(b.path)
+    ));
 }
 
 function buildPublicationAudit({
@@ -140,10 +167,16 @@ function buildPublicationAudit({
   const robotsDirectives = extractRobotsDirectives(html);
   const xRobotsTag = String(response.headers.get('x-robots-tag') || '').toLowerCase();
   const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  const publicationKind = resolvePublicationKind(item);
+  const eventAt = resolvePublicationEventAt(item);
   const datePublished = extractDatePublished(html);
-  const publishedDateSource = datePublished === item.publishedAt
+  const dateModified = extractDateModified(html);
+  const eventDate = publicationKind === PUBLICATION_KINDS.SUBSTANTIAL_REFRESH
+    ? dateModified
+    : datePublished;
+  const publishedDateSource = eventDate === eventAt
     ? 'structured-data'
-    : (hasVisiblePublishedDate(html, item.publishedAt) ? 'visible' : 'missing');
+    : (hasVisiblePublishedDate(html, eventAt) ? 'visible' : 'missing');
   const checks = {
     status200: response.status === 200,
     html: contentType.includes('text/html'),
@@ -159,9 +192,12 @@ function buildPublicationAudit({
     contentType: item.collection,
     cluster: item.cluster,
     publishedAt: item.publishedAt,
+    eventAt,
+    publicationKind,
     status: response.status,
     canonical,
-    datePublished: publishedDateSource === 'missing' ? datePublished : item.publishedAt,
+    datePublished,
+    dateModified,
     publishedDateSource,
     checks,
     qualifies: Object.values(checks).every(Boolean),
@@ -178,8 +214,15 @@ async function fetchText(fetchImpl, url) {
 }
 
 function buildWindowSummary(items, now, days) {
-  const cohort = items.filter((item) => isPublicationInWindow(item.publishedAt, now, days));
+  const cohort = items.filter((item) => isPublicationInWindow(
+    item.eventAt || item.publishedAt,
+    now,
+    days
+  ));
   const qualifyingItems = cohort.filter((item) => item.qualifies);
+  const countKind = (kind) => qualifyingItems.filter((item) => (
+    resolvePublicationKind(item) === kind
+  )).length;
   const target = Math.round((days / 7) * WEEKLY_MINIMUM);
   return {
     days,
@@ -187,6 +230,9 @@ function buildWindowSummary(items, now, days) {
     targetMaximum: Math.round((days / 7) * WEEKLY_TARGET_MAXIMUM),
     declared: cohort.length,
     qualifying: qualifyingItems.length,
+    newUrls: countKind(PUBLICATION_KINDS.NEW_URL),
+    substantialRefreshes: countKind(PUBLICATION_KINDS.SUBSTANTIAL_REFRESH),
+    otherGrowthActions: countKind(PUBLICATION_KINDS.OTHER_GROWTH_ACTION),
     deficit: Math.max(0, target - qualifyingItems.length),
     items: cohort,
   };
@@ -257,9 +303,12 @@ async function collectLivePublicationLedger(options = {}) {
         contentType: item.collection,
         cluster: item.cluster,
         publishedAt: item.publishedAt,
+        eventAt: resolvePublicationEventAt(item),
+        publicationKind: resolvePublicationKind(item),
         status: 0,
         canonical: '',
         datePublished: '',
+        dateModified: '',
         checks: {
           status200: false,
           html: false,
@@ -347,6 +396,7 @@ module.exports = {
   DAILY_TARGET,
   DEFAULT_ORIGIN,
   DEFAULT_WINDOWS,
+  PUBLICATION_KINDS,
   WEEKLY_MINIMUM,
   WEEKLY_TARGET_MAXIMUM,
   buildPublicationAudit,
@@ -356,6 +406,7 @@ module.exports = {
   evaluateCadence,
   extractCanonicalHref,
   extractDatePublished,
+  extractDateModified,
   extractRobotsDirectives,
   extractSitemapLocations,
   hasVisiblePublishedDate,

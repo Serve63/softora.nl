@@ -3492,6 +3492,8 @@ function getSeoContentPublicationPlan({ now = new Date() } = {}) {
       title: item.title,
       cluster: getSeoContentClusterForItem(item).key,
       publishedAt: item.publishedAt,
+      eventAt: item.publishedAt,
+      publicationKind: 'new_url',
       status: Number.isFinite(publishedMs) && publishedMs <= nowMs ? 'live' : 'scheduled',
     };
   }).sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)) || a.slug.localeCompare(b.slug));

@@ -73,6 +73,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Bedrijfssoftware op maat laten maken voor CRM, dashboards, klantportaal of offerteflow? Softora helpt met scope, koppelingen, rechten en veilige doorgroei.',
     lastmod: '2026-07-06',
+    growthEventKind: 'substantial_refresh',
+    growthCluster: 'software-crm',
     kind: 'service',
     serviceName: 'Bedrijfssoftware op maat',
     relatedLinks: [
@@ -91,6 +93,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     description:
       'Laat een maatwerk CRM bouwen voor sales pipeline, offertebeheer, klantportaal, dashboards en AI-opvolging. Voor MKB-teams die CRM willen laten maken.',
     lastmod: '2026-07-04',
+    growthEventKind: 'substantial_refresh',
+    growthCluster: 'software-crm',
     kind: 'service',
     serviceName: 'CRM systeem op maat',
     relatedLinks: [
@@ -116,6 +120,8 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     kind: 'service',
     serviceName: 'AI automatisering',
     lastmod: '2026-07-23',
+    growthEventKind: 'substantial_refresh',
+    growthCluster: 'ai-automatisering',
     relatedLinks: [
       '/crm-systeem-op-maat',
       '/chatbot-laten-maken',
@@ -563,6 +569,7 @@ function buildStructuredDataGraph(entry, siteOriginRaw) {
       inLanguage: 'nl-NL',
       isPartOf: { '@id': `${siteOrigin}/#website` },
       about: { '@id': `${siteOrigin}/#organization` },
+      ...(entry.lastmod ? { dateModified: entry.lastmod } : {}),
     },
   ];
 
@@ -614,6 +621,24 @@ function addStructuredDataIfMissing(htmlRaw, entry, siteOrigin) {
   const json = escapeHtmlJson(buildStructuredDataGraph(entry, siteOrigin));
   const snippet = `    <script type="application/ld+json" data-softora-public-seo="structured-data">${json}</script>`;
   return injectBeforeHeadClose(html, snippet);
+}
+
+function upsertStructuredDataDateModified(htmlRaw, entry) {
+  const html = String(htmlRaw || '');
+  if (!entry.lastmod) return html;
+  const pattern = /(<script\b[^>]*data-softora-public-seo=["']structured-data["'][^>]*>)([\s\S]*?)(<\/script>)/i;
+  const match = html.match(pattern);
+  if (!match) return html;
+  try {
+    const payload = JSON.parse(match[2]);
+    const graph = Array.isArray(payload && payload['@graph']) ? payload['@graph'] : [];
+    const webPage = graph.find((node) => ['WebPage', 'AboutPage'].includes(node && node['@type']));
+    if (!webPage) return html;
+    webPage.dateModified = entry.lastmod;
+    return html.replace(pattern, `$1${escapeHtmlJson(payload)}$3`);
+  } catch (_) {
+    return html;
+  }
 }
 
 const PUBLIC_SEO_INTERNAL_LINK_STYLE = [
@@ -837,6 +862,7 @@ function applyPublicSeoHeadDefaults(htmlRaw, fileNameRaw, { siteOrigin = DEFAULT
   html = addMetaIfMissing(html, 'name', 'twitter:description', entry.description);
   html = addMetaIfMissing(html, 'name', 'twitter:image', imageUrl);
   html = addStructuredDataIfMissing(html, entry, siteOrigin);
+  html = upsertStructuredDataDateModified(html, entry);
   html = addInternalLinksIfMissing(html, entry);
   html = addConversionTrackingAttributesIfMissing(html, entry);
   html = addGoogleAdsConsentAssetsIfMissing(html);
