@@ -14,6 +14,8 @@
   const SAVE_DEBOUNCE_MS = 250;
   const SAVE_RETRY_MS = 1500;
   const MAX_SAVE_RETRIES = 3;
+  const STATE_LOAD_RETRY_BASE_MS = 1500;
+  const STATE_LOAD_RETRY_MAX_MS = 30000;
   const TODAY_REFRESH_MS = 60 * 1000;
   const DAYS = Array.from({ length: PERIOD.lastDay }, (_, index) => index + 1);
   const TOTAL_DAYS = DAYS.length;
@@ -50,6 +52,9 @@
   let stateRevision = 0;
   let queuedKeepalive = false;
   let saveRetryCount = 0;
+  let stateLoadRetryCount = 0;
+  let stateLoadRetryTimer = null;
+  let stateLoadInFlight = false;
   let iconPicker = null;
   let iconPickerTrigger = null;
   let activeIconCategory = ALL_ICON_CATEGORIES;
@@ -891,50 +896,92 @@
     markStateChanged();
     return true;
   }
+  function clearStateLoadRetry() {
+    if (!stateLoadRetryTimer) {
+      return;
+    }
+    window.clearTimeout(stateLoadRetryTimer);
+    stateLoadRetryTimer = null;
+  }
+  function scheduleStateHydrationRetry() {
+    if (stateReady || stateLoadRetryTimer) {
+      return;
+    }
+    const delay = Math.min(
+      STATE_LOAD_RETRY_MAX_MS,
+      STATE_LOAD_RETRY_BASE_MS * (2 ** Math.min(stateLoadRetryCount, 5))
+    );
+    stateLoadRetryCount += 1;
+    console.warn(`[LiveMomentum][state-load] Nieuwe poging over ${delay}ms.`);
+    stateLoadRetryTimer = window.setTimeout(() => {
+      stateLoadRetryTimer = null;
+      void hydrateState();
+    }, delay);
+  }
+  function retryStateHydrationNow() {
+    if (stateReady || stateLoadInFlight) {
+      return;
+    }
+    clearStateLoadRetry();
+    void hydrateState();
+  }
   async function hydrateState() {
+    if (stateReady || stateLoadInFlight) {
+      return;
+    }
+    stateLoadInFlight = true;
+    let shouldRetry = false;
     const uiStateClient = window.SoftoraUiStateClient;
     if (!uiStateClient || typeof uiStateClient.get !== 'function' || typeof uiStateClient.set !== 'function') {
       setPersistenceState('error');
-      return;
+      shouldRetry = true;
+      console.error('[LiveMomentum][state-load] Supabase-stateclient is niet beschikbaar.');
+    } else {
+      setPersistenceState('loading');
+      try {
+        const response = await uiStateClient.get(STATE_SCOPE);
+        if (!response?.ok || response.source !== 'supabase') {
+          throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
+        }
+        const values = response.values || {};
+        let storedState = parseStoredState(values[STATE_KEY]);
+        if (!storedState && PERIOD_KEY === calendar.INITIAL_PERIOD_KEY) {
+          storedState = parseStoredState(values[calendar.LEGACY_STATE_KEY], { allowLegacy: true });
+        }
+        if (!storedState) {
+          const priorStateKey = calendar.findLatestPriorMonthStateKey(values, PERIOD_KEY);
+          const priorRawState = priorStateKey
+            ? values[priorStateKey]
+            : PERIOD_KEY > calendar.INITIAL_PERIOD_KEY
+              ? values[calendar.LEGACY_STATE_KEY]
+              : null;
+          storedState = parseCarriedState(priorRawState);
+        }
+        if (storedState) {
+          renderGridShell(storedState.goals);
+          endGameCards.render(storedState.endGameCards);
+          refreshCellData();
+          getLabels().forEach(bindLabel);
+          updateChart();
+        }
+        stateReady = true;
+        stateLoadRetryCount = 0;
+        clearStateLoadRetry();
+        setPersistenceState('saved');
+        if (!storedState || storedState.needsMigration) {
+          markStateChanged();
+        }
+      } catch (error) {
+        shouldRetry = true;
+        setPersistenceState('error');
+        console.error('[LiveMomentum][state-load]', error?.message || error);
+      }
     }
-    setPersistenceState('loading');
-    try {
-      const response = await uiStateClient.get(STATE_SCOPE);
-      if (!response?.ok || response.source !== 'supabase') {
-        throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
-      }
-      const values = response.values || {};
-      let storedState = parseStoredState(values[STATE_KEY]);
-      if (!storedState && PERIOD_KEY === calendar.INITIAL_PERIOD_KEY) {
-        storedState = parseStoredState(values[calendar.LEGACY_STATE_KEY], { allowLegacy: true });
-      }
-      if (!storedState) {
-        const priorStateKey = calendar.findLatestPriorMonthStateKey(values, PERIOD_KEY);
-        const priorRawState = priorStateKey
-          ? values[priorStateKey]
-          : PERIOD_KEY > calendar.INITIAL_PERIOD_KEY
-            ? values[calendar.LEGACY_STATE_KEY]
-            : null;
-        storedState = parseCarriedState(priorRawState);
-      }
-      if (storedState) {
-        renderGridShell(storedState.goals);
-        endGameCards.render(storedState.endGameCards);
-        refreshCellData();
-        getLabels().forEach(bindLabel);
-        updateChart();
-      }
-      stateReady = true;
-      setPersistenceState('saved');
-      if (!storedState || storedState.needsMigration) {
-        markStateChanged();
-      }
-    } catch (error) {
-      setPersistenceState('error');
-      console.error('[LiveMomentum][state-load]', error?.message || error);
-    } finally {
-      focusMobileCalendarOnToday();
+    stateLoadInFlight = false;
+    if (shouldRetry && !stateReady) {
+      scheduleStateHydrationRetry();
     }
+    focusMobileCalendarOnToday();
   }
   renderChartShell();
   renderGridShell(getDefaultGoals());
@@ -945,7 +992,11 @@
   focusMobileCalendarOnToday();
   void hydrateState();
   window.setInterval(refreshToday, TODAY_REFRESH_MS);
-  window.addEventListener('focus', refreshToday);
+  window.addEventListener('focus', () => {
+    refreshToday();
+    retryStateHydrationNow();
+  });
+  window.addEventListener('online', retryStateHydrationNow);
   grid.addEventListener('click', (event) => {
     if (!stateReady) {
       return;
@@ -1106,10 +1157,14 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       refreshToday();
+      retryStateHydrationNow();
     }
     if (document.visibilityState === 'hidden' && stateDirty) {
       flushStateWrite();
     }
   });
-  window.addEventListener('pagehide', flushStateWrite);
+  window.addEventListener('pagehide', () => {
+    clearStateLoadRetry();
+    flushStateWrite();
+  });
 })();
