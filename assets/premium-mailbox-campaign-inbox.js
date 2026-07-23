@@ -534,6 +534,7 @@
   }
 
   function bindMessageDeletionSync(options = {}) {
+    if (!global.document || typeof global.addEventListener !== 'function') return () => {};
     const unsubscribe = subscribeToMessageDeletions((identity) => {
       const messages = typeof options.getMessages === 'function' ? options.getMessages() : [];
       const activeId = typeof options.getActiveId === 'function' ? options.getActiveId() : null;
