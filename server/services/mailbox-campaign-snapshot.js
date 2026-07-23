@@ -9,6 +9,8 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 2;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_MESSAGES = 10;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
 const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
@@ -62,6 +64,32 @@ function sanitizeBodyImage(value, options = {}) {
   };
 }
 
+function sanitizeThreadMessage(value, options = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const rawBody = String(source.body || '');
+  const body = options.includeBody === false
+    ? ''
+    : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS);
+  return {
+    id: text(source.id, 500),
+    uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
+    folder: 'sent',
+    accountEmail: text(source.accountEmail, 320).toLowerCase(),
+    from: text(source.from, 500),
+    email: text(source.email, 320).toLowerCase(),
+    to: text(source.to, 2000),
+    subject: text(source.subject || '(Geen onderwerp)', 1000),
+    preview: text(source.preview, 1000),
+    body,
+    date: text(source.date, 100),
+    messageId: text(source.messageId, 1000),
+    inReplyTo: text(source.inReplyTo, 1000),
+    references: text(source.references, 4000),
+    hasBody: Boolean(source.hasBody || rawBody),
+    bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
+  };
+}
+
 function sanitizeMessage(value, options = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const rawBody = String(source.body || '');
@@ -100,6 +128,9 @@ function sanitizeMessage(value, options = {}) {
     campaign: sanitizeCampaign(source.campaign),
     outreach: sanitizeOutreach(source.outreach),
     bodyImages,
+    threadMessages: (Array.isArray(source.threadMessages) ? source.threadMessages : [])
+      .slice(-MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_MESSAGES)
+      .map((message) => sanitizeThreadMessage(message, { includeBody: options.includeBody !== false })),
   };
 }
 
@@ -118,6 +149,12 @@ function fitSnapshotToBudget(snapshot) {
     if (index > 0 && snapshot.messages[index].body) {
       snapshot.messages[index].body = '';
       snapshot.messages[index].bodyTruncated = true;
+    }
+    if (index > 0 && snapshot.messages[index].threadMessages.length) {
+      snapshot.messages[index].threadMessages.forEach((message) => {
+        if (message.body) message.bodyTruncated = true;
+        message.body = '';
+      });
     }
     serialized = serialize(snapshot);
     if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;

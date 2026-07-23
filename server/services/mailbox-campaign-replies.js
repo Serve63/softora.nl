@@ -12,6 +12,8 @@ const CAMPAIGN_MAILBOX_ACCOUNTS = Object.freeze([
 
 const CAMPAIGN_REPLY_LIMIT = 200;
 const CAMPAIGN_MESSAGE_SCAN_LIMIT = 2000;
+const CAMPAIGN_THREAD_MESSAGE_LIMIT = 10;
+const CAMPAIGN_THREAD_FALLBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -25,6 +27,82 @@ function normalizeMessageId(value) {
   return normalizeText(value)
     .toLowerCase()
     .replace(/^<+|>+$/g, '');
+}
+
+function normalizeSubject(value) {
+  return normalizeClassifierText(value)
+    .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/g, '')
+    .trim();
+}
+
+function extractEmailAddresses(value) {
+  const matches = normalizeText(value).toLowerCase().match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g);
+  return Array.from(new Set(matches || []));
+}
+
+function parseMessageDate(value) {
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function messageReferencesId(message, messageId) {
+  if (!messageId) return false;
+  const references = [
+    message && message.inReplyTo,
+    message && message.references,
+  ].map((value) => normalizeText(value).toLowerCase());
+  return references.some((value) => value
+    .split(/\s+/)
+    .map(normalizeMessageId)
+    .includes(messageId));
+}
+
+function isSentReplyForMessage(sentMessage, inboxMessage) {
+  if (
+    normalizeText(sentMessage && sentMessage.folder).toLowerCase() !== 'sent' ||
+    normalizeEmail(sentMessage && sentMessage.accountEmail) !== normalizeEmail(inboxMessage && inboxMessage.accountEmail)
+  ) {
+    return false;
+  }
+  const sentAt = parseMessageDate(sentMessage && sentMessage.date);
+  const inboxAt = parseMessageDate(inboxMessage && inboxMessage.date);
+  if (!sentAt || !inboxAt || sentAt <= inboxAt) return false;
+
+  const inboxMessageId = normalizeMessageId(inboxMessage && inboxMessage.messageId);
+  if (messageReferencesId(sentMessage, inboxMessageId)) return true;
+
+  const senderEmail = normalizeEmail(inboxMessage && inboxMessage.email);
+  const recipients = extractEmailAddresses(sentMessage && sentMessage.to);
+  const sameSubject = normalizeSubject(sentMessage && sentMessage.subject) === normalizeSubject(inboxMessage && inboxMessage.subject);
+  return Boolean(
+    senderEmail &&
+    recipients.includes(senderEmail) &&
+    sameSubject &&
+    sentAt - inboxAt <= CAMPAIGN_THREAD_FALLBACK_WINDOW_MS
+  );
+}
+
+function attachSentThreadMessages(replies, sentMessages) {
+  const sourceReplies = Array.isArray(replies) ? replies : [];
+  const candidates = dedupeCampaignMessages(sentMessages)
+    .filter((message) => normalizeText(message && message.folder).toLowerCase() === 'sent');
+  const messagesByReply = new Map(sourceReplies.map((reply) => [reply, []]));
+  candidates.forEach((message) => {
+    const eligibleReplies = sourceReplies
+      .filter((reply) => isSentReplyForMessage(message, reply))
+      .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
+    if (!eligibleReplies.length) return;
+    const directReply = eligibleReplies.find((reply) =>
+      messageReferencesId(message, normalizeMessageId(reply && reply.messageId))
+    );
+    messagesByReply.get(directReply || eligibleReplies[0]).push(message);
+  });
+  return sourceReplies.map((reply) => ({
+    ...reply,
+    threadMessages: messagesByReply.get(reply)
+      .sort((left, right) => parseMessageDate(left && left.date) - parseMessageDate(right && right.date))
+      .slice(-CAMPAIGN_THREAD_MESSAGE_LIMIT),
+  }));
 }
 
 function normalizeClassifierText(value) {
@@ -200,11 +278,18 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const messages = await mailboxIndexStore.listMessagesForAccounts({
-      accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-      folder: 'inbox',
-      limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
-    });
+    const [messages, sentMessagesResult] = await Promise.all([
+      mailboxIndexStore.listMessagesForAccounts({
+        accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+        folder: 'inbox',
+        limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+      }),
+      mailboxIndexStore.listMessagesForAccounts({
+        accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+        folder: 'sent',
+        limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+      }).catch(() => []),
+    ]);
     if (!Array.isArray(messages)) {
       const error = new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.');
       error.status = 503;
@@ -242,7 +327,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
-    const replies = campaignMessages
+    let replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
         if (!customer && !isCampaignReplySubject(message)) return null;
@@ -251,10 +336,23 @@ function createMailboxCampaignRepliesService(deps = {}) {
       .filter(Boolean)
       .slice(0, safeLimit);
 
-    if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') return replies;
+    const sentMessages = Array.isArray(sentMessagesResult) ? sentMessagesResult : [];
+    if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') {
+      return attachSentThreadMessages(replies, sentMessages);
+    }
     const hydratedReplies = await mailboxIndexStore.hydrateMessageBodies({ messages: replies });
-    return (Array.isArray(hydratedReplies) ? hydratedReplies : replies)
+    replies = (Array.isArray(hydratedReplies) ? hydratedReplies : replies)
       .filter((message) => !isAutomatedCampaignReply(message));
+    const matchedSentMessages = dedupeCampaignMessages(
+      replies.flatMap((reply) => sentMessages.filter((message) => isSentReplyForMessage(message, reply)))
+    );
+    const hydratedSentMessages = [];
+    for (let index = 0; index < matchedSentMessages.length; index += 100) {
+      const batch = matchedSentMessages.slice(index, index + 100);
+      const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: batch });
+      hydratedSentMessages.push(...(Array.isArray(hydrated) ? hydrated : batch));
+    }
+    return attachSentThreadMessages(replies, hydratedSentMessages);
   }
 
   return {
@@ -266,11 +364,14 @@ module.exports = {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_REPLY_LIMIT,
+  CAMPAIGN_THREAD_MESSAGE_LIMIT,
+  attachSentThreadMessages,
   buildCampaignReply,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
   isCampaignReplySubject,
+  isSentReplyForMessage,
   isOwnMailboxCampaignCustomer,
   isWebdesignCampaignCustomer,
   normalizeOutreachStatus,

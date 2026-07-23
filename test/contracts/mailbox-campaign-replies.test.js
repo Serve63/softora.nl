@@ -120,3 +120,66 @@ test('campaign reply service excludes duplicates and automatic replies before cu
   assert.deepEqual(lookedUpEmails.sort(), ['human@example.nl', 'leergeld@example.nl']);
   assert.deepEqual(replies.map((message) => message.id), ['inbox:3']);
 });
+
+test('campaign reply service koppelt een later verzonden antwoord aan dezelfde ontvangen mail', async () => {
+  const requestedFolders = [];
+  const inboxMessage = {
+    id: 'inbox:91',
+    uid: 91,
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Seats 2 Meet Station Den Bosch',
+    email: 'info@seats2meetstationdenbosch.nl',
+    to: 'martijnven123@gmail.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Mag ik vragen waar jij het liefst je sites mee bouwt?',
+    body: 'Mag ik vragen waar jij het liefst je sites mee bouwt?',
+    date: '2026-07-22T15:36:00.000Z',
+    messageId: '<incoming-seats2meet@example.nl>',
+  };
+  const sentReply = {
+    id: 'sent:102',
+    uid: 102,
+    folder: 'sent',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijnven123@gmail.com',
+    to: 'info@seats2meetstationdenbosch.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Hoi Helma, ik bouw onze websites...',
+    date: '2026-07-23T09:21:00.000Z',
+    messageId: '<martijn-answer@example.nl>',
+    inReplyTo: '<incoming-seats2meet@example.nl>',
+    references: '<campaign-start@example.nl> <incoming-seats2meet@example.nl>',
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => {
+        requestedFolders.push(folder);
+        return folder === 'sent' ? [sentReply] : [inboxMessage];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages.map((message) => (
+        message.id === 'sent:102'
+          ? { ...message, body: 'Hoi Helma,\n\nIk bouw onze websites met maatwerk.' }
+          : message
+      )),
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'seats2meet',
+        bedrijf: 'Seats 2 Meet Station Den Bosch',
+        email: 'info@seats2meetstationdenbosch.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100 });
+
+  assert.deepEqual(requestedFolders.sort(), ['inbox', 'sent']);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].threadMessages.length, 1);
+  assert.equal(replies[0].threadMessages[0].id, 'sent:102');
+  assert.equal(replies[0].threadMessages[0].body, 'Hoi Helma,\n\nIk bouw onze websites met maatwerk.');
+});
