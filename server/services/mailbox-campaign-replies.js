@@ -186,6 +186,7 @@ function attachSentThreadMessages(replies, sentMessages) {
     .filter((message) => normalizeText(message && message.folder).toLowerCase() !== 'sent');
   const candidates = dedupeCampaignMessages(sentMessages)
     .filter((message) => normalizeText(message && message.folder).toLowerCase() === 'sent');
+  const disjointSet = createConversationDisjointSet([...sourceReplies, ...candidates]);
   const replyGroups = new Map();
 
   sourceReplies.forEach((reply) => {
@@ -199,12 +200,32 @@ function attachSentThreadMessages(replies, sentMessages) {
   candidates.forEach((message) => {
     const account = normalizeEmail(message && message.accountEmail);
     const recipients = extractEmailAddresses(message && message.to);
+    const explicitConversationIds = new Set(
+      sourceReplies
+        .filter((reply) =>
+          normalizeEmail(reply && reply.accountEmail) === account &&
+          (
+            isSentReplyForMessage(message, reply) ||
+            (
+              getCampaignConversationId(message, disjointSet) &&
+              getCampaignConversationId(message, disjointSet) ===
+                getCampaignConversationId(reply, disjointSet)
+            )
+          )
+        )
+        .map((reply) => getContactConversationId(reply))
+        .filter(Boolean)
+    );
     recipients.forEach((contactEmail) => {
       const conversationId = getContactConversationId(
         { ...message, accountEmail: account },
         contactEmail
       );
-      if (!conversationId || !replyGroups.has(conversationId)) return;
+      if (conversationId && replyGroups.has(conversationId)) {
+        explicitConversationIds.add(conversationId);
+      }
+    });
+    explicitConversationIds.forEach((conversationId) => {
       if (!sentByConversation.has(conversationId)) sentByConversation.set(conversationId, []);
       sentByConversation.get(conversationId).push(message);
     });

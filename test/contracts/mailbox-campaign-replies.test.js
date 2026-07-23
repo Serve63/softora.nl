@@ -64,6 +64,48 @@ test('campaign mailbox sorteert gesprekken op hun nieuwste echte activiteit', ()
   assert.equal(conversations[1].email, 'later@example.test');
 });
 
+test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een ander contactadres', () => {
+  const originalMessageId = '<initial-vangestel@gmail.com>';
+  const incomingMessageId = '<reply-vangestel@example.nl>';
+  const conversations = attachSentThreadMessages(
+    [{
+      id: 'inbox:2429',
+      folder: 'inbox',
+      accountEmail: 'serve290@gmail.com',
+      email: 'info@vangestelsteigerbouw.nl',
+      to: 'serve290@gmail.com',
+      subject: 'Re: Kleine vraag over jullie website',
+      date: '2026-06-09T21:38:29.000Z',
+      messageId: incomingMessageId,
+      inReplyTo: originalMessageId,
+      references: originalMessageId,
+    }],
+    [{
+      id: 'sent:joey',
+      folder: 'sent',
+      accountEmail: 'serve290@gmail.com',
+      email: 'serve290@gmail.com',
+      to: 'Joey <joey@vangestelsteigerbouw.nl>',
+      subject: 'Re: Kleine vraag over jullie website',
+      date: '2026-06-10T08:00:00.000Z',
+      messageId: '<serve-follow-up@gmail.com>',
+      inReplyTo: incomingMessageId,
+      references: `${originalMessageId} ${incomingMessageId}`,
+    }]
+  );
+
+  assert.equal(conversations.length, 1);
+  assert.equal(
+    conversations[0].conversationId,
+    'conversation:serve290@gmail.com|contact:info@vangestelsteigerbouw.nl'
+  );
+  assert.deepEqual(
+    conversations[0].threadMessages.map((message) => message.id),
+    ['sent:joey']
+  );
+  assert.equal(conversations[0].activityAt, '2026-06-10T08:00:00.000Z');
+});
+
 test('campaign mailbox recognizes strong automatic reply signals without hiding normal replies', () => {
   assert.equal(isAutomatedCampaignReply({
     subject: 'Afwezigheidmelding Re: Kleine vraag over jullie website',
