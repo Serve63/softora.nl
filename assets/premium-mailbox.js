@@ -764,17 +764,9 @@ function renderList(options = {}) {
   }
   const hasVisibleActiveMail = activeMail != null && list.some((mail) => String(mail.id) === String(activeMail));
   if (!hasVisibleActiveMail) activeMail = null;
-  wrap.innerHTML = list.map(m => `
-    <div class="mail-item ${m.unread ? 'unread' : ''} ${String(activeMail) === String(m.id) ? 'active' : ''}" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(m.id)}" data-mailbox-received-at="${escapeHtml(m.receivedAt || '')}" role="button" tabindex="0">
-      ${m.unread ? '<div class="unread-dot"></div>' : ''}
-      <div class="mail-item-top">
-        <div class="mail-from">${escapeHtml(window.SoftoraMailboxDisplay.getListPrimaryText(m, { ...displayOptions, account: m.accountEmail || displayOptions.account }))}</div>
-        <time class="mail-time" datetime="${escapeHtml(m.receivedAt || '')}">
-          ${m.listDate ? `<span class="mail-date-label">${escapeHtml(m.listDate)}</span>` : ''}
-          <span class="mail-time-value">${escapeHtml(m.time)}</span>
-        </time>
-      </div>
-    </div>`).join('');
+  wrap.innerHTML = list.map(m => window.SoftoraMailboxList.renderItem(m, {
+    activeMail, displayOptions, escapeHtml, display: window.SoftoraMailboxDisplay,
+  })).join('');
   if (!activeMail && options.openLatest !== false) openMail(list[0].id);
 }
 async function persistMailReadState(mail) {
