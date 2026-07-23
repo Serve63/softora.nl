@@ -865,6 +865,7 @@ async function deleteMail(id) {
     if (!response.ok || !data?.ok) {
       throw new Error(data?.detail || data?.error || 'Mail verwijderen mislukt');
     }
+    window.SoftoraMailboxCampaignInbox?.removeCachedMessage?.(m);
     mails = mails.filter(mail => String(mail.id) !== String(id));
     if (String(activeMail) === String(id)) activeMail = null;
     resetDetailEmpty();

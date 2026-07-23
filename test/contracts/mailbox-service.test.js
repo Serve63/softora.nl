@@ -2064,6 +2064,7 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
 });
 
 test('mailbox service moves deleted messages to the resolved trash folder', async () => {
+  const persistenceCalls = [];
   const client = createFakeImapClient({
     boxes: [
       { path: 'INBOX' },
@@ -2093,6 +2094,20 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
       },
     ]),
     createImapClient: () => client,
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      markMessageDeleted: async (input) => {
+        persistenceCalls.push(['index-delete', input]);
+        return { ok: true };
+      },
+    },
+    mailboxCampaignRepliesService: {
+      listReplies: async () => {
+        persistenceCalls.push(['snapshot-refresh']);
+        return [];
+      },
+    },
   });
   const res = createResponseRecorder();
 
@@ -2118,6 +2133,15 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
   });
   assert.deepEqual(client.movedMessages, [
     { mailboxName: 'INBOX', uids: [42], destination: 'INBOX/Prullenbak', options: { uid: true } },
+  ]);
+  assert.deepEqual(persistenceCalls, [
+    ['index-delete', {
+      accountEmail: 'serve@softora.nl',
+      id: 'inbox:42',
+      folder: 'inbox',
+      uid: 42,
+    }],
+    ['snapshot-refresh'],
   ]);
 });
 
