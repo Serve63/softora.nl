@@ -2,6 +2,13 @@ const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   normalizeWebsitePreviewReferenceImage: normalizeWebsitePreviewReferenceImageDefault,
 } = require('./ai-reference-image');
+const {
+  inferWebsitePreviewReferenceFileName,
+  isLikelyUsefulReferenceImageUrl,
+  isRetryableReferenceHttpStatus,
+  resolveHomepageScreenshotCandidateCount,
+  resolveReferenceFetchAttempts,
+} = require('./ai-reference-fetch');
 
 function createAiRemoteService(deps = {}) {
   const {
@@ -909,33 +916,6 @@ function createAiRemoteService(deps = {}) {
     return '';
   }
 
-  function isLikelyUsefulReferenceImageUrl(urlRaw) {
-    const url = normalizeString(urlRaw || '').toLowerCase();
-    if (!url) return false;
-    if (/^data:|^blob:|^javascript:/i.test(url)) return false;
-    if (/\.(?:svg|ico)(?:[?#].*)?$/i.test(url)) return false;
-    return /^https?:\/\//i.test(url);
-  }
-
-  function inferWebsitePreviewReferenceFileName(urlRaw, index, mimeTypeRaw) {
-    const mimeType = normalizeString(mimeTypeRaw || '').toLowerCase();
-    const extension =
-      mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-    let base = '';
-    try {
-      const parsed = new URL(String(urlRaw || ''));
-      base = normalizeString(parsed.pathname.split('/').filter(Boolean).pop() || '')
-        .replace(/\.[a-z0-9]+$/i, '')
-        .replace(/[^a-z0-9._-]+/gi, '-')
-        .replace(/-{2,}/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 80);
-    } catch {
-      base = '';
-    }
-    return `${base || `website-reference-${index + 1}`}.${extension}`;
-  }
-
   async function fetchWebsitePreviewReferenceImages(scan = {}) {
     const referenceMode = normalizeString(
       scan.referenceImageMode || scan.websitePreviewReferenceMode || ''
@@ -960,19 +940,22 @@ function createAiRemoteService(deps = {}) {
     const pageUrl = normalizeString(scan.sourceUrl || scan.url || '');
     const isHomepageScreenshot = referenceMode === 'homepage-screenshot';
     const maxImages = isHomepageScreenshot ? 1 : 3;
-    const configuredScreenshotCandidateCount = Number(scan.homepageScreenshotReferenceUrlCount);
-    const screenshotCandidateCount =
-      isHomepageScreenshot && Number.isFinite(configuredScreenshotCandidateCount)
-        ? Math.max(0, Math.min(candidates.length, Math.floor(configuredScreenshotCandidateCount)))
-        : candidates.length;
+    const screenshotCandidateCount = resolveHomepageScreenshotCandidateCount({
+      candidateCount: candidates.length,
+      configuredCount: scan.homepageScreenshotReferenceUrlCount,
+      isHomepageScreenshot,
+    });
     const rejectionDiagnostics = [];
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (rawImages.length >= maxImages) break;
       const candidateUrl = candidates[index];
       if (!isLikelyUsefulReferenceImageUrl(candidateUrl)) continue;
-      const isScreenshotProviderCandidate = isHomepageScreenshot && index < screenshotCandidateCount;
-      const maxFetchAttempts = isScreenshotProviderCandidate ? 3 : 1;
+      const maxFetchAttempts = resolveReferenceFetchAttempts({
+        index,
+        isHomepageScreenshot,
+        screenshotCandidateCount,
+      });
       let finalRejectionReason = 'unknown';
       let acceptedCandidate = false;
 
@@ -1023,7 +1006,7 @@ function createAiRemoteService(deps = {}) {
           } else {
             const status = Number(response?.status || 0) || 0;
             rejectionReason = `http:${status}`;
-            retryableRejection = status === 408 || status === 425 || status === 429 || (status >= 500 && status !== 501);
+            retryableRejection = isRetryableReferenceHttpStatus(status);
           }
         } catch (error) {
           rejectionReason = `error:${normalizeString(error?.name || 'Error').slice(0, 40)}`;
