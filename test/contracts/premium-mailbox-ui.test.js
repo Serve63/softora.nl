@@ -206,7 +206,7 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723l/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723h/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723i/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -280,7 +280,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723h"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723i"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723l"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -407,14 +407,31 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       body: 'Dit bericht is automatisch gegenereerd.',
       receivedAt: '2026-07-23T11:00:00.000Z',
     },
+    {
+      id: 'sushi-auto',
+      accountEmail: 'servecreusen7@gmail.com',
+      subject: 'Re: Kleine vraag over jullie website',
+      preview: 'Dit is een automatisch email van info@sushidetoren.com.',
+      body: 'We hebben uw email in goede orde ontvangen en proberen uw email binnen 24 uur te beantwoorden.',
+      receivedAt: '2026-07-23T12:00:00.000Z',
+    },
+    {
+      id: 'human-about-automation',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Re: Kleine vraag over jullie website',
+      body: 'Dank voor je mail. De automatische e-mail op onze website werkt inderdaad nog niet goed.',
+      receivedAt: '2026-07-23T13:00:00.000Z',
+    },
   ];
 
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[0]), false);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[1]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[2]), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[3]), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[4]), false);
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
-    ['human']
+    ['human-about-automation', 'human']
   );
 });
 
