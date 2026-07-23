@@ -13,6 +13,11 @@
 - `server/schemas/` voor formele request/response contracts
 - `assets/pages/` voor paginalogica buiten HTML
 
+## Omvangsbudget
+- Bestaande backendmodules boven 1200 regels zijn afbouwzones en mogen standaard niet netto groeien.
+- Nieuwe backendlogica landt in een gerichte module met één duidelijke verantwoordelijkheid.
+- Uitzonderingen vereisen een bewuste lokale override; CI bevat geen permanente bypass.
+
 ## Niet-breekbare flows
 Zie [server/routes/manifest.js](../server/routes/manifest.js).
 

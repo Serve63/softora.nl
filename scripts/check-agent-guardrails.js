@@ -7,8 +7,9 @@ const {
   countAddedInlineScriptLines,
   countAddedServerJsFunctions,
   countDiffLines,
-  isBehaviorChangePath,
   isApprovedBrowserStoragePath,
+  isBackendProductionPath,
+  isBehaviorChangePath,
   isFrontendProductionPath,
   isHighRiskPath,
   isPremiumAuthUsersWriteScanPath,
@@ -457,6 +458,22 @@ const oversizedFrontendGrowthViolations = changedFiles
   })
   .filter(Boolean);
 
+const oversizedBackendLineLimit = Number(process.env.GUARDRAILS_MAX_BACKEND_FILE_LINES || 1200);
+const oversizedBackendNetGrowthLimit = Number(process.env.GUARDRAILS_MAX_OVERSIZED_BACKEND_NET_GROWTH || 0);
+const oversizedBackendGrowthViolations = changedFiles
+  .filter(isBackendProductionPath)
+  .map((filePath) => {
+    const lineCount = readRepoFileLineCount(filePath);
+    if (lineCount <= oversizedBackendLineLimit) return '';
+    const diffArgs = getDiffArgsForPath(filePath);
+    const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+    const counts = countDiffLines(diffText);
+    const netGrowth = counts.additions - counts.deletions;
+    if (netGrowth <= oversizedBackendNetGrowthLimit) return '';
+    return `${filePath} (${lineCount} regels; netto +${netGrowth}; limiet ${oversizedBackendLineLimit} regels en max +${oversizedBackendNetGrowthLimit})`;
+  })
+  .filter(Boolean);
+
 function diffTouchesPremiumShell(filePath) {
   const normalized = normalizeRepoPath(filePath);
   if (isProtectedFrontendShellPath(normalized)) return true;
@@ -496,6 +513,7 @@ const violations = buildGuardrailViolations({
   testWeakeningViolations,
   largeInlineScriptViolations,
   oversizedFrontendGrowthViolations,
+  oversizedBackendGrowthViolations,
   protectedFrontendShellFiles,
   protectedQualityGateFiles,
   qualityBaselineViolations: [
@@ -514,6 +532,7 @@ const violations = buildGuardrailViolations({
   allowTestWeakening: toBooleanEnv('ALLOW_TEST_WEAKENING'),
   allowLargeInlineScript: toBooleanEnv('ALLOW_LARGE_INLINE_SCRIPT'),
   allowOversizedFrontendGrowth: toBooleanEnv('ALLOW_OVERSIZED_FRONTEND_GROWTH'),
+  allowOversizedBackendGrowth: toBooleanEnv('ALLOW_OVERSIZED_BACKEND_GROWTH'),
   allowUntestedShellChange: toBooleanEnv('ALLOW_UNTESTED_SHELL_CHANGE'),
   allowUntestedQualityGateChange: toBooleanEnv('ALLOW_UNTESTED_QUALITY_GATE_CHANGE'),
   allowLargeBehaviorChange: toBooleanEnv('ALLOW_LARGE_BEHAVIOR_CHANGE'),
