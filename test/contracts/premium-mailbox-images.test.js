@@ -72,7 +72,12 @@ test('mailbox image loader warmt alleen de eerste twee beeldmails vooruit', asyn
   try {
     loaded.module.prewarm([
       { bodyImages: [] },
-      { bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=1' }] },
+      {
+        bodyImages: [],
+        threadMessages: [{
+          bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=1' }],
+        }],
+      },
       { bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=2' }] },
       { bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=3' }] },
     ]);

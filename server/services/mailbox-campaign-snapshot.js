@@ -66,6 +66,11 @@ function sanitizeBodyImage(value, options = {}) {
 function sanitizeThreadMessage(value, options = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const rawBody = String(source.body || '');
+  const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
+  const bodyImages = (options.includeImages === false ? [] : sourceBodyImages)
+    .map((image, imageIndex) => sanitizeBodyImage(image, { message: source, imageIndex }))
+    .filter(Boolean)
+    .slice(0, 2);
   const body = options.includeBody === false
     ? ''
     : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS);
@@ -80,12 +85,15 @@ function sanitizeThreadMessage(value, options = {}) {
     subject: text(source.subject || '(Geen onderwerp)', 1000),
     preview: text(source.preview, 1000),
     body,
+    optOutUrl: text(source.optOutUrl, 4000),
     date: text(source.date, 100),
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
     hasBody: Boolean(source.hasBody || rawBody),
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
+    bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
+    bodyImages,
   };
 }
 
@@ -153,7 +161,10 @@ function sanitizeMessage(value, options = {}) {
     outreach: sanitizeOutreach(source.outreach),
     bodyImages,
     threadMessages: (Array.isArray(source.threadMessages) ? source.threadMessages : [])
-      .map((message) => sanitizeThreadMessage(message, { includeBody: options.includeBody !== false })),
+      .map((message) => sanitizeThreadMessage(message, {
+        includeBody: options.includeBody !== false,
+        includeImages: options.includeImages !== false,
+      })),
   };
 }
 
@@ -201,6 +212,10 @@ function fitSnapshotToBudget(snapshot) {
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
     if (snapshot.messages[index].bodyImages.length) snapshot.messages[index].bodyImagesTruncated = true;
     snapshot.messages[index].bodyImages = [];
+    snapshot.messages[index].threadMessages.forEach((message) => {
+      if (message.bodyImages.length) message.bodyImagesTruncated = true;
+      message.bodyImages = [];
+    });
     serialized = serialize(snapshot);
     if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
   }
