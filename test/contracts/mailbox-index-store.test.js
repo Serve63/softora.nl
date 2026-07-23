@@ -90,6 +90,7 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(row.has_body, true);
   assert.equal(row.body_text, 'Volledige tekst');
   assert.equal(row.message_id, '<m-42@softora.nl>');
+  assert.equal(Object.hasOwn(row, 'deleted_at'), false);
 
   const listMessage = store.normalizeMessageRow(row);
   assert.equal(listMessage.id, 'inbox:42');
@@ -146,6 +147,94 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
     ['is', 'deleted_at', null],
     ['eq', 'uid', 42],
   ]);
+});
+
+test('mailbox index store bewaart verwijdering als duurzaam tombstone zonder sync-resurrectie', async () => {
+  const calls = [];
+  const query = {
+    update(patch) {
+      calls.push(['update', patch]);
+      return query;
+    },
+    eq(column, value) {
+      calls.push(['eq', column, value]);
+      return query;
+    },
+    is(column, value) {
+      calls.push(['is', column, value]);
+      return query;
+    },
+    then(resolve) {
+      resolve({ data: [], error: null });
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from(table) {
+        calls.push(['from', table]);
+        return query;
+      },
+    }),
+    now: () => new Date('2026-07-23T09:00:00.000Z'),
+  });
+
+  const result = await store.markMessageDeleted({
+    accountEmail: 'SERVE@SOFTORA.NL',
+    folder: 'INBOX',
+    id: 'inbox:42',
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [
+    ['from', 'softora_mailbox_messages'],
+    ['update', {
+      deleted_at: '2026-07-23T09:00:00.000Z',
+      updated_at: '2026-07-23T09:00:00.000Z',
+    }],
+    ['eq', 'account_email', 'serve@softora.nl'],
+    ['eq', 'folder', 'inbox'],
+    ['is', 'deleted_at', null],
+    ['eq', 'uid', 42],
+  ]);
+});
+
+test('mailbox index sync laat ontbrekende tombstonevelden ongemoeid bij upsert', async () => {
+  let upsertOptions = null;
+  let upsertRows = null;
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          async upsert(rows, options) {
+            upsertRows = rows;
+            upsertOptions = options;
+            return { data: [], error: null };
+          },
+        };
+      },
+    }),
+    now: () => new Date('2026-07-23T09:00:00.000Z'),
+  });
+
+  const result = await store.upsertMessages({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    messages: [{
+      id: 'inbox:42',
+      uid: 42,
+      body: 'Reactie',
+      date: '2026-07-23T08:30:00.000Z',
+    }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(Object.hasOwn(upsertRows[0], 'deleted_at'), false);
+  assert.deepEqual(upsertOptions, {
+    onConflict: 'message_key',
+    defaultToNull: false,
+  });
 });
 
 test('mailbox index store reads campaign inbox messages across selected accounts', async () => {

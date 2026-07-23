@@ -209,7 +209,6 @@ function createMailboxIndexStore(deps = {}) {
         source: 'imap-sync',
       },
       updated_at: isoNow(),
-      deleted_at: null,
     };
   }
 
@@ -346,7 +345,10 @@ function createMailboxIndexStore(deps = {}) {
       .filter((row) => row.uid > 0);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
     const result = await run('upsert-messages', (client) =>
-      client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, { onConflict: 'message_key' })
+      client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
+        onConflict: 'message_key',
+        defaultToNull: false,
+      })
     );
     if (!result.ok) return result;
     return { ...result, upserted: rows.length };
@@ -360,6 +362,23 @@ function createMailboxIndexStore(deps = {}) {
       const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
         .update({ unread: false, updated_at: isoNow() })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) return query.eq('uid', parsedUid);
+      return query.eq('provider_id', normalizedId);
+    });
+  }
+
+  async function markMessageDeleted({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    return run('mark-message-deleted', (client) => {
+      const deletedAt = isoNow();
+      const query = client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .update({ deleted_at: deletedAt, updated_at: deletedAt })
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizedFolder)
         .is('deleted_at', null);
@@ -457,6 +476,7 @@ function createMailboxIndexStore(deps = {}) {
     isSyncStateStale,
     listMessages,
     listMessagesForAccounts,
+    markMessageDeleted,
     markMessageRead,
     normalizeMessageRow,
     upsertMessages,

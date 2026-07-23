@@ -336,13 +336,50 @@
     });
     return cache.write(cacheKey, {
       ok: data.ok !== false,
+      savedAt: Number.isFinite(Date.parse(String(data.savedAt || '')))
+        ? new Date(data.savedAt).toISOString()
+        : new Date().toISOString(),
       messages,
       sync: data.sync && typeof data.sync === 'object' ? data.sync : null,
     });
   }
 
+  function snapshotSavedAt(snapshot) {
+    const timestamp = Date.parse(String(snapshot && snapshot.savedAt || ''));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
   function readInitialMailboxSnapshot() {
-    return readPageBootstrap() || readSessionMailboxSnapshot();
+    const pageSnapshot = readPageBootstrap();
+    const sessionSnapshot = readSessionMailboxSnapshot();
+    if (!pageSnapshot) return sessionSnapshot;
+    if (!sessionSnapshot) return pageSnapshot;
+    return snapshotSavedAt(sessionSnapshot) > snapshotSavedAt(pageSnapshot)
+      ? sessionSnapshot
+      : pageSnapshot;
+  }
+
+  function removeCachedMessage(mail) {
+    const snapshot = readSessionMailboxSnapshot();
+    if (!snapshot || !mail) return false;
+    const account = getAccount(mail, '');
+    const folder = getFolder(mail, 'inbox');
+    const requestId = getRequestId(mail);
+    const uid = Number(mail.uid) || 0;
+    const messages = snapshot.messages.filter((candidate) => {
+      const sameAccount = getAccount(candidate, '') === account;
+      const sameFolder = getFolder(candidate, 'inbox') === folder;
+      const candidateUid = Number(candidate && candidate.uid) || 0;
+      const sameMessage = uid > 0 && candidateUid > 0
+        ? candidateUid === uid
+        : getRequestId(candidate) === requestId;
+      return !(sameAccount && sameFolder && sameMessage);
+    });
+    return writeSessionMailboxSnapshot({
+      ...snapshot,
+      savedAt: new Date().toISOString(),
+      messages,
+    });
   }
 
   function getPageBootstrapSession() {
@@ -418,6 +455,7 @@
     load,
     normalizeOwner,
     pinOwner,
+    removeCachedMessage,
     renderDetailAccount,
     renderListMeta,
     renderOwnerMenu,
