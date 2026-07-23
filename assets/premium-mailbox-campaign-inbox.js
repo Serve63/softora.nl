@@ -508,11 +508,13 @@
       const owner = sent ? getOwnerLabel(getOwnerByAccount(message.accountEmail)) : '';
       const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
       const meta = [dateLabel, owner].filter(Boolean).join(' · ');
-      const lines = body.split('\n').map((line) => {
-        const content = String(line || '');
-        const emptyClass = content.trim() ? '' : ' detail-mail-line-empty';
-        return `<div class="detail-mail-line${emptyClass}">${escapeHtml(content)}</div>`;
-      }).join('');
+      const renderedBody = typeof options.renderMessageBody === 'function'
+        ? options.renderMessageBody({ message, body, sent })
+        : `<div class="detail-mail-lines">${body.split('\n').map((line) => {
+            const content = String(line || '');
+            const emptyClass = content.trim() ? '' : ' detail-mail-line-empty';
+            return `<div class="detail-mail-line${emptyClass}">${escapeHtml(content)}</div>`;
+          }).join('')}</div>`;
       const sectionClass = sent
         ? 'detail-mail-section detail-mail-section-sent'
         : 'detail-mail-section detail-mail-section-received';
@@ -520,7 +522,7 @@
         <section class="${sectionClass}">
           <div class="detail-mail-section-label">${sent ? 'Jouw bericht' : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
-          <div class="detail-mail-lines">${lines}</div>
+          ${renderedBody}
         </section>`;
     }).filter(Boolean).join('');
   }
@@ -579,10 +581,25 @@
         const dataUrl = String(image && image.dataUrl || '').trim();
         return dataUrl.startsWith('/api/mailbox/message-image?') && isSafeImageSource(dataUrl);
       });
+      const threadMessages = (Array.isArray(source.threadMessages) ? source.threadMessages : []).map((message) => {
+        const threadMessage = message && typeof message === 'object' ? message : {};
+        const sourceThreadImages = Array.isArray(threadMessage.bodyImages) ? threadMessage.bodyImages : [];
+        const threadBodyImages = sourceThreadImages.filter((image) => {
+          const dataUrl = String(image && image.dataUrl || '').trim();
+          return dataUrl.startsWith('/api/mailbox/message-image?') && isSafeImageSource(dataUrl);
+        });
+        return {
+          ...threadMessage,
+          bodyImagesTruncated: Boolean(threadMessage.bodyImagesTruncated || sourceThreadImages.length > threadBodyImages.length),
+          bodyImages: threadBodyImages,
+          inlineImages: [],
+        };
+      });
       return {
         ...source,
         bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
         bodyImages,
+        threadMessages,
         inlineImages: [],
       };
     });
@@ -781,6 +798,7 @@
     resolveOwnerForSession,
     setOwner,
     sortMessagesNewestFirst,
+    stripQuotedReply,
     subscribeToMessageDeletions,
   };
   global.SoftoraMailboxCampaignInbox = campaignInboxApi;

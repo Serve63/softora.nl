@@ -43,6 +43,10 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
       date: '2026-07-22T14:05:00.000Z',
       messageId: '<sent-answer@example.test>',
       inReplyTo: '<inbox-answer@example.test>',
+      bodyImages: [{
+        alt: 'Verzonden ontwerp',
+        dataUrl: `data:image/png;base64,${'b'.repeat(120)}`,
+      }],
     }] : [],
   }));
 
@@ -67,12 +71,18 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     subject: 'Re: Reactie 0',
     preview: '',
     body: 'Dankjewel voor je reactie.',
+    optOutUrl: '',
     date: '2026-07-22T14:05:00.000Z',
     messageId: '<sent-answer@example.test>',
     inReplyTo: '<inbox-answer@example.test>',
     references: '',
     hasBody: true,
     bodyTruncated: false,
+    bodyImagesTruncated: false,
+    bodyImages: [{
+      alt: 'Verzonden ontwerp',
+      dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=sent&id=sent%3A201&index=0',
+    }],
   }]);
   assert.deepEqual(parsed.messages[0].bodyImages, [{
     alt: 'Ontwerp',
