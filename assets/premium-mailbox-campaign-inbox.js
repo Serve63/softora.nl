@@ -422,13 +422,42 @@
     return (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim();
   }
 
+  const THREAD_MATCH_IGNORABLE_LINE_PATTERNS = [
+    /^\[image:\s*[^\]]+\]\s*$/i,
+    /^hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.?\s*$/i,
+    /^geen webdesign willen ontvangen\?\s*laat het me weten!.*$/i,
+  ];
+
   function normalizeThreadMatchText(value) {
     return String(value || '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => String(line || '')
+        .replace(/^\s*(?:>\s*)+/, '')
+        .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+        .trim())
+      .filter((line) => (
+        line &&
+        !THREAD_MATCH_IGNORABLE_LINE_PATTERNS.some((pattern) => pattern.test(line))
+      ))
+      .join(' ')
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, ' ')
+      .replace(/<?https?:\/\/[^\s>]+>?/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();
+  }
+
+  function isSameThreadMessageText(quotedText, authoredText) {
+    if (!quotedText || !authoredText) return false;
+    if (quotedText === authoredText) return true;
+    const [shorterText, longerText] = quotedText.length <= authoredText.length
+      ? [quotedText, authoredText]
+      : [authoredText, quotedText];
+    if (shorterText.length < 8) return false;
+    return longerText.startsWith(`${shorterText} `) || longerText.endsWith(` ${shorterText}`);
   }
 
   function stripStructuredQuoteMetadata(lines) {
@@ -452,7 +481,7 @@
         message && (message.body || message.text || message.preview)
       ));
       if (authoredText.length < 8) return false;
-      return quotedText === authoredText || quotedText.startsWith(`${authoredText} `);
+      return isSameThreadMessageText(quotedText, authoredText);
     });
   }
 
