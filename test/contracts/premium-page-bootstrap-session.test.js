@@ -38,6 +38,31 @@ test('pagina-bootstrap faalt stil bij ongeldige JSON', () => {
   assert.equal(window.SoftoraPageBootstrapSession.get(), null);
 });
 
+test('pagina-bootstrap leest een unicode sessie uit veilige base64', () => {
+  const payload = {
+    session: { authenticated: true, email: 'serve@softora.nl', displayName: 'Servé Creusen' },
+  };
+  const window = {
+    atob,
+    TextDecoder,
+    document: {
+      getElementById(id) {
+        if (id !== 'softoraPageStateBootstrap') return null;
+        return {
+          textContent: Buffer.from(JSON.stringify(payload), 'utf8').toString('base64'),
+          getAttribute(name) {
+            return name === 'data-softora-encoding' ? 'base64' : null;
+          },
+        };
+      },
+    },
+  };
+
+  const helper = createPageBootstrapSession(window);
+
+  assert.equal(helper.get().displayName, 'Servé Creusen');
+});
+
 test('pagina-bootstrap deelt een afgeschermde tabcache met maximale leeftijd', () => {
   const values = new Map();
   const window = {

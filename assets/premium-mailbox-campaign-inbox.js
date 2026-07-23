@@ -408,7 +408,19 @@
     const element = global.document.getElementById('softoraPageStateBootstrap');
     if (!element) return null;
     try {
-      const payload = JSON.parse(String(element.textContent || '{}'));
+      let serialized = String(element.textContent || '{}');
+      if (
+        typeof element.getAttribute === 'function' &&
+        element.getAttribute('data-softora-encoding') === 'base64'
+      ) {
+        if (typeof global.atob !== 'function') return null;
+        const binary = global.atob(serialized.trim());
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        serialized = typeof global.TextDecoder === 'function'
+          ? new global.TextDecoder('utf-8').decode(bytes)
+          : decodeURIComponent(escape(binary));
+      }
+      const payload = JSON.parse(serialized);
       return payload && typeof payload === 'object' ? payload : null;
     } catch (_) {
       return null;

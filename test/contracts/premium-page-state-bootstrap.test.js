@@ -38,7 +38,13 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
       primaryBootstrapMarkers[fileName] || /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/,
       fileName
     );
-    assert.match(pageSource, /premium-ui-state-client\.js\?v=20260722b/, fileName);
+    assert.match(
+      pageSource,
+      fileName === 'premium-mailbox.html'
+        ? /premium-ui-state-client\.js\?v=20260723c/
+        : /premium-ui-state-client\.js\?v=20260722b/,
+      fileName
+    );
   });
 });
 

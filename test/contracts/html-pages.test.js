@@ -507,7 +507,7 @@ test('html page coordinator caps dashboard bootstrap reads without late error lo
   assert.match(res.body, /id="kpiTotalClients">--<script>/);
   assert.match(res.body, /Actieve opdrachten tijdelijk niet geladen/);
   assert.match(res.body, /id="softoraCustomersBootstrap" type="application\/json">/);
-  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722b/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260723c/);
   assert.match(res.body, /"source":"unavailable"/);
   assert.match(res.body, /<span class="chart-label">Jan<\/span>/);
   assert.doesNotMatch(res.body, /SOFTORA_DASHBOARD_TOTAL_REVENUE/);
@@ -583,7 +583,7 @@ test('html page coordinator gives protected premium bootstrap enough time for Su
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /€1\.234/);
   assert.match(res.body, /id="softoraCustomersBootstrap"/);
-  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722b/);
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260723c/);
   assert.equal(
     loggerInfos.some(
       (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-personeel-dashboard.html'
@@ -634,9 +634,66 @@ test('html page coordinator houdt een koude premium pagina niet vast en levert d
 
   assert.ok(Date.now() - startedAt < 180, 'koude serverdata mag de eerste HTML niet blokkeren');
   assert.match(res.body, /id="softoraPageStateBootstrap"/);
-  assert.match(res.body, /"email":"serve@softora\.nl"/);
-  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260722b/);
+  const bootstrapMatch = res.body.match(
+    /id="softoraPageStateBootstrap"[^>]*data-softora-encoding="base64"[^>]*>([^<]+)<\/script>/
+  );
+  assert.ok(bootstrapMatch);
+  const bootstrapPayload = JSON.parse(Buffer.from(bootstrapMatch[1], 'base64').toString('utf8'));
+  assert.equal(bootstrapPayload.session.email, 'serve@softora.nl');
+  assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260723c/);
   assert.doesNotMatch(res.body, /nooit-in-html/);
+});
+
+test('mailbox-bootstrap blijft geldige HTML bij scripts en binaire mailinhoud', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-mailbox-base64-'));
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-mailbox.html'),
+    '<!DOCTYPE html><html><head><title>Mailbox</title></head><body><!-- SOFTORA_PAGE_STATE_BOOTSTRAP --><script src="assets/mailbox.js"></script></body></html>'
+  );
+  const dangerousBody = 'Voorbeeld </script><div id="mail-leak">zichtbaar</div> \\u0000 � einde';
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    logger: { info() {}, error() {} },
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-mailbox.html' ? 'premium-mailbox.html' : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: { authenticated: true, email: 'serve@softora.nl', role: 'admin' },
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () => ({
+      marker: 'SOFTORA_PAGE_STATE_BOOTSTRAP',
+      scriptId: 'softoraPageStateBootstrap',
+      data: {
+        ok: true,
+        page: 'premium-mailbox.html',
+        mailbox: { ok: true, messages: [{ id: 'mail-1', body: dangerousBody }] },
+      },
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/mailbox' },
+    res,
+    () => {},
+    'premium-mailbox.html'
+  );
+
+  const bootstrapMatch = res.body.match(
+    /<script id="softoraPageStateBootstrap" type="application\/json" data-softora-encoding="base64">([^<]+)<\/script>/
+  );
+  assert.ok(bootstrapMatch, 'mailbox-bootstrap hoort volledig als veilige base64 in één script te staan');
+  const payload = JSON.parse(Buffer.from(bootstrapMatch[1], 'base64').toString('utf8'));
+  assert.equal(payload.mailbox.messages[0].body, dangerousBody);
+  assert.equal((res.body.match(/id="softoraPageStateBootstrap"/g) || []).length, 1);
+  assert.equal((res.body.match(/assets\/mailbox\.js/g) || []).length, 1);
+  assert.doesNotMatch(res.body, /id="mail-leak"/);
 });
 
 test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
