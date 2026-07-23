@@ -431,11 +431,20 @@
       .toLowerCase();
   }
 
+  function stripStructuredQuoteMetadata(lines) {
+    const metadataPattern = /^(?:verzonden|sent|datum|date|aan|to|onderwerp|subject):\s*/i;
+    const values = Array.isArray(lines) ? lines.slice() : [];
+    while (values.length && (!String(values[0] || '').trim() || metadataPattern.test(String(values[0] || '').trim()))) {
+      values.shift();
+    }
+    return values;
+  }
+
   function isDuplicateStructuredOwnQuote(section, mail, isOwnReplyHeaderLine) {
     if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
     const firstLine = String(section.lines[0] || '').trim();
     if (typeof isOwnReplyHeaderLine !== 'function' || !isOwnReplyHeaderLine(firstLine)) return false;
-    const quotedText = normalizeThreadMatchText(section.lines.slice(1).join('\n'));
+    const quotedText = normalizeThreadMatchText(stripStructuredQuoteMetadata(section.lines.slice(1)).join('\n'));
     if (!quotedText) return false;
     return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : []).some((message) => {
       if (String(message && message.folder || '').trim().toLowerCase() !== 'sent') return false;
