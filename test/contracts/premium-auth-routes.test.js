@@ -195,6 +195,50 @@ test('premium auth session response clears revoked cookies and returns stable pa
   ]);
 });
 
+test('premium auth session refreshes a thin token fallback before returning profile data', async () => {
+  const resolverCalls = [];
+  const { coordinator } = createFixture({
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolverCalls.push(options);
+      if (options.allowTokenFallbackWithoutHydration) {
+        return {
+          configured: true,
+          authenticated: true,
+          tokenFallback: true,
+          email: 'serve@softora.nl',
+          displayName: '',
+          user: null,
+        };
+      }
+      return {
+        configured: true,
+        authenticated: true,
+        tokenFallback: false,
+        email: 'serve@softora.nl',
+        displayName: 'Servé Creusen',
+        user: { id: 'usr_serve' },
+      };
+    },
+  });
+  const req = createRequest({ originalUrl: '/api/auth/session' });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSessionResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.displayName, 'Servé Creusen');
+  assert.deepEqual(resolverCalls, [
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: true,
+    },
+    {
+      allowAnonymousWithoutHydration: true,
+      allowTokenFallbackWithoutHydration: false,
+    },
+  ]);
+});
+
 test('premium auth login returns 503 when auth is not fully configured', async () => {
   const { auditEvents, coordinator } = createFixture({
     sessionSecret: '',
