@@ -121,6 +121,42 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
   assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
 });
 
+test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
+  const legacySnapshot = JSON.stringify({
+    version: 3,
+    savedAt: '2026-07-23T15:00:00.000Z',
+    ok: true,
+    messages: [{
+      id: 'martijn@softora.nl|inbox|23',
+      folder: 'inbox',
+      accountEmail: 'martijn@softora.nl',
+      email: 'rruyters@road2value.com',
+      date: '2026-06-15T13:58:18.000Z',
+      receivedAt: '2026-06-15T13:58:18.000Z',
+      conversationId: 'conversation:martijn@softora.nl|contact:rruyters@road2value.com',
+      threadMessages: [{
+        id: 'martijn@softora.nl|sent|111',
+        folder: 'sent',
+        accountEmail: 'martijn@softora.nl',
+        date: '2026-06-16T12:31:32.000Z',
+      }, {
+        id: 'martijn@softora.nl|sent|149',
+        folder: 'sent',
+        accountEmail: 'martijn@softora.nl',
+        date: '2026-06-23T11:32:58.000Z',
+      }],
+    }],
+    sync: {
+      indexed: true,
+      stale: false,
+    },
+  });
+  const [message] = parseMailboxCampaignSnapshot(legacySnapshot).messages;
+
+  assert.equal(message.receivedAt, '2026-06-15T13:58:18.000Z');
+  assert.equal(message.activityAt, '2026-06-23T11:32:58.000Z');
+});
+
 test('mailbox campaign snapshot bewaart de volledige conversatie van meer dan tien berichten', () => {
   const threadMessages = Array.from({ length: 12 }, (_, index) => ({
     id: `sent:${index + 1}`,
