@@ -73,6 +73,7 @@ async function loadBody({
   folder,
   normalizeBodyImages,
   normalizeOptOutUrl,
+  getActiveMail,
   openMail,
 }) {
   const mail = getMail(id);
@@ -104,7 +105,9 @@ async function loadBody({
     }
   } finally {
     mail.bodyLoading = false;
-    openMail(id, { skipBodyFetch: true });
+    if (typeof getActiveMail === 'function' && String(getActiveMail()) === String(id)) {
+      openMail(id, { skipBodyFetch: true });
+    }
   }
 }
 

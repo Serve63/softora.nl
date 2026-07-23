@@ -818,27 +818,32 @@ async function loadMailboxMessageBody(id) {
     folder: window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
     normalizeBodyImages: normalizeMailboxBodyImages,
     normalizeOptOutUrl: normalizeMailboxOptOutUrl,
+    getActiveMail: () => activeMail,
     openMail,
   });
 }
 function openMail(id, options = {}) {
   const m = findMailById(id);
   if (!m) return;
-  if (!m.bodyLoaded && !options.skipBodyFetch) {
-    void loadMailboxMessageBody(m.id);
-    if (!m.body) return;
-  }
   const wasUnread = m.unread;
   activeMail = m.id;
   m.unread = false;
   renderList();
   if (wasUnread) void persistMailReadState(m);
-  if (!options.imagesPrepared && window.SoftoraMailboxImages?.stage?.(m.bodyImages, () => String(activeMail) === String(m.id), () => openMail(m.id, { skipBodyFetch: true, imagesPrepared: true }))) return;
+  if (!m.bodyLoaded && !options.skipBodyFetch) {
+    void loadMailboxMessageBody(m.id);
+  }
+  const imagesPending = !options.imagesPrepared && Boolean(window.SoftoraMailboxImages?.stage?.(
+    m.bodyImages,
+    () => String(activeMail) === String(m.id),
+    () => openMail(m.id, { skipBodyFetch: true, imagesPrepared: true })
+  ));
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
-  const detailBody = m.body;
+  const detailBody = m.body || m.preview || '';
+  const detailBodyImages = imagesPending ? [] : m.bodyImages;
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-body">
       <article class="detail-mail-block">
@@ -860,7 +865,7 @@ function openMail(id, options = {}) {
           </div>
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${renderMailBody(detailBody, m.bodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id })}</div>
+        <div class="detail-body-text">${renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id })}</div>
       </article>
     </div>`;
 }
