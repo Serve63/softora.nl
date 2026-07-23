@@ -20,7 +20,7 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Werk binnen de ene bestaande `softora-seo-actiemachine`; maak geen tweede SEO-automation, blogbot of parallel schema.
 - Voer twee sporen in dezelfde run uit: een kort operationeel spoor en een publiek groeispoor.
 - Operationeel spoor: controleer Git/GSC/productie-preflight, open SEO-PR's, kritieke live signalen en experimenten waarvan een reviewdatum is bereikt.
-- Publiek groeispoor: lever per succesvolle run precies een publieke SEO-groeiverbetering op. Een nieuwe sterke contentpublicatie is de standaard; kies alleen een aantoonbaar waardevollere substantiële refresh, interne-linkverbetering, visual/designverbetering of conversieverbetering wanneer die meer verwachte gekwalificeerde impact heeft.
+- Publiek groeispoor: lever per succesvolle run precies een publieke SEO-groeiverbetering op. De machine-toestand bepaalt of dit een nieuwe pagina, substantiële refresh, consolidatie, interne-linkverbetering, indexatieverbetering, visual/designverbetering of conversieverbetering is.
 - Onderhoud aan een oude PR, rapportage, URL Inspection, scorecards en technische controles tellen niet als publieke groeilevering.
 - De cooldown geldt alleen voor dezelfde URL en blokkeert nooit een nieuw, uniek ondersteunend onderwerp binnen hetzelfde cluster.
 - Een no-op is alleen toegestaan bij een operationele P0 die veilige publicatie blokkeert, een onoplosbaar claim- of expertiseprobleem, aantoonbare cannibalisatie zonder uniek alternatief, of een merge/deployblokkade buiten de automation. Leg dan exact vast wat blokkeert, wie eigenaar is en welke actie nodig is.
@@ -32,7 +32,7 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Draai de brede publieke link-, metadata-, visual- en CTA-controles.
 - Vergelijk 7, 28 en 90 dagen voor non-branded verkeer, money pages en queryclusters.
 - Beoordeel welke experimenten voldoende data hebben en plan het volgende cluster.
-- Houd 5 tot 7 sterke publieke contentleveringen per week aan. Kwaliteitspoorten blijven hard; het tempo is geen toestemming voor dunne pagina's.
+- Houd in `scale` 5 tot 7 sterke nieuwe of substantieel vernieuwde contentleveringen per week aan. In `growth`, `quality_recovery` en `indexation_recovery` gelden lagere maxima; een publicatiequotum mag nooit indexatie- of kwaliteitsherstel verdringen.
 - Houd minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs vooruit in `docs/growth/seo-machine-backlog.json`, verdeeld over de commerciële clusters. Dit versieerbare JSON-register is de enige backlogbron; de automation memory bewaart alleen runhistorie, experimenten en beslissingen.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
 - Backlinks en off-site linkbuilding vallen volledig buiten deze automation. Doe geen backlinkanalyse als actielijn, outreach, gastblogs, directoryplaatsingen, partner-/leveranciersprofielen, linkruil of betaalde links. Natuurlijke interne links binnen `softora.nl` blijven wel onderdeel van iedere relevante publicatie.
@@ -45,6 +45,21 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Verbeter, consolideer, redirect of noindex alleen met aantoonbaar bewijs.
 
 De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. Alleen de expliciete no-op-uitzonderingen hierboven mogen het tempo doorbreken.
+
+## Adaptieve Machine-Toestand
+
+`npm run seo:cadence:check` kiest exact een toestand in deze prioriteit:
+
+| Toestand | Trigger | Publieke actie | Maximum nieuwe URL's per 7 dagen |
+| --- | --- | --- | --- |
+| `operations_p0` | Live-versie, crawlbaarheid, sitemap, backlog of verplichte tooling blokkeert veilige uitvoering | Alleen de blocker repareren | 0 |
+| `data_degraded` | GSC- of URL Inspection-data ontbreekt of is onvoldoende betrouwbaar | Meting repareren en alleen eerder bewijsdekte veilige verbetering uitvoeren | 2 |
+| `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Discovery, kwaliteit, canonicals, consolidatie en contextuele links verbeteren | 2 |
+| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Unieke informatiewinst toevoegen of overlappende pagina's samenvoegen | 3 |
+| `growth` | Techniek en herstelpoorten zijn groen | Hoogste verwachte gekwalificeerde impact kiezen | 5 |
+| `scale` | Minimaal vijf reviewbare URL's en minstens 80% D14/D28-indexatie, plus groene kwaliteit | Gecontroleerd opschalen | 7 |
+
+Deze percentages zijn interne operationele veiligheidsgrenzen, geen door Google gepubliceerde rankingfactoren. Iedere niet-geindexeerde nieuwe URL krijgt een bewijsstatus `already_indexed`, `requested`, `quota_blocked`, `browser_blocked` of `failed` in de automation memory. Een status anders dan `already_indexed` of `requested` blijft openstaan voor de volgende run. Vraag niet opnieuw aan zonder materiele wijziging of gedocumenteerd vervolgvenster.
 
 ### Dagelijkse fallback-ladder
 
@@ -67,7 +82,7 @@ Een nieuwsupdatesamenvatting mag nooit bestaan uit overgeschreven berichtgeving.
 De machine mag niet stilvallen wanneer GSC nog weinig top-20-query's toont. Bouw en onderhoud daarom een actieve publicatiebacklog met deze bronvolgorde:
 
 1. `queries.prioritized`, query/page-mismatches en pagina's met impressies maar zwakke CTR of positie;
-2. ontbrekende supportrollen rond bestaande money pages en zichtbare gaten in de huidige contentinventaris;
+2. ontbrekende supportrollen rond bestaande money pages, maar alleen wanneer aanvullend vraagbewijs bestaat; een inventarisgat alleen is geen publicatiebewijs;
 3. actuele SERP-, concurrent-, autocomplete-, nieuws- en buyer-question-analyse voor Nederlandse commerciële zoekintentie;
 4. echte vragen over kosten, keuze, implementatie, koppelingen, migratie, risico's, doorlooptijd, beheer en menselijke controle;
 5. lokale of branchespecifieke intentie, maar alleen wanneer de pagina aantoonbaar unieke regionale of operationele waarde heeft.
@@ -86,21 +101,25 @@ Ieder hoofdcluster bestaat uit een money page met ondersteunende rollen zoals:
 
 Spreid de productie bewust over blogs, kennisbank, vergelijkingen en commerciële landingspagina's. Nieuwsupdates zijn alleen geschikt wanneer de ontwikkeling actueel, bronbaar, relevant voor een Softora-dienst en nuttig na de eerste nieuwspiek is.
 
-Een kandidaat is pas publicatieklaar wanneer de zoekintentie, primaire money page, onderscheid met bestaande URL's, interne links, conversiepad, bewijsbehoefte en twee nuttige visualconcepten vooraf zijn vastgelegd. Publiceer geen synoniempagina, dunne city-swap of tekst die alleen een bestaand artikel herschrijft.
+Een kandidaat is pas publicatieklaar wanneer de zoekintentie, primaire money page, onderscheid met bestaande URL's, controleerbare vraagbronnen, unieke informatiewinst, contextuele interne links, conversiepad, claimrisico en twee nuttige visualconcepten vooraf zijn vastgelegd. Nieuwe content gebruikt `qualityVersion: 2`: geen automatische opvulsecties, geen verplichte generieke FAQ en geen vaste woordtelling als kwaliteitsbewijs. Publiceer geen synoniempagina, dunne city-swap of tekst die alleen een bestaand artikel herschrijft.
 
 ## Machine Enforcement
 
-De instructietekst is niet de poort. Deze drie commando's leveren de afdwingbare staat:
+De instructietekst is niet de poort. Deze vier commando's leveren de afdwingbare staat:
 
 - `npm run seo:backlog:check` valideert het JSON-schema, minimaal 15 `ready` briefs, unieke URL's en ID's, de vaste scoreformule, exact drie overlap-URL's, publicatiebriefvelden en minimaal 70% commerciële intentie. Deze validator draait ook tegen het echte register in de contracttests van `verify:critical`.
 - `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen. Een URL telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en dezelfde `datePublished` toont als het contentregister.
-- `npm run seo:cadence:check` combineert backlog en live ledger. Exitcode `0` is op schema, exitcode `2` is `CONTENT_REQUIRED` en verplicht dezelfde automation de hoogst scorende veilige publicatie te shippen, exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
+- `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
+- `npm run seo:cadence:check` combineert backlog, live ledger, indexatie en corpusoriginaliteit. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
-De live cadence-check draait bewust niet als mergeblokker in CI. Een bestaande publicatieachterstand mag de PR met de eerste herstelpublicatie niet blokkeren. De dagelijkse automation moet de check wel als harde preflight draaien en exitcode `2` als uitvoeropdracht behandelen, niet als reden voor een no-op.
+De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation moet exitcode `2` als uitvoeropdracht voor de genoemde toestand behandelen, nooit automatisch als opdracht om een nieuwe URL te maken.
 
 ## Opportunity Ranking
 
 Gebruik `queries.prioritized` uit `scripts/seo-agent-report.js` als eerste datagedreven kandidatenlijst. Deze queue:
+
+- gebruikt dimensieloze propertytotalen voor het echte klik- en impressietotaal;
+- rapporteert zichtbare branded/non-branded query's apart van geanonimiseerde of anderszins niet-classificeerbare klikken;
 
 - sluit branded queries uit van de groeiprioritering;
 - neemt ook 0% CTR mee;
@@ -156,7 +175,7 @@ Besluit: hold | iterate | expand | revert
 
 ## Operationele P0
 
-GSC OAuth, live-versiecontrole, sitemap/indexatieblokkades en ontbrekende verplichte tooling zijn P0 wanneer ze betrouwbare besluitvorming blokkeren.
+Live-versieverschil, security, publieke crawlblokkades, kapotte canonicals en een onbruikbare sitemap zijn publicatieblokkerende P0's. Een meetstoring zonder publicatierisico is `data_degraded`: claim geen actuele prestaties, maar laat eerder bewijsdekt veilig herstelwerk doorgaan.
 
 - Eerste fout: diagnoseer, leg exacte oorzaak vast en probeer de veilige reparatie.
 - Tweede opeenvolgende run met dezelfde P0: repareer de operatie of rapporteer exact welke menselijke actie, eigenaar en credential/scope/configuratie nodig is. Publiceer alleen wanneer onderzoek, kwaliteitscontrole en live verificatie ondanks die P0 betrouwbaar en veilig blijven.

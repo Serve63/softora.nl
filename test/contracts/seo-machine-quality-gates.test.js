@@ -8,23 +8,26 @@ const {
   applyPublicSeoHeadDefaults,
 } = require('../../server/services/public-seo');
 const {
+  SEO_CONTENT_ITEMS,
   buildSeoContentArticleHtml,
   buildSeoContentIndexHtml,
+  enrichSeoContentItem,
   getSeoContentClusterForItem,
   getSeoContentClusters,
   getSeoContentCollectionPaths,
   getSeoContentItems,
   getSeoContentPublicationPlan,
   getSeoContentPathForItem,
+  renderSeoParagraph,
 } = require('../../server/services/seo-content');
 const {
-  DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION,
   DEFAULT_UNSUPPORTED_CLAIM_RULES,
   auditClaimSafety,
   auditContentQuality,
   auditConversionCtas,
   auditLinkGraph,
   auditSeoImages,
+  buildContentOriginalityReport,
   buildSeoLinkGraph,
   extractButtonLikeControlEntries,
   extractButtonEntries,
@@ -94,14 +97,6 @@ test('publieke contactknoppen gebruiken klantvriendelijke labels', () => {
 });
 
 test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te groeien', () => {
-  assert.deepEqual(DEFAULT_MIN_CONTENT_WORDS_BY_COLLECTION, {
-    blog: 1500,
-    kennisbank: 850,
-    vergelijkingen: 1200,
-    branches: 1100,
-    regio: 1100,
-  });
-
   const items = getSeoContentItems({ now: seoMachineNow }).map((item) => ({
     ...item,
     cluster: getSeoContentClusterForItem(item).key,
@@ -112,6 +107,46 @@ test('seo machine contentkwaliteit blijft sterk genoeg om automatisch door te gr
   });
 
   assert.deepEqual(issues, []);
+});
+
+test('seo machine ziet template-overlap als herstelwerk en niet als publicatiekwaliteit', () => {
+  const report = buildContentOriginalityReport({
+    sourceItems: SEO_CONTENT_ITEMS,
+    renderedItems: getSeoContentItems({ now: new Date('2026-07-22T12:00:00.000Z') }),
+  });
+
+  assert.equal(report.status, 'quality_recovery');
+  assert.ok(report.pageCount >= 50);
+  assert.ok(report.averageTemplateShare > report.thresholds.maximumAverageTemplateShare);
+  assert.ok(report.duplicateOccurrences > 0);
+  assert.ok(report.nearestPair.left.startsWith('/'));
+});
+
+test('quality version 2 gebruikt alleen eigen secties, optionele FAQ en veilige contextuele links', () => {
+  const item = enrichSeoContentItem({
+    collection: 'blog',
+    slug: 'native-quality',
+    title: 'Native quality content',
+    qualityVersion: 2,
+    sections: [{
+      heading: 'Eigen sectie',
+      paragraphs: [{
+        text: 'Bekijk CRM op maat voor een passende vervolgstap.',
+        links: [{ anchor: 'CRM op maat', href: '/crm-systeem-op-maat' }],
+      }],
+    }],
+  });
+
+  assert.equal(item.sections.length, 1);
+  assert.deepEqual(item.faq, []);
+  assert.equal(
+    renderSeoParagraph(item.sections[0].paragraphs[0]),
+    'Bekijk <a href="/crm-systeem-op-maat">CRM op maat</a> voor een passende vervolgstap.'
+  );
+  assert.doesNotMatch(
+    renderSeoParagraph({ text: 'Extern voorbeeld', links: [{ anchor: 'voorbeeld', href: 'javascript:alert(1)' }] }),
+    /<a/
+  );
 });
 
 test('weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
