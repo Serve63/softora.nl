@@ -583,6 +583,16 @@ let activeMail = null;
 let inboxUnreadCount = 0;
 let mailboxSyncState = null;
 let composeReplyContext = null;
+const mailboxDeleteController = window.SoftoraMailboxDelete.create({
+  fetch,
+  dialogs: window.SoftoraDialogs,
+  confirm: (message) => typeof window.confirm === 'function' && window.confirm(message),
+  getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
+  getRequestId: (mail) => window.SoftoraMailboxCampaignInbox.getRequestId(mail),
+  getFolder: (mail) => window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
+  removeCached: (mail) => window.SoftoraMailboxCampaignInbox?.removeCachedMessage?.(mail),
+  toast,
+});
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
 }
@@ -649,7 +659,7 @@ async function hydrateMailboxOutreachContextsInBackground() {
   if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.hydrateOutreachContexts !== 'function') return;
   await window.SoftoraMailboxIndex.hydrateOutreachContexts({
     getMails: () => mails,
-    setMails: (nextMails) => { mails = Array.isArray(nextMails) ? nextMails : []; },
+    setMails: (nextMails) => { mails = mailboxDeleteController.filterMessages(nextMails); },
     renderList,
     getActiveMail: () => activeMail,
     openMail,
@@ -667,7 +677,7 @@ async function syncMailboxInBackground() {
 async function loadMailboxMessages(options = {}) {
   const wrap = document.getElementById('mail-items'); if (wrap) wrap.setAttribute('aria-busy', 'true');
   try { const campaignResult = await window.SoftoraMailboxCampaignInbox?.load(activeFolder, normalizeMailboxApiMessage, null, { skipBootstrap: options.skipPageBootstrap === true });
-    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = campaignResult.messages; window.SoftoraMailboxImages?.prewarm?.(mails); renderList({ openLatest: options.openLatest !== false }); window.SoftoraMailboxIndex?.setStatus(''); if (wrap) wrap.setAttribute('aria-busy', 'false'); if (campaignResult.fromBootstrap) void loadMailboxMessages({ skipPageBootstrap: true, skipBackgroundSync: true, openLatest: false, preserveOnError: true }); return; }
+    if (campaignResult) { mailboxSyncState = campaignResult.sync; mails = mailboxDeleteController.filterMessages(campaignResult.messages); window.SoftoraMailboxImages?.prewarm?.(mails); renderList({ openLatest: options.openLatest !== false }); window.SoftoraMailboxIndex?.setStatus(''); if (wrap) wrap.setAttribute('aria-busy', 'false'); if (campaignResult.fromBootstrap) void loadMailboxMessages({ skipPageBootstrap: true, skipBackgroundSync: true, openLatest: false, preserveOnError: true }); return; }
     const response = await fetch(`/api/mailbox/messages?account=${encodeURIComponent(activeMailboxAccount)}&folder=${encodeURIComponent(activeFolder)}&limit=50`, {
       credentials: 'same-origin',
       cache: 'no-store',
@@ -678,7 +688,9 @@ async function loadMailboxMessages(options = {}) {
       throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
     }
     mailboxSyncState = data?.sync && typeof data.sync === 'object' ? data.sync : null;
-    mails = Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : [];
+    mails = mailboxDeleteController.filterMessages(
+      Array.isArray(data.messages) ? data.messages.map(normalizeMailboxApiMessage) : []
+    );
     window.SoftoraMailboxImages?.prewarm?.(mails);
     renderList({ openLatest: options.openLatest !== false });
     void hydrateMailboxOutreachContextsInBackground().catch(() => {});
@@ -848,48 +860,28 @@ function openMail(id, options = {}) {
 async function deleteMail(id) {
   const m = findMailById(id);
   if (!m) return;
-  if (!(await requestMailboxDeleteConfirmation(m))) return;
-  try {
-    const response = await fetch('/api/mailbox/messages/delete', {
-      method: 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount),
-        id: window.SoftoraMailboxCampaignInbox.getRequestId(m),
-        uid: m.uid,
-        folder: window.SoftoraMailboxCampaignInbox.getFolder(m, activeFolder),
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.detail || data?.error || 'Mail verwijderen mislukt');
-    }
-    window.SoftoraMailboxCampaignInbox?.removeCachedMessage?.(m);
-    mails = mails.filter(mail => String(mail.id) !== String(id));
-    if (String(activeMail) === String(id)) activeMail = null;
-    resetDetailEmpty();
-    renderList();
-    toast((m.folder || activeFolder) === 'trash' ? 'Mail definitief verwijderd' : 'Mail verplaatst naar prullenbak');
-  } catch (error) {
-    toast(String(error?.message || error || 'Mail verwijderen mislukt'));
-  }
-}
-async function requestMailboxDeleteConfirmation(mail) {
-  const folder = String(mail?.folder || activeFolder || '').toLowerCase();
-  const subject = String(mail?.subject || '').trim() || 'deze mail';
-  const permanent = folder === 'trash';
-  const message = `Weet je zeker dat je "${subject}" wilt ${permanent ? 'definitief verwijderen' : 'naar de prullenbak verplaatsen'}?`;
-  const options = {
-    title: permanent ? 'Mail definitief verwijderen' : 'Mail verwijderen',
-    confirmText: permanent ? 'Definitief verwijderen' : 'Verwijderen',
-    cancelText: 'Annuleren',
-  };
-  if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
-    return window.SoftoraDialogs.confirm(message, options);
-  }
-  return typeof window.confirm === 'function' ? window.confirm(message) : false;
+  await mailboxDeleteController.remove(m, {
+    optimistic() {
+      const transaction = { mails: mails.slice(), activeMail };
+      const visibleBefore = getMailsForFolder(activeFolder);
+      const deletedIndex = Math.max(0, visibleBefore.findIndex(mail => String(mail.id) === String(id)));
+      mails = mailboxDeleteController.filterMessages(mails);
+      const visibleAfter = getMailsForFolder(activeFolder);
+      const nextMail = visibleAfter[Math.min(deletedIndex, Math.max(0, visibleAfter.length - 1))] || null;
+      activeMail = nextMail?.id || null;
+      renderList({ openLatest: false });
+      if (nextMail) openMail(nextMail.id, { skipBodyFetch: true });
+      else resetDetailEmpty();
+      return transaction;
+    },
+    rollback(_mail, transaction) {
+      mails = transaction?.mails || mails;
+      activeMail = transaction?.activeMail || null;
+      renderList({ openLatest: false });
+      if (activeMail) openMail(activeMail, { skipBodyFetch: true });
+      else resetDetailEmpty();
+    },
+  });
 }
 function getComposeFieldValue(id) {
   const field = document.getElementById(id);

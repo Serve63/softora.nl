@@ -1,3 +1,9 @@
+const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  removeMailboxCampaignSnapshotMessage,
+} = require('./mailbox-campaign-snapshot');
+
 function createMailboxDeleteMessage(deps = {}) {
   const {
     getAccount,
@@ -6,11 +12,37 @@ function createMailboxDeleteMessage(deps = {}) {
     resolveMailboxName,
     canUseMailboxIndex,
     mailboxIndexStore,
-    refreshCampaignSnapshot,
+    getUiStateValues,
+    setUiStateValues,
     logger = console,
   } = deps;
 
+  async function removeFromCampaignSnapshot({ account, id, messageRef }) {
+    if (typeof getUiStateValues !== 'function' || typeof setUiStateValues !== 'function') return false;
+    try {
+      const current = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE);
+      const rawValue = current?.values?.[MAILBOX_CAMPAIGN_SNAPSHOT_KEY] || '';
+      const next = removeMailboxCampaignSnapshotMessage(rawValue, {
+        accountEmail: account.email,
+        folder: messageRef.folder,
+        id,
+        uid: messageRef.uid,
+      });
+      if (!next.changed) return false;
+      await setUiStateValues(
+        MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+        { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: next.serialized },
+        { source: 'mailbox-delete', actor: account.email }
+      );
+      return true;
+    } catch (error) {
+      logger.warn('[Mailbox][DeleteSnapshot]', error?.message || error);
+      return false;
+    }
+  }
+
   async function persistDeletion({ account, id, messageRef }) {
+    let indexUpdated = false;
     if (canUseMailboxIndex() && typeof mailboxIndexStore.markMessageDeleted === 'function') {
       const result = await mailboxIndexStore.markMessageDeleted({
         accountEmail: account.email,
@@ -18,18 +50,17 @@ function createMailboxDeleteMessage(deps = {}) {
         folder: messageRef.folder,
         uid: messageRef.uid,
       });
-      if (!result || result.ok !== true) {
+      if (result?.ok === true) {
+        indexUpdated = true;
+      } else {
         logger.warn(
           '[Mailbox][DeleteIndex]',
           result?.error?.message || 'Verwijdering niet in mailboxindex opgeslagen'
         );
       }
     }
-    try {
-      await refreshCampaignSnapshot({ limit: 100 });
-    } catch (error) {
-      logger.warn('[Mailbox][DeleteSnapshot]', error?.message || error);
-    }
+    const snapshotUpdated = await removeFromCampaignSnapshot({ account, id, messageRef });
+    return { indexUpdated, snapshotUpdated };
   }
 
   return async function deleteMessage({ accountEmail, id, folder, uid }) {
@@ -99,8 +130,8 @@ function createMailboxDeleteMessage(deps = {}) {
       } catch (_) {}
     }
 
-    await persistDeletion({ account, id, messageRef });
-    return deletionResult;
+    const persistence = await persistDeletion({ account, id, messageRef });
+    return { ...deletionResult, ...persistence };
   };
 }
 

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
   parseMailboxCampaignSnapshot,
+  removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
 
@@ -118,6 +119,31 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
   assert.equal(message.bodyImagesTruncated, false);
   assert.doesNotMatch(serialized, new RegExp(smallImage.slice(0, 100)));
   assert.doesNotMatch(serialized, new RegExp(oversizedImage.slice(0, 80_000)));
+});
+
+test('mailbox campaign snapshot verwijdert alleen de exact gekozen mail', () => {
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [
+      { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', subject: 'Weg' },
+      { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'martijn@softora.nl', subject: 'Blijft' },
+      { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', subject: 'Blijft ook' },
+    ],
+  }, { savedAt: '2026-07-23T10:00:00.000Z' });
+
+  const next = removeMailboxCampaignSnapshotMessage(serialized, {
+    accountEmail: 'SERVE@SOFTORA.NL',
+    folder: 'INBOX',
+    uid: 42,
+  }, { savedAt: '2026-07-23T10:01:00.000Z' });
+  const parsed = parseMailboxCampaignSnapshot(next.serialized);
+
+  assert.equal(next.changed, true);
+  assert.equal(parsed.savedAt, '2026-07-23T10:01:00.000Z');
+  assert.deepEqual(parsed.messages.map((message) => [message.accountEmail, message.uid]), [
+    ['martijn@softora.nl', 42],
+    ['serve@softora.nl', 43],
+  ]);
 });
 
 test('mailbox campaign snapshot weigert lege en ongeldige data', () => {

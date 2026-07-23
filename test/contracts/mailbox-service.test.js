@@ -3,6 +3,12 @@ const assert = require('node:assert/strict');
 
 const { createMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
+const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  parseMailboxCampaignSnapshot,
+  serializeMailboxCampaignSnapshot,
+} = require('../../server/services/mailbox-campaign-snapshot');
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -2065,6 +2071,14 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
 
 test('mailbox service moves deleted messages to the resolved trash folder', async () => {
   const persistenceCalls = [];
+  let savedSnapshot = '';
+  const initialSnapshot = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [
+      { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+    ],
+  });
   const client = createFakeImapClient({
     boxes: [
       { path: 'INBOX' },
@@ -2102,11 +2116,13 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
         return { ok: true };
       },
     },
-    mailboxCampaignRepliesService: {
-      listReplies: async () => {
-        persistenceCalls.push(['snapshot-refresh']);
-        return [];
-      },
+    getUiStateValues: async (scope) => {
+      persistenceCalls.push(['snapshot-read', scope]);
+      return { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: initialSnapshot } };
+    },
+    setUiStateValues: async (scope, values, meta) => {
+      persistenceCalls.push(['snapshot-write', scope, meta]);
+      savedSnapshot = values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY];
     },
   });
   const res = createResponseRecorder();
@@ -2130,6 +2146,8 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
     uid: 42,
     deleted: true,
     moved: true,
+    indexUpdated: true,
+    snapshotUpdated: true,
   });
   assert.deepEqual(client.movedMessages, [
     { mailboxName: 'INBOX', uids: [42], destination: 'INBOX/Prullenbak', options: { uid: true } },
@@ -2141,8 +2159,16 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
       folder: 'inbox',
       uid: 42,
     }],
-    ['snapshot-refresh'],
+    ['snapshot-read', MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE],
+    ['snapshot-write', MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
+      source: 'mailbox-delete',
+      actor: 'serve@softora.nl',
+    }],
   ]);
+  assert.deepEqual(
+    parseMailboxCampaignSnapshot(savedSnapshot).messages.map((message) => message.uid),
+    [43]
+  );
 });
 
 test('mailbox service strips tracking and standalone asset urls from display text', () => {
