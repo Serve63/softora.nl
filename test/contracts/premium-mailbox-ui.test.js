@@ -458,6 +458,112 @@ test('mailbox toont een gestructureerd antwoord niet nogmaals na Outlook-headerv
   assert.doesNotMatch(html, /detail-mail-section-quote/);
 });
 
+test('mailbox toont dezelfde coldmail met afbeeldingsplaceholders niet dubbel', () => {
+  const quotedColdmail = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website nicolevintagefashion\u2060.\u2060com tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link',
+    '[https://www.softora.nl/webdesign/nicole-vintage-fashion?sender=serve] bekijken 🎨',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '',
+    'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.',
+  ].join('\n');
+  const sentColdmail = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website nicolevintagefashion.com tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link',
+    'https://www.softora.nl/webdesign/nicole-vintage-fashion?sender=serve bekijken 🎨',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '',
+    '[image: nicolevintagefashion.com-preview]',
+    'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.',
+    '[image: nicolevintagefashion.com-preview-device-mockup-v8]',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(
+    [
+      'Bedankt voor je bericht, maar we hebben geen interesse.',
+      '',
+      'Op 21 jul 2026 om 11:52 heeft Servé Creusen het volgende geschreven:',
+      '',
+      quotedColdmail,
+    ].join('\n'),
+    [],
+    {
+      replyMailId: 'inbox:500',
+      mail: {
+        accountEmail: 'servecreusen7@gmail.com',
+        receivedAt: '2026-07-22T09:21:00.000Z',
+        threadMessages: [{
+          id: 'sent:499',
+          folder: 'sent',
+          accountEmail: 'servecreusen7@gmail.com',
+          date: '2026-07-21T09:52:00.000Z',
+          body: sentColdmail,
+        }],
+      },
+    }
+  );
+
+  assert.match(html, /Jouw antwoord/);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website nicolevintagefashion\.com tegen\./g) || []).length, 1);
+  assert.doesNotMatch(html, /Jouw eerdere mail/);
+  assert.doesNotMatch(html, /detail-mail-section-quote/);
+});
+
+test('mailbox laat een inhoudelijk andere eerdere eigen mail wel staan', () => {
+  const html = renderMailboxBodyForTest(
+    [
+      'Bedankt voor de uitleg.',
+      '',
+      'Op 21 jul 2026 om 11:52 heeft Servé Creusen het volgende geschreven:',
+      '',
+      'Hoi Nicole,',
+      '',
+      'Hierbij stuur ik een nieuw voorstel met een andere prijs en planning.',
+    ].join('\n'),
+    [],
+    {
+      replyMailId: 'inbox:501',
+      mail: {
+        accountEmail: 'servecreusen7@gmail.com',
+        receivedAt: '2026-07-22T09:21:00.000Z',
+        threadMessages: [{
+          id: 'sent:500',
+          folder: 'sent',
+          accountEmail: 'servecreusen7@gmail.com',
+          date: '2026-07-21T09:52:00.000Z',
+          body: [
+            'Goedendag,',
+            '',
+            'Afgelopen week kwam ik jullie website nicolevintagefashion.com tegen.',
+            'Uit enthousiasme heb ik een fris webdesign gemaakt.',
+          ].join('\n'),
+        }],
+      },
+    }
+  );
+
+  assert.match(html, /Jouw antwoord/);
+  assert.match(html, /Jouw eerdere mail/);
+  assert.match(html, /Hierbij stuur ik een nieuw voorstel met een andere prijs en planning\./);
+});
+
 test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af', () => {
   const html = campaignInboxModule.renderThreadMessages(
     {
@@ -480,7 +586,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723n/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723m/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723n/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -554,7 +660,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723m"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723n"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723n"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723n"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
