@@ -36,7 +36,10 @@ const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
 const { registerSeoReadRoutes } = require('../routes/seo-read');
 const { registerSeoWriteRoutes } = require('../routes/seo-write');
-const { registerGoogleAdsRoutes } = require('../routes/google-ads');
+const {
+  registerGoogleAdsProtectedRoutes,
+  registerGoogleAdsPublicRoutes,
+} = require('../routes/google-ads');
 const {
   registerWhoopHealthProtectedRoutes,
   registerWhoopHealthPublicRoutes,
@@ -167,15 +170,19 @@ function registerFeatureRoutes(app, deps = {}) {
     cronSecret: mailboxCronSecret,
   });
 
-  registerGoogleAdsRoutes(app, {
+  registerGoogleAdsPublicRoutes(app, {
     service: googleAdsService,
     cronSecret: mailboxCronSecret,
-    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
 
   createPremiumRouteRuntime({
     app,
     ...premiumRouteRuntime,
+  });
+
+  registerGoogleAdsProtectedRoutes(app, {
+    service: googleAdsService,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
 
   registerWhoopHealthProtectedRoutes(app, {

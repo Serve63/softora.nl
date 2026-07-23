@@ -8,7 +8,11 @@ const {
   createGoogleAdsControlService,
   sanitizeAttribution,
 } = require('../../server/services/google-ads-control');
-const { registerGoogleAdsRoutes } = require('../../server/routes/google-ads');
+const {
+  registerGoogleAdsProtectedRoutes,
+  registerGoogleAdsPublicRoutes,
+  registerGoogleAdsRoutes,
+} = require('../../server/routes/google-ads');
 const {
   CAMPAIGN_LAUNCH_PACKS,
   FINAL_URL_SUFFIX,
@@ -154,6 +158,45 @@ test('Google Ads routes beschermen dashboard en bieden bewust geen activatie- of
   assert.equal(routes.find((route) => route[1] === '/api/google-ads/status')[2][0], requireAdmin);
   assert.notEqual(routes.find((route) => route[1] === '/api/google-ads/public-config')[2][0], requireAdmin);
   assert.equal(paths.some((path) => /activate|budget|mutate|campaign/.test(path)), false);
+});
+
+test('Google Ads publieke en beschermde routes kunnen rond de algemene premium auth-poort worden geregistreerd', () => {
+  const routes = [];
+  const app = {
+    get(path, ...handlers) { routes.push(['GET', path, handlers]); },
+    post(path, ...handlers) { routes.push(['POST', path, handlers]); },
+  };
+  const requireAdmin = (_req, _res, next) => next();
+  const service = {
+    getStatus() {},
+    getBlueprint() {},
+    getLaunchPack() {},
+    getEditorAssetsCsv() {},
+    getPublicConfig() {},
+    runDryRun() {},
+    recordConversion() {},
+  };
+
+  registerGoogleAdsPublicRoutes(app, { cronSecret: 'cron-secret', service });
+  const publicRouteCount = routes.length;
+  registerGoogleAdsProtectedRoutes(app, {
+    requirePremiumAdminApiAccess: requireAdmin,
+    service,
+  });
+
+  assert.equal(publicRouteCount, 3);
+  assert.deepEqual(
+    routes.slice(0, publicRouteCount).map(([method, path]) => `${method} ${path}`),
+    [
+      'POST /api/public-conversion',
+      'GET /api/google-ads/public-config',
+      'GET /api/google-ads/daily-run',
+    ]
+  );
+  assert.equal(
+    routes.slice(publicRouteCount).every((route) => route[2][0] === requireAdmin),
+    true
+  );
 });
 
 test('launch-pack is import-ready, deterministic en blijft binnen Google Ads assetlimieten', () => {
