@@ -189,3 +189,84 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
   assert.equal(replies[0].threadMessages[0].id, 'sent:102');
   assert.equal(replies[0].threadMessages[0].body, 'Hoi Helma,\n\nIk bouw onze websites met maatwerk.');
 });
+
+test('campaign reply service houdt vervolgreacties in één bestaande conversatie', async () => {
+  const originalMessageId = '<222ba73e-2480-c995-627e-2386c4ef08da@gmail.com>';
+  const firstReplyMessageId = '<first-seats-reply@mail.gmail.com>';
+  const martijnReplyMessageId = '<martijn-seats-answer@mail.gmail.com>';
+  const firstReply = {
+    id: 'inbox:37467',
+    uid: 37467,
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Seats 2 Meet Station Den Bosch',
+    email: 'info@seats2meetstationdenbosch.nl',
+    to: 'martijnven123@gmail.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Mag ik vragen waar jij het liefst je sites mee bouwt?',
+    date: '2026-07-22T15:36:03.000Z',
+    messageId: firstReplyMessageId,
+    inReplyTo: originalMessageId,
+    references: originalMessageId,
+  };
+  const latestReply = {
+    ...firstReply,
+    id: 'inbox:37476',
+    uid: 37476,
+    preview: 'Dank voor je antwoord. Kun je ons daar meer over vertellen?',
+    date: '2026-07-23T09:31:11.000Z',
+    messageId: '<latest-seats-reply@mail.gmail.com>',
+    inReplyTo: martijnReplyMessageId,
+    references: `${originalMessageId} ${firstReplyMessageId} ${martijnReplyMessageId}`,
+    unread: true,
+  };
+  const sentReply = {
+    id: 'sent:656',
+    uid: 656,
+    folder: 'sent',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijnven123@gmail.com',
+    to: 'info@seats2meetstationdenbosch.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Hoi Helma, ik bouw onze websites met maatwerk.',
+    date: '2026-07-23T09:08:10.000Z',
+    messageId: martijnReplyMessageId,
+    inReplyTo: firstReplyMessageId,
+    references: `${originalMessageId} ${firstReplyMessageId}`,
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => (
+        folder === 'sent' ? [sentReply] : [latestReply, firstReply]
+      ),
+      hydrateMessageBodies: async ({ messages }) => messages.map((message) => ({
+        ...message,
+        body: message.preview,
+      })),
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'seats2meet',
+        bedrijf: 'Seats 2 Meet Station Den Bosch',
+        email: 'info@seats2meetstationdenbosch.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100 });
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].id, 'inbox:37476');
+  assert.equal(replies[0].date, '2026-07-23T09:31:11.000Z');
+  assert.equal(replies[0].unread, true);
+  assert.match(replies[0].conversationId, /222ba73e-2480-c995-627e-2386c4ef08da/);
+  assert.deepEqual(
+    replies[0].threadMessages.map((message) => message.id),
+    ['sent:656', 'inbox:37467']
+  );
+  assert.equal(replies[0].threadMessages[0].folder, 'sent');
+  assert.equal(replies[0].threadMessages[1].folder, 'inbox');
+});

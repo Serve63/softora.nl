@@ -73,7 +73,7 @@ function sanitizeThreadMessage(value, options = {}) {
   return {
     id: text(source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
-    folder: 'sent',
+    folder: text(source.folder || 'sent', 50).toLowerCase() || 'sent',
     accountEmail: text(source.accountEmail, 320).toLowerCase(),
     from: text(source.from, 500),
     email: text(source.email, 320).toLowerCase(),
@@ -119,6 +119,7 @@ function sanitizeMessage(value, options = {}) {
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
+    conversationId: text(source.conversationId, 2000),
     unread: Boolean(source.unread),
     starred: Boolean(source.starred),
     hasBody: Boolean(source.hasBody || rawBody),
