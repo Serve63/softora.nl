@@ -12,7 +12,9 @@ const CAMPAIGN_MAILBOX_ACCOUNTS = Object.freeze([
 
 const CAMPAIGN_REPLY_LIMIT = 200;
 const CAMPAIGN_MESSAGE_SCAN_LIMIT = 2000;
+const CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT = 500;
 const CAMPAIGN_THREAD_MESSAGE_LIMIT = 10;
+const CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE = 10;
 const CAMPAIGN_THREAD_FALLBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
 function normalizeText(value) {
@@ -87,15 +89,49 @@ function attachSentThreadMessages(replies, sentMessages) {
   const candidates = dedupeCampaignMessages(sentMessages)
     .filter((message) => normalizeText(message && message.folder).toLowerCase() === 'sent');
   const messagesByReply = new Map(sourceReplies.map((reply) => [reply, []]));
+  const repliesByMessageId = new Map();
+  const repliesByFallbackKey = new Map();
+  sourceReplies.forEach((reply) => {
+    const messageId = normalizeMessageId(reply && reply.messageId);
+    if (messageId) {
+      repliesByMessageId.set(`${normalizeEmail(reply && reply.accountEmail)}|${messageId}`, reply);
+    }
+    const fallbackKey = [
+      normalizeEmail(reply && reply.accountEmail),
+      normalizeEmail(reply && reply.email),
+      normalizeSubject(reply && reply.subject),
+    ].join('|');
+    if (!repliesByFallbackKey.has(fallbackKey)) repliesByFallbackKey.set(fallbackKey, []);
+    repliesByFallbackKey.get(fallbackKey).push(reply);
+  });
+  repliesByFallbackKey.forEach((repliesForKey) => {
+    repliesForKey.sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
+  });
   candidates.forEach((message) => {
-    const eligibleReplies = sourceReplies
-      .filter((reply) => isSentReplyForMessage(message, reply))
-      .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date));
-    if (!eligibleReplies.length) return;
-    const directReply = eligibleReplies.find((reply) =>
-      messageReferencesId(message, normalizeMessageId(reply && reply.messageId))
-    );
-    messagesByReply.get(directReply || eligibleReplies[0]).push(message);
+    const referenceIds = [
+      message && message.inReplyTo,
+      message && message.references,
+    ]
+      .flatMap((value) => normalizeText(value).toLowerCase().split(/\s+/))
+      .map(normalizeMessageId)
+      .filter(Boolean);
+    const directReply = referenceIds
+      .map((messageId) => repliesByMessageId.get(
+        `${normalizeEmail(message && message.accountEmail)}|${messageId}`
+      ))
+      .find(Boolean);
+    const recipients = extractEmailAddresses(message && message.to);
+    const fallbackReplies = recipients.flatMap((recipient) => (
+      repliesByFallbackKey.get([
+        normalizeEmail(message && message.accountEmail),
+        recipient,
+        normalizeSubject(message && message.subject),
+      ].join('|')) || []
+    ));
+    const reply = directReply || fallbackReplies.find((candidate) => isSentReplyForMessage(message, candidate));
+    if (!reply) return;
+    const threadMessages = messagesByReply.get(reply);
+    threadMessages.push(message);
   });
   return sourceReplies.map((reply) => ({
     ...reply,
@@ -278,18 +314,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const [messages, sentMessagesResult] = await Promise.all([
-      mailboxIndexStore.listMessagesForAccounts({
-        accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-        folder: 'inbox',
-        limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
-      }),
-      mailboxIndexStore.listMessagesForAccounts({
-        accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-        folder: 'sent',
-        limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
-      }).catch(() => []),
-    ]);
+    const messages = await mailboxIndexStore.listMessagesForAccounts({
+      accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+      folder: 'inbox',
+      limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+    });
     if (!Array.isArray(messages)) {
       const error = new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.');
       error.status = 503;
@@ -336,6 +365,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
       .filter(Boolean)
       .slice(0, safeLimit);
 
+    const sentMessagesResult = await mailboxIndexStore.listMessagesForAccounts({
+      accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+      folder: 'sent',
+      limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+    }).catch(() => []);
     const sentMessages = Array.isArray(sentMessagesResult) ? sentMessagesResult : [];
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') {
       return attachSentThreadMessages(replies, sentMessages);
@@ -347,8 +381,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
       replies.flatMap((reply) => sentMessages.filter((message) => isSentReplyForMessage(message, reply)))
     );
     const hydratedSentMessages = [];
-    for (let index = 0; index < matchedSentMessages.length; index += 100) {
-      const batch = matchedSentMessages.slice(index, index + 100);
+    for (let index = 0; index < matchedSentMessages.length; index += CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE) {
+      const batch = matchedSentMessages.slice(index, index + CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE);
       const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: batch });
       hydratedSentMessages.push(...(Array.isArray(hydrated) ? hydrated : batch));
     }
@@ -364,6 +398,7 @@ module.exports = {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_REPLY_LIMIT,
+  CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_THREAD_MESSAGE_LIMIT,
   attachSentThreadMessages,
   buildCampaignReply,

@@ -58,7 +58,7 @@
           body: JSON.stringify({
             account: activeFolder === 'outreach' ? '' : String(getAccount() || '').trim().toLowerCase(),
             folder: activeFolder === 'outreach' ? 'inbox,sent' : activeFolder,
-            limit: activeFolder === 'outreach' ? 100 : 50,
+            limit: activeFolder === 'outreach' ? 20 : 50,
             force: true,
           }),
         });
