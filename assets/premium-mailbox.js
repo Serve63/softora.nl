@@ -183,7 +183,7 @@ const MAILBOX_REPLY_HEADER_PATTERNS = [
   /^van:\s.+$/i,
   /^from:\s.+$/i,
 ];
-const MAILBOX_OWN_REPLY_AUTHOR_PATTERN = /\b(?:serv[eé]\s+creusen|martijn\s+van\s+de\s+ven|serv[eé]@softora\.nl|martijn@softora\.nl)\b/i;
+const MAILBOX_OWN_REPLY_AUTHOR_PATTERN = /\b(?:serv[eé]\s+creusen|martijn\s+van\s+de\s+ven|serv[eé](?:creusen)?@softora\.nl|martijn(?:vandeven)?@softora\.nl)\b/i;
 const MAILBOX_SIGNATURE_START_PATTERNS = [
   /^met vriendelijke groet[,!]*$/i,
   /^vriendelijke groet(?:en)?[,!]*$/i,
@@ -228,7 +228,7 @@ function isMailboxTechnicalUrl(value, options) {
   return Boolean(options && options.standalone && isMailboxStandaloneAssetUrl(value));
 }
 function cleanMailboxText(value) {
-  const lines = String(value || '')
+  const lines = window.SoftoraMailboxDisplay.normalizeCollapsedReplyStructure(value)
     .replace(/\r\n?/g, '\n')
     .replace(/\u200B/g, '')
     .split('\n')
