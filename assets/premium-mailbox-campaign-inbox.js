@@ -532,10 +532,10 @@
     return values;
   }
 
-  function isDuplicateStructuredOwnQuote(section, mail, isOwnReplyHeaderLine) {
+  function isDuplicateStructuredOwnQuote(section, mail, isReplyHeaderLine) {
     if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
     const firstLine = String(section.lines[0] || '').trim();
-    if (typeof isOwnReplyHeaderLine !== 'function' || !isOwnReplyHeaderLine(firstLine)) return false;
+    if (typeof isReplyHeaderLine !== 'function' || !isReplyHeaderLine(firstLine)) return false;
     const quotedText = normalizeThreadMatchText(stripStructuredQuoteMetadata(section.lines.slice(1)).join('\n'));
     if (!quotedText) return false;
     return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : []).some((message) => {
