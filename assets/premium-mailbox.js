@@ -585,7 +585,7 @@ let mailboxSyncState = null;
 let composeReplyContext = null;
 const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   fetch,
-  dialogs: window.SoftoraDialogs,
+  getDialogs: () => window.SoftoraDialogs,
   confirm: (message) => typeof window.confirm === 'function' && window.confirm(message),
   getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
   getRequestId: (mail) => window.SoftoraMailboxCampaignInbox.getRequestId(mail),
@@ -865,7 +865,9 @@ async function deleteMail(id) {
       const transaction = { mails: mails.slice(), activeMail };
       const visibleBefore = getMailsForFolder(activeFolder);
       const deletedIndex = Math.max(0, visibleBefore.findIndex(mail => String(mail.id) === String(id)));
-      mails = mailboxDeleteController.filterMessages(mails);
+      mails = mailboxDeleteController.filterMessages(
+        mails.filter(mail => String(mail.id) !== String(id))
+      );
       const visibleAfter = getMailsForFolder(activeFolder);
       const nextMail = visibleAfter[Math.min(deletedIndex, Math.max(0, visibleAfter.length - 1))] || null;
       activeMail = nextMail?.id || null;
