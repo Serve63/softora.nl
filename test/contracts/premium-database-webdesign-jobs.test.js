@@ -827,6 +827,76 @@ test('premium database webdesign bulk server worker processes batches without br
   assert.equal(run.batches[0].remaining, 0);
 });
 
+test('premium database webdesign bulk worker never processes an expired persistent job', async () => {
+  const nowMs = Date.parse('2026-07-10T15:00:00.000Z');
+  const store = createInMemoryWebdesignBatchStore();
+  const auth = { email: 'owner@softora.nl', userId: 'owner' };
+  const setupCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    now: () => nowMs,
+  });
+
+  const startRes = createResponseRecorder();
+  await setupCoordinator.startBatchResponse({ premiumAuth: auth, body: { total: 1 } }, startRes);
+  const batchId = startRes.body.batch.id;
+  await setupCoordinator.appendBatchChunkResponse(
+    {
+      premiumAuth: auth,
+      params: { batchId },
+      body: {
+        index: 0,
+        targets: [{
+          websiteUrl: 'https://expired-worker.test',
+          customer: { id: 'expired-worker-customer', bedrijf: 'Verlopen workerjob' },
+        }],
+      },
+    },
+    createResponseRecorder()
+  );
+  await setupCoordinator.commitBatchResponse(
+    { premiumAuth: auth, params: { batchId }, body: { total: 1, expectedChunks: 1 } },
+    createResponseRecorder()
+  );
+
+  const storedJob = Array.from(store.jobs.values())
+    .find((job) => job.customer?.id === 'expired-worker-customer');
+  assert.ok(storedJob);
+  storedJob.createdAt = nowMs - (7 * 60 * 60 * 1000);
+  store.jobs.set(storedJob.id, cloneJson(storedJob));
+
+  let pipelineCalls = 0;
+  const workerCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    now: () => nowMs,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+
+  const run = await workerCoordinator.runBatchWorker({ batchLimit: 1, jobLimit: 1, concurrency: 1 });
+  const storedChunk = Array.from(store.chunks.values()).find((chunk) => chunk.batchId === batchId);
+  const target = storedChunk.targets[0];
+
+  assert.equal(run.ok, true);
+  assert.equal(run.processedJobs, 0);
+  assert.equal(pipelineCalls, 0);
+  assert.equal(workerCoordinator._jobs.has(storedJob.id), false);
+  assert.equal(target.status, 'error');
+  assert.equal(target.jobId, '');
+  assert.match(target.error, /verlopen/i);
+});
+
 test('premium database webdesign bulk cancel stops the remaining server batch work', async () => {
   const store = createInMemoryWebdesignBatchStore();
   const pipelineCalls = [];
@@ -1428,7 +1498,7 @@ test('premium database webdesign jobs hide expired persistent jobs and allow a f
     {
       premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
       body: {
-        jobId: 'fresh-job-12345678',
+        jobId: 'expired-job-123456',
         websiteUrl: 'https://softora.nl/',
         customer: { id: 'customer-expired', bedrijf: 'Nieuwe job' },
       },
@@ -1437,7 +1507,149 @@ test('premium database webdesign jobs hide expired persistent jobs and allow a f
   );
 
   assert.equal(startRes.statusCode, 202);
-  assert.equal(startRes.body.job.id, 'fresh-job-12345678');
+  assert.equal(startRes.body.existing, false);
+  assert.equal(startRes.body.job.id, 'expired-job-123456');
+  assert.equal(startRes.body.job.createdAt, nowMs);
+});
+
+test('premium database webdesign job polling never processes an expired persistent job', async () => {
+  const nowMs = Date.parse('2026-07-10T15:00:00.000Z');
+  const store = createInMemoryWebdesignBatchStore();
+  let pipelineCalls = 0;
+  store.jobs.set('expired-poll-job-123456', {
+    id: 'expired-poll-job-123456',
+    ownerKey: 'owner@softora.nl::owner',
+    websiteUrl: 'https://softora.nl/',
+    customer: { id: 'customer-expired-poll', bedrijf: 'Verlopen polljob' },
+    status: 'queued',
+    error: null,
+    createdAt: nowMs - (7 * 60 * 60 * 1000),
+    startedAt: 0,
+    finishedAt: 0,
+  });
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    dataOpsStore: store,
+    processJobsInline: true,
+    now: () => nowMs,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+
+  const res = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'expired-poll-job-123456' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.ok, false);
+  assert.equal(pipelineCalls, 0);
+  assert.equal(coordinator._jobs.has('expired-poll-job-123456'), false);
+});
+
+test('premium database webdesign queue rechecks expiry immediately before generation', async () => {
+  const initialNowMs = Date.parse('2026-07-10T15:00:00.000Z');
+  let currentNowMs = initialNowMs;
+  let pipelineCalls = 0;
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: false,
+    now: () => currentNowMs,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'expires-before-settle-123456',
+        websiteUrl: 'https://softora.nl/',
+        customer: { id: 'expires-before-settle', bedrijf: 'Verloopt voor uitvoering' },
+      },
+    },
+    startRes
+  );
+  assert.equal(startRes.statusCode, 202);
+
+  currentNowMs = initialNowMs + (7 * 60 * 60 * 1000);
+  await wait(20);
+
+  assert.equal(pipelineCalls, 0);
+  assert.equal(coordinator._jobs.has('expires-before-settle-123456'), false);
+});
+
+test('premium database webdesign polling returns 404 when a job expires during persistence', async () => {
+  const initialNowMs = Date.parse('2026-07-10T15:00:00.000Z');
+  let currentNowMs = initialNowMs;
+  let pipelineCalls = 0;
+  let persistCalls = 0;
+  const store = createInMemoryWebdesignBatchStore();
+  const persistJob = store.upsertWebdesignJob.bind(store);
+  store.upsertWebdesignJob = async (job) => {
+    persistCalls += 1;
+    const result = await persistJob(job);
+    if (persistCalls === 2) currentNowMs = initialNowMs + (7 * 60 * 60 * 1000);
+    return result;
+  };
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    processJobsInline: true,
+    dataOpsStore: store,
+    now: () => currentNowMs,
+    aiToolsCoordinator: {
+      runWebsitePreviewGeneratePipeline: async () => {
+        pipelineCalls += 1;
+        return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: 'preview.png' } };
+      },
+    },
+  });
+
+  const startRes = createResponseRecorder();
+  await coordinator.startJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      body: {
+        jobId: 'expires-during-persist-123456',
+        websiteUrl: 'https://softora.nl/',
+        customer: { id: 'expires-during-persist', bedrijf: 'Verloopt tijdens opslag' },
+      },
+    },
+    startRes
+  );
+  assert.equal(startRes.statusCode, 202);
+
+  const statusRes = createResponseRecorder();
+  await coordinator.getJobResponse(
+    {
+      premiumAuth: { email: 'owner@softora.nl', userId: 'owner' },
+      params: { jobId: 'expires-during-persist-123456' },
+    },
+    statusRes
+  );
+
+  assert.equal(statusRes.statusCode, 404);
+  assert.equal(pipelineCalls, 0);
+  assert.equal(coordinator._jobs.has('expires-during-persist-123456'), false);
 });
 
 test('premium database webdesign jobs keep thousands of queued jobs visible', async () => {
