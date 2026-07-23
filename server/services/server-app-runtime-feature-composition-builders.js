@@ -254,6 +254,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         isPremiumMfaCodeValid: securityRuntime.isPremiumMfaCodeValid,
         getSafePremiumRedirectPath: securityRuntime.getSafePremiumRedirectPath,
         getResolvedPremiumAuthState: securityRuntime.getResolvedPremiumAuthState,
+        grantLiveMomentumAccess: securityRuntime.grantLiveMomentumAccess,
         isPremiumAdminIpAllowed: securityRuntime.isPremiumAdminIpAllowed,
         createPremiumSessionToken: securityRuntime.createPremiumSessionToken,
         setPremiumSessionCookie: securityRuntime.setPremiumSessionCookie,

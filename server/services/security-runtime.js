@@ -7,6 +7,7 @@ const { createRequestSecurityContext } = require('../security/request-context');
 const { createRuntimeDebugAccessGuard } = require('../security/runtime-debug');
 const { createRuntimeEventStore } = require('../security/runtime-events');
 const { createPremiumHtmlPageAccessController } = require('../security/premium-pages');
+const { createLiveMomentumAccessGate } = require('../security/live-momentum-access');
 const { createLeadOwnerService } = require('./lead-owners');
 const { createPremiumAuthRuntime } = require('./premium-auth-runtime');
 
@@ -163,6 +164,13 @@ function createSecurityRuntime(deps = {}) {
     clearPremiumSessionCookie,
   });
 
+  const { grantLiveMomentumAccess, hasLiveMomentumAccess } = createLiveMomentumAccessGate({
+    sessionSecret: premiumSessionSecret,
+    isProduction,
+    isSecureHttpRequest,
+    normalizeSessionEmail: normalizePremiumSessionEmail,
+  });
+
   const { resolvePremiumHtmlPageAccess } = createPremiumHtmlPageAccessController({
     premiumPublicHtmlFiles,
     noindexHeaderValue,
@@ -173,6 +181,7 @@ function createSecurityRuntime(deps = {}) {
     appendSecurityAuditEvent,
     getClientIpFromRequest,
     getRequestOriginFromHeaders,
+    hasLiveMomentumAccess,
   });
 
   const { requireRuntimeDebugAccess } = createRuntimeDebugAccessGuard({
@@ -197,6 +206,7 @@ function createSecurityRuntime(deps = {}) {
     createPremiumSessionToken,
     getPremiumAuthState,
     getResolvedPremiumAuthState,
+    grantLiveMomentumAccess,
     getSafePremiumRedirectPath,
     getStateChangingApiProtectionDecision,
     isPremiumAuthConfigured,
