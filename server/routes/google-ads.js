@@ -1,10 +1,7 @@
-function registerGoogleAdsRoutes(app, deps = {}) {
+function registerGoogleAdsPublicRoutes(app, deps = {}) {
   const service = deps.service;
   if (!service) return;
   const cronSecret = String(deps.cronSecret || process.env.CRON_SECRET || '').trim();
-  const requireAdmin = typeof deps.requirePremiumAdminApiAccess === 'function'
-    ? deps.requirePremiumAdminApiAccess
-    : (_req, _res, next) => next();
 
   app.post('/api/public-conversion', async (req, res) => {
     try {
@@ -32,6 +29,14 @@ function registerGoogleAdsRoutes(app, deps = {}) {
       return res.status(500).json({ ok: false, error: String(error.message || error).slice(0, 300) });
     }
   });
+}
+
+function registerGoogleAdsProtectedRoutes(app, deps = {}) {
+  const service = deps.service;
+  if (!service) return;
+  const requireAdmin = typeof deps.requirePremiumAdminApiAccess === 'function'
+    ? deps.requirePremiumAdminApiAccess
+    : (_req, _res, next) => next();
 
   app.get('/api/google-ads/status', requireAdmin, async (_req, res) => {
     try {
@@ -73,4 +78,13 @@ function registerGoogleAdsRoutes(app, deps = {}) {
   });
 }
 
-module.exports = { registerGoogleAdsRoutes };
+function registerGoogleAdsRoutes(app, deps = {}) {
+  registerGoogleAdsPublicRoutes(app, deps);
+  registerGoogleAdsProtectedRoutes(app, deps);
+}
+
+module.exports = {
+  registerGoogleAdsProtectedRoutes,
+  registerGoogleAdsPublicRoutes,
+  registerGoogleAdsRoutes,
+};
