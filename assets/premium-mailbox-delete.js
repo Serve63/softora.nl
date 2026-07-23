@@ -30,8 +30,9 @@
         confirmText: permanent ? 'Definitief verwijderen' : 'Verwijderen',
         cancelText: 'Annuleren',
       };
-      if (options.dialogs && typeof options.dialogs.confirm === 'function') {
-        return options.dialogs.confirm(message, dialogOptions);
+      const dialogs = options.getDialogs?.() || options.dialogs || global.SoftoraDialogs;
+      if (dialogs && typeof dialogs.confirm === 'function') {
+        return dialogs.confirm(message, dialogOptions);
       }
       return typeof options.confirm === 'function' ? options.confirm(message) : false;
     }
