@@ -54,12 +54,15 @@ function isAutomatedCampaignReply(message) {
     /\bdelivery status notification\b/,
     /^email received\b/,
     /^bericht ontvangen\b/,
+    /\buw mail is ontvangen\b/,
   ];
   const automatedContentPatterns = [
     /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
     /\bdit is een automatisch bericht\b/,
     /\bwe would like to acknowledge that we have received your request\b/,
     /\bis ons kantoor gesloten\b/,
+    /\bop dit moment ben ik op vakantie\b/,
+    /\bberichten worden (?:in deze periode )?niet gelezen\b/,
   ];
 
   return (

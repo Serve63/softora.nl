@@ -2570,6 +2570,16 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
           preview: 'Delivery failed.',
           date: '2026-07-22T10:00:00.000Z',
         },
+        {
+          id: 'inbox:93',
+          accountEmail: 'serve290@gmail.com',
+          folder: 'inbox',
+          email: 'info@bijkatrien.com',
+          from: 'Bij Katrien',
+          subject: 'Uw mail is ontvangen | Bij Katrien Re: Kleine vraag over jullie website',
+          preview: 'Hartelijk dank voor uw mail. Op dit moment ben ik op vakantie tot 20 augustus.',
+          date: '2026-07-22T08:13:00.000Z',
+        },
       ].reverse(),
       hydrateMessageBodies: async ({ messages }) => {
         hydratedReplyIds = messages.map((message) => message.id);
