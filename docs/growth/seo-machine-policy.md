@@ -32,7 +32,9 @@ De ambitie is 100.000 organische klikken per 28 dagen uiterlijk 31 december 2026
 - Draai de brede publieke link-, metadata-, visual- en CTA-controles.
 - Vergelijk 7, 28 en 90 dagen voor non-branded verkeer, money pages en queryclusters.
 - Beoordeel welke experimenten voldoende data hebben en plan het volgende cluster.
-- Houd in `scale` 5 tot 7 sterke nieuwe of substantieel vernieuwde contentleveringen per week aan. In `growth`, `quality_recovery` en `indexation_recovery` gelden lagere maxima; een publicatiequotum mag nooit indexatie- of kwaliteitsherstel verdringen.
+- Bewaak nieuwe URL's en refreshes apart. Een substantiële refresh, interne-linkactie of designverbetering mag de minimumvloer voor echt nieuwe URL's nooit invullen.
+- Houd per rollende 7 dagen minimaal 1 nieuwe URL in `data_degraded`, 2 in `indexation_recovery`, 2 in `quality_recovery`, 3 in `growth` en 5 in `scale`, binnen de maxima uit de control-plane-tabel.
+- Als de vloer is gemist, publiceert de eerstvolgende veilige run de hoogst scorende unieke backlogkandidaat. Alleen een echte operationele P0, aantoonbare cannibalisatie van alle veilige kandidaten of een externe merge/deployblokkade mag dit tegenhouden.
 - Houd minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs vooruit in `docs/growth/seo-machine-backlog.json`, verdeeld over de commerciële clusters. Dit versieerbare JSON-register is de enige backlogbron; de automation memory bewaart alleen runhistorie, experimenten en beslissingen.
 - Zorg dat minimaal 70% van de nieuwe content directe koop-, vergelijkings-, kosten-, implementatie-, integratie- of probleemoplossingsintentie heeft. Algemene uitleg is maximaal 30%.
 - Backlinks en off-site linkbuilding vallen volledig buiten deze automation. Doe geen backlinkanalyse als actielijn, outreach, gastblogs, directoryplaatsingen, partner-/leveranciersprofielen, linkruil of betaalde links. Natuurlijke interne links binnen `softora.nl` blijven wel onderdeel van iedere relevante publicatie.
@@ -50,16 +52,18 @@ De werkstandaard is een publieke groeilevering per succesvolle dagelijkse run. A
 
 `npm run seo:cadence:check` kiest exact een toestand in deze prioriteit:
 
-| Toestand | Trigger | Publieke actie | Maximum nieuwe URL's per 7 dagen |
-| --- | --- | --- | --- |
-| `operations_p0` | Live-versie, crawlbaarheid, sitemap, backlog of verplichte tooling blokkeert veilige uitvoering | Alleen de blocker repareren | 0 |
-| `data_degraded` | GSC- of URL Inspection-data ontbreekt of is onvoldoende betrouwbaar | Meting repareren en alleen eerder bewijsdekte veilige verbetering uitvoeren | 2 |
-| `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Discovery, kwaliteit, canonicals, consolidatie en contextuele links verbeteren | 2 |
-| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Unieke informatiewinst toevoegen of overlappende pagina's samenvoegen | 3 |
-| `growth` | Techniek en herstelpoorten zijn groen | Hoogste verwachte gekwalificeerde impact kiezen | 5 |
-| `scale` | Minimaal vijf reviewbare URL's en minstens 80% D14/D28-indexatie, plus groene kwaliteit | Gecontroleerd opschalen | 7 |
+| Toestand | Trigger | Publieke actie | Minimum nieuwe URL's per 7 dagen | Maximum nieuwe URL's per 7 dagen |
+| --- | --- | --- | --- | --- |
+| `operations_p0` | Live-versie, crawlbaarheid, sitemap, backlog of verplichte tooling blokkeert veilige uitvoering | Alleen de blocker repareren | 0 | 0 |
+| `data_degraded` | GSC- of URL Inspection-data ontbreekt of is onvoldoende betrouwbaar | Meting repareren en alleen eerder bewijsdekte veilige verbetering uitvoeren | 1 | 2 |
+| `indexation_recovery` | Minimaal vijf D14/D28-URL's zijn inspecteerbaar en minder dan 60% is geïndexeerd | Nieuwe-URL-vloer bewaken; daarnaast discovery, canonicals, consolidatie en contextuele links verbeteren | 2 | 2 |
+| `quality_recovery` | Templateaandeel, herhaalde paragrafen of dichtstbijzijnde pagina-overlap overschrijdt de interne kwaliteitsgrens | Nieuwe-URL-vloer bewaken; daarnaast unieke informatiewinst toevoegen of overlap consolideren | 2 | 3 |
+| `growth` | Techniek en herstelpoorten zijn groen | Hoogste verwachte gekwalificeerde impact kiezen | 3 | 5 |
+| `scale` | Minimaal vijf reviewbare URL's en minstens 80% D14/D28-indexatie, plus groene kwaliteit | Gecontroleerd opschalen | 5 | 7 |
 
 Deze percentages zijn interne operationele veiligheidsgrenzen, geen door Google gepubliceerde rankingfactoren. Iedere niet-geindexeerde nieuwe URL krijgt een bewijsstatus `already_indexed`, `requested`, `quota_blocked`, `browser_blocked` of `failed` in de automation memory. Een status anders dan `already_indexed` of `requested` blijft openstaan voor de volgende run. Vraag niet opnieuw aan zonder materiele wijziging of gedocumenteerd vervolgvenster.
+
+`npm run seo:publications:report` rapporteert daarom afzonderlijk `newUrls`, `substantialRefreshes` en `otherGrowthActions`. Alleen `newUrls` verlaagt de nieuwe-URL-achterstand. Zodra `newUrlDeficit` groter is dan nul, overschrijft `publish_new_url_from_highest_scoring_safe_ready_candidate` de normale herstelactie voor die run.
 
 ### Dagelijkse fallback-ladder
 
@@ -108,11 +112,11 @@ Een kandidaat is pas publicatieklaar wanneer de zoekintentie, primaire money pag
 De instructietekst is niet de poort. Deze vier commando's leveren de afdwingbare staat:
 
 - `npm run seo:backlog:check` valideert het JSON-schema, minimaal 15 `ready` briefs, unieke URL's en ID's, de vaste scoreformule, exact drie overlap-URL's, publicatiebriefvelden en minimaal 70% commerciële intentie. Deze validator draait ook tegen het echte register in de contracttests van `verify:critical`.
-- `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen. Een URL telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en dezelfde `datePublished` toont als het contentregister.
+- `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen en splitst nieuwe URL's, substantiële refreshes en overige groei-acties. Een event telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en de passende `datePublished` of `dateModified` toont.
 - `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
 - `npm run seo:cadence:check` combineert backlog, live ledger, indexatie en corpusoriginaliteit. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
-De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation moet exitcode `2` als uitvoeropdracht voor de genoemde toestand behandelen, nooit automatisch als opdracht om een nieuwe URL te maken.
+De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation behandelt exitcode `2` als uitvoeropdracht. Bij `newUrlRequired=true` is dat expliciet een nieuwe URL uit de gevalideerde backlog; anders volgt zij de normale actie van de gekozen toestand.
 
 ## Opportunity Ranking
 

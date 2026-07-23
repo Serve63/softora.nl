@@ -8,13 +8,18 @@ const {
   extractSitemapLocations,
   isPublicationInWindow,
 } = require('../../server/services/seo-machine-publication-ledger');
+const {
+  getPublicSeoGrowthEventPlan,
+} = require('../../server/services/seo-machine-publication-plan');
 
-function htmlPage({ path, publishedAt, noindex = false }) {
+function htmlPage({ path, publishedAt, modifiedAt, noindex = false }) {
   return [
     '<!doctype html><html><head>',
     `<meta name="robots" content="${noindex ? 'noindex, follow' : 'index, follow'}">`,
     `<link rel="canonical" href="https://www.softora.nl${path}">`,
-    `<script type="application/ld+json">{"datePublished":"${publishedAt}"}</script>`,
+    `<script type="application/ld+json">{"datePublished":"${publishedAt}"${
+      modifiedAt ? `,"dateModified":"${modifiedAt}"` : ''
+    }}</script>`,
     '</head><body>Content</body></html>',
   ].join('');
 }
@@ -33,7 +38,7 @@ function createFetchFixture() {
       { contentType: 'application/json' }
     )],
     ['https://www.softora.nl/sitemap.xml', response(
-      '<urlset><url><loc>https://www.softora.nl/blog/good</loc></url><url><loc>https://www.softora.nl/blog/noindex</loc></url></urlset>',
+      '<urlset><url><loc>https://www.softora.nl/blog/good</loc></url><url><loc>https://www.softora.nl/blog/noindex</loc></url><url><loc>https://www.softora.nl/blog/refreshed</loc></url></urlset>',
       { contentType: 'application/xml' }
     )],
     ['https://www.softora.nl/blog/good', response(htmlPage({
@@ -44,6 +49,11 @@ function createFetchFixture() {
       path: '/blog/noindex',
       publishedAt: '2026-07-15',
       noindex: true,
+    }))],
+    ['https://www.softora.nl/blog/refreshed', response(htmlPage({
+      path: '/blog/refreshed',
+      publishedAt: '2026-06-01',
+      modifiedAt: '2026-07-14',
     }))],
   ]);
   return async (url) => {
@@ -64,6 +74,18 @@ test('publication helpers normalize canonical and UTC rolling windows', () => {
   );
   assert.equal(isPublicationInWindow('2026-07-11', new Date('2026-07-17T20:00:00Z'), 7), true);
   assert.equal(isPublicationInWindow('2026-07-10', new Date('2026-07-17T20:00:00Z'), 7), false);
+});
+
+test('public SEO refreshes have an explicit machine-readable event plan', () => {
+  const events = getPublicSeoGrowthEventPlan({ now: new Date('2026-07-23T12:00:00.000Z') });
+  assert.deepEqual(
+    events.map((event) => [event.path, event.eventAt, event.publicationKind]),
+    [
+      ['/bedrijfssoftware-op-maat', '2026-07-06', 'substantial_refresh'],
+      ['/crm-systeem-op-maat', '2026-07-04', 'substantial_refresh'],
+      ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
+    ]
+  );
 });
 
 test('live publication ledger counts only verified public indexable URLs', async () => {
@@ -88,16 +110,31 @@ test('live publication ledger counts only verified public indexable URLs', async
         status: 'live',
         title: 'Noindex',
       },
+      {
+        collection: 'blog',
+        cluster: 'software-crm',
+        path: '/blog/refreshed',
+        publishedAt: '2026-06-01',
+        eventAt: '2026-07-14',
+        publicationKind: 'substantial_refresh',
+        status: 'live',
+        title: 'Refreshed',
+      },
     ],
   });
 
   assert.equal(ledger.status, 'p0');
   assert.match(ledger.errors.join('\n'), /noindex.*indexable/i);
-  assert.equal(ledger.windows['7'].declared, 2);
-  assert.equal(ledger.windows['7'].qualifying, 1);
-  assert.equal(ledger.windows['7'].deficit, 4);
+  assert.equal(ledger.windows['7'].declared, 3);
+  assert.equal(ledger.windows['7'].qualifying, 2);
+  assert.equal(ledger.windows['7'].newUrls, 1);
+  assert.equal(ledger.windows['7'].substantialRefreshes, 1);
+  assert.equal(ledger.windows['7'].otherGrowthActions, 0);
+  assert.equal(ledger.windows['7'].deficit, 3);
   assert.equal(ledger.windows['7'].items[0].qualifies, true);
   assert.equal(ledger.windows['7'].items[1].checks.indexable, false);
+  assert.equal(ledger.windows['7'].items[2].publicationKind, 'substantial_refresh');
+  assert.equal(ledger.windows['7'].items[2].dateModified, '2026-07-14');
 });
 
 test('cadence gate returns red exit code two when content is required', () => {

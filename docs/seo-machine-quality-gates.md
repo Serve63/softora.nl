@@ -12,9 +12,11 @@ Deze poorten voorkomen dat productiesnelheid wordt verward met organische groei.
 
 ## Machine-Toestanden
 
-De dagelijkse `seo:cadence:check` beslist in deze volgorde: `operations_p0`, `data_degraded`, `indexation_recovery`, `quality_recovery`, `growth`, `scale`. Iedere succesvolle run levert een publieke verbetering, maar alleen `growth` en `scale` mogen automatisch een nieuwe URL als standaard kiezen.
+De dagelijkse `seo:cadence:check` beslist in deze volgorde: `operations_p0`, `data_degraded`, `indexation_recovery`, `quality_recovery`, `growth`, `scale`. Iedere succesvolle run levert een publieke verbetering. Daarnaast geldt een harde rollende nieuwe-URL-vloer: 0 in `operations_p0`, 1 in `data_degraded`, 2 in `indexation_recovery`, 2 in `quality_recovery`, 3 in `growth` en 5 in `scale`.
 
-In `indexation_recovery` zijn contextuele links, discovery, consolidatie, canonicalherstel en versterking van bestaande pagina's belangrijker dan volume. In `quality_recovery` worden automatische opvultekst, overlap en herhaalde alinea's vervangen door pagina-eigen informatie.
+In `indexation_recovery` blijven contextuele links, discovery, consolidatie, canonicalherstel en versterking van bestaande pagina's belangrijk. In `quality_recovery` worden automatische opvultekst, overlap en herhaalde alinea's vervangen door pagina-eigen informatie. Geen van beide hersteltoestanden mag eindeloos alle nieuwe publicaties verdringen: als de vloer is gemist, wordt de volgende veilige publieke actie een nieuwe URL.
+
+De live ledger rapporteert `newUrls`, `substantialRefreshes` en `otherGrowthActions` apart. Alleen `newUrls` telt voor de vloer. Een refresh kan wel meetellen voor het totale ritme, maar nooit doen alsof er een nieuwe indexeerbare ingang is gemaakt.
 
 ## Nieuwe Content: Quality Version 2
 
@@ -64,6 +66,6 @@ Dit zijn interne alarmsignalen, geen Google-rankingfactoren. Overschrijding zet 
 - `npm run seo:backlog:check` is groen.
 - `npm run seo:publications:report -- --json` geeft een betrouwbare live ledger.
 - `npm run seo:indexation:report -- --json` geeft verse inspectiestatus of expliciet `data_degraded`.
-- `npm run seo:cadence:check` noemt toestand, verplichte actie, request evidence debt en maximum nieuwe URL's.
+- `npm run seo:cadence:check` noemt toestand, verplichte actie, request evidence debt, nieuwe-URL-vloer, achterstand en maximum nieuwe URL's.
 - Gerichte tests en `npm run verify:critical` zijn groen.
 - PR, merge, productiecommit en live verificatie zijn aantoonbaar; merged-but-not-live telt nooit als publicatie.

@@ -35,12 +35,14 @@ function formatPublicationLedger(ledger) {
   for (const [days, window] of Object.entries(ledger.windows || {})) {
     lines.push(
       `[seo-publications] ${days}d qualifying=${window.qualifying} declared=${window.declared} `
-      + `target=${window.target} deficit=${window.deficit}`
+      + `newUrls=${window.newUrls} substantialRefreshes=${window.substantialRefreshes} `
+      + `otherGrowthActions=${window.otherGrowthActions} target=${window.target} deficit=${window.deficit}`
     );
     for (const item of window.items || []) {
       const failedChecks = Object.entries(item.checks || {}).filter(([, passed]) => !passed).map(([name]) => name);
       lines.push(
-        `- ${item.publishedAt} ${item.path} ${item.qualifies ? 'LIVE' : `REJECTED(${failedChecks.join(',')})`}`
+        `- ${item.eventAt || item.publishedAt} ${item.path} ${item.publicationKind || 'new_url'} `
+        + `${item.qualifies ? 'LIVE' : `REJECTED(${failedChecks.join(',')})`}`
       );
     }
   }
