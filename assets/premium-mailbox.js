@@ -422,7 +422,7 @@ function renderMailboxParagraphs(lines, options) {
       candidates[0] ||
       null;
   }
-  lines.forEach((line) => {
+  lines.filter((line) => !window.SoftoraMailboxDisplay.isGeneratedImageDescriptionLine(line)).forEach((line) => {
     const value = String(line || '');
     const cleaned = quoteBody ? stripMailboxQuotePrefix(value) : value.trimEnd();
     const imageAlt = cleaned.trim().match(/^\[image:\s*([^\]]+)\]$/i)?.[1] || '';
