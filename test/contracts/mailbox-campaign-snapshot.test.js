@@ -97,6 +97,7 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
       accountEmail: 'martijnven123@gmail.com',
       subject: 'Re: Kleine vraag over jullie website',
       date: '2026-07-23T09:31:11.000Z',
+      activityAt: '2026-07-23T11:31:12.000Z',
       conversationId: 'conversation:martijnven123@gmail.com|campaign-start@example.test',
       threadMessages: [{
         id: 'inbox:37467',
@@ -114,6 +115,8 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
     message.conversationId,
     'conversation:martijnven123@gmail.com|campaign-start@example.test'
   );
+  assert.equal(message.receivedAt, '2026-07-23T09:31:11.000Z');
+  assert.equal(message.activityAt, '2026-07-23T11:31:12.000Z');
   assert.equal(message.threadMessages[0].folder, 'inbox');
   assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
 });
