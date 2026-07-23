@@ -41,6 +41,7 @@ function buildServerAppUiContentRuntimeCompositionContext({
       parseIntSafe: shared.parseIntSafe,
       fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
       fetchTextWithTimeout: shared.fetchTextWithTimeout,
+      fetchBinaryWithTimeout: shared.fetchBinaryWithTimeout,
       assertWebsitePreviewUrlIsPublic: shared.assertWebsitePreviewUrlIsPublic,
       normalizeAbsoluteHttpUrl: shared.normalizeAbsoluteHttpUrl,
       normalizeWebsitePreviewTargetUrl: shared.normalizeWebsitePreviewTargetUrl,
