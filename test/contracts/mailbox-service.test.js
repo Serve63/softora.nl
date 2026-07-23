@@ -1108,6 +1108,10 @@ test('mailbox service exposes inline cid images for mail display placeholders', 
   );
   assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
   assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
+  assert.deepEqual(
+    messages[0].bodyImages.map((image) => image.owner),
+    ['sent-campaign', 'sent-campaign']
+  );
   assert.equal(messages[0].inlineImages.length, 2);
   assert.equal(messages[0].inlineImages[0].alt, 'Softora Testmodus webdesign');
   assert.equal(messages[0].inlineImages[0].contentType, 'image/png');
@@ -1176,6 +1180,7 @@ test('mailbox service keeps inline cid images when plain text has no image place
   assert.equal(messages[0].bodyImages.length, 1);
   assert.equal(messages[0].bodyImages[0].alt, 'Softora Testmodus webdesign');
   assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
+  assert.equal(messages[0].bodyImages[0].owner, undefined);
 });
 
 test('mailbox service restores quoted webdesign image placeholders from stored database photos', async () => {
@@ -1244,6 +1249,7 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
   assert.equal(messages[0].bodyImages[0].alt, 'Softora Testmodus webdesign');
   assert.equal(messages[0].bodyImages[0].contentType, 'image/png');
   assert.equal(messages[0].bodyImages[0].dataUrl, TINY_PNG_DATA_URL);
+  assert.equal(messages[0].bodyImages[0].owner, 'sent-campaign');
   assert.equal(messages[0].inlineImages.length, 1);
   assert.equal(messages[0].inlineImages[0].alt, 'Softora Testmodus webdesign');
   assert.equal(messages[0].inlineImages[0].contentType, 'image/png');
@@ -1334,6 +1340,10 @@ test('mailbox service restores webdesign photos when an indexed reply is opened'
   assert.deepEqual(
     message.bodyImages.map((image) => image.alt),
     ['De Vyldre webdesign', 'De Vyldre device mockup']
+  );
+  assert.deepEqual(
+    message.bodyImages.map((image) => image.owner),
+    ['sent-campaign', 'sent-campaign']
   );
   assert.match(message.body, /\[image: De Vyldre webdesign\]/);
   assert.match(message.body, /\[image: De Vyldre device mockup\]/);

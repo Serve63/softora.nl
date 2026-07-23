@@ -208,7 +208,7 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
       accountEmail: 'serve@softora.nl',
       body: 'Bericht met afbeeldingen',
       bodyImages: [
-        { alt: 'Klein ontwerp', dataUrl: smallImage },
+        { alt: 'Klein ontwerp', dataUrl: smallImage, owner: 'sent-campaign' },
         { alt: 'Grote mockup', dataUrl: oversizedImage },
       ],
     }],
@@ -219,6 +219,7 @@ test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
     {
       alt: 'Klein ontwerp',
       dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=0',
+      owner: 'sent-campaign',
     },
     {
       alt: 'Grote mockup',

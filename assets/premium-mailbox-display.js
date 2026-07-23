@@ -24,6 +24,16 @@
     }
   }
 
+  function isSoftoraWebdesignUrl(value) {
+    try {
+      const parsed = new URL(String(value || '').trim());
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+      return host === 'softora.nl' && /^\/webdesign\/[^/]+/i.test(parsed.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function isLabelledUrlMatch(label, url) {
     if (/^deze link$/i.test(String(label || '').trim())) return true;
     const normalizedLabel = normalizeComparableMailUrl(label);
@@ -109,6 +119,15 @@
     const result = [];
     for (let index = 0; index < source.length; index += 1) {
       const current = source[index].trim();
+      const rawUrlMatch = current.match(/^[([]?(https?:\/\/[^\s)\]]+)[)\]]?\s+(bekijken(?:\s*🎨)?)$/i);
+      if (rawUrlMatch && isSoftoraWebdesignUrl(rawUrlMatch[1])) {
+        while (result.length && !result[result.length - 1].trim()) result.pop();
+        const previousIndex = result.length - 1;
+        if (previousIndex >= 0 && /\bdeze link\s*$/i.test(result[previousIndex].trim())) {
+          result[previousIndex] = `${result[previousIndex].trimEnd()} [${rawUrlMatch[1]}] ${rawUrlMatch[2]}`;
+          continue;
+        }
+      }
       if (!/^deze link\s*\[https?:\/\/[^\]]+\]$/i.test(current)) {
         result.push(source[index]);
         continue;

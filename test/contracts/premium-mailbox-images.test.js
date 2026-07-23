@@ -22,6 +22,27 @@ function loadModuleWithImage(ImageClass) {
   };
 }
 
+function proxyImage(id, alt, owner = '') {
+  return {
+    alt,
+    dataUrl: `/api/mailbox/message-image?mail=${id}`,
+    ...(owner ? { owner } : {}),
+  };
+}
+
+function sentCampaignMessage(bodyImages = []) {
+  return {
+    folder: 'sent',
+    body: [
+      'Goedendag,',
+      'Afgelopen week kwam ik jullie website voorbeeld.nl tegen.',
+      'Vanuit enthousiasme heb ik een fris webdesign gemaakt.',
+      'Ik ben oprecht benieuwd wat je ervan vindt.',
+    ].join('\n\n'),
+    bodyImages,
+  };
+}
+
 test('mailbox image loader haalt een afbeelding eenmalig op en wacht op decode', async () => {
   let created = 0;
   let decoded = 0;
@@ -111,6 +132,57 @@ test('mailbox image loader toont alleen de laatst gekozen mail na de decode', as
     pending.forEach((finish) => finish());
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(rendered, ['second']);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom zet herstelde campagnebeelden onder het verzonden bericht', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const sent = sentCampaignMessage();
+    const design = proxyImage('design', 'voorbeeld.nl preview');
+    const plan = loaded.module.createOwnershipPlan({
+      threadMessages: [sent],
+    }, [design], true);
+    assert.equal(plan.owner, sent);
+    assert.deepEqual(plan.mainImages, []);
+    assert.deepEqual(plan.fallbackImages, [design]);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom bewaart echte antwoordfoto en verplaatst alleen campagnebeeld', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const sent = sentCampaignMessage();
+    const recipientPhoto = proxyImage('recipient-photo', 'Foto van de nieuwe winkel');
+    const campaignDesign = proxyImage('campaign-design', 'Ontwerp', 'sent-campaign');
+    const plan = loaded.module.createOwnershipPlan({
+      threadMessages: [sent],
+    }, [recipientPhoto, campaignDesign], true);
+    assert.equal(plan.owner, sent);
+    assert.deepEqual(plan.mainImages, [recipientPhoto]);
+    assert.deepEqual(plan.fallbackImages, [campaignDesign]);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom laat gewone ontvangen foto bij de ontvanger', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const recipientPhoto = proxyImage('recipient-photo-only', 'Teamfoto');
+    const plan = loaded.module.createOwnershipPlan({
+      threadMessages: [{
+        folder: 'sent',
+        body: 'Bedankt voor je bericht.',
+      }],
+    }, [recipientPhoto], true);
+    assert.equal(plan.owner, null);
+    assert.deepEqual(plan.mainImages, [recipientPhoto]);
+    assert.deepEqual(plan.fallbackImages, []);
   } finally {
     loaded.restore();
   }

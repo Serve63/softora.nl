@@ -29,10 +29,16 @@
     const isSafeImageSource = global.SoftoraMailboxCampaignInbox?.isSafeImageSource;
     if (typeof isSafeImageSource !== 'function') return [];
     return (Array.isArray(images) ? images : [])
-      .map((image) => ({
-        alt: String(image && image.alt || '').trim(),
-        dataUrl: String(image && image.dataUrl || '').trim(),
-      }))
+      .map((image) => {
+        const normalized = {
+          alt: String(image && image.alt || '').trim(),
+          dataUrl: String(image && image.dataUrl || '').trim(),
+        };
+        if (String(image && image.owner || '').trim().toLowerCase() === 'sent-campaign') {
+          normalized.owner = 'sent-campaign';
+        }
+        return normalized;
+      })
       .filter((image) => image.alt && isSafeImageSource(image.dataUrl));
   }
 
@@ -68,10 +74,57 @@
     }) || sentMessages.find((message) => normalize(message && message.bodyImages).length) || null;
   }
 
+  function getAuthoredBody(message) {
+    const stripQuotedReply = global.SoftoraMailboxCampaignInbox?.stripQuotedReply;
+    return typeof stripQuotedReply === 'function'
+      ? stripQuotedReply(message && message.body)
+      : String(message && message.body || '');
+  }
+
+  function looksLikeSentWebdesignCampaign(message) {
+    const body = getAuthoredBody(message)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!body) return false;
+    const signals = [
+      /\b(?:afgelopen|vorige)\s+week kwam ik (?:jullie|je) website\b/,
+      /\b(?:uit|vanuit)\s+enthousiasme\b.{0,100}\b(?:fris|nieuw)\s+webdesign\b/,
+      /\bik ben oprecht benieuwd wat je ervan vindt\b/,
+      /\bonline preview\b/,
+      /\bontwerp in de bijlage\b/,
+      /\bwebdesign\b.{0,80}\bbekijken\b/,
+    ];
+    return signals.filter((pattern) => pattern.test(body)).length >= 2;
+  }
+
+  function getSentCampaignOwner(mail) {
+    return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
+      .filter((message) => String(message && message.folder || '').trim().toLowerCase() === 'sent')
+      .find(looksLikeSentWebdesignCampaign) || null;
+  }
+
+  function isSentCampaignImage(image) {
+    if (String(image && image.owner || '').trim().toLowerCase() === 'sent-campaign') return true;
+    return /\b(?:webdesign|preview|device mockup|mockup|website generator)\b/.test(
+      normalizeLabel(image && image.alt)
+    );
+  }
+
   function createOwnershipPlan(mail, mainImages, hasMainPlaceholders) {
+    const visibleMainImages = normalize(mainImages);
+    const campaignOwner = getSentCampaignOwner(mail);
+    const campaignImages = visibleMainImages.filter(isSentCampaignImage);
+    if (campaignOwner && campaignImages.length) {
+      const campaignKeys = new Set(campaignImages.map(imageKey));
+      return {
+        owner: campaignOwner,
+        mainImages: visibleMainImages.filter((image) => !campaignKeys.has(imageKey(image))),
+        fallbackImages: campaignImages,
+      };
+    }
     const owner = hasMainPlaceholders ? null : getSentImageOwner(mail);
     const ownerImages = normalize(owner && owner.bodyImages);
-    const visibleMainImages = normalize(mainImages);
     if (!owner) return { owner: null, mainImages: visibleMainImages, fallbackImages: [] };
     if (!ownerImages.length) return { owner, mainImages: [], fallbackImages: visibleMainImages };
     const reservedKeys = new Set(ownerImages.map(imageKey));

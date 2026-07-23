@@ -22,6 +22,7 @@ const {
   MAILBOX_MESSAGE_IMAGE_MAX_INDEX,
   decodeMailboxMessageImage,
 } = require('./mailbox-message-image');
+const { mergeMailboxBodyImages, tagSentCampaignBodyImages } = require('./mailbox-image-ownership');
 const {
   buildCustomerIdentityKey,
   parseImageDataUrl,
@@ -316,22 +317,6 @@ function photoDataUrlFromState(values, meta, normalizeString, options = {}) {
   );
   if (!photoKey || !chunkCount) return '';
   return Array.from({ length: chunkCount }, (_item, index) => normalizeString(values && values[`${photoKey}_${index}`])).join('');
-}
-
-function mergeMailboxBodyImages(primaryImages, fallbackImages, text, options = {}) {
-  const images = Array.isArray(primaryImages) ? primaryImages : [];
-  const fallbacks = Array.isArray(fallbackImages) ? fallbackImages : [];
-  if (!fallbacks.length) return images;
-  const labels = extractBodyImageLabels(text);
-  const used = new Set(images.map((image) => normalizeImageLabel(image.alt || image.cid || image.dataUrl)).filter(Boolean));
-  const matchedFallbacks = fallbacks.filter((image) => {
-    const key = normalizeImageLabel(image.alt || image.cid || image.dataUrl);
-    if (!key || used.has(key)) return false;
-    if (!options.allowUnmatchedFallbacks && !labels.some((label) => photoLabelMatches(image.alt || image.cid || image.dataUrl, label))) return false;
-    used.add(key);
-    return true;
-  });
-  return [...images, ...matchedFallbacks].slice(0, 8);
 }
 
 function isMockupBodyImage(image) {
@@ -2046,6 +2031,7 @@ function createMailboxService(deps = {}) {
       };
       return {
         key: `${normalizeString(message && message.accountEmail)}|${normalizeFolder(message && message.folder)}:${Number(message && message.uid) || index}`,
+        folder: normalizeFolder(message && message.folder),
         parsed,
         text,
         primaryBodyImages: Array.isArray(message && message.bodyImages) ? message.bodyImages : [],
@@ -2056,9 +2042,16 @@ function createMailboxService(deps = {}) {
       const record = records[index];
       const primaryBodyImages = record.primaryBodyImages;
       const storedImages = storedImagesByKey.get(record.key) || [];
-      const bodyImages = mergeMailboxBodyImages(primaryBodyImages, storedImages, record.text, {
-        allowUnmatchedFallbacks: true,
-      });
+      const bodyImages = tagSentCampaignBodyImages(
+        mergeMailboxBodyImages(primaryBodyImages, storedImages, record.text, {
+          allowUnmatchedFallbacks: true,
+        }),
+        {
+          folder: record.folder,
+          storedImages,
+          looksLikeCampaign: looksLikeWebdesignOutreach(record.parsed, record.text),
+        }
+      );
       if (!bodyImages.length) return message;
       return {
         ...message,
@@ -2085,9 +2078,16 @@ function createMailboxService(deps = {}) {
       : Array.isArray(options.storedImages)
         ? options.storedImages
         : [];
-    const bodyImages = mergeMailboxBodyImages(primaryBodyImages, storedImages, text, {
-      allowUnmatchedFallbacks: true,
-    });
+    const bodyImages = tagSentCampaignBodyImages(
+      mergeMailboxBodyImages(primaryBodyImages, storedImages, text, {
+        allowUnmatchedFallbacks: true,
+      }),
+      {
+        folder,
+        storedImages,
+        looksLikeCampaign: looksLikeWebdesignOutreach(parsed, text),
+      }
+    );
     const bodyText = storedImages.length && !primaryBodyImages.length
       ? decorateRecoveredWebdesignImagesText(text, bodyImages)
       : text;

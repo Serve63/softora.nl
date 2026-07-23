@@ -232,6 +232,7 @@ function cleanMailboxText(value) {
       .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
       .replace(/<((?:https?:\/\/)[^>\s]+)>/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
       .replace(/\s{2,}/g, ' ')
+      .replace(/^[\t \u00a0]+/, '')
       .trimEnd())
     .map((line) => window.SoftoraMailboxDisplay.collapseDuplicateAnnotations(line))
     .filter((line) => {
@@ -484,7 +485,7 @@ function renderMailBody(value, images, options) {
     optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl), senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount),
     usedImages: new Set()
   };
-  const sections = buildMailboxBodySections(value).filter((section) => !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxOwnReplyHeaderLine));
+  const sections = buildMailboxBodySections(value).filter((section) => !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxReplyHeaderLine));
   const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
   const imagePlan = window.SoftoraMailboxImages?.createOwnershipPlan?.(options && options.mail, imageState.images, hasImagePlaceholders) ||
     { owner: null, mainImages: imageState.images, fallbackImages: [] };
