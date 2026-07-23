@@ -62,6 +62,43 @@
     return merge(mail && mail.bodyImages, threadImages);
   }
 
+  function normalizeMessageId(value) {
+    return String(value || '')
+      .trim()
+      .replace(/^<+|>+$/g, '')
+      .toLowerCase();
+  }
+
+  function getMessageIdentity(message) {
+    const account = String(message && message.accountEmail || '').trim().toLowerCase();
+    const messageId = normalizeMessageId(message && message.messageId);
+    if (account && messageId) return `${account}|message:${messageId}`;
+    const mailboxId = String(message && (message.mailboxId || message.id) || '').trim();
+    return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
+  }
+
+  function isSameMessage(left, right) {
+    if (left === right) return true;
+    const leftIdentity = getMessageIdentity(left);
+    const rightIdentity = getMessageIdentity(right);
+    return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
+  }
+
+  function sectionHasPlaceholder(section) {
+    return Boolean(section && Array.isArray(section.lines) && section.lines.some((line) => (
+      /^\s*\[image:\s*[^\]]+\]\s*$/i.test(String(line || ''))
+    )));
+  }
+
+  function isOwnQuoteSection(section, isReplyHeaderLine, isOwnReplyHeaderLine) {
+    if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
+    const firstLine = String(section.lines[0] || '').trim();
+    return typeof isReplyHeaderLine === 'function' &&
+      typeof isOwnReplyHeaderLine === 'function' &&
+      isReplyHeaderLine(firstLine) &&
+      isOwnReplyHeaderLine(firstLine);
+  }
+
   function getSentImageOwner(mail) {
     const sentMessages = (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
       .filter((message) => String(message && message.folder || '').trim().toLowerCase() === 'sent');
@@ -111,7 +148,7 @@
     );
   }
 
-  function createOwnershipPlan(mail, mainImages, hasMainPlaceholders) {
+  function createOwnershipPlan(mail, mainImages, hasMainPlaceholders, options = {}) {
     const visibleMainImages = normalize(mainImages);
     const campaignOwner = getSentCampaignOwner(mail);
     const campaignImages = visibleMainImages.filter(isSentCampaignImage);
@@ -121,18 +158,72 @@
         owner: campaignOwner,
         mainImages: visibleMainImages.filter((image) => !campaignKeys.has(imageKey(image))),
         fallbackImages: campaignImages,
+        quoteImages: [],
+      };
+    }
+    const hasOwnQuotePlaceholders = Boolean(options && options.hasOwnQuotePlaceholders);
+    if (campaignImages.length && (!hasMainPlaceholders || hasOwnQuotePlaceholders)) {
+      const campaignKeys = new Set(campaignImages.map(imageKey));
+      return {
+        owner: null,
+        mainImages: visibleMainImages.filter((image) => !campaignKeys.has(imageKey(image))),
+        fallbackImages: [],
+        quoteImages: campaignImages,
       };
     }
     const owner = hasMainPlaceholders ? null : getSentImageOwner(mail);
     const ownerImages = normalize(owner && owner.bodyImages);
-    if (!owner) return { owner: null, mainImages: visibleMainImages, fallbackImages: [] };
-    if (!ownerImages.length) return { owner, mainImages: [], fallbackImages: visibleMainImages };
+    if (!owner) return { owner: null, mainImages: visibleMainImages, fallbackImages: [], quoteImages: [] };
+    if (!ownerImages.length) return { owner, mainImages: [], fallbackImages: visibleMainImages, quoteImages: [] };
     const reservedKeys = new Set(ownerImages.map(imageKey));
     return {
       owner,
       mainImages: visibleMainImages.filter((image) => !reservedKeys.has(imageKey(image))),
       fallbackImages: [],
+      quoteImages: [],
     };
+  }
+
+  function createSectionOwnershipPlan(mail, mainImages, sections, isReplyHeaderLine, isOwnReplyHeaderLine) {
+    const bodySections = Array.isArray(sections) ? sections : [];
+    const hasMainPlaceholders = bodySections.some(sectionHasPlaceholder);
+    const hasOwnQuotePlaceholders = bodySections.some((section) => (
+      isOwnQuoteSection(section, isReplyHeaderLine, isOwnReplyHeaderLine) &&
+      sectionHasPlaceholder(section)
+    ));
+    return createOwnershipPlan(mail, mainImages, hasMainPlaceholders, { hasOwnQuotePlaceholders });
+  }
+
+  function renderInlineImage(image, escapeHtml) {
+    const dataUrl = String(image && image.dataUrl || '').trim();
+    const isSafeImageSource = global.SoftoraMailboxCampaignInbox?.isSafeImageSource;
+    if (typeof isSafeImageSource !== 'function' || !isSafeImageSource(dataUrl)) return '';
+    const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
+    const escape = typeof escapeHtml === 'function' ? escapeHtml : (value) => String(value || '');
+    return `<figure class="detail-mail-image"><img src="${escape(dataUrl)}" alt="${escape(alt)}" loading="eager" decoding="async" fetchpriority="high" data-mailbox-inline-image></figure>`;
+  }
+
+  function prepareOwnQuote(images, baseState, renderImage) {
+    const imageState = {
+      images: normalize(images),
+      optOutUrl: baseState && baseState.optOutUrl,
+      senderEmail: baseState && baseState.senderEmail,
+      usedImages: new Set(),
+    };
+    return {
+      imageState,
+      html: renderUnused(imageState, renderImage, { inline: true }),
+    };
+  }
+
+  function renderOwnQuoteSection(images, baseState, renderImage) {
+    const prepared = prepareOwnQuote(images, baseState, renderImage);
+    if (!prepared.html) return '';
+    return `
+      <section class="detail-mail-section detail-mail-section-quote">
+        <div class="detail-mail-section-label">Jouw eerdere mail</div>
+        <div class="detail-mail-quote-body">${prepared.html}</div>
+      </section>`;
   }
 
   function renderUnused(imageState, renderImage, options = {}) {
@@ -158,7 +249,7 @@
     const message = payload && payload.message;
     const sent = Boolean(payload && payload.sent);
     const messageImages = context.imagesReady === false ? [] : normalize(message && message.bodyImages);
-    const fallbackImages = sent && message === context.imageOwner ? context.fallbackImages : [];
+    const fallbackImages = sent && isSameMessage(message, context.imageOwner) ? context.fallbackImages : [];
     const imageState = {
       images: merge(messageImages, fallbackImages),
       optOutUrl: renderers.normalizeOptOutUrl(message && message.optOutUrl),
@@ -250,13 +341,19 @@
 
   const api = {
     createOwnershipPlan,
+    createSectionOwnershipPlan,
     getConversationImages,
+    isOwnQuoteSection,
     merge,
     normalize,
     prepare,
+    prepareOwnQuote,
     prewarm,
+    renderInlineImage,
+    renderOwnQuoteSection,
     renderThreadMessageBody,
     renderUnused,
+    sectionHasPlaceholder,
     stage,
   };
   global.SoftoraMailboxImages = api;

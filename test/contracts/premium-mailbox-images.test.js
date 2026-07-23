@@ -148,6 +148,7 @@ test('mailbox afbeeldingseigendom zet herstelde campagnebeelden onder het verzon
     assert.equal(plan.owner, sent);
     assert.deepEqual(plan.mainImages, []);
     assert.deepEqual(plan.fallbackImages, [design]);
+    assert.deepEqual(plan.quoteImages, []);
   } finally {
     loaded.restore();
   }
@@ -165,6 +166,7 @@ test('mailbox afbeeldingseigendom bewaart echte antwoordfoto en verplaatst allee
     assert.equal(plan.owner, sent);
     assert.deepEqual(plan.mainImages, [recipientPhoto]);
     assert.deepEqual(plan.fallbackImages, [campaignDesign]);
+    assert.deepEqual(plan.quoteImages, []);
   } finally {
     loaded.restore();
   }
@@ -183,6 +185,90 @@ test('mailbox afbeeldingseigendom laat gewone ontvangen foto bij de ontvanger', 
     assert.equal(plan.owner, null);
     assert.deepEqual(plan.mainImages, [recipientPhoto]);
     assert.deepEqual(plan.fallbackImages, []);
+    assert.deepEqual(plan.quoteImages, []);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom zet geciteerde campagnebeelden nooit onder een ontvangen reactie', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const campaignDesign = proxyImage('quoted-campaign-design', 'dirvenschoenen.nl preview', 'sent-campaign');
+    const plan = loaded.module.createOwnershipPlan({
+      threadMessages: [{
+        folder: 'sent',
+        body: 'Hoi,\n\nDankjewel voor je reactie.',
+      }],
+    }, [campaignDesign], false);
+    assert.equal(plan.owner, null);
+    assert.deepEqual(plan.mainImages, []);
+    assert.deepEqual(plan.fallbackImages, []);
+    assert.deepEqual(plan.quoteImages, [campaignDesign]);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom bewaart expliciete inline placeholders in het zichtbare bericht', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const inlineDesign = proxyImage('inline-campaign-design', 'softora.nl preview', 'sent-campaign');
+    const plan = loaded.module.createOwnershipPlan({
+      threadMessages: [],
+    }, [inlineDesign], true);
+    assert.equal(plan.owner, null);
+    assert.deepEqual(plan.mainImages, [inlineDesign]);
+    assert.deepEqual(plan.fallbackImages, []);
+    assert.deepEqual(plan.quoteImages, []);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom zet placeholders uit jouw eerdere mail in dat eigen blok', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const quotedDesign = proxyImage('quoted-inline-design', 'dirvenschoenen.nl preview', 'sent-campaign');
+    const plan = loaded.module.createOwnershipPlan({
+      threadMessages: [],
+    }, [quotedDesign], true, { hasOwnQuotePlaceholders: true });
+    assert.equal(plan.owner, null);
+    assert.deepEqual(plan.mainImages, []);
+    assert.deepEqual(plan.fallbackImages, []);
+    assert.deepEqual(plan.quoteImages, [quotedDesign]);
+  } finally {
+    loaded.restore();
+  }
+});
+
+test('mailbox afbeeldingseigendom herkent hetzelfde verzonden bericht na conversation grouping', () => {
+  const loaded = loadModuleWithImage(class FakeImage {});
+  try {
+    const owner = {
+      id: 'sent:195',
+      accountEmail: 'servecreusen7@gmail.com',
+      messageId: '<sent-message@example.com>',
+      folder: 'sent',
+      body: '',
+    };
+    const groupedClone = { ...owner };
+    const design = proxyImage('stable-owner-design', 'voorbeeld.nl preview');
+    const html = loaded.module.renderThreadMessageBody({
+      message: groupedClone,
+      sent: true,
+      body: 'Goedendag',
+    }, {
+      imageOwner: owner,
+      fallbackImages: [design],
+      imagesReady: true,
+    }, {
+      normalizeEmail: (value) => value,
+      normalizeOptOutUrl: (value) => value,
+      renderInlineImage: (image) => `<img data-alt="${image.alt}">`,
+      renderParagraphs: () => '<p>Goedendag</p>',
+    });
+    assert.match(html, /stable-owner-design|voorbeeld\.nl preview/);
   } finally {
     loaded.restore();
   }

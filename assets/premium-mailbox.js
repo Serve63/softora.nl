@@ -309,9 +309,6 @@ function isMailboxMockupImageLabel(value) {
 function isMailboxWebdesignImageLabel(value) {
   return /\b(?:webdesign|website|site|foto|screenshot)\b/i.test(String(value || ''));
 }
-function sectionHasMailboxImagePlaceholder(section) {
-  return Boolean(section && Array.isArray(section.lines) && section.lines.some((line) => /^\s*\[image:\s*[^\]]+\]\s*$/i.test(String(line || ''))));
-}
 function buildMailboxBodySections(value) {
   const text = cleanMailboxText(value);
   if (!text) {
@@ -443,10 +440,7 @@ function renderMailboxParagraphs(lines, options) {
     : '<div class="detail-mail-lines"><div class="detail-mail-line">Geen inhoud.</div></div>';
 }
 function renderMailboxInlineImage(image) {
-  const dataUrl = String(image && image.dataUrl || '').trim();
-  if (!window.SoftoraMailboxCampaignInbox.isSafeImageSource(dataUrl)) return '';
-  const alt = String(image && image.alt || 'Afbeelding').trim() || 'Afbeelding';
-  return `<figure class="detail-mail-image"><img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(alt)}" loading="eager" decoding="async" fetchpriority="high" data-mailbox-inline-image></figure>`;
+  return window.SoftoraMailboxImages?.renderInlineImage?.(image, escapeHtml) || '';
 }
 function renderMailboxBodySection(section, imageState) {
   if (!section || !Array.isArray(section.lines)) {
@@ -458,11 +452,14 @@ function renderMailboxBodySection(section, imageState) {
     const quoteLabel = hasMeta && isMailboxOwnReplyHeaderLine(firstLine) ? 'Jouw eerdere mail' : 'Eerdere mail';
     const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
     const quoteLines = window.SoftoraMailboxDisplay.trimOwnQuotedMailLines(hasMeta ? section.lines.slice(1) : section.lines, quoteLabel === 'Jouw eerdere mail' ? MAILBOX_OWN_REPLY_AUTHOR_PATTERN : null);
+    const preparedImages = quoteLabel === 'Jouw eerdere mail' && imageState.quoteImages.length
+      ? window.SoftoraMailboxImages.prepareOwnQuote(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage)
+      : { imageState, html: '' };
     return `
       <section class="detail-mail-section detail-mail-section-quote">
         <div class="detail-mail-section-label">${quoteLabel}</div>
         ${quoteMeta}
-        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: imageState.images, optOutUrl: imageState.optOutUrl, senderEmail: imageState.senderEmail, usedImages: imageState.usedImages })}</div>
+        <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: preparedImages.imageState.images, optOutUrl: preparedImages.imageState.optOutUrl, senderEmail: preparedImages.imageState.senderEmail, usedImages: preparedImages.imageState.usedImages })}${preparedImages.html}</div>
       </section>`;
   }
   if (section.type === 'signature') {
@@ -486,10 +483,11 @@ function renderMailBody(value, images, options) {
     usedImages: new Set()
   };
   const sections = buildMailboxBodySections(value).filter((section) => !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxReplyHeaderLine));
-  const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
-  const imagePlan = window.SoftoraMailboxImages?.createOwnershipPlan?.(options && options.mail, imageState.images, hasImagePlaceholders) ||
-    { owner: null, mainImages: imageState.images, fallbackImages: [] };
+  const hasImagePlaceholders = sections.some(window.SoftoraMailboxImages.sectionHasPlaceholder);
+  const imagePlan = window.SoftoraMailboxImages?.createSectionOwnershipPlan?.(options && options.mail, imageState.images, sections, isMailboxReplyHeaderLine, isMailboxOwnReplyHeaderLine) ||
+    { owner: null, mainImages: imageState.images, fallbackImages: [], quoteImages: [] };
   imageState.images = imagePlan.mainImages;
+  imageState.quoteImages = normalizeMailboxBodyImages(imagePlan.quoteImages);
   const replyMailId = String(options && options.replyMailId || '').trim();
   const replyActionHtml = replyMailId ? `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(replyMailId)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>Beantwoorden</button></div>` : '';
   const threadBodyContext = {
@@ -528,6 +526,7 @@ function renderMailBody(value, images, options) {
     renderedSections.push(replyActionHtml);
     if (olderThreadMessagesHtml) renderedSections.push(olderThreadMessagesHtml);
   }
+  if (imageState.quoteImages.length) renderedSections.push(window.SoftoraMailboxImages.renderOwnQuoteSection(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage));
   return renderedSections.join('');
 }
 function findMailById(id) {
