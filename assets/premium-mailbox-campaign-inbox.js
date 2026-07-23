@@ -518,7 +518,7 @@
         : 'detail-mail-section detail-mail-section-received';
       return `
         <section class="${sectionClass}">
-          <div class="detail-mail-section-label">${sent ? 'Jouw antwoord' : 'Eerder ontvangen'}</div>
+          <div class="detail-mail-section-label">${sent ? 'Jouw bericht' : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
           <div class="detail-mail-lines">${lines}</div>
         </section>`;
