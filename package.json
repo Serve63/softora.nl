@@ -24,6 +24,7 @@
     "check:live-production-version:wait": "node scripts/wait-live-production-version.js",
     "seo:backlog:check": "node scripts/check-seo-machine-backlog.js",
     "seo:publications:report": "node scripts/seo-machine-publication-report.js",
+    "seo:indexation:report": "node scripts/seo-machine-indexation-report.js",
     "seo:cadence:check": "node scripts/check-seo-machine-cadence.js",
     "check:coldmail-outbound-guards": "node scripts/backfill-coldmail-outbound-guards.js",
     "backfill:coldmail-outbound-guards": "node scripts/backfill-coldmail-outbound-guards.js --apply",

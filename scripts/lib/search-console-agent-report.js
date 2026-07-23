@@ -1,5 +1,6 @@
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SEARCH_CONSOLE_API_BASE = 'https://www.googleapis.com/webmasters/v3';
+const SEARCH_CONSOLE_INSPECTION_API_BASE = 'https://searchconsole.googleapis.com/v1';
 const SEARCH_CONSOLE_READONLY_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const DEFAULT_SITE_URL = 'sc-domain:softora.nl';
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
@@ -188,11 +189,40 @@ function createSearchConsoleClient(options = {}) {
     return normalizeSitemaps(data.sitemap || []);
   }
 
+  async function inspectUrl(inspectionUrl, siteUrl = config.siteUrl || DEFAULT_SITE_URL) {
+    const token = await resolveAccessToken();
+    const response = await fetchImpl(
+      `${config.inspectionApiBaseUrl || SEARCH_CONSOLE_INSPECTION_API_BASE}/urlInspection/index:inspect`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          inspectionUrl: normalizeString(inspectionUrl),
+          siteUrl: normalizeString(siteUrl),
+          languageCode: 'nl-NL',
+        }),
+      }
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(`Search Console URL Inspection mislukt (${response.status})`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  }
+
   return {
     config,
     resolveAccessToken,
     querySearchAnalytics,
     listSitemaps,
+    inspectUrl,
   };
 }
 
@@ -212,6 +242,7 @@ function normalizeSitemaps(rows = []) {
   return (Array.isArray(rows) ? rows : []).map((sitemap) => ({
     path: normalizeString(sitemap.path),
     lastSubmitted: normalizeString(sitemap.lastSubmitted),
+    lastDownloaded: normalizeString(sitemap.lastDownloaded),
     isPending: Boolean(sitemap.isPending),
     isSitemapsIndex: Boolean(sitemap.isSitemapsIndex),
     type: normalizeString(sitemap.type),
@@ -242,6 +273,20 @@ function aggregateRows(rows = []) {
     impressions: roundNumber(totals.impressions, 2),
     ctr: totals.impressions > 0 ? roundNumber(totals.clicks / totals.impressions, 4) : 0,
     position: totals.impressions > 0 ? roundNumber(totals.weightedPosition / totals.impressions, 2) : 0,
+  };
+}
+
+function buildUnclassifiedSegment(propertyTotals, visibleQueryTotals) {
+  const clicks = Math.max(0, toFiniteNumber(propertyTotals.clicks) - toFiniteNumber(visibleQueryTotals.clicks));
+  const impressions = Math.max(
+    0,
+    toFiniteNumber(propertyTotals.impressions) - toFiniteNumber(visibleQueryTotals.impressions)
+  );
+  return {
+    clicks: roundNumber(clicks, 2),
+    impressions: roundNumber(impressions, 2),
+    ctr: impressions > 0 ? roundNumber(clicks / impressions, 4) : 0,
+    position: null,
   };
 }
 
@@ -310,8 +355,9 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
   const pageRows = rowsWithDelta(snapshot.pagesCurrent || [], snapshot.pagesPrevious || [], 0);
   const queryRows = rowsWithDelta(snapshot.queriesCurrent || [], snapshot.queriesPrevious || [], 0);
   const pageQueryRows = normalizeSearchRows(snapshot.pageQueryCurrent || []);
-  const currentTotals = aggregateRows(snapshot.queriesCurrent || []);
-  const previousTotals = aggregateRows(snapshot.queriesPrevious || []);
+  const visibleCurrentTotals = aggregateRows(snapshot.queriesCurrent || []);
+  const currentTotals = aggregateRows(snapshot.totalsCurrent || snapshot.queriesCurrent || []);
+  const previousTotals = aggregateRows(snapshot.totalsPrevious || snapshot.queriesPrevious || []);
   const brandedQueryRows = queryRows.filter((row) => isBrandedQuery(rowKey(row, 0)));
   const nonBrandedQueryRows = queryRows.filter((row) => !isBrandedQuery(rowKey(row, 0)));
   const sitemapIssues = (snapshot.sitemaps || []).filter(
@@ -421,6 +467,8 @@ function buildSearchConsoleAgentReport(snapshot = {}, options = {}) {
     segments: {
       branded: aggregateRows(brandedQueryRows),
       nonBranded: aggregateRows(nonBrandedQueryRows),
+      visibleQueries: visibleCurrentTotals,
+      unclassified: buildUnclassifiedSegment(currentTotals, visibleCurrentTotals),
     },
     queries: {
       top: [...queryRows].sort(sortByNumberDesc('clicks')).slice(0, 20),
@@ -453,8 +501,20 @@ async function fetchSearchConsoleSnapshot(options = {}) {
     now: options.now,
   });
 
-  const [pagesCurrent, pagesPrevious, queriesCurrent, queriesPrevious, pageQueryCurrent, sitemaps] =
+  const [totalsCurrent, totalsPrevious, pagesCurrent, pagesPrevious, queriesCurrent, queriesPrevious, pageQueryCurrent, sitemaps] =
     await Promise.all([
+      client.querySearchAnalytics({
+        siteUrl,
+        ...dateWindows.current,
+        dimensions: [],
+        rowLimit: 1,
+      }),
+      client.querySearchAnalytics({
+        siteUrl,
+        ...dateWindows.previous,
+        dimensions: [],
+        rowLimit: 1,
+      }),
       client.querySearchAnalytics({
         siteUrl,
         ...dateWindows.current,
@@ -492,6 +552,8 @@ async function fetchSearchConsoleSnapshot(options = {}) {
     generatedAt: new Date().toISOString(),
     siteUrl,
     dateWindows,
+    totalsCurrent,
+    totalsPrevious,
     pagesCurrent,
     pagesPrevious,
     queriesCurrent,
@@ -632,6 +694,7 @@ function formatAgentMarkdown(report = {}) {
       '',
       `Non-branded: ${report.segments.nonBranded?.clicks || 0} klikken, ${report.segments.nonBranded?.impressions || 0} vertoningen, CTR ${formatPercent(report.segments.nonBranded?.ctr || 0)}`,
       `Branded: ${report.segments.branded?.clicks || 0} klikken, ${report.segments.branded?.impressions || 0} vertoningen, CTR ${formatPercent(report.segments.branded?.ctr || 0)}`,
+      `Niet classificeerbaar: ${report.segments.unclassified?.clicks || 0} klikken, ${report.segments.unclassified?.impressions || 0} vertoningen (geen merkclaim mogelijk)`,
       ''
     );
   }
@@ -687,11 +750,13 @@ module.exports = {
   DEFAULT_SITE_URL,
   GOOGLE_TOKEN_URL,
   SEARCH_CONSOLE_API_BASE,
+  SEARCH_CONSOLE_INSPECTION_API_BASE,
   SEARCH_CONSOLE_READONLY_SCOPE,
   aggregateRows,
   analyzeRobotsTxt,
   buildSearchConsoleAgentReport,
   buildTechnicalOnlyAgentReport,
+  buildUnclassifiedSegment,
   createSearchConsoleClient,
   extractSitemapUrls,
   fetchSearchConsoleSnapshot,
