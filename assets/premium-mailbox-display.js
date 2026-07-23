@@ -39,6 +39,11 @@
     }
   }
 
+  function isGeneratedImageDescriptionLine(value) {
+    const line = String(value || '').replace(/^\s*(?:>\s*)+/, '').trim();
+    return /^\[?\s*(?:afbeelding|image)\s+met\b[\s\S]*\b(?:automatisch\s+gegenereerde\s+beschrijving|automatically\s+generated\s+description)\s*\]?$/i.test(line);
+  }
+
   function collapseDuplicateAnnotations(line) {
     return String(line || '').replace(
       /\b([a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,})\s+\[(?:mailto:)?([^\]\s]+)\]/gi,
@@ -249,6 +254,7 @@
     collapseDuplicateAnnotations,
     formatDetailSubject,
     isSentMessage,
+    isGeneratedImageDescriptionLine,
     isGmailSignatureAssetUrl,
     isLabelledUrlMatch,
     joinBrokenWebdesignLinkLines,
