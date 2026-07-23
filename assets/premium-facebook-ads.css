@@ -1,0 +1,18 @@
+html[data-advertising-channel="facebook"] #google { display: none; }
+html:not([data-advertising-channel="facebook"]) #facebook { display: none; }
+#facebook .google-ads-kicker,
+#facebook .google-ads-panel-head span { color: #2851a3; }
+#facebook .google-ads-mode { border-color: #d8e1f2; background: #f7f9fe; }
+#facebook .google-ads-mode > span { background: #2851a3; box-shadow: 0 0 0 5px #dfe8f8; }
+#facebook #facebookAdsDryRun { background: #2851a3; color: #fff; }
+#facebook #facebookAdsDryRun:disabled { opacity: .55; cursor: wait; }
+#facebook .google-ads-chip { background: #eaf0fb; color: #2851a3; }
+.facebook-ads-campaign p { min-height: 52px; }
+.facebook-ads-placement-line { color: #6f7890 !important; line-height: 1.45; }
+.facebook-ads-preview { padding: 12px; border: 1px solid #e7eaf0; border-radius: 8px; background: #fff; }
+.facebook-ads-preview small { display: block; color: #858b98; font-size: 8px; }
+.facebook-ads-preview p { margin: 8px 0 11px; color: #3f4654; font-size: 10px; line-height: 1.5; }
+.facebook-ads-preview strong { display: block; color: #20242c; font-size: 12px; line-height: 1.35; }
+.facebook-ads-preview em { display: block; margin-top: 3px; color: #777f8d; font-size: 9px; font-style: normal; }
+.facebook-ads-format { margin-top: 10px; color: #2851a3; font-size: 8px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+@media (max-width: 1050px) { #facebook .google-ads-campaigns { grid-template-columns: 1fr; } }

@@ -7,24 +7,30 @@ function readPage(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
-test('premium advertenties is een dedicated Google Ads dry-run commandocentrale', () => {
+test('premium advertenties bevat aparte Google en Facebook Ads dry-run werkruimtes', () => {
   const pageSource = readPage('premium-advertenties.html');
-  const assetSource = readPage('assets/premium-google-ads.js');
+  const googleAssetSource = readPage('assets/premium-google-ads.js');
+  const facebookAssetSource = readPage('assets/premium-facebook-ads.js');
   const lockAssetSource = readPage('assets/premium-marketing-content-lock.js');
   const cssSource = readPage('assets/premium-google-ads.css');
+  const facebookCssSource = readPage('assets/premium-facebook-ads.css');
 
   assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
-  assert.match(pageSource, /<title>Google Ads – Softora\.nl<\/title>/);
+  assert.match(pageSource, /<title>Advertenties – Softora\.nl<\/title>/);
   assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-google-ads\.css\?v=20260716b">/);
+  assert.match(pageSource, /<link rel="stylesheet" href="assets\/premium-facebook-ads\.css\?v=20260723a">/);
   assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
   assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260722a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260723b" defer><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260716b" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-facebook-ads\.js\?v=20260723a" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_advertenties_content_lock"/);
   assert.match(pageSource, /data-content-lock-input/);
   assert.match(pageSource, /data-content-lock-submit/);
-  assert.match(pageSource, /data-google-ads-open/);
+  assert.match(pageSource, /data-advertising-workspace-open/);
+  assert.match(pageSource, /data-advertising-channel/);
   assert.match(pageSource, /<h1>Google Ads<\/h1>/);
+  assert.match(pageSource, /<h1>Facebook Ads<\/h1>/);
   assert.match(pageSource, /Dezelfde discipline als de SEO-machine/);
   assert.match(pageSource, /Kostenslot actief/);
   assert.match(pageSource, /Draai dry-run/);
@@ -32,30 +38,44 @@ test('premium advertenties is een dedicated Google Ads dry-run commandocentrale'
   assert.match(pageSource, /Advertenties, keywords en URL-tracking/);
   assert.match(pageSource, /id="googleAdsDownloadPack"/);
   assert.match(pageSource, /href="\/api\/google-ads\/editor-assets\.csv" download/);
-  assert.doesNotMatch(pageSource, /Trustoo-campagnes|Pinterest promoted pins|Meta \/ Facebook advertenties|LinkedIn Campaign Manager/);
+  assert.match(pageSource, /Meta-blueprint/);
+  assert.match(pageSource, /Copy, formats en URL-tracking/);
+  assert.match(pageSource, /id="facebookAdsDownloadPack"/);
+  assert.doesNotMatch(pageSource, /Trustoo-campagnes|Pinterest promoted pins|LinkedIn Campaign Manager/);
   assert.doesNotMatch(pageSource, /onclick=/);
   assert.doesNotMatch(pageSource, /onkeydown=/);
   assert.doesNotMatch(pageSource, /function unlockAdvertentiesArea/);
   assert.doesNotMatch(lockAssetSource, /localStorage|sessionStorage/);
   assert.match(lockAssetSource, /window\.SoftoraUiStateClient/);
-  assert.match(lockAssetSource, /isOpenGoogleAdsView/);
-  assert.match(lockAssetSource, /document\.documentElement\.removeAttribute\('data-google-ads-open'\)/);
-  assert.match(lockAssetSource, /remoteUnlocked \|\| googleAdsOpen/);
+  assert.match(lockAssetSource, /getOpenAdvertisingChannel/);
+  assert.match(lockAssetSource, /hash === 'facebook'/);
+  assert.match(lockAssetSource, /document\.documentElement\.removeAttribute\('data-advertising-workspace-open'\)/);
+  assert.match(lockAssetSource, /remoteUnlocked \|\| Boolean\(advertisingChannel\)/);
   assert.match(lockAssetSource, /client\.get\(remoteScope\)/);
   assert.match(lockAssetSource, /client\.peek\(remoteScope\)/);
   assert.match(lockAssetSource, /client\.set\(remoteScope,/);
   assert.match(lockAssetSource, /submitButton\.addEventListener\('click', unlockContent\)/);
   assert.match(lockAssetSource, /event\.key === 'Enter'/);
-  assert.match(assetSource, /fetchJson\('\/api\/google-ads\/status'\)/);
-  assert.match(assetSource, /fetchJson\('\/api\/google-ads\/blueprint'\)/);
-  assert.match(assetSource, /fetchJson\('\/api\/google-ads\/dry-run'/);
-  assert.match(assetSource, /fetchJson\('\/api\/google-ads\/launch-pack'\)/);
-  assert.match(assetSource, /softora-google-ads-launch-pack\.json/);
-  assert.match(assetSource, /campaign\.headlines\.slice\(0, 3\)/);
-  assert.match(assetSource, /replaceChildren/);
-  assert.doesNotMatch(assetSource, /innerHTML/);
+  assert.match(googleAssetSource, /fetchJson\('\/api\/google-ads\/status'\)/);
+  assert.match(googleAssetSource, /fetchJson\('\/api\/google-ads\/blueprint'\)/);
+  assert.match(googleAssetSource, /fetchJson\('\/api\/google-ads\/dry-run'/);
+  assert.match(googleAssetSource, /fetchJson\('\/api\/google-ads\/launch-pack'\)/);
+  assert.match(googleAssetSource, /softora-google-ads-launch-pack\.json/);
+  assert.match(googleAssetSource, /campaign\.headlines\.slice\(0, 3\)/);
+  assert.match(googleAssetSource, /replaceChildren/);
+  assert.doesNotMatch(googleAssetSource, /innerHTML/);
+  assert.match(facebookAssetSource, /fetchJson\('\/api\/facebook-ads\/status'\)/);
+  assert.match(facebookAssetSource, /fetchJson\('\/api\/facebook-ads\/blueprint'\)/);
+  assert.match(facebookAssetSource, /fetchJson\('\/api\/facebook-ads\/dry-run'/);
+  assert.match(facebookAssetSource, /fetchJson\('\/api\/facebook-ads\/launch-pack'\)/);
+  assert.match(facebookAssetSource, /softora-facebook-ads-launch-pack\.json/);
+  assert.match(facebookAssetSource, /ad\.primaryText/);
+  assert.match(facebookAssetSource, /replaceChildren/);
+  assert.doesNotMatch(facebookAssetSource, /innerHTML/);
   assert.match(cssSource, /\.google-ads-safety/);
   assert.match(cssSource, /\.google-ads-campaigns/);
+  assert.match(facebookCssSource, /data-advertising-channel="facebook"/);
+  assert.match(facebookCssSource, /\.facebook-ads-preview/);
 });
 
 test('premium socialmedia toont een aparte AI beheer workspace boven de personeelspagina', () => {
