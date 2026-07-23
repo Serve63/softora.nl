@@ -41,6 +41,9 @@ const {
   registerGoogleAdsPublicRoutes,
 } = require('../routes/google-ads');
 const {
+  registerFacebookAdsProtectedRoutes,
+} = require('../routes/facebook-ads');
+const {
   registerWhoopHealthProtectedRoutes,
   registerWhoopHealthPublicRoutes,
 } = require('../routes/whoop-health');
@@ -64,6 +67,7 @@ const {
 const { createGoogleHealthSheetService } = require('./google-health-sheet');
 const { createWhoopHealthService } = require('./whoop-health');
 const { createGoogleAdsControlService } = require('./google-ads-control');
+const { createFacebookAdsControlService } = require('./facebook-ads-control');
 
 function registerFeatureRoutes(app, deps = {}) {
   const {
@@ -152,6 +156,11 @@ function registerFeatureRoutes(app, deps = {}) {
     setUiStateValues: deps.setUiStateValues,
     env: deps.env || process.env,
   });
+  const facebookAdsService = createFacebookAdsControlService({
+    getUiStateValues: deps.getUiStateValues,
+    setUiStateValues: deps.setUiStateValues,
+    env: deps.env || process.env,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -182,6 +191,11 @@ function registerFeatureRoutes(app, deps = {}) {
 
   registerGoogleAdsProtectedRoutes(app, {
     service: googleAdsService,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
+
+  registerFacebookAdsProtectedRoutes(app, {
+    service: facebookAdsService,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
 

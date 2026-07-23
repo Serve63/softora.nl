@@ -21,10 +21,13 @@
     return Boolean(state && state.values && state.values[REMOTE_UNLOCK_KEY] === '1');
   }
 
-  function isOpenGoogleAdsView() {
+  function getOpenAdvertisingChannel() {
     var path = String(window.location.pathname || '').toLowerCase();
     var hash = String(window.location.hash || '').replace(/^#/, '').toLowerCase();
-    return path.indexOf('/premium-advertenties') === 0 && (!hash || hash === 'google');
+    if (path.indexOf('/premium-advertenties') !== 0) return '';
+    if (!hash || hash === 'google') return 'google';
+    if (hash === 'facebook') return 'facebook';
+    return '';
   }
 
   function getUiStateClient() {
@@ -62,13 +65,17 @@
   }
 
   function syncOverlayVisibility() {
-    var googleAdsOpen = isOpenGoogleAdsView();
-    if (googleAdsOpen) {
-      document.documentElement.setAttribute('data-google-ads-open', 'true');
+    var advertisingChannel = getOpenAdvertisingChannel();
+    if (advertisingChannel) {
+      document.documentElement.setAttribute('data-advertising-workspace-open', 'true');
+      document.documentElement.setAttribute('data-advertising-channel', advertisingChannel);
+      document.title = advertisingChannel === 'facebook'
+        ? 'Facebook Ads – Softora.nl'
+        : 'Google Ads – Softora.nl';
     } else {
-      document.documentElement.removeAttribute('data-google-ads-open');
+      document.documentElement.removeAttribute('data-advertising-workspace-open');
     }
-    overlay.style.display = remoteUnlocked || googleAdsOpen ? 'none' : '';
+    overlay.style.display = remoteUnlocked || Boolean(advertisingChannel) ? 'none' : '';
   }
 
   function scrollToCurrentHash() {
