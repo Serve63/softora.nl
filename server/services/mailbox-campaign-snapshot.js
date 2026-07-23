@@ -115,6 +115,7 @@ function sanitizeMessage(value, options = {}) {
     optOutUrl: text(source.optOutUrl, 4000),
     date: text(source.date, 100),
     receivedAt: text(source.receivedAt || source.date, 100),
+    activityAt: text(source.activityAt || source.receivedAt || source.date, 100),
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
