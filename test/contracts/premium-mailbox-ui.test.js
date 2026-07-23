@@ -12,9 +12,11 @@ const outreachScriptPath = path.join(__dirname, '../../assets/premium-mailbox-ou
 const campaignInboxScriptPath = path.join(__dirname, '../../assets/premium-mailbox-campaign-inbox.js');
 const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-refresh.js');
 const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
+const listScriptPath = path.join(__dirname, '../../assets/premium-mailbox-list.js');
 const campaignInboxModule = require('../../assets/premium-mailbox-campaign-inbox.js');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const composeModule = require('../../assets/premium-mailbox-compose.js');
+const listModule = require('../../assets/premium-mailbox-list.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -46,6 +48,10 @@ function readRefreshScript() {
 
 function readComposeScript() {
   return fs.readFileSync(composeScriptPath, 'utf8');
+}
+
+function readListScript() {
+  return fs.readFileSync(listScriptPath, 'utf8');
 }
 
 test('mailbox gebruikt de juiste browsertitel', () => {
@@ -198,7 +204,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723d"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -549,15 +555,17 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met
   const pageSource = readPage();
   const scriptSource = readScript();
   const renderListSource = scriptSource.match(/function renderList\(options = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const listSource = readListScript();
 
-  assert.match(renderListSource, /class="unread-dot"/);
-  assert.match(renderListSource, /class="mail-from"/);
-  assert.match(renderListSource, /class="mail-time"/);
-  assert.match(renderListSource, /class="mail-date-label"/);
-  assert.match(renderListSource, /class="mail-time-value"/);
-  assert.match(renderListSource, /data-mailbox-received-at/);
-  assert.doesNotMatch(renderListSource, /class="mail-subject"/);
-  assert.doesNotMatch(renderListSource, /class="mail-preview"/);
+  assert.match(renderListSource, /SoftoraMailboxList\.renderItem/);
+  assert.match(listSource, /class="unread-dot"/);
+  assert.match(listSource, /class="mail-from"/);
+  assert.match(listSource, /class="mail-time"/);
+  assert.match(listSource, /class="mail-date-label"/);
+  assert.match(listSource, /class="mail-time-value"/);
+  assert.match(listSource, /data-mailbox-received-at/);
+  assert.doesNotMatch(listSource, /class="mail-subject"/);
+  assert.doesNotMatch(listSource, /class="mail-preview"/);
   assert.doesNotMatch(renderListSource, /renderListMeta/);
   assert.doesNotMatch(pageSource, /\.mail-campaign-meta/);
   assert.match(pageSource, /\.mail-from \{[\s\S]*font-weight:\s*400;/);
@@ -567,6 +575,33 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met
   assert.match(pageSource, /\.mail-items \{[\s\S]*overflow-y:\s*auto;[\s\S]*scrollbar-width:\s*none;[\s\S]*-ms-overflow-style:\s*none;/);
   assert.match(pageSource, /\.mail-items::\-webkit\-scrollbar \{[\s\S]*display:\s*none;/);
   assert.match(pageSource, /\.mail-time \{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-end;/);
+});
+
+test('geselecteerde mailboxrij toont een aparte verwijderknop zonder de openactie te vervangen', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+  const listSource = fs.readFileSync(listScriptPath, 'utf8');
+
+  assert.match(pageSource, /assets\/premium-mailbox-list\.js/);
+  assert.match(scriptSource, /SoftoraMailboxList\.renderItem/);
+  assert.match(listSource, /const isActive = String\(options\.activeMail\) === String\(mail\.id\);/);
+  assert.match(listSource, /class="mail-item-open"[\s\S]*data-mailbox-action="open-mail"/);
+  assert.match(listSource, /\$\{isActive \? `[\s\S]*class="mail-item-delete"[\s\S]*data-mailbox-action="delete-mail"/);
+  assert.match(listSource, /aria-label="Mail verwijderen"/);
+  assert.match(pageSource, /\.mail-item-delete \{[\s\S]*color:\s*var\(--crimson\);[\s\S]*cursor:\s*pointer;/);
+  assert.match(pageSource, /\.mail-item-open:focus-visible \{[\s\S]*outline:/);
+
+  const escaped = (value) => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const baseOptions = {
+    display: { getListPrimaryText: () => 'Noortje Vogels' },
+    displayOptions: { account: 'serve@softora.nl' },
+    escapeHtml: escaped,
+  };
+  const activeRow = listModule.renderItem({ id: 'inbox:42', time: '13:41' }, { ...baseOptions, activeMail: 'inbox:42' });
+  const inactiveRow = listModule.renderItem({ id: 'inbox:43', time: '13:42' }, { ...baseOptions, activeMail: 'inbox:42' });
+
+  assert.match(activeRow, /data-mailbox-action="delete-mail"/);
+  assert.doesNotMatch(inactiveRow, /data-mailbox-action="delete-mail"/);
 });
 
 test('premium mailbox toont bij verzonden mails de ontvanger als hoofdregel', () => {
@@ -982,6 +1017,7 @@ test('premium mailbox voorkomt horizontale overflow door brede e-mails', () => {
 test('premium mailbox houdt gedrag uit inline handlers', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
+  const listSource = readListScript();
 
   assert.doesNotMatch(pageSource, /\son[a-z]+=/);
   assert.doesNotMatch(scriptSource, /onclick=/);
@@ -991,7 +1027,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.doesNotMatch(pageSource, /class="btn-compose"/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose"/);
   assert.doesNotMatch(pageSource, /data-mailbox-action="set-folder"/);
-  assert.match(scriptSource, /data-mailbox-action="open-mail"/);
+  assert.match(listSource, /data-mailbox-action="open-mail"/);
   assert.doesNotMatch(scriptSource, /data-mailbox-action="toggle-star"/);
   assert.doesNotMatch(scriptSource, />\s*Markeren\s*</);
   assert.match(scriptSource, /data-mailbox-action="reply-mail"/);
