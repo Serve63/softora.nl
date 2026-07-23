@@ -18,7 +18,10 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.match(policy, /per succesvolle run precies een publieke SEO-groeiverbetering/i);
   assert.match(policy, /Onderhoud aan een oude PR[\s\S]*tellen niet als publieke groeilevering/i);
   assert.match(policy, /cooldown geldt alleen voor dezelfde URL/i);
-  assert.match(policy, /in `scale` 5 tot 7 sterke nieuwe of substantieel vernieuwde contentleveringen per week/i);
+  assert.match(policy, /nieuwe URL's en refreshes apart/i);
+  assert.match(policy, /minimaal 1 nieuwe URL in `data_degraded`[\s\S]*2 in `indexation_recovery`[\s\S]*2 in `quality_recovery`[\s\S]*3 in `growth`[\s\S]*5 in `scale`/i);
+  assert.match(policy, /`newUrls`[\s\S]*`substantialRefreshes`[\s\S]*`otherGrowthActions`/i);
+  assert.match(policy, /Alleen `newUrls` verlaagt de nieuwe-URL-achterstand/i);
   assert.match(policy, /`indexation_recovery`/i);
   assert.match(policy, /`quality_recovery`/i);
   assert.match(policy, /minimaal 15 unieke, gescoorde en publicatieklare kandidaatbriefs/i);

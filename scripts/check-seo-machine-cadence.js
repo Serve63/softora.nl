@@ -79,11 +79,15 @@ async function runCli() {
     const label = cadence.color === 'green' ? 'GREEN' : cadence.color === 'amber' ? 'AMBER' : 'RED';
     console.log(
       `[seo-cadence] ${label}: state=${cadence.state} status=${cadence.status} action=${cadence.action} `
-      + `qualifying7d=${cadence.qualifying ?? 'n/a'} deficit=${cadence.deficit ?? 'n/a'}`
+      + `qualifying7d=${cadence.qualifying ?? 'n/a'} newUrls7d=${cadence.newUrls ?? 'n/a'} `
+      + `refreshes7d=${cadence.substantialRefreshes ?? 'n/a'} otherActions7d=${cadence.otherGrowthActions ?? 'n/a'} `
+      + `deficit=${cadence.deficit ?? 'n/a'}`
     );
     console.log(
       `[seo-cadence] indexation=${cadence.reviewable?.indexed ?? 'n/a'}/${cadence.reviewable?.inspected ?? 'n/a'} `
-      + `requestEvidenceDue=${cadence.requestEvidenceDue ?? 'n/a'} maxNewUrls7d=${cadence.maximumNewUrlsPerWeek}`
+      + `requestEvidenceDue=${cadence.requestEvidenceDue ?? 'n/a'} `
+      + `newUrlFloor7d=${cadence.minimumNewUrlsPerWeek} newUrlDeficit=${cadence.newUrlDeficit} `
+      + `maxNewUrls7d=${cadence.maximumNewUrlsPerWeek}`
     );
     if (cadence.nextCandidate) {
       console.log(

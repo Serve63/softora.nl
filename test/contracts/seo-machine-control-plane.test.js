@@ -10,7 +10,18 @@ const { loadFreshIndexationReport } = require('../../scripts/check-seo-machine-c
 function readyInputs(overrides = {}) {
   return {
     backlogResult: { ok: true, summary: { topReady: [{ id: 'candidate', path: '/blog/candidate', score: 4.6 }] } },
-    ledger: { status: 'ready', errors: [], windows: { '7': { qualifying: 5 } } },
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: {
+        '7': {
+          qualifying: 5,
+          newUrls: 5,
+          substantialRefreshes: 0,
+          otherGrowthActions: 0,
+        },
+      },
+    },
     indexation: {
       status: 'ready',
       summary: {
@@ -35,7 +46,11 @@ test('control plane makes live blockers an operations P0', () => {
 
 test('control plane prioritizes indexation recovery over publication deficit', () => {
   const state = evaluateSeoMachineState(readyInputs({
-    ledger: { status: 'ready', errors: [], windows: { '7': { qualifying: 1 } } },
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': { qualifying: 5, newUrls: 1, substantialRefreshes: 4, otherGrowthActions: 0 } },
+    },
     indexation: {
       status: 'ready',
       summary: { requestEvidenceDue: 8, d14: { inspected: 5, indexed: 1 }, d28: { inspected: 5, indexed: 2 } },
@@ -43,7 +58,11 @@ test('control plane prioritizes indexation recovery over publication deficit', (
   }));
   assert.equal(state.state, 'indexation_recovery');
   assert.equal(state.exitCode, 2);
+  assert.equal(state.minimumNewUrlsPerWeek, 2);
   assert.equal(state.maximumNewUrlsPerWeek, 2);
+  assert.equal(state.newUrlRequired, true);
+  assert.equal(state.newUrlDeficit, 1);
+  assert.equal(state.action, 'publish_new_url_from_highest_scoring_safe_ready_candidate');
 });
 
 test('control plane selects quality recovery before scaling new content', () => {
@@ -54,9 +73,48 @@ test('control plane selects quality recovery before scaling new content', () => 
   assert.equal(state.action, 'replace_template_content_with_unique_information_or_consolidate');
 });
 
+test('quality recovery refreshes cannot satisfy the new URL floor', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': { qualifying: 5, newUrls: 1, substantialRefreshes: 4, otherGrowthActions: 0 } },
+    },
+    quality: { status: 'quality_recovery', reasons: ['template_share'] },
+  }));
+  assert.equal(state.state, 'quality_recovery');
+  assert.equal(state.minimumNewUrlsPerWeek, 2);
+  assert.equal(state.newUrlRequired, true);
+  assert.equal(state.action, 'publish_new_url_from_highest_scoring_safe_ready_candidate');
+});
+
+test('growth requires three genuinely new URLs even when five total improvements are live', () => {
+  const state = evaluateSeoMachineState(readyInputs({
+    ledger: {
+      status: 'ready',
+      errors: [],
+      windows: { '7': { qualifying: 5, newUrls: 2, substantialRefreshes: 3, otherGrowthActions: 0 } },
+    },
+    indexation: {
+      status: 'ready',
+      summary: {
+        requestEvidenceDue: 0,
+        d14: { inspected: 5, indexed: 3 },
+        d28: { inspected: 5, indexed: 4 },
+      },
+    },
+  }));
+  assert.equal(state.state, 'growth');
+  assert.equal(state.minimumNewUrlsPerWeek, 3);
+  assert.equal(state.newUrlDeficit, 1);
+  assert.equal(state.exitCode, 2);
+  assert.equal(state.action, 'publish_new_url_from_highest_scoring_safe_ready_candidate');
+});
+
 test('control plane scales only with healthy reviewable indexation', () => {
   const state = evaluateSeoMachineState(readyInputs());
   assert.equal(state.state, 'scale');
+  assert.equal(state.minimumNewUrlsPerWeek, 5);
   assert.equal(state.maximumNewUrlsPerWeek, 7);
   assert.equal(state.exitCode, 0);
 });
