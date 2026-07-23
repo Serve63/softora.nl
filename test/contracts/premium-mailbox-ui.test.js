@@ -301,6 +301,41 @@ test('coldmail eigenaarfilter koppelt alleen de negen campagneadressen aan ServÃ
   campaignInboxModule.setOwner('both');
 });
 
+test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessiecache', () => {
+  const messages = [
+    {
+      id: 'human',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Re: Kleine vraag over jullie website',
+      body: 'Dank voor je ontwerp, maar wij hebben geen interesse.',
+      receivedAt: '2026-07-23T09:00:00.000Z',
+    },
+    {
+      id: 'qccs-away',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Afwezigheidmelding Re: Kleine vraag over jullie website',
+      body: 'Vanaf 2 juli tot en met 3 augustus 2026 is ons kantoor gesloten.',
+      receivedAt: '2026-07-23T10:00:00.000Z',
+    },
+    {
+      id: 'body-only-auto',
+      accountEmail: 'martijn@softora.nl',
+      subject: 'Nieuw e-mailadres Re: Kleine vraag over jullie website',
+      preview: 'Beste lezer, wij hebben een nieuw e-mailadres.',
+      body: 'Dit bericht is automatisch gegenereerd.',
+      receivedAt: '2026-07-23T11:00:00.000Z',
+    },
+  ];
+
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[0]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[1]), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[2]), true);
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
+    ['human']
+  );
+});
+
 test('coldmail berichten met hetzelfde IMAP-id blijven per mailboxaccount uniek', () => {
   const serveMail = campaignInboxModule.decorateMessage(
     { id: 'inbox:42' },

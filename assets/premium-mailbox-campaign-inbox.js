@@ -31,6 +31,42 @@
     return String(value || '').trim().toLowerCase();
   }
 
+  function normalizeClassifierText(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  function isAutomatedCampaignReply(mail) {
+    const subject = normalizeClassifierText(mail && mail.subject);
+    const content = normalizeClassifierText([
+      mail && mail.preview,
+      mail && mail.body,
+    ].filter(Boolean).join(' '));
+    const automatedSubjectPatterns = [
+      /\bautomatisch antwoord\b/,
+      /\bautomatic (?:reply|response)\b/,
+      /\bauto[ -]?reply\b/,
+      /\bout[ -]?of[ -]?office\b/,
+      /\bafwezigheid(?:sbericht|melding)?\b/,
+      /^email received\b/,
+      /^bericht ontvangen\b/,
+    ];
+    const automatedContentPatterns = [
+      /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
+      /\bdit is een automatisch bericht\b/,
+      /\bwe would like to acknowledge that we have received your request\b/,
+      /\bis ons kantoor gesloten\b/,
+    ];
+    return (
+      automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
+      automatedContentPatterns.some((pattern) => pattern.test(content))
+    );
+  }
+
   function isSafeImageSource(value) {
     const source = String(value || '').trim();
     if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(source)) return true;
@@ -153,6 +189,7 @@
     const owner = normalizeOwner(value == null ? activeOwner : value);
     return sortMessagesNewestFirst(
       (Array.isArray(messages) ? messages : []).filter((mail) => {
+        if (isAutomatedCampaignReply(mail)) return false;
         const accountOwner = getOwnerByAccount(
           mail && (mail.accountEmail || mail.campaign && mail.campaign.account)
         );
@@ -373,6 +410,7 @@
     getPageBootstrapSession,
     getRequestId,
     initializeOwnerPreference,
+    isAutomatedCampaignReply,
     isOwner,
     isSafeImageSource,
     isCampaignMail,
