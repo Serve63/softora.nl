@@ -450,6 +450,68 @@
       .toLowerCase();
   }
 
+  function tokenizeThreadMatchText(value) {
+    return String(value || '')
+      .replace(/&(?:nbsp|amp);/gi, ' ')
+      .replace(/['’]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function extractThreadWebsiteDomain(value) {
+    const match = String(value || '').match(
+      /\b(?:website|site)\s+\(?([a-z0-9-]+(?:\s*\.\s*[a-z0-9-]+)+)\)?\s+tegen\b/i
+    );
+    return match ? match[1].replace(/\s+/g, '').toLowerCase() : '';
+  }
+
+  function countSharedTokens(leftTokens, rightTokens) {
+    const available = new Map();
+    rightTokens.forEach((token) => available.set(token, (available.get(token) || 0) + 1));
+    return leftTokens.reduce((count, token) => {
+      const remaining = available.get(token) || 0;
+      if (!remaining) return count;
+      available.set(token, remaining - 1);
+      return count + 1;
+    }, 0);
+  }
+
+  function createThreadTokenShingles(tokens, size = 3) {
+    if (!Array.isArray(tokens) || tokens.length < size) return [];
+    const shingles = [];
+    for (let index = 0; index <= tokens.length - size; index += 1) {
+      shingles.push(tokens.slice(index, index + size).join(' '));
+    }
+    return shingles;
+  }
+
+  function isFormattingVariantOfThreadMessage(quotedText, authoredText) {
+    if (Math.min(quotedText.length, authoredText.length) < 96) return false;
+    const quotedDomain = extractThreadWebsiteDomain(quotedText);
+    const authoredDomain = extractThreadWebsiteDomain(authoredText);
+    if (quotedDomain && authoredDomain && quotedDomain !== authoredDomain) return false;
+
+    const quotedTokens = tokenizeThreadMatchText(quotedText);
+    const authoredTokens = tokenizeThreadMatchText(authoredText);
+    if (Math.min(quotedTokens.length, authoredTokens.length) < 16) return false;
+
+    const shorterTokens = quotedTokens.length <= authoredTokens.length ? quotedTokens : authoredTokens;
+    const longerTokens = quotedTokens.length <= authoredTokens.length ? authoredTokens : quotedTokens;
+    const sharedTokenCoverage = countSharedTokens(shorterTokens, longerTokens) / shorterTokens.length;
+
+    const shorterShingles = createThreadTokenShingles(shorterTokens);
+    const longerShingles = createThreadTokenShingles(longerTokens);
+    if (!shorterShingles.length || !longerShingles.length) return false;
+    const sharedShingleCoverage = countSharedTokens(shorterShingles, longerShingles) / shorterShingles.length;
+
+    return (
+      (sharedTokenCoverage >= 0.82 && sharedShingleCoverage >= 0.72) ||
+      (sharedTokenCoverage >= 0.9 && sharedShingleCoverage >= 0.58)
+    );
+  }
+
   function isSameThreadMessageText(quotedText, authoredText) {
     if (!quotedText || !authoredText) return false;
     if (quotedText === authoredText) return true;
@@ -457,7 +519,8 @@
       ? [quotedText, authoredText]
       : [authoredText, quotedText];
     if (shorterText.length < 8) return false;
-    return longerText.startsWith(`${shorterText} `) || longerText.endsWith(` ${shorterText}`);
+    if (longerText.startsWith(`${shorterText} `) || longerText.endsWith(` ${shorterText}`)) return true;
+    return isFormattingVariantOfThreadMessage(quotedText, authoredText);
   }
 
   function stripStructuredQuoteMetadata(lines) {
