@@ -49,3 +49,45 @@ test('campaign history sync searches both coldmail subjects from campaign start'
   ]);
   assert.deepEqual(options, [{ uid: true }, { uid: true }, { uid: true }]);
 });
+
+test('campaign history sync prioritizes missing sent replies linked by thread headers', async () => {
+  const queries = [];
+  const client = {
+    async search(query) {
+      queries.push(query);
+      if (query.all) return Array.from({ length: 120 }, (_item, index) => index + 1);
+      if (query.or) return [42, 115];
+      return Array.from({ length: 120 }, (_item, index) => index + 1);
+    },
+  };
+
+  const selected = await resolveMailboxSyncUids({
+    client,
+    limit: 20,
+    campaignHistory: true,
+    oldestIndexedCampaignUid: 91,
+    threadReferenceIds: [
+      '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>',
+    ],
+    indexedUids: [115],
+  });
+
+  assert.equal(selected[7], 42);
+  assert.deepEqual(queries[3], {
+    since: CAMPAIGN_HISTORY_SINCE,
+    or: [
+      {
+        header: {
+          references: '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>',
+        },
+      },
+      {
+        header: {
+          'in-reply-to': '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>',
+        },
+      },
+    ],
+  });
+  assert.equal(selected.filter((uid) => uid === 42).length, 1);
+  assert.equal(selected.filter((uid) => uid === 115).length, 1);
+});

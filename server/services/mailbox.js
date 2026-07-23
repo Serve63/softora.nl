@@ -2138,10 +2138,9 @@ function createMailboxService(deps = {}) {
     return account;
   }
 
-  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0 }) {
+  async function fetchMessagesFromImap({ account, folder = 'inbox', limit = DEFAULT_SYNC_LIMIT, uids = null, campaignHistory = false, oldestIndexedCampaignUid = 0, ...historySyncOptions }) {
     const normalizedFolder = normalizeFolder(folder);
     const safeLimit = getSafeLimit(limit);
-
     const client = createClient(account);
     try {
       await client.connect();
@@ -2158,6 +2157,7 @@ function createMailboxService(deps = {}) {
             limit: safeLimit,
             campaignHistory,
             oldestIndexedCampaignUid,
+            ...historySyncOptions,
             logger,
             accountEmail: account.email,
             folder: normalizedFolder,

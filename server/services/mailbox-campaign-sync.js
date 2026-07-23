@@ -1,6 +1,21 @@
 const { CAMPAIGN_MAILBOX_ACCOUNTS } = require('./mailbox-campaign-replies');
 const { CAMPAIGN_HISTORY_SUBJECT_TERMS } = require('./mailbox-campaign-history-sync');
 
+function collectCampaignThreadReferenceIds(messages = []) {
+  const subjectTerms = CAMPAIGN_HISTORY_SUBJECT_TERMS.map((term) => term.toLowerCase());
+  return Array.from(
+    new Set(
+      (Array.isArray(messages) ? messages : [])
+        .filter((message) => {
+          const subject = String(message?.subject || '').toLowerCase();
+          return subjectTerms.some((term) => subject.includes(term));
+        })
+        .map((message) => String(message?.messageId || '').trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 function selectMailboxSyncAccounts({
   accountEmail = '',
   accounts = [],
@@ -60,12 +75,34 @@ function createMailboxSyncService({
               subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
             })
           : 0;
+      let threadReferenceIds = [];
+      let indexedUids = [];
+      if (
+        campaignOnly &&
+        normalizedFolder === 'sent' &&
+        typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
+      ) {
+        const indexedInboxMessages =
+          (await mailboxIndexStore.listAllMessagesForAccounts({
+            accountEmails: [account.email],
+            folder: 'inbox',
+          })) || [];
+        const indexedSentMessages =
+          (await mailboxIndexStore.listAllMessagesForAccounts({
+            accountEmails: [account.email],
+            folder: 'sent',
+          })) || [];
+        threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
+        indexedUids = indexedSentMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
+      }
       const messages = await fetchMessagesFromImap({
         account,
         folder: normalizedFolder,
         limit: getSafeLimit(limit),
         campaignHistory: campaignOnly,
         oldestIndexedCampaignUid,
+        threadReferenceIds,
+        indexedUids,
       });
       const saved = await mailboxIndexStore.upsertMessages({
         accountEmail: account.email,
@@ -91,6 +128,7 @@ function createMailboxSyncService({
         upserted: saved.upserted || messages.length,
         historyBackfill: Boolean(campaignOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
+        targetedThreadReferences: threadReferenceIds.length,
       };
     } catch (error) {
       await mailboxIndexStore.finishSync({
@@ -155,6 +193,7 @@ function createMailboxSyncService({
 }
 
 module.exports = {
+  collectCampaignThreadReferenceIds,
   createMailboxSyncService,
   selectMailboxSyncAccounts,
 };
