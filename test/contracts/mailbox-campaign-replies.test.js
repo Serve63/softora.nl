@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  CAMPAIGN_MESSAGE_SCAN_LIMIT,
+  CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
@@ -123,6 +125,7 @@ test('campaign reply service excludes duplicates and automatic replies before cu
 
 test('campaign reply service koppelt een later verzonden antwoord aan dezelfde ontvangen mail', async () => {
   const requestedFolders = [];
+  const requestedLimits = {};
   const inboxMessage = {
     id: 'inbox:91',
     uid: 91,
@@ -154,8 +157,9 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
   };
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {
-      listMessagesForAccounts: async ({ folder }) => {
+      listMessagesForAccounts: async ({ folder, limit }) => {
         requestedFolders.push(folder);
+        requestedLimits[folder] = limit;
         return folder === 'sent' ? [sentReply] : [inboxMessage];
       },
       hydrateMessageBodies: async ({ messages }) => messages.map((message) => (
@@ -178,6 +182,8 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
   const replies = await service.listReplies({ limit: 100 });
 
   assert.deepEqual(requestedFolders.sort(), ['inbox', 'sent']);
+  assert.equal(requestedLimits.inbox, CAMPAIGN_MESSAGE_SCAN_LIMIT);
+  assert.equal(requestedLimits.sent, CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT);
   assert.equal(replies.length, 1);
   assert.equal(replies[0].threadMessages.length, 1);
   assert.equal(replies[0].threadMessages[0].id, 'sent:102');
