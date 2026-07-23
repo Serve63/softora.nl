@@ -5,12 +5,11 @@ const {
 } = require('./mailbox-message-image');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 2;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 3;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
-const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_MESSAGES = 10;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
 const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
@@ -130,7 +129,6 @@ function sanitizeMessage(value, options = {}) {
     outreach: sanitizeOutreach(source.outreach),
     bodyImages,
     threadMessages: (Array.isArray(source.threadMessages) ? source.threadMessages : [])
-      .slice(-MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_MESSAGES)
       .map((message) => sanitizeThreadMessage(message, { includeBody: options.includeBody !== false })),
   };
 }
@@ -157,6 +155,19 @@ function fitSnapshotToBudget(snapshot) {
         message.body = '';
       });
     }
+    serialized = serialize(snapshot);
+    if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
+  }
+
+  // A single active conversation can contain years of correspondence. Keep
+  // every message and its preview, but drop hydrated thread bodies when that
+  // one conversation alone would exceed the snapshot budget. Opening it still
+  // fetches the complete hydrated conversation from the mailbox index.
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    snapshot.messages[index].threadMessages.forEach((message) => {
+      if (message.body) message.bodyTruncated = true;
+      message.body = '';
+    });
     serialized = serialize(snapshot);
     if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
   }

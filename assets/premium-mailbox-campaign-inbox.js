@@ -249,8 +249,7 @@
           seen.add(identity);
           return true;
         })
-        .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left))
-        .slice(0, 10);
+        .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left));
       return {
         ...primary,
         conversationId,

@@ -262,11 +262,107 @@ test('campaign reply service houdt vervolgreacties in één bestaande conversati
   assert.equal(replies[0].id, 'inbox:37476');
   assert.equal(replies[0].date, '2026-07-23T09:31:11.000Z');
   assert.equal(replies[0].unread, true);
-  assert.match(replies[0].conversationId, /222ba73e-2480-c995-627e-2386c4ef08da/);
+  assert.equal(
+    replies[0].conversationId,
+    'conversation:martijnven123@gmail.com|contact:info@seats2meetstationdenbosch.nl'
+  );
   assert.deepEqual(
     replies[0].threadMessages.map((message) => message.id),
     ['sent:656', 'inbox:37467']
   );
   assert.equal(replies[0].threadMessages[0].folder, 'sent');
   assert.equal(replies[0].threadMessages[1].folder, 'inbox');
+});
+
+test('campaign reply service toont alle latere mails aan Ralph buiten de oude 500-mailscan', async () => {
+  const inboxMessage = {
+    id: 'inbox:23',
+    uid: 23,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Ralph Ruyters',
+    email: 'rruyters@road2value.com',
+    to: 'martijn@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Leuk dat je op deze manier marketing bedrijft.',
+    date: '2026-06-15T13:58:18.000Z',
+    messageId: '<ralph-reply@example.test>',
+  };
+  const sentMessages = [
+    {
+      id: 'sent:111',
+      uid: 111,
+      folder: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      from: 'Martijn van de Ven',
+      email: 'martijn@softora.nl',
+      to: 'Ralph Ruyters <rruyters@road2value.com>',
+      subject: 'Re: Kleine vraag over jullie website',
+      preview: 'Hoi Ralph, dankjewel voor je reactie.',
+      date: '2026-06-16T12:31:32.000Z',
+      messageId: '<martijn-reply@example.test>',
+      inReplyTo: '<ralph-reply@example.test>',
+    },
+    {
+      id: 'sent:149',
+      uid: 149,
+      folder: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      from: 'Martijn van de Ven',
+      email: 'martijn@softora.nl',
+      to: 'rruyters@road2value.com',
+      subject: 'Andere onderwerpregel',
+      preview: 'Hoi Ralph, misschien heb je mijn mailtje gemist.',
+      date: '2026-06-23T11:32:58.000Z',
+      messageId: '<martijn-followup@example.test>',
+    },
+  ];
+  const requestedMethods = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async () => {
+        throw new Error('De begrensde query hoort niet gebruikt te worden.');
+      },
+      listAllMessagesForAccounts: async ({ folder, limit }) => {
+        requestedMethods.push([folder, limit]);
+        return folder === 'sent' ? sentMessages : [inboxMessage];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages.map((message) => ({
+        ...message,
+        body: message.preview,
+      })),
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'road2value',
+        bedrijf: 'Road2Value',
+        email: 'rruyters@road2value.com',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100 });
+
+  assert.deepEqual(requestedMethods, [
+    ['inbox', undefined],
+    ['sent', undefined],
+  ]);
+  assert.equal(replies.length, 1);
+  assert.equal(
+    replies[0].conversationId,
+    'conversation:martijn@softora.nl|contact:rruyters@road2value.com'
+  );
+  assert.deepEqual(
+    replies[0].threadMessages.map((message) => message.id),
+    ['sent:149', 'sent:111']
+  );
+  assert.deepEqual(
+    replies[0].threadMessages.map((message) => message.body),
+    [
+      'Hoi Ralph, misschien heb je mijn mailtje gemist.',
+      'Hoi Ralph, dankjewel voor je reactie.',
+    ]
+  );
 });

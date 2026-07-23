@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
+const {
+  MAILBOX_INDEX_PAGE_SIZE,
+  createMailboxIndexStore,
+} = require('../../server/services/mailbox-index-store');
 
 function createMailboxIndexClient() {
   const stateRows = new Map();
@@ -328,6 +331,55 @@ test('mailbox index store reads campaign inbox messages across selected accounts
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'inbox']);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 2000]);
+});
+
+test('mailbox index store leest de volledige accountgeschiedenis gepagineerd', async () => {
+  const ranges = [];
+  const rows = Array.from({ length: MAILBOX_INDEX_PAGE_SIZE + 2 }, (_, index) => ({
+    message_key: `martijn@softora.nl|sent|${index + 1}`,
+    account_email: 'martijn@softora.nl',
+    folder: 'sent',
+    uid: index + 1,
+    provider_id: `sent:${index + 1}`,
+    sender_name: 'Martijn van de Ven',
+    sender_email: 'martijn@softora.nl',
+    recipients_text: `contact-${index}@example.test`,
+    subject: 'Re: Kleine vraag over jullie website',
+    date: new Date(Date.UTC(2026, 5, 30) - index * 1000).toISOString(),
+  }));
+  const client = {
+    from() {
+      const query = {
+        select() { return query; },
+        in() { return query; },
+        eq() { return query; },
+        is() { return query; },
+        order() { return query; },
+        range(from, to) {
+          ranges.push([from, to]);
+          return Promise.resolve({ data: rows.slice(from, to + 1), error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.listAllMessagesForAccounts({
+    accountEmails: ['martijn@softora.nl'],
+    folder: 'sent',
+  });
+
+  assert.equal(messages.length, MAILBOX_INDEX_PAGE_SIZE + 2);
+  assert.deepEqual(ranges, [
+    [0, MAILBOX_INDEX_PAGE_SIZE - 1],
+    [MAILBOX_INDEX_PAGE_SIZE, (MAILBOX_INDEX_PAGE_SIZE * 2) - 1],
+  ]);
+  assert.equal(messages.at(-1).id, `sent:${MAILBOX_INDEX_PAGE_SIZE + 2}`);
 });
 
 test('mailbox index store hydrates only selected message bodies in one query', async () => {

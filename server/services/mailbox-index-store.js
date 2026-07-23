@@ -9,6 +9,7 @@ const BODY_RETENTION_DAYS = 90;
 const BODY_RETENTION_NEWEST_COUNT = 500;
 const BODY_MAX_CHARS = 200 * 1024;
 const SYNC_LOCK_TTL_MS = 90_000;
+const MAILBOX_INDEX_PAGE_SIZE = 1000;
 
 function createMailboxIndexStore(deps = {}) {
   const {
@@ -279,6 +280,39 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row));
   }
 
+  async function listAllMessagesForAccounts({ accountEmails = [], folder = 'inbox', limit = null }) {
+    const normalizedAccounts = Array.from(
+      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
+    );
+    if (!normalizedAccounts.length) return [];
+    const normalizedFolder = normalizeFolder(folder);
+    const requestedLimit = Number(limit);
+    const hasLimit = Number.isFinite(requestedLimit) && requestedLimit > 0;
+    const safeLimit = hasLimit ? Math.max(1, Math.floor(requestedLimit)) : Number.POSITIVE_INFINITY;
+    const rows = [];
+    for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
+      const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
+      const result = await run(`list-all-messages-for-accounts:${normalizedFolder}:${offset}`, (client) =>
+        client
+          .from(MAILBOX_INDEX_TABLES.messages)
+          .select(
+            'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated'
+          )
+          .in('account_email', normalizedAccounts)
+          .eq('folder', normalizedFolder)
+          .is('deleted_at', null)
+          .order('date', { ascending: false })
+          .order('message_key', { ascending: false })
+          .range(offset, offset + pageSize - 1)
+      );
+      if (!result.ok) return null;
+      const page = Array.isArray(result.data) ? result.data : [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return (hasLimit ? rows.slice(0, safeLimit) : rows).map((row) => normalizeMessageRow(row));
+  }
+
   async function hydrateMessageBodies({ messages = [] } = {}) {
     const source = Array.isArray(messages) ? messages : [];
     const messageKeys = Array.from(
@@ -479,6 +513,7 @@ function createMailboxIndexStore(deps = {}) {
     hydrateMessageBodies,
     isAvailable,
     isSyncStateStale,
+    listAllMessagesForAccounts,
     listMessages,
     listMessagesForAccounts,
     markMessageDeleted,
@@ -492,6 +527,7 @@ module.exports = {
   BODY_MAX_CHARS,
   BODY_RETENTION_DAYS,
   BODY_RETENTION_NEWEST_COUNT,
+  MAILBOX_INDEX_PAGE_SIZE,
   MAILBOX_INDEX_TABLES,
   createMailboxIndexStore,
 };

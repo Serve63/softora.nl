@@ -118,6 +118,36 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
   assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
 });
 
+test('mailbox campaign snapshot bewaart de volledige conversatie van meer dan tien berichten', () => {
+  const threadMessages = Array.from({ length: 12 }, (_, index) => ({
+    id: `sent:${index + 1}`,
+    uid: index + 1,
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    to: 'rruyters@road2value.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: `Bericht ${index + 1}`,
+    body: `Volledige inhoud ${index + 1}`,
+    date: new Date(Date.UTC(2026, 5, 23, 12, 0, 0) - index * 60_000).toISOString(),
+  }));
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:23',
+      folder: 'inbox',
+      accountEmail: 'martijn@softora.nl',
+      email: 'rruyters@road2value.com',
+      conversationId: 'conversation:martijn@softora.nl|contact:rruyters@road2value.com',
+      threadMessages,
+    }],
+  });
+  const [message] = parseMailboxCampaignSnapshot(serialized).messages;
+
+  assert.equal(message.threadMessages.length, 12);
+  assert.equal(message.threadMessages[0].body, 'Volledige inhoud 1');
+  assert.equal(message.threadMessages.at(-1).body, 'Volledige inhoud 12');
+});
+
 test('mailbox campaign snapshot bewaart alleen complete afbeeldingen', () => {
   const smallImage = `data:image/png;base64,${'a'.repeat(120)}`;
   const oversizedImage = `data:image/jpeg;base64,${'b'.repeat(90_000)}`;
