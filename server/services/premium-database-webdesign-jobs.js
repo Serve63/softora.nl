@@ -926,8 +926,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     return error;
   }
 
+  function createExpiredWebdesignJobError() {
+    const error = new Error('Webdesign-opdracht verlopen.');
+    error.webdesignJobExpired = true;
+    return error;
+  }
+
   function isJobReadyToProcess(job) {
-    if (!job || job.status !== 'queued') return false;
+    if (!job || job.status !== 'queued' || isExpiredJob(job)) return false;
     const retry = getRetryState(job);
     return !retry.nextAttemptAt || retry.nextAttemptAt <= now();
   }
@@ -935,7 +941,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   function getSoonestQueuedRetryAt() {
     let soonest = Infinity;
     for (const job of jobs.values()) {
-      if (!job || job.status !== 'queued') continue;
+      if (!job || job.status !== 'queued' || isExpiredJob(job)) continue;
       const retry = getRetryState(job);
       if (retry.nextAttemptAt && retry.nextAttemptAt > now()) {
         soonest = Math.min(soonest, retry.nextAttemptAt);
@@ -1253,9 +1259,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function processJob(job) {
     if (job && job.cancelled === true) throw createCancelledWebdesignJobError();
+    if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
     job.status = 'running';
     job.startedAt = now();
     await persistJob(job);
+
+    // The queue can wait behind persistence or another worker. Re-check at the
+    // irreversible boundary so an expired job can never reach a paid provider.
+    if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
 
     if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
       throw new Error('Websitegenerator is niet beschikbaar.');
@@ -1329,6 +1340,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function settleJob(job) {
+    if (isExpiredJob(job)) {
+      jobs.delete(job.id);
+      return job;
+    }
     try {
       await withJobProcessTimeout(job, processJob(job));
       job.status = 'done';
@@ -1337,6 +1352,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       clearRetryState(job);
       await persistJob(job);
     } catch (error) {
+      if (error && error.webdesignJobExpired === true) {
+        jobs.delete(job.id);
+        return job;
+      }
       if (error && error.webdesignJobCancelled === true) {
         job.status = 'error';
         job.error = WEBDESIGN_JOB_CANCELLED_ERROR;
@@ -1389,7 +1408,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function isStaleRunningJob(job) {
-    if (!job || job.status !== 'running') return false;
+    if (!job || job.status !== 'running' || isExpiredJob(job)) return false;
     const startedAt = Number(job.startedAt) || 0;
     if (!startedAt) return true;
     return now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
@@ -1397,6 +1416,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function processJobForStatusRequest(job) {
     if (!processJobsInline || !job) return job;
+    if (isExpiredJob(job)) {
+      jobs.delete(job.id);
+      return job;
+    }
     const shouldProcess = (job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job);
     if (!shouldProcess || activeProcessingCount >= PROCESSING_CONCURRENCY || inlineProcessingJobIds.has(job.id)) return job;
 
@@ -1421,6 +1444,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function processJobForWorker(job) {
     if (!job) return job;
+    if (isExpiredJob(job)) {
+      jobs.delete(job.id);
+      return job;
+    }
     const shouldProcess = (job.status === 'queued' && isJobReadyToProcess(job)) || isStaleRunningJob(job);
     if (!shouldProcess || activeProcessingCount >= PROCESSING_CONCURRENCY || inlineProcessingJobIds.has(job.id)) return job;
 
@@ -1513,6 +1540,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       const loadedById = await loadPersistentJobResult(jobId);
       if (loadedById.error) return createWebdesignJobStatusUnavailableResult();
       existingById = loadedById.job;
+    }
+    if (existingById && isExpiredJob(existingById)) {
+      jobs.delete(existingById.id);
+      existingById = null;
     }
     if (existingById) {
       jobs.set(existingById.id, existingById);
@@ -1624,11 +1655,25 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         error: 'Geen toegang',
       });
     }
+    if (isExpiredJob(job)) {
+      jobs.delete(job.id);
+      return res.status(404).json({
+        ok: false,
+        error: 'Job niet gevonden',
+      });
+    }
     jobs.set(job.id, job);
     if (processJobsInline) {
       await processJobForStatusRequest(job);
     } else if (job.status === 'queued') {
       queueProcessing();
+    }
+    if (isExpiredJob(job) || !jobs.has(job.id)) {
+      jobs.delete(job.id);
+      return res.status(404).json({
+        ok: false,
+        error: 'Job niet gevonden',
+      });
     }
 
     return res.status(200).json({
@@ -2014,6 +2059,16 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           changed.add(chunk.index);
           continue;
         }
+        if (isExpiredJob(job)) {
+          jobs.delete(job.id);
+          markTarget(target, 'error', {
+            jobId: '',
+            error: 'Webdesign-opdracht verlopen. Start deze lead opnieuw.',
+            nextAttemptAt: null,
+          });
+          changed.add(chunk.index);
+          continue;
+        }
         jobs.set(job.id, job);
         if (!processJobsInline && job.status === 'queued') {
           queueProcessing();
@@ -2158,6 +2213,17 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         if (!job) {
           markTarget(target, 'pending', { jobId: '', error: '' });
           missingJobs += 1;
+          changed.add(chunk.index);
+          continue;
+        }
+        if (isExpiredJob(job)) {
+          jobs.delete(job.id);
+          markTarget(target, 'error', {
+            jobId: '',
+            error: 'Webdesign-opdracht verlopen. Start deze lead opnieuw.',
+            nextAttemptAt: null,
+          });
+          completedTargets += 1;
           changed.add(chunk.index);
           continue;
         }
