@@ -250,6 +250,7 @@
         : '',
       campaign: message.campaign || null,
       outreach: message.outreach || null,
+      threadMessages: Array.isArray(message.threadMessages) ? message.threadMessages : [],
     };
   }
 
@@ -283,6 +284,43 @@
   function renderDetailAccount(mail, escapeHtml) {
     if (!isCampaignMail(mail) || !mail.accountEmail || typeof escapeHtml !== 'function') return '';
     return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}</div>`;
+  }
+
+  function stripQuotedReply(value) {
+    const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
+    const quoteStart = lines.findIndex((line) => {
+      const content = String(line || '').trim();
+      return (
+        /^>/.test(content) ||
+        /^(?:on .+ wrote:|op .+ (?:schreef|heeft .+ geschreven):)$/i.test(content) ||
+        /^-{2,}\s*(?:original message|oorspronkelijk bericht)/i.test(content)
+      );
+    });
+    return (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim();
+  }
+
+  function renderThreadMessages(mail, escapeHtml, formatDate) {
+    if (!mail || typeof escapeHtml !== 'function') return '';
+    const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
+    return messages.map((message) => {
+      const body = stripQuotedReply(message && (message.body || message.preview));
+      if (!body) return '';
+      const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
+      const owner = getOwnerLabel(getOwnerByAccount(message.accountEmail));
+      const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
+      const meta = [dateLabel, owner].filter(Boolean).join(' · ');
+      const lines = body.split('\n').map((line) => {
+        const content = String(line || '');
+        const emptyClass = content.trim() ? '' : ' detail-mail-line-empty';
+        return `<div class="detail-mail-line${emptyClass}">${escapeHtml(content)}</div>`;
+      }).join('');
+      return `
+        <section class="detail-mail-section detail-mail-section-sent">
+          <div class="detail-mail-section-label">Jouw antwoord</div>
+          ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
+          <div class="detail-mail-lines">${lines}</div>
+        </section>`;
+    }).filter(Boolean).join('');
   }
 
   function readPageBootstrapPayload() {
@@ -459,6 +497,7 @@
     renderDetailAccount,
     renderListMeta,
     renderOwnerMenu,
+    renderThreadMessages,
     resolveOwnerForSession,
     setOwner,
     sortMessagesNewestFirst,

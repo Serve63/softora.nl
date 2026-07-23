@@ -29,6 +29,20 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
       status: 'reactie_ontvangen',
       actionRequired: true,
     },
+    threadMessages: index === 0 ? [{
+      id: 'sent:201',
+      uid: 201,
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      from: 'Servé Creusen',
+      email: 'serve@softora.nl',
+      to: 'bedrijf-0@example.test',
+      subject: 'Re: Reactie 0',
+      body: 'Dankjewel voor je reactie.',
+      date: '2026-07-22T14:05:00.000Z',
+      messageId: '<sent-answer@example.test>',
+      inReplyTo: '<inbox-answer@example.test>',
+    }] : [],
   }));
 
   const serialized = serializeMailboxCampaignSnapshot(
@@ -41,6 +55,24 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.equal(parsed.messages.length, 100);
   assert.match(parsed.messages[0].body, /^Volledige inhoud 0/);
   assert.equal(parsed.messages[0].campaign.company, 'Bedrijf 0');
+  assert.deepEqual(parsed.messages[0].threadMessages, [{
+    id: 'sent:201',
+    uid: 201,
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    from: 'Servé Creusen',
+    email: 'serve@softora.nl',
+    to: 'bedrijf-0@example.test',
+    subject: 'Re: Reactie 0',
+    preview: '',
+    body: 'Dankjewel voor je reactie.',
+    date: '2026-07-22T14:05:00.000Z',
+    messageId: '<sent-answer@example.test>',
+    inReplyTo: '<inbox-answer@example.test>',
+    references: '',
+    hasBody: true,
+    bodyTruncated: false,
+  }]);
   assert.deepEqual(parsed.messages[0].bodyImages, [{
     alt: 'Ontwerp',
     dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A100&index=0',
