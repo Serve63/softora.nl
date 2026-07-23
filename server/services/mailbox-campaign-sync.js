@@ -39,7 +39,7 @@ function collectCampaignThreadReferenceIds(messages = []) {
 function collectCampaignThreadRecipientTerms(messages = []) {
   const terms = new Set();
   (Array.isArray(messages) ? messages : []).filter(isCampaignSubject).forEach((message) => {
-    const emailMatch = String(message?.senderEmail || '')
+    const emailMatch = String(message?.email || message?.senderEmail || '')
       .trim()
       .toLowerCase()
       .match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/i);

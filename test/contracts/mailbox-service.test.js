@@ -3168,8 +3168,8 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
   assert.deepEqual(client.searchQueries[4], {
     since: new Date('2026-05-01T00:00:00.000Z'),
     or: [
-      { header: { to: 'info@vangestelsteigerbouw.nl' } },
-      { header: { to: 'vangestelsteigerbouw.nl' } },
+      { to: 'info@vangestelsteigerbouw.nl' },
+      { to: 'vangestelsteigerbouw.nl' },
     ],
   });
 });
