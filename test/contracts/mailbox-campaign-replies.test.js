@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+  attachSentThreadMessages,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
@@ -29,6 +30,38 @@ test('campaign mailbox removes duplicate IMAP rows for the same internet message
   ]);
 
   assert.deepEqual(messages.map((message) => message.id), ['inbox:7', 'inbox:8']);
+});
+
+test('campaign mailbox sorteert gesprekken op hun nieuwste echte activiteit', () => {
+  const conversations = attachSentThreadMessages(
+    [
+      {
+        id: 'inbox:ralph',
+        folder: 'inbox',
+        accountEmail: 'martijn@softora.nl',
+        email: 'rruyters@road2value.com',
+        date: '2026-06-15T13:58:18.000Z',
+      },
+      {
+        id: 'inbox:later-contact',
+        folder: 'inbox',
+        accountEmail: 'martijn@softora.nl',
+        email: 'later@example.test',
+        date: '2026-06-20T09:00:00.000Z',
+      },
+    ],
+    [{
+      id: 'sent:ralph-followup',
+      folder: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      to: 'rruyters@road2value.com',
+      date: '2026-06-23T11:32:58.000Z',
+    }]
+  );
+
+  assert.equal(conversations[0].email, 'rruyters@road2value.com');
+  assert.equal(conversations[0].activityAt, '2026-06-23T11:32:58.000Z');
+  assert.equal(conversations[1].email, 'later@example.test');
 });
 
 test('campaign mailbox recognizes strong automatic reply signals without hiding normal replies', () => {
@@ -363,6 +396,7 @@ test('campaign reply service toont alle latere mails aan Ralph buiten de oude 50
     replies[0].conversationId,
     'conversation:martijn@softora.nl|contact:rruyters@road2value.com'
   );
+  assert.equal(replies[0].activityAt, '2026-06-23T11:32:58.000Z');
   assert.deepEqual(
     replies[0].threadMessages.map((message) => message.id),
     ['sent:149', 'sent:111']

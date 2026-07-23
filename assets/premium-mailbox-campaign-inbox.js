@@ -178,6 +178,12 @@
   }
 
   function getReceivedTimestamp(mail) {
+    const value = mail && (mail.activityAt || mail.receivedAt || mail.internalDate || mail.date);
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function getMessageTimestamp(mail) {
     const value = mail && (mail.receivedAt || mail.internalDate || mail.date);
     const timestamp = Date.parse(value || '');
     return Number.isFinite(timestamp) ? timestamp : 0;
@@ -317,6 +323,7 @@
     const mailboxId = String(message.mailboxId || message.id || mail && mail.id || '').trim();
     const accountEmail = normalizeEmail(message.accountEmail || mail && mail.accountEmail);
     const receivedAtValue = message.receivedAt || message.date || mail && mail.receivedAt;
+    const activityAtValue = message.activityAt || receivedAtValue;
     return {
       ...mail,
       id: accountEmail && mailboxId ? `${accountEmail}|${mailboxId}` : (mail && mail.id) || mailboxId,
@@ -324,6 +331,9 @@
       accountEmail,
       receivedAt: Number.isFinite(Date.parse(receivedAtValue || ''))
         ? new Date(receivedAtValue).toISOString()
+        : '',
+      activityAt: Number.isFinite(Date.parse(activityAtValue || ''))
+        ? new Date(activityAtValue).toISOString()
         : '',
       campaign: message.campaign || null,
       outreach: message.outreach || null,
@@ -366,7 +376,7 @@
 
   function stripQuotedReply(value) {
     const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
-    const quoteStart = lines.findIndex((line) => {
+    const directQuoteStart = lines.findIndex((line) => {
       const content = String(line || '').trim();
       return (
         /^>/.test(content) ||
@@ -374,12 +384,58 @@
         /^-{2,}\s*(?:original message|oorspronkelijk bericht)/i.test(content)
       );
     });
+    const headerPatterns = {
+      from: /^(?:van|from):\s*\S/i,
+      sent: /^(?:verzonden|sent|datum|date):\s*\S/i,
+      to: /^(?:aan|to):\s*\S/i,
+      subject: /^(?:onderwerp|subject):\s*\S/i,
+    };
+    function isHeaderCluster(startIndex) {
+      const windowLines = lines
+        .slice(startIndex, startIndex + 8)
+        .map((line) => String(line || '').trim())
+        .filter(Boolean);
+      if (!windowLines.length || !headerPatterns.from.test(windowLines[0])) return false;
+      const matchedFields = ['sent', 'to', 'subject']
+        .filter((field) => windowLines.some((line) => headerPatterns[field].test(line)));
+      return matchedFields.length >= 2;
+    }
+    let structuredQuoteStart = -1;
+    for (let index = 0; index < lines.length; index += 1) {
+      const content = String(lines[index] || '').trim();
+      const separator = /^(?:_{5,}|-{5,})$/.test(content);
+      if (separator) {
+        let headerIndex = index + 1;
+        while (headerIndex < lines.length && !String(lines[headerIndex] || '').trim()) headerIndex += 1;
+        if (isHeaderCluster(headerIndex)) {
+          structuredQuoteStart = index;
+          break;
+        }
+      }
+      if (isHeaderCluster(index)) {
+        structuredQuoteStart = index;
+        break;
+      }
+    }
+    const quoteStarts = [directQuoteStart, structuredQuoteStart].filter((index) => index >= 0);
+    const quoteStart = quoteStarts.length ? Math.min(...quoteStarts) : -1;
     return (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim();
   }
 
-  function renderThreadMessages(mail, escapeHtml, formatDate) {
+  function renderThreadMessages(mail, escapeHtml, formatDate, options = {}) {
     if (!mail || typeof escapeHtml !== 'function') return '';
-    const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
+    const rootTimestamp = getMessageTimestamp(mail);
+    const position = String(options.position || 'all').trim().toLowerCase();
+    const messages = (Array.isArray(mail.threadMessages) ? mail.threadMessages : [])
+      .filter((message) => {
+        if (position === 'all') return true;
+        if (!rootTimestamp) return position !== 'newer';
+        const messageTimestamp = getMessageTimestamp(message);
+        if (!messageTimestamp) return position !== 'newer';
+        return position === 'newer'
+          ? messageTimestamp > rootTimestamp
+          : messageTimestamp <= rootTimestamp;
+      });
     return messages.map((message) => {
       const body = stripQuotedReply(message && (message.body || message.preview));
       if (!body) return '';

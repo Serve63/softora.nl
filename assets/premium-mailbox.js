@@ -501,15 +501,15 @@ function renderMailBody(value, images, options) {
   const sections = buildMailboxBodySections(value);
   const replyMailId = String(options && options.replyMailId || '').trim();
   const replyActionHtml = replyMailId ? `<div class="detail-footer"><button class="detail-reply" type="button" data-mailbox-action="reply-mail" data-mailbox-id="${escapeHtml(replyMailId)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>Beantwoorden</button></div>` : '';
-  const threadMessagesHtml = window.SoftoraMailboxCampaignInbox?.renderThreadMessages(options && options.mail, escapeHtml, formatMailDate) || '';
+  const [newerThreadMessagesHtml, olderThreadMessagesHtml] = ['newer', 'older'].map((position) => window.SoftoraMailboxCampaignInbox?.renderThreadMessages(options && options.mail, escapeHtml, formatMailDate, { position }) || '');
   const hasImagePlaceholders = sections.some(sectionHasMailboxImagePlaceholder);
-  const renderedSections = [];
+  const renderedSections = newerThreadMessagesHtml ? [newerThreadMessagesHtml] : [];
   let injectedImages = false;
   let insertedReplyAction = false;
   sections.forEach((section) => {
     if (!insertedReplyAction && replyActionHtml && section && section.type === 'quote') {
       renderedSections.push(replyActionHtml);
-      if (threadMessagesHtml) renderedSections.push(threadMessagesHtml);
+      if (olderThreadMessagesHtml) renderedSections.push(olderThreadMessagesHtml);
       insertedReplyAction = true;
     }
     if (!hasImagePlaceholders && !injectedImages && section && section.type === 'signature') {
@@ -525,7 +525,7 @@ function renderMailBody(value, images, options) {
   }
   if (!insertedReplyAction && replyActionHtml) {
     renderedSections.push(replyActionHtml);
-    if (threadMessagesHtml) renderedSections.push(threadMessagesHtml);
+    if (olderThreadMessagesHtml) renderedSections.push(olderThreadMessagesHtml);
   }
   return renderedSections.join('');
 }
@@ -607,7 +607,7 @@ function formatMailDate(value, nowValue) {
   return window.SoftoraMailboxDisplay.formatMailDate(value, nowValue);
 }
 function normalizeMailboxApiMessage(message) {
-  const when = formatMailDate(message.receivedAt || message.date);
+  const when = formatMailDate(message.receivedAt || message.date); const activityWhen = formatMailDate(message.activityAt || message.receivedAt || message.date);
   const body = cleanMailboxText(message.body || message.preview || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
@@ -626,9 +626,8 @@ function normalizeMailboxApiMessage(message) {
     messageId: message.messageId || '',
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
-    time: when.time,
-    date: when.date,
-    listDate: when.listDate,
+    time: when.time, date: when.date, listDate: when.listDate,
+    activityTime: activityWhen.time, activityDate: activityWhen.date, activityListDate: activityWhen.listDate,
     uid: message.uid,
     unread: Boolean(message.unread),
     starred: Boolean(message.starred),

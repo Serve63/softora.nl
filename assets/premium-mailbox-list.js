@@ -11,15 +11,18 @@
       account: mail.accountEmail || displayOptions.account,
     });
     const isActive = String(options.activeMail) === String(mail.id);
+    const activityAt = mail.activityAt || mail.receivedAt || '';
+    const listDate = mail.activityListDate || mail.listDate;
+    const listTime = mail.activityTime || mail.time;
     return `
-    <div class="mail-item ${mail.unread ? 'unread' : ''} ${isActive ? 'active' : ''}" data-mailbox-received-at="${escapeHtml(mail.receivedAt || '')}">
+    <div class="mail-item ${mail.unread ? 'unread' : ''} ${isActive ? 'active' : ''}" data-mailbox-received-at="${escapeHtml(activityAt)}">
       ${mail.unread ? '<div class="unread-dot"></div>' : ''}
       <button class="mail-item-open" type="button" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(mail.id)}" aria-label="${escapeHtml(primaryText)} openen">
         <span class="mail-item-top">
           <span class="mail-from">${escapeHtml(primaryText)}</span>
-          <time class="mail-time" datetime="${escapeHtml(mail.receivedAt || '')}">
-            ${mail.listDate ? `<span class="mail-date-label">${escapeHtml(mail.listDate)}</span>` : ''}
-            <span class="mail-time-value">${escapeHtml(mail.time)}</span>
+          <time class="mail-time" datetime="${escapeHtml(activityAt)}">
+            ${listDate ? `<span class="mail-date-label">${escapeHtml(listDate)}</span>` : ''}
+            <span class="mail-time-value">${escapeHtml(listTime)}</span>
           </time>
         </span>
       </button>
