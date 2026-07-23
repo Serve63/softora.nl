@@ -43,24 +43,26 @@ function sanitizeBodyImage(value, options = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const dataUrl = String(value.dataUrl || value.src || '').trim();
   if (!dataUrl || !/^(?:data:image\/|https?:\/\/|\/)/i.test(dataUrl)) return null;
+  const owner = String(value.owner || '').trim().toLowerCase() === 'sent-campaign'
+    ? 'sent-campaign'
+    : '';
+  const createImage = (resolvedDataUrl) => {
+    const image = {
+      alt: text(value.alt || value.name || 'Afbeelding', 300),
+      dataUrl: resolvedDataUrl,
+    };
+    if (owner) image.owner = owner;
+    return image;
+  };
   const proxyUrl = buildMailboxMessageImageUrl(options.message, options.imageIndex);
   if (/^data:image\//i.test(dataUrl) && proxyUrl) {
-    return {
-      alt: text(value.alt || value.name || 'Afbeelding', 300),
-      dataUrl: proxyUrl,
-    };
+    return createImage(proxyUrl);
   }
   if (isMailboxMessageImageUrl(dataUrl)) {
-    return {
-      alt: text(value.alt || value.name || 'Afbeelding', 300),
-      dataUrl,
-    };
+    return createImage(dataUrl);
   }
   if (dataUrl.length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS) return null;
-  return {
-    alt: text(value.alt || value.name || 'Afbeelding', 300),
-    dataUrl,
-  };
+  return createImage(dataUrl);
 }
 
 function sanitizeThreadMessage(value, options = {}) {
