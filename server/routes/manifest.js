@@ -1,5 +1,6 @@
 const criticalFlowChecklist = Object.freeze([
   'premium login laadt en auth-session contract blijft stabiel',
+  'Winnen blijft achter de server-side 808080-codepoort',
   'agenda laadt en afsprakenlijst reageert zonder serverfout',
   'afspraak datum/tijd blijft behouden na refresh',
   'leadmodal opent met audio en gesprekssamenvatting',

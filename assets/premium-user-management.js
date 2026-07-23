@@ -280,6 +280,29 @@ function navigateToSettingsModule(moduleHref) {
   targetWindow.location.href = moduleHref;
 }
 
+async function openWinningModule(moduleHref) {
+  var accessCode;
+  try {
+    accessCode = await requestAdminActionPin('Winnen openen', { forcePrompt: true });
+  } catch (error) {
+    if (error && error.message !== 'Geannuleerd') {
+      showToast(error.message || 'Toegangscode invullen mislukt');
+    }
+    return;
+  }
+
+  try {
+    await fetchJson('/api/live-momentum/access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: accessCode })
+    });
+    navigateToSettingsModule(moduleHref);
+  } catch (error) {
+    showToast(error.message || 'Toegangscode is onjuist');
+  }
+}
+
 function mountExtraSettingsCategory() {
   var overviewScreen = document.getElementById('screen-overzicht');
   var personnelTile = overviewScreen && overviewScreen.querySelector('.tegel[data-settings-action="open-pin"]');
@@ -438,6 +461,10 @@ function mountExtraSettingsCategory() {
       card.type = 'button';
       card.setAttribute('data-settings-extra-href', moduleHref);
       card.addEventListener('click', function () {
+        if (isWinning) {
+          void openWinningModule(moduleHref);
+          return;
+        }
         navigateToSettingsModule(moduleHref);
       });
     } else {
@@ -575,6 +602,8 @@ function setAdminPinDescForTitle(title) {
     descEl.textContent = 'Typ je zes cijfers. Daarna wordt de medewerker toegevoegd.';
   } else if (t.indexOf('Opslaan') !== -1) {
     descEl.textContent = 'Typ je zes cijfers. Daarna worden je wijzigingen opgeslagen.';
+  } else if (t.indexOf('Winnen') !== -1) {
+    descEl.textContent = 'Vul de zescijferige toegangscode in om Winnen te openen.';
   } else {
     descEl.textContent = 'Typ je zes cijfers. Daarna wordt je actie uitgevoerd.';
   }
@@ -585,8 +614,9 @@ function clearAdminPinMsg() {
   if (msg) msg.textContent = '';
 }
 
-function requestAdminActionPin(title) {
-  if (window.__premiumSettingsSessionActive && window.__premiumSettingsUnlockedPin) {
+function requestAdminActionPin(title, options) {
+  var forcePrompt = Boolean(options && options.forcePrompt);
+  if (!forcePrompt && window.__premiumSettingsSessionActive && window.__premiumSettingsUnlockedPin) {
     return Promise.resolve(String(window.__premiumSettingsUnlockedPin));
   }
   return new Promise(function (resolve, reject) {
@@ -596,7 +626,7 @@ function requestAdminActionPin(title) {
     }
     adminPinPending = { resolve: resolve, reject: reject };
     var titleEl = document.getElementById('admin-pin-modal-title');
-    if (titleEl) titleEl.textContent = 'PIN invoeren';
+    if (titleEl) titleEl.textContent = title && title.indexOf('Winnen') !== -1 ? 'Toegangscode' : 'PIN invoeren';
     setAdminPinDescForTitle(title);
     clearAdminPinMsg();
     var input = document.getElementById('admin-action-pin-input');

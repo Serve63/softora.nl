@@ -349,3 +349,58 @@ test('admin-only premium pages redirect non-admin users back to the dashboard an
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.headers['X-Robots-Tag'], 'noindex');
 });
+
+test('live momentum requires the separate code gate even for an authenticated admin', async () => {
+  const events = [];
+  const controller = createPremiumHtmlPageAccessController({
+    premiumPublicHtmlFiles: createPremiumPublicHtmlFilesSet(),
+    premiumAdminOnlyHtmlFiles: new Set(['live-momentum.html']),
+    noindexHeaderValue: 'noindex',
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: true,
+      email: 'serve@softora.test',
+      isAdmin: true,
+    }),
+    isPremiumAdminIpAllowed: () => true,
+    hasLiveMomentumAccess: () => false,
+    appendSecurityAuditEvent: (payload, reason) => events.push({ payload, reason }),
+  });
+  const req = createRequest({
+    originalUrl: '/live-momentum',
+    path: '/live-momentum',
+  });
+  const res = createResponseRecorder();
+
+  const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'live-momentum.html');
+
+  assert.equal(result.handled, true);
+  assert.equal(res.redirectCode, 302);
+  assert.equal(res.redirectLocation, '/premium-instellingen?liveMomentumLocked=1');
+  assert.equal(events[0].reason, 'security_live_momentum_code_required');
+});
+
+test('live momentum opens after the separate code gate grants access', async () => {
+  const controller = createPremiumHtmlPageAccessController({
+    premiumPublicHtmlFiles: createPremiumPublicHtmlFilesSet(),
+    premiumAdminOnlyHtmlFiles: new Set(['live-momentum.html']),
+    getResolvedPremiumAuthState: async () => ({
+      configured: true,
+      authenticated: true,
+      email: 'serve@softora.test',
+      isAdmin: true,
+    }),
+    isPremiumAdminIpAllowed: () => true,
+    hasLiveMomentumAccess: () => true,
+  });
+  const req = createRequest({
+    originalUrl: '/live-momentum',
+    path: '/live-momentum',
+  });
+  const res = createResponseRecorder();
+
+  const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'live-momentum.html');
+
+  assert.equal(result.handled, false);
+  assert.equal(res.redirectCode, null);
+});
