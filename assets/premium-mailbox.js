@@ -507,7 +507,11 @@ function renderMailBody(value, images, options) {
   let injectedImages = false;
   let insertedReplyAction = false;
   sections.forEach((section) => {
-    if (!insertedReplyAction && replyActionHtml && section && section.type === 'quote') { if (threadMessagesHtml) renderedSections.push(threadMessagesHtml); renderedSections.push(replyActionHtml); insertedReplyAction = true; }
+    if (!insertedReplyAction && replyActionHtml && section && section.type === 'quote') {
+      renderedSections.push(replyActionHtml);
+      if (threadMessagesHtml) renderedSections.push(threadMessagesHtml);
+      insertedReplyAction = true;
+    }
     if (!hasImagePlaceholders && !injectedImages && section && section.type === 'signature') {
       const imagesHtml = renderUnusedMailboxInlineImages(imageState);
       if (imagesHtml) renderedSections.push(imagesHtml);
@@ -519,7 +523,10 @@ function renderMailBody(value, images, options) {
     const imagesHtml = renderUnusedMailboxInlineImages(imageState);
     if (imagesHtml) renderedSections.push(imagesHtml);
   }
-  if (!insertedReplyAction && replyActionHtml) { if (threadMessagesHtml) renderedSections.push(threadMessagesHtml); renderedSections.push(replyActionHtml); }
+  if (!insertedReplyAction && replyActionHtml) {
+    renderedSections.push(replyActionHtml);
+    if (threadMessagesHtml) renderedSections.push(threadMessagesHtml);
+  }
   return renderedSections.join('');
 }
 function findMailById(id) {

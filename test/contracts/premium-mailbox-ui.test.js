@@ -160,11 +160,12 @@ test('mailbox toont een extern verzonden antwoord in dezelfde conversatie', () =
   assert.match(html, /Martijn van de Ven/);
   assert.match(html, /Ik bouw onze websites met maatwerk\./);
   assert.doesNotMatch(
-    html.slice(html.indexOf('Jouw antwoord'), html.indexOf('Beantwoorden')),
+    html.slice(html.indexOf('Jouw antwoord'), html.indexOf('Jouw eerdere mail')),
     /Welke techniek gebruik je/
   );
-  assert.ok(html.indexOf('Jouw antwoord') < html.indexOf('Beantwoorden'));
-  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw eerdere mail'));
+  assert.match(html, /class="detail-mail-section detail-mail-section-sent"/);
+  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Jouw antwoord'));
+  assert.ok(html.indexOf('Jouw antwoord') < html.indexOf('Jouw eerdere mail'));
 });
 
 test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conversatie', () => {
@@ -189,7 +190,9 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
   assert.match(html, /Eerder ontvangen/);
   assert.match(html, /Mag ik vragen waar jij het liefst je sites mee bouwt\?/);
   assert.doesNotMatch(html, /Jouw antwoord/);
-  assert.ok(html.indexOf('Eerder ontvangen') < html.indexOf('Beantwoorden'));
+  assert.match(html, /class="detail-mail-section detail-mail-section-received"/);
+  assert.doesNotMatch(html, /detail-mail-section-received[^>]*detail-mail-section-sent/);
+  assert.ok(html.indexOf('Beantwoorden') < html.indexOf('Eerder ontvangen'));
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {

@@ -392,8 +392,11 @@
         const emptyClass = content.trim() ? '' : ' detail-mail-line-empty';
         return `<div class="detail-mail-line${emptyClass}">${escapeHtml(content)}</div>`;
       }).join('');
+      const sectionClass = sent
+        ? 'detail-mail-section detail-mail-section-sent'
+        : 'detail-mail-section detail-mail-section-received';
       return `
-        <section class="detail-mail-section detail-mail-section-sent">
+        <section class="${sectionClass}">
           <div class="detail-mail-section-label">${sent ? 'Jouw antwoord' : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
           <div class="detail-mail-lines">${lines}</div>
