@@ -21,6 +21,61 @@ function normalizeEmail(value) {
   return normalizeText(value).toLowerCase();
 }
 
+function normalizeMessageId(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/^<+|>+$/g, '');
+}
+
+function normalizeClassifierText(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function isAutomatedCampaignReply(message) {
+  const subject = normalizeClassifierText(message && message.subject);
+  const content = normalizeClassifierText([
+    message && message.preview,
+    message && message.body,
+  ].filter(Boolean).join(' '));
+
+  const automatedSubjectPatterns = [
+    /\bautomatisch antwoord\b/,
+    /\bautomatic (?:reply|response)\b/,
+    /\bauto[ -]?reply\b/,
+    /\bout[ -]?of[ -]?office\b/,
+    /\bafwezigheid(?:sbericht|melding)?\b/,
+    /^email received\b/,
+    /^bericht ontvangen\b/,
+  ];
+  const automatedContentPatterns = [
+    /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
+    /\bdit is een automatisch bericht\b/,
+    /\bwe would like to acknowledge that we have received your request\b/,
+    /\bis ons kantoor gesloten\b/,
+  ];
+
+  return (
+    automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
+    automatedContentPatterns.some((pattern) => pattern.test(content))
+  );
+}
+
+function dedupeCampaignMessages(messages) {
+  const seen = new Set();
+  return (Array.isArray(messages) ? messages : []).filter((message) => {
+    const messageId = normalizeMessageId(message && message.messageId);
+    if (!messageId) return true;
+    const key = `${normalizeEmail(message && message.accountEmail)}|${messageId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function normalizeKey(value) {
   return normalizeText(value)
     .toLowerCase()
@@ -141,8 +196,15 @@ function createMailboxCampaignRepliesService(deps = {}) {
     }
     if (!messages.length) return [];
 
+    const campaignMessages = dedupeCampaignMessages(
+      messages
+        .filter((message) => !isAutomatedCampaignReply(message))
+        .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
+    );
+    if (!campaignMessages.length) return [];
+
     const senderEmails = Array.from(
-      new Set(messages.map((message) => normalizeEmail(message && message.email)).filter(Boolean))
+      new Set(campaignMessages.map((message) => normalizeEmail(message && message.email)).filter(Boolean))
     );
     const customers = await dataOpsStore.listCustomersByEmails({
       emails: senderEmails,
@@ -164,13 +226,12 @@ function createMailboxCampaignRepliesService(deps = {}) {
       }
     });
 
-    const replies = messages
+    const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
         return customer ? buildCampaignReply(message, customer) : null;
       })
       .filter(Boolean)
-      .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
       .slice(0, safeLimit);
 
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') return replies;
@@ -189,6 +250,8 @@ module.exports = {
   CAMPAIGN_REPLY_LIMIT,
   buildCampaignReply,
   createMailboxCampaignRepliesService,
+  dedupeCampaignMessages,
+  isAutomatedCampaignReply,
   isOwnMailboxCampaignCustomer,
   isWebdesignCampaignCustomer,
   normalizeOutreachStatus,
