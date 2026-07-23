@@ -72,6 +72,18 @@ function createAiToolsCoordinator(deps = {}) {
     ];
   }
 
+  function buildVisualDnaReferenceUrls(screenshotUrls = [], websiteAssetUrls = []) {
+    const ordered = [];
+    const seen = new Set();
+    [...screenshotUrls, ...websiteAssetUrls].forEach((value) => {
+      const url = normalizeString(value || '');
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+      ordered.push(url);
+    });
+    return ordered.slice(0, 6);
+  }
+
   function collectErrorText(value, out = []) {
     if (value === null || value === undefined) return out;
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -189,6 +201,9 @@ function createAiToolsCoordinator(deps = {}) {
     const homepageScreenshotUrls = usesHomepageScreenshot
       ? buildHomepageScreenshotReferenceUrls(fetched.finalUrl || fetched.normalizedUrl || inputUrl)
       : [];
+    const visualDnaReferenceUrls = usesHomepageScreenshot
+      ? buildVisualDnaReferenceUrls(homepageScreenshotUrls, fetched.scan?.referenceImageUrls)
+      : [];
     const generationScan = {
       ...fetched.scan,
       imageSize: normalizeString(options.imageSize || ''),
@@ -197,7 +212,10 @@ function createAiToolsCoordinator(deps = {}) {
       requireReferenceImages: options.requireReferenceImages === true,
       referenceImageFidelity: usesHomepageScreenshot ? 'high' : '',
       ...(usesHomepageScreenshot
-        ? { referenceImageUrls: homepageScreenshotUrls }
+        ? {
+            referenceImageUrls: visualDnaReferenceUrls,
+            homepageScreenshotReferenceUrlCount: homepageScreenshotUrls.length,
+          }
         : {}),
       ...(softoraOutreachProfile ? { softoraOutreachProfile } : {}),
     };

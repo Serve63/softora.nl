@@ -69,7 +69,7 @@
         let autoMockupRunning = false;
         let pollPumpTimer = null, pollPumpDueAt = 0, activePollRequests = 0;
         let finishedPhotoRefreshTimer = null, finishedPhotoRefreshRunning = false, finishedPhotoRefreshPromise = null, resolveFinishedPhotoRefresh = null;
-        const finishedPhotoRefreshIds = new Set();
+        const finishedPhotoRefreshIds = new Set(), finishedPhotoSuccessIds = new Set();
         ensureStyles();
 
         function getSharedLoadedPhotoKeys() {
@@ -449,8 +449,9 @@
         async function startBulkBatchForCustomers(customers){const controller=getBulkController();if(!controller)throw new Error("Webdesign-bulk script is niet geladen.");return controller.startBulkBatchForCustomers(customers);}
         function resumeBulkBatch(){const controller=getBulkController();if(controller&&typeof controller.loadLatestBatch==="function")void controller.loadLatestBatch();}
 
-        function queueFinishedPhotoRefresh(customerId) {
+        function queueFinishedPhotoRefresh(customerId, announceSuccess) {
             const id = normalizeString(customerId); if (id) finishedPhotoRefreshIds.add(id);
+            if (id && announceSuccess === true) finishedPhotoSuccessIds.add(id);
             if (!finishedPhotoRefreshPromise) finishedPhotoRefreshPromise = new Promise(function (resolve) { resolveFinishedPhotoRefresh = resolve; });
             if (!finishedPhotoRefreshTimer && typeof global.setTimeout === "function") finishedPhotoRefreshTimer = global.setTimeout(flushFinishedPhotoRefresh, FINISHED_PHOTO_REFRESH_DELAY_MS);
             else if (!finishedPhotoRefreshTimer) void flushFinishedPhotoRefresh();
@@ -460,9 +461,9 @@
         async function flushFinishedPhotoRefresh() {
             if (finishedPhotoRefreshRunning) return finishedPhotoRefreshPromise;
             finishedPhotoRefreshRunning = true; if (finishedPhotoRefreshTimer && typeof global.clearTimeout === "function") global.clearTimeout(finishedPhotoRefreshTimer); finishedPhotoRefreshTimer = null;
-            const customerIds = Array.from(finishedPhotoRefreshIds); finishedPhotoRefreshIds.clear();
-            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); if (customerIds.length && typeof setStatusMessage === "function") setStatusMessage(customerIds.length === 1 ? "Webdesign klaar. De lead staat nu bij Mailklaar." : customerIds.length + " webdesigns klaar en naar Mailklaar verplaatst.", "success", true); }
-            finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh(""); }
+            const customerIds = Array.from(finishedPhotoRefreshIds), successCount = customerIds.filter(function (id) { return finishedPhotoSuccessIds.has(id); }).length; finishedPhotoRefreshIds.clear(); finishedPhotoSuccessIds.clear();
+            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); if (successCount && typeof setStatusMessage === "function") setStatusMessage(successCount === 1 ? "Webdesign klaar. De lead staat nu bij Mailklaar." : successCount + " webdesigns klaar en naar Mailklaar verplaatst.", "success", true); }
+            finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh("", false); }
         }
 
         function clearPollTimer(jobId) {
@@ -508,11 +509,11 @@
             return POLL_INTERVAL_MS;
         }
 
-        async function finishPendingJob(job, message) {
+        async function finishPendingJob(job, message, outcome) {
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
-            queueFinishedPhotoRefresh(job.customerId);
-            if (message) setStatusMessage(message, "error", /De lead is vrijgegeven/i.test(normalizeString(message)) ? true : undefined);
+            if (outcome === "success" || outcome === "reconcile") queueFinishedPhotoRefresh(job.customerId, outcome === "success");
+            if (message) setStatusMessage(message, "error");
             if (typeof renderPage === "function") renderPage();
         }
 
@@ -544,7 +545,8 @@
                     }
                     await finishPendingJob(
                         storedJob,
-                        isRestoredPendingJob(storedJob) ? "" : "Webdesign-opdracht niet gevonden. Probeer opnieuw."
+                        isRestoredPendingJob(storedJob) ? "" : "Webdesign-opdracht niet gevonden. Probeer opnieuw.",
+                        isRestoredPendingJob(storedJob) ? "reconcile" : "failed"
                     );
                     return;
                 }
@@ -552,11 +554,11 @@
                     throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-status laden is mislukt.");
                 }
                 if (job.status === "done") {
-                    await finishPendingJob(storedJob, "");
+                    await finishPendingJob(storedJob, "", "success");
                     return;
                 }
                 if (job.status === "error") {
-                    await finishPendingJob(storedJob, job.safetyBlocked ? "" : (normalizeString(job.error) || "Webdesign maken is mislukt."));
+                    await finishPendingJob(storedJob, job.safetyBlocked ? "" : (normalizeString(job.error) || "Webdesign maken is mislukt."), "failed");
                     return;
                 }
                 schedulePoll(jobId, resolveJobPollDelay(job));
@@ -746,13 +748,13 @@
                 if (job.id !== jobId) clearPollTimer(jobId);
                 setPendingJob({ customerId: target.id, jobId: job.id, variant: normalizeVariant(job.variant || variant), startedAt: Math.max(0, Number(job.createdAt) || now()) }, { deferRender: true });
                 if (job.status === "done") {
-                    await finishPendingJob({ customerId: target.id, jobId: job.id }, "");
+                    await finishPendingJob({ customerId: target.id, jobId: job.id }, "", "success");
                     return { started: true, done: true, jobId: job.id };
                 }
                 if (job.status === "error") {
                     const errorMessage = job.safetyBlocked ? "" : (normalizeString(job.error) || "Webdesign maken is mislukt.");
                     if (quiet) return clearPendingStart(target, job.id, startOptions, errorMessage);
-                    await finishPendingJob({ customerId: target.id, jobId: job.id }, errorMessage);
+                    await finishPendingJob({ customerId: target.id, jobId: job.id }, errorMessage, "failed");
                     return { started: false, failed: true, error: errorMessage };
                 }
                 schedulePoll(job.id, pollDelay);

@@ -960,17 +960,26 @@ function createAiRemoteService(deps = {}) {
     const pageUrl = normalizeString(scan.sourceUrl || scan.url || '');
     const isHomepageScreenshot = referenceMode === 'homepage-screenshot';
     const maxImages = isHomepageScreenshot ? 1 : 3;
-    const maxFetchAttempts = isHomepageScreenshot ? 3 : 1;
+    const configuredScreenshotCandidateCount = Number(scan.homepageScreenshotReferenceUrlCount);
+    const screenshotCandidateCount =
+      isHomepageScreenshot && Number.isFinite(configuredScreenshotCandidateCount)
+        ? Math.max(0, Math.min(candidates.length, Math.floor(configuredScreenshotCandidateCount)))
+        : candidates.length;
     const rejectionDiagnostics = [];
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (rawImages.length >= maxImages) break;
       const candidateUrl = candidates[index];
       if (!isLikelyUsefulReferenceImageUrl(candidateUrl)) continue;
+      const isScreenshotProviderCandidate = isHomepageScreenshot && index < screenshotCandidateCount;
+      const maxFetchAttempts = isScreenshotProviderCandidate ? 3 : 1;
+      let finalRejectionReason = 'unknown';
+      let acceptedCandidate = false;
 
       for (let attempt = 0; attempt < maxFetchAttempts; attempt += 1) {
         let accepted = false;
         let rejectionReason = 'unknown';
+        let retryableRejection = true;
         try {
           const safeUrl = await assertWebsitePreviewUrlIsPublic(candidateUrl);
           const { response, bytes } = await fetchBinaryWithTimeout(
@@ -1012,25 +1021,32 @@ function createAiRemoteService(deps = {}) {
               }
             }
           } else {
-            rejectionReason = `http:${Number(response?.status || 0) || 0}`;
+            const status = Number(response?.status || 0) || 0;
+            rejectionReason = `http:${status}`;
+            retryableRejection = status === 408 || status === 425 || status === 429 || (status >= 500 && status !== 501);
           }
         } catch (error) {
           rejectionReason = `error:${normalizeString(error?.name || 'Error').slice(0, 40)}`;
           /* Retry screenshot warming below; optional references may still fall back to prompt-only. */
         }
-        if (accepted) break;
-        if (attempt === maxFetchAttempts - 1) {
-          let provider = 'unknown';
-          try {
-            provider = new URL(candidateUrl).hostname;
-          } catch (_error) {
-            provider = 'invalid-url';
-          }
-          rejectionDiagnostics.push({ provider, reason: rejectionReason });
+        finalRejectionReason = rejectionReason;
+        if (accepted) {
+          acceptedCandidate = true;
+          break;
         }
+        if (!retryableRejection) break;
         if (attempt < maxFetchAttempts - 1) {
           await waitForWebsitePreviewScreenshotRetry();
         }
+      }
+      if (!acceptedCandidate) {
+        let provider = 'unknown';
+        try {
+          provider = new URL(candidateUrl).hostname;
+        } catch (_error) {
+          provider = 'invalid-url';
+        }
+        rejectionDiagnostics.push({ provider, reason: finalRejectionReason });
       }
     }
 

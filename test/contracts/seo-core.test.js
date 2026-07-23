@@ -218,6 +218,7 @@ test('seo core extracts website preview scan data from html', () => {
     <h1>Welkom bij Softora</h1>
     <h2>Onze aanpak</h2>
     <p>Wij bouwen websites die converteren.</p>
+    <img src="/images/no-image.jpg" alt="Geen foto">
     <img src="/hero-image.png" alt="Hero visual">
   </body>
 </html>`,
@@ -233,7 +234,7 @@ test('seo core extracts website preview scan data from html', () => {
   assert.deepEqual(scan.ctaLabels, ['Start project', 'Contact']);
   assert.ok(scan.layoutHints.includes('kaart- of gridstructuur') === false);
   assert.ok(scan.layoutHints.includes('volledige homepage met footer') === false);
-  assert.deepEqual(scan.visualCues, ['Hero visual']);
+  assert.deepEqual(scan.visualCues, ['Geen foto', 'Hero visual']);
   assert.deepEqual(scan.referenceImageUrls, [
     'https://softora.nl/og-softora.jpg',
     'https://softora.nl/hero-image.png',

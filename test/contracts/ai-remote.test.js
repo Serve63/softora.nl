@@ -469,6 +469,64 @@ test('ai remote service falls back to the next V2 screenshot provider and still 
   assert.equal(result.referenceImageCount, 1);
 });
 
+test('ai remote service skips permanent screenshot errors and uses a direct website visual for V2', async () => {
+  const generationCalls = [];
+  const referenceFetches = [];
+  const primaryUrl = 'https://image.thum.io/get/bliv';
+  const fallbackUrl = 'https://s0.wordpress.com/mshots/v1/bliv';
+  const websiteVisualUrl = 'https://www.bliv.nl/hero.jpg';
+  const { service } = createService({
+    waitForWebsitePreviewScreenshotRetry: async () => {
+      throw new Error('HTTP 501 must not be retried');
+    },
+    sanitizeReferenceImages: (images) => images,
+    fetchBinaryWithTimeout: async (url) => {
+      referenceFetches.push(url);
+      if (url !== websiteVisualUrl) {
+        return {
+          response: {
+            ok: false,
+            status: 501,
+            url,
+            headers: { get: () => 'text/html' },
+          },
+          bytes: Buffer.from(''),
+        };
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url,
+          headers: { get: () => 'image/jpeg' },
+        },
+        bytes: Buffer.alloc(4096, 1),
+      };
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      generationCalls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: { data: [{ b64_json: 'YWJjZA==' }] },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({
+    host: 'www.bliv.nl',
+    sourceUrl: 'https://www.bliv.nl/',
+    referenceImageMode: 'homepage-screenshot',
+    requireReferenceImages: true,
+    homepageScreenshotReferenceUrlCount: 2,
+    referenceImageUrls: [primaryUrl, fallbackUrl, websiteVisualUrl],
+  });
+
+  assert.deepEqual(referenceFetches, [primaryUrl, fallbackUrl, websiteVisualUrl]);
+  assert.equal(generationCalls.length, 1);
+  assert.equal(generationCalls[0].options.body.getAll('image[]').length, 1);
+  assert.equal(result.referenceImageCount, 1);
+});
+
 test('ai remote service normalizes an oversized valid V2 screenshot before sending it', async () => {
   const generationCalls = [];
   const normalizedInputs = [];

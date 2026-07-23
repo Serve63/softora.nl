@@ -1596,7 +1596,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723c/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
@@ -1849,7 +1849,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723c/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -2000,7 +2000,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723c/);
   assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
   assert.match(webdesignActionScriptSource, /Keuze tussen V1 en V2 kon niet worden geladen/);
   assert.doesNotMatch(webdesignActionScriptSource, /DEFAULT_SINGLE_VARIANT/);
@@ -2011,11 +2011,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);
-  assert.match(webdesignActionScriptSource, /De lead is vrijgegeven/);
-  assert.match(
-    webdesignActionScriptSource,
-    /setStatusMessage\(message, "error", \/De lead is vrijgegeven\/i\.test\(normalizeString\(message\)\) \? true : undefined\)/
-  );
+  assert.match(webdesignActionScriptSource, /if \(outcome === "success" \|\| outcome === "reconcile"\) queueFinishedPhotoRefresh\(job\.customerId, outcome === "success"\);/);
+  assert.match(webdesignActionScriptSource, /if \(message\) setStatusMessage\(message, "error"\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /Geen geldige website gevonden voor " \+ target\.bedrijf \+ "\.", "error", true/);
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /const firstLoad = jobRestoreController \? jobRestoreController\.run\(\) : loadRunningJobs\(\)\.catch/);
@@ -2026,7 +2023,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /schedulePoll\(jobId, resolveJobPollDelay\(job\)\);/);
   assert.match(webdesignActionScriptSource, /const FINISHED_PHOTO_REFRESH_DELAY_MS = 900;/);
   assert.match(webdesignActionScriptSource, /const AUTO_MOCKUP_IDLE_DELAY_MS = 350;/);
-  assert.match(webdesignActionScriptSource, /function queueFinishedPhotoRefresh\(customerId\)/);
+  assert.match(webdesignActionScriptSource, /function queueFinishedPhotoRefresh\(customerId, announceSuccess\)/);
   assert.match(webdesignActionScriptSource, /function pruneExpiredPendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /if \(!isPendingJobFresh\(pendingJob\)\) return;/);
   assert.match(webdesignActionScriptSource, /setPendingJob\(pendingJob, \{ deferRender: true \}\); schedulePoll\(pendingJob\.jobId, \(restoredCount % 80\) \* BATCH_POLL_STAGGER_MS\);/);
@@ -2042,7 +2039,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723b/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723c/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
@@ -3394,9 +3391,10 @@ test('premium database webdesign action fails closed when the V1/V2 picker is un
   assert.match(messages[0].message, /Keuze tussen V1 en V2/);
 });
 
-test('premium database webdesign action auto-clears a temporary finished-job error', async () => {
+test('premium database webdesign action keeps a failed job visible and never announces false success', async () => {
   const messages = [];
   const chargeLabels = [];
+  let photoRefreshes = 0;
   const document = {
     getElementById: () => null,
     createElement: () => ({ ...createClassListNode(), style: {} }),
@@ -3449,7 +3447,9 @@ test('premium database webdesign action auto-clears a temporary finished-job err
       messages.push({ message, tone, autoClear });
     },
     renderPage() {},
-    refreshPhotos: async () => {},
+    refreshPhotos: async () => {
+      photoRefreshes += 1;
+    },
   });
 
   await controller.generateForCustomer('customer-1');
@@ -3460,7 +3460,9 @@ test('premium database webdesign action auto-clears a temporary finished-job err
     errorMessage.message,
     'Het V2-bronbeeld kon tijdelijk niet worden geladen. De lead is vrijgegeven; probeer het webdesign opnieuw.'
   );
-  assert.equal(errorMessage.autoClear, true);
+  assert.equal(errorMessage.autoClear, undefined);
+  assert.equal(photoRefreshes, 0);
+  assert.equal(messages.some((item) => item.tone === 'success'), false);
 });
 
 test('premium database webdesign action hides safety-blocked job errors from the banner', async () => {
