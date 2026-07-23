@@ -9,6 +9,7 @@ const {
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxDeleteMessage } = require('./mailbox-delete-message');
 const { createMailboxCampaignRepliesService } = require('./mailbox-campaign-replies');
+const { selectMailboxSyncAccounts } = require('./mailbox-campaign-sync');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -2281,10 +2282,8 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function syncMailbox({ accountEmail = '', folders = DEFAULT_SYNC_FOLDERS, limit = DEFAULT_SYNC_LIMIT, force = false } = {}) {
-    const accounts = accountEmail
-      ? [assertReadableAccount(accountEmail)]
-      : getAccounts().filter((account) => account.imapConfigured);
+  async function syncMailbox({ accountEmail = '', folders = DEFAULT_SYNC_FOLDERS, limit = DEFAULT_SYNC_LIMIT, force = false, campaignOnly = false } = {}) {
+    const accounts = selectMailboxSyncAccounts({ accountEmail, accounts: getAccounts(), assertReadableAccount, normalizeEmail, campaignOnly });
     const folderList = Array.from(
       new Set((Array.isArray(folders) && folders.length ? folders : DEFAULT_SYNC_FOLDERS).map(normalizeFolder))
     );
@@ -2858,6 +2857,7 @@ function createMailboxService(deps = {}) {
         folders,
         limit: Number(requestedLimit) || defaultLimit,
         force: Boolean(body.force || req.query?.force === '1' || req.query?.force === 'true'),
+        campaignOnly: Boolean(body.campaignOnly || req.query?.campaignOnly === '1' || req.query?.campaignOnly === 'true'),
       });
       return res.status(result.ok ? 200 : 207).json(result);
     } catch (error) {

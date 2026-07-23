@@ -2855,6 +2855,50 @@ test('mailbox service exposes sync response handler for cron and admin routes', 
   assert.deepEqual(response.body, { ok: true, results: [] });
 });
 
+test('campaign mailbox sync skips configured accounts outside the campaign', async () => {
+  const requestedAccounts = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'serve@softora.nl',
+        name: 'Servé',
+        imapHost: 'imap.example.test',
+        imapUser: 'serve@softora.nl',
+        imapPass: 'secret',
+      },
+      {
+        email: 'zakelijk@theimpactbox.co',
+        name: 'Impactbox',
+        imapHost: 'imap.example.test',
+        imapUser: 'zakelijk@theimpactbox.co',
+        imapPass: 'secret',
+      },
+    ]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async ({ accountEmail }) => {
+        requestedAccounts.push(accountEmail);
+        return { ok: false, locked: true };
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse(
+    {
+      method: 'POST',
+      query: {},
+      body: { folder: 'inbox,sent', campaignOnly: true },
+    },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(requestedAccounts, ['serve@softora.nl', 'serve@softora.nl']);
+});
+
 test('mailbox cron sync indexes a lightweight sent batch by default', async () => {
   const sentMessages = Array.from({ length: 120 }, (_item, index) => ({
     uid: index + 1,
