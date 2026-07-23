@@ -972,6 +972,7 @@ test('mailbox service resolves sent folders through IMAP special-use metadata', 
   const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
 
   assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
+  // ImapFlow compiles this object to SEARCH ALL; the old array input compiled to an empty query.
   assert.deepEqual(client.searchQueries, [{ all: true }]);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].subject, 'Verzonden bericht');
