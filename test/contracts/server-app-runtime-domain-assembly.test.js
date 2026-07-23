@@ -20,6 +20,10 @@ test('server app runtime domain assembly keeps late-bound refs and page bootstra
     getLatestCallUpdateByCallId: () => 'initial-call',
   };
   const captured = {};
+  const fetchBinaryWithTimeout = async () => ({
+    response: { ok: true, status: 200 },
+    bytes: Buffer.from('reference-image'),
+  });
 
   const runtimeSyncRuntime = createFallbackProxy({
     ensureRuntimeStateHydratedFromSupabase: async () => true,
@@ -87,7 +91,7 @@ test('server app runtime domain assembly keeps late-bound refs and page bootstra
         parseIntSafe: Number,
         parseNumberSafe: Number,
         fetchJsonWithTimeout: async () => ({}),
-        fetchBinaryWithTimeout: async () => Buffer.from(''),
+        fetchBinaryWithTimeout,
         fetchTextWithTimeout: async () => '',
         clipText: (value) => String(value || ''),
         timingSafeEqualStrings: () => true,
@@ -163,6 +167,10 @@ test('server app runtime domain assembly keeps late-bound refs and page bootstra
   );
   assert.equal(result.runtimeSyncRuntime, runtimeSyncRuntime);
   assert.equal(result.seedDemoConfirmationTaskForUiTesting(), 'seeded');
+  assert.equal(
+    captured.uiContentContext.shared.fetchBinaryWithTimeout,
+    fetchBinaryWithTimeout
+  );
   assert.equal(captured.agendaWiringContext.mailboxCoordinator, mailboxCoordinator);
   assert.equal(
     captured.agendaWiringContext.shared.normalizeAbsoluteHttpUrl('https://softora.test'),

@@ -862,6 +862,10 @@ test('server app runtime composition builders preserve operational runtime group
 
 test('server app runtime composition builders preserve ui-content runtime groups', async () => {
   let bootstrapReader = async () => ({ ok: 'initial' });
+  const fetchBinaryWithTimeout = async () => ({
+    response: { ok: true, status: 200 },
+    bytes: Buffer.from('reference-image'),
+  });
 
   const context = buildServerAppUiContentRuntimeCompositionContext({
     env: { NODE_ENV: 'test' },
@@ -916,6 +920,7 @@ test('server app runtime composition builders preserve ui-content runtime groups
       parseIntSafe: Number,
       fetchJsonWithTimeout: async () => ({}),
       fetchTextWithTimeout: async () => '<html></html>',
+      fetchBinaryWithTimeout,
       assertWebsitePreviewUrlIsPublic: async () => true,
       normalizeAbsoluteHttpUrl: String,
       normalizeWebsitePreviewTargetUrl: String,
@@ -925,6 +930,7 @@ test('server app runtime composition builders preserve ui-content runtime groups
   assert.deepEqual(context.knownHtmlPageFiles, ['premium-test.html']);
   assert.equal(context.uiSeoConfig.seoConfigScope, 'seo');
   assert.equal(context.platform.getWebsiteGenerationProvider(), 'anthropic');
+  assert.equal(context.shared.fetchBinaryWithTimeout, fetchBinaryWithTimeout);
   assert.equal(
     context.runtimeSync.ensureRuntimeStateHydratedFromSupabase.constructor.name,
     'AsyncFunction'

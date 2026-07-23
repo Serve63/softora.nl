@@ -203,6 +203,7 @@ function assembleServerAppRuntimeDomainsWithFactories(
         parseIntSafe: shared.parseIntSafe,
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
         fetchTextWithTimeout: shared.fetchTextWithTimeout,
+        fetchBinaryWithTimeout: shared.fetchBinaryWithTimeout,
         assertWebsitePreviewUrlIsPublic: shared.assertWebsitePreviewUrlIsPublic,
         normalizeAbsoluteHttpUrl,
         normalizeWebsitePreviewTargetUrl: shared.normalizeWebsitePreviewTargetUrl,
