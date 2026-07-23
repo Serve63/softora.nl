@@ -232,6 +232,7 @@ function cleanMailboxText(value) {
       .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
       .replace(/<((?:https?:\/\/)[^>\s]+)>/gi, (match, url) => isMailboxTechnicalUrl(url) ? '' : match)
       .replace(/\s{2,}/g, ' ')
+      .replace(/^[\t \u00a0]+/, '')
       .trimEnd())
     .map((line) => window.SoftoraMailboxDisplay.collapseDuplicateAnnotations(line))
     .filter((line) => {
