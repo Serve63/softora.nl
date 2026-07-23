@@ -193,8 +193,8 @@ test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conv
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723j/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723e/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723k/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723f/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -268,7 +268,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723j"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723e"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723k"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -836,6 +836,8 @@ test('premium mailbox verwijdert direct optimistisch en houdt refresh-resultaten
   assert.match(scriptSource, /optimistic\(\) \{[\s\S]*mails = mailboxDeleteController\.filterMessages\([\s\S]*mails\.filter\(mail => String\(mail\.id\) !== String\(id\)\)/);
   assert.match(scriptSource, /rollback\(_mail, transaction\) \{/);
   assert.match(scriptSource, /mails = mailboxDeleteController\.filterMessages\(/);
+  assert.match(scriptSource, /removeAndPublishMessageDeletion\?\.\(mail\)/);
+  assert.match(scriptSource, /bindMessageDeletionSync\?\.\(\{/);
   assert.match(deleteSource, /hiddenMessageKeys\.add\(messageKey\);[\s\S]*hooks\.optimistic/);
   assert.match(deleteSource, /\/api\/mailbox\/messages\/delete/);
   assert.match(scriptSource, /case 'delete-mail':[\s\S]*void deleteMail\(id\);/);
@@ -1514,7 +1516,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
   }
 });
 
-test('mailbox bewaart een verwijderde campagnemail direct in de nieuwere tabcache', async () => {
+test('mailbox verkiest de serverbootstrap boven een nieuwere maar verouderde tabcache', async () => {
   const previousDocument = globalThis.document;
   const previousBootstrapSession = globalThis.SoftoraPageBootstrapSession;
   const previousApi = globalThis.SoftoraMailboxCampaignInbox;
@@ -1537,7 +1539,6 @@ test('mailbox bewaart een verwijderde campagnemail direct in de nieuwere tabcach
             ok: true,
             savedAt: '2026-07-23T07:00:00.000Z',
             messages: [
-              { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
               { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
             ],
           },
@@ -1559,12 +1560,15 @@ test('mailbox bewaart een verwijderde campagnemail direct in de nieuwere tabcach
   const freshCampaignInboxModule = require(modulePath);
 
   try {
+    const authoritativeResult = await freshCampaignInboxModule.load('outreach', (message) => message);
+    assert.deepEqual(authoritativeResult.messages.map((message) => message.id), ['reply-keep']);
+
     assert.equal(freshCampaignInboxModule.removeCachedMessage({
       mailboxId: 'inbox:42',
       uid: 42,
       folder: 'inbox',
       accountEmail: 'serve@softora.nl',
-    }), true);
+    }), false);
     assert.deepEqual(cachedSnapshot.messages.map((message) => message.id), ['reply-keep']);
 
     const result = await freshCampaignInboxModule.load('outreach', (message) => message);
@@ -1573,6 +1577,92 @@ test('mailbox bewaart een verwijderde campagnemail direct in de nieuwere tabcach
     delete require.cache[modulePath];
     globalThis.document = previousDocument;
     globalThis.SoftoraPageBootstrapSession = previousBootstrapSession;
+    globalThis.SoftoraMailboxCampaignInbox = previousApi;
+  }
+});
+
+test('mailbox deelt een bevestigde verwijdering direct met andere open tabs', () => {
+  const previousDocument = globalThis.document;
+  const previousBootstrapSession = globalThis.SoftoraPageBootstrapSession;
+  const previousBroadcastChannel = globalThis.BroadcastChannel;
+  const previousApi = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  const openChannels = new Set();
+  let cachedSnapshot = {
+    ok: true,
+    savedAt: '2026-07-23T08:00:00.000Z',
+    messages: [
+      { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+      { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
+    ],
+  };
+  class FakeBroadcastChannel {
+    constructor(name) {
+      this.name = name;
+      this.listener = null;
+      openChannels.add(this);
+    }
+    addEventListener(type, listener) {
+      if (type === 'message') this.listener = listener;
+    }
+    removeEventListener(type, listener) {
+      if (type === 'message' && this.listener === listener) this.listener = null;
+    }
+    postMessage(data) {
+      openChannels.forEach((channel) => {
+        if (channel !== this && channel.name === this.name && channel.listener) {
+          channel.listener({ data });
+        }
+      });
+    }
+    close() {
+      openChannels.delete(this);
+    }
+  }
+  globalThis.document = {
+    getElementById(id) {
+      if (id !== 'softoraPageStateBootstrap') return null;
+      return { textContent: JSON.stringify({ session: { authenticated: true, userId: 'usr_serve' } }) };
+    },
+  };
+  globalThis.SoftoraPageBootstrapSession = {
+    get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
+    cache: {
+      read() { return cachedSnapshot; },
+      write(_key, value) {
+        cachedSnapshot = value;
+        return true;
+      },
+    },
+  };
+  globalThis.BroadcastChannel = FakeBroadcastChannel;
+  delete require.cache[modulePath];
+  const freshCampaignInboxModule = require(modulePath);
+  const received = [];
+  const unsubscribe = freshCampaignInboxModule.subscribeToMessageDeletions((identity) => {
+    received.push(identity);
+  });
+
+  try {
+    assert.equal(freshCampaignInboxModule.publishMessageDeletion({
+      mailboxId: 'inbox:42',
+      uid: 42,
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+    }), true);
+    assert.deepEqual(cachedSnapshot.messages.map((message) => message.id), ['reply-keep']);
+    assert.deepEqual(received, [{
+      accountEmail: 'serve@softora.nl',
+      folder: 'inbox',
+      uid: 42,
+      id: 'inbox:42',
+    }]);
+  } finally {
+    unsubscribe();
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraPageBootstrapSession = previousBootstrapSession;
+    globalThis.BroadcastChannel = previousBroadcastChannel;
     globalThis.SoftoraMailboxCampaignInbox = previousApi;
   }
 });

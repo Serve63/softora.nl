@@ -590,9 +590,9 @@ const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
   getRequestId: (mail) => window.SoftoraMailboxCampaignInbox.getRequestId(mail),
   getFolder: (mail) => window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
-  removeCached: (mail) => window.SoftoraMailboxCampaignInbox?.removeCachedMessage?.(mail),
+  removeCached: (mail) => window.SoftoraMailboxCampaignInbox?.removeAndPublishMessageDeletion?.(mail),
   toast,
-});
+}); window.SoftoraMailboxCampaignInbox?.bindMessageDeletionSync?.({ getMessages: () => mails, setMessages: (messages) => { mails = messages; }, getActiveId: () => activeMail, setActiveId: (id) => { activeMail = id; }, filterMessages: mailboxDeleteController.filterMessages, renderList, openMail, resetDetail: resetDetailEmpty });
 function resetDetailEmpty() {
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
 }

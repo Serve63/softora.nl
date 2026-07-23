@@ -10,6 +10,7 @@
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
   const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
     'servecreusen@softora.nl': 'serve',
@@ -459,42 +460,100 @@
     });
   }
 
-  function snapshotSavedAt(snapshot) {
-    const timestamp = Date.parse(String(snapshot && snapshot.savedAt || ''));
-    return Number.isFinite(timestamp) ? timestamp : 0;
-  }
-
   function readInitialMailboxSnapshot() {
     const pageSnapshot = readPageBootstrap();
     const sessionSnapshot = readSessionMailboxSnapshot();
-    if (!pageSnapshot) return sessionSnapshot;
-    if (!sessionSnapshot) return pageSnapshot;
-    return snapshotSavedAt(sessionSnapshot) > snapshotSavedAt(pageSnapshot)
-      ? sessionSnapshot
-      : pageSnapshot;
+    return pageSnapshot || sessionSnapshot;
+  }
+
+  function getDeletionIdentity(mail) {
+    if (!mail || typeof mail !== 'object') return null;
+    const accountEmail = getAccount(mail, '');
+    const folder = getFolder(mail, 'inbox');
+    const uid = Number(mail.uid) || 0;
+    const id = getRequestId(mail);
+    if (!accountEmail || (!uid && !id)) return null;
+    return { accountEmail, folder, uid, id };
+  }
+
+  function matchesMessageIdentity(mail, identity) {
+    const candidate = getDeletionIdentity(mail);
+    const deleted = getDeletionIdentity(identity);
+    if (!candidate || !deleted) return false;
+    if (candidate.accountEmail !== deleted.accountEmail || candidate.folder !== deleted.folder) return false;
+    if (candidate.uid > 0 && deleted.uid > 0) return candidate.uid === deleted.uid;
+    return Boolean(candidate.id && deleted.id && candidate.id === deleted.id);
   }
 
   function removeCachedMessage(mail) {
     const snapshot = readSessionMailboxSnapshot();
     if (!snapshot || !mail) return false;
-    const account = getAccount(mail, '');
-    const folder = getFolder(mail, 'inbox');
-    const requestId = getRequestId(mail);
-    const uid = Number(mail.uid) || 0;
-    const messages = snapshot.messages.filter((candidate) => {
-      const sameAccount = getAccount(candidate, '') === account;
-      const sameFolder = getFolder(candidate, 'inbox') === folder;
-      const candidateUid = Number(candidate && candidate.uid) || 0;
-      const sameMessage = uid > 0 && candidateUid > 0
-        ? candidateUid === uid
-        : getRequestId(candidate) === requestId;
-      return !(sameAccount && sameFolder && sameMessage);
-    });
+    const messages = snapshot.messages.filter((candidate) => !matchesMessageIdentity(candidate, mail));
+    if (messages.length === snapshot.messages.length) return false;
     return writeSessionMailboxSnapshot({
       ...snapshot,
       savedAt: new Date().toISOString(),
       messages,
     });
+  }
+
+  function publishMessageDeletion(mail) {
+    const identity = getDeletionIdentity(mail);
+    if (!identity || typeof global.BroadcastChannel !== 'function') return false;
+    const channel = new global.BroadcastChannel(MAILBOX_DELETION_CHANNEL);
+    try {
+      channel.postMessage(identity);
+      return true;
+    } finally {
+      channel.close?.();
+    }
+  }
+
+  function removeAndPublishMessageDeletion(mail) {
+    const cacheUpdated = removeCachedMessage(mail);
+    const published = publishMessageDeletion(mail);
+    return cacheUpdated || published;
+  }
+
+  function subscribeToMessageDeletions(handler) {
+    if (typeof handler !== 'function' || typeof global.BroadcastChannel !== 'function') return () => {};
+    const channel = new global.BroadcastChannel(MAILBOX_DELETION_CHANNEL);
+    const receive = (event) => {
+      const identity = getDeletionIdentity(event && event.data);
+      if (!identity) return;
+      removeCachedMessage(identity);
+      handler(identity);
+    };
+    if (typeof channel.addEventListener === 'function') channel.addEventListener('message', receive);
+    else channel.onmessage = receive;
+    return () => {
+      if (typeof channel.removeEventListener === 'function') channel.removeEventListener('message', receive);
+      else if (channel.onmessage === receive) channel.onmessage = null;
+      channel.close?.();
+    };
+  }
+
+  function bindMessageDeletionSync(options = {}) {
+    const unsubscribe = subscribeToMessageDeletions((identity) => {
+      const messages = typeof options.getMessages === 'function' ? options.getMessages() : [];
+      const activeId = typeof options.getActiveId === 'function' ? options.getActiveId() : null;
+      const removedActiveMessage = messages.find((mail) => (
+        String(mail && mail.id) === String(activeId) && matchesMessageIdentity(mail, identity)
+      ));
+      const remainingMessages = messages.filter((mail) => !matchesMessageIdentity(mail, identity));
+      if (remainingMessages.length === messages.length) return;
+      const nextMessages = typeof options.filterMessages === 'function'
+        ? options.filterMessages(remainingMessages)
+        : remainingMessages;
+      options.setMessages?.(nextMessages);
+      if (removedActiveMessage) options.setActiveId?.(null);
+      options.renderList?.({ openLatest: false });
+      const nextActiveId = typeof options.getActiveId === 'function' ? options.getActiveId() : null;
+      if (nextActiveId) options.openMail?.(nextActiveId, { skipBodyFetch: true });
+      else options.resetDetail?.();
+    });
+    global.addEventListener?.('pagehide', unsubscribe, { once: true });
+    return unsubscribe;
   }
 
   function getPageBootstrapSession() {
@@ -549,6 +608,7 @@
   }
 
   const campaignInboxApi = {
+    bindMessageDeletionSync,
     decorateMessage,
     filterMessages,
     getAccount,
@@ -570,8 +630,11 @@
     isCampaignMail,
     isCampaignAccount,
     load,
+    matchesMessageIdentity,
     normalizeOwner,
     pinOwner,
+    publishMessageDeletion,
+    removeAndPublishMessageDeletion,
     removeCachedMessage,
     renderDetailAccount,
     renderListMeta,
@@ -580,6 +643,7 @@
     resolveOwnerForSession,
     setOwner,
     sortMessagesNewestFirst,
+    subscribeToMessageDeletions,
   };
   global.SoftoraMailboxCampaignInbox = campaignInboxApi;
   if (typeof module !== 'undefined' && module.exports) module.exports = campaignInboxApi;
