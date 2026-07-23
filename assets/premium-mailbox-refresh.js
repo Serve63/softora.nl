@@ -60,6 +60,7 @@
             folder: activeFolder === 'outreach' ? 'inbox,sent' : activeFolder,
             limit: activeFolder === 'outreach' ? 20 : 50,
             force: true,
+            campaignOnly: activeFolder === 'outreach',
           }),
         });
         const data = await response.json().catch(() => ({}));
