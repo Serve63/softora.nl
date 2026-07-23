@@ -177,6 +177,39 @@
     return OWNER_OPTIONS.find((option) => option.key === owner)?.label || 'Servé Creusen';
   }
 
+  function getMessageAuthorLabel(mail, options = {}) {
+    const folder = String(
+      mail && mail.folder ||
+      options.folder ||
+      options.activeFolder ||
+      ''
+    ).trim().toLowerCase();
+    if (folder === 'sent') {
+      const owner = getOwnerByAccount(
+        mail && mail.accountEmail ||
+        options.account
+      );
+      if (owner) return getOwnerLabel(owner);
+    }
+    return String(
+      mail && mail.from ||
+      mail && mail.email ||
+      ''
+    ).trim();
+  }
+
+  function getMessageMeta(mail, formatDate, options = {}) {
+    if (!mail) return '';
+    const timestamp = mail.receivedAt || mail.internalDate || mail.date;
+    const when = typeof formatDate === 'function' ? formatDate(timestamp) : null;
+    const dateLabel = [
+      when && when.date || mail.date,
+      when && when.time || mail.time,
+    ].filter(Boolean).join(', ');
+    const author = getMessageAuthorLabel(mail, options);
+    return [dateLabel, author].filter(Boolean).join(' · ');
+  }
+
   function getReceivedTimestamp(mail) {
     const value = mail && (mail.activityAt || mail.receivedAt || mail.internalDate || mail.date);
     const timestamp = Date.parse(value || '');
@@ -565,12 +598,9 @@
     return messages.map((message) => {
       const body = stripQuotedReply(message && (message.body || message.preview));
       if (!body) return '';
-      const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const folder = String(message && message.folder || 'sent').trim().toLowerCase();
       const sent = folder === 'sent';
-      const owner = sent ? getOwnerLabel(getOwnerByAccount(message.accountEmail)) : '';
-      const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
-      const meta = [dateLabel, owner].filter(Boolean).join(' · ');
+      const meta = getMessageMeta(message, formatDate);
       const renderedBody = typeof options.renderMessageBody === 'function'
         ? options.renderMessageBody({ message, body, sent })
         : `<div class="detail-mail-lines">${body.split('\n').map((line) => {
@@ -831,6 +861,8 @@
     getAccount,
     getConversationId,
     getFolder,
+    getMessageAuthorLabel,
+    getMessageMeta,
     hasPageBootstrap,
     getOwner,
     getOwnerByAccount,

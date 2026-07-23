@@ -823,8 +823,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723s/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723s/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -898,7 +898,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723s"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723s"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -991,6 +991,31 @@ test('coldmail eigenaarfilter houdt de negen campagneadressen gescheiden tussen 
   assert.ok(ownerMenu.indexOf('Servé Creusen') < ownerMenu.indexOf('Martijn van de Ven'));
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('serve');
+});
+
+test('mailboxberichtmetadata gebruikt altijd de werkelijke auteur van het bericht', () => {
+  const formatDate = () => ({ date: 'Vandaag', time: '11:08' });
+
+  assert.equal(
+    campaignInboxModule.getMessageMeta({
+      folder: 'inbox',
+      accountEmail: 'martijnven123@gmail.com',
+      from: 'Helma Schellen',
+      email: 'helma@example.com',
+      receivedAt: '2026-07-23T09:08:00.000Z',
+    }, formatDate),
+    'Vandaag, 11:08 · Helma Schellen'
+  );
+
+  assert.equal(
+    campaignInboxModule.getMessageMeta({
+      folder: 'sent',
+      accountEmail: 'martijnven123@gmail.com',
+      from: 'Softora',
+      receivedAt: '2026-07-23T09:08:00.000Z',
+    }, formatDate),
+    'Vandaag, 11:08 · Martijn van de Ven'
+  );
 });
 
 test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessiecache', () => {
@@ -1681,7 +1706,7 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
   assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, detailBodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id, threadImagesReady: !imagesPending \}\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, detailBodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, messageMeta, replyMailId: m\.id, threadImagesReady: !imagesPending \}\)\}<\/div>/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
 
@@ -1968,6 +1993,31 @@ test('premium mailbox vervangt het oude detail direct wanneer een nieuwe mail no
   assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Vorige mail|Dit is de oude mail\./);
 });
 
+test('premium mailbox toont datum, tijd en echte auteur boven ieder geopend hoofdbericht', () => {
+  const mailbox = loadMailboxHelpersForTest();
+  const receivedAt = '2026-07-23T09:08:00.000Z';
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'martijn:inbox:helma',
+    folder: 'inbox',
+    accountEmail: 'martijnven123@gmail.com',
+    from: 'Helma Schellen',
+    email: 'helma@example.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Dank je wel voor het aanbod.',
+    receivedAt,
+  });
+  mailbox.setMails([mail]);
+
+  mailbox.openMail(mail.id, { skipBodyFetch: true, imagesPrepared: true });
+
+  const when = mailbox.formatMailDate(receivedAt);
+  const expectedMeta = `${when.date}, ${when.time} · Helma Schellen`;
+  const detailHtml = mailbox.getElement('mail-detail').innerHTML;
+  assert.match(detailHtml, new RegExp(expectedMeta.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.ok(detailHtml.indexOf(expectedMeta) < detailHtml.indexOf('Dank je wel voor het aanbod.'));
+  assert.doesNotMatch(detailHtml, new RegExp(`${when.date}, ${when.time} · Martijn van de Ven`));
+});
+
 test('premium mailbox laat een late body-response nooit een nieuwere selectie overschrijven', async () => {
   let resolveResponse;
   const response = new Promise((resolve) => { resolveResponse = resolve; });
@@ -2089,7 +2139,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /SoftoraMailboxIndex\?\.bindImageRecovery\(\{ getActiveMail: \(\) => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody \}\)/);
   assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
   assert.match(scriptSource, /renderLinkedMailboxText\(value, options\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, detailBodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id, threadImagesReady: !imagesPending \}\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, detailBodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, messageMeta, replyMailId: m\.id, threadImagesReady: !imagesPending \}\)\}<\/div>/);
 });
 
 test('geopende mail staat als één rustig mailblok met antwoordactie na het ontvangen bericht', () => {

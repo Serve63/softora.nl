@@ -503,6 +503,8 @@ function renderMailBody(value, images, options) {
     }) || '',
   }) || '');
   const renderedSections = newerThreadMessagesHtml ? [newerThreadMessagesHtml] : [];
+  const messageMeta = String(options && options.messageMeta || '').trim();
+  if (messageMeta) renderedSections.push(`<div class="detail-mail-quote-meta">${escapeHtml(messageMeta)}</div>`);
   let injectedImages = false;
   let insertedReplyAction = false;
   sections.forEach((section) => {
@@ -844,6 +846,7 @@ function openMail(id, options = {}) {
   const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
   const detailBody = m.body || m.preview || '';
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
+  const messageMeta = window.SoftoraMailboxCampaignInbox.getMessageMeta(m, formatMailDate, displayOptions);
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-body">
       <article class="detail-mail-block">
@@ -865,7 +868,7 @@ function openMail(id, options = {}) {
           </div>
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, threadImagesReady: !imagesPending })}</div>
+        <div class="detail-body-text">${renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, messageMeta, replyMailId: m.id, threadImagesReady: !imagesPending })}</div>
       </article>
     </div>`;
 }
