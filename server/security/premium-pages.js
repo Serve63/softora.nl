@@ -19,6 +19,7 @@ function createPremiumHtmlPageAccessController(options = {}) {
     appendSecurityAuditEvent = () => {},
     getClientIpFromRequest = () => '',
     getRequestOriginFromHeaders = () => '',
+    hasLiveMomentumAccess = () => false,
   } = options;
 
   function normalizeFileName(value) {
@@ -161,6 +162,32 @@ function createPremiumHtmlPageAccessController(options = {}) {
           'security_premium_admin_page_required'
         );
         res.redirect(302, '/premium-personeel-dashboard?forbidden=1');
+        return {
+          handled: true,
+          authState,
+          fileName,
+          isLoginPage,
+          isProtectedPremiumPage,
+          isAdminOnlyPremiumPage,
+        };
+      }
+
+      if (fileName === 'live-momentum.html' && !hasLiveMomentumAccess(req, authState)) {
+        appendSecurityAuditEvent(
+          {
+            type: 'live_momentum_code_required',
+            severity: 'info',
+            success: false,
+            email: authState.email || '',
+            ip: getClientIpFromRequest(req),
+            path: requestedPath,
+            origin: getRequestOriginFromHeaders(req),
+            userAgent: getRequestUserAgent(req),
+            detail: 'Winnen-pagina geweigerd omdat de toegangscode nog niet is bevestigd.',
+          },
+          'security_live_momentum_code_required'
+        );
+        res.redirect(302, '/premium-instellingen?liveMomentumLocked=1');
         return {
           handled: true,
           authState,

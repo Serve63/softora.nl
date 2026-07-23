@@ -91,11 +91,16 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /localDatabaseFrame/);
   assert.doesNotMatch(userManagementSource, /: '\/premium-database';/);
   assert.match(userManagementSource, /function navigateToSettingsModule\(moduleHref\)/);
+  assert.match(userManagementSource, /async function openWinningModule\(moduleHref\)/);
+  assert.match(userManagementSource, /requestAdminActionPin\('Winnen openen', \{ forcePrompt: true \}\)/);
+  assert.match(userManagementSource, /fetchJson\('\/api\/live-momentum\/access'/);
+  assert.match(userManagementSource, /body: JSON\.stringify\(\{ code: accessCode \}\)/);
+  assert.match(userManagementSource, /if \(isWinning\) \{[\s\S]*openWinningModule\(moduleHref\)/);
   assert.match(userManagementSource, /var targetWindow = window\.top && window\.top !== window \? window\.top : window;/);
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260722a/);
+  assert.match(source, /premium-user-management\.js\?v=20260723b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);
