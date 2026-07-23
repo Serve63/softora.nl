@@ -115,6 +115,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Laat AI automatisering maken voor leadopvolging, processen automatiseren met AI, intake, mailbox, CRM-flows, rapportages en veilige controle.',
     kind: 'service',
     serviceName: 'AI automatisering',
+    lastmod: '2026-07-23',
     relatedLinks: [
       '/crm-systeem-op-maat',
       '/chatbot-laten-maken',

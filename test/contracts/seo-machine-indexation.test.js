@@ -11,6 +11,7 @@ const {
 test('indexation controller classifies Search Console coverage states', () => {
   assert.equal(classifyIndexationState({ verdict: 'PASS' }), 'indexed');
   assert.equal(classifyIndexationState({ coverageState: 'URL is unknown to Google' }), 'unknown');
+  assert.equal(classifyIndexationState({ coverageState: 'URL is onbekend bij Google' }), 'unknown');
   assert.equal(classifyIndexationState({ coverageState: 'Crawled - currently not indexed' }), 'crawled_not_indexed');
   assert.equal(classifyIndexationState({ coverageState: 'Discovered - currently not indexed' }), 'discovered_not_indexed');
   assert.equal(classifyIndexationState({ coverageState: 'Duplicate without user-selected canonical' }), 'duplicate');

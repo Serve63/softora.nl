@@ -298,10 +298,13 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /voice-overdracht/);
   assert.match(source, /Menselijke controle/);
   assert.match(source, /Veilige AI grenzen/);
-  assert.match(source, /Van losse taak naar betrouwbare workflow/);
+  assert.match(source, /Is dit proces klaar voor AI automatisering\?/);
+  assert.match(source, /Controlepunten voor een eerste AI-workflow/);
+  assert.match(source, /Acceptatievoorbeelden voor goed, fout en doorzetten naar een mens/);
+  assert.match(source, /Test de workflow op echte uitzonderingen/);
+  assert.match(source, /Nog niet live als/);
   assert.match(source, /Waar AI automatisering voor MKB direct verschil kan maken/);
   assert.match(source, /Wanneer is AI automatisering beter dan standaard software\?/);
-  assert.match(source, /Wat moet klaarstaan voor een goede AI workflow\?/);
   assert.match(source, /AI automatisering, CRM of chatbot\?/);
   assert.match(source, /Veelgestelde vragen over AI automatisering/);
   assert.match(source, /Kan AI automatisering koppelen met bestaande systemen\?/);
@@ -316,6 +319,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.match(source, /href="\/blog\/ai-automatisering-mkb-waar-beginnen"/);
   assert.match(source, /href="\/blog\/ai-automatisering-leadopvolging"/);
   assert.match(source, /href="\/blog\/ai-automatisering-leadkwalificatie-mkb"/);
+  assert.match(source, /href="\/blog\/ai-processen-automatiseren-zonder-controle-verliezen"/);
   assert.match(source, /href="\/kennisbank\/wat-is-leadkwalificatie"/);
   assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
@@ -324,6 +328,7 @@ test('ai automation money page is focused on leads, CRM flows and safe handoff',
   assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
 
   assert.equal(entry.title, 'AI automatisering laten maken voor MKB');
+  assert.equal(entry.lastmod, '2026-07-23');
   assert.match(entry.description, /leadopvolging, processen automatiseren met AI/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/chatbot-laten-maken'));
