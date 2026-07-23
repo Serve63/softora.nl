@@ -148,6 +148,12 @@
     return label;
   }
 
+  function getMissionAriaLabel(card, state, missionNumber) {
+    return state.completed
+      ? `Missie ${missionNumber}: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
+      : `Missie ${missionNumber}: ${card.title}. Sleep om te verplaatsen of klik voor acties.`;
+  }
+
   function createCard(card, state, missionNumber) {
     const slot = document.createElement('div');
     const article = document.createElement('article');
@@ -168,9 +174,7 @@
       slot.setAttribute('role', 'button');
       slot.setAttribute('aria-haspopup', 'menu');
       slot.setAttribute('aria-expanded', 'false');
-      slot.setAttribute('aria-label', state.completed
-        ? `Missie ${missionNumber}: ${card.title}, afgerond. Sleep om te verplaatsen of klik voor acties.`
-        : `Missie ${missionNumber}: ${card.title}. Sleep om te verplaatsen of klik voor acties.`);
+      slot.setAttribute('aria-label', getMissionAriaLabel(card, state, missionNumber));
     }
     article.classList.toggle('is-completed', state.completed);
     article.append(createCardArtwork(card));
@@ -261,10 +265,39 @@
       completeButton.focus();
     }
 
+    function findCardElement(cardId) {
+      return Array.from(track.querySelectorAll('[data-end-game-card-id]'))
+        .find((element) => element.dataset.endGameCardId === cardId);
+    }
+
+    function syncCardElement(cardElement, cardId) {
+      const card = CARD_CATALOG.find((item) => item.id === cardId);
+      const cardState = state[cardId];
+      if (!cardElement || !card || !cardState) return;
+      const article = cardElement.querySelector('.end-game-goal-card');
+      const actions = cardElement.querySelector('.end-game-mission-actions');
+      const completeButton = actions?.querySelector('[data-end-game-card-action="toggle-complete"]');
+      const missionNumber = Number(cardElement.querySelector('.end-game-card-number')?.textContent || 0);
+      article?.classList.toggle('is-completed', cardState.completed);
+      if (completeButton) {
+        completeButton.textContent = cardState.completed ? 'Afronding ongedaan maken' : 'Afronden';
+      }
+      if (actions) actions.hidden = true;
+      cardElement.setAttribute('aria-expanded', 'false');
+      cardElement.setAttribute('aria-label', getMissionAriaLabel(card, cardState, missionNumber));
+    }
+
     function updateCard(cardId, patch) {
       if (!state[cardId]) return;
       state = { ...state, [cardId]: normalizeCardState({ ...state[cardId], ...patch }) };
-      render(state);
+      const cardElement = findCardElement(cardId);
+      if (state[cardId].deleted) {
+        cardElement?.remove();
+        updateMissionNumbers(track);
+      } else {
+        syncCardElement(cardElement, cardId);
+      }
+      updateProgress();
       onStateChange();
     }
 
