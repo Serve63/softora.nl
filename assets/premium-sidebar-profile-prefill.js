@@ -117,14 +117,47 @@
     }
 
     function buildProfileRenderKey(session) {
-        var displayName = String((session && session.displayName) || "Softora Premium").trim() || "Softora Premium";
+        var displayName = String(
+            (session && (session.displayName || session.firstName || session.email)) ||
+            "Softora Premium"
+        ).trim() || "Softora Premium";
         var role = String((session && session.role) || "admin").trim().toLowerCase() || "admin";
         var avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
         return [displayName, role, avatarDataUrl].join("\u0001");
     }
 
+    function buildProfileUserKey(session) {
+        return String((session && (session.userId || session.email)) || "").trim().toLowerCase();
+    }
+
     function countDisplayNameWords(value) {
         return String(value || "").trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function displayNameQuality(value) {
+        var normalized = String(value || "").trim();
+        if (!normalized || normalized.toLowerCase() === "softora premium" || normalized.indexOf("@") !== -1) {
+            return 0;
+        }
+        return countDisplayNameWords(normalized) >= 2 ? 2 : 1;
+    }
+
+    function shouldPreferPersistedSession(session, serverUserKey, serverRenderKey) {
+        var normalized = normalizeSessionCandidate(session);
+        if (!normalized) return false;
+        var persistedUserKey = buildProfileUserKey(normalized);
+        var normalizedServerUserKey = String(serverUserKey || "").trim().toLowerCase();
+        if (!persistedUserKey || !normalizedServerUserKey || persistedUserKey !== normalizedServerUserKey) {
+            return false;
+        }
+
+        var renderParts = String(serverRenderKey || "").split("\u0001");
+        var serverDisplayName = String(renderParts[0] || "").trim();
+        var serverAvatarDataUrl = String(renderParts[2] || "").trim();
+        return Boolean(
+            (normalized.avatarDataUrl && !serverAvatarDataUrl) ||
+            displayNameQuality(normalized.displayName) > displayNameQuality(serverDisplayName)
+        );
     }
 
     function buildDisplayNameFromParts(firstName, lastName, fallbackValue) {
@@ -248,11 +281,12 @@
                 var avatarEl = document.querySelector("[data-sidebar-avatar]");
                 var profileWrapEl = document.querySelector(".sidebar-user .sidebar-user-trigger");
                 var sidebarEl = document.querySelector(".sidebar");
-                var hasServerRenderedProfile = sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-render-key") || "").trim();
-                if (!hasServerRenderedProfile) {
+                var serverRenderKey = sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-render-key") || "").trim();
+                var serverUserKey = sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-user-key") || "").trim();
+                if (!serverRenderKey || shouldPreferPersistedSession(s, serverUserKey, serverRenderKey)) {
                     var renderKey = buildProfileRenderKey(s);
 
-                    var displayName = String(s.displayName || "Softora Premium");
+                    var displayName = String(s.displayName || s.firstName || s.email || "Softora Premium");
                     if (nameEl) nameEl.textContent = displayName;
                     if (roleEl) roleEl.textContent = roleLabel(s.role);
                     if (profileWrapEl) {
@@ -285,6 +319,7 @@
     window.SoftoraPremiumSidebarProfileSession = {
         enrichSession: enrichSession,
         mergeSessions: mergeSessions,
-        shouldEnrichSession: shouldEnrichSession
+        shouldEnrichSession: shouldEnrichSession,
+        shouldPreferPersistedSession: shouldPreferPersistedSession
     };
 })();

@@ -432,6 +432,39 @@ test('premium sidebar profile helper stays available when tab profile cache is e
 
   assert.equal(enriched.displayName, 'Servé Creusen');
   assert.equal(enriched.avatarDataUrl, 'data:image/png;base64,abcd');
+  assert.equal(
+    helper.shouldPreferPersistedSession(
+      enriched,
+      'usr_serve',
+      ['serve@softora.nl', 'admin', ''].join('\u0001')
+    ),
+    true
+  );
+  assert.equal(
+    helper.shouldPreferPersistedSession(
+      enriched,
+      'usr_other',
+      ['Softora Premium', 'admin', ''].join('\u0001')
+    ),
+    false
+  );
+
+  const source = readRepoFile('assets/premium-sidebar-profile-prefill.js');
+  assert.match(
+    source,
+    /if \(!serverRenderKey \|\| shouldPreferPersistedSession\(s, serverUserKey, serverRenderKey\)\)/
+  );
+  assert.match(
+    source,
+    /var serverUserKey = sidebarEl && String\(sidebarEl\.getAttribute\("data-sidebar-profile-user-key"\)/
+  );
+  assert.match(
+    source,
+    /var displayName = String\(s\.displayName \|\| s\.firstName \|\| s\.email \|\| "Softora Premium"\)/
+  );
+  assert.match(source, /persistedUserKey !== normalizedServerUserKey/);
+  assert.match(source, /function buildProfileUserKey\(session\)/);
+  assert.match(source, /session && \(session\.userId \|\| session\.email\)/);
 });
 
 test('custom premium layouts stay outside the shared sidebar shell', () => {

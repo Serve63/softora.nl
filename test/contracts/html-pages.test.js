@@ -826,7 +826,43 @@ test('html page coordinator injects authenticated premium sidebar profile html b
 
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /data-sidebar-profile-render-key=/);
+  assert.match(res.body, /data-sidebar-profile-user-key="serve@softora\.nl"/);
   assert.match(res.body, /Ingelogd als Servé Creusen/);
   assert.match(res.body, /data-sidebar-user-name>Servé Creusen</);
   assert.match(res.body, /data-sidebar-avatar>SC</);
+
+  const thinCoordinator = createHtmlPageCoordinator({
+    pagesDir,
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-personeel-agenda.html' ? 'premium-personeel-agenda.html' : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: {
+        authenticated: true,
+        userId: 'usr_serve',
+        displayName: '',
+        role: 'admin',
+        email: 'serve@softora.nl',
+        avatarDataUrl: '',
+      },
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+  });
+  const thinRes = createResponseRecorder();
+
+  await thinCoordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-personeel-agenda' },
+    thinRes,
+    () => {},
+    'premium-personeel-agenda.html'
+  );
+
+  assert.match(thinRes.body, /data-sidebar-profile-render-key="serve@softora\.nl/);
+  assert.match(thinRes.body, /data-sidebar-profile-user-key="usr_serve"/);
+  assert.match(thinRes.body, /data-sidebar-user-name>serve@softora\.nl</);
 });
