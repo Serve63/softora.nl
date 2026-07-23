@@ -236,7 +236,8 @@ function createMailboxCampaignRepliesService(deps = {}) {
 
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') return replies;
     const hydratedReplies = await mailboxIndexStore.hydrateMessageBodies({ messages: replies });
-    return Array.isArray(hydratedReplies) ? hydratedReplies : replies;
+    return (Array.isArray(hydratedReplies) ? hydratedReplies : replies)
+      .filter((message) => !isAutomatedCampaignReply(message));
   }
 
   return {

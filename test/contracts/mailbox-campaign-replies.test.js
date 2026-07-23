@@ -76,25 +76,47 @@ test('campaign reply service excludes duplicates and automatic replies before cu
           date: '2026-07-22T01:00:00.000Z',
           messageId: '<automatic-reply@example.nl>',
         },
+        {
+          id: 'inbox:4',
+          accountEmail: 'martijn@softora.nl',
+          email: 'leergeld@example.nl',
+          subject: 'Nieuw Email adres Re: Kleine vraag over jullie website',
+          preview: 'Beste lezer, wij hebben een nieuw e-mailadres. Dit bericht...',
+          date: '2026-07-21T01:00:00.000Z',
+          messageId: '<body-only-automatic-reply@example.nl>',
+        },
       ],
-      hydrateMessageBodies: async ({ messages }) => messages,
+      hydrateMessageBodies: async ({ messages }) => messages.map((message) => (
+        message.id === 'inbox:4'
+          ? { ...message, body: 'Dit bericht is automatisch gegenereerd.' }
+          : message
+      )),
     },
     dataOpsStore: {
       listCustomersByEmails: async ({ emails }) => {
         lookedUpEmails = emails;
-        return [{
-          id: 'human-customer',
-          bedrijf: 'Menselijke reactie',
-          email: 'human@example.nl',
-          campaignType: 'webdesign',
-          lastColdmailProvider: 'softora',
-        }];
+        return [
+          {
+            id: 'human-customer',
+            bedrijf: 'Menselijke reactie',
+            email: 'human@example.nl',
+            campaignType: 'webdesign',
+            lastColdmailProvider: 'softora',
+          },
+          {
+            id: 'body-only-automatic-customer',
+            bedrijf: 'Automatische reactie',
+            email: 'leergeld@example.nl',
+            campaignType: 'webdesign',
+            lastColdmailProvider: 'softora',
+          },
+        ];
       },
     },
   });
 
   const replies = await service.listReplies({ limit: 100 });
 
-  assert.deepEqual(lookedUpEmails, ['human@example.nl']);
+  assert.deepEqual(lookedUpEmails.sort(), ['human@example.nl', 'leergeld@example.nl']);
   assert.deepEqual(replies.map((message) => message.id), ['inbox:3']);
 });
