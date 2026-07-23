@@ -124,7 +124,7 @@ function renderMailboxBodyForTest(body, images, options) {
 }
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260723d/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260723c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
@@ -198,7 +198,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260723c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260722c"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260723d"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -763,6 +763,25 @@ test('premium mailbox zet beantwoorden direct onder de ontvangen mail en voor de
   assert.ok(html.indexOf('Daffy de Vyldre') < html.indexOf('data-mailbox-action="reply-mail"'));
   assert.ok(html.indexOf('data-mailbox-action="reply-mail"') < html.indexOf('detail-mail-section-quote'));
   assert.match(html, /data-mailbox-id="mail-123"/);
+});
+
+test('premium mailbox herstelt een samengeplakte Samsung-reactie van Martijn', () => {
+  const html = renderMailboxBodyForTest([
+    'Dag Martijn,We zijn het als bestuur aan het overleggen wat wenselijk is.Mochten we van je diensten gebruik willen maken, dan laten we je dat weten.GroetGerard Schellekens Verzonden vanaf mijn Galaxy',
+    '-------- Oorspronkelijk bericht --------Van: Martijn van de Ven Datum: 25-06-2026 11:17 (GMT+01:00) Aan: gschellekens@home.nl Onderwerp: Kleine vraag over jullie website Goedendag,',
+    'Afgelopen week kwam ik jullie website (bchelvoirt.nl) tegen.',
+    'Met vriendelijke groet,Martijn van de Ven',
+    '📍 Helvoirt',
+  ].join('\n'), [], { replyMailId: 'martijnvandeven@softora.nl|inbox:17' });
+
+  assert.equal((html.match(/detail-mail-section-quote/g) || []).length, 1);
+  assert.match(html, /<div class="detail-mail-section-label">Jouw eerdere mail<\/div>/);
+  assert.match(html, /<div class="detail-mail-quote-meta">Van: Martijn van de Ven<\/div>/);
+  assert.doesNotMatch(html, /Oorspronkelijk bericht/i);
+  assert.match(html, /Dag Martijn,<\/div>\s*<div class="detail-mail-line detail-mail-line-empty"[^>]*>&nbsp;<\/div>\s*<div class="detail-mail-line">We zijn het als bestuur/);
+  assert.ok(html.indexOf('Gerard Schellekens') < html.indexOf('data-mailbox-action="reply-mail"'));
+  assert.ok(html.indexOf('data-mailbox-action="reply-mail"') < html.indexOf('detail-mail-section-quote'));
+  assert.ok(html.indexOf('Onderwerp: Kleine vraag over jullie website') < html.indexOf('Goedendag,'));
 });
 
 test('premium mailbox zet beantwoorden onderaan als er geen eerdere mail is', () => {

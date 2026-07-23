@@ -72,6 +72,33 @@
     return result;
   }
 
+  function expandCollapsedMailText(value) {
+    return String(value || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/^((?:Dag|Hoi|Hallo)\s+[^,\n]{1,80},)(?=\S)/i, '$1\n\n')
+      .replace(/([.!?])(?=[A-Z\u00c0-\u00d6\u00d8-\u00de])/g, '$1\n\n')
+      .replace(/\b(Met vriendelijke groet|Vriendelijke groet|Hartelijke groet|Groet|Kind regards|Best regards|Cheers)(,?)(?=[A-Z\u00c0-\u00d6\u00d8-\u00de])/g, '$1$2\n')
+      .replace(/\s+(?=Verzonden vanaf mijn (?:Galaxy|iPhone|Android)\b)/gi, '\n');
+  }
+
+  function normalizeCollapsedReplyStructure(value) {
+    const source = String(value || '').replace(/\u00a0/g, ' ');
+    const separator = /-{5,}\s*(?:Oorspronkelijk bericht|Original message)\s*-{5,}/i;
+    const match = separator.exec(source);
+    if (!match) return source;
+
+    const received = expandCollapsedMailText(source.slice(0, match.index)).trimEnd();
+    let quoted = source.slice(match.index + match[0].length)
+      .trimStart()
+      .replace(/\s+(?=(?:Van|From|Datum|Date|Aan|To|Onderwerp|Subject):\s)/gi, '\n');
+    quoted = quoted.replace(
+      /((?:Onderwerp|Subject):[^\n]{0,200}?)\s+(?=(?:Goedendag|Goedemorgen|Goedemiddag|Goedenavond|Hoi|Hallo|Beste|Dear|Hello)\b)/i,
+      '$1\n\n'
+    );
+    quoted = expandCollapsedMailText(quoted).trimStart();
+    return [received, quoted].filter(Boolean).join('\n\n');
+  }
+
   function isSentMessage(mail, options) {
     return String(mail && (mail.folder || (options && options.activeFolder)) || '').toLowerCase() === 'sent';
   }
@@ -184,6 +211,7 @@
     isSentMessage,
     isGmailSignatureAssetUrl,
     isLabelledUrlMatch,
+    normalizeCollapsedReplyStructure,
     removeDuplicateSignatureLeadLines,
     getListPrimaryText,
     getDetailPrimaryText,
