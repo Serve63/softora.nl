@@ -691,6 +691,22 @@
     });
   }
 
+  function isMessageBodyPending(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    if (source.bodyLoading === true) return true;
+    const body = String(source.body || '').trim();
+    const hasBody = Boolean(source.hasBody || body);
+    return Boolean(
+      hasBody &&
+      (
+        source.bodyLoaded === false ||
+        !body ||
+        source.bodyTruncated === true ||
+        source.bodyImagesTruncated === true
+      )
+    );
+  }
+
   function renderThreadMessages(mail, escapeHtml, formatDate, options = {}) {
     if (!mail || typeof escapeHtml !== 'function') return '';
     const rootTimestamp = getMessageTimestamp(mail);
@@ -712,8 +728,8 @@
       messages = messages.slice().sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
     }
     return messages.map((message) => {
-      const loading = Boolean(message && message.bodyLoading);
-      const body = loading ? '' : stripQuotedReply(message && (message.body || message.preview));
+      const loading = isMessageBodyPending(message);
+      const body = loading ? '' : stripQuotedReply(message && message.body);
       if (!body && !loading) return '';
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const folder = String(message && message.folder || 'sent').trim().toLowerCase();
@@ -1008,6 +1024,7 @@
     isSafeImageSource,
     isCampaignMail,
     isCampaignAccount,
+    isMessageBodyPending,
     load,
     matchesMessageIdentity,
     normalizeOwner,

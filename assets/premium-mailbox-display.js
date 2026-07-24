@@ -287,7 +287,21 @@
   }
 
   function renderDetailBody(mail, content) {
-    return mail && mail.bodyLoading
+    const source = mail && typeof mail === 'object' ? mail : {};
+    const body = String(source.body || '').trim();
+    const hasBody = Boolean(source.hasBody || body);
+    const pending = Boolean(
+      source.bodyLoading === true ||
+      (
+        hasBody &&
+        (
+          source.bodyLoaded === false ||
+          !body ||
+          source.bodyTruncated === true
+        )
+      )
+    );
+    return pending
       ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
       : String(content || '');
   }
