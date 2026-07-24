@@ -182,6 +182,14 @@ function createMailboxIndexStore(deps = {}) {
     return { text, truncated: rawBody.length > BODY_MAX_CHARS, hasBody: true };
   }
 
+  function normalizeAttachments(value) {
+    return (Array.isArray(value) ? value : []).slice(0, 20).map((attachment) => ({
+      filename: truncateText(normalizeString(attachment && attachment.filename) || 'Bijlage', 180),
+      contentType: truncateText(normalizeString(attachment && attachment.contentType), 120),
+      size: Math.max(0, Number(attachment && attachment.size) || 0),
+    }));
+  }
+
   function buildMessageKey(accountEmail, folder, uid) {
     return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}|${Number(uid) || 0}`;
   }
@@ -227,6 +235,12 @@ function createMailboxIndexStore(deps = {}) {
           normalizeString(message && message.webdesignLinkUrl),
           4000
         ),
+        recipientRoutingEvidenceKnown: message && message.recipientRoutingEvidenceKnown === true,
+        toDisplay: truncateText(normalizeString(message && message.toDisplay), 2000),
+        cc: truncateText(normalizeString(message && message.cc), 2000),
+        bcc: truncateText(normalizeString(message && message.bcc), 2000),
+        deliveredTo: truncateText(normalizeString(message && message.deliveredTo), 1000),
+        attachments: normalizeAttachments(message && message.attachments),
       },
       updated_at: isoNow(),
     };
@@ -246,6 +260,12 @@ function createMailboxIndexStore(deps = {}) {
       from: normalizeString(row.sender_name) || normalizeString(row.sender_email) || 'Onbekend',
       email: normalizeString(row.sender_email),
       to: normalizeString(row.recipients_text),
+      toDisplay: normalizeString(payload.toDisplay),
+      cc: normalizeString(payload.cc),
+      bcc: normalizeString(payload.bcc),
+      deliveredTo: normalizeString(payload.deliveredTo),
+      recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true,
+      attachments: normalizeAttachments(payload.attachments),
       subject: normalizeString(row.subject) || '(Geen onderwerp)',
       preview: normalizeString(row.preview),
       body: includeBody ? normalizeString(row.body_text) : '',
@@ -632,6 +652,27 @@ function createMailboxIndexStore(deps = {}) {
     return { ok: false, unavailable: false, data: [], error };
   }
 
+  async function restoreMessage({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    const result = await run('restore-message', (client) => {
+      const query = client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .update({ deleted_at: null, updated_at: isoNow() })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
+        return query.eq('uid', parsedUid).select('message_key');
+      }
+      return query.eq('provider_id', normalizedId).select('message_key');
+    });
+    if (!result.ok || (Array.isArray(result.data) && result.data.length)) return result;
+    const error = new Error('Verborgen Softora-mailboxbericht is niet gevonden.');
+    error.code = 'MAILBOX_INDEX_HIDDEN_MESSAGE_NOT_FOUND';
+    return { ok: false, unavailable: false, data: [], error };
+  }
+
   async function getSyncState({ accountEmail, folder = 'inbox' }) {
     const syncKey = buildSyncKey(accountEmail, folder);
     const result = await run('get-sync-state', (client) =>
@@ -728,6 +769,7 @@ function createMailboxIndexStore(deps = {}) {
     listMessagesForAccounts,
     markMessageDeleted,
     markMessageRead,
+    restoreMessage,
     normalizeMessageRow,
     upsertMessages,
   };

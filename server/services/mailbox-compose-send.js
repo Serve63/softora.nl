@@ -1,0 +1,202 @@
+const MAX_COMPOSE_ATTACHMENTS = 5;
+const MAX_COMPOSE_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+const MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES = 5 * 1024 * 1024;
+const COMPOSE_ATTACHMENT_EXTENSIONS = new Set([
+  'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
+  'ppt', 'pptx', 'txt', 'webp', 'xls', 'xlsx',
+]);
+
+function createMailboxComposeSend(deps = {}) {
+  const {
+    getAccount,
+    isValidEmail,
+    normalizeEmail,
+    normalizeString,
+    truncateText,
+    createTransport,
+    buildMailboxWebdesignSendParts,
+    reserveMailboxWebdesignOutboundRecipient,
+    confirmMailboxWebdesignOutboundRecipient,
+    appendSentMessage,
+    createImapClient,
+    nodemailer,
+    webdesignEmailTemplateVersion,
+    logger = console,
+    now = () => new Date(),
+  } = deps;
+
+  function normalizeRecipientList(value, label) {
+    const values = (Array.isArray(value) ? value : String(value || '').split(/[;,]/))
+      .map(normalizeEmail)
+      .filter(Boolean);
+    if (values.length > 10) {
+      const error = new Error(`${label} ondersteunt maximaal 10 ontvangers.`);
+      error.status = 400;
+      throw error;
+    }
+    if (values.some((email) => !isValidEmail(email))) {
+      const error = new Error(`Controleer de e-mailadressen bij ${label}.`);
+      error.status = 400;
+      throw error;
+    }
+    return Array.from(new Set(values));
+  }
+
+  function normalizeComposeAttachments(value) {
+    const attachments = Array.isArray(value) ? value : [];
+    if (attachments.length > MAX_COMPOSE_ATTACHMENTS) {
+      const error = new Error(`Je kunt maximaal ${MAX_COMPOSE_ATTACHMENTS} bijlagen toevoegen.`);
+      error.status = 400;
+      throw error;
+    }
+    let totalBytes = 0;
+    return attachments.map((attachment) => {
+      const rawName = normalizeString(attachment && (attachment.filename || attachment.name))
+        .normalize('NFKC')
+        .replace(/[\u0000-\u001f\u007f/\\]+/g, '-')
+        .replace(/^\.+/, '')
+        .slice(0, 120);
+      const extension = rawName.includes('.') ? rawName.split('.').pop().toLowerCase() : '';
+      if (!rawName || !COMPOSE_ATTACHMENT_EXTENSIONS.has(extension)) {
+        const error = new Error(`Bijlage "${rawName || 'zonder naam'}" heeft geen ondersteund bestandstype.`);
+        error.status = 400;
+        throw error;
+      }
+      const encoded = normalizeString(attachment && (attachment.contentBase64 || attachment.data))
+        .replace(/^data:[^;,]+;base64,/i, '')
+        .replace(/\s+/g, '');
+      if (!encoded || !/^[a-z0-9+/]+={0,2}$/i.test(encoded)) {
+        const error = new Error(`Bijlage "${rawName}" kon niet veilig worden gelezen.`);
+        error.status = 400;
+        throw error;
+      }
+      const content = Buffer.from(encoded, 'base64');
+      if (!content.length || content.length > MAX_COMPOSE_ATTACHMENT_BYTES) {
+        const error = new Error(`Bijlage "${rawName}" mag maximaal 4 MB zijn.`);
+        error.status = 400;
+        throw error;
+      }
+      totalBytes += content.length;
+      if (totalBytes > MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES) {
+        const error = new Error('De bijlagen mogen samen maximaal 5 MB zijn.');
+        error.status = 400;
+        throw error;
+      }
+      return {
+        filename: rawName,
+        content,
+        contentType: truncateText(normalizeString(attachment && attachment.contentType), 120) || undefined,
+        contentDisposition: 'attachment',
+      };
+    });
+  }
+
+  return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments }) {
+    const account = getAccount(accountEmail);
+    if (!account) {
+      const error = new Error('Mailbox-account niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    if (account.smtpIdentityMatches === false) {
+      const error = new Error('De SMTP-login hoort niet bij het gekozen afzenderadres. Verzending is geblokkeerd.');
+      error.status = 503;
+      error.code = 'SENDER_SMTP_IDENTITY_MISMATCH';
+      throw error;
+    }
+    if (!account.smtpConfigured) {
+      const error = new Error('SMTP is niet geconfigureerd voor deze mailbox.');
+      error.status = 503;
+      throw error;
+    }
+    if (!isValidEmail(to)) {
+      const error = new Error('Vul een geldig e-mailadres in.');
+      error.status = 400;
+      throw error;
+    }
+    const normalizedTo = normalizeEmail(to);
+    const normalizedCc = normalizeRecipientList(cc, 'CC');
+    const normalizedBcc = normalizeRecipientList(bcc, 'BCC');
+    const duplicateRecipient = [...normalizedCc, ...normalizedBcc]
+      .find((email, index, recipients) => email === normalizedTo || recipients.indexOf(email) !== index);
+    if (duplicateRecipient) {
+      const error = new Error(`Ontvanger ${duplicateRecipient} staat meer dan één keer bij Aan, CC of BCC.`);
+      error.status = 400;
+      throw error;
+    }
+    const explicitAttachments = normalizeComposeAttachments(attachments);
+    const cleanSubject = truncateText(normalizeString(subject), 240);
+    if (!cleanSubject) {
+      const error = new Error('Onderwerp is verplicht.');
+      error.status = 400;
+      throw error;
+    }
+    const transporter = createTransport({
+      host: account.smtpHost,
+      port: account.smtpPort,
+      secure: account.smtpSecure,
+      auth: { user: account.smtpUser, pass: account.smtpPass },
+    });
+    const normalizedText = normalizeString(text);
+    const webdesignParts = await buildMailboxWebdesignSendParts({
+      accountEmail: account.email,
+      to: normalizedTo,
+      subject: cleanSubject,
+      text: normalizedText,
+    });
+    const mail = {
+      from: account.name ? `${account.name} <${account.email}>` : account.email,
+      to: normalizedTo,
+      cc: normalizedCc.length ? normalizedCc : undefined,
+      bcc: normalizedBcc.length ? normalizedBcc : undefined,
+      subject: cleanSubject,
+      text: webdesignParts?.text || normalizedText,
+    };
+    if (webdesignParts?.html) mail.html = webdesignParts.html;
+    if (webdesignParts) {
+      mail.headers = { 'X-Softora-Template-Version': webdesignEmailTemplateVersion };
+    }
+    const outboundAttachments = [
+      ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
+      ...explicitAttachments,
+    ];
+    if (outboundAttachments.length) mail.attachments = outboundAttachments;
+    const outboundReservation = webdesignParts
+      ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
+          accountEmail: account.email,
+          subject: cleanSubject,
+        })
+      : null;
+    const info = await transporter.sendMail(mail);
+    if (webdesignParts) {
+      await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
+        messageId: normalizeString(info?.messageId || ''),
+        email: normalizedTo,
+        subject: cleanSubject,
+      });
+    }
+    const sentCopySaved = await appendSentMessage({
+      account,
+      createImapClient,
+      nodemailer,
+      mail,
+      messageId: normalizeString(info?.messageId || ''),
+      sentAt: now(),
+      logger,
+    });
+    return {
+      messageId: normalizeString(info?.messageId || ''),
+      accepted: Array.isArray(info?.accepted) ? info.accepted : [],
+      rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+      sentCopySaved,
+    };
+  };
+}
+
+module.exports = {
+  COMPOSE_ATTACHMENT_EXTENSIONS,
+  MAX_COMPOSE_ATTACHMENT_BYTES,
+  MAX_COMPOSE_ATTACHMENTS,
+  MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES,
+  createMailboxComposeSend,
+};

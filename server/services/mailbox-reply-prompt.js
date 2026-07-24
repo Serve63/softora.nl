@@ -160,7 +160,8 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Laat de zichtbare placeholder [dag] altijd letterlijk staan zodat Servé die zelf kan invullen. Vul nooit zelf een weekdag, datum of tijd in en doe nooit alsof de afspraak al staat.',
     `Bij een prijsvraag: verzin geen prijs, pakket, garantie of afspraak. Leg vriendelijk uit dat de prijs afhangt van wat iemand precies wil, bijvoorbeeld: "${MAILBOX_REPLY_PRICE_EXPLANATION}" Werk daarna alleen bij oprechte interesse toe naar hetzelfde vrijblijvende voorstel met [dag].`,
     'Gebruik nooit de woorden "laagdrempelig", "kansen" of "verbeterpunten" en zet de ontvanger niet aan tot een verkoopgesprek of beoordeling.',
-    'Bij geen interesse of een afwijzing: reageer kort en respectvol, zonder nieuwe verkooppoging en zonder afspraak- of langskomvoorstel.',
+    'Negatieve intentie in ontvangenMail gaat altijd vóór interesse-indicatoren, een open campagnecontext of oorspronkelijkeVerzondenMail.',
+    'Bij geen interesse, geen behoefte, geen vervolgtraject, buiten-scope, een beleefde afwijzing of een verzoek om niet door te gaan: reageer kort en respectvol zonder nieuwe verkooppoging; bedank; zeg eventueel dat de ontvanger later zelf contact mag opnemen; stel nooit een bezoek, afspraak, vervolgstap, prijsbespreking of meedenken voor.',
     'Als iemand al tevreden is met een andere partij, benoem juist dat dit begrijpelijk en fijn is.',
     'Feitelijke waarheid gaat altijd voor stijl. Het actuele ontwerp uit deze coldmail is met code gebouwd.',
     `Als iemand Webflow noemt of ernaar vraagt, zeg feitelijk: "Dit ontwerp heb ik met code gebouwd." Haak kort op de vraag aan zonder te beweren dat Servé Webflow gebruikt, zonder defensieve tegenstelling zoals "dus niet in Webflow" en zonder ongevraagd Webflow-advies. Werk bij zo’n open vraag natuurlijk toe naar het vrijblijvende voorstel met [dag].`,
@@ -282,7 +283,12 @@ function classifyMailboxReplyIntent(inboundText) {
     /\b(?:niet\s+meer\s+mailen|niet\s+opnieuw\s+mailen|afmelden|uitschrijven|stoppen\s+met\s+mailen)\b/.test(text) ||
     /\b(?:al|reeds)\s+(?:een\s+)?(?:goede\s+)?partij\b/.test(text) ||
     /\btevreden\s+met\s+(?:onze|de|een)\s+(?:huidige\s+)?(?:partij|website|leverancier)\b/.test(text) ||
-    /\b(?:niet\s+nodig|doen\s+we\s+niets\s+mee|zien\s+we\s+vanaf|helaas\s+niet|past\s+(?:helaas\s+)?niet|niet\s+wat\s+we\s+zoeken)\b/.test(text)
+    /\b(?:niet\s+nodig|doen\s+we\s+niets\s+mee|zien\s+we\s+vanaf|helaas\s+niet|past\s+(?:helaas\s+)?niet|niet\s+wat\s+we\s+zoeken|buiten\s+(?:onze|de)\s+scope)\b/.test(text) ||
+    /\b(?:traject|samenwerking|vervolg(?:stap|traject)?|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant|niet\s+van\s+toepassing)\b/.test(text) ||
+    /\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake)\b[^.!?]{0,120}\b(?:traject|samenwerking|vervolg|opdracht)\b/.test(text) ||
+    /\b(?:geen|niet)\s+(?:verdere?\s+)?(?:stappen|vervolg|traject|samenwerking)\b/.test(text) ||
+    /\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door|op\s+in|in\s+mee)\b/.test(text) ||
+    /\b(?:geen\s+gebruik\s+(?:willen\s+)?maken|niet\s+ingaan\s+op|laat\s+het\s+hierbij|hoeft\s+voor\s+(?:mij|ons)\s+niet)\b/.test(text)
   ) {
     return 'rejection';
   }
@@ -359,6 +365,17 @@ function enforceMailboxReplyProfile(value, options = {}) {
     originalSentMail: options.originalSentMail,
   });
   const intent = classifyMailboxReplyIntent(options.inboundText);
+  const inboundText = normalizeClassifierText(options.inboundText);
+  if (intent === 'rejection') {
+    const rejectionBody = (
+      /\b(?:niet\s+meer\s+mailen|niet\s+opnieuw\s+mailen|afmelden|uitschrijven|stoppen\s+met\s+mailen)\b/.test(inboundText)
+        ? 'Dankjewel voor je duidelijke reactie. Ik zal je niet meer benaderen 😁'
+        : /\b(?:tevreden|goede\s+partij|andere\s+partij|huidige\s+partij)\b/.test(inboundText)
+          ? 'Dankjewel voor je duidelijke reactie. Fijn dat je al goed geholpen wordt 😁'
+          : 'Dankjewel voor je duidelijke reactie. Helemaal begrijpelijk 😁'
+    );
+    return `${greeting}\n\n${rejectionBody}\n\n${sender.signature}`;
+  }
   let body = stripGeneratedSignature(stripGeneratedGreeting(value));
   body = enforceWebflowTruth(body, options.inboundText);
   body = enforcePriceTruth(body, intent);

@@ -64,8 +64,11 @@ function registerMailboxRoutes(app, deps = {}) {
   app.post('/api/mailbox/messages/read', requireAdmin, (req, res) =>
     coordinator.markMessageReadResponse(req, res)
   );
-  app.post('/api/mailbox/messages/delete', requireAdmin, (req, res) =>
-    coordinator.deleteMessageResponse(req, res)
+  app.post('/api/mailbox/messages/hide', requireAdmin, (req, res) =>
+    coordinator.hideConversationResponse(req, res)
+  );
+  app.post('/api/mailbox/messages/restore', requireAdmin, (req, res) =>
+    coordinator.restoreConversationResponse(req, res)
   );
   app.post('/api/mailbox/sync', requireAdmin, (req, res) => coordinator.syncMailboxResponse(req, res));
   app.get('/api/mailbox/sync', requireCronAccess, (req, res) => {

@@ -93,13 +93,16 @@ test('shared webdesign renderer escapes image metadata and supports one image', 
 test('mailbox and autopilot use the same shared webdesign image renderer', () => {
   const servicesDir = path.join(__dirname, '..', '..', 'server', 'services');
   const mailboxSource = fs.readFileSync(path.join(servicesDir, 'mailbox.js'), 'utf8');
+  const mailboxComposeSendSource = fs.readFileSync(path.join(servicesDir, 'mailbox-compose-send.js'), 'utf8');
   const campaignSource = fs.readFileSync(path.join(servicesDir, 'coldmail-campaign.js'), 'utf8');
 
   for (const source of [mailboxSource, campaignSource]) {
     assert.match(source, /require\('\.\/webdesign-email-renderer'\)/);
     assert.match(source, /renderWebdesignImageSection\(/);
-    assert.match(source, /X-Softora-Template-Version/);
   }
+  assert.match(mailboxSource, /createMailboxComposeSend\(/);
+  assert.match(mailboxComposeSendSource, /X-Softora-Template-Version/);
+  assert.match(campaignSource, /X-Softora-Template-Version/);
   assert.doesNotMatch(mailboxSource, /function renderMailboxEmailImagePair\(/);
   assert.doesNotMatch(campaignSource, /function renderEmailImagePairTable\(/);
 });

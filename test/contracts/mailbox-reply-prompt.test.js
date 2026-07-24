@@ -184,6 +184,10 @@ test('replyprofiel classificeert interesse, prijs en afwijzing vóór afspraaklo
   assert.equal(classifyMailboxReplyIntent('Wat kost dit ontwerp ongeveer?'), 'price');
   assert.equal(classifyMailboxReplyIntent('Wij hebben geen interesse en willen geen afspraak.'), 'rejection');
   assert.equal(classifyMailboxReplyIntent('Het ontwerp past helaas niet bij ons.'), 'rejection');
+  assert.equal(classifyMailboxReplyIntent('Het verder ingaan van een traject met Softora is niet aan de orde.'), 'rejection');
+  assert.equal(classifyMailboxReplyIntent('Wij gaan hier niet mee verder, maar bedankt voor de moeite.'), 'rejection');
+  assert.equal(classifyMailboxReplyIntent('Dit valt buiten onze scope en we geven hier geen vervolg aan.'), 'rejection');
+  assert.equal(classifyMailboxReplyIntent('We willen geen gebruik maken van je aanbod.'), 'rejection');
   assert.equal(classifyMailboxReplyIntent('Dank voor het ontwerp.'), 'neutral');
   assert.equal(classifyMailboxReplyIntent('Bedankt voor je bericht.'), 'neutral');
 });
@@ -216,6 +220,51 @@ test('afwijzing verwijdert ieder afspraakvoorstel en blijft kort respectvol', ()
   assert.doesNotMatch(result, /afspraak|langskom|volgende week|\[dag\]/i);
   assert.match(result, /^Beste Daffy,/);
   assert.equal((result.match(/😁/gu) || []).length, 1);
+});
+
+test('Hoogstam Brigade afwijzing blokkeert ieder bezoek en generieke interesseheuristiek', () => {
+  const inbound = [
+    'Beste Servé,',
+    '',
+    'Dank voor je uitgebreide toelichting en de mooie eerste opzet.',
+    'Het verder ingaan van een traject met Softora is voor ons niet aan de orde.',
+    '',
+    'Met vriendelijke groet,',
+    'Hub Meertens',
+  ].join('\n');
+  const result = enforceMailboxReplyProfile(
+    'Wat fijn dat je de opzet mooi vindt. Ik denk graag mee. Is het een idee dat ik volgende week [dag] even langskom om prijzen en mogelijkheden te bespreken?',
+    {
+      firstName: 'Hub',
+      inboundText: inbound,
+      originalSentMail: {
+        body: 'Ik ben benieuwd wat je van het ontwerp vindt en kom graag langs.',
+      },
+    }
+  );
+
+  assert.match(result, /^Beste Hub,/);
+  assert.match(result, /Dankjewel voor je duidelijke reactie/);
+  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|meedenk|mogelijkheden|prijs|vervolgstap|traject/i);
+  assert.equal((result.match(/😁/gu) || []).length, 1);
+  assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
+});
+
+test('Nederlandse afwijzingsvarianten krijgen nooit een vervolgvoorstel', () => {
+  const variants = [
+    'Wij gaan hier niet mee verder.',
+    'Er is geen sprake van een vervolgtraject.',
+    'We willen geen gebruik maken van je aanbod.',
+    'Dit valt buiten onze scope.',
+    'Laat het hierbij en mail ons niet opnieuw.',
+  ];
+  variants.forEach((inboundText) => {
+    const result = enforceMailboxReplyProfile(
+      'Ik denk graag met je mee en kan volgende week [dag] langskomen voor een afspraak.',
+      { inboundText }
+    );
+    assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|meedenk|prijs|vervolg/i, inboundText);
+  });
 });
 
 test('prijsvraag verwijdert verzonnen bedragen, legt afhankelijkheid uit en laat de dag bewerkbaar', () => {

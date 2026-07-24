@@ -5,11 +5,122 @@ const {
   CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+  attachCrossAccountMailboxCopies,
   attachSentThreadMessages,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
 } = require('../../server/services/mailbox-campaign-replies');
+
+test('campaign mailbox bouwt een bewezen BCC-kopie als volledige chronologische thread', () => {
+  const original = {
+    id: 'sent:original',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven',
+    email: 'martijn@softora.nl',
+    to: 'Sandra van Berkel <equirehab4you@gmail.com>',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-24T15:00:00.000Z',
+    messageId: '<original@softora.nl>',
+  };
+  const incoming = {
+    id: 'inbox:sandra',
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Sandra van Berkel',
+    email: 'equirehab4you@gmail.com',
+    to: 'martijn@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-24T15:30:00.000Z',
+    messageId: '<sandra@gmail.com>',
+    inReplyTo: original.messageId,
+    references: original.messageId,
+  };
+  const sentReply = {
+    id: 'sent:reply',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven',
+    email: 'martijn@softora.nl',
+    to: 'Sandra van Berkel <equirehab4you@gmail.com>',
+    bcc: 'Servé Creusen <serve@softora.nl>',
+    recipientRoutingEvidenceKnown: true,
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-24T16:15:00.000Z',
+    messageId: '<reply@softora.nl>',
+    inReplyTo: incoming.messageId,
+    references: `${original.messageId} ${incoming.messageId}`,
+  };
+  const copy = {
+    ...sentReply,
+    id: 'inbox:copy',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+  };
+  const conversations = attachCrossAccountMailboxCopies(
+    [
+      { ...incoming, threadMessages: [sentReply, original] },
+      { ...copy, threadMessages: [] },
+    ],
+    [incoming, copy],
+    [original, sentReply]
+  );
+
+  assert.equal(conversations.length, 1);
+  assert.equal(conversations[0].id, 'inbox:copy');
+  assert.deepEqual(conversations[0].threadMessages.map((message) => message.id), [
+    'sent:original',
+    'inbox:sandra',
+  ]);
+  assert.deepEqual(conversations[0].copyContext, {
+    evidenceKnown: true,
+    kind: 'bcc',
+    sourceAccountEmail: 'martijn@softora.nl',
+    sourceName: 'Martijn van de Ven',
+    sourceEmail: 'martijn@softora.nl',
+    recipientName: 'Sandra van Berkel',
+    recipientEmail: 'equirehab4you@gmail.com',
+    copyAccountEmail: 'serve@softora.nl',
+    evidence: 'exact-bcc-recipient-and-cross-account-sent-message-id',
+  });
+});
+
+test('campaign mailbox labelt CC exact en gokt niet zonder recipient-provenance', () => {
+  const sent = {
+    id: 'sent:cc',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven',
+    email: 'martijn@softora.nl',
+    to: 'klant@example.nl',
+    cc: 'serve@softora.nl',
+    date: '2026-07-24T16:15:00.000Z',
+    messageId: '<cc@softora.nl>',
+  };
+  const copy = {
+    ...sent,
+    id: 'inbox:cc-copy',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+  };
+  const exact = attachCrossAccountMailboxCopies([{ ...copy, threadMessages: [] }], [copy], [sent]);
+  assert.equal(exact[0].copyContext.kind, 'cc');
+
+  const uncertainSent = { ...sent, id: 'sent:unknown', messageId: '<unknown@softora.nl>', cc: '' };
+  const uncertainCopy = {
+    ...uncertainSent,
+    id: 'inbox:unknown-copy',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+  };
+  const uncertain = attachCrossAccountMailboxCopies(
+    [{ ...uncertainCopy, threadMessages: [] }],
+    [uncertainCopy],
+    [uncertainSent]
+  );
+  assert.equal(uncertain[0].copyContext, undefined);
+});
 
 test('campaign mailbox removes duplicate IMAP rows for the same internet message', () => {
   const messages = dedupeCampaignMessages([

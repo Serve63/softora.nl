@@ -218,6 +218,92 @@ test('mailbox service sends mail through selected account smtp', async () => {
   assert.equal(sent[0].message.to, 'klant@example.nl');
 });
 
+test('mailbox service verstuurt alleen expliciete CC, BCC en veilige composebijlagen', async () => {
+  const sent = [];
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.example.test',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'secret',
+    }]),
+    createTransport: () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: '<compose@softora.nl>', accepted: [message.to], rejected: [] };
+      },
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await service.sendMessageResponse({
+    body: {
+      account: 'serve@softora.nl',
+      to: 'klant@example.nl',
+      cc: 'boekhouder@example.nl, collega@example.nl',
+      bcc: 'archief@example.nl',
+      subject: 'Documenten',
+      body: 'Hierbij de documenten.',
+      attachments: [{
+        filename: 'voorstel.pdf',
+        contentType: 'application/pdf',
+        contentBase64: Buffer.from('veilig document').toString('base64'),
+      }],
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(sent[0].cc, ['boekhouder@example.nl', 'collega@example.nl']);
+  assert.deepEqual(sent[0].bcc, ['archief@example.nl']);
+  assert.equal(sent[0].attachments.length, 1);
+  assert.equal(sent[0].attachments[0].filename, 'voorstel.pdf');
+  assert.equal(sent[0].attachments[0].content.toString(), 'veilig document');
+  assert.equal(sent[0].attachments[0].contentDisposition, 'attachment');
+});
+
+test('mailbox service blokkeert dubbele ontvangers en gevaarlijke composebijlagen voor SMTP', async () => {
+  let sendCalls = 0;
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      smtpHost: 'smtp.example.test',
+      smtpUser: 'serve@softora.nl',
+      smtpPass: 'secret',
+    }]),
+    createTransport: () => ({
+      sendMail: async () => {
+        sendCalls += 1;
+        return { accepted: [] };
+      },
+    }),
+  });
+  const duplicateRes = createResponseRecorder();
+  await service.sendMessageResponse({
+    body: {
+      account: 'serve@softora.nl',
+      to: 'klant@example.nl',
+      cc: 'klant@example.nl',
+      subject: 'Dubbel',
+    },
+  }, duplicateRes);
+  assert.equal(duplicateRes.statusCode, 400);
+
+  const attachmentRes = createResponseRecorder();
+  await service.sendMessageResponse({
+    body: {
+      account: 'serve@softora.nl',
+      to: 'klant@example.nl',
+      subject: 'Onveilig',
+      attachments: [{
+        filename: 'factuur.exe',
+        contentBase64: Buffer.from('niet uitvoeren').toString('base64'),
+      }],
+    },
+  }, attachmentRes);
+  assert.equal(attachmentRes.statusCode, 400);
+  assert.equal(sendCalls, 0);
+});
+
 test('mailbox service enriches normal webdesign sends with public link and inline images by default', async () => {
   const sent = [];
   const guardCalls = [];
@@ -1041,6 +1127,61 @@ test('mailbox service resolves Dutch sent folders without special-use metadata',
   assert.deepEqual(client.lockedMailboxes, ['INBOX/Verstuurd']);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].subject, 'STRATO verzonden bericht');
+});
+
+test('mailbox service bewaart exacte To, CC, BCC en bijlagemetadata uit de MIME-bron', async () => {
+  const sentDate = new Date('2026-07-24T16:15:00.000Z');
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [{
+        uid: 297,
+        flags: ['\\Seen'],
+        internalDate: sentDate,
+        source: {
+          date: sentDate,
+          text: 'Beste Sandra, hierbij mijn reactie.',
+          subject: 'Re: Kleine vraag over jullie website',
+          from: { value: [{ name: 'Martijn van de Ven', address: 'martijn@softora.nl' }] },
+          to: { value: [{ name: 'Sandra van Berkel', address: 'equirehab4you@gmail.com' }] },
+          cc: { value: [{ name: 'Collega', address: 'collega@softora.nl' }] },
+          bcc: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
+          attachments: [{
+            filename: 'voorstel.pdf',
+            contentType: 'application/pdf',
+            contentDisposition: 'attachment',
+            content: Buffer.from('document'),
+          }],
+        },
+      }],
+    },
+  });
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'martijn@softora.nl',
+      imapHost: 'imap.example.test',
+      imapUser: 'martijn@softora.nl',
+      imapPass: 'secret',
+    }]),
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const [message] = await service.listMessages({
+    accountEmail: 'martijn@softora.nl',
+    folder: 'sent',
+  });
+
+  assert.equal(message.to, 'equirehab4you@gmail.com');
+  assert.equal(message.toDisplay, 'Sandra van Berkel <equirehab4you@gmail.com>');
+  assert.equal(message.cc, 'Collega <collega@softora.nl>');
+  assert.equal(message.bcc, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(message.recipientRoutingEvidenceKnown, true);
+  assert.deepEqual(message.attachments, [{
+    filename: 'voorstel.pdf',
+    contentType: 'application/pdf',
+    size: 8,
+  }]);
 });
 
 test('mailbox service never reuses quoted cid campaign images as incoming-message media', async () => {
@@ -2162,7 +2303,7 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
   ]);
 });
 
-test('mailbox service moves deleted messages to the resolved trash folder', async () => {
+test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder bronmailmutatie', async () => {
   const persistenceCalls = [];
   let savedSnapshot = '';
   const initialSnapshot = serializeMailboxCampaignSnapshot({
@@ -2172,23 +2313,7 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
       { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
     ],
   });
-  const client = createFakeImapClient({
-    boxes: [
-      { path: 'INBOX' },
-      { path: 'INBOX/Prullenbak', specialUse: '\\Trash' },
-    ],
-    messagesByMailbox: {
-      INBOX: [
-        {
-          uid: 42,
-          flags: ['\\Seen'],
-          internalDate: new Date('2026-05-20T00:00:00.000Z'),
-          source: {},
-        },
-      ],
-      'INBOX/Prullenbak': [],
-    },
-  });
+  let imapClientCreations = 0;
   const service = createMailboxService({
     mailConfig: {},
     mailboxAccountsRaw: JSON.stringify([
@@ -2200,12 +2325,19 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
         imapPass: 'secret',
       },
     ]),
-    createImapClient: () => client,
+    createImapClient: () => {
+      imapClientCreations += 1;
+      throw new Error('bronmailclient mag niet worden aangemaakt');
+    },
     mailboxIndexStore: {
       isAvailable: () => true,
       listMessages: async () => [],
       markMessageDeleted: async (input) => {
         persistenceCalls.push(['index-delete', input]);
+        return { ok: true };
+      },
+      restoreMessage: async (input) => {
+        persistenceCalls.push(['index-restore', input]);
         return { ok: true };
       },
     },
@@ -2220,11 +2352,15 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
   });
   const res = createResponseRecorder();
 
-  await service.deleteMessageResponse(
+  await service.hideConversationResponse(
     {
       body: {
         account: 'serve@softora.nl',
         id: 'inbox:42',
+        messages: [
+          { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, folder: 'inbox' },
+          { account: 'serve@softora.nl', id: 'sent:7', uid: 7, folder: 'sent' },
+        ],
       },
     },
     res
@@ -2233,18 +2369,12 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.deepEqual(res.body.result, {
-    account: 'serve@softora.nl',
-    folder: 'inbox',
-    destinationFolder: 'trash',
-    uid: 42,
-    deleted: true,
-    moved: true,
-    indexUpdated: true,
+    hidden: true,
+    sourceMailboxMutated: false,
+    messageCount: 2,
     snapshotUpdated: true,
   });
-  assert.deepEqual(client.movedMessages, [
-    { mailboxName: 'INBOX', uids: [42], destination: 'INBOX/Prullenbak', options: { uid: true } },
-  ]);
+  assert.equal(imapClientCreations, 0);
   assert.deepEqual(persistenceCalls, [
     ['index-delete', {
       accountEmail: 'serve@softora.nl',
@@ -2252,9 +2382,15 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
       folder: 'inbox',
       uid: 42,
     }],
+    ['index-delete', {
+      accountEmail: 'serve@softora.nl',
+      id: 'sent:7',
+      folder: 'sent',
+      uid: 7,
+    }],
     ['snapshot-read', MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE],
     ['snapshot-write', MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
-      source: 'mailbox-delete',
+      source: 'mailbox-view-hide',
       actor: 'serve@softora.nl',
     }],
   ]);
@@ -2262,6 +2398,42 @@ test('mailbox service moves deleted messages to the resolved trash folder', asyn
     parseMailboxCampaignSnapshot(savedSnapshot).messages.map((message) => message.uid),
     [43]
   );
+
+  const restoreRes = createResponseRecorder();
+  await service.restoreConversationResponse(
+    {
+      body: {
+        account: 'serve@softora.nl',
+        id: 'inbox:42',
+        messages: [
+          { account: 'serve@softora.nl', id: 'inbox:42', uid: 42, folder: 'inbox' },
+          { account: 'serve@softora.nl', id: 'sent:7', uid: 7, folder: 'sent' },
+        ],
+      },
+    },
+    restoreRes
+  );
+  assert.equal(restoreRes.statusCode, 200);
+  assert.deepEqual(restoreRes.body.result, {
+    restored: true,
+    sourceMailboxMutated: false,
+    messageCount: 2,
+  });
+  assert.equal(imapClientCreations, 0);
+  assert.deepEqual(persistenceCalls.slice(-2), [
+    ['index-restore', {
+      accountEmail: 'serve@softora.nl',
+      id: 'inbox:42',
+      folder: 'inbox',
+      uid: 42,
+    }],
+    ['index-restore', {
+      accountEmail: 'serve@softora.nl',
+      id: 'sent:7',
+      folder: 'sent',
+      uid: 7,
+    }],
+  ]);
 });
 
 test('mailbox service strips tracking and standalone asset urls from display text', () => {
@@ -2871,7 +3043,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   assert.equal(persistedSnapshot.messages[1].body, 'Volledige inhoud voor inbox:42');
 });
 
-test('mailbox routes expose accounts, messages, send, delete and rewrite endpoints', () => {
+test('mailbox routes expose accounts, messages, send, local hide restore and rewrite endpoints', () => {
   const routes = [];
   const app = {
     get(path, ...handlers) {
@@ -2891,7 +3063,8 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
       getMessageBodiesResponse() {},
       getMessageImageResponse() {},
       markMessageReadResponse() {},
-      deleteMessageResponse() {},
+      hideConversationResponse() {},
+      restoreConversationResponse() {},
       sendMessageResponse() {},
       rewriteDraftResponse() {},
     },
@@ -2903,7 +3076,9 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/bodies'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/message-image'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
-  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/hide'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/restore'));
+  assert.ok(!routes.some(([, path]) => path === '/api/mailbox/messages/delete'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/send'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
 });
