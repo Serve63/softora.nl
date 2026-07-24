@@ -1376,7 +1376,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724j/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724k/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260724d/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724e/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
@@ -1452,7 +1452,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724d"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724d"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724e"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260724c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724j"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724d"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724d"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724e"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260724c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724k"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3009,6 +3009,62 @@ test('premium mailbox toont Brigit, Karlien en Marjolein hun exacte oude Sent-pa
     );
     assert.doesNotMatch(html, new RegExp(`>${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<`));
   });
+});
+
+test('premium mailbox houdt de oude Sent-parent zichtbaar naast een latere uitgaande reactie', () => {
+  const url = 'https://www.softora.nl/webdesign/bizzylizzy?cid=legacy-parent';
+  const parentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website (bizzylizzy.nl) tegen.',
+    '',
+    `PS: Wordt het webdesign niet zichtbaar? Open het via hier [[${url}](${url})] 👈`,
+  ].join('\n');
+  const laterReply = 'Hoi Brigit,\n\nDankjewel voor je reactie.';
+  const html = renderMailboxBodyForTest(
+    'Hoi Servé,\n\nBedankt voor het ontwerp.',
+    [],
+    {
+      replyMailId: 'inbox:60',
+      mail: {
+        id: 'inbox:60',
+        accountEmail: 'serve@softora.nl',
+        folder: 'inbox',
+        receivedAt: '2026-06-01T14:46:00.000Z',
+        date: '2026-06-01T14:46:00.000Z',
+        threadMessages: [
+          {
+            id: 'sent:71',
+            folder: 'sent',
+            accountEmail: 'serve@softora.nl',
+            date: '2026-06-02T11:12:14.000Z',
+            body: laterReply,
+            originalCampaignOutbound: false,
+          },
+          {
+            id: 'sent:62',
+            folder: 'sent',
+            accountEmail: 'serve@softora.nl',
+            date: '2026-06-01T10:33:11.000Z',
+            body: parentBody,
+            originalCampaignOutbound: true,
+            webdesignLinkEvidenceKnown: true,
+            webdesignLinkUrl: url,
+          },
+        ],
+      },
+    }
+  );
+
+  assert.equal((html.match(/detail-mail-section-sent/g) || []).length, 2);
+  assert.equal((html.match(/>Jouw bericht</g) || []).length, 2);
+  assert.equal((html.match(/Nieuw bericht sturen/g) || []).length, 1);
+  assert.match(html, /Dankjewel voor je reactie/);
+  assert.match(
+    html,
+    new RegExp(`<a class="detail-mail-cta-link" href="${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;')}" target="_blank" rel="noopener noreferrer">hier</a>`)
+  );
+  assert.doesNotMatch(html, /Jouw eerdere mail|detail-mail-section-quote/);
 });
 
 test('premium mailbox maakt een legacy hier-url zonder exact MIME-bewijs niet klikbaar', () => {

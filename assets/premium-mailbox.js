@@ -566,6 +566,7 @@ function renderMailBody(value, images, options) {
   let injectedImages = false;
   let injectedAttachments = false;
   let insertedReplyAction = false;
+  let insertedOlderThreadMessages = false;
   sections.forEach((section) => {
     if (!insertedReplyAction && rootActionHtml && section && section.type === 'quote') {
       if (rootAttachmentsHtml && !injectedAttachments) {
@@ -573,7 +574,10 @@ function renderMailBody(value, images, options) {
         injectedAttachments = true;
       }
       renderedSections.push(rootActionHtml);
-      if (!isProvenMailboxCopy && olderThreadMessagesHtml) renderedSections.push(olderThreadMessagesHtml);
+      if (!isProvenMailboxCopy && olderThreadMessagesHtml) {
+        renderedSections.push(olderThreadMessagesHtml);
+        insertedOlderThreadMessages = true;
+      }
       insertedReplyAction = true;
     }
     if (!hasImagePlaceholders && !injectedImages && section && section.type === 'signature') {
@@ -593,7 +597,13 @@ function renderMailBody(value, images, options) {
   }
   if (!insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
     renderedSections.push(rootActionHtml);
-    if (!isProvenMailboxCopy && olderThreadMessagesHtml) renderedSections.push(olderThreadMessagesHtml);
+    if (!isProvenMailboxCopy && olderThreadMessagesHtml) {
+      renderedSections.push(olderThreadMessagesHtml);
+      insertedOlderThreadMessages = true;
+    }
+  }
+  if (!isProvenMailboxCopy && olderThreadMessagesHtml && !insertedOlderThreadMessages) {
+    renderedSections.push(olderThreadMessagesHtml);
   }
   if (imageState.quoteImages.length) renderedSections.push(window.SoftoraMailboxImages.renderOwnQuoteSection(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage));
   if (isProvenMailboxCopy) renderedSections.push('</section>');
