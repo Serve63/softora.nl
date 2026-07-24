@@ -227,6 +227,37 @@
     return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
   }
 
+  function getActionMessageKey(mail) {
+    const messageId = normalizeMessageId(mail && mail.messageId);
+    if (messageId) return `message:${messageId}`;
+    const account = normalizeEmail(mail && mail.accountEmail);
+    const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
+    return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
+  }
+
+  function getConversationAction(mail) {
+    if (!mail) return null;
+    const root = { ...mail, mailboxConversationRoot: true };
+    const messages = [
+      root,
+      ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : []),
+    ].filter((message) => getMessageTimestamp(message));
+    if (!messages.length) return null;
+    const latest = messages
+      .slice()
+      .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0];
+    const isRoot = latest.mailboxConversationRoot === true;
+    const exactCopy = isRoot && mail.copyContext && mail.copyContext.evidenceKnown === true;
+    const outbound = exactCopy ||
+      String(latest && latest.folder || '').trim().toLowerCase() === 'sent';
+    return {
+      kind: outbound ? 'new-message' : 'reply',
+      message: latest,
+      messageKey: getActionMessageKey(latest),
+      isRoot,
+    };
+  }
+
   function sortMessagesNewestFirst(messages) {
     return (Array.isArray(messages) ? messages : [])
       .slice()
@@ -372,6 +403,47 @@
   function renderDetailAccount(mail, escapeHtml) {
     if (!isCampaignMail(mail) || !mail.accountEmail || typeof escapeHtml !== 'function') return '';
     return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}</div>`;
+  }
+
+  function renderCopyRouting(mail, escapeHtml) {
+    const context = mail && mail.copyContext;
+    const kind = String(context && context.kind || '').trim().toLowerCase();
+    if (
+      !context ||
+      context.evidenceKnown !== true ||
+      !['bcc', 'cc'].includes(kind) ||
+      typeof escapeHtml !== 'function'
+    ) return '';
+    function identity(name, email) {
+      const normalizedEmail = normalizeEmail(email);
+      const owner = getOwnerByAccount(normalizedEmail);
+      const normalizedName = owner ? getOwnerLabel(owner) : String(name || '').trim();
+      if (normalizedName && normalizedEmail) {
+        return `${escapeHtml(normalizedName)} &lt;${escapeHtml(normalizedEmail)}&gt;`;
+      }
+      return escapeHtml(normalizedEmail || normalizedName || 'Onbekend');
+    }
+    return `
+      <div class="detail-routing" data-mailbox-copy-kind="${escapeHtml(kind)}">
+        <div><span>Van:</span><strong>${identity(context.sourceName, context.sourceEmail)}</strong></div>
+        <div><span>Aan:</span><strong>${identity(context.recipientName, context.recipientEmail)}</strong></div>
+        <div><span>${kind.toUpperCase()}:</span><strong>${identity('', context.copyAccountEmail)}</strong></div>
+      </div>`;
+  }
+
+  function renderAttachments(message, escapeHtml) {
+    if (typeof escapeHtml !== 'function') return '';
+    const attachments = (Array.isArray(message && message.attachments) ? message.attachments : [])
+      .filter((attachment) => String(attachment && attachment.filename || '').trim())
+      .slice(0, 20);
+    if (!attachments.length) return '';
+    return `<div class="detail-attachments" aria-label="Bijlagen">${attachments.map((attachment) => {
+      const size = Math.max(0, Number(attachment.size) || 0);
+      const sizeLabel = size >= 1024 * 1024
+        ? `${(size / (1024 * 1024)).toFixed(1)} MB`
+        : size ? `${Math.max(1, Math.round(size / 1024))} kB` : '';
+      return `<span class="detail-attachment"><span>📎</span><strong>${escapeHtml(attachment.filename)}</strong>${sizeLabel ? `<small>${escapeHtml(sizeLabel)}</small>` : ''}</span>`;
+    }).join('')}</div>`;
   }
 
   function stripQuotedReply(value) {
@@ -597,8 +669,9 @@
   function renderThreadMessages(mail, escapeHtml, formatDate, options = {}) {
     if (!mail || typeof escapeHtml !== 'function') return '';
     const rootTimestamp = getMessageTimestamp(mail);
+    const mailboxOwner = getOwnerByAccount(mail.accountEmail) || activeOwner;
     const position = String(options.position || 'all').trim().toLowerCase();
-    const messages = (Array.isArray(mail.threadMessages) ? mail.threadMessages : [])
+    let messages = (Array.isArray(mail.threadMessages) ? mail.threadMessages : [])
       .filter((message) => {
         if (position === 'all') return true;
         if (!rootTimestamp) return position !== 'newer';
@@ -608,6 +681,9 @@
           ? messageTimestamp > rootTimestamp
           : messageTimestamp <= rootTimestamp;
       });
+    if (options.chronological === true) {
+      messages = messages.slice().sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
+    }
     return messages.map((message) => {
       const loading = Boolean(message && message.bodyLoading);
       const body = loading ? '' : stripQuotedReply(message && (message.body || message.preview));
@@ -615,7 +691,9 @@
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const folder = String(message && message.folder || 'sent').trim().toLowerCase();
       const sent = folder === 'sent';
-      const owner = sent ? getOwnerLabel(getOwnerByAccount(message.accountEmail)) : '';
+      const messageOwner = sent ? getOwnerByAccount(message.accountEmail) : '';
+      const owner = messageOwner ? getOwnerLabel(messageOwner) : '';
+      const sentLabel = messageOwner && messageOwner === mailboxOwner ? 'Jouw bericht' : 'Eerdere mail';
       const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
       const meta = [dateLabel, owner].filter(Boolean).join(' · ');
       const renderedBody = loading
@@ -627,14 +705,19 @@
             const emptyClass = content.trim() ? '' : ' detail-mail-line-empty';
             return `<div class="detail-mail-line${emptyClass}">${escapeHtml(content)}</div>`;
           }).join('')}</div>`;
+      const renderedAttachments = loading ? '' : renderAttachments(message, escapeHtml);
       const sectionClass = sent
         ? 'detail-mail-section detail-mail-section-sent'
         : 'detail-mail-section detail-mail-section-received';
-      return `
+      const actionBefore = options.action &&
+        options.action.messageKey === getActionMessageKey(message)
+        ? String(options.action.html || '')
+        : '';
+      return `${actionBefore}
         <section class="${sectionClass}">
-          <div class="detail-mail-section-label">${sent ? 'Jouw bericht' : 'Eerder ontvangen'}</div>
+          <div class="detail-mail-section-label">${sent ? sentLabel : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
-          ${renderedBody}
+          ${renderedBody}${renderedAttachments}
         </section>`;
     }).filter(Boolean).join('');
   }
@@ -879,6 +962,7 @@
     filterMessages,
     getAccount,
     getConversationId,
+    getConversationAction,
     getFolder,
     hasPageBootstrap,
     getOwner,
@@ -904,6 +988,8 @@
     removeAndPublishMessageDeletion,
     removeCachedMessage,
     renderDetailAccount,
+    renderCopyRouting,
+    renderAttachments,
     renderListMeta,
     renderOwnerMenu,
     renderThreadMessages,
