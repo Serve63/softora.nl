@@ -563,6 +563,23 @@ function createRuntimeOpsCoordinator(deps = {}) {
     return snapshotUpdatedAtMs || parseStateUpdatedAtMs(state);
   }
 
+  function getSportschoolLogbookStateVersionToken(state) {
+    return normalizeString(
+      (state && state.updatedAt) ||
+        (parseSportschoolLogbookStateSnapshot(state) || {}).updatedAt
+    );
+  }
+
+  function hasMatchingSportschoolLogbookVersion(expectedUpdatedAt, currentState) {
+    const expected = normalizeString(expectedUpdatedAt);
+    const current = getSportschoolLogbookStateVersionToken(currentState);
+    if (!expected || !current) return true;
+    const expectedMs = Date.parse(expected);
+    const currentMs = Date.parse(current);
+    if (Number.isFinite(expectedMs) && Number.isFinite(currentMs)) return expectedMs === currentMs;
+    return expected === current;
+  }
+
   function shouldPreferLegacySportschoolLogbook(fallbackState, sportschoolState) {
     const fallbackQuality = getSportschoolLogbookStateQuality(fallbackState);
     if (!fallbackQuality.usable) return false;
@@ -674,11 +691,27 @@ function createRuntimeOpsCoordinator(deps = {}) {
         updatedAt: new Date().toISOString(),
       };
 
+      if (!hasMatchingSportschoolLogbookVersion(body.baseUpdatedAt, currentState)) {
+        return {
+          statusCode: 409,
+          payload: {
+            ok: false,
+            conflict: true,
+            scope: SPORTSCHOOL_LOGBOOK_SCOPE,
+            error: 'Sportschool logboek is intussen gewijzigd.',
+            values: (currentState && currentState.values) || {},
+            source: (currentState && currentState.source) || 'supabase',
+            updatedAt: (currentState && currentState.updatedAt) || null,
+          },
+        };
+      }
+
       if (isOlderSportschoolLogbookWrite(incomingState, currentState)) {
         return {
           statusCode: 409,
           payload: {
             ok: false,
+            conflict: true,
             scope: SPORTSCHOOL_LOGBOOK_SCOPE,
             error: 'Verouderde sportschool logboekdata geweigerd.',
             values: (currentState && currentState.values) || {},

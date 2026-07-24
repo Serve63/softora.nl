@@ -861,6 +861,106 @@ test('runtime ops coordinator serialiseert sportschool writes zodat laatste snap
   assert.equal(JSON.parse(currentState.values.sportschool_logboek_v1).exerciseSources['name:LEG EXTENSIONS'].kg, '104');
 });
 
+test('runtime ops coordinator weigert een nieuwere clientwrite vanaf een verouderde remote basis', async () => {
+  const writes = [];
+  const currentSnapshot = {
+    version: 2,
+    updatedAt: '2026-07-24T10:02:00.000Z',
+    exerciseSources: {
+      'name:CHEST PRESS': {
+        title: 'CHEST PRESS',
+        sets: '3',
+        reps: '8',
+        kg: '84',
+        notes: '',
+      },
+    },
+    days: {},
+  };
+  const incomingSnapshot = {
+    ...currentSnapshot,
+    updatedAt: '2026-07-24T10:03:00.000Z',
+    exerciseSources: {
+      ...currentSnapshot.exerciseSources,
+      'name:CHEST PRESS': {
+        ...currentSnapshot.exerciseSources['name:CHEST PRESS'],
+        kg: '86',
+      },
+    },
+  };
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: { sportschool_logboek_v1: JSON.stringify(currentSnapshot) },
+      source: 'supabase',
+      updatedAt: '2026-07-24T10:02:00.000Z',
+    }),
+    setUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return { values, source: 'supabase', updatedAt: incomingSnapshot.updatedAt };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot: incomingSnapshot,
+        baseUpdatedAt: '2026-07-24T10:00:00.000Z',
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.conflict, true);
+  assert.match(res.body.error, /intussen gewijzigd/);
+  assert.equal(JSON.parse(res.body.values.sportschool_logboek_v1).exerciseSources['name:CHEST PRESS'].kg, '84');
+  assert.equal(writes.length, 0);
+});
+
+test('runtime ops coordinator accepteert dezelfde remote versie met equivalente tijdzone-notatie', async () => {
+  const writes = [];
+  const currentSnapshot = {
+    version: 2,
+    updatedAt: '2026-07-24T10:02:00.000Z',
+    exerciseSources: {},
+    days: {},
+  };
+  const incomingSnapshot = {
+    ...currentSnapshot,
+    updatedAt: '2026-07-24T10:03:00.000Z',
+  };
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: { sportschool_logboek_v1: JSON.stringify(currentSnapshot) },
+      source: 'supabase',
+      updatedAt: '2026-07-24T12:02:00.000+02:00',
+    }),
+    setUiStateValues: async (_scope, values) => {
+      writes.push(values);
+      return { values, source: 'supabase', updatedAt: incomingSnapshot.updatedAt };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSportschoolLogbookSetResponse(
+    {
+      body: {
+        snapshot: incomingSnapshot,
+        baseUpdatedAt: '2026-07-24T10:02:00.000Z',
+        source: 'sportschool-logboek',
+        actor: 'serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes.length, 1);
+});
+
 test('runtime ops coordinator schrijft sportschool logboek via data-ops brug wanneer legacy opslag ontbreekt', async () => {
   const bridgedWrites = [];
   const legacyWrites = [];

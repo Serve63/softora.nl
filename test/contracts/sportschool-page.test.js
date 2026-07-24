@@ -23,6 +23,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
+  const syncScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-sync.js'), 'utf8');
   const migrationSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-program-migration.js'), 'utf8');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const prettyPages = createKnownPrettyPageSlugToFile(new Set(['sportschool.html']));
@@ -55,7 +56,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/premium-ui-state-client\.js/);
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260701a/);
+  assert.match(pageSource, /assets\/sportschool-logboek-sync\.js\?v=20260724a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260724a/);
   assert.match(pageSource, /assets\/sportschool-program-migration\.js\?v=20260711a/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -92,7 +94,13 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /window\.setTimeout\(boot, REMOTE_RETRY_DELAY_MS\)/);
   assert.match(scriptSource, /keepalive: options\.keepalive === true/);
   assert.match(scriptSource, /pagehide/);
-  assert.match(scriptSource, /visibilitychange/);
+  assert.match(syncScriptSource, /visibilitychange/);
+  assert.match(scriptSource, /createResumeRevalidator/);
+  assert.match(scriptSource, /bindResumeEvents/);
+  assert.match(scriptSource, /baseUpdatedAt/);
+  assert.match(scriptSource, /resolveRemoteSaveConflict/);
+  assert.match(syncScriptSource, /mergeConflictSnapshots/);
+  assert.match(syncScriptSource, /refreshDeferredForLocalChanges/);
   assert.match(scriptSource, /lastRemoteSnapshotJson = snapshotJson/);
   assert.match(scriptSource, /createDefaultState/);
   assert.match(scriptSource, /async function boot/);
