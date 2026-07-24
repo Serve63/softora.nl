@@ -2440,10 +2440,10 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   });
 
   assert.match(result.text, /^Beste Lisa,/);
-  assert.match(result.text, /Servé Creusen$/);
-  assert.doesNotMatch(result.text, /Martijn van de Ven/);
+  assert.match(result.text, /Martijn van de Ven$/);
+  assert.doesNotMatch(result.text, /Servé Creusen/);
   assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
-  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Servé Creusen/);
+  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
   assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v1/);
   assert.match(calls[0].messages[0].content, /verzin geen prijs/i);
   assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
@@ -2452,7 +2452,7 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
 });
 
-test('mailbox service laat replycontext de afzender bepalen en corrigeert een verkeerde AI-signatuur', async () => {
+test('mailbox service laat replycontext Martijn bepalen en corrigeert een verkeerde AI-signatuur', async () => {
   const calls = [];
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-key',
@@ -2484,10 +2484,10 @@ test('mailbox service laat replycontext de afzender bepalen en corrigeert een ve
     },
   });
 
-  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Servé Creusen/);
+  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
   assert.match(calls[0].messages[1].content, /"accountEmail":"martijn@softora.nl"/);
-  assert.match(calls[0].messages[1].content, /"naam":"Servé Creusen"/);
-  assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen');
+  assert.match(calls[0].messages[1].content, /"naam":"Martijn van de Ven"/);
+  assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
 });
 
 test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail en corrigeert Webflow-feiten', async () => {
@@ -2503,7 +2503,7 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
         data: {
           choices: [{
             message: {
-              content: 'Hoi Salon,\n\nIk werk zelf ook in Webflow. Dan kunnen we jullie kansen laagdrempelig bespreken.',
+              content: 'Hoi Salon,\n\nDit ontwerp heb ik met code gebouwd, dus niet in Webflow. Webflow kan ik ook voor jullie verbeteren.',
             },
           }],
         },
@@ -2541,7 +2541,10 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
   assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
   assert.match(result.text, /^Beste,/);
   assert.match(result.text, /Dit ontwerp heb ik met code gebouwd/);
-  assert.doesNotMatch(result.text, /Hoi Salon|werk zelf ook in Webflow|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.match(result.text, /Als je wilt, denk ik graag even met je mee over wat voor jou handig is\./);
+  assert.match(result.text, /Is het een idee dat ik volgende week \[dag\] even langskom\?/);
+  assert.doesNotMatch(result.text, /Hoi Salon|dus niet in Webflow|Webflow kan|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.doesNotMatch(result.text, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.text.match(/😁/gu) || []).length, 1);
   assert.equal(result.text.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });

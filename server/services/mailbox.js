@@ -39,7 +39,6 @@ const {
 const { fitWebdesignPreviewForEmail } = require('./coldmail-image-frame');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
-  MAILBOX_REPLY_PROFILE,
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplyPromptPayload,
   buildMailboxReplySystemPrompt,
@@ -2399,13 +2398,9 @@ function createMailboxService(deps = {}) {
     const contextAccountEmail = normalizeEmail(context && context.accountEmail);
     const resolvedAccountEmail = getAccount(contextAccountEmail) ? contextAccountEmail : normalizeEmail(accountEmail);
     const accountSenderName = cleanPromptText(getAccount(resolvedAccountEmail)?.name, 120) || resolvedAccountEmail;
-    const systemPrompt = hasReplyContext
-      ? buildMailboxReplySystemPrompt({ hasDraft: Boolean(draft) })
-      : buildMailboxDraftRewriteSystemPrompt({ senderName: accountSenderName });
-
     const payload = buildMailboxReplyPromptPayload({
       accountEmail: resolvedAccountEmail,
-      senderName: hasReplyContext ? MAILBOX_REPLY_PROFILE.senderName : accountSenderName,
+      senderName: accountSenderName,
       to,
       subject,
       body: draft,
@@ -2415,6 +2410,9 @@ function createMailboxService(deps = {}) {
       cleanPromptText,
       normalizeEmail,
     });
+    const systemPrompt = hasReplyContext
+      ? buildMailboxReplySystemPrompt({ hasDraft: Boolean(draft), senderName: payload.afzenderContext?.naam })
+      : buildMailboxDraftRewriteSystemPrompt({ senderName: accountSenderName });
     const baseUrl = normalizeString(openAiApiBaseUrl) || 'https://api.openai.com/v1';
     const { response, data } = await fetchJsonWithTimeout(
       `${baseUrl}/chat/completions`,
@@ -2454,6 +2452,7 @@ function createMailboxService(deps = {}) {
             payload.ontvangenMail?.body,
             payload.ontvangenMail?.preview,
           ].filter(Boolean).join('\n'),
+          senderName: payload.afzenderContext?.naam,
         }), 8000)
       : generatedText;
     if (!text) {

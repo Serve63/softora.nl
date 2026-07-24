@@ -272,7 +272,8 @@
     const normalizedLabel = String(label || '').trim();
     const isWebdesignCta = /^deze link$/i.test(normalizedLabel);
     const anchorLabel = isWebdesignCta ? 'link' : normalizedLabel;
-    const anchor = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anchorLabel)}</a>`;
+    const anchorClass = isWebdesignCta ? ' class="detail-mail-cta-link"' : '';
+    const anchor = `<a${anchorClass} href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anchorLabel)}</a>`;
     return isWebdesignCta ? `deze ${anchor}` : anchor;
   }
 
