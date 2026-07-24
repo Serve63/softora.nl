@@ -2,7 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
-const { CAMPAIGN_SYNC_INDEX_SCAN_LIMIT } = require('../../server/services/mailbox-campaign-sync');
+const {
+  CAMPAIGN_SYNC_FETCH_LIMIT,
+  CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+  CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+} = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
@@ -1039,7 +1043,7 @@ test('mailbox service resolves Dutch sent folders without special-use metadata',
   assert.equal(messages[0].subject, 'STRATO verzonden bericht');
 });
 
-test('mailbox service exposes inline cid images for mail display placeholders', async () => {
+test('mailbox service never reuses quoted cid campaign images as incoming-message media', async () => {
   const sentDate = new Date('2026-05-18T13:18:00.000Z');
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX' }],
@@ -1102,21 +1106,11 @@ test('mailbox service exposes inline cid images for mail display placeholders', 
 
   assert.equal(messages.length, 1);
   assert.match(messages[0].body, /\[image: Softora Testmodus webdesign\]/);
-  assert.equal(messages[0].bodyImages.length, 2);
-  assert.deepEqual(
-    messages[0].bodyImages.map((image) => image.alt),
-    ['Softora Testmodus webdesign', 'Softora Testmodus device mockup']
-  );
-  assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
-  assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
-  assert.deepEqual(
-    messages[0].bodyImages.map((image) => image.owner),
-    ['sent-campaign', 'sent-campaign']
-  );
-  assert.equal(messages[0].inlineImages.length, 2);
-  assert.equal(messages[0].inlineImages[0].alt, 'Softora Testmodus webdesign');
-  assert.equal(messages[0].inlineImages[0].contentType, 'image/png');
-  assert.equal(messages[0].inlineImages[0].contentBase64, 'd2ViZGVzaWduLXBob3Rv');
+  assert.deepEqual(messages[0].bodyImages, []);
+  assert.deepEqual(messages[0].inlineImages, []);
+  assert.equal(messages[0].bodyImageEvidenceKnown, true);
+  assert.equal(messages[0].embeddedImageCount, 2);
+  assert.equal(messages[0].originalCampaignOutbound, false);
   assert.doesNotMatch(messages[0].preview, /\[image:/);
 });
 
@@ -1182,9 +1176,12 @@ test('mailbox service keeps inline cid images when plain text has no image place
   assert.equal(messages[0].bodyImages[0].alt, 'Softora Testmodus webdesign');
   assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
   assert.equal(messages[0].bodyImages[0].owner, undefined);
+  assert.equal(messages[0].bodyImageEvidenceKnown, true);
+  assert.equal(messages[0].embeddedImageCount, 1);
+  assert.equal(messages[0].originalCampaignOutbound, true);
 });
 
-test('mailbox service restores quoted webdesign image placeholders from stored database photos', async () => {
+test('mailbox service never turns a quoted image placeholder into stored database media', async () => {
   const photoKey = 'softora_database_photo_data_v1_softora_testmodus';
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX' }],
@@ -1213,6 +1210,7 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
       ],
     },
   });
+  let stateReads = 0;
   const service = createMailboxService({
     mailboxAccountsRaw: JSON.stringify([
       {
@@ -1223,6 +1221,7 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
       },
     ]),
     getUiStateValues: async (scope) => {
+      stateReads += 1;
       if (scope === 'premium_customers_database') return { values: {} };
       assert.equal(scope, 'premium_database_photos');
       return {
@@ -1246,18 +1245,13 @@ test('mailbox service restores quoted webdesign image placeholders from stored d
   const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'inbox' });
 
   assert.equal(messages.length, 1);
-  assert.equal(messages[0].bodyImages.length, 1);
-  assert.equal(messages[0].bodyImages[0].alt, 'Softora Testmodus webdesign');
-  assert.equal(messages[0].bodyImages[0].contentType, 'image/png');
-  assert.equal(messages[0].bodyImages[0].dataUrl, TINY_PNG_DATA_URL);
-  assert.equal(messages[0].bodyImages[0].owner, 'sent-campaign');
-  assert.equal(messages[0].inlineImages.length, 1);
-  assert.equal(messages[0].inlineImages[0].alt, 'Softora Testmodus webdesign');
-  assert.equal(messages[0].inlineImages[0].contentType, 'image/png');
-  assert.equal(messages[0].inlineImages[0].contentBase64, TINY_PNG_DATA_URL.split(',')[1]);
+  assert.deepEqual(messages[0].bodyImages, []);
+  assert.deepEqual(messages[0].inlineImages, []);
+  assert.equal(messages[0].embeddedImageCount, 0);
+  assert.equal(stateReads, 0);
 });
 
-test('mailbox service restores webdesign photos when an indexed reply is opened', async () => {
+test('mailbox service trusts indexed zero-image evidence and never synthesizes reply media', async () => {
   let imapCalls = 0;
   const customerId = 'devyldre';
   const service = createMailboxService({
@@ -1290,6 +1284,9 @@ test('mailbox service restores webdesign photos when an indexed reply is opened'
           'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.',
         ].join('\n'),
         hasBody: true,
+        bodyImageEvidenceKnown: true,
+        embeddedImageCount: 0,
+        originalCampaignOutbound: false,
         indexed: true,
       }),
     },
@@ -1338,20 +1335,12 @@ test('mailbox service restores webdesign photos when an indexed reply is opened'
   });
 
   assert.equal(imapCalls, 0);
-  assert.deepEqual(
-    message.bodyImages.map((image) => image.alt),
-    ['De Vyldre webdesign', 'De Vyldre device mockup']
-  );
-  assert.deepEqual(
-    message.bodyImages.map((image) => image.owner),
-    ['sent-campaign', 'sent-campaign']
-  );
-  assert.match(message.body, /\[image: De Vyldre webdesign\]/);
-  assert.match(message.body, /\[image: De Vyldre device mockup\]/);
-  assert.equal(message.inlineImages.length, 2);
+  assert.deepEqual(message.bodyImages || [], []);
+  assert.deepEqual(message.inlineImages || [], []);
+  assert.doesNotMatch(message.body, /\[image:/);
 });
 
-test('mailbox service prioritizes the matched recipient design over stale indexed image labels', async () => {
+test('mailbox service never replaces stale indexed image labels with another stored design', async () => {
   const requestedCustomerIds = [];
   const customerId = 'nicole-vintage-fashion';
   const service = createMailboxService({
@@ -1384,6 +1373,9 @@ test('mailbox service prioritizes the matched recipient design over stale indexe
           '[image: www.dejavu-kapsalon.nl-preview-device-mockup-v8]',
         ].join('\n'),
         hasBody: true,
+        bodyImageEvidenceKnown: true,
+        embeddedImageCount: 0,
+        originalCampaignOutbound: false,
         indexed: true,
       }),
     },
@@ -1452,12 +1444,9 @@ test('mailbox service prioritizes the matched recipient design over stale indexe
     id: 'inbox:45',
   });
 
-  assert.deepEqual(requestedCustomerIds, [customerId]);
-  assert.deepEqual(
-    message.bodyImages.map((image) => image.alt),
-    ['nicolevintagefashion.com-preview', 'nicolevintagefashion.com-preview-device-mockup']
-  );
-  assert.equal(message.bodyImages.some((image) => /dejavu/i.test(image.alt)), false);
+  assert.deepEqual(requestedCustomerIds, []);
+  assert.deepEqual(message.bodyImages || [], []);
+  assert.match(message.body, /\[image: www\.dejavu-kapsalon\.nl-preview\]/);
 });
 
 test('mailbox service never falls back to another company design for a matched recipient', async () => {
@@ -1492,6 +1481,9 @@ test('mailbox service never falls back to another company design for a matched r
           '[image: www.dejavu-kapsalon.nl-preview-device-mockup-v8]',
         ].join('\n'),
         hasBody: true,
+        bodyImageEvidenceKnown: true,
+        embeddedImageCount: 0,
+        originalCampaignOutbound: false,
         indexed: true,
       }),
     },
@@ -1610,6 +1602,9 @@ test('mailbox service keeps link-only webdesign sends free of recovered image pl
   assert.doesNotMatch(messages[0].body, /\[image:/i);
   assert.doesNotMatch(messages[0].body, /korte indruk van de eerste versie/i);
   assert.equal(messages[0].bodyImages.length, 0);
+  assert.equal(messages[0].bodyImageEvidenceKnown, true);
+  assert.equal(messages[0].embeddedImageCount, 0);
+  assert.equal(messages[0].originalCampaignOutbound, true);
   assert.deepEqual(requestedScopes, []);
 });
 
@@ -1663,7 +1658,7 @@ test('mailbox service exposes hidden coldmail opt-out links for clickable mail p
   assert.equal(messages[0].optOutUrl, 'https://www.softora.nl/afmelden?t=test-token');
 });
 
-test('mailbox service recovers sent webdesign images without treating Softora links as customer designs', async () => {
+test('mailbox service never infers sent webdesign images from links or stored customer designs', async () => {
   const photoUrl = 'https://example.supabase.co/storage/v1/object/sign/jagthuijs-design-photo.png?token=photo';
   const mockupUrl = 'https://example.supabase.co/storage/v1/object/sign/jagthuijs-design-mockup.png?token=mockup';
   const softoraPhotoUrl = 'https://example.supabase.co/storage/v1/object/sign/softora-design-photo.png?token=photo';
@@ -1789,26 +1784,14 @@ test('mailbox service recovers sent webdesign images without treating Softora li
     const messages = await service.listMessages({ accountEmail: 'serve@softora.nl', folder: 'sent' });
 
     assert.equal(messages.length, 1);
-    const phoneIndex = messages[0].body.indexOf('0629917185');
-    const webdesignIndex = messages[0].body.indexOf('[image: Jaghthuijs webdesign]');
-    const captionIndex = messages[0].body.indexOf('Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.');
-    const mockupIndex = messages[0].body.indexOf('[image: Jaghthuijs device mockup]');
-    const optOutIndex = messages[0].body.indexOf('Geen webdesign willen ontvangen? Laat het me weten!');
-    assert.ok(phoneIndex > 0);
-    assert.ok(webdesignIndex > phoneIndex);
-    assert.ok(captionIndex > webdesignIndex);
-    assert.ok(mockupIndex > captionIndex);
-    assert.ok(optOutIndex > mockupIndex);
-    assert.doesNotMatch(messages[0].body, /\[image: Softora webdesign]/);
-    assert.equal(messages[0].bodyImages.length, 2);
-    assert.deepEqual(
-      messages[0].bodyImages.map((image) => image.alt),
-      ['Jaghthuijs webdesign', 'Jaghthuijs device mockup']
-    );
-    assert.equal(messages[0].bodyImages[0].dataUrl, 'data:image/png;base64,d2ViZGVzaWduLXBob3Rv');
-    assert.equal(messages[0].bodyImages[1].dataUrl, 'data:image/png;base64,ZGV2aWNlLW1vY2t1cC1waG90bw==');
+    assert.doesNotMatch(messages[0].body, /\[image:/);
+    assert.deepEqual(messages[0].bodyImages, []);
+    assert.deepEqual(messages[0].inlineImages, []);
+    assert.equal(messages[0].bodyImageEvidenceKnown, true);
+    assert.equal(messages[0].embeddedImageCount, 0);
+    assert.equal(messages[0].originalCampaignOutbound, true);
     assert.equal(messages[0].optOutUrl, 'https://www.softora.nl/afmelden?t=test');
-    assert.deepEqual(fetchedUrls, [photoUrl, mockupUrl]);
+    assert.deepEqual(fetchedUrls, []);
   } finally {
     global.fetch = oldFetch;
   }
@@ -2768,7 +2751,30 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/rewrite'));
 });
 
-test('mailbox image response serves a recovered image with durable private browser cache', async () => {
+test('mailbox image response serves exact-message MIME media with durable private browser cache', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX' }],
+    messagesByMailbox: {
+      INBOX: [{
+        uid: 42,
+        flags: ['\\Seen'],
+        internalDate: new Date('2026-07-24T10:00:00.000Z'),
+        source: {
+          date: new Date('2026-07-24T10:00:00.000Z'),
+          text: 'Bericht met afbeelding',
+          html: '<p>Bericht met afbeelding</p><img src="cid:exact-image@example.test" alt="Ontwerp">',
+          subject: 'Losse afbeelding',
+          from: { value: [{ name: 'Klant', address: 'klant@example.test' }] },
+          to: { value: [{ name: 'Servé', address: 'serve@softora.nl' }] },
+          attachments: [{
+            cid: 'exact-image@example.test',
+            contentType: 'image/png',
+            content: Buffer.from('mailbox-image'),
+          }],
+        },
+      }],
+    },
+  });
   const service = createMailboxService({
     mailboxAccountsRaw: JSON.stringify([{
       email: 'serve@softora.nl',
@@ -2776,21 +2782,8 @@ test('mailbox image response serves a recovered image with durable private brows
       imapUser: 'serve@softora.nl',
       imapPass: 'secret',
     }]),
-    mailboxIndexStore: {
-      isAvailable: () => true,
-      listMessages: async () => [],
-      getMessage: async () => ({
-        id: 'inbox:42',
-        folder: 'inbox',
-        accountEmail: 'serve@softora.nl',
-        hasBody: true,
-        body: 'Bericht met afbeelding',
-        bodyImages: [{
-          alt: 'Ontwerp',
-          dataUrl: `data:image/png;base64,${Buffer.from('mailbox-image').toString('base64')}`,
-        }],
-      }),
-    },
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
   });
   const response = createResponseRecorder();
 
@@ -3039,6 +3032,10 @@ test('campaign mailbox sync combines newest mail with missing historical convers
         oldestLookup = options;
         return 91;
       },
+      listMessageUidsForAccount: async (options) => {
+        assert.equal(options.limit, CAMPAIGN_SYNC_UID_SCAN_LIMIT);
+        return [119, 120];
+      },
       upsertMessages: async ({ messages }) => {
         upsertedUids = messages.map((message) => message.uid);
         return { ok: true, upserted: messages.length };
@@ -3068,11 +3065,8 @@ test('campaign mailbox sync combines newest mail with missing historical convers
     folder: 'sent',
     subjectTerms: ['Kleine vraag over jullie website', 'Nieuw webdesign'],
   });
-  assert.deepEqual(upsertedUids.slice(0, 10), [120, 119, 118, 117, 116, 115, 114, 113, 112, 111]);
-  assert.deepEqual(upsertedUids.slice(10), [
-    90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
-    80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
-  ]);
+  assert.equal(upsertedUids.length, CAMPAIGN_SYNC_FETCH_LIMIT);
+  assert.deepEqual(upsertedUids, [118, 117, 90, 89]);
   assert.equal(client.searchQueries.length, 3);
   assert.deepEqual(client.searchQueries[0], { all: true });
   assert.deepEqual(client.searchOptions, [{ uid: true }, { uid: true }, { uid: true }]);
@@ -3130,18 +3124,20 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
     mailboxIndexStore: {
       isAvailable: () => true,
       listMessages: async () => [],
-      listAllMessagesForAccounts: async ({ folder, limit }) => {
+      listMessageUidsForAccount: async ({ folder, limit }) => {
+        assert.equal(folder, 'sent');
+        assert.equal(limit, CAMPAIGN_SYNC_UID_SCAN_LIMIT);
+        return Array.from({ length: 7 }, (_item, index) => 114 + index);
+      },
+      listMatchingMessagesForAccounts: async ({ folder, limit, subjectTerms }) => {
         historyScanRequests.push({ folder, limit });
-        return folder === 'inbox'
-          ? [
-              {
-                uid: 2429,
-                subject: 'Re: Kleine vraag over jullie website',
-                messageId: indexedInboxMessageId,
-                senderEmail: 'info@vangestelsteigerbouw.nl',
-              },
-            ]
-          : Array.from({ length: 7 }, (_item, index) => ({ uid: 114 + index }));
+        assert.deepEqual(subjectTerms, ['Kleine vraag over jullie website', 'Nieuw webdesign']);
+        return [{
+          uid: 2429,
+          subject: 'Re: Kleine vraag over jullie website',
+          messageId: indexedInboxMessageId,
+          senderEmail: 'info@vangestelsteigerbouw.nl',
+        }];
       },
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-targeted-history' }),
       getOldestMatchingMessageUid: async () => 91,
@@ -3171,11 +3167,10 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
   assert.equal(response.statusCode, 200);
   assert.deepEqual(historyScanRequests, [
     { folder: 'inbox', limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT },
-    { folder: 'sent', limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT },
   ]);
   assert.equal(response.body.results[0].targetedThreadReferences, 1);
   assert.equal(response.body.results[0].targetedThreadRecipients, 2);
-  assert.equal(upsertedUids[7], 42);
+  assert.deepEqual(upsertedUids, [113, 112, 42, 90]);
   assert.deepEqual(client.searchQueries[3], {
     since: new Date('2026-05-01T00:00:00.000Z'),
     or: [

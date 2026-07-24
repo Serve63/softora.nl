@@ -107,26 +107,27 @@ function selectMailboxSyncUids({
     .filter((uid) => !indexedUidSet.has(uid))
     .slice(-TARGETED_THREAD_HISTORY_LIMIT)
     .reverse();
-  if (!normalizedCampaign.length && !missingPriorityUids.length) {
-    return normalizedAll.slice(-safeLimit).reverse();
+  const unindexedAll = normalizedAll.filter((uid) => !indexedUidSet.has(uid));
+  const unindexedCampaign = normalizedCampaign.filter((uid) => !indexedUidSet.has(uid));
+  if (!unindexedCampaign.length && !missingPriorityUids.length) {
+    return unindexedAll.slice(-safeLimit).reverse();
   }
 
   const beforeUid = Number(oldestIndexedCampaignUid) || Number.POSITIVE_INFINITY;
-  const olderCampaignUids = normalizedCampaign.filter((uid) => uid < beforeUid);
+  const olderCampaignUids = unindexedCampaign.filter((uid) => uid < beforeUid);
 
   const recentCount = Math.max(1, Math.ceil(safeLimit / 3));
-  const effectiveLimit = Math.max(safeLimit, recentCount + missingPriorityUids.length);
   const selected = [];
   const seen = new Set();
   const addUid = (uid) => {
-    if (!uid || seen.has(uid) || selected.length >= effectiveLimit) return;
+    if (!uid || seen.has(uid) || selected.length >= safeLimit) return;
     seen.add(uid);
     selected.push(uid);
   };
-  normalizedAll.slice(-recentCount).reverse().forEach(addUid);
+  unindexedAll.slice(-recentCount).reverse().forEach(addUid);
   missingPriorityUids.forEach(addUid);
   olderCampaignUids.slice().reverse().forEach(addUid);
-  normalizedAll.slice().reverse().forEach(addUid);
+  unindexedAll.slice().reverse().forEach(addUid);
   return selected;
 }
 

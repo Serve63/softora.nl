@@ -94,12 +94,20 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(row.body_text, 'Volledige tekst');
   assert.equal(row.message_id, '<m-42@softora.nl>');
   assert.equal(Object.hasOwn(row, 'deleted_at'), false);
+  assert.deepEqual(row.payload, {
+    source: 'imap-sync',
+    embeddedImageCount: 0,
+    originalCampaignOutbound: false,
+  });
 
   const listMessage = store.normalizeMessageRow(row);
   assert.equal(listMessage.id, 'inbox:42');
   assert.equal(listMessage.accountEmail, 'info@softora.nl');
   assert.equal(listMessage.body, '');
   assert.equal(listMessage.hasBody, true);
+  assert.equal(listMessage.bodyImageEvidenceKnown, true);
+  assert.equal(listMessage.embeddedImageCount, 0);
+  assert.equal(listMessage.originalCampaignOutbound, false);
 
   const detailMessage = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(detailMessage.body, 'Volledige tekst');
@@ -442,6 +450,127 @@ test('mailbox index store leest de volledige accountgeschiedenis gepagineerd', a
   assert.equal(messages.at(-1).id, `sent:${MAILBOX_INDEX_PAGE_SIZE + 2}`);
 });
 
+test('mailbox index store filtert campagneberichten in SQL en dedupliceert overlappende termen', async () => {
+  const subjectFilters = [];
+  const ranges = [];
+  const client = {
+    from() {
+      let subjectFilter = '';
+      const query = {
+        select() { return query; },
+        in() { return query; },
+        eq() { return query; },
+        ilike(column, value) {
+          assert.equal(column, 'subject');
+          subjectFilter = value;
+          subjectFilters.push(value);
+          return query;
+        },
+        is() { return query; },
+        order() { return query; },
+        range(from, to) {
+          ranges.push([from, to]);
+          return Promise.resolve({
+            data: [{
+              message_key: 'serve@softora.nl|inbox|42',
+              account_email: 'serve@softora.nl',
+              folder: 'inbox',
+              uid: 42,
+              provider_id: 'inbox:42',
+              sender_email: 'klant@example.test',
+              subject: subjectFilter.includes('Kleine vraag')
+                ? 'Re: Kleine vraag over jullie website'
+                : 'Re: Nieuw webdesign',
+              date: '2026-07-24T10:00:00.000Z',
+            }],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.listMatchingMessagesForAccounts({
+    accountEmails: ['SERVE@SOFTORA.NL'],
+    folder: 'INBOX',
+    subjectTerms: ['Kleine vraag over jullie website', 'Nieuw webdesign'],
+    limit: 500,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].id, 'inbox:42');
+  assert.deepEqual(subjectFilters, [
+    '%Kleine vraag over jullie website%',
+    '%Nieuw webdesign%',
+  ]);
+  assert.deepEqual(ranges, [[0, 499], [0, 499]]);
+});
+
+test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie', async () => {
+  const calls = [];
+  const client = {
+    from() {
+      const query = {
+        select(columns) {
+          calls.push(['select', columns]);
+          return query;
+        },
+        eq(column, value) {
+          calls.push(['eq', column, value]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        gte(column, value) {
+          calls.push(['gte', column, value]);
+          return query;
+        },
+        range(from, to) {
+          calls.push(['range', from, to]);
+          return Promise.resolve({
+            data: [{ uid: 42 }, { uid: 42 }, { uid: 41 }],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const uids = await store.listMessageUidsForAccount({
+    accountEmail: 'SERVE@SOFTORA.NL',
+    folder: 'SENT',
+    since: '2026-05-01T00:00:00.000Z',
+    limit: 500,
+  });
+
+  assert.deepEqual(uids, [42, 41]);
+  assert.deepEqual(calls.find((call) => call[0] === 'select'), ['select', 'uid']);
+  assert.deepEqual(calls.find((call) => call[0] === 'gte'), [
+    'gte',
+    'date',
+    '2026-05-01T00:00:00.000Z',
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'range'), ['range', 0, 499]);
+});
+
 test('mailbox index store hydrates only selected message bodies in one query', async () => {
   const calls = [];
   const client = {
@@ -464,6 +593,15 @@ test('mailbox index store hydrates only selected message bodies in one query', a
               body_text: 'Dit is de volledige reactie.',
               has_body: true,
               body_truncated: false,
+              payload: {
+                embeddedImageCount: 0,
+                originalCampaignOutbound: false,
+              },
+              folder: 'inbox',
+              subject: 'Re: Kleine vraag over jullie website',
+              preview: 'Dit is de korte preview.',
+              in_reply_to: '<campaign@example.test>',
+              references_text: '<campaign@example.test>',
             }],
             error: null,
           });
@@ -489,9 +627,12 @@ test('mailbox index store hydrates only selected message bodies in one query', a
 
   assert.equal(messages[0].body, 'Dit is de volledige reactie.');
   assert.equal(messages[0].hasBody, true);
+  assert.equal(messages[0].bodyImageEvidenceKnown, true);
+  assert.equal(messages[0].embeddedImageCount, 0);
+  assert.equal(messages[0].originalCampaignOutbound, false);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',
-    'message_key,body_text,has_body,body_truncated',
+    'message_key,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'in'), [
     'in',

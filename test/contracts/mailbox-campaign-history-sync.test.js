@@ -46,7 +46,7 @@ test('campaign history sync reserves capacity for newest and older campaign mail
   ]);
 });
 
-test('campaign history sync imports the newest missing targeted replies first', () => {
+test('campaign history sync bounds each run and imports the newest missing targeted replies first', () => {
   const selected = selectMailboxSyncUids({
     allUids: Array.from({ length: 300 }, (_item, index) => index + 1),
     priorityUids: Array.from({ length: 200 }, (_item, index) => index + 1),
@@ -56,9 +56,10 @@ test('campaign history sync imports the newest missing targeted replies first', 
 
   assert.equal(selected.includes(200), false);
   assert.equal(selected.includes(199), true);
-  assert.equal(selected.includes(100), true);
-  assert.equal(selected.includes(99), false);
-  assert.ok(selected.indexOf(199) < selected.indexOf(100));
+  assert.equal(selected.includes(187), true);
+  assert.equal(selected.includes(186), false);
+  assert.equal(selected.length, 20);
+  assert.ok(selected.indexOf(199) < selected.indexOf(187));
 });
 
 test('campaign history sync searches both coldmail subjects from campaign start', async () => {
@@ -128,7 +129,7 @@ test('campaign history sync prioritizes missing sent replies linked by thread he
     ],
   });
   assert.equal(selected.filter((uid) => uid === 42).length, 1);
-  assert.equal(selected.filter((uid) => uid === 115).length, 1);
+  assert.equal(selected.filter((uid) => uid === 115).length, 0);
   assert.deepEqual(queries[4], {
     since: CAMPAIGN_HISTORY_SINCE,
     or: [

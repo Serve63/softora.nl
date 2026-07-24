@@ -1,7 +1,12 @@
 const { CAMPAIGN_MAILBOX_ACCOUNTS } = require('./mailbox-campaign-replies');
-const { CAMPAIGN_HISTORY_SUBJECT_TERMS } = require('./mailbox-campaign-history-sync');
+const {
+  CAMPAIGN_HISTORY_SINCE,
+  CAMPAIGN_HISTORY_SUBJECT_TERMS,
+} = require('./mailbox-campaign-history-sync');
 
-const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 2000;
+const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
+const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
+const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
 
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -116,31 +121,73 @@ function createMailboxSyncService({
       let threadReferenceIds = [];
       let threadRecipientTerms = [];
       let indexedUids = [];
-      if (
-        campaignOnly &&
-        normalizedFolder === 'sent' &&
-        typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-      ) {
-        const indexedInboxMessages =
-          (await mailboxIndexStore.listAllMessagesForAccounts({
-            accountEmails: [account.email],
-            folder: 'inbox',
-            limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
-          })) || [];
-        const indexedSentMessages =
-          (await mailboxIndexStore.listAllMessagesForAccounts({
-            accountEmails: [account.email],
-            folder: 'sent',
-            limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
-          })) || [];
-        threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
-        threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
-        indexedUids = indexedSentMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
+      if (campaignOnly) {
+        if (typeof mailboxIndexStore.listMessageUidsForAccount === 'function') {
+          indexedUids =
+            (await mailboxIndexStore.listMessageUidsForAccount({
+              accountEmail: account.email,
+              folder: normalizedFolder,
+              since: CAMPAIGN_HISTORY_SINCE.toISOString(),
+              limit: CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+            })) || [];
+        }
+        if (
+          normalizedFolder === 'sent' &&
+          typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
+        ) {
+          const indexedInboxMessages =
+            (await mailboxIndexStore.listMatchingMessagesForAccounts({
+              accountEmails: [account.email],
+              folder: 'inbox',
+              subjectTerms: CAMPAIGN_HISTORY_SUBJECT_TERMS,
+              limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+            })) || [];
+          threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
+          threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
+        } else if (
+          normalizedFolder === 'sent' &&
+          typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
+        ) {
+          const indexedInboxMessages =
+            (await mailboxIndexStore.listAllMessagesForAccounts({
+              accountEmails: [account.email],
+              folder: 'inbox',
+              limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+            })) || [];
+          const indexedSentMessages =
+            (await mailboxIndexStore.listAllMessagesForAccounts({
+              accountEmails: [account.email],
+              folder: 'sent',
+              limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+            })) || [];
+          if (!indexedUids.length) {
+            indexedUids = indexedSentMessages
+              .map((message) => Number(message?.uid) || 0)
+              .filter(Boolean);
+          }
+          threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
+          threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
+        }
+        if (
+          !indexedUids.length &&
+          normalizedFolder !== 'sent' &&
+          typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
+        ) {
+          const indexedMessages =
+            (await mailboxIndexStore.listAllMessagesForAccounts({
+              accountEmails: [account.email],
+              folder: normalizedFolder,
+              limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+            })) || [];
+          indexedUids = indexedMessages.map((message) => Number(message?.uid) || 0).filter(Boolean);
+        }
       }
       const messages = await fetchMessagesFromImap({
         account,
         folder: normalizedFolder,
-        limit: getSafeLimit(limit),
+        limit: campaignOnly
+          ? Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
+          : getSafeLimit(limit),
         campaignHistory: campaignOnly,
         oldestIndexedCampaignUid,
         threadReferenceIds,
@@ -237,7 +284,9 @@ function createMailboxSyncService({
 }
 
 module.exports = {
+  CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
+  CAMPAIGN_SYNC_UID_SCAN_LIMIT,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,
