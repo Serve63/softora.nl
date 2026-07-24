@@ -901,22 +901,22 @@ function getComposeFieldValue(id) {
   return field ? field.value : '';
 }
 function setComposeReplyContext(mail) {
-  composeReplyContext = mail
-    ? {
-        id: mail.id,
-        from: mail.from,
-        email: mail.email,
-        subject: mail.subject,
-        preview: mail.preview,
-        body: mail.body,
-        date: mail.date,
-        time: mail.time,
-        folder: mail.folder || activeFolder, accountEmail: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
-      }
-    : null;
+  composeReplyContext = window.SoftoraMailboxCompose.buildReplyContext(mail, {
+    activeFolder,
+    fallbackAccount: activeMailboxAccount,
+    getAccount: window.SoftoraMailboxCampaignInbox.getAccount,
+  });
 }
 function buildComposeRewriteContext() {
-  return composeReplyContext ? { ...composeReplyContext } : null;
+  if (!composeReplyContext) return null;
+  const currentMail = findMailById(composeReplyContext.id);
+  return currentMail
+    ? window.SoftoraMailboxCompose.buildReplyContext(currentMail, {
+        activeFolder,
+        fallbackAccount: activeMailboxAccount,
+        getAccount: window.SoftoraMailboxCampaignInbox.getAccount,
+      })
+    : { ...composeReplyContext };
 }
 function replyMail(mail) {
   if (!mail) return;
