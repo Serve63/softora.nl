@@ -188,7 +188,7 @@ function needsThreadLinkHydration(message) {
   if (source.webdesignLinkEvidenceKnown === true) return false;
   const body = normalizeText(source.body || source.preview);
   if (!body || /https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+/i.test(body)) return false;
-  return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\bdeze link\b/i.test(body);
+  return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\b(?:deze link|(?:open|bekijk) het via hier)\b/i.test(body);
 }
 
 function needsThreadImageHydration(message) {

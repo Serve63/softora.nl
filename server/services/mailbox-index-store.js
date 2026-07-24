@@ -13,6 +13,7 @@ const BODY_RETENTION_NEWEST_COUNT = 500;
 const BODY_MAX_CHARS = 200 * 1024;
 const SYNC_LOCK_TTL_MS = 90_000;
 const MAILBOX_INDEX_PAGE_SIZE = 1000;
+const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
   'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated,payload';
 
@@ -391,6 +392,42 @@ function createMailboxIndexStore(deps = {}) {
       .map((row) => normalizeMessageRow(row));
   }
 
+  async function listMessagesByMessageIdsForAccounts({
+    accountEmails = [],
+    folder = 'sent',
+    messageIds = [],
+  } = {}) {
+    const normalizedAccounts = Array.from(
+      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
+    );
+    const normalizedMessageIds = Array.from(
+      new Set((Array.isArray(messageIds) ? messageIds : []).map(normalizeString).filter(Boolean))
+    ).slice(0, 2000);
+    if (!normalizedAccounts.length || !normalizedMessageIds.length) return [];
+    const normalizedFolder = normalizeFolder(folder);
+    const rowsByKey = new Map();
+    for (let offset = 0; offset < normalizedMessageIds.length; offset += MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE) {
+      const batch = normalizedMessageIds.slice(offset, offset + MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE);
+      const result = await run(`list-messages-by-message-id:${normalizedFolder}:${offset}`, (client) =>
+        client
+          .from(MAILBOX_INDEX_TABLES.messages)
+          .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
+          .in('account_email', normalizedAccounts)
+          .eq('folder', normalizedFolder)
+          .in('message_id', batch)
+          .is('deleted_at', null)
+      );
+      if (!result.ok) return null;
+      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+        const key = normalizeString(row && row.message_key);
+        if (key && !rowsByKey.has(key)) rowsByKey.set(key, row);
+      });
+    }
+    return Array.from(rowsByKey.values())
+      .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
+      .map((row) => normalizeMessageRow(row));
+  }
+
   async function listMessageUidsForAccount({
     accountEmail,
     folder = 'inbox',
@@ -685,6 +722,7 @@ function createMailboxIndexStore(deps = {}) {
     isSyncStateStale,
     listAllMessagesForAccounts,
     listMatchingMessagesForAccounts,
+    listMessagesByMessageIdsForAccounts,
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,
@@ -700,6 +738,7 @@ module.exports = {
   BODY_RETENTION_DAYS,
   BODY_RETENTION_NEWEST_COUNT,
   MAILBOX_INDEX_PAGE_SIZE,
+  MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE,
   MAILBOX_INDEX_TABLES,
   createMailboxIndexStore,
 };

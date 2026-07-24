@@ -70,7 +70,7 @@ function readDeleteScript() {
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
-  assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724a/);
+  assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724b/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -477,6 +477,24 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
     html,
     /deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/salon-tof\?cid=safe-row-247&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a>/
   );
+});
+
+test('mailbox vraagt voor legacy Open het via hier eerst exact MIME-bewijs op', () => {
+  const helpers = loadMailboxHelpersForTest();
+  const message = {
+    id: 'sent:62',
+    folder: 'sent',
+    originalCampaignOutbound: true,
+    webdesignLinkEvidenceKnown: false,
+    body: [
+      'PS: Wordt het webdesign niet zichtbaar?',
+      'Open het via hier 👈',
+    ].join('\n'),
+  };
+
+  assert.equal(helpers.index.needsThreadLinkHydration(message), true);
+  message.webdesignLinkEvidenceKnown = true;
+  assert.equal(helpers.index.needsThreadLinkHydration(message), false);
 });
 
 test('mailbox koppelt coldmail-afbeeldingen aan het eigen verzonden bericht en niet aan de ontvangen reactie', () => {
@@ -1175,9 +1193,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724d/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724e/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724c/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -1250,7 +1268,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724d"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724d"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724e"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2555,7 +2573,9 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
 test('premium mailbox verbergt een technische webdesign-url achter alleen het woord link', () => {
   const url = 'https://www.softora.nl/webdesign/de-vyldre?cid=safe-dedupe-20260615-row-1891-d84e3e0cb2&sender=serve';
   const html = renderMailboxBodyForTest(
-    `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link [${url}] bekijken 🎨`
+    `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link [${url}] bekijken 🎨`,
+    [],
+    { mail: { webdesignLinkEvidenceKnown: true, webdesignLinkUrl: url } }
   );
 
   assert.match(
@@ -2577,7 +2597,9 @@ test('premium mailbox houdt bekijken direct achter een afgebroken deze-link-verw
     `deze link [${url}]`,
     '',
     'bekijken 🎨',
-  ].join('\n'));
+  ].join('\n'), [], {
+    mail: { webdesignLinkEvidenceKnown: true, webdesignLinkUrl: url },
+  });
 
   assert.match(
     html,
@@ -2588,6 +2610,13 @@ test('premium mailbox houdt bekijken direct achter een afgebroken deze-link-verw
 
 test('premium mailbox lijnt Gmail-citaten links uit en verbergt een losse Softora-webdesign-url', () => {
   const url = 'https://www.softora.nl/webdesign/the-chamomile-collective?cid=safe-dedupe-20260615-row-2149-6137264c438&sender=serve';
+  const parentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website thechamomilecollective.nl tegen.',
+    '',
+    `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link [${url}] bekijken 🎨`,
+  ].join('\n');
   const html = renderMailboxBodyForTest([
     'Bedankt voor je bericht.',
     '',
@@ -2600,7 +2629,23 @@ test('premium mailbox lijnt Gmail-citaten links uit en verbergt een losse Softor
     '\tLukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link',
     '',
     `    (${url}) bekijken 🎨`,
-  ].join('\n'));
+  ].join('\n'), [], {
+    replyMailId: 'inbox:2149',
+    mail: {
+      receivedAt: '2026-07-23T10:13:00.000Z',
+      threadMessages: [{
+        id: 'sent:2149',
+        uid: 2149,
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        date: '2026-07-23T09:13:00.000Z',
+        body: parentBody,
+        originalCampaignOutbound: true,
+        webdesignLinkEvidenceKnown: true,
+        webdesignLinkUrl: url,
+      }],
+    },
+  });
 
   assert.doesNotMatch(html, /<div class="detail-mail-line">[\t ]+/);
   assert.match(
@@ -2608,6 +2653,81 @@ test('premium mailbox lijnt Gmail-citaten links uit en verbergt een losse Softor
     /via deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/the-chamomile-collective\?cid=safe-dedupe-20260615-row-2149-6137264c438&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨<\/div>/
   );
   assert.doesNotMatch(html, />https:\/\/www\.softora\.nl\/webdesign\/the-chamomile-collective/);
+});
+
+test('premium mailbox toont Brigit, Karlien en Marjolein hun exacte oude Sent-parent één keer roze', () => {
+  const fixtures = [
+    ['Brigit', 'bizzylizzy.nl', 'bizzylizzy'],
+    ['Karlien Vis', 'misverstant.nl', 'misverstant'],
+    ['Marjolein de Kroon', 'dekroonopjewerk.eu', 'de-kroon-op-je-werk'],
+  ];
+
+  fixtures.forEach(([name, website, slug], index) => {
+    const url = `https://www.softora.nl/webdesign/${slug}?cid=legacy-${index + 1}`;
+    const parentBody = [
+      'Goedendag,',
+      '',
+      `Afgelopen week kwam ik jullie website (${website}) tegen.`,
+      '',
+      'Vanuit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+      '',
+      `PS: Wordt het webdesign niet zichtbaar? Open het via hier [[${url}](${url})] 👈`,
+      '',
+      'Met vriendelijke groet,',
+      'Servé Creusen',
+    ].join('\n');
+    const replyBody = [
+      `Bedankt voor je reactie, ${name}.`,
+      '',
+      'Op 2 jun 2026 om 07:17 heeft Servé Creusen het volgende geschreven:',
+      ...parentBody.split('\n').map((line) => `> ${line}`),
+    ].join('\n');
+    const html = renderMailboxBodyForTest(replyBody, [], {
+      replyMailId: `inbox:${index + 59}`,
+      mail: {
+        receivedAt: '2026-06-02T08:00:00.000Z',
+        threadMessages: [{
+          id: `sent:${index + 60}`,
+          uid: index + 60,
+          folder: 'sent',
+          accountEmail: 'serve@softora.nl',
+          date: '2026-06-02T07:00:00.000Z',
+          body: parentBody,
+          originalCampaignOutbound: true,
+          webdesignLinkEvidenceKnown: true,
+          webdesignLinkUrl: url,
+        }],
+      },
+    });
+
+    assert.equal((html.match(/detail-mail-section-sent/g) || []).length, 1);
+    assert.equal((html.match(/>Jouw bericht</g) || []).length, 1);
+    assert.doesNotMatch(html, /Jouw eerdere mail/);
+    assert.doesNotMatch(html, /detail-mail-section-quote/);
+    assert.match(
+      html,
+      new RegExp(`<a class="detail-mail-cta-link" href="${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;')}" target="_blank" rel="noopener noreferrer">hier</a>`)
+    );
+    assert.doesNotMatch(html, new RegExp(`>${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<`));
+  });
+});
+
+test('premium mailbox maakt een legacy hier-url zonder exact MIME-bewijs niet klikbaar', () => {
+  const url = 'https://www.softora.nl/webdesign/bizzylizzy?cid=onbewezen';
+  const html = renderMailboxBodyForTest(
+    `PS: Wordt het webdesign niet zichtbaar? Open het via hier [${url}] 👈`,
+    [],
+    {
+      mail: {
+        webdesignLinkEvidenceKnown: false,
+        webdesignLinkUrl: '',
+      },
+    }
+  );
+
+  assert.doesNotMatch(html, /detail-mail-cta-link/);
+  assert.doesNotMatch(html, /<a\b/);
+  assert.match(html, /hier \[https:\/\/www\.softora\.nl\/webdesign\/bizzylizzy\?cid=onbewezen\]/);
 });
 
 test('premium mailbox houdt databasekoppeling zonder interessebalk in het maildetail', () => {

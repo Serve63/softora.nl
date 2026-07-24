@@ -24,7 +24,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
-const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[(https?:\/\/[^\]\s<>"']+)\]/gi;
+const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|hier|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[\s*(?:\[(https?:\/\/[^\]\s<>"']+)\]\((https?:\/\/[^\)\s<>"']+)\)|(https?:\/\/[^\]\s<>"']+))\s*\]/gi;
 function countCharacter(value, character) {
   return String(value || '').split(character).length - 1;
 }
@@ -71,12 +71,14 @@ function renderLinkedMailboxText(value, options) {
   const text = String(value == null ? '' : value);
   let html = '';
   let lastIndex = 0;
-  text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, url, offset) => {
+  text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, markdownLabelUrl, markdownTargetUrl, plainUrl, offset) => {
+    const url = markdownTargetUrl || plainUrl;
+    const nestedUrlMatches = !markdownLabelUrl || markdownLabelUrl === markdownTargetUrl;
     html += renderMailboxUrls(text.slice(lastIndex, offset));
-    if (isSafeMailBodyUrl(url) && window.SoftoraMailboxDisplay.isLabelledUrlMatch(label, url)) {
+    if (nestedUrlMatches && isSafeMailBodyUrl(url) && window.SoftoraMailboxDisplay.isLabelledUrlMatch(label, url, options)) {
       html += window.SoftoraMailboxDisplay.renderLabelledUrlAnchor(url, label, escapeHtml);
     } else {
-      html += renderMailboxUrls(match);
+      html += /^(?:deze link|hier)$/i.test(String(label || '').trim()) ? escapeHtml(match) : renderMailboxUrls(match);
     }
     lastIndex = offset + match.length;
     return match;
@@ -479,7 +481,7 @@ function normalizeMailboxBodyImages(images) {
 function renderMailBody(value, images, options) {
   const imageState = {
     images: normalizeMailboxBodyImages(images),
-    optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl), senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount),
+    optOutUrl: normalizeMailboxOptOutUrl(options && options.optOutUrl), senderEmail: normalizeMailboxEmail((options && options.senderEmail) || (options && options.mail && options.mail.email) || activeMailboxAccount), mail: options && options.mail,
     usedImages: new Set()
   };
   const sections = buildMailboxBodySections(value).filter((section) => !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxReplyHeaderLine));

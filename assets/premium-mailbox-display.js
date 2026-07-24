@@ -34,10 +34,19 @@
     }
   }
 
-  function isLabelledUrlMatch(label, url) {
-    if (/^deze link$/i.test(String(label || '').trim())) return true;
-    const normalizedLabel = normalizeComparableMailUrl(label);
-    return Boolean(normalizedLabel && normalizedLabel === normalizeComparableMailUrl(url));
+  function isLabelledUrlMatch(label, url, options) {
+    const normalizedLabel = String(label || '').trim();
+    if (/^(?:deze link|hier)$/i.test(normalizedLabel)) {
+      const mail = options && options.mail;
+      return Boolean(
+        mail &&
+        mail.webdesignLinkEvidenceKnown === true &&
+        isSoftoraWebdesignUrl(url) &&
+        normalizeComparableMailUrl(mail.webdesignLinkUrl) === normalizeComparableMailUrl(url)
+      );
+    }
+    const normalizedUrlLabel = normalizeComparableMailUrl(label);
+    return Boolean(normalizedUrlLabel && normalizedUrlLabel === normalizeComparableMailUrl(url));
   }
 
   function isGmailSignatureAssetUrl(value) {
@@ -270,11 +279,11 @@
 
   function renderLabelledUrlAnchor(url, label, escapeHtml) {
     const normalizedLabel = String(label || '').trim();
-    const isWebdesignCta = /^deze link$/i.test(normalizedLabel);
-    const anchorLabel = isWebdesignCta ? 'link' : normalizedLabel;
+    const isWebdesignCta = /^(?:deze link|hier)$/i.test(normalizedLabel);
+    const anchorLabel = /^deze link$/i.test(normalizedLabel) ? 'link' : normalizedLabel;
     const anchorClass = isWebdesignCta ? ' class="detail-mail-cta-link"' : '';
     const anchor = `<a${anchorClass} href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anchorLabel)}</a>`;
-    return isWebdesignCta ? `deze ${anchor}` : anchor;
+    return /^deze link$/i.test(normalizedLabel) ? `deze ${anchor}` : anchor;
   }
 
   function renderDetailBody(mail, content) {

@@ -241,6 +241,7 @@
       images: merge(messageImages, fallbackImages),
       optOutUrl: renderers.normalizeOptOutUrl(message && message.optOutUrl),
       senderEmail: renderers.normalizeEmail(message && message.accountEmail),
+      mail: message,
       usedImages: new Set(),
     };
     const paragraphs = renderers.renderParagraphs(String(payload && payload.body || '').split('\n'), imageState);
