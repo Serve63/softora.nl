@@ -70,7 +70,7 @@ function readDeleteScript() {
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
-  assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260723d/);
+  assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724a/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -197,6 +197,7 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
     threadMessages: [
       {
         id: 'sent:87',
+        uid: 87,
         folder: 'sent',
         accountEmail: 'serve@softora.nl',
         preview: 'Beste Lenneke, bedankt voor je reactie en de lijst met potentiële kan...',
@@ -206,6 +207,7 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
       },
       {
         id: 'sent:83',
+        uid: 83,
         folder: 'sent',
         accountEmail: 'serve@softora.nl',
         preview: 'Goedendag, afgelopen week kwam ik jullie website tegen...',
@@ -215,6 +217,7 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
       },
       {
         id: 'sent:90',
+        uid: 90,
         folder: 'sent',
         accountEmail: 'serve@softora.nl',
         body: 'Dit bericht was al volledig.',
@@ -223,6 +226,7 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
       },
       {
         id: 'sent:91',
+        uid: 91,
         folder: 'sent',
         accountEmail: 'serve@softora.nl',
         preview: 'Deze veilige preview blijft staan als de volledige body nog niet beschikbaar is...',
@@ -243,10 +247,36 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
     normalizeOptOutUrl: (value) => String(value || ''),
     getActiveMail: () => mail.id,
     openMail: (id, options) => rerenders.push({ id, options }),
-    fetchImpl: async (url) => {
+    fetchImpl: async (url, options = {}) => {
+      if (String(url) === '/api/mailbox/messages/bodies') {
+        const body = JSON.parse(options.body);
+        requests.push({
+          kind: 'batch',
+          ids: body.messages.map((message) => message.id),
+        });
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            messages: body.messages
+              .filter((message) => message.id !== 'sent:91')
+              .map((message) => ({
+                ...message,
+                accountEmail: message.account,
+                body: fullBodies[message.id],
+                hasBody: true,
+                bodyTruncated: false,
+                bodyImageEvidenceKnown: true,
+                embeddedImageCount: 0,
+                originalCampaignOutbound: message.id === 'sent:83',
+              })),
+          }),
+        };
+      }
       const parsed = new URL(String(url), 'https://www.softora.nl');
       const requestId = parsed.searchParams.get('id');
       requests.push({
+        kind: 'detail',
         account: parsed.searchParams.get('account'),
         folder: parsed.searchParams.get('folder'),
         id: requestId,
@@ -267,9 +297,13 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
   });
 
   assert.equal(updated, true);
-  assert.equal(requests.length, 3);
-  assert.deepEqual(requests.map((request) => request.id), ['sent:87', 'sent:83', 'sent:91']);
-  assert.ok(requests.every((request) => (
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[0], {
+    kind: 'batch',
+    ids: ['sent:87', 'sent:83', 'sent:91'],
+  });
+  assert.equal(requests[1].id, 'sent:91');
+  assert.ok(requests.filter((request) => request.kind === 'detail').every((request) => (
     request.account === 'serve@softora.nl' && request.folder === 'sent'
   )));
   assert.equal(mail.threadMessages[0].body, fullBodies['sent:87']);
@@ -279,20 +313,40 @@ test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek open
   assert.equal(mail.threadMessages[2].body, 'Dit bericht was al volledig.');
   assert.equal(mail.threadMessages[3].body, '');
   assert.equal(mail.threadMessages[3].bodyTruncated, true);
-  assert.equal(rerenders.length, 1);
-  assert.equal(rerenders[0].id, mail.id);
-  assert.equal(rerenders[0].options.skipBodyFetch, true);
-  assert.equal(rerenders[0].options.skipThreadBodyFetch, true);
+  assert.equal(rerenders.length, 3);
+  assert.ok(rerenders.every((entry) => entry.id === mail.id));
+  assert.ok(rerenders.every((entry) => (
+    entry.options.skipBodyFetch === true && entry.options.skipThreadBodyFetch === true
+  )));
+});
+
+test('mailbox toont tijdens bodyhydratie een eerlijke laadstatus in plaats van een afgekorte preview', () => {
+  const html = campaignInboxModule.renderThreadMessages(
+    {
+      receivedAt: '2026-07-24T12:00:00.000Z',
+      threadMessages: [{
+        id: 'sent:87',
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        date: '2026-07-24T11:00:00.000Z',
+        preview: 'Beste Lenneke, lijst met potentiële kan...',
+        bodyLoading: true,
+      }],
+    },
+    (value) => String(value || ''),
+    () => ({ date: '24 juli', time: '13:00' })
+  );
+
+  assert.match(html, /Volledig bericht laden…/);
+  assert.match(html, /role="status"/);
+  assert.doesNotMatch(html, /potentiële kan\.\.\./);
 });
 
 test('mailbox koppelt coldmail-afbeeldingen aan het eigen verzonden bericht en niet aan de ontvangen reactie', () => {
   const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
   const html = renderMailboxBodyForTest(
     'Hoi Servé,\n\nMooi wat je hebt gemaakt, maar wij hebben geen interesse.\n\nSucces verder!',
-    [
-      { alt: 'stamhoeve.nl webdesign', dataUrl: tinyPng },
-      { alt: 'stamhoeve.nl device mockup', dataUrl: tinyPng },
-    ],
+    [],
     {
       replyMailId: 'inbox:stamhoeve',
       mail: {
@@ -305,6 +359,13 @@ test('mailbox koppelt coldmail-afbeeldingen aan het eigen verzonden bericht en n
             folder: 'sent',
             accountEmail: 'servec321@gmail.com',
             date: '2026-07-23T19:00:00.000Z',
+            originalCampaignOutbound: false,
+            bodyImageEvidenceKnown: true,
+            embeddedImageCount: 2,
+            bodyImages: [
+              { alt: 'stamhoeve.nl webdesign', dataUrl: tinyPng },
+              { alt: 'stamhoeve.nl device mockup', dataUrl: tinyPng },
+            ],
             body: [
               'Hoi,',
               '',
@@ -320,6 +381,13 @@ test('mailbox koppelt coldmail-afbeeldingen aan het eigen verzonden bericht en n
             folder: 'sent',
             accountEmail: 'servec321@gmail.com',
             date: '2026-07-23T09:00:00.000Z',
+            originalCampaignOutbound: true,
+            bodyImageEvidenceKnown: true,
+            embeddedImageCount: 2,
+            bodyImages: [
+              { alt: 'stamhoeve.nl webdesign', dataUrl: tinyPng },
+              { alt: 'stamhoeve.nl device mockup', dataUrl: tinyPng },
+            ],
             body: [
               'Goedendag,',
               '',
@@ -340,6 +408,55 @@ test('mailbox koppelt coldmail-afbeeldingen aan het eigen verzonden bericht en n
   assert.equal((html.match(/<figure class="detail-mail-image">/g) || []).length, 2);
   assert.ok(html.indexOf('Uit enthousiasme heb ik een fris webdesign gemaakt.') < html.indexOf('<figure class="detail-mail-image">'));
   assert.doesNotMatch(html, /\[image:/i);
+});
+
+test('mailbox toont geen designbeeld voor een link-only coldmail of vervuild vervolgbericht', () => {
+  const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
+  const html = renderMailboxBodyForTest(
+    'Dank voor uw bericht.',
+    [],
+    {
+      replyMailId: 'inbox:kbo',
+      mail: {
+        folder: 'inbox',
+        accountEmail: 'servec321@gmail.com',
+        receivedAt: '2026-07-24T12:00:00.000Z',
+        threadMessages: [{
+          id: 'sent:kbo-followup',
+          folder: 'sent',
+          accountEmail: 'servec321@gmail.com',
+          date: '2026-07-24T11:00:00.000Z',
+          originalCampaignOutbound: false,
+          bodyImageEvidenceKnown: true,
+          embeddedImageCount: 0,
+          body: 'Hoi, ik kom nog even terug op mijn eerdere bericht.',
+          bodyImages: [{
+            alt: 'www.softora.nl-preview',
+            dataUrl: tinyPng,
+            owner: 'sent-campaign',
+          }],
+        }, {
+          id: 'sent:kbo-original',
+          folder: 'sent',
+          accountEmail: 'servec321@gmail.com',
+          date: '2026-07-23T09:00:00.000Z',
+          originalCampaignOutbound: true,
+          bodyImageEvidenceKnown: true,
+          embeddedImageCount: 0,
+          body: [
+            'Goedendag,',
+            'Afgelopen week kwam ik jullie website kbo-heikant.nl tegen.',
+            'Je kunt het webdesign hier bekijken.',
+          ].join('\n'),
+          bodyImages: [],
+        }],
+      },
+    }
+  );
+
+  assert.match(html, /kbo-heikant\.nl/);
+  assert.doesNotMatch(html, /<figure class="detail-mail-image">/);
+  assert.doesNotMatch(html, /www\.softora\.nl-preview/);
 });
 
 test('mailbox toont een oudere inkomende reactie als onderdeel van dezelfde conversatie', () => {
@@ -922,8 +1039,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260723s/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -996,7 +1113,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260723s"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260723d"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -1837,7 +1954,7 @@ test('premium mailbox zet een eerdere eigen mail als apart geciteerd blok neer',
   assert.ok(html.indexOf('Goedendag') > html.indexOf('detail-mail-section-quote'));
 });
 
-test('premium mailbox zet geciteerde campagnebeelden alleen in Jouw eerdere mail', () => {
+test('premium mailbox maakt uit geciteerde campagnebeelden geen berichtmedia', () => {
   const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
   const html = renderMailboxBodyForTest([
     'Hoi Servé,',
@@ -1866,11 +1983,9 @@ test('premium mailbox zet geciteerde campagnebeelden alleen in Jouw eerdere mail
 
   const replyIndex = html.indexOf('Bedankt voor je mail');
   const quoteIndex = html.indexOf('<div class="detail-mail-section-label">Jouw eerdere mail</div>');
-  const firstImageIndex = html.indexOf('<figure class="detail-mail-image">');
   assert.ok(replyIndex >= 0);
   assert.ok(quoteIndex > replyIndex);
-  assert.ok(firstImageIndex > quoteIndex);
-  assert.equal((html.match(/<figure class="detail-mail-image">/g) || []).length, 2);
+  assert.equal((html.match(/<figure class="detail-mail-image">/g) || []).length, 0);
   assert.equal((html.match(/Afgelopen week kwam ik jullie website dirvenschoenen\.nl tegen\./g) || []).length, 1);
 });
 
@@ -1993,7 +2108,14 @@ test('premium mailbox behoudt mail-enters en vervangt image placeholders inline'
   const html = renderMailboxBodyForTest(body, [
     { alt: 'Softora Testmodus webdesign.png', dataUrl: tinyPng },
     { alt: 'Softora Testmodus device mockup.png', dataUrl: tinyPng },
-  ]);
+  ], {
+    mail: {
+      folder: 'sent',
+      originalCampaignOutbound: true,
+      bodyImageEvidenceKnown: true,
+      embeddedImageCount: 2,
+    },
+  });
 
   assert.equal((html.match(/detail-mail-line-empty/g) || []).length, 7);
   assert.equal((html.match(/<figure class="detail-mail-image">/g) || []).length, 2);

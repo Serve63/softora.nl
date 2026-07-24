@@ -13,6 +13,7 @@ const {
   resolveMailboxSyncUids,
 } = require('./mailbox-campaign-history-sync');
 const { createMailboxSyncService } = require('./mailbox-campaign-sync');
+const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -2104,11 +2105,12 @@ function createMailboxService(deps = {}) {
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
   });
-
+  const { getMessageBodiesResponse } = createMailboxMessageBodiesService({
+    mailboxIndexStore, assertReadableAccount, normalizeFolder, logger,
+  });
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);
   }
-
   async function listMessagesWithMeta({
     accountEmail,
     folder = 'inbox',
@@ -2584,7 +2586,6 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-
   async function getMessageResponse(req, res) {
     try {
       const message = await getMessage({
@@ -2602,7 +2603,6 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-
   async function getMessageImageResponse(req, res) {
     try {
       const imageIndex = Number(req.query?.index);
@@ -2752,10 +2752,10 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-
   return {
     accountsResponse,
     campaignRepliesResponse,
+    getMessageBodiesResponse,
     getMessageResponse,
     getMessageImageResponse,
     listMessagesResponse,

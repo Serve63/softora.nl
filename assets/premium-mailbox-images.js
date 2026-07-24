@@ -56,10 +56,26 @@
     });
   }
 
+  function isSentCampaignImage(image) {
+    if (String(image && image.owner || '').trim().toLowerCase() === 'sent-campaign') return true;
+    return /\b(?:webdesign|preview|device mockup|mockup|website generator)\b/.test(
+      normalizeLabel(image && image.alt)
+    );
+  }
+
+  function getMessageImages(message) {
+    const images = normalize(message && message.bodyImages);
+    const folder = String(message && message.folder || '').trim().toLowerCase();
+    if (folder === 'sent' && message && message.originalCampaignOutbound === true) {
+      return images;
+    }
+    return images.filter((image) => !isSentCampaignImage(image));
+  }
+
   function getConversationImages(mail) {
     const threadImages = (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
-      .flatMap((message) => Array.isArray(message && message.bodyImages) ? message.bodyImages : []);
-    return merge(mail && mail.bodyImages, threadImages);
+      .flatMap(getMessageImages);
+    return merge(getMessageImages(mail), threadImages);
   }
 
   function normalizeMessageId(value) {
@@ -101,14 +117,11 @@
 
   function getSentImageOwner(mail) {
     const sentMessages = (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
-      .filter((message) => String(message && message.folder || '').trim().toLowerCase() === 'sent');
-    const getAuthoredBody = global.SoftoraMailboxCampaignInbox?.stripQuotedReply;
-    return sentMessages.find((message) => {
-      const body = typeof getAuthoredBody === 'function'
-        ? getAuthoredBody(message && message.body)
-        : String(message && message.body || '');
-      return /\[image:\s*[^\]]+\]/i.test(body);
-    }) || sentMessages.find((message) => normalize(message && message.bodyImages).length) || null;
+      .filter((message) => (
+        String(message && message.folder || '').trim().toLowerCase() === 'sent' &&
+        message && message.originalCampaignOutbound === true
+      ));
+    return sentMessages.find((message) => getMessageImages(message).length) || null;
   }
 
   function getAuthoredBody(message) {
@@ -127,6 +140,7 @@
     const signals = [
       /\b(?:afgelopen|vorige)\s+week kwam ik (?:jullie|je) website\b/,
       /\b(?:uit|vanuit)\s+enthousiasme\b.{0,100}\b(?:fris|nieuw)\s+webdesign\b/,
+      /\bik heb\b.{0,100}\b(?:fris|nieuw)\s+webdesign\b.{0,80}\bgemaakt\b/,
       /\bik ben oprecht benieuwd wat je ervan vindt\b/,
       /\bonline preview\b/,
       /\bontwerp in de bijlage\b/,
@@ -137,48 +151,21 @@
 
   function getSentCampaignOwner(mail) {
     return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
-      .filter((message) => String(message && message.folder || '').trim().toLowerCase() === 'sent')
+      .filter((message) => (
+        String(message && message.folder || '').trim().toLowerCase() === 'sent' &&
+        message && message.originalCampaignOutbound === true
+      ))
       .find(looksLikeSentWebdesignCampaign) || null;
   }
 
-  function isSentCampaignImage(image) {
-    if (String(image && image.owner || '').trim().toLowerCase() === 'sent-campaign') return true;
-    return /\b(?:webdesign|preview|device mockup|mockup|website generator)\b/.test(
-      normalizeLabel(image && image.alt)
-    );
-  }
-
   function createOwnershipPlan(mail, mainImages, hasMainPlaceholders, options = {}) {
-    const visibleMainImages = normalize(mainImages);
-    const campaignOwner = getSentCampaignOwner(mail);
-    const campaignImages = visibleMainImages.filter(isSentCampaignImage);
-    if (campaignOwner && campaignImages.length) {
-      const campaignKeys = new Set(campaignImages.map(imageKey));
-      return {
-        owner: campaignOwner,
-        mainImages: visibleMainImages.filter((image) => !campaignKeys.has(imageKey(image))),
-        fallbackImages: campaignImages,
-        quoteImages: [],
-      };
-    }
-    const hasOwnQuotePlaceholders = Boolean(options && options.hasOwnQuotePlaceholders);
-    if (campaignImages.length && (!hasMainPlaceholders || hasOwnQuotePlaceholders)) {
-      const campaignKeys = new Set(campaignImages.map(imageKey));
-      return {
-        owner: null,
-        mainImages: visibleMainImages.filter((image) => !campaignKeys.has(imageKey(image))),
-        fallbackImages: [],
-        quoteImages: campaignImages,
-      };
-    }
-    const owner = hasMainPlaceholders ? null : getSentImageOwner(mail);
-    const ownerImages = normalize(owner && owner.bodyImages);
-    if (!owner) return { owner: null, mainImages: visibleMainImages, fallbackImages: [], quoteImages: [] };
-    if (!ownerImages.length) return { owner, mainImages: [], fallbackImages: visibleMainImages, quoteImages: [] };
-    const reservedKeys = new Set(ownerImages.map(imageKey));
+    const visibleMainImages = getMessageImages({
+      ...mail,
+      bodyImages: normalize(mainImages),
+    });
     return {
-      owner,
-      mainImages: visibleMainImages.filter((image) => !reservedKeys.has(imageKey(image))),
+      owner: null,
+      mainImages: visibleMainImages,
       fallbackImages: [],
       quoteImages: [],
     };
@@ -248,7 +235,7 @@
   function renderThreadMessageBody(payload, context, renderers) {
     const message = payload && payload.message;
     const sent = Boolean(payload && payload.sent);
-    const messageImages = context.imagesReady === false ? [] : normalize(message && message.bodyImages);
+    const messageImages = context.imagesReady === false ? [] : getMessageImages(message);
     const fallbackImages = sent && isSameMessage(message, context.imageOwner) ? context.fallbackImages : [];
     const imageState = {
       images: merge(messageImages, fallbackImages),
@@ -314,11 +301,9 @@
     let warmed = 0;
     for (const message of Array.isArray(messages) ? messages : []) {
       const conversationImages = [
-        ...(Array.isArray(message && message.bodyImages) ? message.bodyImages : []),
+        ...getMessageImages(message),
         ...(Array.isArray(message && message.threadMessages)
-          ? message.threadMessages.flatMap((threadMessage) => (
-              Array.isArray(threadMessage && threadMessage.bodyImages) ? threadMessage.bodyImages : []
-            ))
+          ? message.threadMessages.flatMap(getMessageImages)
           : []),
       ];
       if (!getSources(conversationImages).length) continue;
@@ -343,6 +328,7 @@
     createOwnershipPlan,
     createSectionOwnershipPlan,
     getConversationImages,
+    getMessageImages,
     isOwnQuoteSection,
     merge,
     normalize,
