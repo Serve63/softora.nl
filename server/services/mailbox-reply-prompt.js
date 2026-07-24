@@ -40,10 +40,8 @@ const MAILBOX_REPLY_PROFILE = Object.freeze({
   defaultSenderKey: 'serve',
   senders: MAILBOX_REPLY_SENDERS,
 });
-const MAILBOX_REPLY_CONVERSATION_BRIDGE =
-  'Als je wilt, denk ik graag even met je mee over wat voor jou handig is.';
-const MAILBOX_REPLY_MEETING_SUGGESTION =
-  'Is het een idee dat ik volgende week [dag] even langskom? Dan kunnen we samen kort kijken wat er mogelijk is.';
+const MAILBOX_REPLY_NEXT_STEP =
+  'Als je wilt, is het een idee dat ik volgende week [dag] even langskom? Dan kunnen we samen kort kijken wat er mogelijk is.';
 const MAILBOX_REPLY_PRICE_EXPLANATION =
   'De prijs hangt af van wat je precies wilt en wat daarvoor nodig is.';
 
@@ -156,7 +154,8 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Reageer altijd specifiek op de concrete reden of boodschap van de ontvanger. Voeg geen generiek bedankzinnetje toe dat niet bij de inhoud past.',
     'Spreek de ontvanger aan met je en nooit met jullie. Gebruik korte alinea’s en gewone spreektaal.',
     'Gebruik exact één keer 😁, natuurlijk in de inhoud en nooit in de afsluiting.',
-    `Bij interesse, een verzoek om de preview of een inhoudelijke/open vraag die een gesprek uitnodigt: reageer enthousiaster en persoonlijk, haak kort aan op de concrete vraag en werk natuurlijk toe naar: "${MAILBOX_REPLY_CONVERSATION_BRIDGE} ${MAILBOX_REPLY_MEETING_SUGGESTION}"`,
+    `Bij interesse, een verzoek om de preview of een inhoudelijke/open vraag die een gesprek uitnodigt: beantwoord eerst de concrete vraag. Voeg daarna alleen als de ontvangen mail daar echt ruimte voor laat maximaal één conditionele vervolgstap toe, exact: "${MAILBOX_REPLY_NEXT_STEP}"`,
+    'Zet nooit meerdere varianten van dezelfde vervolgstap achter elkaar. Combineer dus geen losse zin over meedenken met nog een afspraak- of bezoekvoorstel. Herhaal ook geen inhoudelijk gelijke zin of alinea.',
     'Laat de zichtbare placeholder [dag] altijd letterlijk staan zodat Servé die zelf kan invullen. Vul nooit zelf een weekdag, datum of tijd in en doe nooit alsof de afspraak al staat.',
     `Bij een prijsvraag: verzin geen prijs, pakket, garantie of afspraak. Leg vriendelijk uit dat de prijs afhangt van wat iemand precies wil, bijvoorbeeld: "${MAILBOX_REPLY_PRICE_EXPLANATION}" Werk daarna alleen bij oprechte interesse toe naar hetzelfde vrijblijvende voorstel met [dag].`,
     'Gebruik nooit de woorden "laagdrempelig", "kansen" of "verbeterpunten" en zet de ontvanger niet aan tot een verkoopgesprek of beoordeling.',
@@ -164,7 +163,7 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Bij geen interesse, geen behoefte, geen vervolgtraject, buiten-scope, een beleefde afwijzing of een verzoek om niet door te gaan: reageer kort en respectvol zonder nieuwe verkooppoging; bedank; zeg eventueel dat de ontvanger later zelf contact mag opnemen; stel nooit een bezoek, afspraak, vervolgstap, prijsbespreking of meedenken voor.',
     'Als iemand al tevreden is met een andere partij, benoem juist dat dit begrijpelijk en fijn is.',
     'Feitelijke waarheid gaat altijd voor stijl. Het actuele ontwerp uit deze coldmail is met code gebouwd.',
-    `Als iemand Webflow noemt of ernaar vraagt, zeg feitelijk: "Dit ontwerp heb ik met code gebouwd." Haak kort op de vraag aan zonder te beweren dat Servé Webflow gebruikt, zonder defensieve tegenstelling zoals "dus niet in Webflow" en zonder ongevraagd Webflow-advies. Werk bij zo’n open vraag natuurlijk toe naar het vrijblijvende voorstel met [dag].`,
+    `Als iemand Webflow noemt of ernaar vraagt, erken de vraag eerst natuurlijk en antwoord dan feitelijk: "Goede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd." Beweer niet dat Servé Webflow gebruikt, zet Webflow niet negatief neer, gebruik geen defensieve tegenstelling zoals "dus niet in Webflow" en geef geen ongevraagd Webflow-advies. Gebruik daarna hooguit één relevante conditionele vervolgstap.`,
     'Vermijd corporate taal, gladde verkooppraat, overmatige beleefdheid en formuleringen zoals "ik respecteer je keuze volledig", "je gegevens niet verder mailen", "vriendelijke woorden" en "dank voor uw reactie".',
     'Houd de kern meestal tussen 30 en 75 woorden, exclusief afsluiting. Schrijf niet langer dan nodig.',
     `Sluit altijd exact af met: ${sender.signature}`,
@@ -324,16 +323,44 @@ function enforceWebflowTruth(value, inboundText) {
   if (!/webflow/i.test(String(inboundText || ''))) return String(value || '');
   const cleaned = removeSentencesMatching(
     value,
-    /\bwebflow\b|\bdit\s+ontwerp\b[^.!?]{0,80}\b(?:code|gecodeerd)\b/i
+    /\bwebflow\b|\bdit\s+ontwerp\b[^.!?]{0,80}\b(?:code|gecodeerd)\b|^(?:leuke|goede)\s+vraag\b/i
   );
-  return ['Dit ontwerp heb ik met code gebouwd.', cleaned].filter(Boolean).join('\n\n');
+  return ['Goede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd.', cleaned]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
-function removeMeetingSuggestions(value) {
+function removeConditionalNextSteps(value) {
   return removeSentencesMatching(
     value,
-    /\b(?:afspraak|langskom|langs\s+te\s+komen|even\s+bellen|kennismak|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|overmorgen|samen\b[^.!?]{0,80}\b(?:kijk|bekijk|bespreek))\b/i
+    /\b(?:afspraak|langskom|langs\s+te\s+komen|even\s+bellen|kennismak|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|overmorgen|samen\b[^.!?]{0,80}\b(?:kijk|bekijk|bespreek)|(?:als\s+je\s+wilt[^.!?]{0,160})?(?:denk|denk\s+ik)\s+graag[^.!?]{0,120}\bmee\b)\b/i
   );
+}
+
+function dedupeSemanticReplySentences(value) {
+  const seen = new Set();
+  return String(value || '')
+    .split(/\n{2,}/)
+    .map((paragraph) => {
+      const sentences = paragraph.match(/[^.!?]+[.!?]?/g) || [];
+      return sentences
+        .map((sentence) => sentence.trim())
+        .filter((sentence) => {
+          if (!sentence) return false;
+          const semanticKey = normalizeClassifierText(sentence)
+            .replace(/[^\p{L}\p{N}\[\]]+/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (!semanticKey || seen.has(semanticKey)) return false;
+          seen.add(semanticKey);
+          return true;
+        })
+        .join(' ')
+        .trim();
+    })
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
 }
 
 function enforcePriceTruth(value, intent) {
@@ -379,7 +406,7 @@ function enforceMailboxReplyProfile(value, options = {}) {
   let body = stripGeneratedSignature(stripGeneratedGreeting(value));
   body = enforceWebflowTruth(body, options.inboundText);
   body = enforcePriceTruth(body, intent);
-  body = removeMeetingSuggestions(body);
+  body = removeConditionalNextSteps(body);
   body = body
     .replace(/\bjullie\b/gi, 'je')
     .replace(/\bkunt\su\b/gi, 'kun je')
@@ -391,10 +418,11 @@ function enforceMailboxReplyProfile(value, options = {}) {
     .replace(/\blaagdrempelig\b/gi, 'kort')
     .replace(/\bverbeterpunten\b/gi, 'wensen')
     .replace(/\bkansen\b/gi, 'mogelijkheden');
-  body = enforceSingleSmile(body);
+  body = dedupeSemanticReplySentences(body);
   if (intent === 'interest' || intent === 'price') {
-    body = `${body}\n\n${MAILBOX_REPLY_CONVERSATION_BRIDGE}\n\n${MAILBOX_REPLY_MEETING_SUGGESTION}`;
+    body = `${body}\n\n${MAILBOX_REPLY_NEXT_STEP}`;
   }
+  body = enforceSingleSmile(dedupeSemanticReplySentences(body));
   return `${greeting}\n\n${body}\n\n${sender.signature}`;
 }
 
@@ -424,8 +452,7 @@ function buildMailboxDraftRewriteSystemPrompt({ senderName } = {}) {
 }
 
 module.exports = {
-  MAILBOX_REPLY_CONVERSATION_BRIDGE,
-  MAILBOX_REPLY_MEETING_SUGGESTION,
+  MAILBOX_REPLY_NEXT_STEP,
   MAILBOX_REPLY_PRICE_EXPLANATION,
   MAILBOX_REPLY_PROFILE,
   MAILBOX_REPLY_SENDERS,

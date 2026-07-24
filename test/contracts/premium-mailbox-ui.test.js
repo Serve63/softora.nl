@@ -285,6 +285,16 @@ test('BCC en CC verschijnen alleen met exacte provenance in lijst en detail', ()
   assert.equal(campaignInboxModule.renderCopyRouting(direct, baseOptions.escapeHtml), '');
   const uncertain = { ...bccMail, copyContext: { kind: 'bcc', evidenceKnown: false } };
   assert.doesNotMatch(listModule.renderItem(uncertain, baseOptions), /mail-copy-badge/);
+
+  const pageSource = readPage();
+  assert.match(
+    pageSource,
+    /\.detail-routing \{[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /\.detail-routing \{[^}]*(?:background:\s*rgba|border:\s*1px)/
+  );
 });
 
 test('BCC-thread toont volledige chronologie, roze identiteit en één nieuwe-berichtactie', () => {
