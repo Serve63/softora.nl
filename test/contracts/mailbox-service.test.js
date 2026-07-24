@@ -2355,7 +2355,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
         data: {
           model: 'gpt-test',
           usage: { total_tokens: 123 },
-          choices: [{ message: { content: 'Beste klant,\n\nVerbeterde tekst.' } }],
+          choices: [{ message: { content: 'Hoi klant,\n\nVerbeterde tekst.' } }],
         },
       };
     },
@@ -2383,7 +2383,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     },
   });
 
-  assert.equal(result.text, 'Beste klant,\n\nVerbeterde tekst.\n\nMet vriendelijke groet,\nServé Creusen');
+  assert.equal(result.text, 'Beste,\n\nVerbeterde tekst. 😁\n\nMet vriendelijke groet,\nServé Creusen');
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
@@ -2392,12 +2392,13 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(calls[0].timeout, 65000);
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
-  assert.match(calls[0].payload.messages[0].content, /Je bent Malik Mailing/);
-  assert.match(calls[0].payload.messages[0].content, /Schrijf namens Servé Creusen/);
+  assert.match(calls[0].payload.messages[0].content, /centraal antwoordprofiel serve-mailbox-reply-v1/);
+  assert.match(calls[0].payload.messages[0].content, /Schrijf altijd namens Servé Creusen/);
   assert.match(calls[0].payload.messages[0].content, /exact één keer 😁/);
   assert.match(calls[0].payload.messages[0].content, /nooit met jullie/);
   assert.match(calls[0].payload.messages[0].content, /zonder nieuwe verkooppoging/);
   assert.match(calls[0].payload.messages[0].content, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
+  assert.match(calls[0].payload.messages[1].content, /"ontvangenMail"/);
   assert.match(calls[0].payload.messages[1].content, /Kan dit voor vrijdag/);
   assert.match(calls[0].payload.messages[1].content, /hoi ik stuur dit ff/);
   assert.doesNotMatch(calls[0].payload.messages[1].content, /Groetjes[\s\S]*Servé/);
@@ -2438,10 +2439,12 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
     },
   });
 
-  assert.match(result.text, /Martijn van de Ven/);
+  assert.match(result.text, /^Beste Lisa,/);
+  assert.match(result.text, /Servé Creusen$/);
+  assert.doesNotMatch(result.text, /Martijn van de Ven/);
   assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
-  assert.match(calls[0].messages[0].content, /Schrijf namens Martijn van de Ven/);
-  assert.match(calls[0].messages[0].content, /Je bent Malik Mailing/);
+  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Servé Creusen/);
+  assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v1/);
   assert.match(calls[0].messages[0].content, /verzin geen prijs/i);
   assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
   assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
@@ -2481,10 +2484,66 @@ test('mailbox service laat replycontext de afzender bepalen en corrigeert een ve
     },
   });
 
-  assert.match(calls[0].messages[0].content, /Schrijf namens Martijn van de Ven/);
+  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Servé Creusen/);
   assert.match(calls[0].messages[1].content, /"accountEmail":"martijn@softora.nl"/);
-  assert.match(calls[0].messages[1].content, /"naam":"Martijn van de Ven"/);
-  assert.equal(result.text, 'Hoi,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
+  assert.match(calls[0].messages[1].content, /"naam":"Servé Creusen"/);
+  assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen');
+});
+
+test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail en corrigeert Webflow-feiten', async () => {
+  const calls = [];
+  const service = createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiApiBaseUrl: 'https://api.openai.test/v1',
+    openAiModel: 'gpt-test',
+    fetchJsonWithTimeout: async (_url, options) => {
+      calls.push(JSON.parse(options.body));
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          choices: [{
+            message: {
+              content: 'Hoi Salon,\n\nIk werk zelf ook in Webflow. Dan kunnen we jullie kansen laagdrempelig bespreken.',
+            },
+          }],
+        },
+      };
+    },
+    extractOpenAiTextContent: (content) => String(content || ''),
+  });
+
+  const result = await service.rewriteDraft({
+    accountEmail: 'serve@softora.nl',
+    to: 'info@salontof.nl',
+    subject: 'Re: Kleine vraag over je website',
+    body: '',
+    context: {
+      from: 'Salon TOF',
+      email: 'info@salontof.nl',
+      subject: 'Re: Kleine vraag over je website',
+      body: 'Met welk programma werk je? Wij hebben nu Webflow.',
+      originalSentMail: {
+        folder: 'sent',
+        from: 'Servé Creusen',
+        to: 'info@salontof.nl',
+        subject: 'Kleine vraag over je website',
+        body: 'Ik heb een fris webdesign gemaakt en hoor graag wat je ervan vindt.',
+      },
+    },
+  });
+
+  const promptPayload = JSON.parse(calls[0].messages[1].content);
+  assert.equal(promptPayload.ontvangenMail.body, 'Met welk programma werk je? Wij hebben nu Webflow.');
+  assert.equal(
+    promptPayload.oorspronkelijkeVerzondenMail.body,
+    'Ik heb een fris webdesign gemaakt en hoor graag wat je ervan vindt.'
+  );
+  assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
+  assert.match(result.text, /^Beste,/);
+  assert.match(result.text, /Dit ontwerp heb ik met code gebouwd/);
+  assert.doesNotMatch(result.text, /Hoi Salon|werk zelf ook in Webflow|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.equal((result.text.match(/😁/gu) || []).length, 1);
+  assert.equal(result.text.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });
 
 test('mailbox service bewaart coldmailprofiel alleen bij een los concept zonder replycontext', async () => {
