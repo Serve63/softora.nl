@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
+const { CAMPAIGN_SYNC_INDEX_SCAN_LIMIT } = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
@@ -3103,6 +3104,7 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
     return sentMessages.map((message) => message.uid);
   };
   let upsertedUids = [];
+  const historyScanRequests = [];
   const indexedInboxMessageId =
     '<BF12953B-A9DE-4A85-8F2D-F94926245967@vangestelsteigerbouw.nl>';
   const service = createMailboxService({
@@ -3128,8 +3130,9 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
     mailboxIndexStore: {
       isAvailable: () => true,
       listMessages: async () => [],
-      listAllMessagesForAccounts: async ({ folder }) =>
-        folder === 'inbox'
+      listAllMessagesForAccounts: async ({ folder, limit }) => {
+        historyScanRequests.push({ folder, limit });
+        return folder === 'inbox'
           ? [
               {
                 uid: 2429,
@@ -3138,7 +3141,8 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
                 senderEmail: 'info@vangestelsteigerbouw.nl',
               },
             ]
-          : Array.from({ length: 7 }, (_item, index) => ({ uid: 114 + index })),
+          : Array.from({ length: 7 }, (_item, index) => ({ uid: 114 + index }));
+      },
       acquireSyncLock: async () => ({ ok: true, lockToken: 'lock-targeted-history' }),
       getOldestMatchingMessageUid: async () => 91,
       upsertMessages: async ({ messages }) => {
@@ -3165,6 +3169,10 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
   );
 
   assert.equal(response.statusCode, 200);
+  assert.deepEqual(historyScanRequests, [
+    { folder: 'inbox', limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT },
+    { folder: 'sent', limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT },
+  ]);
   assert.equal(response.body.results[0].targetedThreadReferences, 1);
   assert.equal(response.body.results[0].targetedThreadRecipients, 2);
   assert.equal(upsertedUids[7], 42);

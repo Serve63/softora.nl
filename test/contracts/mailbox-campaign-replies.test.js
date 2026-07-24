@@ -367,7 +367,7 @@ test('campaign reply service houdt vervolgreacties in één bestaande conversati
   assert.equal(replies[0].threadMessages[1].folder, 'inbox');
 });
 
-test('campaign reply service toont alle latere mails aan Ralph buiten de oude 500-mailscan', async () => {
+test('campaign reply service houdt historische vervolgreacties binnen een begrensde scan', async () => {
   const inboxMessage = {
     id: 'inbox:23',
     uid: 23,
@@ -439,8 +439,8 @@ test('campaign reply service toont alle latere mails aan Ralph buiten de oude 50
   const replies = await service.listReplies({ limit: 100 });
 
   assert.deepEqual(requestedMethods, [
-    ['inbox', undefined],
-    ['sent', undefined],
+    ['inbox', CAMPAIGN_MESSAGE_SCAN_LIMIT],
+    ['sent', CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT],
   ]);
   assert.equal(replies.length, 1);
   assert.equal(

@@ -445,14 +445,14 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const hasCompleteAccountHistory = typeof mailboxIndexStore.listAllMessagesForAccounts === 'function';
-    const listMessagesForAccounts = hasCompleteAccountHistory
+    const hasPagedAccountHistory = typeof mailboxIndexStore.listAllMessagesForAccounts === 'function';
+    const listMessagesForAccounts = hasPagedAccountHistory
       ? mailboxIndexStore.listAllMessagesForAccounts.bind(mailboxIndexStore)
       : mailboxIndexStore.listMessagesForAccounts.bind(mailboxIndexStore);
     const messages = await listMessagesForAccounts({
       accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
       folder: 'inbox',
-      ...(hasCompleteAccountHistory ? {} : { limit: CAMPAIGN_MESSAGE_SCAN_LIMIT }),
+      limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
     });
     if (!Array.isArray(messages)) {
       const error = new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.');
@@ -502,7 +502,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
     const sentMessagesResult = await listMessagesForAccounts({
       accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
       folder: 'sent',
-      ...(hasCompleteAccountHistory ? {} : { limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT }),
+      limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
     }).catch(() => []);
     const sentMessages = Array.isArray(sentMessagesResult) ? sentMessagesResult : [];
     const candidateConversationLimit = Math.min(CAMPAIGN_REPLY_LIMIT, safeLimit * 2);

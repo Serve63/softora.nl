@@ -1,6 +1,8 @@
 const { CAMPAIGN_MAILBOX_ACCOUNTS } = require('./mailbox-campaign-replies');
 const { CAMPAIGN_HISTORY_SUBJECT_TERMS } = require('./mailbox-campaign-history-sync');
 
+const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 2000;
+
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
   'gmail.com',
@@ -123,11 +125,13 @@ function createMailboxSyncService({
           (await mailboxIndexStore.listAllMessagesForAccounts({
             accountEmails: [account.email],
             folder: 'inbox',
+            limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
           })) || [];
         const indexedSentMessages =
           (await mailboxIndexStore.listAllMessagesForAccounts({
             accountEmails: [account.email],
             folder: 'sent',
+            limit: CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
           })) || [];
         threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
         threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
@@ -233,6 +237,7 @@ function createMailboxSyncService({
 }
 
 module.exports = {
+  CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,
