@@ -6,6 +6,7 @@
   const DIRECT_SUPABASE_ROW_ID = 'serve_logbook';
   const REMOTE_SAVE_DELAY_MS = 450;
   const REMOTE_RETRY_DELAY_MS = 1800;
+  const REMOTE_REFRESH_DEDUPE_MS = 900;
   const SWIPE_WIDTH = 108;
   const REORDER_START_THRESHOLD = 6;
   const DRAFT_EXERCISE_TITLE = 'NIEUWE OEFENING';
@@ -69,6 +70,8 @@
 
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
+  const logbookSync = window.SoftoraSportschoolLogbookSync;
+  if (!logbookSync) return;
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
@@ -87,6 +90,9 @@
   let stateRevision = 0;
   let lastSavedRevision = 0;
   let lastRemoteSnapshotJson = '';
+  let lastRemoteUpdatedAtMs = 0;
+  let lastRemoteVersionToken = '';
+  let resumeRevalidator = null;
   let logbookState = createDefaultState();
   let cleanedLegacyNotesDuringLoad = false;
   let shouldPersistLoadedSnapshot = false;
@@ -476,6 +482,7 @@
   async function saveDirectSupabaseState(config, snapshotJson, options = {}) {
     const endpoint =
       `${config.url}/rest/v1/${DIRECT_SUPABASE_TABLE}?on_conflict=id`;
+    const updatedAt = new Date().toISOString();
     const response = await fetch(endpoint, {
       method: 'POST',
       keepalive: options.keepalive === true,
@@ -486,21 +493,20 @@
       body: JSON.stringify({
         id: DIRECT_SUPABASE_ROW_ID,
         payload: JSON.parse(snapshotJson),
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
       }),
     });
     if (!response.ok) throw new Error(`Sportschool Supabase opslaan mislukt (${response.status})`);
     return {
       ok: true,
       scope: REMOTE_SCOPE,
+      values: { [REMOTE_STATE_KEY]: snapshotJson },
       source: 'supabase:sportschool',
+      updatedAt,
     };
   }
 
   async function fetchRemoteState() {
-    const directConfig = getDirectSupabaseConfig();
-    if (directConfig) return fetchDirectSupabaseState(directConfig);
-
     const response = await fetch(REMOTE_LOGBOOK_ENDPOINT, {
       method: 'GET',
       cache: 'no-store',
@@ -510,6 +516,9 @@
       throw new Error(`Sportschool opslag laden mislukt (${response.status})`);
     }
 
+    const directConfig = getDirectSupabaseConfig();
+    if (directConfig) return fetchDirectSupabaseState(directConfig);
+
     if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.get === 'function') {
       return window.SoftoraUiStateClient.get(REMOTE_SCOPE);
     }
@@ -518,9 +527,6 @@
   }
 
   async function saveRemoteState(snapshotJson, options = {}) {
-    const directConfig = getDirectSupabaseConfig();
-    if (directConfig) return saveDirectSupabaseState(directConfig, snapshotJson, options);
-
     const body = {
       patch: { [REMOTE_STATE_KEY]: snapshotJson },
       source: 'sportschool-logboek',
@@ -535,12 +541,23 @@
         snapshot: JSON.parse(snapshotJson),
         source: 'sportschool-logboek',
         actor: 'serve',
+        baseUpdatedAt: options.baseUpdatedAt || undefined,
       }),
     });
-    if (response.ok) return response.json();
+    const responseBody = await response.json().catch(() => null);
+    if (response.ok) return responseBody;
+    if (response.status === 409) {
+      return {
+        ...(responseBody || {}),
+        conflict: true,
+      };
+    }
     if (response.status !== 404) {
       throw new Error(`Sportschool opslag opslaan mislukt (${response.status})`);
     }
+
+    const directConfig = getDirectSupabaseConfig();
+    if (directConfig) return saveDirectSupabaseState(directConfig, snapshotJson, options);
 
     if (window.SoftoraUiStateClient && typeof window.SoftoraUiStateClient.set === 'function') {
       return window.SoftoraUiStateClient.set(REMOTE_SCOPE, body, options);
@@ -559,15 +576,14 @@
   async function loadRemoteState() {
     try {
       const state = await fetchRemoteState();
-      const raw = state?.values?.[REMOTE_STATE_KEY] || state?.values?.gymLogbookJson || '';
-      const snapshot = parseRemoteSnapshot(raw);
-      if (!snapshot) {
-        return false;
-      }
-      lastRemoteSnapshotJson = JSON.stringify(snapshot);
+      const info = readRemoteSnapshotInfo(state);
+      if (!info) return false;
+      lastRemoteSnapshotJson = info.snapshotJson;
+      lastRemoteUpdatedAtMs = info.updatedAtMs;
+      lastRemoteVersionToken = info.versionToken;
       cleanedLegacyNotesDuringLoad = false;
       shouldPersistLoadedSnapshot = false;
-      applyRemoteSnapshot(snapshot);
+      applyRemoteSnapshot(info.snapshot);
       stateRevision = 0;
       lastSavedRevision = 0;
       pendingRemoteSave = false;
@@ -576,6 +592,80 @@
     } catch (_error) {
       return false;
     }
+  }
+
+  function readRemoteSnapshotInfo(state) {
+    const values = state?.values && typeof state.values === 'object' ? state.values : {};
+    const normalizedState =
+      Object.prototype.hasOwnProperty.call(values, REMOTE_STATE_KEY) || !values.gymLogbookJson
+        ? state
+        : {
+            ...state,
+            values: {
+              ...values,
+              [REMOTE_STATE_KEY]: values.gymLogbookJson,
+            },
+          };
+    return logbookSync.readRemoteSnapshotInfo(normalizedState, REMOTE_STATE_KEY, parseRemoteSnapshot);
+  }
+
+  function hasLocalChangesOrSaveInFlight() {
+    return (
+      stateRevision !== lastSavedRevision ||
+      pendingRemoteSave ||
+      remoteSaveInFlight
+    );
+  }
+
+  function rememberRemoteSnapshot(info) {
+    lastRemoteSnapshotJson = info.snapshotJson;
+    lastRemoteUpdatedAtMs = info.updatedAtMs;
+    lastRemoteVersionToken = info.versionToken;
+  }
+
+  function applyFreshRemoteSnapshot(snapshot, info) {
+    if (hasLocalChangesOrSaveInFlight()) return false;
+    window.clearTimeout(remoteSaveTimer);
+    clearRemoteRetryTimer();
+    cleanedLegacyNotesDuringLoad = false;
+    shouldPersistLoadedSnapshot = false;
+    applyRemoteSnapshot(snapshot);
+    rememberRemoteSnapshot(info);
+    stateRevision = 0;
+    lastSavedRevision = 0;
+    pendingRemoteSave = false;
+    render();
+    if (cleanedLegacyNotesDuringLoad || shouldPersistLoadedSnapshot) {
+      markStateChanged({ silent: true });
+      persistRemoteSave();
+    }
+    return true;
+  }
+
+  function resolveRemoteSaveConflict(remoteState) {
+    const info = readRemoteSnapshotInfo(remoteState);
+    if (!info) {
+      pendingRemoteSave = true;
+      scheduleRemoteRetry();
+      return;
+    }
+    const baseSnapshot = parseRemoteSnapshot(lastRemoteSnapshotJson) || {};
+    const currentLocalSnapshot = buildSnapshotFromState();
+    const mergedSnapshot = logbookSync.mergeConflictSnapshots(
+      baseSnapshot,
+      currentLocalSnapshot,
+      info.snapshot
+    );
+    const revisionBeforeMerge = stateRevision;
+    cleanedLegacyNotesDuringLoad = false;
+    shouldPersistLoadedSnapshot = false;
+    applyRemoteSnapshot(mergedSnapshot);
+    rememberRemoteSnapshot(info);
+    stateRevision = Math.max(revisionBeforeMerge, lastSavedRevision) + 1;
+    pendingRemoteSave = true;
+    render();
+    window.clearTimeout(remoteSaveTimer);
+    remoteSaveTimer = window.setTimeout(() => persistRemoteSave(), 0);
   }
 
   function clearRemoteRetryTimer() {
@@ -617,10 +707,24 @@
     let saved = false;
     if (tracksInFlight) remoteSaveInFlight = true;
     try {
-      await saveRemoteState(snapshotJson, options);
+      const savedState = await saveRemoteState(snapshotJson, {
+        ...options,
+        baseUpdatedAt: lastRemoteVersionToken,
+      });
+      if (savedState?.conflict) {
+        resolveRemoteSaveConflict(savedState);
+        return;
+      }
       saved = true;
       if (revisionAtStart === stateRevision) {
-        lastRemoteSnapshotJson = snapshotJson;
+        const savedInfo = readRemoteSnapshotInfo(
+          savedState || {
+            values: { [REMOTE_STATE_KEY]: snapshotJson },
+            updatedAt: snapshot.updatedAt,
+          }
+        );
+        if (savedInfo) rememberRemoteSnapshot(savedInfo);
+        else lastRemoteSnapshotJson = snapshotJson;
         lastSavedRevision = revisionAtStart;
         pendingRemoteSave = false;
       } else {
@@ -639,6 +743,9 @@
             persistRemoteSave();
           }, 0);
         }
+      }
+      if (saved && resumeRevalidator && !hasLocalChangesOrSaveInFlight()) {
+        resumeRevalidator.notifyLocalStateSettled();
       }
     }
   }
@@ -950,8 +1057,21 @@
   });
   window.addEventListener('online', scheduleRemoteSave);
   window.addEventListener('pagehide', flushRemoteSave);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushRemoteSave();
+  resumeRevalidator = logbookSync.createResumeRevalidator({
+    fetchRemoteState,
+    readSnapshotInfo: readRemoteSnapshotInfo,
+    getKnownRemoteUpdatedAtMs: () => lastRemoteUpdatedAtMs,
+    hasLocalChanges: hasLocalChangesOrSaveInFlight,
+    isReady: () => isReady,
+    isVisible: () => document.visibilityState !== 'hidden',
+    applyRemoteSnapshot: applyFreshRemoteSnapshot,
+    dedupeMs: REMOTE_REFRESH_DEDUPE_MS,
+  });
+  logbookSync.bindResumeEvents({
+    windowTarget: window,
+    documentTarget: document,
+    requestRefresh: (source) => resumeRevalidator.requestRefresh(source),
+    onHidden: flushRemoteSave,
   });
 
   async function boot() {
