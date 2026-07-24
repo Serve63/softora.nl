@@ -96,11 +96,21 @@ test('mailbox image loader warmt alleen de eerste twee beeldmails vooruit', asyn
       {
         bodyImages: [],
         threadMessages: [{
-          bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=1' }],
+          folder: 'sent',
+          originalCampaignOutbound: true,
+          bodyImages: [proxyImage('1', 'Eerste echte bijlage')],
         }],
       },
-      { bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=2' }] },
-      { bodyImages: [{ dataUrl: '/api/mailbox/message-image?mail=3' }] },
+      {
+        folder: 'sent',
+        originalCampaignOutbound: true,
+        bodyImages: [proxyImage('2', 'Tweede echte bijlage')],
+      },
+      {
+        folder: 'sent',
+        originalCampaignOutbound: true,
+        bodyImages: [proxyImage('3', 'Derde echte bijlage')],
+      },
     ]);
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(requested, [
@@ -137,7 +147,7 @@ test('mailbox image loader toont alleen de laatst gekozen mail na de decode', as
   }
 });
 
-test('mailbox afbeeldingseigendom zet herstelde campagnebeelden onder het verzonden bericht', () => {
+test('mailbox afbeeldingseigendom leidt campagnebeelden nooit af uit losse conversatiemedia', () => {
   const loaded = loadModuleWithImage(class FakeImage {});
   try {
     const sent = sentCampaignMessage();
@@ -145,16 +155,16 @@ test('mailbox afbeeldingseigendom zet herstelde campagnebeelden onder het verzon
     const plan = loaded.module.createOwnershipPlan({
       threadMessages: [sent],
     }, [design], true);
-    assert.equal(plan.owner, sent);
+    assert.equal(plan.owner, null);
     assert.deepEqual(plan.mainImages, []);
-    assert.deepEqual(plan.fallbackImages, [design]);
+    assert.deepEqual(plan.fallbackImages, []);
     assert.deepEqual(plan.quoteImages, []);
   } finally {
     loaded.restore();
   }
 });
 
-test('mailbox afbeeldingseigendom bewaart echte antwoordfoto en verplaatst alleen campagnebeeld', () => {
+test('mailbox afbeeldingseigendom bewaart echte antwoordfoto en negeert los campagnebeeld', () => {
   const loaded = loadModuleWithImage(class FakeImage {});
   try {
     const sent = sentCampaignMessage();
@@ -163,9 +173,9 @@ test('mailbox afbeeldingseigendom bewaart echte antwoordfoto en verplaatst allee
     const plan = loaded.module.createOwnershipPlan({
       threadMessages: [sent],
     }, [recipientPhoto, campaignDesign], true);
-    assert.equal(plan.owner, sent);
+    assert.equal(plan.owner, null);
     assert.deepEqual(plan.mainImages, [recipientPhoto]);
-    assert.deepEqual(plan.fallbackImages, [campaignDesign]);
+    assert.deepEqual(plan.fallbackImages, []);
     assert.deepEqual(plan.quoteImages, []);
   } finally {
     loaded.restore();
@@ -191,7 +201,7 @@ test('mailbox afbeeldingseigendom laat gewone ontvangen foto bij de ontvanger', 
   }
 });
 
-test('mailbox afbeeldingseigendom zet geciteerde campagnebeelden nooit onder een ontvangen reactie', () => {
+test('mailbox afbeeldingseigendom negeert geciteerde campagnebeelden volledig', () => {
   const loaded = loadModuleWithImage(class FakeImage {});
   try {
     const campaignDesign = proxyImage('quoted-campaign-design', 'dirvenschoenen.nl preview', 'sent-campaign');
@@ -204,13 +214,13 @@ test('mailbox afbeeldingseigendom zet geciteerde campagnebeelden nooit onder een
     assert.equal(plan.owner, null);
     assert.deepEqual(plan.mainImages, []);
     assert.deepEqual(plan.fallbackImages, []);
-    assert.deepEqual(plan.quoteImages, [campaignDesign]);
+    assert.deepEqual(plan.quoteImages, []);
   } finally {
     loaded.restore();
   }
 });
 
-test('mailbox afbeeldingseigendom bewaart expliciete inline placeholders in het zichtbare bericht', () => {
+test('mailbox afbeeldingseigendom gebruikt placeholders nooit als MIME-bewijs', () => {
   const loaded = loadModuleWithImage(class FakeImage {});
   try {
     const inlineDesign = proxyImage('inline-campaign-design', 'softora.nl preview', 'sent-campaign');
@@ -218,7 +228,7 @@ test('mailbox afbeeldingseigendom bewaart expliciete inline placeholders in het 
       threadMessages: [],
     }, [inlineDesign], true);
     assert.equal(plan.owner, null);
-    assert.deepEqual(plan.mainImages, [inlineDesign]);
+    assert.deepEqual(plan.mainImages, []);
     assert.deepEqual(plan.fallbackImages, []);
     assert.deepEqual(plan.quoteImages, []);
   } finally {
@@ -226,7 +236,7 @@ test('mailbox afbeeldingseigendom bewaart expliciete inline placeholders in het 
   }
 });
 
-test('mailbox afbeeldingseigendom zet placeholders uit jouw eerdere mail in dat eigen blok', () => {
+test('mailbox afbeeldingseigendom gebruikt placeholders in eerdere mail nooit als MIME-bewijs', () => {
   const loaded = loadModuleWithImage(class FakeImage {});
   try {
     const quotedDesign = proxyImage('quoted-inline-design', 'dirvenschoenen.nl preview', 'sent-campaign');
@@ -236,7 +246,7 @@ test('mailbox afbeeldingseigendom zet placeholders uit jouw eerdere mail in dat 
     assert.equal(plan.owner, null);
     assert.deepEqual(plan.mainImages, []);
     assert.deepEqual(plan.fallbackImages, []);
-    assert.deepEqual(plan.quoteImages, [quotedDesign]);
+    assert.deepEqual(plan.quoteImages, []);
   } finally {
     loaded.restore();
   }
@@ -245,22 +255,24 @@ test('mailbox afbeeldingseigendom zet placeholders uit jouw eerdere mail in dat 
 test('mailbox afbeeldingseigendom herkent hetzelfde verzonden bericht na conversation grouping', () => {
   const loaded = loadModuleWithImage(class FakeImage {});
   try {
+    const design = proxyImage('stable-owner-design', 'voorbeeld.nl preview');
     const owner = {
       id: 'sent:195',
       accountEmail: 'servecreusen7@gmail.com',
       messageId: '<sent-message@example.com>',
       folder: 'sent',
+      originalCampaignOutbound: true,
+      bodyImages: [design],
       body: '',
     };
     const groupedClone = { ...owner };
-    const design = proxyImage('stable-owner-design', 'voorbeeld.nl preview');
     const html = loaded.module.renderThreadMessageBody({
       message: groupedClone,
       sent: true,
       body: 'Goedendag',
     }, {
       imageOwner: owner,
-      fallbackImages: [design],
+      fallbackImages: [],
       imagesReady: true,
     }, {
       normalizeEmail: (value) => value,

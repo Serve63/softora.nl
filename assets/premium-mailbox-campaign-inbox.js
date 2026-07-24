@@ -523,6 +523,36 @@
     return isFormattingVariantOfThreadMessage(quotedText, authoredText);
   }
 
+  function looksLikeOriginalCampaignText(value) {
+    const text = normalizeThreadMatchText(value);
+    const signals = [
+      /\bafgelopen week kwam ik (?:jullie|je|uw) website\b/,
+      /\b(?:uit|vanuit) enthousiasme\b.{0,180}\b(?:fris|nieuw) webdesign\b/,
+      /\bik heb\b.{0,100}\b(?:fris|nieuw) webdesign\b.{0,80}\bgemaakt\b/,
+      /\bik ben oprecht benieuwd wat (?:je|jullie|u) ervan vind/,
+      /\b(?:ontwerp|webdesign)\b.{0,100}\b(?:bijlage|online preview)\b/,
+    ];
+    return signals.filter((pattern) => pattern.test(text)).length >= 2;
+  }
+
+  function getCampaignWebsiteDomains(value) {
+    const domains = new Set();
+    const source = String(value || '').replace(/\u2060/g, '');
+    for (const match of source.matchAll(/\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/gi)) {
+      const domain = String(match[1] || '').toLowerCase();
+      if (!domain || domain === 'softora.nl' || domain.endsWith('.softora.nl')) continue;
+      domains.add(domain);
+    }
+    return domains;
+  }
+
+  function isSameCampaignWebsite(leftText, rightText) {
+    const leftDomains = getCampaignWebsiteDomains(leftText);
+    const rightDomains = getCampaignWebsiteDomains(rightText);
+    if (!leftDomains.size || !rightDomains.size) return true;
+    return Array.from(leftDomains).some((domain) => rightDomains.has(domain));
+  }
+
   function stripStructuredQuoteMetadata(lines) {
     const metadataPattern = /^(?:verzonden|sent|datum|date|aan|to|onderwerp|subject):\s*/i;
     const values = Array.isArray(lines) ? lines.slice() : [];
@@ -535,11 +565,27 @@
   function isDuplicateStructuredOwnQuote(section, mail, isReplyHeaderLine) {
     if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
     const firstLine = String(section.lines[0] || '').trim();
-    if (typeof isReplyHeaderLine !== 'function' || !isReplyHeaderLine(firstLine)) return false;
-    const quotedText = normalizeThreadMatchText(stripStructuredQuoteMetadata(section.lines.slice(1)).join('\n'));
+    const hasReplyHeader = typeof isReplyHeaderLine === 'function' && isReplyHeaderLine(firstLine);
+    const quotedText = normalizeThreadMatchText(
+      stripStructuredQuoteMetadata(hasReplyHeader ? section.lines.slice(1) : section.lines).join('\n')
+    );
     if (!quotedText) return false;
-    return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : []).some((message) => {
-      if (String(message && message.folder || '').trim().toLowerCase() !== 'sent') return false;
+    const sentMessages = (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
+      .filter((message) => String(message && message.folder || '').trim().toLowerCase() === 'sent');
+    if (looksLikeOriginalCampaignText(quotedText)) {
+      const originalCampaignMessage = sentMessages.find((message) => {
+        const authoredText = stripQuotedReply(
+          message && (message.body || message.text || message.preview)
+        );
+        return Boolean(
+          (message && message.originalCampaignOutbound) ||
+          looksLikeOriginalCampaignText(authoredText)
+        ) && isSameCampaignWebsite(quotedText, authoredText);
+      });
+      if (originalCampaignMessage) return true;
+    }
+    if (!hasReplyHeader) return false;
+    return sentMessages.some((message) => {
       const authoredText = normalizeThreadMatchText(stripQuotedReply(
         message && (message.body || message.text || message.preview)
       ));
@@ -563,15 +609,18 @@
           : messageTimestamp <= rootTimestamp;
       });
     return messages.map((message) => {
-      const body = stripQuotedReply(message && (message.body || message.preview));
-      if (!body) return '';
+      const loading = Boolean(message && message.bodyLoading);
+      const body = loading ? '' : stripQuotedReply(message && (message.body || message.preview));
+      if (!body && !loading) return '';
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const folder = String(message && message.folder || 'sent').trim().toLowerCase();
       const sent = folder === 'sent';
       const owner = sent ? getOwnerLabel(getOwnerByAccount(message.accountEmail)) : '';
       const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
       const meta = [dateLabel, owner].filter(Boolean).join(' · ');
-      const renderedBody = typeof options.renderMessageBody === 'function'
+      const renderedBody = loading
+        ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
+        : typeof options.renderMessageBody === 'function'
         ? options.renderMessageBody({ message, body, sent })
         : `<div class="detail-mail-lines">${body.split('\n').map((line) => {
             const content = String(line || '');

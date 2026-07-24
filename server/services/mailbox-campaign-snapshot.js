@@ -76,6 +76,12 @@ function sanitizeThreadMessage(value, options = {}) {
   const body = options.includeBody === false
     ? ''
     : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS);
+  const bodyImageEvidenceKnown =
+    source.bodyImageEvidenceKnown === true ||
+    (
+      source.bodyImageEvidenceKnown !== false &&
+      Object.prototype.hasOwnProperty.call(source, 'embeddedImageCount')
+    );
   return {
     id: text(source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
@@ -93,6 +99,11 @@ function sanitizeThreadMessage(value, options = {}) {
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
     hasBody: Boolean(source.hasBody || rawBody),
+    bodyImageEvidenceKnown,
+    embeddedImageCount: bodyImageEvidenceKnown
+      ? Math.max(0, Math.min(8, Number(source.embeddedImageCount) || 0))
+      : 0,
+    originalCampaignOutbound: source.originalCampaignOutbound === true,
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
     bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     bodyImages,
@@ -133,6 +144,12 @@ function sanitizeMessage(value, options = {}) {
   const body = options.includeBody === false
     ? ''
     : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS);
+  const bodyImageEvidenceKnown =
+    source.bodyImageEvidenceKnown === true ||
+    (
+      source.bodyImageEvidenceKnown !== false &&
+      Object.prototype.hasOwnProperty.call(source, 'embeddedImageCount')
+    );
   return {
     id: text(source.id, 500),
     mailboxId: text(source.mailboxId || source.id, 500),
@@ -156,6 +173,11 @@ function sanitizeMessage(value, options = {}) {
     unread: Boolean(source.unread),
     starred: Boolean(source.starred),
     hasBody: Boolean(source.hasBody || rawBody),
+    bodyImageEvidenceKnown,
+    embeddedImageCount: bodyImageEvidenceKnown
+      ? Math.max(0, Math.min(8, Number(source.embeddedImageCount) || 0))
+      : 0,
+    originalCampaignOutbound: source.originalCampaignOutbound === true,
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
     bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     indexed: source.indexed !== false,

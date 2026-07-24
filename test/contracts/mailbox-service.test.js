@@ -2733,6 +2733,7 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
       campaignRepliesResponse() {},
       listMessagesResponse() {},
       getMessageResponse() {},
+      getMessageBodiesResponse() {},
       getMessageImageResponse() {},
       markMessageReadResponse() {},
       deleteMessageResponse() {},
@@ -2744,6 +2745,7 @@ test('mailbox routes expose accounts, messages, send, delete and rewrite endpoin
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/accounts'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/campaign-replies'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/messages'));
+  assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/bodies'));
   assert.ok(routes.some(([method, path]) => method === 'GET' && path === '/api/mailbox/message-image'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/read'));
   assert.ok(routes.some(([method, path]) => method === 'POST' && path === '/api/mailbox/messages/delete'));

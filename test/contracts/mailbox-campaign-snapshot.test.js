@@ -22,6 +22,9 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     date: new Date(Date.UTC(2026, 6, 22, 14, 0, 0) - index * 60_000).toISOString(),
     unread: index < 2,
     indexed: true,
+    bodyImageEvidenceKnown: true,
+    embeddedImageCount: 1,
+    originalCampaignOutbound: false,
     bodyImages: [{ alt: 'Ontwerp', dataUrl: `data:image/png;base64,${'a'.repeat(150_000)}` }],
     campaign: {
       company: `Bedrijf ${index}`,
@@ -43,6 +46,9 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
       date: '2026-07-22T14:05:00.000Z',
       messageId: '<sent-answer@example.test>',
       inReplyTo: '<inbox-answer@example.test>',
+      bodyImageEvidenceKnown: true,
+      embeddedImageCount: 1,
+      originalCampaignOutbound: false,
       bodyImages: [{
         alt: 'Verzonden ontwerp',
         dataUrl: `data:image/png;base64,${'b'.repeat(120)}`,
@@ -77,6 +83,9 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     inReplyTo: '<inbox-answer@example.test>',
     references: '',
     hasBody: true,
+    bodyImageEvidenceKnown: true,
+    embeddedImageCount: 1,
+    originalCampaignOutbound: false,
     bodyTruncated: false,
     bodyImagesTruncated: false,
     bodyImages: [{
