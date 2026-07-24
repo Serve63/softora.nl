@@ -4,6 +4,8 @@
 let syncInFlight = false;
 let lastBackgroundSyncAt = 0;
 const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const LEGACY_MAILBOX_MEDIA_CAPTION =
+  'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -17,15 +19,32 @@ function setStatus(message) {
   el.textContent = text;
 }
 
+function hasUnverifiedLegacyMedia(message) {
+  const source = message && typeof message === 'object' ? message : {};
+  if (source.bodyImageEvidenceKnown === true) return false;
+  const body = String(source.body || '');
+  return body.includes(LEGACY_MAILBOX_MEDIA_CAPTION) || /^\s*\[image:\s*[^\]]+\]\s*$/im.test(body);
+}
+
 function decorateMessage(mail, source) {
   const message = source && typeof source === 'object' ? source : {};
+  const legacyMediaNeedsHydration = hasUnverifiedLegacyMedia(message);
   return {
     ...mail,
     hasBody: Boolean(message.hasBody || message.body),
-    bodyLoaded: Boolean(message.body) && !message.bodyTruncated && !message.bodyImagesTruncated,
+    bodyLoaded:
+      Boolean(message.body) &&
+      !message.bodyTruncated &&
+      !message.bodyImagesTruncated &&
+      !legacyMediaNeedsHydration,
     bodyLoading: false,
     bodyTruncated: Boolean(message.bodyTruncated),
     bodyImagesTruncated: Boolean(message.bodyImagesTruncated),
+    bodyImageEvidenceKnown: Boolean(message.bodyImageEvidenceKnown),
+    embeddedImageCount: Math.max(0, Math.min(8, Number(message.embeddedImageCount) || 0)),
+    originalCampaignOutbound: Boolean(message.originalCampaignOutbound),
+    webdesignLinkEvidenceKnown: Boolean(message.webdesignLinkEvidenceKnown),
+    webdesignLinkUrl: normalizeText(message.webdesignLinkUrl),
     indexed: Boolean(message.indexed),
   };
 }
@@ -98,6 +117,14 @@ async function loadBody({
     mail.hasBody = Boolean(data.message.hasBody || body);
     mail.bodyTruncated = Boolean(data.message.bodyTruncated);
     mail.bodyImagesTruncated = false;
+    mail.bodyImageEvidenceKnown = Boolean(data.message.bodyImageEvidenceKnown);
+    mail.embeddedImageCount = Math.max(
+      0,
+      Math.min(8, Number(data.message.embeddedImageCount) || 0)
+    );
+    mail.originalCampaignOutbound = Boolean(data.message.originalCampaignOutbound);
+    mail.webdesignLinkEvidenceKnown = Boolean(data.message.webdesignLinkEvidenceKnown);
+    mail.webdesignLinkUrl = normalizeText(data.message.webdesignLinkUrl);
   } catch (error) {
     if (!mail.body) {
       mail.body = String(error?.message || error || 'Bericht laden mislukt');
@@ -150,7 +177,18 @@ function applyThreadMessagePayload(message, source, normalizeBodyImages, normali
   message.bodyImageEvidenceKnown = Boolean(source && source.bodyImageEvidenceKnown);
   message.embeddedImageCount = Math.max(0, Math.min(8, Number(source && source.embeddedImageCount) || 0));
   message.originalCampaignOutbound = Boolean(source && source.originalCampaignOutbound);
+  message.webdesignLinkEvidenceKnown = Boolean(source && source.webdesignLinkEvidenceKnown);
+  message.webdesignLinkUrl = normalizeText(source && source.webdesignLinkUrl);
   return Boolean(body);
+}
+
+function needsThreadLinkHydration(message) {
+  const source = message && typeof message === 'object' ? message : {};
+  if (source.originalCampaignOutbound !== true) return false;
+  if (source.webdesignLinkEvidenceKnown === true) return false;
+  const body = normalizeText(source.body || source.preview);
+  if (!body || /https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+/i.test(body)) return false;
+  return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\bdeze link\b/i.test(body);
 }
 
 function needsThreadImageHydration(message) {
@@ -172,14 +210,18 @@ async function loadThreadBodies({
   if (!mail || mail.threadBodiesLoading) return false;
   const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
   const targets = messages.filter((message) => (
-    needsThreadBodyHydration(message) || needsThreadImageHydration(message)
+    needsThreadBodyHydration(message) ||
+    needsThreadImageHydration(message) ||
+    needsThreadLinkHydration(message)
   ));
   if (!targets.length) return false;
 
   const request = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   mail.threadBodiesLoading = true;
   targets.forEach((message) => {
-    message.bodyLoading = needsThreadBodyHydration(message);
+    message.bodyLoading =
+      needsThreadBodyHydration(message) ||
+      needsThreadLinkHydration(message);
   });
   if (
     typeof openMail === 'function' &&
@@ -229,7 +271,9 @@ async function loadThreadBodies({
     }
 
     targets.forEach((message) => {
-      message.bodyLoading = false;
+      message.bodyLoading =
+        needsThreadBodyHydration(message) ||
+        needsThreadLinkHydration(message);
     });
     if (
       typeof openMail === 'function' &&
@@ -240,14 +284,18 @@ async function loadThreadBodies({
     }
 
     const detailTargets = targets.filter((message) => (
-      needsThreadBodyHydration(message) || needsThreadImageHydration(message)
+      needsThreadBodyHydration(message) ||
+      needsThreadImageHydration(message) ||
+      needsThreadLinkHydration(message)
     ));
     for (let offset = 0; offset < detailTargets.length; offset += 2) {
       await Promise.all(detailTargets.slice(offset, offset + 2).map(async (message) => {
         const { account, folder, id } = getThreadMessageRequest(message, mail);
         if (!account || !id) return;
         message.imageLoading = true;
-        message.bodyLoading = needsThreadBodyHydration(message);
+        message.bodyLoading =
+          needsThreadBodyHydration(message) ||
+          needsThreadLinkHydration(message);
         try {
           const params = new URLSearchParams({ account, folder, id });
           const response = await request(`/api/mailbox/message?${params.toString()}`, {
@@ -309,6 +357,7 @@ window.SoftoraMailboxIndex = {
   isSyncInFlight: () => syncInFlight,
   loadBody,
   loadThreadBodies,
+  needsThreadLinkHydration,
   needsThreadImageHydration,
   needsThreadBodyHydration,
   setStatus,

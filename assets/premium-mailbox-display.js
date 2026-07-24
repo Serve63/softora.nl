@@ -268,6 +268,12 @@
     return String(html || '').split(label).join(link);
   }
 
+  function renderDetailBody(mail, content) {
+    return mail && mail.bodyLoading
+      ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
+      : String(content || '');
+  }
+
   global.SoftoraMailboxDisplay = {
     applySenderCtaLinks,
     collapseDuplicateAnnotations,
@@ -287,5 +293,6 @@
     getReplyToAddress,
     buildSearchText,
     formatMailDate,
+    renderDetailBody,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

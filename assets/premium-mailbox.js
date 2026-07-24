@@ -864,7 +864,7 @@ function openMail(id, options = {}) {
           </div>
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, threadImagesReady: !imagesPending })}</div>
+        <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, threadImagesReady: !imagesPending }))}</div>
       </article>
     </div>`;
 }

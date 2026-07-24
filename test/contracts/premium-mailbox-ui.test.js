@@ -342,6 +342,143 @@ test('mailbox toont tijdens bodyhydratie een eerlijke laadstatus in plaats van e
   assert.doesNotMatch(html, /potentiële kan\.\.\./);
 });
 
+test('mailbox toont legacy snapshotmedia nooit kort voordat de exacte body geladen is', () => {
+  const mailbox = loadMailboxHelpersForTest({
+    fetch: async () => new Promise(() => {}),
+  });
+  const legacyCaption =
+    'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
+  const mail = mailbox.normalizeMailboxApiMessage({
+    id: 'inbox:2478',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Salon TOF',
+    email: 'info@salontof.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Met welk programma werk je?',
+    body: [
+      'Met welk programma werk je?',
+      '',
+      '[image: salontof.nl-preview]',
+      legacyCaption,
+      '[image: salontof.nl-preview-device-mockup-v8]',
+    ].join('\n'),
+    hasBody: true,
+    bodyTruncated: false,
+    bodyImagesTruncated: false,
+    bodyImageEvidenceKnown: false,
+    receivedAt: '2026-07-24T13:54:00.000Z',
+  });
+
+  assert.equal(mail.bodyLoaded, false);
+  mailbox.setMails([mail]);
+  mailbox.openMail(mail.id);
+
+  const html = mailbox.getElement('mail-detail').innerHTML;
+  assert.match(html, /Volledig bericht laden…/);
+  assert.doesNotMatch(html, /korte indruk van de eerste versie/);
+  assert.doesNotMatch(html, /salontof\.nl-preview/);
+});
+
+test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs', async () => {
+  const helpers = loadMailboxHelpersForTest();
+  const exactUrl =
+    'https://www.softora.nl/webdesign/salon-tof?cid=safe-row-247&sender=serve';
+  const plainBody = [
+    'Goedendag,',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
+  ].join('\n');
+  const linkedBody = plainBody.replace('deze link', `deze link [${exactUrl}]`);
+  const mail = {
+    id: 'serve@softora.nl|inbox:2478',
+    accountEmail: 'serve@softora.nl',
+    threadMessages: [{
+      id: 'sent:247',
+      uid: 247,
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      body: plainBody,
+      hasBody: true,
+      bodyTruncated: false,
+      bodyImageEvidenceKnown: true,
+      embeddedImageCount: 0,
+      originalCampaignOutbound: true,
+      webdesignLinkEvidenceKnown: false,
+    }],
+  };
+  const requests = [];
+
+  await helpers.index.loadThreadBodies({
+    mail,
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+    getActiveMail: () => mail.id,
+    openMail: () => {},
+    fetchImpl: async (url) => {
+      requests.push(String(url));
+      if (String(url) === '/api/mailbox/messages/bodies') {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            messages: [{
+              id: 'sent:247',
+              uid: 247,
+              folder: 'sent',
+              accountEmail: 'serve@softora.nl',
+              body: plainBody,
+              hasBody: true,
+              bodyTruncated: false,
+              bodyImageEvidenceKnown: true,
+              embeddedImageCount: 0,
+              originalCampaignOutbound: true,
+              webdesignLinkEvidenceKnown: false,
+              webdesignLinkUrl: '',
+            }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          message: {
+            body: linkedBody,
+            hasBody: true,
+            bodyTruncated: false,
+            bodyImages: [],
+            bodyImageEvidenceKnown: true,
+            embeddedImageCount: 0,
+            originalCampaignOutbound: true,
+            webdesignLinkEvidenceKnown: true,
+            webdesignLinkUrl: exactUrl,
+          },
+        }),
+      };
+    },
+  });
+
+  assert.deepEqual(requests, [
+    '/api/mailbox/messages/bodies',
+    '/api/mailbox/message?account=serve%40softora.nl&folder=sent&id=sent%3A247',
+  ]);
+  assert.equal(mail.threadMessages[0].body, linkedBody);
+  assert.equal(mail.threadMessages[0].webdesignLinkUrl, exactUrl);
+
+  const html = renderMailboxBodyForTest('Bedankt voor je mail.', [], {
+    replyMailId: 'inbox:2478',
+    mail: {
+      receivedAt: '2026-07-24T13:54:00.000Z',
+      threadMessages: mail.threadMessages,
+    },
+  });
+  assert.match(
+    html,
+    /<a href="https:\/\/www\.softora\.nl\/webdesign\/salon-tof\?cid=safe-row-247&amp;sender=serve" target="_blank" rel="noopener noreferrer">deze link<\/a>/
+  );
+});
+
 test('mailbox koppelt coldmail-afbeeldingen aan het eigen verzonden bericht en niet aan de ontvangen reactie', () => {
   const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
   const html = renderMailboxBodyForTest(
@@ -1038,9 +1175,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260724b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724b/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260724c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -1113,7 +1250,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260723g"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260723a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -1896,7 +2033,8 @@ test('premium mailbox ruimt technische mail-links op voor weergave', () => {
   assert.match(scriptSource, /const bodyImages = normalizeMailboxBodyImages\(message\.bodyImages\);/);
   assert.match(scriptSource, /const optOutUrl = normalizeMailboxOptOutUrl\(message\.optOutUrl\);/);
   assert.match(scriptSource, /cleanMailboxText\(message\.body \|\| message\.preview \|\| ''\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, detailBodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id, threadImagesReady: !imagesPending \}\)\}<\/div>/);
+  assert.match(readDisplayScript(), /function renderDetailBody\(mail, content\)[\s\S]*Volledig bericht laden…/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{window\.SoftoraMailboxDisplay\.renderDetailBody\(m, renderMailBody\(detailBody, detailBodyImages,/);
   assert.match(scriptSource, /imageAlt = cleaned\.trim\(\)\.match\(\/\^\\\[image:\\s\*\(\[\^\\\]\]\+\)\\\]\$\/i\)/);
 });
 
@@ -2184,7 +2322,8 @@ test('premium mailbox vervangt het oude detail direct wanneer een nieuwe mail no
 
   assert.equal(mailbox.getActiveMail(), next.id);
   assert.match(mailbox.getElement('mail-detail').innerHTML, /Nieuwe mail/);
-  assert.match(mailbox.getElement('mail-detail').innerHTML, /Dit is alvast de nieuwe mail\./);
+  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledig bericht laden…/);
+  assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Dit is alvast de nieuwe mail\./);
   assert.doesNotMatch(mailbox.getElement('mail-detail').innerHTML, /Vorige mail|Dit is de oude mail\./);
 });
 
@@ -2309,7 +2448,7 @@ test('premium mailbox houdt gedrag uit inline handlers', () => {
   assert.match(scriptSource, /SoftoraMailboxIndex\?\.bindImageRecovery\(\{ getActiveMail: \(\) => activeMail, getMail: findMailById, loadMessageBody: loadMailboxMessageBody \}\)/);
   assert.match(scriptSource, /function renderLinkedMailboxText\(value, options\)/);
   assert.match(scriptSource, /renderLinkedMailboxText\(value, options\)/);
-  assert.match(scriptSource, /<div class="detail-body-text">\$\{renderMailBody\(detailBody, detailBodyImages, \{ optOutUrl: m\.optOutUrl, mail: m, replyMailId: m\.id, threadImagesReady: !imagesPending \}\)\}<\/div>/);
+  assert.match(scriptSource, /<div class="detail-body-text">\$\{window\.SoftoraMailboxDisplay\.renderDetailBody\(m, renderMailBody\(detailBody, detailBodyImages,/);
 });
 
 test('geopende mail staat als één rustig mailblok met antwoordactie na het ontvangen bericht', () => {
@@ -2317,13 +2456,14 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   const scriptSource = readScript();
 
   assert.match(scriptSource, /const wasUnread = m\.unread;[\s\S]*activeMail = m\.id;[\s\S]*renderList\(\);[\s\S]*if \(!m\.bodyLoaded && !options\.skipBodyFetch\) void loadMailboxMessageBody\(m\.id\);/);
-  assert.match(readIndexScript(), /bodyLoaded:\s*Boolean\(message\.body\) && !message\.bodyTruncated && !message\.bodyImagesTruncated/);
+  assert.match(readIndexScript(), /function hasUnverifiedLegacyMedia\(message\)/);
+  assert.match(readIndexScript(), /bodyLoaded:[\s\S]*Boolean\(message\.body\)[\s\S]*!legacyMediaNeedsHydration/);
   assert.match(readIndexScript(), /mail\.bodyImagesTruncated = false;/);
   assert.match(readIndexScript(), /String\(getActiveMail\(\)\) === String\(id\)/);
   assert.match(readIndexScript(), /function loadThreadBodies\(/);
   assert.match(scriptSource, /if \(!options\.skipThreadBodyFetch && activeFolder === 'outreach' && window\.SoftoraMailboxCampaignInbox\.isCampaignMail\(m\)\) void window\.SoftoraMailboxIndex\?\.loadThreadBodies\?\.\(\{ mail: m,/);
   assert.match(scriptSource, /const detailBody = m\.body \|\| m\.preview \|\| '';/);
-  assert.doesNotMatch(scriptSource, /Bericht laden…/);
+  assert.match(readDisplayScript(), /Volledig bericht laden…/);
 
   assert.match(scriptSource, /<article class="detail-mail-block">/);
   assert.match(scriptSource, /<div class="detail-subject-row">/);

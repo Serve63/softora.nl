@@ -14,6 +14,7 @@ const {
 } = require('./mailbox-campaign-history-sync');
 const { createMailboxSyncService } = require('./mailbox-campaign-sync');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
+const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -1571,19 +1572,7 @@ function createMailboxService(deps = {}) {
       .trim();
   }
 
-  function extractPublicWebdesignPreviewUrlFromText(text) {
-    const source = String(text || '');
-    const match = source.match(/(https?:\/\/[^\s)\]]*\/webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s\]]*)?|(?:^|[\s([])(\/?webdesign\/[a-z0-9-]+(?:\/concept)?(?:\?[^)\s\]]*)?))/i);
-    const rawUrl = normalizeString(match && (match[2] || match[1] || ''));
-    if (!rawUrl) return '';
-    const cleanUrl = rawUrl.replace(/[),.;!?]+$/g, '');
-    const absoluteUrl = /^https?:\/\//i.test(cleanUrl)
-      ? cleanUrl
-      : `${getPublicWebdesignPreviewBaseUrl()}/${cleanUrl.replace(/^\/+/, '')}`;
-    return absoluteUrl
-      .replace(/\/webdesign\/([^/?#]+)(?:\/concept)?(?=([?#]|$))/i, '/webdesign/$1')
-      .replace(/#.*$/g, '');
-  }
+  const webdesignLinkProvenance = createMailboxWebdesignLinkProvenance({ getHtmlAttribute, getPublicBaseUrl: getPublicWebdesignPreviewBaseUrl, htmlToReadableText, normalizeString, safeUrl });
 
   function isColdmailOptOutTextLine(line) {
     const cleanLine = normalizeString(line);
@@ -1871,7 +1860,7 @@ function createMailboxService(deps = {}) {
               accountEmail,
               renderedBody: rawText,
             })
-        : extractPublicWebdesignPreviewUrlFromText(rawText);
+        : webdesignLinkProvenance.extractExistingUrl(rawText);
       const inlineImages = mailboxWebdesignImageDelivery === 'cid'
         ? await prepareMailboxInlineWebdesignImages(images, matchedId)
         : [];
@@ -1919,16 +1908,22 @@ function createMailboxService(deps = {}) {
 
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
-    const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
-    const optOutUrl = resolveColdmailOptOutUrl(parsed, text);
-    const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
+    const rawText = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
     const originalCampaignOutbound = isOriginalCampaignOutboundMessage({
       folder,
       subject: parsed.subject,
-      body: text,
+      body: rawText,
       inReplyTo: parsed.inReplyTo,
       references: parsed.references,
     });
+    const webdesignLinkUrl = originalCampaignOutbound
+      ? webdesignLinkProvenance.extractExactLinkFromHtml(parsed && parsed.html)
+      : '';
+    const text = originalCampaignOutbound
+      ? webdesignLinkProvenance.attachExactLinkToText(rawText, webdesignLinkUrl)
+      : rawText;
+    const optOutUrl = resolveColdmailOptOutUrl(parsed, text);
+    const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
     const campaignLike = looksLikeWebdesignOutreach(parsed, text);
     const visiblePrimaryBodyImages = campaignLike && !originalCampaignOutbound
       ? primaryBodyImages.filter((image) => !isSentCampaignDesignImage(image))
@@ -1969,6 +1964,8 @@ function createMailboxService(deps = {}) {
       bodyImageEvidenceKnown: true,
       embeddedImageCount: Math.max(0, Math.min(8, primaryBodyImages.length)),
       originalCampaignOutbound,
+      webdesignLinkEvidenceKnown: originalCampaignOutbound,
+      webdesignLinkUrl,
     };
   }
 
@@ -2206,7 +2203,8 @@ function createMailboxService(deps = {}) {
         indexed.hasBody &&
         indexed.body &&
         indexed.bodyImageEvidenceKnown &&
-        indexed.embeddedImageCount === 0
+        indexed.embeddedImageCount === 0 &&
+        !webdesignLinkProvenance.needsHydration(indexed)
       ) {
         return indexed;
       }

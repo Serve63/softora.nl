@@ -221,6 +221,11 @@ function createMailboxIndexStore(deps = {}) {
           ...message,
           folder: normalizedFolder,
         }),
+        webdesignLinkEvidenceKnown: message && message.webdesignLinkEvidenceKnown === true,
+        webdesignLinkUrl: truncateText(
+          normalizeString(message && message.webdesignLinkUrl),
+          4000
+        ),
       },
       updated_at: isoNow(),
     };
@@ -260,6 +265,12 @@ function createMailboxIndexStore(deps = {}) {
     normalized.originalCampaignOutbound =
       payload.originalCampaignOutbound === true ||
       isOriginalCampaignOutboundMessage(normalized);
+    normalized.webdesignLinkEvidenceKnown =
+      payload.webdesignLinkEvidenceKnown === true ||
+      Boolean(normalizeString(payload.webdesignLinkUrl));
+    normalized.webdesignLinkUrl = normalized.webdesignLinkEvidenceKnown
+      ? normalizeString(payload.webdesignLinkUrl)
+      : '';
     return normalized;
   }
 
@@ -471,6 +482,10 @@ function createMailboxIndexStore(deps = {}) {
             inReplyTo: row.in_reply_to,
             references: row.references_text,
           }),
+        webdesignLinkEvidenceKnown:
+          payload.webdesignLinkEvidenceKnown === true ||
+          Boolean(normalizeString(payload.webdesignLinkUrl)),
+        webdesignLinkUrl: normalizeString(payload.webdesignLinkUrl),
       };
     });
   }
