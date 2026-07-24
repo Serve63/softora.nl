@@ -468,6 +468,111 @@ test('campaign reply service houdt historische vervolgreacties binnen een begren
   assert.deepEqual(replies[0].threadMessages.map((message) => message.body), [undefined, undefined]);
 });
 
+test('campaign reply service koppelt Brigit, Karlien en Marjolein via exacte oude Sent-ouders buiten de globale scan', async () => {
+  const fixtures = [
+    {
+      id: 'inbox:59',
+      uid: 59,
+      accountEmail: 'serve@softora.nl',
+      from: 'Marjolein de Kroon',
+      email: 'marjolein@dekroonopjewerk.eu',
+      messageId: '<marjolein-reply@example.nl>',
+      parentMessageId: '<marjolein-parent@softora.nl>',
+      sentId: 'sent:60',
+      sentUid: 60,
+    },
+    {
+      id: 'inbox:60',
+      uid: 60,
+      accountEmail: 'serve@softora.nl',
+      from: 'Brigit',
+      email: 'info@bizzylizzy.nl',
+      messageId: '<brigit-reply@example.nl>',
+      parentMessageId: '<brigit-parent@softora.nl>',
+      sentId: 'sent:62',
+      sentUid: 62,
+    },
+    {
+      id: 'inbox:61',
+      uid: 61,
+      accountEmail: 'serve@softora.nl',
+      from: 'Karlien Vis',
+      email: 'info@misverstant.nl',
+      messageId: '<karlien-reply@example.nl>',
+      parentMessageId: '<karlien-parent@softora.nl>',
+      sentId: 'sent:66',
+      sentUid: 66,
+    },
+  ];
+  const inboxMessages = fixtures.map((fixture, index) => ({
+    id: fixture.id,
+    uid: fixture.uid,
+    folder: 'inbox',
+    accountEmail: fixture.accountEmail,
+    from: fixture.from,
+    email: fixture.email,
+    to: fixture.accountEmail,
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Bedankt voor je ontwerp.',
+    date: new Date(Date.UTC(2026, 5, 3, 10, index)).toISOString(),
+    messageId: fixture.messageId,
+    inReplyTo: fixture.parentMessageId,
+    references: fixture.parentMessageId,
+  }));
+  const targetedSent = fixtures.map((fixture, index) => ({
+    id: fixture.sentId,
+    uid: fixture.sentUid,
+    folder: 'sent',
+    accountEmail: fixture.accountEmail,
+    from: 'Servé Creusen',
+    email: fixture.accountEmail,
+    to: fixture.email,
+    subject: 'Kleine vraag over jullie website',
+    preview: 'Goedendag, afgelopen week kwam ik jullie website tegen.',
+    date: new Date(Date.UTC(2026, 5, 2, 8, index)).toISOString(),
+    messageId: fixture.parentMessageId,
+    originalCampaignOutbound: true,
+    webdesignLinkEvidenceKnown: false,
+  }));
+  const targetedLookups = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async () => inboxMessages,
+      listMatchingMessagesForAccounts: async ({ folder }) => (
+        folder === 'sent' ? [] : inboxMessages
+      ),
+      listMessagesByMessageIdsForAccounts: async (options) => {
+        targetedLookups.push(options);
+        return targetedSent;
+      },
+      hydrateMessageBodies: async ({ messages }) => messages.map((message) => ({
+        ...message,
+        body: message.preview,
+      })),
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async ({ emails }) => emails.map((email) => ({
+        id: email,
+        bedrijf: email,
+        email,
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      })),
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100 });
+
+  assert.equal(targetedLookups.length, 1);
+  fixtures.forEach((fixture) => {
+    assert.ok(targetedLookups[0].messageIds.includes(fixture.parentMessageId));
+    const conversation = replies.find((message) => message.id === fixture.id);
+    assert.ok(conversation);
+    assert.deepEqual(conversation.threadMessages.map((message) => message.id), [fixture.sentId]);
+    assert.equal(conversation.threadMessages[0].originalCampaignOutbound, true);
+  });
+});
+
 test('campaign reply service hydrateert alleen de zichtbare conversatieroots en niet alle threadbodies', async () => {
   const hydratedIds = [];
   const replies = Array.from({ length: 140 }, (_item, index) => ({

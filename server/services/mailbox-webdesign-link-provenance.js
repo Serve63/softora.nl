@@ -34,7 +34,7 @@ function createMailboxWebdesignLinkProvenance(options = {}) {
 
     for (const match of source.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
       const label = htmlToReadableText(match[2] || '').replace(/\s+/g, ' ').trim();
-      if (!/^(?:deze\s+)?link$/i.test(label)) continue;
+      if (!/^(?:(?:deze\s+)?link|hier)$/i.test(label)) continue;
       const contextStart = Math.max(0, Number(match.index) - 300);
       const contextEnd = Math.min(
         source.length,
@@ -61,10 +61,10 @@ function createMailboxWebdesignLinkProvenance(options = {}) {
     if (!exactUrl || extractExistingUrl(source)) return source;
     const lines = source.replace(/\r\n?/g, '\n').split('\n');
     for (let index = 0; index < lines.length; index += 1) {
-      if (!/\bdeze link\b/i.test(lines[index])) continue;
+      if (!/\b(?:deze link|hier)\b/i.test(lines[index])) continue;
       const context = lines.slice(Math.max(0, index - 2), Math.min(lines.length, index + 3)).join(' ');
       if (!/\b(?:webdesign|ontwerp)\b/i.test(context)) continue;
-      lines[index] = lines[index].replace(/\bdeze link\b/i, (label) => `${label} [${exactUrl}]`);
+      lines[index] = lines[index].replace(/\b(?:deze link|hier)\b/i, (label) => `${label} [${exactUrl}]`);
       return lines.join('\n');
     }
     return source;
@@ -75,7 +75,7 @@ function createMailboxWebdesignLinkProvenance(options = {}) {
     if (message.webdesignLinkEvidenceKnown === true) return false;
     const body = normalizeString(message.body || message.preview);
     if (!body || extractExistingUrl(body)) return false;
-    return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\bdeze link\b/i.test(body);
+    return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\b(?:deze link|(?:open|bekijk) het via hier)\b/i.test(body);
   }
 
   return {

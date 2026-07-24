@@ -516,6 +516,75 @@ test('mailbox index store filtert campagneberichten in SQL en dedupliceert overl
   assert.deepEqual(ranges, [[0, 499], [0, 499]]);
 });
 
+test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id op', async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      const filters = {};
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        in(column, values) {
+          filters[column] = values;
+          calls.push(['in', column, values]);
+          return query;
+        },
+        eq(column, value) {
+          filters[column] = value;
+          calls.push(['eq', column, value]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return Promise.resolve({
+            data: [{
+              message_key: 'serve@softora.nl|sent|62',
+              account_email: 'serve@softora.nl',
+              folder: 'sent',
+              uid: 62,
+              provider_id: 'sent:62',
+              message_id: '<bizzylizzy-parent@softora.nl>',
+              sender_email: 'serve@softora.nl',
+              recipients_text: 'info@bizzylizzy.nl',
+              subject: 'Kleine vraag over jullie website',
+              preview: 'Goedendag,',
+              date: '2026-06-01T10:33:11.000Z',
+              payload: { originalCampaignOutbound: true },
+            }],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.listMessagesByMessageIdsForAccounts({
+    accountEmails: ['SERVE@SOFTORA.NL'],
+    folder: 'SENT',
+    messageIds: [
+      '<bizzylizzy-parent@softora.nl>',
+      '<bizzylizzy-parent@softora.nl>',
+    ],
+  });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].id, 'sent:62');
+  assert.equal(messages[0].originalCampaignOutbound, true);
+  assert.deepEqual(calls.filter((call) => call[0] === 'in'), [
+    ['in', 'account_email', ['serve@softora.nl']],
+    ['in', 'message_id', ['<bizzylizzy-parent@softora.nl>']],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'sent']);
+});
+
 test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie', async () => {
   const calls = [];
   const client = {

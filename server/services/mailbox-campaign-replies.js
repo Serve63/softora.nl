@@ -14,6 +14,7 @@ const CAMPAIGN_REPLY_LIMIT = 200;
 const CAMPAIGN_MESSAGE_SCAN_LIMIT = 250;
 const CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT = 500;
 const CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT = 2000;
+const CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT = 1000;
 const CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE = 100;
 const CAMPAIGN_THREAD_FALLBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
@@ -76,6 +77,26 @@ function getMessageReferenceIds(message) {
     .flatMap((value) => normalizeText(value).toLowerCase().split(/\s+/))
     .map(normalizeMessageId)
     .filter(Boolean)));
+}
+
+function getMessageReferenceLookupValues(messages) {
+  const values = new Set();
+  (Array.isArray(messages) ? messages : []).forEach((message) => {
+    [message && message.inReplyTo, message && message.references].forEach((rawValue) => {
+      const source = normalizeText(rawValue);
+      if (!source) return;
+      const tokens = source.match(/<[^<>]+>/g) || source.split(/\s+/);
+      tokens.forEach((token) => {
+        const raw = normalizeText(token);
+        const bare = raw.replace(/^<+|>+$/g, '');
+        if (!bare) return;
+        values.add(raw);
+        values.add(bare);
+        values.add(`<${bare}>`);
+      });
+    });
+  });
+  return Array.from(values).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
 }
 
 function getMessageIdentity(message) {
@@ -537,7 +558,19 @@ function createMailboxCampaignRepliesService(deps = {}) {
               limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
             })
     ).catch(() => []);
-    const sentMessages = Array.isArray(sentMessagesResult) ? sentMessagesResult : [];
+    const parentMessageIds = getMessageReferenceLookupValues(replies);
+    const targetedParentMessagesResult = parentMessageIds.length &&
+      typeof mailboxIndexStore.listMessagesByMessageIdsForAccounts === 'function'
+      ? await mailboxIndexStore.listMessagesByMessageIdsForAccounts({
+          accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+          folder: 'sent',
+          messageIds: parentMessageIds,
+        }).catch(() => [])
+      : [];
+    const sentMessages = dedupeCampaignMessages([
+      ...(Array.isArray(sentMessagesResult) ? sentMessagesResult : []),
+      ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
+    ]);
     const visibleConversations = attachSentThreadMessages(replies, sentMessages)
       .slice(0, safeLimit);
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') {
@@ -561,6 +594,7 @@ module.exports = {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
+  CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT,
   CAMPAIGN_REPLY_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SUBJECT_TERMS,
@@ -570,6 +604,7 @@ module.exports = {
   dedupeCampaignMessages,
   getCampaignConversationId,
   getMessageReferenceIds,
+  getMessageReferenceLookupValues,
   isAutomatedCampaignReply,
   isCampaignReplySubject,
   isSentReplyForMessage,
