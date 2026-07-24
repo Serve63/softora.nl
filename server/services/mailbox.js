@@ -7,8 +7,13 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
-const { createMailboxDeleteMessage } = require('./mailbox-delete-message');
-const { createMailboxCampaignRepliesService } = require('./mailbox-campaign-replies');
+const { createMailboxComposeSend } = require('./mailbox-compose-send');
+const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
+const { createMailboxVisibilityService } = require('./mailbox-delete-message');
+const {
+  CAMPAIGN_MAILBOX_ACCOUNTS,
+  createMailboxCampaignRepliesService,
+} = require('./mailbox-campaign-replies');
 const {
   resolveMailboxSyncUids,
 } = require('./mailbox-campaign-history-sync');
@@ -614,6 +619,11 @@ function createMailboxService(deps = {}) {
     const email = normalizeEmail(value);
     return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
   }
+  const {
+    addressDisplayText,
+    buildAttachmentMetadata: buildMailboxAttachmentMetadata,
+    parsedHeaderText,
+  } = buildMailboxMessageMetadataHelpers({ normalizeEmail, normalizeString });
 
   function getMailboxDisplayName(email, preferredName) {
     const address = normalizeEmail(email);
@@ -1935,6 +1945,7 @@ function createMailboxService(deps = {}) {
         looksLikeCampaign: looksLikeWebdesignOutreach(parsed, text),
       }
     );
+    const attachments = buildMailboxAttachmentMetadata(parsed);
     const bodyText = text;
     const preview = truncateText(bodyText.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
     const parsedFromName = displayName(parsed.from?.value);
@@ -1947,11 +1958,20 @@ function createMailboxService(deps = {}) {
       from: fromText,
       email: parsedFromEmail || account.email,
       to: addressText(parsed.to?.value),
+      toDisplay: addressDisplayText(parsed.to),
+      cc: addressDisplayText(parsed.cc),
+      bcc: addressDisplayText(parsed.bcc),
+      deliveredTo:
+        parsedHeaderText(parsed, 'delivered-to') ||
+        parsedHeaderText(parsed, 'x-original-to') ||
+        parsedHeaderText(parsed, 'envelope-to'),
+      recipientRoutingEvidenceKnown: true,
       subject: normalizeString(parsed.subject || '(Geen onderwerp)'),
       preview,
       body: bodyText || preview,
       optOutUrl,
       bodyImages,
+      attachments,
       inlineImages: bodyImages.map(bodyImageToInlineImage),
       date: date.toISOString(),
       messageId: normalizeString(parsed.messageId || ''),
@@ -2198,12 +2218,19 @@ function createMailboxService(deps = {}) {
         folder: normalizedFolder,
         id,
       });
+      const recipientRoutingNeedsHydration = Boolean(
+        indexed &&
+        indexed.recipientRoutingEvidenceKnown !== true &&
+        CAMPAIGN_MAILBOX_ACCOUNTS.includes(normalizeEmail(indexed.email)) &&
+        !normalizeString(indexed.to).toLowerCase().includes(normalizeEmail(indexed.accountEmail))
+      );
       if (
         indexed &&
         indexed.hasBody &&
         indexed.body &&
         indexed.bodyImageEvidenceKnown &&
         indexed.embeddedImageCount === 0 &&
+        !recipientRoutingNeedsHydration &&
         !webdesignLinkProvenance.needsHydration(indexed)
       ) {
         return indexed;
@@ -2273,104 +2300,33 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  const deleteMessage = createMailboxDeleteMessage({
+  const mailboxVisibility = createMailboxVisibilityService({
     getAccount,
     parseMessageReference,
-    createClient,
-    resolveMailboxName,
     canUseMailboxIndex,
     mailboxIndexStore,
     getUiStateValues, setUiStateValues,
     logger,
   });
+  const hideConversation = mailboxVisibility.hideConversation;
+  const restoreConversation = mailboxVisibility.restoreConversation;
 
-  async function sendMessage({ accountEmail, to, subject, text }) {
-    const account = getAccount(accountEmail);
-    if (!account) {
-      const error = new Error('Mailbox-account niet gevonden.');
-      error.status = 404;
-      throw error;
-    }
-    if (account.smtpIdentityMatches === false) {
-      const error = new Error('De SMTP-login hoort niet bij het gekozen afzenderadres. Verzending is geblokkeerd.');
-      error.status = 503;
-      error.code = 'SENDER_SMTP_IDENTITY_MISMATCH';
-      throw error;
-    }
-    if (!account.smtpConfigured) {
-      const error = new Error('SMTP is niet geconfigureerd voor deze mailbox.');
-      error.status = 503;
-      throw error;
-    }
-    if (!isValidEmail(to)) {
-      const error = new Error('Vul een geldig e-mailadres in.');
-      error.status = 400;
-      throw error;
-    }
-    const cleanSubject = truncateText(normalizeString(subject), 240);
-    if (!cleanSubject) {
-      const error = new Error('Onderwerp is verplicht.');
-      error.status = 400;
-      throw error;
-    }
-    const transporter = createTransport({
-      host: account.smtpHost,
-      port: account.smtpPort,
-      secure: account.smtpSecure,
-      auth: { user: account.smtpUser, pass: account.smtpPass },
-    });
-    const normalizedText = normalizeString(text);
-    const webdesignParts = await buildMailboxWebdesignSendParts({
-      accountEmail: account.email,
-      to,
-      subject: cleanSubject,
-      text: normalizedText,
-    });
-    const mail = {
-      from: account.name ? `${account.name} <${account.email}>` : account.email,
-      to: normalizeEmail(to),
-      subject: cleanSubject,
-      text: webdesignParts?.text || normalizedText,
-    };
-    if (webdesignParts?.html) mail.html = webdesignParts.html;
-    if (webdesignParts) {
-      mail.headers = {
-        'X-Softora-Template-Version': WEBDESIGN_EMAIL_TEMPLATE_VERSION,
-      };
-    }
-    if (Array.isArray(webdesignParts?.attachments) && webdesignParts.attachments.length) {
-      mail.attachments = webdesignParts.attachments;
-    }
-    const outboundReservation = webdesignParts
-      ? await reserveMailboxWebdesignOutboundRecipient(webdesignParts.outboundIdentity, {
-          accountEmail: account.email,
-          subject: cleanSubject,
-        })
-      : null;
-    const info = await transporter.sendMail(mail);
-    if (webdesignParts) {
-      await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
-        messageId: normalizeString(info?.messageId || ''),
-        email: normalizeEmail(to),
-        subject: cleanSubject,
-      });
-    }
-    const sentCopySaved = await appendSentMessage({
-      account,
-      createImapClient,
-      nodemailer,
-      mail,
-      messageId: normalizeString(info?.messageId || ''),
-      sentAt: new Date(),
-      logger,
-    });
-    return {
-      messageId: normalizeString(info?.messageId || ''),
-      accepted: Array.isArray(info?.accepted) ? info.accepted : [],
-      rejected: Array.isArray(info?.rejected) ? info.rejected : [],
-      sentCopySaved,
-    };
-  }
+  const sendMessage = createMailboxComposeSend({
+    getAccount,
+    isValidEmail,
+    normalizeEmail,
+    normalizeString,
+    truncateText,
+    createTransport,
+    buildMailboxWebdesignSendParts,
+    reserveMailboxWebdesignOutboundRecipient,
+    confirmMailboxWebdesignOutboundRecipient,
+    appendSentMessage,
+    createImapClient,
+    nodemailer,
+    webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+    logger,
+  });
 
   function cleanPromptText(value, maxLength = 6000) {
     return truncateText(sanitizeMailboxDisplayText(normalizeString(value)), maxLength);
@@ -2639,8 +2595,11 @@ function createMailboxService(deps = {}) {
       const result = await sendMessage({
         accountEmail: body.account,
         to: body.to,
+        cc: body.cc,
+        bcc: body.bcc,
         subject: body.subject,
         text: body.body || body.text || '',
+        attachments: body.attachments,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
@@ -2673,21 +2632,43 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function deleteMessageResponse(req, res) {
+  async function hideConversationResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const result = await deleteMessage({
+      const result = await hideConversation({
         accountEmail: body.account,
         id: body.id || body.messageId,
         folder: body.folder,
         uid: body.uid,
+        messages: body.messages,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
-      logger.error('[Mailbox][Delete]', error?.message || error);
+      logger.error('[Mailbox][Hide]', error?.message || error);
       return res.status(error.status || 500).json({
         ok: false,
-        error: 'Mail verwijderen mislukt',
+        error: 'Gesprek verbergen mislukt',
+        detail: String(error?.message || 'Onbekende fout'),
+      });
+    }
+  }
+
+  async function restoreConversationResponse(req, res) {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await restoreConversation({
+        accountEmail: body.account,
+        id: body.id || body.messageId,
+        folder: body.folder,
+        uid: body.uid,
+        messages: body.messages,
+      });
+      return res.status(200).json({ ok: true, result });
+    } catch (error) {
+      logger.error('[Mailbox][Restore]', error?.message || error);
+      return res.status(error.status || 500).json({
+        ok: false,
+        error: 'Gesprek herstellen mislukt',
         detail: String(error?.message || 'Onbekende fout'),
       });
     }
@@ -2723,7 +2704,8 @@ function createMailboxService(deps = {}) {
     listMessagesResponse,
     sendMessageResponse,
     markMessageReadResponse,
-    deleteMessageResponse,
+    hideConversationResponse,
+    restoreConversationResponse,
     rewriteDraftResponse,
     getAccounts,
     getMessage,
@@ -2732,7 +2714,8 @@ function createMailboxService(deps = {}) {
     listMessagesWithMeta,
     syncMailboxResponse,
     markMessageRead,
-    deleteMessage,
+    hideConversation,
+    restoreConversation,
     sendMessage,
     rewriteDraft,
     syncMailbox,

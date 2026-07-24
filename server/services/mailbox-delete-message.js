@@ -4,12 +4,12 @@ const {
   removeMailboxCampaignSnapshotMessage,
 } = require('./mailbox-campaign-snapshot');
 
-function createMailboxDeleteMessage(deps = {}) {
+const MAX_CONVERSATION_MESSAGES = 100;
+
+function createMailboxVisibilityService(deps = {}) {
   const {
     getAccount,
     parseMessageReference,
-    createClient,
-    resolveMailboxName,
     canUseMailboxIndex,
     mailboxIndexStore,
     getUiStateValues,
@@ -17,124 +17,150 @@ function createMailboxDeleteMessage(deps = {}) {
     logger = console,
   } = deps;
 
-  async function removeFromCampaignSnapshot({ account, id, messageRef }) {
+  function createStatusError(message, status = 503) {
+    const error = new Error(message);
+    error.status = status;
+    return error;
+  }
+
+  function normalizeTargets(input = {}) {
+    const supplied = Array.isArray(input.messages) && input.messages.length
+      ? input.messages
+      : [input];
+    const targets = [];
+    const seen = new Set();
+    supplied.slice(0, MAX_CONVERSATION_MESSAGES).forEach((source) => {
+      const account = getAccount(source.account || source.accountEmail || input.accountEmail);
+      if (!account) throw createStatusError('Mailbox-account niet gevonden.', 404);
+      const messageRef = parseMessageReference({
+        id: source.id || source.messageId,
+        folder: source.folder,
+        uid: source.uid,
+      });
+      const key = `${account.email}|${messageRef.folder}|${messageRef.uid}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      targets.push({
+        account,
+        id: source.id || source.messageId || `${messageRef.folder}:${messageRef.uid}`,
+        messageRef,
+      });
+    });
+    if (!targets.length) throw createStatusError('Geen geldig Softora-gesprek gekozen.', 400);
+    return targets;
+  }
+
+  async function updateIndex(targets, hidden) {
+    if (!canUseMailboxIndex()) {
+      throw createStatusError('Softora-mailboxindex is niet beschikbaar; gesprek is niet verborgen.');
+    }
+    const operation = hidden
+      ? mailboxIndexStore.markMessageDeleted
+      : mailboxIndexStore.restoreMessage;
+    if (typeof operation !== 'function') {
+      throw createStatusError('Softora-mailboxweergave kan deze actie nog niet duurzaam opslaan.');
+    }
+    const completed = [];
+    try {
+      for (const target of targets) {
+        const result = await operation.call(mailboxIndexStore, {
+          accountEmail: target.account.email,
+          id: target.id,
+          folder: target.messageRef.folder,
+          uid: target.messageRef.uid,
+        });
+        if (result?.ok !== true) {
+          const error = createStatusError(
+            result?.error?.message ||
+              (hidden
+                ? 'Gesprek kon niet in Softora worden verborgen.'
+                : 'Gesprek kon niet in Softora worden hersteld.'),
+            result?.unavailable ? 503 : 404
+          );
+          error.code = result?.error?.code || 'MAILBOX_VISIBILITY_UPDATE_FAILED';
+          throw error;
+        }
+        completed.push(target);
+      }
+    } catch (error) {
+      const rollback = hidden
+        ? mailboxIndexStore.restoreMessage
+        : mailboxIndexStore.markMessageDeleted;
+      if (typeof rollback === 'function') {
+        for (const target of completed.reverse()) {
+          await rollback.call(mailboxIndexStore, {
+            accountEmail: target.account.email,
+            id: target.id,
+            folder: target.messageRef.folder,
+            uid: target.messageRef.uid,
+          }).catch((rollbackError) => {
+            logger.error('[Mailbox][VisibilityRollback]', rollbackError?.message || rollbackError);
+          });
+        }
+      }
+      throw error;
+    }
+  }
+
+  async function removeTargetsFromCampaignSnapshot(targets) {
     if (typeof getUiStateValues !== 'function' || typeof setUiStateValues !== 'function') return false;
     try {
       const current = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE);
       const rawValue = current?.values?.[MAILBOX_CAMPAIGN_SNAPSHOT_KEY] || '';
-      const next = removeMailboxCampaignSnapshotMessage(rawValue, {
-        accountEmail: account.email,
-        folder: messageRef.folder,
-        id,
-        uid: messageRef.uid,
+      let serialized = rawValue;
+      let changed = false;
+      targets.forEach((target) => {
+        const result = removeMailboxCampaignSnapshotMessage(serialized, {
+          accountEmail: target.account.email,
+          folder: target.messageRef.folder,
+          id: target.id,
+          uid: target.messageRef.uid,
+        });
+        serialized = result.serialized;
+        changed = changed || result.changed;
       });
-      if (!next.changed) return false;
+      if (!changed) return false;
       await setUiStateValues(
         MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
-        { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: next.serialized },
-        { source: 'mailbox-delete', actor: account.email }
+        { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serialized },
+        { source: 'mailbox-view-hide', actor: targets[0].account.email }
       );
       return true;
     } catch (error) {
-      logger.warn('[Mailbox][DeleteSnapshot]', error?.message || error);
+      logger.warn('[Mailbox][HideSnapshot]', error?.message || error);
       return false;
     }
   }
 
-  async function persistDeletion({ account, id, messageRef }) {
-    let indexUpdated = false;
-    if (canUseMailboxIndex() && typeof mailboxIndexStore.markMessageDeleted === 'function') {
-      const result = await mailboxIndexStore.markMessageDeleted({
-        accountEmail: account.email,
-        id,
-        folder: messageRef.folder,
-        uid: messageRef.uid,
-      });
-      if (result?.ok === true) {
-        indexUpdated = true;
-      } else {
-        logger.warn(
-          '[Mailbox][DeleteIndex]',
-          result?.error?.message || 'Verwijdering niet in mailboxindex opgeslagen'
-        );
-      }
-    }
-    const snapshotUpdated = await removeFromCampaignSnapshot({ account, id, messageRef });
-    return { indexUpdated, snapshotUpdated };
+  async function hideConversation(input) {
+    const targets = normalizeTargets(input);
+    await updateIndex(targets, true);
+    const snapshotUpdated = await removeTargetsFromCampaignSnapshot(targets);
+    return {
+      hidden: true,
+      sourceMailboxMutated: false,
+      messageCount: targets.length,
+      snapshotUpdated,
+    };
   }
 
-  return async function deleteMessage({ accountEmail, id, folder, uid }) {
-    const account = getAccount(accountEmail);
-    if (!account) {
-      const error = new Error('Mailbox-account niet gevonden.');
-      error.status = 404;
-      throw error;
-    }
-    if (!account.imapConfigured) {
-      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
-      error.status = 503;
-      throw error;
-    }
+  async function restoreConversation(input) {
+    const targets = normalizeTargets(input);
+    await updateIndex(targets, false);
+    return {
+      restored: true,
+      sourceMailboxMutated: false,
+      messageCount: targets.length,
+    };
+  }
 
-    const messageRef = parseMessageReference({ id, folder, uid });
-    const client = createClient(account);
-    let deletionResult = null;
-    try {
-      await client.connect();
-      const sourceMailboxName = await resolveMailboxName(client, messageRef.folder);
-      if (!sourceMailboxName) {
-        const error = new Error('Mailboxmap niet gevonden.');
-        error.status = 404;
-        throw error;
-      }
-      const lock = await client.getMailboxLock(sourceMailboxName);
-      try {
-        if (messageRef.folder === 'trash') {
-          await client.messageFlagsAdd([messageRef.uid], ['\\Deleted'], { uid: true });
-          if (typeof client.mailboxClose === 'function') await client.mailboxClose();
-          deletionResult = {
-            account: account.email,
-            folder: messageRef.folder,
-            uid: messageRef.uid,
-            deleted: true,
-            permanent: true,
-          };
-        } else {
-          const trashMailboxName = await resolveMailboxName(client, 'trash');
-          if (!trashMailboxName) {
-            const error = new Error('Prullenbakmap niet gevonden voor deze mailbox.');
-            error.status = 404;
-            throw error;
-          }
-          if (typeof client.messageMove !== 'function') {
-            const error = new Error('Deze mailbox ondersteunt verplaatsen naar prullenbak niet.');
-            error.status = 503;
-            throw error;
-          }
-          await client.messageMove([messageRef.uid], trashMailboxName, { uid: true });
-          deletionResult = {
-            account: account.email,
-            folder: messageRef.folder,
-            destinationFolder: 'trash',
-            uid: messageRef.uid,
-            deleted: true,
-            moved: true,
-          };
-        }
-      } finally {
-        lock.release();
-      }
-    } finally {
-      try {
-        if (client.usable) await client.logout();
-      } catch (_) {}
-    }
-
-    const persistence = await persistDeletion({ account, id, messageRef });
-    return { ...deletionResult, ...persistence };
+  return {
+    hideConversation,
+    restoreConversation,
   };
 }
 
 module.exports = {
-  createMailboxDeleteMessage,
+  MAX_CONVERSATION_MESSAGES,
+  createMailboxVisibilityService,
 };

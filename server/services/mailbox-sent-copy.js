@@ -164,7 +164,10 @@ async function buildRawMessage(nodemailer, mail) {
     buffer: true,
     newline: 'windows',
   });
-  const info = await streamTransport.sendMail(mail);
+  const info = await streamTransport.sendMail({
+    ...mail,
+    keepBcc: Boolean(mail && mail.bcc),
+  });
   const raw = info && info.message ? info.message : null;
   if (!raw) return null;
   const source = Buffer.isBuffer(raw) ? raw.toString('latin1') : Buffer.from(String(raw)).toString('latin1');
@@ -290,6 +293,7 @@ async function assertRawMessageIntegrity(raw, mail = {}) {
   assertAddressIntegrity(parsed.from, mail.from, 'From', { compareName: true });
   assertAddressIntegrity(parsed.to, mail.to, 'To');
   assertAddressIntegrity(parsed.cc, mail.cc, 'Cc');
+  assertAddressIntegrity(parsed.bcc, mail.bcc, 'Bcc');
   assertAddressIntegrity(parsed.replyTo, mail.replyTo, 'Reply-To');
   const parsedSender = parsed.sender || (parsed.headers && parsed.headers.get('sender'));
   assertAddressIntegrity(parsedSender, mail.sender, 'Sender', { compareName: true });

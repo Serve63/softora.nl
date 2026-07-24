@@ -82,7 +82,7 @@ function getMessageReferenceIds(message) {
 function getMessageReferenceLookupValues(messages) {
   const values = new Set();
   (Array.isArray(messages) ? messages : []).forEach((message) => {
-    [message && message.inReplyTo, message && message.references].forEach((rawValue) => {
+    [message && message.messageId, message && message.inReplyTo, message && message.references].forEach((rawValue) => {
       const source = normalizeText(rawValue);
       if (!source) return;
       const tokens = source.match(/<[^<>]+>/g) || source.split(/\s+/);
@@ -97,6 +97,103 @@ function getMessageReferenceLookupValues(messages) {
     });
   });
   return Array.from(values).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
+}
+
+function getExactCrossAccountSentCopy(message, sentMessages) {
+  const messageId = normalizeMessageId(message && message.messageId);
+  const account = normalizeEmail(message && message.accountEmail);
+  const sender = normalizeEmail(message && message.email);
+  if (!messageId || !account || !sender) return null;
+  return (Array.isArray(sentMessages) ? sentMessages : []).find((candidate) => (
+    normalizeText(candidate && candidate.folder).toLowerCase() === 'sent' &&
+    normalizeMessageId(candidate && candidate.messageId) === messageId &&
+    normalizeEmail(candidate && candidate.accountEmail) !== account &&
+    normalizeEmail(candidate && candidate.email) === sender
+  )) || null;
+}
+
+function getExactMessageLineage(message, messages, maxDepth = 20) {
+  const account = normalizeEmail(message && message.accountEmail);
+  if (!account) return [];
+  const candidates = (Array.isArray(messages) ? messages : [])
+    .filter((candidate) => normalizeEmail(candidate && candidate.accountEmail) === account);
+  const lineage = [];
+  const seen = new Set();
+  let current = message;
+  for (let depth = 0; depth < maxDepth; depth += 1) {
+    const referenceIds = getMessageReferenceIds(current);
+    if (!referenceIds.length) break;
+    const parent = candidates
+      .filter((candidate) => (
+        referenceIds.includes(normalizeMessageId(candidate && candidate.messageId)) &&
+        parseMessageDate(candidate && candidate.date) < parseMessageDate(current && current.date)
+      ))
+      .sort((left, right) => parseMessageDate(right && right.date) - parseMessageDate(left && left.date))[0];
+    if (!parent) break;
+    const identity = getMessageIdentity(parent);
+    if (!identity || seen.has(identity)) break;
+    seen.add(identity);
+    lineage.push(parent);
+    current = parent;
+  }
+  return lineage.reverse();
+}
+
+function attachCrossAccountMailboxCopies(conversations, replies, sentMessages) {
+  const allMessages = dedupeCampaignMessages([
+    ...(Array.isArray(replies) ? replies : []),
+    ...(Array.isArray(sentMessages) ? sentMessages : []),
+  ]);
+  const ancestorMessageIds = new Set();
+  const enriched = (Array.isArray(conversations) ? conversations : []).map((conversation) => {
+    const sentCopy = getExactCrossAccountSentCopy(conversation, sentMessages);
+    if (!sentCopy) return conversation;
+    const copyAccountEmail = normalizeEmail(conversation.accountEmail);
+    const copyKind = extractEmailAddresses(sentCopy.bcc).includes(copyAccountEmail)
+      ? 'bcc'
+      : extractEmailAddresses(sentCopy.cc).includes(copyAccountEmail)
+        ? 'cc'
+        : '';
+    if (!copyKind) return conversation;
+    const recipientEmail = extractEmailAddresses(sentCopy.to)
+      .find((email) => email !== normalizeEmail(sentCopy.accountEmail)) || '';
+    if (!recipientEmail || recipientEmail === normalizeEmail(conversation.accountEmail)) return conversation;
+    const lineage = getExactMessageLineage(sentCopy, allMessages);
+    lineage.forEach((message) => {
+      const messageId = normalizeMessageId(message && message.messageId);
+      if (messageId) ancestorMessageIds.add(messageId);
+    });
+    const recipientMessage = lineage.find((message) => (
+      normalizeText(message && message.folder).toLowerCase() !== 'sent' &&
+      normalizeEmail(message && message.email) === recipientEmail
+    ));
+    const rootMessageId = normalizeMessageId(conversation && conversation.messageId);
+    const threadMessages = dedupeCampaignMessages([
+      ...lineage,
+      ...(Array.isArray(conversation.threadMessages) ? conversation.threadMessages : []),
+    ])
+      .filter((message) => normalizeMessageId(message && message.messageId) !== rootMessageId)
+      .sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
+    return {
+      ...conversation,
+      copyContext: {
+        evidenceKnown: true,
+        kind: copyKind,
+        sourceAccountEmail: normalizeEmail(sentCopy.accountEmail),
+        sourceName: normalizeText(sentCopy.from),
+        sourceEmail: normalizeEmail(sentCopy.email),
+        recipientName: normalizeText(recipientMessage && recipientMessage.from),
+        recipientEmail,
+        copyAccountEmail,
+        evidence: `exact-${copyKind}-recipient-and-cross-account-sent-message-id`,
+      },
+      threadMessages,
+    };
+  });
+  return enriched.filter((conversation) => (
+    conversation.copyContext ||
+    !ancestorMessageIds.has(normalizeMessageId(conversation && conversation.messageId))
+  ));
 }
 
 function getMessageIdentity(message) {
@@ -571,7 +668,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ...(Array.isArray(sentMessagesResult) ? sentMessagesResult : []),
       ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
     ]);
-    const visibleConversations = attachSentThreadMessages(replies, sentMessages)
+    const visibleConversations = attachCrossAccountMailboxCopies(
+      attachSentThreadMessages(replies, sentMessages),
+      replies,
+      sentMessages
+    )
       .slice(0, safeLimit);
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') {
       return visibleConversations;
@@ -599,12 +700,15 @@ module.exports = {
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SUBJECT_TERMS,
   attachSentThreadMessages,
+  attachCrossAccountMailboxCopies,
   buildCampaignReply,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   getCampaignConversationId,
   getMessageReferenceIds,
   getMessageReferenceLookupValues,
+  getExactCrossAccountSentCopy,
+  getExactMessageLineage,
   isAutomatedCampaignReply,
   isCampaignReplySubject,
   isSentReplyForMessage,

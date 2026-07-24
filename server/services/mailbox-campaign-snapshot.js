@@ -65,6 +65,14 @@ function sanitizeBodyImage(value, options = {}) {
   return createImage(dataUrl);
 }
 
+function sanitizeAttachments(value) {
+  return (Array.isArray(value) ? value : []).slice(0, 20).map((attachment) => ({
+    filename: text(attachment && attachment.filename || 'Bijlage', 180),
+    contentType: text(attachment && attachment.contentType, 120).toLowerCase(),
+    size: Math.max(0, Number(attachment && attachment.size) || 0),
+  }));
+}
+
 function sanitizeThreadMessage(value, options = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const rawBody = String(source.body || '');
@@ -90,6 +98,12 @@ function sanitizeThreadMessage(value, options = {}) {
     from: text(source.from, 500),
     email: text(source.email, 320).toLowerCase(),
     to: text(source.to, 2000),
+    toDisplay: text(source.toDisplay, 2000),
+    cc: text(source.cc, 2000),
+    bcc: text(source.bcc, 2000),
+    deliveredTo: text(source.deliveredTo, 1000),
+    recipientRoutingEvidenceKnown: source.recipientRoutingEvidenceKnown === true,
+    attachments: sanitizeAttachments(source.attachments),
     subject: text(source.subject || '(Geen onderwerp)', 1000),
     preview: text(source.preview, 1000),
     body,
@@ -161,6 +175,12 @@ function sanitizeMessage(value, options = {}) {
     from: text(source.from, 500),
     email: text(source.email, 320).toLowerCase(),
     to: text(source.to, 2000),
+    toDisplay: text(source.toDisplay, 2000),
+    cc: text(source.cc, 2000),
+    bcc: text(source.bcc, 2000),
+    deliveredTo: text(source.deliveredTo, 1000),
+    recipientRoutingEvidenceKnown: source.recipientRoutingEvidenceKnown === true,
+    attachments: sanitizeAttachments(source.attachments),
     subject: text(source.subject || '(Geen onderwerp)', 1000),
     preview: text(source.preview, 1000),
     body,
@@ -185,6 +205,21 @@ function sanitizeMessage(value, options = {}) {
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
     bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     indexed: source.indexed !== false,
+    copyContext: source.copyContext && source.copyContext.evidenceKnown === true
+      ? {
+          evidenceKnown: true,
+          kind: ['bcc', 'cc'].includes(text(source.copyContext.kind, 10).toLowerCase())
+            ? text(source.copyContext.kind, 10).toLowerCase()
+            : '',
+          sourceAccountEmail: text(source.copyContext.sourceAccountEmail, 320).toLowerCase(),
+          sourceName: text(source.copyContext.sourceName, 500),
+          sourceEmail: text(source.copyContext.sourceEmail, 320).toLowerCase(),
+          recipientName: text(source.copyContext.recipientName, 500),
+          recipientEmail: text(source.copyContext.recipientEmail, 320).toLowerCase(),
+          copyAccountEmail: text(source.copyContext.copyAccountEmail, 320).toLowerCase(),
+          evidence: text(source.copyContext.evidence, 200),
+        }
+      : null,
     campaign: sanitizeCampaign(source.campaign),
     outreach: sanitizeOutreach(source.outreach),
     bodyImages,
