@@ -44,6 +44,10 @@ const MAILBOX_REPLY_NEXT_STEP =
   'Als je wilt, is het een idee dat ik volgende week [dag] even langskom? Dan kunnen we samen kort kijken wat er mogelijk is.';
 const MAILBOX_REPLY_PRICE_EXPLANATION =
   'De prijs hangt af van wat je precies wilt en wat daarvoor nodig is.';
+const MAILBOX_REPLY_WEBFLOW_ANSWER =
+  'Goede vraag. Het ontwerp dat ik je heb gestuurd, heb ik helemaal op maat met code gebouwd. Je huidige site staat in Webflow, en dat kan natuurlijk ook prima werken 😁';
+const MAILBOX_REPLY_WEBFLOW_NEXT_STEP =
+  'Als je wilt, is het een idee dat ik volgende week [dag] even langskom? Dan bespreek ik graag kort met je wat voor je site praktisch is binnen je huidige Webflow-opzet.';
 
 function cleanLine(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -163,7 +167,8 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Bij geen interesse, geen behoefte, geen vervolgtraject, buiten-scope, een beleefde afwijzing of een verzoek om niet door te gaan: reageer kort en respectvol zonder nieuwe verkooppoging; bedank; zeg eventueel dat de ontvanger later zelf contact mag opnemen; stel nooit een bezoek, afspraak, vervolgstap, prijsbespreking of meedenken voor.',
     'Als iemand al tevreden is met een andere partij, benoem juist dat dit begrijpelijk en fijn is.',
     'Feitelijke waarheid gaat altijd voor stijl. Het actuele ontwerp uit deze coldmail is met code gebouwd.',
-    `Als iemand Webflow noemt of ernaar vraagt, erken de vraag eerst natuurlijk en antwoord dan feitelijk: "Goede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd." Beweer niet dat Servé Webflow gebruikt, zet Webflow niet negatief neer, gebruik geen defensieve tegenstelling zoals "dus niet in Webflow" en geef geen ongevraagd Webflow-advies. Gebruik daarna hooguit één relevante conditionele vervolgstap.`,
+    `Als iemand vraagt met welk programma het ontwerp is gemaakt en erbij zegt dat de huidige site in Webflow staat, antwoord dan inhoudelijk volgens deze vaste lijn: "${MAILBOX_REPLY_WEBFLOW_ANSWER}" Voeg alleen als de vraag ruimte laat voor een vervolg exact één relevante vervolgstap toe: "${MAILBOX_REPLY_WEBFLOW_NEXT_STEP}"`,
+    'Beweer nooit dat Servé Webflow gebruikt, zet Webflow niet negatief neer, gebruik geen defensieve tegenstelling zoals "dus niet in Webflow" en geef geen ongevraagd Webflow-advies.',
     'Vermijd corporate taal, gladde verkooppraat, overmatige beleefdheid en formuleringen zoals "ik respecteer je keuze volledig", "je gegevens niet verder mailen", "vriendelijke woorden" en "dank voor uw reactie".',
     'Houd de kern meestal tussen 30 en 75 woorden, exclusief afsluiting. Schrijf niet langer dan nodig.',
     `Sluit altijd exact af met: ${sender.signature}`,
@@ -330,6 +335,16 @@ function enforceWebflowTruth(value, inboundText) {
     .join('\n\n');
 }
 
+function isWebflowToolQuestion(value) {
+  const text = normalizeClassifierText(value);
+  if (!/\bwebflow\b/.test(text)) return false;
+  return (
+    /\b(?:met\s+)?welk(?:e)?\s+(?:programma|tool|platform|systeem)\b/.test(text) ||
+    /\b(?:waarmee|waarin)\s+(?:werk|bouw|maak)\b/.test(text) ||
+    /\bwat\s+(?:gebruik|gebruikte)\s+je\b/.test(text)
+  );
+}
+
 function removeConditionalNextSteps(value) {
   return removeSentencesMatching(
     value,
@@ -403,6 +418,9 @@ function enforceMailboxReplyProfile(value, options = {}) {
     );
     return `${greeting}\n\n${rejectionBody}\n\n${sender.signature}`;
   }
+  if (intent === 'interest' && isWebflowToolQuestion(options.inboundText)) {
+    return `${greeting}\n\n${MAILBOX_REPLY_WEBFLOW_ANSWER}\n\n${MAILBOX_REPLY_WEBFLOW_NEXT_STEP}\n\n${sender.signature}`;
+  }
   let body = stripGeneratedSignature(stripGeneratedGreeting(value));
   body = enforceWebflowTruth(body, options.inboundText);
   body = enforcePriceTruth(body, intent);
@@ -456,6 +474,8 @@ module.exports = {
   MAILBOX_REPLY_PRICE_EXPLANATION,
   MAILBOX_REPLY_PROFILE,
   MAILBOX_REPLY_SENDERS,
+  MAILBOX_REPLY_WEBFLOW_ANSWER,
+  MAILBOX_REPLY_WEBFLOW_NEXT_STEP,
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplyPromptPayload,
   buildMailboxReplySystemPrompt,
@@ -463,5 +483,6 @@ module.exports = {
   enforceMailboxReplyProfile,
   enforceMailboxReplySignature,
   inferMailboxReplyFirstName,
+  isWebflowToolQuestion,
   resolveMailboxReplySenderProfile,
 };
