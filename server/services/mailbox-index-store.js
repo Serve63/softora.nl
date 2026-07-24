@@ -1,4 +1,7 @@
 const crypto = require('crypto');
+const {
+  isOriginalCampaignOutboundMessage,
+} = require('./mailbox-image-ownership');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -10,6 +13,8 @@ const BODY_RETENTION_NEWEST_COUNT = 500;
 const BODY_MAX_CHARS = 200 * 1024;
 const SYNC_LOCK_TTL_MS = 90_000;
 const MAILBOX_INDEX_PAGE_SIZE = 1000;
+const MAILBOX_MESSAGE_METADATA_COLUMNS =
+  'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated,payload';
 
 function createMailboxIndexStore(deps = {}) {
   const {
@@ -208,6 +213,14 @@ function createMailboxIndexStore(deps = {}) {
       starred: Boolean(message && message.starred),
       payload: {
         source: 'imap-sync',
+        embeddedImageCount: Math.max(
+          0,
+          Math.min(8, Array.isArray(message && message.bodyImages) ? message.bodyImages.length : 0)
+        ),
+        originalCampaignOutbound: isOriginalCampaignOutboundMessage({
+          ...message,
+          folder: normalizedFolder,
+        }),
       },
       updated_at: isoNow(),
     };
@@ -217,7 +230,9 @@ function createMailboxIndexStore(deps = {}) {
     const folder = normalizeFolder(row.folder);
     const uid = Number(row.uid) || 0;
     const includeBody = options.includeBody === true;
-    return {
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');
+    const normalized = {
       id: normalizeString(row.provider_id) || `${folder}:${uid}`,
       uid,
       folder,
@@ -236,8 +251,16 @@ function createMailboxIndexStore(deps = {}) {
       starred: Boolean(row.starred),
       hasBody: Boolean(row.has_body),
       bodyTruncated: Boolean(row.body_truncated),
+      bodyImageEvidenceKnown,
+      embeddedImageCount: bodyImageEvidenceKnown
+        ? Math.max(0, Math.min(8, Number(payload.embeddedImageCount) || 0))
+        : 0,
       indexed: true,
     };
+    normalized.originalCampaignOutbound =
+      payload.originalCampaignOutbound === true ||
+      isOriginalCampaignOutboundMessage(normalized);
+    return normalized;
   }
 
   async function listMessages({ accountEmail, folder = 'inbox', limit = 50 }) {
@@ -245,9 +268,7 @@ function createMailboxIndexStore(deps = {}) {
     const result = await run('list-messages', (client) =>
       client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .select(
-          'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated'
-        )
+        .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizeFolder(folder))
         .is('deleted_at', null)
@@ -267,9 +288,7 @@ function createMailboxIndexStore(deps = {}) {
     const result = await run('list-messages-for-accounts', (client) =>
       client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .select(
-          'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated'
-        )
+        .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
         .in('account_email', normalizedAccounts)
         .eq('folder', normalizeFolder(folder))
         .is('deleted_at', null)
@@ -295,9 +314,7 @@ function createMailboxIndexStore(deps = {}) {
       const result = await run(`list-all-messages-for-accounts:${normalizedFolder}:${offset}`, (client) =>
         client
           .from(MAILBOX_INDEX_TABLES.messages)
-          .select(
-            'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated'
-          )
+          .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
           .in('account_email', normalizedAccounts)
           .eq('folder', normalizedFolder)
           .is('deleted_at', null)
@@ -311,6 +328,93 @@ function createMailboxIndexStore(deps = {}) {
       if (page.length < pageSize) break;
     }
     return (hasLimit ? rows.slice(0, safeLimit) : rows).map((row) => normalizeMessageRow(row));
+  }
+
+  async function listMatchingMessagesForAccounts({
+    accountEmails = [],
+    folder = 'inbox',
+    subjectTerms = [],
+    limit = 1000,
+  } = {}) {
+    const normalizedAccounts = Array.from(
+      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
+    );
+    const terms = Array.from(
+      new Set((Array.isArray(subjectTerms) ? subjectTerms : []).map(normalizeString).filter(Boolean))
+    );
+    if (!normalizedAccounts.length || !terms.length) return [];
+    const normalizedFolder = normalizeFolder(folder);
+    const safeLimit = Math.max(1, Math.min(4000, Math.floor(Number(limit) || 1000)));
+    const rowsByKey = new Map();
+
+    for (const term of terms) {
+      for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
+        const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
+        const result = await run(
+          `list-matching-messages-for-accounts:${normalizedFolder}:${offset}`,
+          (client) =>
+            client
+              .from(MAILBOX_INDEX_TABLES.messages)
+              .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
+              .in('account_email', normalizedAccounts)
+              .eq('folder', normalizedFolder)
+              .ilike('subject', `%${term}%`)
+              .is('deleted_at', null)
+              .order('date', { ascending: false })
+              .order('message_key', { ascending: false })
+              .range(offset, offset + pageSize - 1)
+        );
+        if (!result.ok) return null;
+        const page = Array.isArray(result.data) ? result.data : [];
+        page.forEach((row) => {
+          const key = normalizeString(row && row.message_key);
+          if (key && !rowsByKey.has(key)) rowsByKey.set(key, row);
+        });
+        if (page.length < pageSize) break;
+      }
+    }
+
+    return Array.from(rowsByKey.values())
+      .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
+      .slice(0, safeLimit)
+      .map((row) => normalizeMessageRow(row));
+  }
+
+  async function listMessageUidsForAccount({
+    accountEmail,
+    folder = 'inbox',
+    since = '',
+    limit = 5000,
+  } = {}) {
+    const normalizedAccount = normalizeEmail(accountEmail);
+    if (!normalizedAccount) return [];
+    const normalizedFolder = normalizeFolder(folder);
+    const safeLimit = Math.max(1, Math.min(10_000, Math.floor(Number(limit) || 5000)));
+    const rows = [];
+    for (let offset = 0; offset < safeLimit; offset += MAILBOX_INDEX_PAGE_SIZE) {
+      const pageSize = Math.min(MAILBOX_INDEX_PAGE_SIZE, safeLimit - offset);
+      const result = await run(
+        `list-message-uids-for-account:${normalizedFolder}:${offset}`,
+        (client) => {
+          let query = client
+            .from(MAILBOX_INDEX_TABLES.messages)
+            .select('uid')
+            .eq('account_email', normalizedAccount)
+            .eq('folder', normalizedFolder)
+            .is('deleted_at', null)
+            .order('uid', { ascending: false });
+          if (normalizeString(since)) query = query.gte('date', normalizeString(since));
+          return query.range(offset, offset + pageSize - 1);
+        }
+      );
+      if (!result.ok) return null;
+      const page = Array.isArray(result.data) ? result.data : [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return Array.from(
+      new Set(rows.map((row) => Number(row && row.uid)).filter((uid) => Number.isSafeInteger(uid) && uid > 0))
+    );
   }
 
   async function hydrateMessageBodies({ messages = [] } = {}) {
@@ -331,7 +435,7 @@ function createMailboxIndexStore(deps = {}) {
     const result = await run('hydrate-message-bodies', (client) =>
       client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .select('message_key,body_text,has_body,body_truncated')
+        .select('message_key,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text')
         .in('message_key', messageKeys)
         .is('deleted_at', null)
     );
@@ -345,11 +449,28 @@ function createMailboxIndexStore(deps = {}) {
       const messageKey = uid ? buildMessageKey(message.accountEmail, message.folder, uid) : '';
       const row = bodyByMessageKey.get(messageKey);
       if (!row) return message;
+      const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+      const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');
+      const body = normalizeString(row.body_text);
       return {
         ...message,
-        body: normalizeString(row.body_text),
+        body,
         hasBody: Boolean(row.has_body),
         bodyTruncated: Boolean(row.body_truncated),
+        bodyImageEvidenceKnown,
+        embeddedImageCount: bodyImageEvidenceKnown
+          ? Math.max(0, Math.min(8, Number(payload.embeddedImageCount) || 0))
+          : 0,
+        originalCampaignOutbound:
+          payload.originalCampaignOutbound === true ||
+          isOriginalCampaignOutboundMessage({
+            folder: row.folder || message.folder,
+            subject: row.subject,
+            preview: row.preview,
+            body,
+            inReplyTo: row.in_reply_to,
+            references: row.references_text,
+          }),
       };
     });
   }
@@ -548,6 +669,8 @@ function createMailboxIndexStore(deps = {}) {
     isAvailable,
     isSyncStateStale,
     listAllMessagesForAccounts,
+    listMatchingMessagesForAccounts,
+    listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,
     markMessageDeleted,

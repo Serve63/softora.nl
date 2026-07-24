@@ -22,7 +22,11 @@ const {
   MAILBOX_MESSAGE_IMAGE_MAX_INDEX,
   decodeMailboxMessageImage,
 } = require('./mailbox-message-image');
-const { mergeMailboxBodyImages, tagSentCampaignBodyImages } = require('./mailbox-image-ownership');
+const {
+  isOriginalCampaignOutboundMessage,
+  isSentCampaignDesignImage,
+  tagSentCampaignBodyImages,
+} = require('./mailbox-image-ownership');
 const {
   buildCustomerIdentityKey,
   parseImageDataUrl,
@@ -1912,185 +1916,30 @@ function createMailboxService(deps = {}) {
     });
   }
 
-  async function loadStoredImagesForRecords(records) {
-    const candidates = (Array.isArray(records) ? records : []).filter((record) => {
-      if (!record || !record.key) return false;
-      if (Array.isArray(record.primaryBodyImages) && record.primaryBodyImages.length) return false;
-      const labels = extractBodyImageLabels(record.text);
-      if (!labels.length && looksLikeLinkOnlyWebdesignOutreach(record.parsed, record.text)) return false;
-      return labels.length || looksLikeWebdesignOutreach(record.parsed, record.text);
-    });
-    if (!candidates.length || typeof getUiStateValues !== 'function') return new Map();
-
-    try {
-      const [photoState, customerState] = await Promise.all([
-        getUiStateValues(customerPhotoScope),
-        candidates.some((record) => looksLikeWebdesignOutreach(record.parsed, record.text))
-          ? getUiStateValues(customerDbScope)
-          : Promise.resolve(null),
-      ]);
-      const photoValues = photoState && photoState.values && typeof photoState.values === 'object' ? photoState.values : {};
-      const customerValues = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
-      const basePhotoMap = safeParseJsonObject(photoValues[customerPhotoKey]);
-      const customerRows = parseCustomerRows(customerValues);
-      const matchesByRecordKey = new Map();
-      const targetedCustomerIds = new Set();
-      candidates.forEach((record) => {
-        const matches = looksLikeWebdesignOutreach(record.parsed, record.text)
-          ? findCustomerRowsForMail(record.parsed, record.text, customerRows)
-          : [];
-        matchesByRecordKey.set(record.key, matches);
-        matches.forEach(({ row, index }) => {
-          const id = getCustomerId(row, index);
-          if (id) targetedCustomerIds.add(id);
-        });
-      });
-      const targetedPhotoMap = await loadTargetedPhotoMap(Array.from(targetedCustomerIds));
-      const photoMap = {
-        ...basePhotoMap,
-        ...targetedPhotoMap,
-      };
-      const photoByIdentity = buildPhotoByIdentity(photoMap);
-      const result = new Map();
-
-      for (const record of candidates) {
-        const images = [];
-        const seen = new Set();
-        const addImages = (items) => {
-          (Array.isArray(items) ? items : []).forEach((image) => {
-            const key = normalizeImageLabel(image && (image.alt || image.dataUrl));
-            if (!key || seen.has(key)) return;
-            seen.add(key);
-            images.push(image);
-          });
-        };
-
-        const matches = matchesByRecordKey.get(record.key) || [];
-        const hasRecipientMatch = matches.length > 0;
-        if (hasRecipientMatch) {
-          for (const { row, index } of matches) {
-            addImages(await imagesFromPhotoMeta(
-              photoValues,
-              getPhotoMetaForRow(row, index, photoMap, photoByIdentity),
-              `${getCustomerDomain(row) || 'Webdesign'} webdesign`
-            ));
-            if (images.length) break;
-          }
-        }
-
-        if (!images.length && !hasRecipientMatch) {
-          const labels = extractBodyImageLabels(record.text);
-          for (const label of labels) {
-            for (const [id, meta] of Object.entries(photoMap)) {
-              const aliases = [id, meta && meta.id, meta && meta.websitePhotoName, meta && meta.fileName].filter(Boolean);
-              if (!aliases.some((alias) => photoLabelMatches(alias, label))) continue;
-              addImages(await imagesFromPhotoMeta(photoValues, meta, label));
-            }
-          }
-        }
-
-        if (!images.length && !hasRecipientMatch && looksLikeWebdesignOutreach(record.parsed, record.text)) {
-          for (const [id, meta] of Object.entries(photoMap)) {
-            if (!directPhotoMetaMatchesMail(id, meta, record.parsed, record.text)) continue;
-            addImages(await imagesFromPhotoMeta(photoValues, meta, meta && meta.websitePhotoName));
-            if (images.length) break;
-          }
-        }
-
-        if (images.length) {
-          result.set(record.key, images.slice(0, 8));
-        }
-      }
-      return result;
-    } catch (error) {
-      logger.warn('[Mailbox][body-images]', error && error.message ? error.message : error);
-      return new Map();
-    }
-  }
-
-  async function restoreIndexedWebdesignImagesForMessages(messages) {
-    const source = Array.isArray(messages) ? messages : [];
-    const records = source.map((message, index) => {
-      const text = normalizeString(message && message.body);
-      const parsed = {
-        subject: normalizeString(message && message.subject),
-        from: {
-          value: [
-            {
-              name: normalizeString(message && message.from),
-              address: normalizeString(message && message.email),
-            },
-          ],
-        },
-        to: {
-          value: normalizeString(message && message.to)
-            .split(',')
-            .map((address) => ({ address: normalizeString(address) }))
-            .filter((entry) => entry.address),
-        },
-      };
-      return {
-        key: `${normalizeString(message && message.accountEmail)}|${normalizeFolder(message && message.folder)}:${Number(message && message.uid) || index}`,
-        folder: normalizeFolder(message && message.folder),
-        parsed,
-        text,
-        primaryBodyImages: Array.isArray(message && message.bodyImages) ? message.bodyImages : [],
-      };
-    });
-    const storedImagesByKey = await loadStoredImagesForRecords(records);
-    return source.map((message, index) => {
-      const record = records[index];
-      const primaryBodyImages = record.primaryBodyImages;
-      const storedImages = storedImagesByKey.get(record.key) || [];
-      const bodyImages = tagSentCampaignBodyImages(
-        mergeMailboxBodyImages(primaryBodyImages, storedImages, record.text, {
-          allowUnmatchedFallbacks: true,
-        }),
-        {
-          folder: record.folder,
-          storedImages,
-          looksLikeCampaign: looksLikeWebdesignOutreach(record.parsed, record.text),
-        }
-      );
-      if (!bodyImages.length) return message;
-      return {
-        ...message,
-        body: storedImages.length && !primaryBodyImages.length
-          ? decorateRecoveredWebdesignImagesText(record.text, bodyImages)
-          : record.text,
-        bodyImages,
-        inlineImages: bodyImages.map(bodyImageToInlineImage),
-      };
-    });
-  }
-
-  async function restoreIndexedWebdesignImages(message) {
-    return (await restoreIndexedWebdesignImagesForMessages([message]))[0] || message;
-  }
-
   function toClientMessage(parsed, message, folder, account, options = {}) {
     const date = parsed.date || message.internalDate || new Date();
     const text = options.text || sanitizeMailboxDisplayText(normalizeString(parsed.text || parsed.html || ''));
     const optOutUrl = resolveColdmailOptOutUrl(parsed, text);
     const primaryBodyImages = Array.isArray(options.primaryBodyImages) ? options.primaryBodyImages : buildMailboxBodyImages(parsed);
-    const storedImages = looksLikeLinkOnlyWebdesignOutreach(parsed, text)
-      ? []
-      : Array.isArray(options.storedImages)
-        ? options.storedImages
-        : [];
+    const originalCampaignOutbound = isOriginalCampaignOutboundMessage({
+      folder,
+      subject: parsed.subject,
+      body: text,
+      inReplyTo: parsed.inReplyTo,
+      references: parsed.references,
+    });
+    const campaignLike = looksLikeWebdesignOutreach(parsed, text);
+    const visiblePrimaryBodyImages = campaignLike && !originalCampaignOutbound
+      ? primaryBodyImages.filter((image) => !isSentCampaignDesignImage(image))
+      : primaryBodyImages;
     const bodyImages = tagSentCampaignBodyImages(
-      mergeMailboxBodyImages(primaryBodyImages, storedImages, text, {
-        allowUnmatchedFallbacks: true,
-      }),
+      visiblePrimaryBodyImages,
       {
         folder,
-        storedImages,
         looksLikeCampaign: looksLikeWebdesignOutreach(parsed, text),
       }
     );
-    const bodyText = storedImages.length && !primaryBodyImages.length
-      ? decorateRecoveredWebdesignImagesText(text, bodyImages)
-      : text;
+    const bodyText = text;
     const preview = truncateText(bodyText.replace(/^\s*\[image:[^\]]+\]\s*$/gim, '').replace(/\s+/g, ' '), 140);
     const parsedFromName = displayName(parsed.from?.value);
     const parsedFromEmail = addressText(parsed.from?.value);
@@ -2116,6 +1965,9 @@ function createMailboxService(deps = {}) {
         : normalizeString(parsed.references || ''),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
+      bodyImageEvidenceKnown: true,
+      embeddedImageCount: Math.max(0, Math.min(8, primaryBodyImages.length)),
+      originalCampaignOutbound,
     };
   }
 
@@ -2181,12 +2033,10 @@ function createMailboxService(deps = {}) {
             primaryBodyImages,
           });
         }
-        const storedImagesByKey = await loadStoredImagesForRecords(records);
         const messages = records.map((record) =>
           toClientMessage(record.parsed, record.message, normalizedFolder, account, {
             text: record.text,
             primaryBodyImages: record.primaryBodyImages,
-            storedImages: storedImagesByKey.get(record.key) || [],
           })
         );
         return messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -2349,8 +2199,14 @@ function createMailboxService(deps = {}) {
         folder: normalizedFolder,
         id,
       });
-      if (indexed && indexed.hasBody && indexed.body) {
-        return restoreIndexedWebdesignImages(indexed);
+      if (
+        indexed &&
+        indexed.hasBody &&
+        indexed.body &&
+        indexed.bodyImageEvidenceKnown &&
+        indexed.embeddedImageCount === 0
+      ) {
+        return indexed;
       }
     }
     const live = await fetchMessageFromImapById({ account, folder: normalizedFolder, id });
@@ -2688,10 +2544,9 @@ function createMailboxService(deps = {}) {
     const replies = await mailboxCampaignRepliesService.listReplies({
       limit: Number(limit || 100) || 100,
     });
-    const messages = await restoreIndexedWebdesignImagesForMessages(replies);
     const result = {
       ok: true,
-      messages,
+      messages: replies,
       sync: {
         indexed: true,
         stale: false,

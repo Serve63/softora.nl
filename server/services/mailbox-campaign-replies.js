@@ -11,10 +11,15 @@ const CAMPAIGN_MAILBOX_ACCOUNTS = Object.freeze([
 ]);
 
 const CAMPAIGN_REPLY_LIMIT = 200;
-const CAMPAIGN_MESSAGE_SCAN_LIMIT = 2000;
+const CAMPAIGN_MESSAGE_SCAN_LIMIT = 250;
+const CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT = 500;
 const CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT = 2000;
 const CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE = 100;
 const CAMPAIGN_THREAD_FALLBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
+  'Kleine vraag over jullie website',
+  'Nieuw webdesign',
+]);
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -445,15 +450,28 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const hasPagedAccountHistory = typeof mailboxIndexStore.listAllMessagesForAccounts === 'function';
-    const listMessagesForAccounts = hasPagedAccountHistory
-      ? mailboxIndexStore.listAllMessagesForAccounts.bind(mailboxIndexStore)
-      : mailboxIndexStore.listMessagesForAccounts.bind(mailboxIndexStore);
-    const messages = await listMessagesForAccounts({
+    const recentMessages = await mailboxIndexStore.listMessagesForAccounts({
       accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
       folder: 'inbox',
       limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
     });
+    const matchingMessages = typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
+      ? await mailboxIndexStore.listMatchingMessagesForAccounts({
+          accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+          folder: 'inbox',
+          subjectTerms: CAMPAIGN_SUBJECT_TERMS,
+          limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+        })
+      : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
+        ? await mailboxIndexStore.listAllMessagesForAccounts({
+            accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+            folder: 'inbox',
+            limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+          })
+        : [];
+    const messages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
+      ? dedupeCampaignMessages([...recentMessages, ...matchingMessages])
+      : null;
     if (!Array.isArray(messages)) {
       const error = new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.');
       error.status = 503;
@@ -499,38 +517,39 @@ function createMailboxCampaignRepliesService(deps = {}) {
       })
       .filter(Boolean);
 
-    const sentMessagesResult = await listMessagesForAccounts({
-      accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-      folder: 'sent',
-      limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
-    }).catch(() => []);
+    const sentMessagesResult = await (
+      typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
+        ? mailboxIndexStore.listMatchingMessagesForAccounts({
+            accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+            folder: 'sent',
+            subjectTerms: CAMPAIGN_SUBJECT_TERMS,
+            limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+          })
+        : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
+          ? mailboxIndexStore.listAllMessagesForAccounts({
+              accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+              folder: 'sent',
+              limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+            })
+          : mailboxIndexStore.listMessagesForAccounts({
+              accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+              folder: 'sent',
+              limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+            })
+    ).catch(() => []);
     const sentMessages = Array.isArray(sentMessagesResult) ? sentMessagesResult : [];
-    const candidateConversationLimit = Math.min(CAMPAIGN_REPLY_LIMIT, safeLimit * 2);
-    const candidateConversations = attachSentThreadMessages(replies, sentMessages)
-      .slice(0, candidateConversationLimit);
+    const visibleConversations = attachSentThreadMessages(replies, sentMessages)
+      .slice(0, safeLimit);
     if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') {
-      return candidateConversations.slice(0, safeLimit);
+      return visibleConversations;
     }
-    const selectedMessages = dedupeCampaignMessages(
-      candidateConversations.flatMap((conversation) => [
-        conversation,
-        ...(Array.isArray(conversation && conversation.threadMessages) ? conversation.threadMessages : []),
-      ])
-    );
     const hydratedMessages = [];
-    for (let index = 0; index < selectedMessages.length; index += CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE) {
-      const batch = selectedMessages.slice(index, index + CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE);
+    for (let index = 0; index < visibleConversations.length; index += CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE) {
+      const batch = visibleConversations.slice(index, index + CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE);
       const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: batch });
       hydratedMessages.push(...(Array.isArray(hydrated) ? hydrated : batch));
     }
-    const hydratedReplies = hydratedMessages.filter((message) => (
-      normalizeText(message && message.folder).toLowerCase() !== 'sent' &&
-      !isAutomatedCampaignReply(message)
-    ));
-    const hydratedSentMessages = hydratedMessages.filter((message) => (
-      normalizeText(message && message.folder).toLowerCase() === 'sent'
-    ));
-    return attachSentThreadMessages(hydratedReplies, hydratedSentMessages).slice(0, safeLimit);
+    return hydratedMessages.filter((message) => !isAutomatedCampaignReply(message));
   }
 
   return {
@@ -540,9 +559,11 @@ function createMailboxCampaignRepliesService(deps = {}) {
 
 module.exports = {
   CAMPAIGN_MAILBOX_ACCOUNTS,
+  CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_REPLY_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+  CAMPAIGN_SUBJECT_TERMS,
   attachSentThreadMessages,
   buildCampaignReply,
   createMailboxCampaignRepliesService,

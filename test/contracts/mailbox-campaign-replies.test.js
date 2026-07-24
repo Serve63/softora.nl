@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   attachSentThreadMessages,
@@ -255,6 +256,11 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
         requestedLimits[folder] = limit;
         return folder === 'sent' ? [sentReply] : [inboxMessage];
       },
+      listMatchingMessagesForAccounts: async ({ folder, limit }) => {
+        requestedFolders.push(`matching:${folder}`);
+        requestedLimits[`matching:${folder}`] = limit;
+        return folder === 'sent' ? [sentReply] : [inboxMessage];
+      },
       hydrateMessageBodies: async ({ messages }) => messages.map((message) => (
         message.id === 'sent:102'
           ? { ...message, body: 'Hoi Helma,\n\nIk bouw onze websites met maatwerk.' }
@@ -274,13 +280,15 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
 
   const replies = await service.listReplies({ limit: 100 });
 
-  assert.deepEqual(requestedFolders.sort(), ['inbox', 'sent']);
+  assert.deepEqual(requestedFolders.sort(), ['inbox', 'matching:inbox', 'matching:sent']);
   assert.equal(requestedLimits.inbox, CAMPAIGN_MESSAGE_SCAN_LIMIT);
-  assert.equal(requestedLimits.sent, CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT);
+  assert.equal(requestedLimits['matching:inbox'], CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT);
+  assert.equal(requestedLimits['matching:sent'], CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT);
   assert.equal(replies.length, 1);
   assert.equal(replies[0].threadMessages.length, 1);
   assert.equal(replies[0].threadMessages[0].id, 'sent:102');
-  assert.equal(replies[0].threadMessages[0].body, 'Hoi Helma,\n\nIk bouw onze websites met maatwerk.');
+  assert.equal(replies[0].threadMessages[0].body, undefined);
+  assert.equal(replies[0].threadMessages[0].preview, 'Hoi Helma, ik bouw onze websites...');
 });
 
 test('campaign reply service houdt vervolgreacties in één bestaande conversatie', async () => {
@@ -331,6 +339,9 @@ test('campaign reply service houdt vervolgreacties in één bestaande conversati
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {
       listMessagesForAccounts: async ({ folder }) => (
+        folder === 'sent' ? [sentReply] : [latestReply, firstReply]
+      ),
+      listMatchingMessagesForAccounts: async ({ folder }) => (
         folder === 'sent' ? [sentReply] : [latestReply, firstReply]
       ),
       hydrateMessageBodies: async ({ messages }) => messages.map((message) => ({
@@ -413,11 +424,12 @@ test('campaign reply service houdt historische vervolgreacties binnen een begren
   const requestedMethods = [];
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {
-      listMessagesForAccounts: async () => {
-        throw new Error('De begrensde query hoort niet gebruikt te worden.');
+      listMessagesForAccounts: async ({ folder, limit }) => {
+        requestedMethods.push([`recent:${folder}`, limit]);
+        return folder === 'inbox' ? [inboxMessage] : [];
       },
-      listAllMessagesForAccounts: async ({ folder, limit }) => {
-        requestedMethods.push([folder, limit]);
+      listMatchingMessagesForAccounts: async ({ folder, limit }) => {
+        requestedMethods.push([`matching:${folder}`, limit]);
         return folder === 'sent' ? sentMessages : [inboxMessage];
       },
       hydrateMessageBodies: async ({ messages }) => messages.map((message) => ({
@@ -439,8 +451,9 @@ test('campaign reply service houdt historische vervolgreacties binnen een begren
   const replies = await service.listReplies({ limit: 100 });
 
   assert.deepEqual(requestedMethods, [
-    ['inbox', CAMPAIGN_MESSAGE_SCAN_LIMIT],
-    ['sent', CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT],
+    ['recent:inbox', CAMPAIGN_MESSAGE_SCAN_LIMIT],
+    ['matching:inbox', CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT],
+    ['matching:sent', CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT],
   ]);
   assert.equal(replies.length, 1);
   assert.equal(
@@ -452,11 +465,57 @@ test('campaign reply service houdt historische vervolgreacties binnen een begren
     replies[0].threadMessages.map((message) => message.id),
     ['sent:149', 'sent:111']
   );
-  assert.deepEqual(
-    replies[0].threadMessages.map((message) => message.body),
-    [
-      'Hoi Ralph, misschien heb je mijn mailtje gemist.',
-      'Hoi Ralph, dankjewel voor je reactie.',
-    ]
-  );
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.body), [undefined, undefined]);
+});
+
+test('campaign reply service hydrateert alleen de zichtbare conversatieroots en niet alle threadbodies', async () => {
+  const hydratedIds = [];
+  const replies = Array.from({ length: 140 }, (_item, index) => ({
+    id: `inbox:${index + 1}`,
+    uid: index + 1,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: `lead-${index + 1}@example.nl`,
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: `Reactie ${index + 1}`,
+    date: new Date(Date.UTC(2026, 6, 24, 12, index % 60)).toISOString(),
+    messageId: `<reply-${index + 1}@example.nl>`,
+  }));
+  const sent = replies.flatMap((reply, index) => Array.from({ length: 12 }, (_item, threadIndex) => ({
+    id: `sent:${index + 1}-${threadIndex + 1}`,
+    folder: 'sent',
+    accountEmail: reply.accountEmail,
+    to: reply.email,
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Grote historische body blijft ongehydrateerd.',
+    body: '',
+    date: new Date(Date.UTC(2026, 6, 25, threadIndex, 0)).toISOString(),
+  })));
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async () => replies,
+      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'sent' ? sent : replies),
+      hydrateMessageBodies: async ({ messages }) => {
+        hydratedIds.push(...messages.map((message) => message.id));
+        return messages.map((message) => ({ ...message, body: `Volledig ${message.id}` }));
+      },
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async ({ emails }) => emails.map((email) => ({
+        id: email,
+        bedrijf: email,
+        email,
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      })),
+    },
+  });
+
+  const messages = await service.listReplies({ limit: 100 });
+
+  assert.equal(messages.length, 100);
+  assert.equal(hydratedIds.length, 100);
+  assert.ok(hydratedIds.every((id) => id.startsWith('inbox:')));
+  assert.ok(messages.every((message) => message.threadMessages.length === 12));
+  assert.ok(messages.every((message) => message.threadMessages.every((thread) => !thread.body)));
 });
