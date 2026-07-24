@@ -193,7 +193,7 @@ function summarizeMailboxBounceStats(messages, options = {}) {
     if (!message || typeof message !== 'object') return;
     if (normalizeString(message.deleted_at || message.deletedAt)) return;
     const folder = normalizeString(message.folder).toLowerCase();
-    if (folder && folder !== 'inbox') return;
+    if (folder && folder !== 'inbox' && folder !== 'coldmail') return;
     if (!isMailboxBounceMessage(message)) return;
     bounceMessages += 1;
 

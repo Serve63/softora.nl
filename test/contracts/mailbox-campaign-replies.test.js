@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  CAMPAIGN_INCOMING_FOLDERS,
   CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
@@ -220,6 +221,107 @@ test('campaign mailbox removes duplicate IMAP rows for the same internet message
   ]);
 
   assert.deepEqual(messages.map((message) => message.id), ['inbox:7', 'inbox:8']);
+});
+
+test('campaign mailbox prefers exact Gmail label provenance over a stale Inbox copy', () => {
+  const messages = dedupeCampaignMessages([
+    {
+      id: 'inbox:7',
+      uid: 7,
+      folder: 'inbox',
+      accountEmail: 'servec321@gmail.com',
+      messageId: '<same-filtered-reply@example.com>',
+    },
+    {
+      id: 'coldmail:91',
+      uid: 91,
+      folder: 'coldmail',
+      accountEmail: 'servec321@gmail.com',
+      messageId: '<same-filtered-reply@example.com>',
+    },
+  ]);
+
+  assert.deepEqual(CAMPAIGN_INCOMING_FOLDERS, ['coldmail', 'inbox']);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].id, 'coldmail:91');
+  assert.deepEqual(messages[0].sourceFolders.sort(), ['coldmail', 'inbox']);
+});
+
+test('campaign reply service shows filtered replies and bounces once without exposing labeled own sent mail', async () => {
+  const filteredReply = {
+    id: 'coldmail:20',
+    uid: 20,
+    folder: 'coldmail',
+    accountEmail: 'servec321@gmail.com',
+    from: 'Klant',
+    email: 'klant@example.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dank voor je ontwerp.',
+    date: '2026-07-25T10:00:00.000Z',
+    messageId: '<reply@example.nl>',
+  };
+  const staleInboxCopy = {
+    ...filteredReply,
+    id: 'inbox:10',
+    uid: 10,
+    folder: 'inbox',
+  };
+  const filteredBounce = {
+    id: 'coldmail:21',
+    uid: 21,
+    folder: 'coldmail',
+    accountEmail: 'servec321@gmail.com',
+    from: 'Mail Delivery Subsystem',
+    email: 'mailer-daemon@googlemail.com',
+    subject: 'Adres niet gevonden',
+    preview: 'Je bericht is niet bezorgd aan oud@example.nl.',
+    date: '2026-07-25T10:05:00.000Z',
+    messageId: '<bounce@googlemail.com>',
+  };
+  const labeledOwnSent = {
+    id: 'coldmail:22',
+    uid: 22,
+    folder: 'coldmail',
+    accountEmail: 'servec321@gmail.com',
+    from: 'Servé Creusen',
+    email: 'servec321@gmail.com',
+    to: 'klant@example.nl',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-25T09:00:00.000Z',
+    messageId: '<sent@gmail.com>',
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => (
+        folder === 'coldmail'
+          ? [filteredBounce, filteredReply, labeledOwnSent]
+          : [staleInboxCopy]
+      ),
+      listMatchingMessagesForAccounts: async ({ folder }) => (
+        folder === 'coldmail'
+          ? [filteredReply, labeledOwnSent]
+          : folder === 'inbox'
+            ? [staleInboxCopy]
+            : []
+      ),
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'klant',
+        bedrijf: 'Klant BV',
+        email: 'klant@example.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100 });
+
+  assert.deepEqual(replies.map((message) => message.id), ['coldmail:21', 'coldmail:20']);
+  assert.equal(replies.filter((message) => message.messageId === '<reply@example.nl>').length, 1);
+  assert.equal(replies.some((message) => message.id === 'coldmail:22'), false);
 });
 
 test('campaign mailbox sorteert gesprekken op hun nieuwste echte activiteit', () => {
@@ -469,8 +571,16 @@ test('campaign reply service koppelt een later verzonden antwoord aan dezelfde o
 
   const replies = await service.listReplies({ limit: 100 });
 
-  assert.deepEqual(requestedFolders.sort(), ['inbox', 'matching:inbox', 'matching:sent']);
+  assert.deepEqual(requestedFolders.sort(), [
+    'coldmail',
+    'inbox',
+    'matching:coldmail',
+    'matching:inbox',
+    'matching:sent',
+  ]);
+  assert.equal(requestedLimits.coldmail, CAMPAIGN_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits.inbox, CAMPAIGN_MESSAGE_SCAN_LIMIT);
+  assert.equal(requestedLimits['matching:coldmail'], CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits['matching:inbox'], CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT);
   assert.equal(requestedLimits['matching:sent'], CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT);
   assert.equal(replies.length, 1);
@@ -640,7 +750,9 @@ test('campaign reply service houdt historische vervolgreacties binnen een begren
   const replies = await service.listReplies({ limit: 100 });
 
   assert.deepEqual(requestedMethods, [
+    ['recent:coldmail', CAMPAIGN_MESSAGE_SCAN_LIMIT],
     ['recent:inbox', CAMPAIGN_MESSAGE_SCAN_LIMIT],
+    ['matching:coldmail', CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT],
     ['matching:inbox', CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT],
     ['matching:sent', CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT],
   ]);

@@ -7,6 +7,7 @@ const {
 const CAMPAIGN_SYNC_INDEX_SCAN_LIMIT = 500;
 const CAMPAIGN_SYNC_UID_SCAN_LIMIT = 5000;
 const CAMPAIGN_SYNC_FETCH_LIMIT = 4;
+const CAMPAIGN_GMAIL_LABEL_FOLDER = 'coldmail';
 
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'aol.com',
@@ -66,12 +67,94 @@ function selectMailboxSyncAccounts({
   normalizeEmail,
   campaignOnly = false,
 } = {}) {
-  if (accountEmail) return [assertReadableAccount(accountEmail)];
+  const campaignAccounts = new Set(CAMPAIGN_MAILBOX_ACCOUNTS.map(normalizeEmail));
+  if (accountEmail) {
+    const account = assertReadableAccount(accountEmail);
+    if (!campaignOnly || campaignAccounts.has(normalizeEmail(account.email))) return [account];
+    return [];
+  }
   const readableAccounts = (Array.isArray(accounts) ? accounts : [])
     .filter((account) => account && account.imapConfigured);
   if (!campaignOnly) return readableAccounts;
-  const campaignAccounts = new Set(CAMPAIGN_MAILBOX_ACCOUNTS.map(normalizeEmail));
   return readableAccounts.filter((account) => campaignAccounts.has(normalizeEmail(account.email)));
+}
+
+function isGmailImapAccount(account = {}) {
+  const host = String(account?.imapHost || '').trim().toLowerCase();
+  return host === 'imap.gmail.com' || host === 'imap.googlemail.com';
+}
+
+function getMailboxSyncFoldersForAccount({
+  account,
+  folders = [],
+  campaignOnly = false,
+  normalizeFolder = (value) => String(value || '').trim().toLowerCase(),
+} = {}) {
+  const normalizedFolders = (Array.isArray(folders) ? folders : [])
+    .map(normalizeFolder)
+    .filter(Boolean);
+  if (campaignOnly && !isGmailImapAccount(account)) {
+    return Array.from(new Set(
+      normalizedFolders.filter((folder) => folder !== CAMPAIGN_GMAIL_LABEL_FOLDER)
+    ));
+  }
+  if (campaignOnly) {
+    normalizedFolders.push(CAMPAIGN_GMAIL_LABEL_FOLDER);
+  }
+  return Array.from(new Set(normalizedFolders));
+}
+
+async function syncMailboxRequest({
+  syncMailbox,
+  method = '',
+  body = {},
+  query = {},
+  normalizeFolder,
+  defaultFolders = ['inbox', 'sent'],
+  defaultLimit = 50,
+  cronLimit = 30,
+} = {}) {
+  const payload = body && typeof body === 'object' ? body : {};
+  const params = query && typeof query === 'object' ? query : {};
+  const folderParam = payload.folder || params.folder || '';
+  const accountEmail = payload.account || params.account || '';
+  const fallbackLimit = String(method || '').toUpperCase() === 'GET' ? cronLimit : defaultLimit;
+  const requestedLimit = payload.limit || params.limit || fallbackLimit;
+  const folders = folderParam
+    ? String(folderParam).split(',').map(normalizeFolder).filter(Boolean)
+    : defaultFolders;
+  const force = Boolean(payload.force || params.force === '1' || params.force === 'true');
+  const campaignOnly = Boolean(
+    payload.campaignOnly ||
+    params.campaignOnly === '1' ||
+    params.campaignOnly === 'true'
+  );
+  const result = await syncMailbox({
+    accountEmail,
+    folders,
+    limit: Number(requestedLimit) || fallbackLimit,
+    force,
+    campaignOnly,
+  });
+  if (
+    String(method || '').toUpperCase() === 'GET' &&
+    !accountEmail &&
+    !folderParam &&
+    !campaignOnly
+  ) {
+    const coldmailResult = await syncMailbox({
+      folders: [CAMPAIGN_GMAIL_LABEL_FOLDER],
+      limit: Number(requestedLimit) || fallbackLimit,
+      force,
+      campaignOnly: true,
+    });
+    result.ok = result.ok && coldmailResult.ok;
+    result.results = [
+      ...(Array.isArray(result.results) ? result.results : []),
+      ...(Array.isArray(coldmailResult.results) ? coldmailResult.results : []),
+    ];
+  }
+  return result;
 }
 
 function createMailboxSyncService({
@@ -111,6 +194,7 @@ function createMailboxSyncService({
     try {
       const oldestIndexedCampaignUid =
         campaignOnly &&
+        normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER &&
         typeof mailboxIndexStore.getOldestMatchingMessageUid === 'function'
           ? await mailboxIndexStore.getOldestMatchingMessageUid({
               accountEmail: account.email,
@@ -188,7 +272,8 @@ function createMailboxSyncService({
         limit: campaignOnly
           ? Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
           : getSafeLimit(limit),
-        campaignHistory: campaignOnly,
+        campaignHistory:
+          campaignOnly && normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER,
         oldestIndexedCampaignUid,
         threadReferenceIds,
         threadRecipientTerms,
@@ -246,11 +331,17 @@ function createMailboxSyncService({
       normalizeEmail,
       campaignOnly,
     });
-    const folderList = Array.from(
+    const requestedFolders = Array.from(
       new Set((Array.isArray(folders) && folders.length ? folders : defaultFolders).map(normalizeFolder))
     );
     const results = [];
     for (const account of accounts) {
+      const folderList = getMailboxSyncFoldersForAccount({
+        account,
+        folders: requestedFolders,
+        campaignOnly,
+        normalizeFolder,
+      });
       for (const folder of folderList) {
         try {
           results.push(await syncMailboxFolder({
@@ -284,11 +375,15 @@ function createMailboxSyncService({
 }
 
 module.exports = {
+  CAMPAIGN_GMAIL_LABEL_FOLDER,
   CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
   collectCampaignThreadRecipientTerms,
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,
+  getMailboxSyncFoldersForAccount,
+  isGmailImapAccount,
   selectMailboxSyncAccounts,
+  syncMailboxRequest,
 };

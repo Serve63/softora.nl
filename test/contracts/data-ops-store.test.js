@@ -174,7 +174,8 @@ test('data ops store reads bounce candidates per mailbox and filters without a t
   const accountQueries = [];
   const rowsByAccount = {
     'serve@softora.nl': [
-      { message_key: 'serve|1', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Returned Mail: test', date: '2026-07-10T10:00:00.000Z' },
+      { message_key: 'serve|1', message_id: '<same-bounce@example.net>', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Returned Mail: test', date: '2026-07-10T10:00:00.000Z' },
+      { message_key: 'serve|coldmail|1', message_id: '<same-bounce@example.net>', account_email: 'serve@softora.nl', folder: 'coldmail', subject: 'Returned Mail: test', date: '2026-07-10T10:01:00.000Z' },
       { message_key: 'serve|2', account_email: 'serve@softora.nl', folder: 'inbox', subject: 'Gewone reactie', date: '2026-07-10T11:00:00.000Z' },
     ],
     'martijn@softora.nl': [
@@ -207,13 +208,13 @@ test('data ops store reads bounce candidates per mailbox and filters without a t
 
   const rows = await store.listMailboxMessages({
     accountEmails: ['serve@softora.nl', 'martijn@softora.nl'],
-    folders: ['inbox'],
+    folders: ['inbox', 'coldmail'],
     maxRows: 1000,
     bounceCandidatesOnly: true,
   });
 
   assert.deepEqual(accountQueries.sort(), ['martijn@softora.nl', 'serve@softora.nl']);
-  assert.deepEqual(rows.map((row) => row.message_key), ['martijn|1', 'serve|1']);
+  assert.deepEqual(rows.map((row) => row.message_key), ['martijn|1', 'serve|coldmail|1']);
 });
 
 test('data ops store saves cancelled webdesign batches with a table-compatible status', async () => {

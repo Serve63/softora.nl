@@ -21,6 +21,7 @@ const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
   'Kleine vraag over jullie website',
   'Nieuw webdesign',
 ]);
+const CAMPAIGN_INCOMING_FOLDERS = Object.freeze(['coldmail', 'inbox']);
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -480,15 +481,68 @@ function isCampaignReplySubject(message) {
 }
 
 function dedupeCampaignMessages(messages) {
-  const seen = new Set();
-  return (Array.isArray(messages) ? messages : []).filter((message) => {
+  const messagesByIdentity = new Map();
+  (Array.isArray(messages) ? messages : []).forEach((message) => {
     const messageId = normalizeMessageId(message && message.messageId);
-    if (!messageId) return true;
-    const key = `${normalizeEmail(message && message.accountEmail)}|${messageId}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+    const account = normalizeEmail(message && message.accountEmail);
+    const folder = normalizeText(message && message.folder).toLowerCase();
+    const fallbackId = normalizeText(message && (message.uid || message.id));
+    const key = messageId
+      ? `${account}|message:${messageId}`
+      : `${account}|folder:${folder}|item:${fallbackId}`;
+    if (!key) return;
+    const existing = messagesByIdentity.get(key);
+    const sourceFolders = Array.from(new Set([
+      ...(Array.isArray(existing?.sourceFolders) ? existing.sourceFolders : []),
+      normalizeText(existing?.folder).toLowerCase(),
+      ...(Array.isArray(message?.sourceFolders) ? message.sourceFolders : []),
+      folder,
+    ].filter(Boolean)));
+    const preferCandidate =
+      !existing ||
+      (folder === 'coldmail' && normalizeText(existing.folder).toLowerCase() !== 'coldmail');
+    messagesByIdentity.set(key, {
+      ...(preferCandidate ? message : existing),
+      sourceFolders,
+    });
   });
+  return Array.from(messagesByIdentity.values());
+}
+
+function hasCampaignLabelProvenance(message) {
+  return [
+    normalizeText(message && message.folder).toLowerCase(),
+    ...(Array.isArray(message?.sourceFolders) ? message.sourceFolders : []),
+  ].includes('coldmail');
+}
+
+function isExternalCampaignMessage(message) {
+  const account = normalizeEmail(message && message.accountEmail);
+  const sender = normalizeEmail(message && message.email);
+  return Boolean(sender && (!account || sender !== account));
+}
+
+function shouldShowCampaignMessage(message) {
+  return hasCampaignLabelProvenance(message)
+    ? isExternalCampaignMessage(message)
+    : !isAutomatedCampaignReply(message);
+}
+
+async function listMessagesAcrossFolders({
+  mailboxIndexStore,
+  method,
+  folders = CAMPAIGN_INCOMING_FOLDERS,
+  options = {},
+} = {}) {
+  if (!mailboxIndexStore || typeof mailboxIndexStore[method] !== 'function') return [];
+  const batches = await Promise.all(
+    folders.map((folder) => mailboxIndexStore[method]({
+      ...options,
+      folder,
+    }))
+  );
+  if (batches.some((batch) => !Array.isArray(batch))) return null;
+  return dedupeCampaignMessages(batches.flat());
 }
 
 function normalizeKey(value) {
@@ -600,23 +654,32 @@ function createMailboxCampaignRepliesService(deps = {}) {
       throw error;
     }
 
-    const recentMessages = await mailboxIndexStore.listMessagesForAccounts({
-      accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-      folder: 'inbox',
-      limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+    const recentMessages = await listMessagesAcrossFolders({
+      mailboxIndexStore,
+      method: 'listMessagesForAccounts',
+      options: {
+        accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+        limit: CAMPAIGN_MESSAGE_SCAN_LIMIT,
+      },
     });
     const matchingMessages = typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
-      ? await mailboxIndexStore.listMatchingMessagesForAccounts({
-          accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-          folder: 'inbox',
-          subjectTerms: CAMPAIGN_SUBJECT_TERMS,
-          limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+      ? await listMessagesAcrossFolders({
+          mailboxIndexStore,
+          method: 'listMatchingMessagesForAccounts',
+          options: {
+            accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+            subjectTerms: CAMPAIGN_SUBJECT_TERMS,
+            limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+          },
         })
       : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-        ? await mailboxIndexStore.listAllMessagesForAccounts({
-            accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
-            folder: 'inbox',
-            limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+        ? await listMessagesAcrossFolders({
+            mailboxIndexStore,
+            method: 'listAllMessagesForAccounts',
+            options: {
+              accountEmails: CAMPAIGN_MAILBOX_ACCOUNTS,
+              limit: CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
+            },
           })
         : [];
     const messages = Array.isArray(recentMessages) && Array.isArray(matchingMessages)
@@ -631,7 +694,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
 
     const campaignMessages = dedupeCampaignMessages(
       messages
-        .filter((message) => !isAutomatedCampaignReply(message))
+        .filter(shouldShowCampaignMessage)
         .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0))
     );
     if (!campaignMessages.length) return [];
@@ -662,7 +725,13 @@ function createMailboxCampaignRepliesService(deps = {}) {
     const replies = campaignMessages
       .map((message) => {
         const customer = campaignCustomerByEmail.get(normalizeEmail(message && message.email));
-        if (!customer && !isCampaignReplySubject(message)) return null;
+        if (
+          !customer &&
+          !isCampaignReplySubject(message) &&
+          !hasCampaignLabelProvenance(message)
+        ) {
+          return null;
+        }
         return buildCampaignReply(message, customer || null);
       })
       .filter(Boolean);
@@ -715,7 +784,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: batch });
       hydratedMessages.push(...(Array.isArray(hydrated) ? hydrated : batch));
     }
-    return hydratedMessages.filter((message) => !isAutomatedCampaignReply(message));
+    return hydratedMessages.filter(shouldShowCampaignMessage);
   }
 
   return {
@@ -724,6 +793,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
 }
 
 module.exports = {
+  CAMPAIGN_INCOMING_FOLDERS,
   CAMPAIGN_MAILBOX_ACCOUNTS,
   CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
@@ -741,10 +811,14 @@ module.exports = {
   getMessageReferenceLookupValues,
   getExactCrossAccountSentCopy,
   getExactMessageLineage,
+  hasCampaignLabelProvenance,
   isAutomatedCampaignReply,
   isCampaignReplySubject,
+  isExternalCampaignMessage,
   isSentReplyForMessage,
   isOwnMailboxCampaignCustomer,
   isWebdesignCampaignCustomer,
+  listMessagesAcrossFolders,
   normalizeOutreachStatus,
+  shouldShowCampaignMessage,
 };

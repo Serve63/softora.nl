@@ -89,6 +89,26 @@ test('campaign history sync searches both coldmail subjects from campaign start'
   assert.deepEqual(options, [{ uid: true }, { uid: true }, { uid: true }]);
 });
 
+test('narrow Gmail label sync advances through unindexed messages without campaign-wide searches', async () => {
+  const queries = [];
+  const client = {
+    async search(query, options) {
+      queries.push({ query, options });
+      return [1, 2, 3, 4, 5, 6];
+    },
+  };
+
+  const selected = await resolveMailboxSyncUids({
+    client,
+    limit: 2,
+    campaignHistory: false,
+    indexedUids: [5, 6],
+  });
+
+  assert.deepEqual(selected, [4, 3]);
+  assert.deepEqual(queries, [{ query: { all: true }, options: { uid: true } }]);
+});
+
 test('campaign history sync prioritizes missing sent replies linked by thread headers', async () => {
   const queries = [];
   const client = {
