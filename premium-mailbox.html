@@ -79,13 +79,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .mail-item.active { background: rgba(155,35,85,.05); }
 .mail-item-open { min-height: 52px; padding: 0 12px 0 28px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; flex: 1; min-width: 0; }
 .mail-item-open:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: -3px; border-radius: 4px; }
-.mail-item-delete { width: 34px; height: 34px; margin: auto 10px auto 0; padding: 0; border: 1px solid rgba(155,35,85,.28); border-radius: 6px; background: var(--card); color: var(--crimson); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease; }
-.mail-item-delete:hover { border-color: var(--crimson); background: rgba(155,35,85,.08); box-shadow: 0 2px 7px rgba(24,24,36,.08); }
-.mail-item-delete:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; }
-.mail-item-delete svg { width: 16px; height: 16px; }
 .unread-dot { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; background: var(--crimson); border-radius: 50%; }
 .mail-item-top { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .mail-from { flex: 1; font-size: 14px; font-weight: 400; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mail-copy-badge { display: inline-flex; margin-left: 7px; padding: 2px 6px; border-radius: 999px; background: rgba(155,35,85,.1); color: var(--crimson); font-size: 9px; font-weight: 800; line-height: 1.2; vertical-align: 1px; }
 .mail-item.unread .mail-from { font-weight: 600; }
 .mail-time { flex-shrink: 0; color: var(--text-light); white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.15; text-align: right; }
 .mail-date-label { font-size: 10px; font-weight: 600; }
@@ -104,14 +101,29 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .detail-subject { flex: 1; min-width: 0; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: clamp(19px, 1.5vw, 24px); font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow-wrap: anywhere; }
 .detail-head-tools { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; }
 .detail-date { font-size: 12px; color: var(--text-light); white-space: nowrap; }
+.detail-hide-conversation { width: 32px; height: 32px; padding: 0; border: 1px solid rgba(155,35,85,.2); border-radius: 50%; background: var(--card); color: var(--crimson); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.detail-hide-conversation:hover { border-color: var(--crimson); background: rgba(155,35,85,.06); }
+.detail-hide-conversation:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; }
+.detail-hide-conversation svg { width: 16px; height: 16px; }
 .detail-meta { display: flex; align-items: center; min-width: 0; margin-top: 18px; }
 .detail-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .detail-from-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .detail-from { font-size: 14px; line-height: 1.35; font-weight: 700; color: var(--text-dark); overflow-wrap: anywhere; }
 .detail-email { margin-top: 1px; font-size: 12px; line-height: 1.4; color: var(--text-light); overflow-wrap: anywhere; }
 .detail-campaign-account { margin-top: 5px; color: var(--crimson); font-size: 12px; line-height: 1.35; font-weight: 500; }
+.detail-routing { display: grid; gap: 6px; margin-top: 16px; padding: 12px 14px; border: 1px solid rgba(155,35,85,.18); border-radius: 6px; background: rgba(155,35,85,.04); font-size: 12px; line-height: 1.45; }
+.detail-routing div { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 8px; min-width: 0; }
+.detail-routing span { color: var(--text-light); font-weight: 700; }
+.detail-routing strong { min-width: 0; color: var(--text-dark); font-weight: 600; overflow-wrap: anywhere; }
+.detail-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+.detail-attachment { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: #f8f4f6; font-size: 12px; }
+.detail-attachment strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-attachment small { color: var(--text-light); white-space: nowrap; }
 .detail-divider { margin: 0 24px; border-top: 1px solid var(--border); }
 .detail-body-text { max-width: 100%; overflow-x: hidden; padding: 24px; background: var(--card); border: 0; border-radius: 0; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: 14px; line-height: 1.75; color: var(--text-dark); white-space: normal; overflow-wrap: anywhere; word-break: break-word; display: flex; flex-direction: column; gap: 16px; }
+.detail-message-meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; margin-bottom: -8px; color: var(--text-light); font-size: 12px; line-height: 1.4; }
+.detail-message-time { font-weight: 700; color: var(--text-mid); }
+.detail-message-sender { overflow-wrap: anywhere; }
 .detail-body-text img { max-width: 100%; height: auto; display: block; }
 .detail-mail-image { margin: 8px 0; max-width: min(640px, 100%); } .detail-mail-image img { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 .detail-mail-image-caption { color: var(--text-mid); font-weight: 600; }
@@ -127,7 +139,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .detail-mail-cta-link:hover { color: #004b91; text-decoration-thickness: 2px; }
 .detail-mail-cta-link:focus-visible { outline: 2px solid rgba(5,99,193,.45); outline-offset: 2px; border-radius: 2px; }
 .detail-mail-section-label { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--crimson); }
-.detail-mail-section-quote { padding: 18px; border-radius: 6px; background: #f8f4ef; border-left: 3px solid rgba(155,35,85,.24); }
+.detail-mail-section-history { padding-top: 14px; border-top: 1px solid var(--border); background: transparent; }
+.detail-mail-section-history-sent { padding: 18px; border-radius: 6px; background: rgba(155,35,85,.055); border-left: 3px solid rgba(155,35,85,.42); }
 .detail-mail-section-sent { padding: 18px; border-radius: 6px; background: rgba(155,35,85,.055); border-left: 3px solid rgba(155,35,85,.42); }
 .detail-mail-section-received { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .detail-mail-quote-meta { font-size: 12px; color: var(--text-light); }
@@ -151,6 +164,14 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .compose-field { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .compose-field-label { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-light); padding: 14px 16px; width: 92px; flex-shrink: 0; }
 .compose-field input { flex: 1; padding: 14px 16px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); outline: none; background: transparent; }
+.compose-copy-toggle,.compose-attach-button { border: 0; background: transparent; color: var(--crimson); font: 700 12px/1 var(--premium-sidebar-font-sans, 'Inter', sans-serif); cursor: pointer; padding: 10px 14px; }
+.compose-copy-toggle:focus-visible,.compose-attach-button:focus-visible,.compose-attachment-chip button:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; }
+.compose-copy-fields[hidden] { display: none; }
+.compose-attachment-row { min-height: 46px; padding: 7px 10px; gap: 8px; flex-wrap: wrap; }
+.compose-attachment-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.compose-attachment-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 999px; background: #f8f4f6; color: var(--text-dark); font-size: 12px; }
+.compose-attachment-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compose-attachment-chip button { border: 0; background: transparent; color: var(--crimson); cursor: pointer; font-size: 16px; line-height: 1; padding: 0; }
 .compose-body { padding: 0; display: flex; flex: 1; min-height: 0; }
 .compose-body textarea { flex: 1; width: 100%; min-height: 360px; padding: 18px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); resize: none; outline: none; background: transparent; line-height: 1.7; }
 .compose-footer { padding: 14px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -163,8 +184,11 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .btn-send:hover { background: var(--crimson-light); }
 
 /* TOAST */
-.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--text-dark); color: #fff; padding: 10px 18px; border-radius: 5px; font-size: 13px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 99; white-space: nowrap; }
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--text-dark); color: #fff; padding: 10px 18px; border-radius: 5px; font-size: 13px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 99; white-space: nowrap; display: inline-flex; align-items: center; gap: 12px; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.toast-action { border: 0; padding: 0; background: transparent; color: #fff; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.toast-action:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.toast-action:disabled { opacity: .6; cursor: wait; }
 
 @media (max-width: 920px) {
   body { overflow: auto; }
@@ -432,8 +456,17 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
       <div class="compose-head-title">Nieuwe mail</div>
       <button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×</button>
     </div>
-    <div class="compose-field"><div class="compose-field-label">Aan</div><input type="email" id="c-to" placeholder="ontvanger@email.nl"></div>
+    <div class="compose-field"><div class="compose-field-label">Aan</div><input type="email" id="c-to" placeholder="ontvanger@email.nl"><button class="compose-copy-toggle" type="button" data-mailbox-action="toggle-copy-fields" aria-controls="c-copy-fields">CC/BCC</button></div>
+    <div class="compose-copy-fields" id="c-copy-fields" hidden>
+      <div class="compose-field"><div class="compose-field-label">CC</div><input type="text" id="c-cc" inputmode="email" placeholder="Optionele ontvangers, gescheiden door komma’s"></div>
+      <div class="compose-field"><div class="compose-field-label">BCC</div><input type="text" id="c-bcc" inputmode="email" placeholder="Optionele ontvangers, gescheiden door komma’s"></div>
+    </div>
     <div class="compose-field"><div class="compose-field-label">Onderwerp</div><input type="text" id="c-subject" placeholder="Onderwerp…"></div>
+    <div class="compose-field compose-attachment-row">
+      <input type="file" id="c-attachments" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+      <button class="compose-attach-button" type="button" data-mailbox-action="choose-attachments">📎 Bijlage toevoegen</button>
+      <div class="compose-attachment-list" id="c-attachment-list" aria-live="polite"></div>
+    </div>
     <div class="compose-body"><textarea id="c-body" placeholder="Typ je bericht hier…"></textarea></div>
     <div class="compose-footer">
       <button class="btn-rewrite-compose" type="button" data-mailbox-action="rewrite-compose">Voorgestelde reactie</button>
@@ -451,7 +484,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260724a"></script><script src="assets/premium-mailbox-images.js?v=20260724b"></script><script src="assets/premium-mailbox-display.js?v=20260724d"></script><script src="assets/premium-mailbox-list.js?v=20260723b"></script><script src="assets/premium-mailbox-index.js?v=20260724d"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260724b"></script><script src="assets/premium-mailbox-delete.js?v=20260723b"></script>
-<script src="assets/premium-mailbox.js?v=20260724e"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260724d"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260724d"></script><script src="assets/premium-mailbox-list.js?v=20260724b"></script><script src="assets/premium-mailbox-index.js?v=20260724e"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260724c"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260724a"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260724c"></script>
+<script src="assets/premium-mailbox.js?v=20260724j"></script>
 </body>
 </html>
