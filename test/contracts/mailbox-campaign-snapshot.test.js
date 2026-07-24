@@ -86,6 +86,8 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     bodyImageEvidenceKnown: true,
     embeddedImageCount: 1,
     originalCampaignOutbound: false,
+    webdesignLinkEvidenceKnown: false,
+    webdesignLinkUrl: '',
     bodyTruncated: false,
     bodyImagesTruncated: false,
     bodyImages: [{

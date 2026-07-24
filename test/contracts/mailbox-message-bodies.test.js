@@ -28,6 +28,10 @@ function createService(overrides = {}) {
           bodyImageEvidenceKnown: true,
           embeddedImageCount: message.id === 'sent:42' ? 2 : 0,
           originalCampaignOutbound: message.id === 'sent:42',
+          webdesignLinkEvidenceKnown: message.id === 'sent:42',
+          webdesignLinkUrl: message.id === 'sent:42'
+            ? 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1'
+            : '',
         }));
       },
     },
@@ -62,6 +66,8 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     bodyImageEvidenceKnown: true,
     embeddedImageCount: 2,
     originalCampaignOutbound: true,
+    webdesignLinkEvidenceKnown: true,
+    webdesignLinkUrl: 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1',
   }, {
     id: 'inbox:43',
     uid: 43,
@@ -73,6 +79,8 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     bodyImageEvidenceKnown: true,
     embeddedImageCount: 0,
     originalCampaignOutbound: false,
+    webdesignLinkEvidenceKnown: false,
+    webdesignLinkUrl: '',
   }]);
 });
 

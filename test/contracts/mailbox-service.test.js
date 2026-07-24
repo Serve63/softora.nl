@@ -1608,6 +1608,98 @@ test('mailbox service keeps link-only webdesign sends free of recovered image pl
   assert.deepEqual(requestedScopes, []);
 });
 
+test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink uit MIME-html', async () => {
+  const exactUrl =
+    'https://www.softora.nl/webdesign/salon-tof?cid=safe-row-247&sender=serve';
+  const plainBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website salontof.nl tegen.',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const client = createFakeImapClient({
+    boxes: [{ path: 'INBOX/Verstuurd' }],
+    messagesByMailbox: {
+      'INBOX/Verstuurd': [{
+        uid: 247,
+        flags: ['\\Seen'],
+        internalDate: new Date('2026-07-24T10:59:00.000Z'),
+        source: {
+          date: new Date('2026-07-24T10:59:00.000Z'),
+          text: plainBody,
+          html: [
+            '<p>Goedendag,</p>',
+            '<p>Afgelopen week kwam ik jullie website salontof.nl tegen.</p>',
+            '<p><a href="https://evil.example/webdesign/verkeerd">deze link</a></p>',
+            '<p>Bekijk onze referentie: <a href="https://www.softora.nl/webdesign/verkeerd">deze link</a>.</p>',
+            `<p>Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${exactUrl.replace('&', '&amp;')}">link</a> bekijken 🎨</p>`,
+            '<script>alert("xss")</script>',
+          ].join(''),
+          subject: 'Kleine vraag over jullie website',
+          from: { value: [{ name: 'Servé Creusen', address: 'serve@softora.nl' }] },
+          to: { value: [{ name: 'Salon TOF', address: 'info@salontof.nl' }] },
+          attachments: [],
+        },
+      }],
+    },
+  });
+  const upserts = [];
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      getMessage: async () => ({
+        id: 'sent:247',
+        uid: 247,
+        folder: 'sent',
+        accountEmail: 'serve@softora.nl',
+        subject: 'Kleine vraag over jullie website',
+        body: plainBody,
+        hasBody: true,
+        bodyTruncated: false,
+        bodyImageEvidenceKnown: true,
+        embeddedImageCount: 0,
+        originalCampaignOutbound: true,
+        webdesignLinkEvidenceKnown: false,
+        webdesignLinkUrl: '',
+        indexed: true,
+      }),
+      upsertMessages: async (payload) => {
+        upserts.push(payload);
+        return { ok: true };
+      },
+    },
+    createImapClient: () => client,
+    parseMailSource: async (source) => source,
+  });
+
+  const message = await service.getMessage({
+    accountEmail: 'serve@softora.nl',
+    folder: 'sent',
+    id: 'sent:247',
+  });
+
+  assert.match(
+    message.body,
+    new RegExp(`deze link \\[${exactUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`)
+  );
+  assert.doesNotMatch(message.body, /evil\.example|<script>|alert\(/);
+  assert.equal(message.webdesignLinkEvidenceKnown, true);
+  assert.equal(message.webdesignLinkUrl, exactUrl);
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].messages[0].webdesignLinkUrl, exactUrl);
+});
+
 test('mailbox service exposes hidden coldmail opt-out links for clickable mail previews', async () => {
   const client = createFakeImapClient({
     boxes: [{ path: 'INBOX/Verstuurd' }],

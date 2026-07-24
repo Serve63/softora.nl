@@ -64,6 +64,8 @@ function createMailboxMessageBodiesService({
         Math.min(8, Number(message && message.embeddedImageCount) || 0)
       ),
       originalCampaignOutbound: Boolean(message && message.originalCampaignOutbound),
+      webdesignLinkEvidenceKnown: Boolean(message && message.webdesignLinkEvidenceKnown),
+      webdesignLinkUrl: normalizeText(message && message.webdesignLinkUrl),
     }));
   }
 

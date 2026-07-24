@@ -98,6 +98,8 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
     source: 'imap-sync',
     embeddedImageCount: 0,
     originalCampaignOutbound: false,
+    webdesignLinkEvidenceKnown: false,
+    webdesignLinkUrl: '',
   });
 
   const listMessage = store.normalizeMessageRow(row);
@@ -108,6 +110,8 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(listMessage.bodyImageEvidenceKnown, true);
   assert.equal(listMessage.embeddedImageCount, 0);
   assert.equal(listMessage.originalCampaignOutbound, false);
+  assert.equal(listMessage.webdesignLinkEvidenceKnown, false);
+  assert.equal(listMessage.webdesignLinkUrl, '');
 
   const detailMessage = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(detailMessage.body, 'Volledige tekst');

@@ -104,6 +104,8 @@ function sanitizeThreadMessage(value, options = {}) {
       ? Math.max(0, Math.min(8, Number(source.embeddedImageCount) || 0))
       : 0,
     originalCampaignOutbound: source.originalCampaignOutbound === true,
+    webdesignLinkEvidenceKnown: source.webdesignLinkEvidenceKnown === true,
+    webdesignLinkUrl: text(source.webdesignLinkUrl, 4000),
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
     bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     bodyImages,
@@ -178,6 +180,8 @@ function sanitizeMessage(value, options = {}) {
       ? Math.max(0, Math.min(8, Number(source.embeddedImageCount) || 0))
       : 0,
     originalCampaignOutbound: source.originalCampaignOutbound === true,
+    webdesignLinkEvidenceKnown: source.webdesignLinkEvidenceKnown === true,
+    webdesignLinkUrl: text(source.webdesignLinkUrl, 4000),
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
     bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     indexed: source.indexed !== false,
