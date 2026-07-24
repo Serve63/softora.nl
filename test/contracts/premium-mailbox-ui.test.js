@@ -362,7 +362,10 @@ test('elk inkomend bericht toont datum tijd en afzender direct boven de eigen in
   );
   assert.doesNotMatch(scriptSource, /<div class="detail-date">/);
   assert.match(pageSource, /\.detail-message-meta \{[\s\S]*font-size:\s*12px;/);
-  assert.match(pageSource, /\.detail-message-time \{[\s\S]*font-weight:\s*700;/);
+  assert.match(
+    pageSource,
+    /\.detail-message-time \{\s*font-weight:\s*400;\s*color:\s*var\(--text-light\);\s*\}/
+  );
 });
 
 test('mailbox hydrateert elk afgekapt threadbericht wanneer een oud gesprek opent', async () => {
