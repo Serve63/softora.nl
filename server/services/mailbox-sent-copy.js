@@ -2,6 +2,7 @@ const { simpleParser } = require('mailparser');
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
+  coldmail: ['Softora / Coldmail', 'Softora/Coldmail'],
   sent: [
     'Sent',
     'Sent Items',
@@ -53,6 +54,7 @@ const FOLDER_SPECIAL_USES = {
 
 const FOLDER_LABELS = {
   inbox: 'Inbox',
+  coldmail: 'Softora / Coldmail',
   sent: 'Verzonden',
   drafts: 'Concepten',
   spam: 'Spam',

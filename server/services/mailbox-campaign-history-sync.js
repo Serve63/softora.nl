@@ -144,7 +144,13 @@ async function resolveMailboxSyncUids({
   folder = '',
 } = {}) {
   const allUids = await client.search({ all: true }, { uid: true });
-  if (!campaignHistory) return selectMailboxSyncUids({ allUids, limit });
+  if (!campaignHistory) {
+    return selectMailboxSyncUids({
+      allUids,
+      indexedUids,
+      limit,
+    });
+  }
 
   const campaignUids = [];
   for (const subject of CAMPAIGN_HISTORY_SUBJECT_TERMS) {

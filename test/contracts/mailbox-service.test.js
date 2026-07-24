@@ -3,9 +3,12 @@ const assert = require('node:assert/strict');
 
 const { createMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
 const {
+  CAMPAIGN_GMAIL_LABEL_FOLDER,
   CAMPAIGN_SYNC_FETCH_LIMIT,
   CAMPAIGN_SYNC_INDEX_SCAN_LIMIT,
   CAMPAIGN_SYNC_UID_SCAN_LIMIT,
+  createMailboxSyncService,
+  getMailboxSyncFoldersForAccount,
 } = require('../../server/services/mailbox-campaign-sync');
 const { registerMailboxRoutes } = require('../../server/routes/mailbox');
 const {
@@ -3271,6 +3274,210 @@ test('campaign mailbox sync skips configured accounts outside the campaign', asy
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(requestedAccounts, ['serve@softora.nl', 'serve@softora.nl']);
+});
+
+test('campaign mailbox sync adds the exact Gmail coldmail label only for Gmail campaign accounts', () => {
+  const normalizeFolder = (value) => String(value || '').trim().toLowerCase();
+
+  assert.deepEqual(
+    getMailboxSyncFoldersForAccount({
+      account: { email: 'servec321@gmail.com', imapHost: 'imap.gmail.com' },
+      folders: ['inbox', 'sent'],
+      campaignOnly: true,
+      normalizeFolder,
+    }),
+    ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]
+  );
+  assert.deepEqual(
+    getMailboxSyncFoldersForAccount({
+      account: { email: 'serve@softora.nl', imapHost: 'imap.strato.com' },
+      folders: ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER],
+      campaignOnly: true,
+      normalizeFolder,
+    }),
+    ['inbox', 'sent']
+  );
+});
+
+test('mailbox cron supplements normal folders with the Gmail campaign label', async () => {
+  const requestedFolders = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'servec321@gmail.com',
+      name: 'Servé',
+      imapHost: 'imap.gmail.com',
+      imapUser: 'servec321@gmail.com',
+      imapPass: 'app-password',
+    }]),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async ({ folder }) => {
+        requestedFolders.push(folder);
+        return { ok: false, locked: true };
+      },
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse({
+    method: 'GET',
+    query: {},
+    body: {},
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(requestedFolders, ['inbox', 'sent', CAMPAIGN_GMAIL_LABEL_FOLDER]);
+});
+
+test('campaign mailbox sync imports a future Skip Inbox reply from the exact Gmail label', async () => {
+  const client = createFakeImapClient({
+    boxes: [{ path: 'Softora / Coldmail' }],
+    messagesByMailbox: {
+      'Softora / Coldmail': [{
+        uid: 91,
+        flags: [],
+        internalDate: new Date('2026-07-25T10:00:00.000Z'),
+        source: Buffer.from(
+          'Message-ID: <filtered-reply@example.nl>\r\n' +
+          'Subject: Re: Kleine vraag over jullie website\r\n' +
+          'From: Klant <klant@example.nl>\r\n' +
+          'To: servec321@gmail.com\r\n\r\n' +
+          'Dank voor je ontwerp.'
+        ),
+      }],
+    },
+  });
+  const upserts = [];
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'servec321@gmail.com',
+      name: 'Servé',
+      imapHost: 'imap.gmail.com',
+      imapUser: 'servec321@gmail.com',
+      imapPass: 'app-password',
+    }]),
+    createImapClient: () => client,
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      acquireSyncLock: async () => ({ ok: true, lockToken: 'gmail-label-lock' }),
+      listMessageUidsForAccount: async () => [],
+      upsertMessages: async (options) => {
+        upserts.push(options);
+        return { ok: true, upserted: options.messages.length };
+      },
+      finishSync: async () => ({ ok: true }),
+    },
+  });
+  const response = createResponseRecorder();
+
+  await service.syncMailboxResponse({
+    method: 'POST',
+    query: {},
+    body: {
+      account: 'servec321@gmail.com',
+      folder: CAMPAIGN_GMAIL_LABEL_FOLDER,
+      campaignOnly: true,
+      force: true,
+    },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(client.lockedMailboxes, ['Softora / Coldmail']);
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].folder, CAMPAIGN_GMAIL_LABEL_FOLDER);
+  assert.equal(upserts[0].messages[0].messageId, '<filtered-reply@example.nl>');
+  assert.equal(response.body.results[0].synced, 1);
+});
+
+test('campaign mailbox sync excludes an explicitly requested non-campaign account', async () => {
+  let lockCalls = 0;
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => {
+        lockCalls += 1;
+        return { ok: false, locked: true };
+      },
+    },
+    assertReadableAccount: (email) => ({
+      email,
+      imapHost: 'imap.gmail.com',
+      imapConfigured: true,
+    }),
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async () => [],
+    getSafeLimit: (limit) => limit,
+    getAccounts: () => [],
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+  });
+
+  const result = await service.syncMailbox({
+    accountEmail: 'zakelijk@theimpactbox.co',
+    folders: ['inbox'],
+    campaignOnly: true,
+  });
+
+  assert.deepEqual(result, { ok: true, results: [] });
+  assert.equal(lockCalls, 0);
+});
+
+test('campaign Gmail label sync records a failure and succeeds on the next forced retry', async () => {
+  let attempts = 0;
+  const finished = [];
+  const service = createMailboxSyncService({
+    mailboxIndexStore: {
+      acquireSyncLock: async () => ({ ok: true, lockToken: `lock-${attempts + 1}` }),
+      listMessageUidsForAccount: async () => [],
+      upsertMessages: async ({ messages }) => ({ ok: true, upserted: messages.length }),
+      finishSync: async (options) => {
+        finished.push(options);
+        return { ok: true };
+      },
+    },
+    assertReadableAccount: (email) => ({
+      email,
+      imapHost: 'imap.gmail.com',
+      imapConfigured: true,
+    }),
+    canUseMailboxIndex: () => true,
+    fetchMessagesFromImap: async ({ folder, campaignHistory, indexedUids }) => {
+      attempts += 1;
+      assert.equal(folder, CAMPAIGN_GMAIL_LABEL_FOLDER);
+      assert.equal(campaignHistory, false);
+      assert.deepEqual(indexedUids, []);
+      if (attempts === 1) throw new Error('tijdelijke Gmail IMAP-fout');
+      return [{ uid: 91, id: 'coldmail:91' }];
+    },
+    getSafeLimit: (limit) => limit,
+    getAccounts: () => [],
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeFolder: (value) => String(value || '').trim().toLowerCase(),
+    logger: { error() {} },
+  });
+
+  const first = await service.syncMailbox({
+    accountEmail: 'servec321@gmail.com',
+    folders: [CAMPAIGN_GMAIL_LABEL_FOLDER],
+    campaignOnly: true,
+    force: true,
+  });
+  const second = await service.syncMailbox({
+    accountEmail: 'servec321@gmail.com',
+    folders: [CAMPAIGN_GMAIL_LABEL_FOLDER],
+    campaignOnly: true,
+    force: true,
+  });
+
+  assert.equal(first.ok, false);
+  assert.match(first.results[0].error, /tijdelijke Gmail IMAP-fout/);
+  assert.equal(second.ok, true);
+  assert.equal(second.results[0].synced, 1);
+  assert.match(String(finished[0].error), /tijdelijke Gmail IMAP-fout/);
+  assert.equal(finished[1].error, undefined);
 });
 
 test('mailbox cron sync indexes a lightweight sent batch by default', async () => {

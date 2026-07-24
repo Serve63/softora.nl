@@ -1226,8 +1226,8 @@ function createSoftoraDataOpsStore(deps = {}) {
           .filter(isBounceCandidate)
           .sort((left, right) => mailboxMessageTime(right) - mailboxMessageTime(left))
           .filter((row) => {
-            const key = normalizeString(row && row.message_key) ||
-              `${normalizeString(row && row.account_email)}|${normalizeString(row && row.folder)}|${normalizeString(row && row.uid)}`;
+            const key = normalizeString(row && row.message_id) ? `${normalizeString(row && row.account_email).toLowerCase()}|message:${normalizeString(row && row.message_id).toLowerCase()}` :
+              normalizeString(row && row.message_key) || `${normalizeString(row && row.account_email)}|${normalizeString(row && row.folder)}|${normalizeString(row && row.uid)}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;

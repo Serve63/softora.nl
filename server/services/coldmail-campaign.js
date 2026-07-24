@@ -3546,7 +3546,7 @@ function createColdmailCampaignService(deps = {}) {
       const accountEmails = configuredSenderEmails.length ? configuredSenderEmails : getAllowedSenderEmails();
       const messages = await dataOpsStore.listMailboxMessages({
         accountEmails,
-        folders: ['inbox'],
+        folders: ['inbox', 'coldmail'],
         maxRows: 1000,
         bounceCandidatesOnly: true,
         bypassReadFailureCooldown: true,

@@ -17,7 +17,10 @@ const {
 const {
   resolveMailboxSyncUids,
 } = require('./mailbox-campaign-history-sync');
-const { createMailboxSyncService } = require('./mailbox-campaign-sync');
+const {
+  createMailboxSyncService,
+  syncMailboxRequest,
+} = require('./mailbox-campaign-sync');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance');
 const {
@@ -105,6 +108,7 @@ const PERSONAL_MAILBOX_DOMAINS = new Set([
 
 const FOLDER_ALIASES = {
   inbox: ['INBOX'],
+  coldmail: ['Softora / Coldmail', 'Softora/Coldmail'],
   sent: [
     'Sent',
     'Sent Items',
@@ -152,6 +156,7 @@ const FOLDER_SPECIAL_USES = {
 
 const FOLDER_LABELS = {
   inbox: 'Inbox',
+  coldmail: 'Softora / Coldmail',
   sent: 'Verzonden',
   drafts: 'Concepten',
   spam: 'Spam',
@@ -2559,24 +2564,15 @@ function createMailboxService(deps = {}) {
 
   async function syncMailboxResponse(req, res) {
     try {
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const folderParam = body.folder || req.query?.folder || '';
-      const defaultLimit = String(req.method || '').toUpperCase() === 'GET'
-        ? CRON_SYNC_LIMIT
-        : DEFAULT_SYNC_LIMIT;
-      const requestedLimit = body.limit || req.query?.limit || defaultLimit;
-      const folders = folderParam
-        ? String(folderParam)
-            .split(',')
-            .map(normalizeFolder)
-            .filter(Boolean)
-        : DEFAULT_SYNC_FOLDERS;
-      const result = await syncMailbox({
-        accountEmail: body.account || req.query?.account || '',
-        folders,
-        limit: Number(requestedLimit) || defaultLimit,
-        force: Boolean(body.force || req.query?.force === '1' || req.query?.force === 'true'),
-        campaignOnly: Boolean(body.campaignOnly || req.query?.campaignOnly === '1' || req.query?.campaignOnly === 'true'),
+      const result = await syncMailboxRequest({
+        syncMailbox,
+        method: req.method,
+        body: req.body,
+        query: req.query,
+        normalizeFolder,
+        defaultFolders: DEFAULT_SYNC_FOLDERS,
+        defaultLimit: DEFAULT_SYNC_LIMIT,
+        cronLimit: CRON_SYNC_LIMIT,
       });
       return res.status(result.ok ? 200 : 207).json(result);
     } catch (error) {

@@ -105,6 +105,23 @@ test('mailbox bounce stats support multiple failed recipients in one DSN', () =>
   assert.equal(stats.duplicateNotices, 0);
 });
 
+test('mailbox bounce stats keep a filtered coldmail-label DSN visible', () => {
+  const stats = summarize([
+    {
+      folder: 'coldmail',
+      account_email: 'serve@softora.nl',
+      sender_email: 'mailer-daemon@googlemail.com',
+      subject: 'Adres niet gevonden',
+      body_text: 'Final-Recipient: rfc822; oud@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
+      date: '2026-07-16T09:00:00.000Z',
+    },
+  ], ['oud@example.test']);
+
+  assert.equal(stats.totalBounces, 1);
+  assert.equal(stats.bounceMessages, 1);
+  assert.equal(stats.bounceItems[0].email, 'oud@example.test');
+});
+
 test('bounce record merge deduplicates database and mailbox signals by recipient', () => {
   const records = mergeBounceRecords(
     [{ email: 'lead@example.test', type: 'soft', at: '2026-07-15T08:00:00.000Z' }],

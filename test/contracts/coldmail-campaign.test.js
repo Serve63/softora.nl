@@ -1093,6 +1093,7 @@ test('coldmail live stats requests only targeted mailbox bounce candidates', asy
   await service.getColdmailLiveStats();
 
   assert.equal(mailboxOptions.maxRows, 1000);
+  assert.deepEqual(mailboxOptions.folders, ['inbox', 'coldmail']);
   assert.equal(mailboxOptions.bounceCandidatesOnly, true);
   assert.equal(mailboxOptions.bypassReadFailureCooldown, true);
   assert.equal(mailboxOptions.suppressReadFailureCooldown, true);
