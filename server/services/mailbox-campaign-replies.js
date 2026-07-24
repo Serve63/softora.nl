@@ -112,6 +112,41 @@ function getExactCrossAccountSentCopy(message, sentMessages) {
   )) || null;
 }
 
+function getExactCrossAccountCopyKind(conversation, sentCopy) {
+  const copyAccountEmail = normalizeEmail(conversation && conversation.accountEmail);
+  if (!copyAccountEmail || !sentCopy) return { kind: '', evidence: '' };
+  if (extractEmailAddresses(sentCopy.bcc).includes(copyAccountEmail)) {
+    return { kind: 'bcc', evidence: 'exact-bcc-recipient-and-cross-account-sent-message-id' };
+  }
+  if (extractEmailAddresses(sentCopy.cc).includes(copyAccountEmail)) {
+    return { kind: 'cc', evidence: 'exact-cc-recipient-and-cross-account-sent-message-id' };
+  }
+
+  const sentDirectRecipients = new Set([
+    ...extractEmailAddresses(sentCopy.to),
+    ...extractEmailAddresses(sentCopy.cc),
+  ]);
+  const copiedDirectRecipients = new Set([
+    ...extractEmailAddresses(conversation.to),
+    ...extractEmailAddresses(conversation.cc),
+  ]);
+  const sentTargetRecipients = Array.from(sentDirectRecipients)
+    .filter((email) => email !== normalizeEmail(sentCopy.accountEmail));
+  const copiedTargetRecipients = Array.from(copiedDirectRecipients)
+    .filter((email) => email !== copyAccountEmail);
+  const hasExactStrippedBccProof = (
+    conversation.recipientRoutingEvidenceKnown === true &&
+    sentCopy.recipientRoutingEvidenceKnown === true &&
+    sentTargetRecipients.length > 0 &&
+    sentTargetRecipients.some((email) => copiedTargetRecipients.includes(email)) &&
+    !sentDirectRecipients.has(copyAccountEmail) &&
+    !copiedDirectRecipients.has(copyAccountEmail)
+  );
+  return hasExactStrippedBccProof
+    ? { kind: 'bcc', evidence: 'exact-cross-account-message-id-with-stripped-bcc-header' }
+    : { kind: '', evidence: '' };
+}
+
 function getExactMessageLineage(message, messages, maxDepth = 20) {
   const account = normalizeEmail(message && message.accountEmail);
   if (!account) return [];
@@ -149,11 +184,8 @@ function attachCrossAccountMailboxCopies(conversations, replies, sentMessages) {
     const sentCopy = getExactCrossAccountSentCopy(conversation, sentMessages);
     if (!sentCopy) return conversation;
     const copyAccountEmail = normalizeEmail(conversation.accountEmail);
-    const copyKind = extractEmailAddresses(sentCopy.bcc).includes(copyAccountEmail)
-      ? 'bcc'
-      : extractEmailAddresses(sentCopy.cc).includes(copyAccountEmail)
-        ? 'cc'
-        : '';
+    const copyProof = getExactCrossAccountCopyKind(conversation, sentCopy);
+    const copyKind = copyProof.kind;
     if (!copyKind) return conversation;
     const recipientEmail = extractEmailAddresses(sentCopy.to)
       .find((email) => email !== normalizeEmail(sentCopy.accountEmail)) || '';
@@ -185,7 +217,7 @@ function attachCrossAccountMailboxCopies(conversations, replies, sentMessages) {
         recipientName: normalizeText(recipientMessage && recipientMessage.from),
         recipientEmail,
         copyAccountEmail,
-        evidence: `exact-${copyKind}-recipient-and-cross-account-sent-message-id`,
+        evidence: copyProof.evidence,
       },
       threadMessages,
     };
