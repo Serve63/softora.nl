@@ -475,7 +475,7 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
   });
   assert.match(
     html,
-    /deze <a href="https:\/\/www\.softora\.nl\/webdesign\/salon-tof\?cid=safe-row-247&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a>/
+    /deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/salon-tof\?cid=safe-row-247&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a>/
   );
 });
 
@@ -1250,7 +1250,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724d"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260723b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260723b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260724d"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2560,8 +2560,11 @@ test('premium mailbox verbergt een technische webdesign-url achter alleen het wo
 
   assert.match(
     html,
-    /via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/de-vyldre\?cid=safe-dedupe-20260615-row-1891-d84e3e0cb2&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨/
+    /via deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/de-vyldre\?cid=safe-dedupe-20260615-row-1891-d84e3e0cb2&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨/
   );
+  assert.match(readPage(), /\.detail-mail-cta-link,\s*\.detail-mail-cta-link:visited\s*\{[^}]*color:\s*#0563c1;[^}]*text-decoration:\s*underline;/s);
+  assert.match(readPage(), /\.detail-mail-cta-link:hover\s*\{[^}]*color:\s*#004b91;[^}]*text-decoration-thickness:\s*2px;/s);
+  assert.match(readPage(), /\.detail-mail-cta-link:focus-visible\s*\{[^}]*outline:\s*2px solid rgba\(5,99,193,.45\);[^}]*outline-offset:\s*2px;/s);
   assert.doesNotMatch(html, />deze link<\/a>/);
   assert.doesNotMatch(html, />https:\/\/www\.softora\.nl\/webdesign\/de-vyldre/);
   assert.doesNotMatch(html, /\[https:\/\//);
@@ -2578,7 +2581,7 @@ test('premium mailbox houdt bekijken direct achter een afgebroken deze-link-verw
 
   assert.match(
     html,
-    /via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/seats2meet\?cid=mail-row&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨<\/div>/
+    /via deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/seats2meet\?cid=mail-row&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨<\/div>/
   );
   assert.doesNotMatch(html, /detail-mail-line-empty[^]*bekijken 🎨/);
 });
@@ -2602,7 +2605,7 @@ test('premium mailbox lijnt Gmail-citaten links uit en verbergt een losse Softor
   assert.doesNotMatch(html, /<div class="detail-mail-line">[\t ]+/);
   assert.match(
     html,
-    /via deze <a href="https:\/\/www\.softora\.nl\/webdesign\/the-chamomile-collective\?cid=safe-dedupe-20260615-row-2149-6137264c438&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨<\/div>/
+    /via deze <a class="detail-mail-cta-link" href="https:\/\/www\.softora\.nl\/webdesign\/the-chamomile-collective\?cid=safe-dedupe-20260615-row-2149-6137264c438&amp;sender=serve" target="_blank" rel="noopener noreferrer">link<\/a> bekijken 🎨<\/div>/
   );
   assert.doesNotMatch(html, />https:\/\/www\.softora\.nl\/webdesign\/the-chamomile-collective/);
 });

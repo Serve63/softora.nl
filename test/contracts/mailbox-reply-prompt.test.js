@@ -12,6 +12,7 @@ const {
   enforceMailboxReplyProfile,
   enforceMailboxReplySignature,
   inferMailboxReplyFirstName,
+  resolveMailboxReplySenderProfile,
 } = require('../../server/services/mailbox-reply-prompt');
 
 test('mailbox reply prompt kiest de ondertekende voornaam uit de nieuwste reactie', () => {
@@ -38,6 +39,16 @@ test('mailbox reply prompt gebruikt geen bedrijfsnaam als aanhefnaam', () => {
   assert.equal(inferMailboxReplyFirstName({ from: 'De Vyldre', body: 'Geen interesse.' }), '');
   assert.equal(inferMailboxReplyFirstName({ from: 'Rijs Textiles', body: 'Bedankt.' }), '');
   assert.equal(inferMailboxReplyFirstName({ from: 'Salon TOF', body: 'Met welk programma werk je?' }), '');
+  assert.equal(
+    inferMailboxReplyFirstName({
+      from: 'Minicamping De Stamhoeve',
+      body: 'Bedankt voor je bericht.\n\nGroet,\nMinicamping De Stamhoeve',
+    }),
+    ''
+  );
+  assert.equal(inferMailboxReplyFirstName({ from: 'peterbrouwersmakelaardij', body: 'Bedankt.' }), '');
+  assert.equal(inferMailboxReplyFirstName({ from: 'Peter Brouwers Makelaardij', body: 'Bedankt.' }), '');
+  assert.equal(inferMailboxReplyFirstName({ from: 'info@destamhoeve.nl', body: 'Bedankt.' }), '');
 });
 
 test('mailbox reply prompt normaliseert een volledig in hoofdletters geschreven voornaam', () => {
@@ -53,7 +64,7 @@ test('mailbox reply prompt normaliseert een volledig in hoofdletters geschreven 
 });
 
 test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen af', () => {
-  const prompt = buildMailboxReplySystemPrompt();
+  const prompt = buildMailboxReplySystemPrompt({ senderName: 'Servé Creusen' });
 
   assert.equal(MAILBOX_REPLY_PROFILE.id, 'serve-mailbox-reply-v1');
   assert.match(prompt, /centraal antwoordprofiel serve-mailbox-reply-v1/);
@@ -74,11 +85,23 @@ test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen a
   assert.match(prompt, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
 });
 
-test('centraal replyprofiel wordt niet overschreven door een losse mailboxafzender', () => {
+test('centraal replyprofiel gebruikt de geselecteerde Martijn-mailboxidentiteit', () => {
   const prompt = buildMailboxReplySystemPrompt({ senderName: 'Martijn van de Ven' });
 
-  assert.match(prompt, /Schrijf altijd namens Servé Creusen/);
-  assert.doesNotMatch(prompt, /Schrijf altijd namens Martijn van de Ven/);
+  assert.match(prompt, /Schrijf altijd namens Martijn van de Ven/);
+  assert.match(prompt, /Met vriendelijke groet,[\s\S]*Martijn van de Ven/);
+  assert.doesNotMatch(prompt, /Schrijf altijd namens Servé Creusen/);
+});
+
+test('replyprofiel kiest oorspronkelijke verzender boven een conflicterende mailboxfallback', () => {
+  assert.equal(
+    resolveMailboxReplySenderProfile({
+      accountEmail: 'serve@softora.nl',
+      originalSentMail: { from: 'Martijn van de Ven <martijn@softora.nl>' },
+    }).name,
+    'Martijn van de Ven'
+  );
+  assert.equal(resolveMailboxReplySenderProfile({ accountEmail: 'serve@softora.nl' }).name, 'Servé Creusen');
 });
 
 test('mailbox reply vervangt een verkeerde AI-ondertekening door de echte afzender', () => {
@@ -118,6 +141,21 @@ test('replyprofiel zet een volledig in hoofdletters aangeleverde aanhefnaam norm
 
   assert.match(result, /^Beste Peter,/);
   assert.doesNotMatch(result, /^Beste PETER,/);
+});
+
+test('replyprofiel ondertekent exact met de geselecteerde mailboxidentiteit', () => {
+  const serveResult = enforceMailboxReplyProfile('Dankjewel voor je reactie.', {
+    accountEmail: 'serve@softora.nl',
+    senderName: 'Servé Creusen',
+  });
+  const martijnResult = enforceMailboxReplyProfile('Dankjewel voor je reactie.', {
+    accountEmail: 'martijn@softora.nl',
+    senderName: 'Martijn van de Ven',
+  });
+
+  assert.equal(serveResult.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
+  assert.equal(martijnResult.endsWith('Met vriendelijke groet,\nMartijn van de Ven'), true);
+  assert.doesNotMatch(martijnResult, /Servé Creusen/);
 });
 
 test('Salon TOF houdt alleen de code-feitelijkheid en stuurt warm naar een bewerkbare dag', () => {

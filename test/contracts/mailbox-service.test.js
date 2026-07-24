@@ -2440,10 +2440,10 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   });
 
   assert.match(result.text, /^Beste Lisa,/);
-  assert.match(result.text, /Servé Creusen$/);
-  assert.doesNotMatch(result.text, /Martijn van de Ven/);
+  assert.match(result.text, /Martijn van de Ven$/);
+  assert.doesNotMatch(result.text, /Servé Creusen/);
   assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
-  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Servé Creusen/);
+  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
   assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v1/);
   assert.match(calls[0].messages[0].content, /verzin geen prijs/i);
   assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
@@ -2452,7 +2452,7 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
 });
 
-test('mailbox service laat replycontext de afzender bepalen en corrigeert een verkeerde AI-signatuur', async () => {
+test('mailbox service laat replycontext Martijn bepalen en corrigeert een verkeerde AI-signatuur', async () => {
   const calls = [];
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-key',
@@ -2484,10 +2484,10 @@ test('mailbox service laat replycontext de afzender bepalen en corrigeert een ve
     },
   });
 
-  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Servé Creusen/);
+  assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
   assert.match(calls[0].messages[1].content, /"accountEmail":"martijn@softora.nl"/);
-  assert.match(calls[0].messages[1].content, /"naam":"Servé Creusen"/);
-  assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nServé Creusen');
+  assert.match(calls[0].messages[1].content, /"naam":"Martijn van de Ven"/);
+  assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
 });
 
 test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail en corrigeert Webflow-feiten', async () => {
