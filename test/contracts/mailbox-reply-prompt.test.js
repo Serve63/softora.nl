@@ -2,8 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  MAILBOX_REPLY_CONVERSATION_BRIDGE,
-  MAILBOX_REPLY_MEETING_SUGGESTION,
+  MAILBOX_REPLY_NEXT_STEP,
   MAILBOX_REPLY_PRICE_EXPLANATION,
   MAILBOX_REPLY_PROFILE,
   buildMailboxDraftRewriteSystemPrompt,
@@ -80,7 +79,7 @@ test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen a
   assert.match(prompt, /nooit alsof de afspraak al staat/);
   assert.match(prompt, /"laagdrempelig", "kansen" of "verbeterpunten"/);
   assert.match(prompt, /Het actuele ontwerp uit deze coldmail is met code gebouwd/);
-  assert.match(prompt, /zonder defensieve tegenstelling zoals "dus niet in Webflow"/);
+  assert.match(prompt, /geen defensieve tegenstelling zoals "dus niet in Webflow"/);
   assert.match(prompt, /alleen als voorstel getoond en nooit automatisch verzonden/);
   assert.match(prompt, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
 });
@@ -168,10 +167,11 @@ test('Salon TOF houdt alleen de code-feitelijkheid en stuurt warm naar een bewer
   );
 
   assert.match(result, /^Beste,/);
-  assert.match(result, /Dit ontwerp heb ik met code gebouwd/);
-  assert.match(result, new RegExp(MAILBOX_REPLY_CONVERSATION_BRIDGE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(result, new RegExp(MAILBOX_REPLY_MEETING_SUGGESTION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.doesNotMatch(result, /Hoi Salon|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan|advies over Webflow|\bjullie\b/i);
+  assert.match(result, /Goede vraag\. Dit ontwerp heb ik helemaal op maat met code gebouwd\./);
+  assert.match(result, new RegExp(MAILBOX_REPLY_NEXT_STEP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan|advies over Webflow|\bjullie\b/i);
+  assert.equal((result.match(/Als je wilt/g) || []).length, 1);
+  assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
   assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
@@ -202,8 +202,7 @@ test('interesse krijgt exact één concreet vrijblijvend voorstel met bewerkbare
   );
 
   assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
-  assert.match(result, new RegExp(MAILBOX_REPLY_CONVERSATION_BRIDGE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(result, new RegExp(MAILBOX_REPLY_MEETING_SUGGESTION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(result, new RegExp(MAILBOX_REPLY_NEXT_STEP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(result, /Zullen we een afspraak maken/);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
 });
@@ -277,8 +276,32 @@ test('prijsvraag verwijdert verzonnen bedragen, legt afhankelijkheid uit en laat
   );
 
   assert.match(result, new RegExp(MAILBOX_REPLY_PRICE_EXPLANATION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(result, new RegExp(MAILBOX_REPLY_CONVERSATION_BRIDGE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(result, new RegExp(MAILBOX_REPLY_MEETING_SUGGESTION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(result, new RegExp(MAILBOX_REPLY_NEXT_STEP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(result, /995|€|\bkansen\b/i);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
+});
+
+test('replyprofiel verwijdert dubbele semantische zinnen en stapelt geen vervolgtemplates', () => {
+  const result = enforceMailboxReplyProfile(
+    [
+      'Beste,',
+      '',
+      'Dankjewel voor je vraag.',
+      '',
+      'Dankjewel voor je vraag!',
+      '',
+      'Als je wilt, denk ik graag even met je mee over wat voor jou handig is.',
+      '',
+      'Als je wilt, denk ik graag even met je mee over wat voor jou handig is.',
+      'Is het een idee dat ik volgende week [dag] even langskom?',
+    ].join('\n'),
+    {
+      inboundText: 'Kun je vertellen hoe je dit hebt gemaakt?',
+    }
+  );
+
+  assert.equal((result.match(/Dankjewel voor je vraag/gi) || []).length, 1);
+  assert.equal((result.match(/Als je wilt/g) || []).length, 1);
+  assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
+  assert.equal((result.match(/😁/gu) || []).length, 1);
 });

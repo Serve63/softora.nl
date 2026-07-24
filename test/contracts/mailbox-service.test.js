@@ -2712,10 +2712,11 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
   );
   assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
   assert.match(result.text, /^Beste,/);
-  assert.match(result.text, /Dit ontwerp heb ik met code gebouwd/);
-  assert.match(result.text, /Als je wilt, denk ik graag even met je mee over wat voor jou handig is\./);
-  assert.match(result.text, /Is het een idee dat ik volgende week \[dag\] even langskom\?/);
-  assert.doesNotMatch(result.text, /Hoi Salon|dus niet in Webflow|Webflow kan|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.match(result.text, /Goede vraag\. Dit ontwerp heb ik helemaal op maat met code gebouwd\./);
+  assert.match(result.text, /Als je wilt, is het een idee dat ik volgende week \[dag\] even langskom\?/);
+  assert.doesNotMatch(result.text, /Hoi Salon|Leuke vraag|dus niet in Webflow|Webflow kan|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.equal((result.text.match(/Als je wilt/g) || []).length, 1);
+  assert.equal((result.text.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.doesNotMatch(result.text, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.text.match(/😁/gu) || []).length, 1);
   assert.equal(result.text.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
