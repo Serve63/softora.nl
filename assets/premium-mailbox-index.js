@@ -111,6 +111,83 @@ async function loadBody({
   }
 }
 
+function needsThreadBodyHydration(message) {
+  const source = message && typeof message === 'object' ? message : {};
+  const hasBody = Boolean(source.hasBody || source.body);
+  return Boolean(
+    hasBody &&
+    (
+      !normalizeText(source.body) ||
+      source.bodyTruncated ||
+      source.bodyImagesTruncated
+    )
+  );
+}
+
+async function loadThreadBodies({
+  mail,
+  normalizeBodyImages,
+  normalizeOptOutUrl,
+  getActiveMail,
+  openMail,
+  fetchImpl,
+}) {
+  if (!mail || mail.threadBodiesLoading) return false;
+  const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
+  const targets = messages.filter(needsThreadBodyHydration);
+  if (!targets.length) return false;
+
+  const request = typeof fetchImpl === 'function' ? fetchImpl : fetch;
+  mail.threadBodiesLoading = true;
+  let updated = false;
+  try {
+    for (const message of targets) {
+      const account = normalizeText(message.accountEmail || mail.accountEmail).toLowerCase();
+      const folder = normalizeText(message.folder || 'sent').toLowerCase() || 'sent';
+      const requestId = normalizeText(message.mailboxId || message.id);
+      if (!account || !requestId) continue;
+      message.bodyLoading = true;
+      try {
+        const params = new URLSearchParams({ account, folder, id: requestId });
+        const response = await request(`/api/mailbox/message?${params.toString()}`, {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.ok || !data.message) continue;
+        const body = normalizeText(data.message.body || '');
+        if (!body) continue;
+        if (body) message.body = body;
+        if (typeof normalizeBodyImages === 'function') {
+          message.bodyImages = normalizeBodyImages(data.message.bodyImages || message.bodyImages);
+        }
+        if (typeof normalizeOptOutUrl === 'function') {
+          message.optOutUrl = normalizeOptOutUrl(data.message.optOutUrl || message.optOutUrl);
+        }
+        message.hasBody = Boolean(data.message.hasBody || body || message.body);
+        message.bodyTruncated = Boolean(data.message.bodyTruncated);
+        message.bodyImagesTruncated = false;
+        updated = true;
+      } catch (_) {
+        // Keep the safe preview in place; reopening the conversation retries.
+      } finally {
+        message.bodyLoading = false;
+      }
+    }
+  } finally {
+    mail.threadBodiesLoading = false;
+    if (
+      typeof openMail === 'function' &&
+      typeof getActiveMail === 'function' &&
+      String(getActiveMail()) === String(mail.id)
+    ) {
+      openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true });
+    }
+  }
+  return updated;
+}
+
 function bindImageRecovery({ getActiveMail, getMail, loadMessageBody }) {
   document.addEventListener('error', (event) => {
     const image = event.target;
@@ -132,6 +209,8 @@ window.SoftoraMailboxIndex = {
   hydrateOutreachContexts,
   isSyncInFlight: () => syncInFlight,
   loadBody,
+  loadThreadBodies,
+  needsThreadBodyHydration,
   setStatus,
   syncInBackground,
 };

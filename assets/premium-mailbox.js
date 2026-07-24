@@ -829,9 +829,8 @@ function openMail(id, options = {}) {
   m.unread = false;
   renderList();
   if (wasUnread) void persistMailReadState(m);
-  if (!m.bodyLoaded && !options.skipBodyFetch) {
-    void loadMailboxMessageBody(m.id);
-  }
+  if (!m.bodyLoaded && !options.skipBodyFetch) void loadMailboxMessageBody(m.id);
+  if (!options.skipThreadBodyFetch && activeFolder === 'outreach' && window.SoftoraMailboxCampaignInbox.isCampaignMail(m)) void window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail: m, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail });
   const conversationBodyImages = window.SoftoraMailboxImages?.getConversationImages?.(m) || m.bodyImages;
   const imagesPending = !options.imagesPrepared && Boolean(window.SoftoraMailboxImages?.stage?.(
     conversationBodyImages,
