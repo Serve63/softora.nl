@@ -268,6 +268,14 @@
     return String(html || '').split(label).join(link);
   }
 
+  function renderLabelledUrlAnchor(url, label, escapeHtml) {
+    const normalizedLabel = String(label || '').trim();
+    const isWebdesignCta = /^deze link$/i.test(normalizedLabel);
+    const anchorLabel = isWebdesignCta ? 'link' : normalizedLabel;
+    const anchor = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anchorLabel)}</a>`;
+    return isWebdesignCta ? `deze ${anchor}` : anchor;
+  }
+
   function renderDetailBody(mail, content) {
     return mail && mail.bodyLoading
       ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
@@ -293,6 +301,7 @@
     getReplyToAddress,
     buildSearchText,
     formatMailDate,
+    renderLabelledUrlAnchor,
     renderDetailBody,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

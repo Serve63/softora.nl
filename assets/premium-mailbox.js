@@ -74,7 +74,7 @@ function renderLinkedMailboxText(value, options) {
   text.replace(MAIL_BODY_LABELLED_URL_PATTERN, (match, label, url, offset) => {
     html += renderMailboxUrls(text.slice(lastIndex, offset));
     if (isSafeMailBodyUrl(url) && window.SoftoraMailboxDisplay.isLabelledUrlMatch(label, url)) {
-      html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+      html += window.SoftoraMailboxDisplay.renderLabelledUrlAnchor(url, label, escapeHtml);
     } else {
       html += renderMailboxUrls(match);
     }
