@@ -81,6 +81,8 @@ test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen a
   assert.match(prompt, /nooit alsof de afspraak al staat/);
   assert.match(prompt, /"laagdrempelig", "kansen" of "verbeterpunten"/);
   assert.match(prompt, /Het actuele ontwerp uit deze coldmail is met code gebouwd/);
+  assert.match(prompt, /technische vraag over het programma, platform of de bouwwijze/);
+  assert.match(prompt, /geen vaste \[dag\]-placeholder/);
   assert.match(prompt, /geen defensieve tegenstelling zoals "dus niet in Webflow"/);
   assert.match(prompt, /alleen als voorstel getoond en nooit automatisch verzonden/);
   assert.match(prompt, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
@@ -159,7 +161,7 @@ test('replyprofiel ondertekent exact met de geselecteerde mailboxidentiteit', ()
   assert.doesNotMatch(martijnResult, /Servé Creusen/);
 });
 
-test('Salon TOF houdt alleen de code-feitelijkheid en stuurt warm naar een bewerkbare dag', () => {
+test('Salon TOF krijgt een inhoudelijk code-antwoord en één natuurlijke uitnodiging', () => {
   const result = enforceMailboxReplyProfile(
     'Beste,\n\nGoede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd. Dan kunnen we samen kort kijken wat er mogelijk is.\n\nAls je wilt, denk ik graag even met je mee over wat voor jou handig is. Als je wilt, is het een idee dat ik volgende week [dag] even langskom? 😁',
     {
@@ -178,13 +180,16 @@ test('Salon TOF houdt alleen de code-feitelijkheid en stuurt warm naar een bewer
     'Met vriendelijke groet,',
     'Servé Creusen',
   ].join('\n'));
-  assert.match(result, /helemaal op maat met code gebouwd/);
-  assert.match(result, /Dan kan ik je kort laten zien hoe het ontwerp is opgebouwd en kunnen we samen bespreken wat handig is voor je website\./);
-  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan ik|advies over Webflow|Je huidige site|Wij hebben nu|\bWebflow\b|\bjullie\b|kijken wat er mogelijk is|denk ik graag even met je mee|Als je wilt/i);
+  assert.match(result, /helemaal op maat met code/);
+  assert.match(result, /indeling, uitstraling en werking gericht afstemmen/);
+  assert.match(result, /zonder vast te zitten aan de standaardmogelijkheden van een websitebouwer/);
+  assert.match(result, /Misschien is het leuk als ik volgende week een keer langskom\?/);
+  assert.match(result, /rustig samen naar je huidige website en het ontwerp kijken en de mogelijkheden bespreken\./);
+  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan ik|advies over Webflow|Wij hebben nu|\bWebflow\b|\bjullie\b|denk ik graag even met je mee|Als je wilt/i);
   assert.equal((result.match(/Als je wilt/g) || []).length, 0);
   assert.equal((result.match(/\bWebflow\b/gi) || []).length, 0);
-  assert.match(result, /Is het een idee dat ik volgende week \[dag\] even langskom\?/);
-  assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
+  assert.doesNotMatch(result, /\[dag\]/);
+  assert.equal((result.match(/volgende week een keer langskom/g) || []).length, 1);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
   assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
