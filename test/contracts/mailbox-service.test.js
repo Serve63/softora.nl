@@ -1636,7 +1636,7 @@ test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink ui
             '<p>Afgelopen week kwam ik jullie website salontof.nl tegen.</p>',
             '<p><a href="https://evil.example/webdesign/verkeerd">deze link</a></p>',
             '<p>Bekijk onze referentie: <a href="https://www.softora.nl/webdesign/verkeerd">deze link</a>.</p>',
-            `<p>Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${exactUrl.replace('&', '&amp;')}">link</a> bekijken 🎨</p>`,
+            `<p>Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze <a href="${exactUrl.replaceAll('&', '&amp;')}">link</a> bekijken 🎨</p>`,
             '<script>alert("xss")</script>',
           ].join(''),
           subject: 'Kleine vraag over jullie website',
@@ -1693,7 +1693,8 @@ test('mailbox service herstelt alleen de exacte oorspronkelijke webdesignlink ui
     message.body,
     new RegExp(`deze link \\[${exactUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`)
   );
-  assert.doesNotMatch(message.body, /evil\.example|<script>|alert\(/);
+  assert.doesNotMatch(message.body, /evil\.example|alert\(/);
+  assert.equal(message.body.toLowerCase().includes('<script'), false);
   assert.equal(message.webdesignLinkEvidenceKnown, true);
   assert.equal(message.webdesignLinkUrl, exactUrl);
   assert.equal(upserts.length, 1);

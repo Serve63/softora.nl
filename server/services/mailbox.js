@@ -1572,7 +1572,7 @@ function createMailboxService(deps = {}) {
       .trim();
   }
 
-  const webdesignLinkProvenance = createMailboxWebdesignLinkProvenance({ getPublicBaseUrl: getPublicWebdesignPreviewBaseUrl, normalizeString });
+  const webdesignLinkProvenance = createMailboxWebdesignLinkProvenance({ getHtmlAttribute, getPublicBaseUrl: getPublicWebdesignPreviewBaseUrl, htmlToReadableText, normalizeString, safeUrl });
 
   function isColdmailOptOutTextLine(line) {
     const cleanLine = normalizeString(line);

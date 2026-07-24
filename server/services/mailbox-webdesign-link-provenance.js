@@ -1,42 +1,11 @@
 function createMailboxWebdesignLinkProvenance(options = {}) {
   const {
+    getHtmlAttribute = () => '',
     getPublicBaseUrl = () => 'https://www.softora.nl',
+    htmlToReadableText = () => '',
     normalizeString = (value) => String(value || '').trim(),
+    safeUrl = () => null,
   } = options;
-
-  function decodeBasicHtmlEntities(value) {
-    return String(value || '')
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;|&apos;/gi, "'")
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>');
-  }
-
-  function getHtmlAttribute(tag, name) {
-    const pattern = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
-    const match = String(tag || '').match(pattern);
-    return decodeBasicHtmlEntities(match?.[1] || match?.[2] || match?.[3] || '').trim();
-  }
-
-  function htmlToReadableText(value) {
-    return decodeBasicHtmlEntities(value)
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ');
-  }
-
-  function safeUrl(value) {
-    const raw = String(value || '').trim();
-    if (!/^https?:\/\//i.test(raw)) return null;
-    try {
-      return new URL(raw);
-    } catch (_) {
-      return null;
-    }
-  }
 
   function extractExistingUrl(text) {
     const source = String(text || '');
