@@ -122,6 +122,84 @@ test('campaign mailbox labelt CC exact en gokt niet zonder recipient-provenance'
   assert.equal(uncertain[0].copyContext, undefined);
 });
 
+test('campaign mailbox bewijst een BCC-kopie via exact Message-ID wanneer Outlook de BCC-header verwijdert', () => {
+  const original = {
+    id: 'sent:291',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven',
+    email: 'martijn@softora.nl',
+    to: 'Sandra van Berkel <equirehab4you@gmail.com>',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-24T07:44:00.000Z',
+    messageId: '<original@softora.nl>',
+    recipientRoutingEvidenceKnown: true,
+  };
+  const incoming = {
+    id: 'inbox:45',
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Sandra van Berkel',
+    email: 'equirehab4you@gmail.com',
+    to: 'martijn@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-24T08:58:25.000Z',
+    messageId: '<sandra@gmail.com>',
+    inReplyTo: original.messageId,
+    references: original.messageId,
+    recipientRoutingEvidenceKnown: true,
+  };
+  const sentReply = {
+    id: 'sent:297',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    from: 'martijn@softora.nl',
+    email: 'martijn@softora.nl',
+    to: 'Sandra van Berkel <equirehab4you@gmail.com>',
+    cc: '',
+    bcc: '',
+    recipientRoutingEvidenceKnown: true,
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-24T16:15:29.000Z',
+    messageId: '<outlook-reply@outlook.com>',
+    inReplyTo: incoming.messageId,
+    references: `${original.messageId} ${incoming.messageId}`,
+  };
+  const strippedBccCopy = {
+    ...sentReply,
+    id: 'inbox:107',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+  };
+
+  const conversations = attachCrossAccountMailboxCopies(
+    [
+      { ...incoming, threadMessages: [sentReply, original] },
+      { ...strippedBccCopy, threadMessages: [] },
+    ],
+    [incoming, strippedBccCopy],
+    [original, sentReply]
+  );
+
+  assert.equal(conversations.length, 1);
+  assert.equal(conversations[0].id, 'inbox:107');
+  assert.deepEqual(conversations[0].threadMessages.map((message) => message.id), [
+    'sent:291',
+    'inbox:45',
+  ]);
+  assert.deepEqual(conversations[0].copyContext, {
+    evidenceKnown: true,
+    kind: 'bcc',
+    sourceAccountEmail: 'martijn@softora.nl',
+    sourceName: 'martijn@softora.nl',
+    sourceEmail: 'martijn@softora.nl',
+    recipientName: 'Sandra van Berkel',
+    recipientEmail: 'equirehab4you@gmail.com',
+    copyAccountEmail: 'serve@softora.nl',
+    evidence: 'exact-cross-account-message-id-with-stripped-bcc-header',
+  });
+});
+
 test('campaign mailbox removes duplicate IMAP rows for the same internet message', () => {
   const messages = dedupeCampaignMessages([
     {
