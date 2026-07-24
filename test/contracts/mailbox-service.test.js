@@ -2503,7 +2503,7 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
         data: {
           choices: [{
             message: {
-              content: 'Hoi Salon,\n\nIk werk zelf ook in Webflow. Dan kunnen we jullie kansen laagdrempelig bespreken.',
+              content: 'Hoi Salon,\n\nDit ontwerp heb ik met code gebouwd, dus niet in Webflow. Webflow kan ik ook voor jullie verbeteren.',
             },
           }],
         },
@@ -2541,7 +2541,10 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
   assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
   assert.match(result.text, /^Beste,/);
   assert.match(result.text, /Dit ontwerp heb ik met code gebouwd/);
-  assert.doesNotMatch(result.text, /Hoi Salon|werk zelf ook in Webflow|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.match(result.text, /Als je wilt, denk ik graag even met je mee over wat voor jou handig is\./);
+  assert.match(result.text, /Is het een idee dat ik volgende week \[dag\] even langskom\?/);
+  assert.doesNotMatch(result.text, /Hoi Salon|dus niet in Webflow|Webflow kan|\bjullie\b|laagdrempelig|\bkansen\b/i);
+  assert.doesNotMatch(result.text, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.text.match(/😁/gu) || []).length, 1);
   assert.equal(result.text.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });
