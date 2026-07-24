@@ -29,6 +29,11 @@ function hasUnverifiedLegacyMedia(message) {
 function decorateMessage(mail, source) {
   const message = source && typeof source === 'object' ? source : {};
   const legacyMediaNeedsHydration = hasUnverifiedLegacyMedia(message);
+  const recipientRoutingNeedsHydration = (
+    message.recipientRoutingEvidenceKnown !== true &&
+    window.SoftoraMailboxCampaignInbox?.isCampaignAccount?.(message.email) &&
+    !String(message.to || '').toLowerCase().includes(String(message.accountEmail || '').toLowerCase())
+  );
   return {
     ...mail,
     hasBody: Boolean(message.hasBody || message.body),
@@ -36,7 +41,8 @@ function decorateMessage(mail, source) {
       Boolean(message.body) &&
       !message.bodyTruncated &&
       !message.bodyImagesTruncated &&
-      !legacyMediaNeedsHydration,
+      !legacyMediaNeedsHydration &&
+      !recipientRoutingNeedsHydration,
     bodyLoading: false,
     bodyTruncated: Boolean(message.bodyTruncated),
     bodyImagesTruncated: Boolean(message.bodyImagesTruncated),
@@ -45,6 +51,12 @@ function decorateMessage(mail, source) {
     originalCampaignOutbound: Boolean(message.originalCampaignOutbound),
     webdesignLinkEvidenceKnown: Boolean(message.webdesignLinkEvidenceKnown),
     webdesignLinkUrl: normalizeText(message.webdesignLinkUrl),
+    toDisplay: normalizeText(message.toDisplay),
+    cc: normalizeText(message.cc),
+    bcc: normalizeText(message.bcc),
+    deliveredTo: normalizeText(message.deliveredTo),
+    recipientRoutingEvidenceKnown: message.recipientRoutingEvidenceKnown === true,
+    attachments: Array.isArray(message.attachments) ? message.attachments : [],
     indexed: Boolean(message.indexed),
   };
 }
@@ -125,6 +137,13 @@ async function loadBody({
     mail.originalCampaignOutbound = Boolean(data.message.originalCampaignOutbound);
     mail.webdesignLinkEvidenceKnown = Boolean(data.message.webdesignLinkEvidenceKnown);
     mail.webdesignLinkUrl = normalizeText(data.message.webdesignLinkUrl);
+    mail.to = normalizeText(data.message.to || mail.to);
+    mail.toDisplay = normalizeText(data.message.toDisplay || data.message.to || mail.toDisplay || mail.to);
+    mail.cc = normalizeText(data.message.cc);
+    mail.bcc = normalizeText(data.message.bcc);
+    mail.deliveredTo = normalizeText(data.message.deliveredTo);
+    mail.recipientRoutingEvidenceKnown = data.message.recipientRoutingEvidenceKnown === true;
+    mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
   } catch (error) {
     if (!mail.body) {
       mail.body = String(error?.message || error || 'Bericht laden mislukt');
@@ -179,6 +198,7 @@ function applyThreadMessagePayload(message, source, normalizeBodyImages, normali
   message.originalCampaignOutbound = Boolean(source && source.originalCampaignOutbound);
   message.webdesignLinkEvidenceKnown = Boolean(source && source.webdesignLinkEvidenceKnown);
   message.webdesignLinkUrl = normalizeText(source && source.webdesignLinkUrl);
+  message.attachments = Array.isArray(source && source.attachments) ? source.attachments : [];
   return Boolean(body);
 }
 

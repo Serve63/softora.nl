@@ -1276,7 +1276,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
   assert.match(scriptSource, /\/api\/mailbox\/accounts/);
   assert.match(scriptSource, /\/api\/mailbox\/messages\?account=/);
-  assert.match(deleteSource, /\/api\/mailbox\/messages\/delete/);
+  assert.match(deleteSource, /\/api\/mailbox\/messages\/\$\{action\}/);
   assert.match(scriptSource, /\/api\/mailbox\/send/);
   assert.match(scriptSource, /\/api\/mailbox\/rewrite/);
   assert.doesNotMatch(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
@@ -1767,18 +1767,15 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met
   assert.match(pageSource, /\.mail-time \{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-end;/);
 });
 
-test('geselecteerde mailboxrij toont een aparte verwijderknop zonder de openactie te vervangen', () => {
+test('mailboxrij toont geen bronmail-verwijderactie', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
   const listSource = fs.readFileSync(listScriptPath, 'utf8');
 
   assert.match(pageSource, /assets\/premium-mailbox-list\.js/);
   assert.match(scriptSource, /SoftoraMailboxList\.renderItem/);
-  assert.match(listSource, /const isActive = String\(options\.activeMail\) === String\(mail\.id\);/);
   assert.match(listSource, /class="mail-item-open"[\s\S]*data-mailbox-action="open-mail"/);
-  assert.match(listSource, /\$\{isActive \? `[\s\S]*class="mail-item-delete"[\s\S]*data-mailbox-action="delete-mail"/);
-  assert.match(listSource, /aria-label="Mail verwijderen"/);
-  assert.match(pageSource, /\.mail-item-delete \{[\s\S]*color:\s*var\(--crimson\);[\s\S]*cursor:\s*pointer;/);
+  assert.doesNotMatch(listSource, /data-mailbox-action="delete-mail"|mail-item-delete/);
   assert.match(pageSource, /\.mail-item-open:focus-visible \{[\s\S]*outline:/);
 
   const escaped = (value) => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -1790,7 +1787,7 @@ test('geselecteerde mailboxrij toont een aparte verwijderknop zonder de openacti
   const activeRow = listModule.renderItem({ id: 'inbox:42', time: '13:41' }, { ...baseOptions, activeMail: 'inbox:42' });
   const inactiveRow = listModule.renderItem({ id: 'inbox:43', time: '13:42' }, { ...baseOptions, activeMail: 'inbox:42' });
 
-  assert.match(activeRow, /data-mailbox-action="delete-mail"/);
+  assert.doesNotMatch(activeRow, /data-mailbox-action="delete-mail"/);
   assert.doesNotMatch(inactiveRow, /data-mailbox-action="delete-mail"/);
 });
 
@@ -1948,7 +1945,7 @@ test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   assert.match(scriptSource, /Gelezen status opslaan mislukt/);
 });
 
-test('premium mailbox verwijdert direct optimistisch en houdt refresh-resultaten schoon', async () => {
+test('premium mailbox verbergt alleen in Softora, biedt herstel en raakt geen bronmail-API', async () => {
   const scriptSource = readScript();
   const deleteSource = readDeleteScript();
 
@@ -1960,16 +1957,29 @@ test('premium mailbox verwijdert direct optimistisch en houdt refresh-resultaten
   assert.match(scriptSource, /removeAndPublishMessageDeletion\?\.\(mail\)/);
   assert.match(scriptSource, /bindMessageDeletionSync\?\.\(\{/);
   assert.match(deleteSource, /hiddenMessageKeys\.add\(messageKey\);[\s\S]*hooks\.optimistic/);
-  assert.match(deleteSource, /\/api\/mailbox\/messages\/delete/);
+  assert.match(deleteSource, /requestVisibility\(mail, 'hide'\)/);
+  assert.match(deleteSource, /requestVisibility\(mail, 'restore'\)/);
+  assert.doesNotMatch(deleteSource, /\/api\/mailbox\/messages\/delete|messageMove|\\\\Deleted|archive|instantly/i);
   assert.match(scriptSource, /case 'delete-mail':[\s\S]*void deleteMail\(id\);/);
 
   let resolveRequest;
   const events = [];
-  const deleted = { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' };
+  const requests = [];
+  const deleted = {
+    id: 'inbox:42',
+    uid: 42,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    threadMessages: [{ id: 'sent:7', uid: 7, folder: 'sent', accountEmail: 'serve@softora.nl' }],
+  };
   const kept = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' };
   const controller = deleteModule.create({
     dialogs: { confirm: async () => true },
-    fetch: async () => new Promise((resolve) => { resolveRequest = resolve; }),
+    fetch: async (url, options) => {
+      requests.push([url, JSON.parse(options.body)]);
+      if (url.endsWith('/hide')) return new Promise((resolve) => { resolveRequest = resolve; });
+      return { ok: true, json: async () => ({ ok: true }) };
+    },
     getAccount: (mail) => mail.accountEmail,
     getFolder: (mail) => mail.folder,
     getRequestId: (mail) => mail.id,
@@ -1988,6 +1998,15 @@ test('premium mailbox verwijdert direct optimistisch en houdt refresh-resultaten
   assert.equal((await removal).ok, true);
   assert.deepEqual(events, ['optimistic', 'cache']);
   assert.deepEqual(controller.filterMessages([deleted, kept]), [kept]);
+  assert.equal(requests[0][0], '/api/mailbox/messages/hide');
+  assert.deepEqual(requests[0][1].messages, [
+    { account: 'serve@softora.nl', folder: 'inbox', uid: 42, id: 'inbox:42' },
+    { account: 'serve@softora.nl', folder: 'sent', uid: 7, id: 'sent:7' },
+  ]);
+
+  assert.equal((await controller.restore(deleted)).ok, true);
+  assert.equal(requests[1][0], '/api/mailbox/messages/restore');
+  assert.deepEqual(controller.filterMessages([deleted, kept]), [deleted, kept]);
 });
 
 test('premium mailbox gebruikt de nette dialoog ook wanneer die pas na de mailboxscripts initialiseert', async () => {

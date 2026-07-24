@@ -207,8 +207,8 @@
     const prepared = prepareOwnQuote(images, baseState, renderImage);
     if (!prepared.html) return '';
     return `
-      <section class="detail-mail-section detail-mail-section-quote">
-        <div class="detail-mail-section-label">Jouw eerdere mail</div>
+      <section class="detail-mail-section detail-mail-section-history-sent" aria-label="Ingesloten berichtgeschiedenis">
+        <div class="detail-mail-section-label">Eerdere mail</div>
         <div class="detail-mail-quote-body">${prepared.html}</div>
       </section>`;
   }

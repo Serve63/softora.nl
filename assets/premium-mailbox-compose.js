@@ -2,6 +2,14 @@
   'use strict';
 
   let rewriteUsed = false;
+  let selectedAttachments = [];
+  const MAX_ATTACHMENTS = 5;
+  const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_EXTENSIONS = new Set([
+    'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'pdf', 'png',
+    'ppt', 'pptx', 'txt', 'webp', 'xls', 'xlsx',
+  ]);
 
   function getRewriteButton(documentRef = global.document) {
     return documentRef?.querySelector?.('[data-mailbox-action="rewrite-compose"]') || null;
@@ -25,6 +33,89 @@
     if (!button) return;
     button.disabled = rewriteUsed;
     if (!rewriteUsed) button.textContent = fallbackLabel;
+  }
+
+  function renderAttachments(documentRef = global.document) {
+    const target = documentRef?.getElementById?.('c-attachment-list');
+    if (!target) return;
+    target.innerHTML = selectedAttachments.map((attachment, index) => `
+      <span class="compose-attachment-chip">
+        <span>${String(attachment.filename || 'Bijlage').replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[character]))}</span>
+        <button type="button" data-mailbox-action="remove-attachment" data-attachment-index="${index}" aria-label="Bijlage verwijderen">×</button>
+      </span>`).join('');
+  }
+
+  function resetOptionalFields(documentRef = global.document) {
+    selectedAttachments = [];
+    ['c-cc', 'c-bcc'].forEach((id) => {
+      const field = documentRef?.getElementById?.(id);
+      if (field) field.value = '';
+    });
+    const copyFields = documentRef?.getElementById?.('c-copy-fields');
+    if (copyFields) copyFields.hidden = true;
+    const input = documentRef?.getElementById?.('c-attachments');
+    if (input) input.value = '';
+    renderAttachments(documentRef);
+  }
+
+  function toggleCopyFields(documentRef = global.document) {
+    const copyFields = documentRef?.getElementById?.('c-copy-fields');
+    if (!copyFields) return;
+    copyFields.hidden = !copyFields.hidden;
+    if (!copyFields.hidden) documentRef?.getElementById?.('c-cc')?.focus?.();
+  }
+
+  function encodeBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    return global.btoa(binary);
+  }
+
+  async function addAttachments(fileList, documentRef = global.document) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return { ok: true };
+    if (selectedAttachments.length + files.length > MAX_ATTACHMENTS) {
+      return { ok: false, error: `Je kunt maximaal ${MAX_ATTACHMENTS} bijlagen toevoegen.` };
+    }
+    let totalBytes = selectedAttachments.reduce((total, attachment) => total + attachment.size, 0);
+    const prepared = [];
+    for (const file of files) {
+      const filename = String(file && file.name || '').trim();
+      const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+      const size = Math.max(0, Number(file && file.size) || 0);
+      if (!filename || !ALLOWED_EXTENSIONS.has(extension)) {
+        return { ok: false, error: `Bestand "${filename || 'zonder naam'}" wordt niet ondersteund.` };
+      }
+      if (!size || size > MAX_ATTACHMENT_BYTES) {
+        return { ok: false, error: `Bijlage "${filename}" mag maximaal 4 MB zijn.` };
+      }
+      totalBytes += size;
+      if (totalBytes > MAX_TOTAL_BYTES) {
+        return { ok: false, error: 'De bijlagen mogen samen maximaal 5 MB zijn.' };
+      }
+      const contentBase64 = encodeBase64(await file.arrayBuffer());
+      prepared.push({
+        filename,
+        contentType: String(file.type || '').trim().toLowerCase(),
+        size,
+        contentBase64,
+      });
+    }
+    selectedAttachments = [...selectedAttachments, ...prepared];
+    renderAttachments(documentRef);
+    return { ok: true };
+  }
+
+  function removeAttachment(index, documentRef = global.document) {
+    const safeIndex = Number(index);
+    if (!Number.isInteger(safeIndex) || safeIndex < 0 || safeIndex >= selectedAttachments.length) return;
+    selectedAttachments.splice(safeIndex, 1);
+    renderAttachments(documentRef);
   }
 
   function getMessageTimestamp(message) {
@@ -67,16 +158,57 @@
       folder: mail.folder || options.activeFolder || 'inbox',
       accountEmail: getAccount(mail, options.fallbackAccount),
       originalSentMail: getOriginalSentMail(mail),
+      mode: 'reply',
+    };
+  }
+
+  function extractEmail(value) {
+    const match = String(value || '').match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+    return match ? match[0].toLowerCase() : '';
+  }
+
+  function buildNewMessageContext(mail, options = {}) {
+    if (!mail) return null;
+    const latest = options.latestMessage && typeof options.latestMessage === 'object'
+      ? options.latestMessage
+      : mail;
+    const copyContext = mail.copyContext && mail.copyContext.evidenceKnown === true
+      ? mail.copyContext
+      : null;
+    const accountEmail = extractEmail(
+      copyContext && copyContext.sourceAccountEmail ||
+      latest.accountEmail ||
+      mail.accountEmail ||
+      options.fallbackAccount
+    );
+    const to = extractEmail(
+      copyContext && copyContext.recipientEmail ||
+      latest.to ||
+      mail.email
+    );
+    if (!accountEmail || !to) return null;
+    return {
+      id: mail.id,
+      accountEmail,
+      to,
+      subject: String(latest.subject || mail.subject || '').trim(),
+      mode: 'new-message',
     };
   }
 
   const api = {
+    buildNewMessageContext,
     buildReplyContext,
+    addAttachments,
     complete,
     finish,
     getOriginalSentMail,
+    getAttachments: () => selectedAttachments.map((attachment) => ({ ...attachment })),
     isUsed: () => rewriteUsed,
     reset,
+    resetOptionalFields,
+    removeAttachment,
+    toggleCopyFields,
   };
   global.SoftoraMailboxCompose = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
