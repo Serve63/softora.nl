@@ -5,6 +5,8 @@ const {
   MAILBOX_REPLY_NEXT_STEP,
   MAILBOX_REPLY_PRICE_EXPLANATION,
   MAILBOX_REPLY_PROFILE,
+  MAILBOX_REPLY_WEBFLOW_ANSWER,
+  MAILBOX_REPLY_WEBFLOW_NEXT_STEP,
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplySystemPrompt,
   classifyMailboxReplyIntent,
@@ -159,17 +161,27 @@ test('replyprofiel ondertekent exact met de geselecteerde mailboxidentiteit', ()
 
 test('Salon TOF houdt alleen de code-feitelijkheid en stuurt warm naar een bewerkbare dag', () => {
   const result = enforceMailboxReplyProfile(
-    'Hoi Salon,\n\nIk werk zelf ook in Webflow. Dus niet in Webflow zoals jullie huidige site. Webflow kan ik ook voor je verbeteren.',
+    'Beste,\n\nGoede vraag. Dit ontwerp heb ik helemaal op maat met code gebouwd. Dan kunnen we samen kort kijken wat er mogelijk is.\n\nAls je wilt, denk ik graag even met je mee over wat voor jou handig is. Als je wilt, is het een idee dat ik volgende week [dag] even langskom? 😁',
     {
       firstName: '',
       inboundText: 'Met welk programma werk je? Wij hebben nu Webflow.',
     }
   );
 
-  assert.match(result, /^Beste,/);
-  assert.match(result, /Goede vraag\. Dit ontwerp heb ik helemaal op maat met code gebouwd\./);
-  assert.match(result, new RegExp(MAILBOX_REPLY_NEXT_STEP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan|advies over Webflow|\bjullie\b/i);
+  assert.equal(result, [
+    'Beste,',
+    '',
+    MAILBOX_REPLY_WEBFLOW_ANSWER,
+    '',
+    MAILBOX_REPLY_WEBFLOW_NEXT_STEP,
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n'));
+  assert.match(result, /helemaal op maat met code gebouwd/);
+  assert.match(result, /Webflow, en dat kan natuurlijk ook prima werken/);
+  assert.match(result, /wat voor je site praktisch is binnen je huidige Webflow-opzet/);
+  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan ik|advies over Webflow|\bjullie\b|kijken wat er mogelijk is|denk ik graag even met je mee/i);
   assert.equal((result.match(/Als je wilt/g) || []).length, 1);
   assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);

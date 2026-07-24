@@ -405,15 +405,10 @@
     return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}</div>`;
   }
 
-  function renderCopyRouting(mail, escapeHtml) {
+  function renderMessageRouting(mail, escapeHtml) {
     const context = mail && mail.copyContext;
     const kind = String(context && context.kind || '').trim().toLowerCase();
-    if (
-      !context ||
-      context.evidenceKnown !== true ||
-      !['bcc', 'cc'].includes(kind) ||
-      typeof escapeHtml !== 'function'
-    ) return '';
+    if (!mail || typeof escapeHtml !== 'function') return '';
     function identity(name, email) {
       const normalizedEmail = normalizeEmail(email);
       const owner = getOwnerByAccount(normalizedEmail);
@@ -423,13 +418,43 @@
       }
       return escapeHtml(normalizedEmail || normalizedName || 'Onbekend');
     }
+    function exactHeaderValue(value) {
+      return escapeHtml(String(value || '').trim());
+    }
+    if (
+      context &&
+      context.evidenceKnown === true &&
+      ['bcc', 'cc'].includes(kind)
+    ) {
+      return `
+        <div class="detail-routing" data-mailbox-routing-kind="${escapeHtml(kind)}">
+          <div><span>Van:</span><strong>${identity(context.sourceName, context.sourceEmail)}</strong></div>
+          <div><span>Aan:</span><strong>${identity(context.recipientName, context.recipientEmail)}</strong></div>
+          <div><span>${kind.toUpperCase()}:</span><strong>${identity('', context.copyAccountEmail)}</strong></div>
+        </div>`;
+    }
+    const rows = [];
+    const fromName = String(mail.from || '').trim();
+    const fromEmail = normalizeEmail(mail.email);
+    if (fromName || fromEmail) {
+      rows.push(`<div><span>Van:</span><strong>${identity(fromName, fromEmail)}</strong></div>`);
+    }
+    if (mail.recipientRoutingEvidenceKnown === true) {
+      const to = String(mail.toDisplay || mail.to || '').trim();
+      const cc = String(mail.cc || '').trim();
+      const bcc = String(mail.bcc || '').trim();
+      if (to) rows.push(`<div><span>Aan:</span><strong>${exactHeaderValue(to)}</strong></div>`);
+      if (cc) rows.push(`<div><span>CC:</span><strong>${exactHeaderValue(cc)}</strong></div>`);
+      if (bcc) rows.push(`<div><span>BCC:</span><strong>${exactHeaderValue(bcc)}</strong></div>`);
+    }
+    if (!rows.length) return '';
     return `
-      <div class="detail-routing" data-mailbox-copy-kind="${escapeHtml(kind)}">
-        <div><span>Van:</span><strong>${identity(context.sourceName, context.sourceEmail)}</strong></div>
-        <div><span>Aan:</span><strong>${identity(context.recipientName, context.recipientEmail)}</strong></div>
-        <div><span>${kind.toUpperCase()}:</span><strong>${identity('', context.copyAccountEmail)}</strong></div>
+      <div class="detail-routing" data-mailbox-routing-kind="direct">
+        ${rows.join('')}
       </div>`;
   }
+
+  const renderCopyRouting = renderMessageRouting;
 
   function renderAttachments(message, escapeHtml) {
     if (typeof escapeHtml !== 'function') return '';
@@ -989,6 +1014,7 @@
     removeCachedMessage,
     renderDetailAccount,
     renderCopyRouting,
+    renderMessageRouting,
     renderAttachments,
     renderListMeta,
     renderOwnerMenu,

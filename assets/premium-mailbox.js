@@ -443,8 +443,9 @@ function renderMailboxParagraphs(lines, options) {
 function renderMailboxInlineImage(image) {
   return window.SoftoraMailboxImages?.renderInlineImage?.(image, escapeHtml) || '';
 }
-function renderMailboxBodySection(section, imageState, leadingHtml = '') {
+function renderMailboxBodySection(section, imageState, leadingHtml = '', options = {}) {
   const sectionLead = String(leadingHtml || '');
+  const embeddedIncoming = options && options.embeddedIncoming === true;
   if (!section || !Array.isArray(section.lines)) {
     return `<section class="detail-mail-section">${sectionLead}<p>Geen inhoud.</p></section>`;
   }
@@ -452,7 +453,7 @@ function renderMailboxBodySection(section, imageState, leadingHtml = '') {
     const firstLine = String(section.lines[0] || '').trim();
     const hasMeta = isMailboxReplyHeaderLine(firstLine);
     const quoteMeta = hasMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(firstLine)}</div>` : '';
-    const isOwnQuote = hasMeta && isMailboxOwnReplyHeaderLine(firstLine);
+    const isOwnQuote = !embeddedIncoming && hasMeta && isMailboxOwnReplyHeaderLine(firstLine);
     const quoteLabel = isOwnQuote ? '<div class="detail-mail-section-label">Eerdere mail</div>' : '';
     const quoteLines = window.SoftoraMailboxDisplay.trimOwnQuotedMailLines(hasMeta ? section.lines.slice(1) : section.lines, isOwnQuote ? MAILBOX_OWN_REPLY_AUTHOR_PATTERN : null);
     const preparedImages = isOwnQuote && imageState.quoteImages.length
@@ -535,8 +536,13 @@ function renderMailBody(value, images, options) {
     ? window.SoftoraMailboxCampaignInbox?.getConversationAction?.(options.mail)
     : replyMailId ? { kind: 'reply', isRoot: true } : null;
   const actionHtml = renderMailboxConversationAction(conversationAction, replyMailId);
-  const rootActionHtml = conversationAction && conversationAction.isRoot ? actionHtml : '';
-  const threadAction = conversationAction && !conversationAction.isRoot
+  const newMessageActionHtml = conversationAction && conversationAction.kind === 'new-message'
+    ? actionHtml
+    : '';
+  const rootActionHtml = conversationAction && conversationAction.kind === 'reply' && conversationAction.isRoot
+    ? actionHtml
+    : '';
+  const threadAction = conversationAction && conversationAction.kind === 'reply' && !conversationAction.isRoot
     ? { ...conversationAction, html: actionHtml }
     : null;
   const rootAttachmentsHtml = window.SoftoraMailboxCampaignInbox?.renderAttachments?.(
@@ -557,10 +563,11 @@ function renderMailBody(value, images, options) {
       renderInlineImage: renderMailboxInlineImage, renderParagraphs: renderMailboxParagraphs,
     }) || '',
   }) || '');
-  const renderedSections = isProvenMailboxCopy
+  const renderedSections = newMessageActionHtml ? [newMessageActionHtml] : [];
+  renderedSections.push(...(isProvenMailboxCopy
     ? (olderThreadMessagesHtml ? [olderThreadMessagesHtml] : [])
-    : (newerThreadMessagesHtml ? [newerThreadMessagesHtml] : []);
-  if (isProvenMailboxCopy && rootActionHtml) renderedSections.push(rootActionHtml);
+    : (newerThreadMessagesHtml ? [newerThreadMessagesHtml] : [])));
+  const rootIncoming = isMailboxRootIncoming(options && options.mail);
   if (isProvenMailboxCopy) {
     const copyOwner = String(copyContext.sourceName || '').trim();
     const copyMeta = [options && options.mail && options.mail.date, options && options.mail && options.mail.time, copyOwner]
@@ -573,8 +580,9 @@ function renderMailBody(value, images, options) {
   let insertedReplyAction = false;
   let insertedOlderThreadMessages = false;
   let insertedRootIncomingMeta = false;
+  if (rootIncoming) renderedSections.push('<section class="detail-mail-section detail-mail-section-received" data-mailbox-message-direction="incoming">');
   sections.forEach((section) => {
-    if (!insertedReplyAction && rootActionHtml && section && section.type === 'quote') {
+    if (!rootIncoming && !insertedReplyAction && rootActionHtml && section && section.type === 'quote') {
       if (rootAttachmentsHtml && !injectedAttachments) {
         renderedSections.push(rootAttachmentsHtml);
         injectedAttachments = true;
@@ -592,7 +600,7 @@ function renderMailBody(value, images, options) {
       injectedImages = true;
     }
     const sectionLead = !insertedRootIncomingMeta && rootIncomingMeta ? rootIncomingMeta : '';
-    renderedSections.push(renderMailboxBodySection(section, imageState, sectionLead));
+    renderedSections.push(renderMailboxBodySection(section, imageState, sectionLead, { embeddedIncoming: rootIncoming }));
     if (sectionLead) insertedRootIncomingMeta = true;
   });
   if (!insertedRootIncomingMeta && rootIncomingMeta) {
@@ -606,6 +614,7 @@ function renderMailBody(value, images, options) {
     renderedSections.push(rootAttachmentsHtml);
     injectedAttachments = true;
   }
+  if (rootIncoming) renderedSections.push('</section>');
   if (!insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
     renderedSections.push(rootActionHtml);
     if (!isProvenMailboxCopy && olderThreadMessagesHtml) {
@@ -955,7 +964,6 @@ function openMail(id, options = {}) {
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
-  const detailSecondary = window.SoftoraMailboxDisplay.getDetailSecondaryText(m, displayOptions);
   const detailBody = m.body || m.preview || '';
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
@@ -976,11 +984,10 @@ function openMail(id, options = {}) {
               <div class="detail-avatar" style="background:${getColor(avatarText)}">${escapeHtml(initials(avatarText))}</div>
               <div>
                 <div class="detail-from">${escapeHtml(detailPrimary)}</div>
-                <div class="detail-email">${escapeHtml(detailSecondary)}</div>${window.SoftoraMailboxCampaignInbox.renderDetailAccount(m, escapeHtml)}
               </div>
             </div>
           </div>
-          ${window.SoftoraMailboxCampaignInbox.renderCopyRouting(m, escapeHtml)}
+          ${window.SoftoraMailboxCampaignInbox.renderMessageRouting(m, escapeHtml)}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
         <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending }))}</div>
