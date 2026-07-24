@@ -556,7 +556,7 @@ function renderMailBody(value, images, options) {
   };
   const [newerThreadMessagesHtml, olderThreadMessagesHtml] = ['newer', 'older'].map((position) => window.SoftoraMailboxCampaignInbox?.renderThreadMessages(options && options.mail, escapeHtml, formatMailDate, {
     position,
-    chronological: isProvenMailboxCopy,
+    newestFirst: true,
     action: threadAction,
     renderMessageBody: (payload) => window.SoftoraMailboxImages?.renderThreadMessageBody?.(payload, threadBodyContext, {
       normalizeEmail: normalizeMailboxEmail, normalizeOptOutUrl: normalizeMailboxOptOutUrl,
@@ -564,9 +564,7 @@ function renderMailBody(value, images, options) {
     }) || '',
   }) || '');
   const renderedSections = newMessageActionHtml ? [newMessageActionHtml] : [];
-  renderedSections.push(...(isProvenMailboxCopy
-    ? (olderThreadMessagesHtml ? [olderThreadMessagesHtml] : [])
-    : (newerThreadMessagesHtml ? [newerThreadMessagesHtml] : [])));
+  if (newerThreadMessagesHtml) renderedSections.push(newerThreadMessagesHtml);
   const rootIncoming = isMailboxRootIncoming(options && options.mail);
   if (isProvenMailboxCopy) {
     const copyOwner = String(copyContext.sourceName || '').trim();
@@ -614,6 +612,10 @@ function renderMailBody(value, images, options) {
     renderedSections.push(rootAttachmentsHtml);
     injectedAttachments = true;
   }
+  if (rootIncoming && !insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
+    renderedSections.push(rootActionHtml);
+    insertedReplyAction = true;
+  }
   if (rootIncoming) renderedSections.push('</section>');
   if (!insertedReplyAction && rootActionHtml && !isProvenMailboxCopy) {
     renderedSections.push(rootActionHtml);
@@ -622,11 +624,17 @@ function renderMailBody(value, images, options) {
       insertedOlderThreadMessages = true;
     }
   }
-  if (!isProvenMailboxCopy && olderThreadMessagesHtml && !insertedOlderThreadMessages) {
-    renderedSections.push(olderThreadMessagesHtml);
+  if (isProvenMailboxCopy && imageState.quoteImages.length) {
+    renderedSections.push(window.SoftoraMailboxImages.renderOwnQuoteSection(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage));
   }
-  if (imageState.quoteImages.length) renderedSections.push(window.SoftoraMailboxImages.renderOwnQuoteSection(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage));
   if (isProvenMailboxCopy) renderedSections.push('</section>');
+  if (olderThreadMessagesHtml && !insertedOlderThreadMessages) {
+    renderedSections.push(olderThreadMessagesHtml);
+    insertedOlderThreadMessages = true;
+  }
+  if (!isProvenMailboxCopy && imageState.quoteImages.length) {
+    renderedSections.push(window.SoftoraMailboxImages.renderOwnQuoteSection(imageState.quoteImages.splice(0), imageState, renderMailboxInlineImage));
+  }
   return renderedSections.join('');
 }
 function findMailById(id) {

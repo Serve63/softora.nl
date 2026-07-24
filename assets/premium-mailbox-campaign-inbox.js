@@ -706,7 +706,9 @@
           ? messageTimestamp > rootTimestamp
           : messageTimestamp <= rootTimestamp;
       });
-    if (options.chronological === true) {
+    if (options.newestFirst === true) {
+      messages = messages.slice().sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
+    } else if (options.chronological === true) {
       messages = messages.slice().sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
     }
     return messages.map((message) => {
@@ -734,15 +736,16 @@
       const sectionClass = sent
         ? 'detail-mail-section detail-mail-section-sent'
         : 'detail-mail-section detail-mail-section-received';
-      const actionBefore = options.action &&
+      const messageActionHtml = options.action &&
         options.action.messageKey === getActionMessageKey(message)
         ? String(options.action.html || '')
         : '';
-      return `${actionBefore}
-        <section class="${sectionClass}">
+      const actionBefore = sent ? messageActionHtml : '';
+      const actionInside = sent ? '' : messageActionHtml;
+      return `${actionBefore}<section class="${sectionClass}">
           <div class="detail-mail-section-label">${sent ? sentLabel : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
-          ${renderedBody}${renderedAttachments}
+          ${renderedBody}${renderedAttachments}${actionInside}
         </section>`;
     }).filter(Boolean).join('');
   }

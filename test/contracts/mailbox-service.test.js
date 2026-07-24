@@ -2712,12 +2712,12 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
   );
   assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
   assert.match(result.text, /^Beste,/);
-  assert.match(result.text, /Goede vraag\. Het ontwerp dat ik je heb gestuurd, heb ik helemaal op maat met code gebouwd\./);
-  assert.match(result.text, /Webflow, en dat kan natuurlijk ook prima werken/);
-  assert.match(result.text, /wat voor je site praktisch is binnen je huidige Webflow-opzet/);
-  assert.match(result.text, /Als je wilt, is het een idee dat ik volgende week \[dag\] even langskom\?/);
-  assert.doesNotMatch(result.text, /Hoi Salon|Leuke vraag|dus niet in Webflow|Webflow kan ik|\bjullie\b|laagdrempelig|\bkansen\b|kijken wat er mogelijk is|denk ik graag even met je mee/i);
-  assert.equal((result.text.match(/Als je wilt/g) || []).length, 1);
+  assert.match(result.text, /Goede vraag\. Het ontwerp dat ik je heb gestuurd, heb ik helemaal op maat met code gebouwd/);
+  assert.match(result.text, /Is het een idee dat ik volgende week \[dag\] even langskom\?/);
+  assert.match(result.text, /Dan kan ik je kort laten zien hoe het ontwerp is opgebouwd en kunnen we samen bespreken wat handig is voor je website\./);
+  assert.doesNotMatch(result.text, /Hoi Salon|Leuke vraag|dus niet in Webflow|Webflow kan ik|Je huidige site|Wij hebben nu|\bWebflow\b|\bjullie\b|laagdrempelig|\bkansen\b|kijken wat er mogelijk is|denk ik graag even met je mee|Als je wilt/i);
+  assert.equal((result.text.match(/Als je wilt/g) || []).length, 0);
+  assert.equal((result.text.match(/\bWebflow\b/gi) || []).length, 0);
   assert.equal((result.text.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.doesNotMatch(result.text, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.text.match(/😁/gu) || []).length, 1);

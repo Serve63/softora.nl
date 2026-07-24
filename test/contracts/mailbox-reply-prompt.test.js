@@ -179,10 +179,11 @@ test('Salon TOF houdt alleen de code-feitelijkheid en stuurt warm naar een bewer
     'Servé Creusen',
   ].join('\n'));
   assert.match(result, /helemaal op maat met code gebouwd/);
-  assert.match(result, /Webflow, en dat kan natuurlijk ook prima werken/);
-  assert.match(result, /wat voor je site praktisch is binnen je huidige Webflow-opzet/);
-  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan ik|advies over Webflow|\bjullie\b|kijken wat er mogelijk is|denk ik graag even met je mee/i);
-  assert.equal((result.match(/Als je wilt/g) || []).length, 1);
+  assert.match(result, /Dan kan ik je kort laten zien hoe het ontwerp is opgebouwd en kunnen we samen bespreken wat handig is voor je website\./);
+  assert.doesNotMatch(result, /Hoi Salon|Leuke vraag|werk zelf ook in Webflow|dus niet in Webflow|Webflow kan ik|advies over Webflow|Je huidige site|Wij hebben nu|\bWebflow\b|\bjullie\b|kijken wat er mogelijk is|denk ik graag even met je mee|Als je wilt/i);
+  assert.equal((result.match(/Als je wilt/g) || []).length, 0);
+  assert.equal((result.match(/\bWebflow\b/gi) || []).length, 0);
+  assert.match(result, /Is het een idee dat ik volgende week \[dag\] even langskom\?/);
   assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
@@ -216,6 +217,7 @@ test('interesse krijgt exact één concreet vrijblijvend voorstel met bewerkbare
   assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.match(result, new RegExp(MAILBOX_REPLY_NEXT_STEP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(result, /Zullen we een afspraak maken/);
+  assert.doesNotMatch(result, /Als je wilt, is het een idee/i);
   assert.doesNotMatch(result, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
 });
 
@@ -313,7 +315,8 @@ test('replyprofiel verwijdert dubbele semantische zinnen en stapelt geen vervolg
   );
 
   assert.equal((result.match(/Dankjewel voor je vraag/gi) || []).length, 1);
-  assert.equal((result.match(/Als je wilt/g) || []).length, 1);
+  assert.equal((result.match(/Als je wilt/g) || []).length, 0);
+  assert.doesNotMatch(result, /Als je wilt, is het een idee/i);
   assert.equal((result.match(/volgende week \[dag\] even langskom/g) || []).length, 1);
   assert.equal((result.match(/😁/gu) || []).length, 1);
 });
