@@ -45,9 +45,9 @@ const MAILBOX_REPLY_NEXT_STEP =
 const MAILBOX_REPLY_PRICE_EXPLANATION =
   'De prijs hangt af van wat je precies wilt en wat daarvoor nodig is.';
 const MAILBOX_REPLY_WEBFLOW_ANSWER =
-  'Goede vraag. Het ontwerp dat ik je heb gestuurd, heb ik helemaal op maat met code gebouwd 😁';
+  'Goede vraag. Ik bouw dit soort websites meestal helemaal op maat met code. Daardoor kan ik de indeling, uitstraling en werking gericht afstemmen op wat een bedrijf nodig heeft, zonder vast te zitten aan de standaardmogelijkheden van een websitebouwer 😁';
 const MAILBOX_REPLY_WEBFLOW_NEXT_STEP =
-  'Is het een idee dat ik volgende week [dag] even langskom? Dan kan ik je kort laten zien hoe het ontwerp is opgebouwd en kunnen we samen bespreken wat handig is voor je website.';
+  'Misschien is het leuk als ik volgende week een keer langskom? Dan kunnen we rustig samen naar je huidige website en het ontwerp kijken en de mogelijkheden bespreken.';
 
 function cleanLine(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -168,7 +168,8 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Bij geen interesse, geen behoefte, geen vervolgtraject, buiten-scope, een beleefde afwijzing of een verzoek om niet door te gaan: reageer kort en respectvol zonder nieuwe verkooppoging; bedank; zeg eventueel dat de ontvanger later zelf contact mag opnemen; stel nooit een bezoek, afspraak, vervolgstap, prijsbespreking of meedenken voor.',
     'Als iemand al tevreden is met een andere partij, benoem juist dat dit begrijpelijk en fijn is.',
     'Feitelijke waarheid gaat altijd voor stijl. Het actuele ontwerp uit deze coldmail is met code gebouwd.',
-    `Als iemand vraagt met welk programma het ontwerp is gemaakt en de eigen huidige tool alleen als context noemt, antwoord dan uitsluitend wat voor het verstuurde ontwerp is gebruikt volgens deze vaste lijn: "${MAILBOX_REPLY_WEBFLOW_ANSWER}" Herhaal de tool van de ontvanger niet. Voeg alleen als de vraag ruimte laat voor een vervolg exact één relevante vervolgstap toe: "${MAILBOX_REPLY_WEBFLOW_NEXT_STEP}"`,
+    `Bij een technische vraag over het programma, platform of de bouwwijze: geef eerst een inhoudelijk antwoord met echte waarde volgens deze vaste lijn: "${MAILBOX_REPLY_WEBFLOW_ANSWER}" Leg uit wat maatwerkcode praktisch mogelijk maakt, maar herhaal of beoordeel de eigen tool van de ontvanger niet.`,
+    `Voeg alleen als zo'n technische vraag werkelijk openheid voor vervolg laat zien exact één natuurlijke uitnodiging toe: "${MAILBOX_REPLY_WEBFLOW_NEXT_STEP}" Gebruik daarvoor geen vaste [dag]-placeholder, geen onnatuurlijke combinatie met "Als je wilt" en geen tweede alternatief vervolg.`,
     'Beweer nooit dat Servé Webflow gebruikt, zet Webflow niet negatief neer, gebruik geen defensieve tegenstelling zoals "dus niet in Webflow" en geef geen ongevraagd Webflow-advies.',
     'Vermijd corporate taal, gladde verkooppraat, overmatige beleefdheid en formuleringen zoals "ik respecteer je keuze volledig", "je gegevens niet verder mailen", "vriendelijke woorden" en "dank voor uw reactie".',
     'Houd de kern meestal tussen 30 en 75 woorden, exclusief afsluiting. Schrijf niet langer dan nodig.',

@@ -122,12 +122,15 @@ async function loadBody({
       throw new Error(data?.detail || data?.error || 'Bericht laden mislukt');
     }
     const body = normalizeText(data.message.body || '');
-    mail.body = body || mail.preview || '';
+    mail.body = body;
     mail.bodyImages = normalizeBodyImages(data.message.bodyImages || mail.bodyImages);
     mail.optOutUrl = normalizeOptOutUrl(data.message.optOutUrl || mail.optOutUrl);
-    mail.bodyLoaded = true;
     mail.hasBody = Boolean(data.message.hasBody || body);
     mail.bodyTruncated = Boolean(data.message.bodyTruncated);
+    mail.bodyLoaded = Boolean(
+      !mail.bodyTruncated &&
+      (body || data.message.hasBody === false)
+    );
     mail.bodyImagesTruncated = false;
     mail.bodyImageEvidenceKnown = Boolean(data.message.bodyImageEvidenceKnown);
     mail.embeddedImageCount = Math.max(
@@ -145,10 +148,8 @@ async function loadBody({
     mail.recipientRoutingEvidenceKnown = data.message.recipientRoutingEvidenceKnown === true;
     mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
   } catch (error) {
-    if (!mail.body) {
-      mail.body = String(error?.message || error || 'Bericht laden mislukt');
-      mail.bodyLoaded = true;
-    }
+    mail.bodyLoadError = String(error?.message || error || 'Bericht laden mislukt');
+    mail.bodyLoaded = false;
   } finally {
     mail.bodyLoading = false;
     if (typeof getActiveMail === 'function' && String(getActiveMail()) === String(id)) {
@@ -164,6 +165,7 @@ function needsThreadBodyHydration(message) {
     hasBody &&
     (
       !normalizeText(source.body) ||
+      source.bodyLoaded === false ||
       source.bodyTruncated ||
       source.bodyImagesTruncated
     )
@@ -182,8 +184,12 @@ function applyThreadMessagePayload(message, source, normalizeBodyImages, normali
   if (body) {
     message.body = body;
     message.bodyTruncated = Boolean(source && source.bodyTruncated);
+    message.bodyLoaded = !message.bodyTruncated;
   } else if (source && source.hasBody === false) {
     message.bodyTruncated = false;
+    message.bodyLoaded = true;
+  } else if (source && source.hasBody === true) {
+    message.bodyLoaded = false;
   }
   if (typeof normalizeBodyImages === 'function' && Array.isArray(source && source.bodyImages)) {
     message.bodyImages = normalizeBodyImages(source.bodyImages);
@@ -332,7 +338,7 @@ async function loadThreadBodies({
             normalizeOptOutUrl
           ) || updated;
         } catch (_) {
-          // Keep the safe preview in place; reopening the conversation retries.
+          // Houd de eerlijke laadstatus zichtbaar; opnieuw openen probeert exact dit bericht nogmaals.
         } finally {
           message.bodyLoading = false;
           message.imageLoading = false;

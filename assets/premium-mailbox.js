@@ -733,7 +733,7 @@ function formatMailDate(value, nowValue) {
 }
 function normalizeMailboxApiMessage(message) {
   const when = formatMailDate(message.receivedAt || message.date); const activityWhen = formatMailDate(message.activityAt || message.receivedAt || message.date);
-  const body = cleanMailboxText(message.body || message.preview || '');
+  const body = cleanMailboxText(message.body || '');
   const preview = cleanMailboxText(message.preview || body).replace(/\s+/g, ' ').slice(0, 160);
   const bodyImages = normalizeMailboxBodyImages(message.bodyImages);
   const optOutUrl = normalizeMailboxOptOutUrl(message.optOutUrl);
@@ -972,7 +972,7 @@ function openMail(id, options = {}) {
   const displayOptions = { activeFolder, account: window.SoftoraMailboxCampaignInbox.getAccount(m, activeMailboxAccount) };
   const avatarText = window.SoftoraMailboxDisplay.getAvatarText(m, displayOptions);
   const detailPrimary = window.SoftoraMailboxDisplay.getDetailPrimaryText(m, displayOptions);
-  const detailBody = m.body || m.preview || '';
+  const detailBody = m.body || '';
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
   document.getElementById('mail-detail').innerHTML = `
