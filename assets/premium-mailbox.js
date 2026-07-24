@@ -443,9 +443,10 @@ function renderMailboxParagraphs(lines, options) {
 function renderMailboxInlineImage(image) {
   return window.SoftoraMailboxImages?.renderInlineImage?.(image, escapeHtml) || '';
 }
-function renderMailboxBodySection(section, imageState) {
+function renderMailboxBodySection(section, imageState, leadingHtml = '') {
+  const sectionLead = String(leadingHtml || '');
   if (!section || !Array.isArray(section.lines)) {
-    return '<section class="detail-mail-section"><p>Geen inhoud.</p></section>';
+    return `<section class="detail-mail-section">${sectionLead}<p>Geen inhoud.</p></section>`;
   }
   if (section.type === 'quote') {
     const firstLine = String(section.lines[0] || '').trim();
@@ -459,6 +460,7 @@ function renderMailboxBodySection(section, imageState) {
       : { imageState, html: '' };
     return `
       <section class="detail-mail-section ${isOwnQuote ? 'detail-mail-section-history-sent' : 'detail-mail-section-history'}" aria-label="Ingesloten berichtgeschiedenis">
+        ${sectionLead}
         ${quoteLabel}
         ${quoteMeta}
         <div class="detail-mail-quote-body">${renderMailboxParagraphs(quoteLines, { quoteBody: true, images: preparedImages.imageState.images, optOutUrl: preparedImages.imageState.optOutUrl, senderEmail: preparedImages.imageState.senderEmail, usedImages: preparedImages.imageState.usedImages })}${preparedImages.html}</div>
@@ -467,11 +469,13 @@ function renderMailboxBodySection(section, imageState) {
   if (section.type === 'signature') {
     return `
       <section class="detail-mail-section detail-mail-section-signature">
+        ${sectionLead}
         ${renderMailboxParagraphs(section.lines, imageState)}
       </section>`;
   }
   return `
     <section class="detail-mail-section">
+      ${sectionLead}
       ${renderMailboxParagraphs(section.lines, imageState)}
     </section>`;
 }
@@ -526,6 +530,7 @@ function renderMailBody(value, images, options) {
   imageState.images = imagePlan.mainImages;
   imageState.quoteImages = normalizeMailboxBodyImages(imagePlan.quoteImages);
   const replyMailId = String(options && options.replyMailId || '').trim();
+  const rootIncomingMeta = String(options && options.rootIncomingMeta || '');
   const conversationAction = options && options.mail
     ? window.SoftoraMailboxCampaignInbox?.getConversationAction?.(options.mail)
     : replyMailId ? { kind: 'reply', isRoot: true } : null;
@@ -567,6 +572,7 @@ function renderMailBody(value, images, options) {
   let injectedAttachments = false;
   let insertedReplyAction = false;
   let insertedOlderThreadMessages = false;
+  let insertedRootIncomingMeta = false;
   sections.forEach((section) => {
     if (!insertedReplyAction && rootActionHtml && section && section.type === 'quote') {
       if (rootAttachmentsHtml && !injectedAttachments) {
@@ -585,8 +591,13 @@ function renderMailBody(value, images, options) {
       if (imagesHtml) renderedSections.push(imagesHtml);
       injectedImages = true;
     }
-    renderedSections.push(renderMailboxBodySection(section, imageState));
+    const sectionLead = !insertedRootIncomingMeta && rootIncomingMeta ? rootIncomingMeta : '';
+    renderedSections.push(renderMailboxBodySection(section, imageState, sectionLead));
+    if (sectionLead) insertedRootIncomingMeta = true;
   });
+  if (!insertedRootIncomingMeta && rootIncomingMeta) {
+    renderedSections.push(`<section class="detail-mail-section">${rootIncomingMeta}</section>`);
+  }
   if (!injectedImages) {
     const imagesHtml = window.SoftoraMailboxImages?.renderUnused?.(imageState, renderMailboxInlineImage) || '';
     if (imagesHtml) renderedSections.push(imagesHtml);
@@ -972,7 +983,7 @@ function openMail(id, options = {}) {
           ${window.SoftoraMailboxCampaignInbox.renderCopyRouting(m, escapeHtml)}
         </div>
         <div class="detail-divider" aria-hidden="true"></div>
-        <div class="detail-body-text">${rootIncomingMeta}${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, threadImagesReady: !imagesPending }))}</div>
+        <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending }))}</div>
       </article>
     </div>`;
 }
