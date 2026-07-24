@@ -2270,6 +2270,11 @@ test('compose toont optionele CC BCC en bijlagen maar verstuurt niets automatisc
   assert.match(pageSource, /id="c-bcc"/);
   assert.match(pageSource, /id="c-attachments" multiple hidden/);
   assert.match(pageSource, /data-mailbox-action="choose-attachments"/);
+  assert.match(pageSource, /\.compose-attach-button \{[^}]*display:\s*inline-flex;[^}]*flex:\s*0 0 auto;[^}]*align-items:\s*center;[^}]*gap:\s*8px;[^}]*border:\s*0;[^}]*background:\s*transparent;/);
+  assert.match(pageSource, /\.compose-attach-button svg \{[^}]*width:\s*15px;[^}]*stroke:\s*currentColor/);
+  assert.match(pageSource, /<button class="compose-attach-button"[^>]*>[\s\S]*<svg[^>]*aria-hidden="true"[\s\S]*<span>Bijlage toevoegen<\/span>/);
+  assert.doesNotMatch(pageSource, /📎 Bijlage toevoegen/);
+  assert.doesNotMatch(pageSource, /\.compose-attach-button:hover\s*\{/);
   assert.match(composeControllerSource, /cc: fieldValue\('c-cc'\)/);
   assert.match(composeControllerSource, /bcc: fieldValue\('c-bcc'\)/);
   assert.match(composeControllerSource, /attachments: options\.compose\.getAttachments\(\)/);

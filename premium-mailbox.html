@@ -164,7 +164,9 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .compose-field { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .compose-field-label { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-light); padding: 14px 16px; width: 92px; flex-shrink: 0; }
 .compose-field input { flex: 1; padding: 14px 16px; border: none; font-family: 'Barlow', sans-serif; font-size: 16px; color: var(--text-dark); outline: none; background: transparent; }
-.compose-copy-toggle,.compose-attach-button { border: 0; background: transparent; color: var(--crimson); font: 700 12px/1 var(--premium-sidebar-font-sans, 'Inter', sans-serif); cursor: pointer; padding: 10px 14px; }
+.compose-copy-toggle { border: 0; background: transparent; color: var(--crimson); font: 700 12px/1 var(--premium-sidebar-font-sans, 'Inter', sans-serif); cursor: pointer; padding: 10px 14px; }
+.compose-attach-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 7px 4px; border: 0; background: transparent; color: var(--crimson); font: 700 12px/1 var(--premium-sidebar-font-sans, 'Inter', sans-serif); cursor: pointer; }
+.compose-attach-button svg { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .compose-copy-toggle:focus-visible,.compose-attach-button:focus-visible,.compose-attachment-chip button:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; }
 .compose-copy-fields[hidden] { display: none; }
 .compose-attachment-row { min-height: 46px; padding: 7px 10px; gap: 8px; flex-wrap: wrap; }
@@ -464,7 +466,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     <div class="compose-field"><div class="compose-field-label">Onderwerp</div><input type="text" id="c-subject" placeholder="Onderwerp…"></div>
     <div class="compose-field compose-attachment-row">
       <input type="file" id="c-attachments" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
-      <button class="compose-attach-button" type="button" data-mailbox-action="choose-attachments">📎 Bijlage toevoegen</button>
+      <button class="compose-attach-button" type="button" data-mailbox-action="choose-attachments">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20.5 11.5-8.8 8.8a6 6 0 0 1-8.5-8.5l9.5-9.5a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 0 1-2.8-2.8l8.9-8.9"/></svg>
+        <span>Bijlage toevoegen</span>
+      </button>
       <div class="compose-attachment-list" id="c-attachment-list" aria-live="polite"></div>
     </div>
     <div class="compose-body"><textarea id="c-body" placeholder="Typ je bericht hier…"></textarea></div>
