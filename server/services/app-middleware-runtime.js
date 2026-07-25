@@ -29,6 +29,7 @@ function applyAppMiddleware(app, deps = {}) {
       '/api/health',
       '/api/healthz',
       '/api/mailbox/sync',
+      '/api/mailbox/instantly/sync',
       '/api/coldmailing/autopilot/run',
       '/api/premium-database/webdesign-photo-batches/run',
     ],
@@ -302,6 +303,7 @@ function applyAppMiddleware(app, deps = {}) {
     [
       '/api/mailbox/send',
       '/api/mailbox/sync',
+      '/api/mailbox/instantly/sync',
       '/api/coldmailing/autopilot/run',
       '/api/premium-database/webdesign-photo-batches/run',
       '/api/coldmailing/autopilot/settings',

@@ -153,6 +153,11 @@
       const sendBtn = documentRef?.querySelector('.btn-send');
       if (sendBtn) sendBtn.disabled = true;
       try {
+        const provider = String(replyContext && replyContext.provider || '').trim().toLowerCase();
+        const attachments = options.compose.getAttachments();
+        if (provider === 'instantly' && attachments.length) {
+          throw new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
+        }
         const response = await options.fetch('/api/mailbox/send', {
           method: 'POST',
           credentials: 'same-origin',
@@ -160,12 +165,20 @@
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
             account,
+            ...(provider
+              ? {
+                  owner: options.campaignInbox?.getOwner?.(),
+                  provider,
+                  providerMessageId: String(replyContext && replyContext.providerMessageId || '').trim(),
+                  providerThreadId: String(replyContext && replyContext.providerThreadId || '').trim(),
+                }
+              : {}),
             to,
             cc: fieldValue('c-cc'),
             bcc: fieldValue('c-bcc'),
             subject,
             body: fieldValue('c-body'),
-            attachments: options.compose.getAttachments(),
+            attachments,
           }),
         });
         const data = await response.json().catch(() => ({}));
@@ -174,7 +187,9 @@
         }
         close();
         options.toast('✓ Mail verzonden');
-        if (options.getActiveFolder() === 'sent') await options.loadMessages();
+        if (['sent', 'outreach'].includes(options.getActiveFolder())) {
+          await options.loadMessages({ skipPageBootstrap: true, openLatest: false });
+        }
       } catch (error) {
         options.toast(String(error?.message || error || 'Mail verzenden mislukt'));
       } finally {

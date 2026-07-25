@@ -3224,6 +3224,7 @@ test('mailbox service exposes sync response handler for cron and admin routes', 
   const service = createMailboxService({ mailConfig: {} });
 
   assert.equal(typeof service.syncMailboxResponse, 'function');
+  assert.equal(typeof service.syncInstantlyMailboxResponse, 'function');
 
   const response = createResponseRecorder();
   await service.syncMailboxResponse({ query: {}, body: {} }, response);

@@ -8,6 +8,7 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxComposeSend } = require('./mailbox-compose-send');
+const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, markInstantlyMessageRead, mergeCampaignReplies, resolveReplyIdentity, sendMailboxMessage, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const {
@@ -594,6 +595,7 @@ function createMailboxService(deps = {}) {
       mailboxIndexStore,
       dataOpsStore,
     }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getUiStateValues, setUiStateValues, logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||
@@ -2257,7 +2259,9 @@ function createMailboxService(deps = {}) {
     return live;
   }
 
-  async function markMessageRead({ accountEmail, id, folder, uid }) {
+  async function markMessageRead({ accountEmail, id, folder, uid, owner }) {
+    const instantlyResult = await markInstantlyMessageRead({ input: { accountEmail, id, folder, uid, owner }, instantlyMailboxService, mailboxIndexStore });
+    if (instantlyResult) return instantlyResult;
     const account = getAccount(accountEmail);
     if (!account) {
       const error = new Error('Mailbox-account niet gevonden.');
@@ -2307,6 +2311,7 @@ function createMailboxService(deps = {}) {
 
   const mailboxVisibility = createMailboxVisibilityService({
     getAccount,
+    ...getInstantlyVisibilityDeps(instantlyMailboxService),
     parseMessageReference,
     canUseMailboxIndex,
     mailboxIndexStore,
@@ -2356,9 +2361,7 @@ function createMailboxService(deps = {}) {
     }
 
     const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
-    const contextAccountEmail = normalizeEmail(context && context.accountEmail);
-    const resolvedAccountEmail = getAccount(contextAccountEmail) ? contextAccountEmail : normalizeEmail(accountEmail);
-    const accountSenderName = cleanPromptText(getAccount(resolvedAccountEmail)?.name, 120) || resolvedAccountEmail;
+    const { resolvedAccountEmail, accountSenderName } = resolveReplyIdentity({ context, accountEmail, getAccount, instantlyMailboxService, normalizeEmail, normalizeString, cleanPromptText });
     const payload = buildMailboxReplyPromptPayload({
       accountEmail: resolvedAccountEmail,
       senderName: accountSenderName,
@@ -2465,19 +2468,21 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function listCampaignReplies({ limit = 100 } = {}) {
+  async function listCampaignReplies({ limit = 100, owner = '', refreshInstantly = false } = {}) {
     const replies = await mailboxCampaignRepliesService.listReplies({
       limit: Number(limit || 100) || 100,
     });
+    const { messages, instantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, instantlyMailboxService, limit, owner, refreshInstantly, normalizeString, truncateText });
     const result = {
       ok: true,
-      messages: replies,
+      messages,
       sync: {
         indexed: true,
-        stale: false,
-        source: 'campaign-replies-index',
-        refreshRecommended: false,
+        stale: instantlySync?.ok === false,
+        source: instantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index',
+        refreshRecommended: instantlySync?.ok === false,
         warming: false,
+        instantly: instantlySync,
       },
     };
     const serializedSnapshot = serializeMailboxCampaignSnapshot(result);
@@ -2499,6 +2504,8 @@ function createMailboxService(deps = {}) {
     try {
       return res.status(200).json(await listCampaignReplies({
         limit: Number(req.query?.limit || 100) || 100,
+        owner: normalizeString(req.query?.owner),
+        refreshInstantly: /^(1|true|yes)$/i.test(normalizeString(req.query?.refreshInstantly)),
       }));
     } catch (error) {
       logger.error('[Mailbox][CampaignReplies]', error?.message || error);
@@ -2585,18 +2592,11 @@ function createMailboxService(deps = {}) {
     }
   }
 
+  async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString }); }
   async function sendMessageResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const result = await sendMessage({
-        accountEmail: body.account,
-        to: body.to,
-        cc: body.cc,
-        bcc: body.bcc,
-        subject: body.subject,
-        text: body.body || body.text || '',
-        attachments: body.attachments,
-      });
+      const result = await sendMailboxMessage({ body, instantlyMailboxService, sendMessage, normalizeString });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
       logger.error('[Mailbox][Send]', error?.message || error);
@@ -2615,7 +2615,7 @@ function createMailboxService(deps = {}) {
         accountEmail: body.account,
         id: body.id || body.messageId,
         folder: body.folder,
-        uid: body.uid,
+        uid: body.uid, owner: body.owner,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {
@@ -2632,7 +2632,7 @@ function createMailboxService(deps = {}) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await hideConversation({
-        accountEmail: body.account,
+        accountEmail: body.account, owner: body.owner,
         id: body.id || body.messageId,
         folder: body.folder,
         uid: body.uid,
@@ -2653,7 +2653,7 @@ function createMailboxService(deps = {}) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const result = await restoreConversation({
-        accountEmail: body.account,
+        accountEmail: body.account, owner: body.owner,
         id: body.id || body.messageId,
         folder: body.folder,
         uid: body.uid,
@@ -2708,14 +2708,14 @@ function createMailboxService(deps = {}) {
     listCampaignReplies,
     listMessages,
     listMessagesWithMeta,
-    syncMailboxResponse,
+    syncMailboxResponse, syncInstantlyMailboxResponse,
     markMessageRead,
     hideConversation,
     restoreConversation,
     sendMessage,
     rewriteDraft,
     syncMailbox,
-    syncMailboxFolder,
+    syncMailboxFolder, instantlyMailboxService,
   };
 }
 

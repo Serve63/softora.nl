@@ -1742,8 +1742,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260725a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260725a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260725b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260725b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260725a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -1818,7 +1818,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260725a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260725a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260725a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260724c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260725a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260725a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260724b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260725a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260724c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260725b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2567,7 +2567,8 @@ test('compose toont optionele CC BCC en bijlagen maar verstuurt niets automatisc
   assert.doesNotMatch(pageSource, /\.compose-attach-button:hover\s*\{/);
   assert.match(composeControllerSource, /cc: fieldValue\('c-cc'\)/);
   assert.match(composeControllerSource, /bcc: fieldValue\('c-bcc'\)/);
-  assert.match(composeControllerSource, /attachments: options\.compose\.getAttachments\(\)/);
+  assert.match(composeControllerSource, /const attachments = options\.compose\.getAttachments\(\)/);
+  assert.match(composeControllerSource, /attachments,/);
   assert.match(composeControllerSource, /action === 'send-mail'[\s\S]*void send\(\)/);
 });
 
@@ -3512,7 +3513,9 @@ test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over all
   assert.doesNotMatch(pageSource, /data-mailbox-folder=/);
   assert.match(scriptSource, /let activeFolder = 'outreach';/);
   assert.match(scriptSource, /SoftoraMailboxCampaignInbox\?\.load/);
-  assert.match(campaignInboxSource, /\/api\/mailbox\/campaign-replies\?limit=100/);
+  assert.match(campaignInboxSource, /\/api\/mailbox\/campaign-replies\?\$\{params\.toString\(\)\}/);
+  assert.match(campaignInboxSource, /owner: activeOwner/);
+  assert.match(campaignInboxSource, /refreshInstantly: '1'/);
   assert.match(campaignInboxSource, /function getAccount\(mail, fallbackAccount\)/);
   assert.match(campaignInboxSource, /function getRequestId\(mail\)/);
   assert.match(campaignInboxSource, /async function load\(folder, normalizeMessage, fetchImpl, options\)/);
@@ -3588,7 +3591,7 @@ test('coldmail inbox laadt echte gekoppelde mailboxberichten via de campagne-rep
   assert.equal(result.messages[1].campaign.actionRequired, false);
   assert.equal(result.sync.source, 'campaign-replies-index');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=100');
+  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=100&owner=serve&refreshInstantly=1');
   assert.equal(calls[0].options.cache, 'no-store');
   assert.doesNotMatch(calls[0].url, /ui-state-get/);
   assert.equal(await campaignInboxModule.load('inbox', (message) => message), null);

@@ -194,6 +194,18 @@ function createMailboxIndexStore(deps = {}) {
     return `${normalizeEmail(accountEmail)}|${normalizeFolder(folder)}|${Number(uid) || 0}`;
   }
 
+  function buildProviderMessageKey(provider, providerId) {
+    return `${normalizeString(provider).toLowerCase()}|${normalizeString(providerId)}`;
+  }
+
+  function stableProviderUid(provider, providerId) {
+    const digest = crypto
+      .createHash('sha256')
+      .update(buildProviderMessageKey(provider, providerId))
+      .digest();
+    return Math.max(1, digest.readUInt32BE(0) & 0x7fffffff);
+  }
+
   function buildMessageRow(message, accountEmail, folder, index = 0) {
     const normalizedFolder = normalizeFolder(folder || message?.folder);
     const uid = parseUidFromMessage(message);
@@ -283,6 +295,21 @@ function createMailboxIndexStore(deps = {}) {
         : 0,
       indexed: true,
     };
+    const provider = normalizeString(payload.provider || payload.source).toLowerCase();
+    if (provider === 'instantly') {
+      normalized.provider = 'instantly';
+      normalized.providerMessageId = normalizeString(payload.providerMessageId);
+      normalized.providerThreadId = normalizeString(payload.providerThreadId);
+      normalized.providerCampaignId = normalizeString(payload.providerCampaignId);
+      normalized.providerAccountEmail = normalizeEmail(payload.providerAccountEmail || row.account_email);
+      normalized.providerOwner = normalizeString(payload.providerOwner).toLowerCase();
+      normalized.storageFolder = normalizeFolder(row.folder);
+      normalized.storageUid = uid;
+      normalized.uid = 0;
+      normalized.folder = normalizeString(payload.direction).toLowerCase() === 'sent' ? 'sent' : 'inbox';
+      normalized.bodyLoaded = Boolean(row.has_body) && !Boolean(row.body_truncated);
+      normalized.hasBody = Boolean(row.has_body);
+    }
     normalized.originalCampaignOutbound =
       payload.originalCampaignOutbound === true ||
       isOriginalCampaignOutboundMessage(normalized);
@@ -293,6 +320,128 @@ function createMailboxIndexStore(deps = {}) {
       ? normalizeString(payload.webdesignLinkUrl)
       : '';
     return normalized;
+  }
+
+  function buildProviderMessageRow(message = {}) {
+    const provider = normalizeString(message.provider).toLowerCase();
+    const providerId = normalizeString(message.providerMessageId || message.id);
+    const accountEmail = normalizeEmail(message.accountEmail || message.providerAccountEmail);
+    const owner = normalizeString(message.providerOwner).toLowerCase();
+    if (!provider || !providerId || !accountEmail || !owner) return null;
+    const uid = stableProviderUid(provider, providerId);
+    const body = trimBodyForStorage(message, 0);
+    const dateIso = parseDateIso(message.date || message.receivedAt);
+    return {
+      message_key: buildProviderMessageKey(provider, providerId),
+      account_email: accountEmail,
+      folder: provider,
+      uid,
+      provider_id: `${provider}:${providerId}`,
+      message_id: normalizeString(message.messageId),
+      in_reply_to: normalizeString(message.inReplyTo),
+      references_text: normalizeString(message.references),
+      sender_name: truncateText(normalizeString(message.from), 240),
+      sender_email: truncateText(normalizeEmail(message.email), 320),
+      recipients_text: truncateText(normalizeString(message.to), 1000),
+      subject: truncateText(normalizeString(message.subject) || '(Geen onderwerp)', 500),
+      preview: truncateText(normalizeString(message.preview), 500),
+      body_text: body.text,
+      body_truncated: body.truncated,
+      has_body: body.hasBody,
+      date: dateIso,
+      internal_date: dateIso,
+      unread: Boolean(message.unread),
+      starred: Boolean(message.starred),
+      payload: {
+        source: provider,
+        provider,
+        providerMessageId: providerId,
+        providerThreadId: truncateText(normalizeString(message.providerThreadId), 500),
+        providerCampaignId: truncateText(normalizeString(message.providerCampaignId), 500),
+        providerAccountEmail: accountEmail,
+        providerOwner: owner,
+        direction: normalizeString(message.folder || message.direction).toLowerCase() === 'sent'
+          ? 'sent'
+          : 'received',
+        recipientRoutingEvidenceKnown: message.recipientRoutingEvidenceKnown === true,
+        toDisplay: truncateText(normalizeString(message.toDisplay || message.to), 2000),
+        cc: truncateText(normalizeString(message.cc), 2000),
+        bcc: truncateText(normalizeString(message.bcc), 2000),
+        deliveredTo: truncateText(normalizeString(message.deliveredTo), 1000),
+        attachments: normalizeAttachments(message.attachments),
+        attachmentSource: provider,
+        originalCampaignOutbound: message.originalCampaignOutbound === true,
+      },
+      updated_at: isoNow(),
+    };
+  }
+
+  async function upsertProviderMessages({ provider, messages = [] } = {}) {
+    const normalizedProvider = normalizeString(provider).toLowerCase();
+    const rows = (Array.isArray(messages) ? messages : [])
+      .map((message) => buildProviderMessageRow({ ...message, provider: normalizedProvider }))
+      .filter(Boolean);
+    if (!rows.length) return { ok: true, data: [], upserted: 0 };
+    const result = await run(`upsert-provider-messages:${normalizedProvider}`, (client) =>
+      client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
+        onConflict: 'message_key',
+        defaultToNull: false,
+      })
+    );
+    if (!result.ok) return result;
+    return { ...result, upserted: rows.length };
+  }
+
+  async function listProviderMessages({
+    provider,
+    accountEmails = [],
+    limit = 500,
+    includeBody = true,
+  } = {}) {
+    const normalizedProvider = normalizeString(provider).toLowerCase();
+    const normalizedAccounts = Array.from(
+      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
+    );
+    if (!normalizedProvider || !normalizedAccounts.length) return [];
+    const safeLimit = Math.max(1, Math.min(2000, Number(limit) || 500));
+    const columns = includeBody
+      ? '*'
+      : MAILBOX_MESSAGE_METADATA_COLUMNS;
+    const result = await run(`list-provider-messages:${normalizedProvider}`, (client) =>
+      client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .select(columns)
+        .eq('folder', normalizedProvider)
+        .in('account_email', normalizedAccounts)
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(safeLimit)
+    );
+    if (!result.ok) return null;
+    return (result.data || []).map((row) => normalizeMessageRow(row, { includeBody }));
+  }
+
+  async function getProviderMessage({ provider, providerMessageId, accountEmail } = {}) {
+    const normalizedProvider = normalizeString(provider).toLowerCase();
+    const rawProviderMessageId = normalizeString(providerMessageId);
+    const normalizedProviderMessageId = rawProviderMessageId.startsWith(`${normalizedProvider}:`)
+      ? rawProviderMessageId.slice(normalizedProvider.length + 1)
+      : rawProviderMessageId;
+    const normalizedAccountEmail = normalizeEmail(accountEmail);
+    if (!normalizedProvider || !normalizedProviderMessageId || !normalizedAccountEmail) return null;
+    const result = await run(`get-provider-message:${normalizedProvider}`, (client) =>
+      client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .select('*')
+        .eq('account_email', normalizedAccountEmail)
+        .eq('folder', normalizedProvider)
+        .eq('provider_id', `${normalizedProvider}:${normalizedProviderMessageId}`)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
+    );
+    if (!result.ok || !result.data) return null;
+    return normalizeMessageRow(result.data, { includeBody: true });
   }
 
   async function listMessages({ accountEmail, folder = 'inbox', limit = 50 }) {
@@ -549,7 +698,9 @@ function createMailboxIndexStore(deps = {}) {
 
   async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
     const normalizedFolder = normalizeFolder(folder);
-    const uid = Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
+    const uid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(normalizeString(id).match(/:(\d+)$/)?.[1] || id);
     const query = (client) => {
       const base = client
         .from(MAILBOX_INDEX_TABLES.messages)
@@ -617,7 +768,9 @@ function createMailboxIndexStore(deps = {}) {
   async function markMessageRead({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
     const normalizedFolder = normalizeFolder(folder);
     const normalizedId = normalizeString(id);
-    const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     return run('mark-message-read', (client) => {
       const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
@@ -633,7 +786,9 @@ function createMailboxIndexStore(deps = {}) {
   async function markMessageDeleted({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
     const normalizedFolder = normalizeFolder(folder);
     const normalizedId = normalizeString(id);
-    const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     const result = await run('mark-message-deleted', (client) => {
       const deletedAt = isoNow();
       const query = client
@@ -655,7 +810,9 @@ function createMailboxIndexStore(deps = {}) {
   async function restoreMessage({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
     const normalizedFolder = normalizeFolder(folder);
     const normalizedId = normalizeString(id);
-    const parsedUid = Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
     const result = await run('restore-message', (client) => {
       const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
@@ -753,9 +910,12 @@ function createMailboxIndexStore(deps = {}) {
     acquireSyncLock,
     buildMessageKey,
     buildMessageRow,
+    buildProviderMessageKey,
+    buildProviderMessageRow,
     buildSyncKey,
     finishSync,
     getMessage,
+    getProviderMessage,
     getOldestMatchingMessageUid,
     getSyncState,
     hydrateMessageBodies,
@@ -767,11 +927,14 @@ function createMailboxIndexStore(deps = {}) {
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,
+    listProviderMessages,
     markMessageDeleted,
     markMessageRead,
     restoreMessage,
     normalizeMessageRow,
+    stableProviderUid,
     upsertMessages,
+    upsertProviderMessages,
   };
 }
 

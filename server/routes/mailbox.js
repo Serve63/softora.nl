@@ -71,6 +71,16 @@ function registerMailboxRoutes(app, deps = {}) {
     coordinator.restoreConversationResponse(req, res)
   );
   app.post('/api/mailbox/sync', requireAdmin, (req, res) => coordinator.syncMailboxResponse(req, res));
+  app.post('/api/mailbox/instantly/sync', requireAdmin, (req, res) =>
+    coordinator.syncInstantlyMailboxResponse(req, res)
+  );
+  app.get('/api/mailbox/instantly/sync', requireCronAccess, (req, res) => {
+    if (shouldSkipCronForSupabaseOutage()) {
+      sendSupabaseOutageCronPauseResponse(res);
+      return;
+    }
+    coordinator.syncInstantlyMailboxResponse(req, res);
+  });
   app.get('/api/mailbox/sync', requireCronAccess, (req, res) => {
     if (shouldSkipCronForSupabaseOutage()) {
       sendSupabaseOutageCronPauseResponse(res);

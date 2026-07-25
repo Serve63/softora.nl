@@ -1,6 +1,7 @@
 function registerInstantlyRoutes(app, deps = {}) {
   const {
     instantlyOutreachService,
+    instantlyMailboxService,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     requirePremiumAdminApiAccess = (_req, _res, next) => next(),
@@ -94,7 +95,16 @@ function registerInstantlyRoutes(app, deps = {}) {
         return;
       }
       const result = await instantlyOutreachService.getStatus();
-      res.json(result);
+      res.json({
+        ...result,
+        mailbox: typeof instantlyMailboxService?.getStatus === 'function'
+          ? instantlyMailboxService.getStatus()
+          : {
+              enabled: false,
+              configured: false,
+              missing: ['INSTANTLY_MAILBOX_SERVICE'],
+            },
+      });
     } catch (error) {
       res.status(error && error.status ? error.status : 400).json({
         ok: false,
@@ -117,8 +127,16 @@ function registerInstantlyRoutes(app, deps = {}) {
         });
         return;
       }
-      const result = await instantlyOutreachService.handleInstantlyWebhook(req);
-      res.json(result);
+      const [outreachResult, mailboxResult] = await Promise.all([
+        instantlyOutreachService.handleInstantlyWebhook(req),
+        typeof instantlyMailboxService?.ingestWebhook === 'function'
+          ? instantlyMailboxService.ingestWebhook(req)
+          : Promise.resolve({ ok: true, skipped: true, reason: 'mailbox-integration-unavailable' }),
+      ]);
+      res.json({
+        ...outreachResult,
+        mailbox: mailboxResult,
+      });
     } catch (error) {
       res.status(error && error.status ? error.status : 400).json({
         ok: false,

@@ -89,6 +89,7 @@ test('app middleware skips Supabase hydration for isolated API requests', async 
     '/api/auth/session',
     '/api/health/baseline',
     '/api/mailbox/sync',
+    '/api/mailbox/instantly/sync',
     '/api/coldmailing/autopilot/run',
     '/api/premium-database/webdesign-photo-batches/run',
   ]) {
@@ -100,7 +101,7 @@ test('app middleware skips Supabase hydration for isolated API requests', async 
     });
   }
 
-  assert.equal(nextCalls, 6);
+  assert.equal(nextCalls, 7);
   assert.equal(hydrateCalls, 0);
 });
 

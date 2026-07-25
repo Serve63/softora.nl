@@ -9,6 +9,8 @@ const MAX_CONVERSATION_MESSAGES = 100;
 function createMailboxVisibilityService(deps = {}) {
   const {
     getAccount,
+    getProviderAccount = () => null,
+    assertTargetAuthorized = async () => null,
     parseMessageReference,
     canUseMailboxIndex,
     mailboxIndexStore,
@@ -30,20 +32,28 @@ function createMailboxVisibilityService(deps = {}) {
     const targets = [];
     const seen = new Set();
     supplied.slice(0, MAX_CONVERSATION_MESSAGES).forEach((source) => {
-      const account = getAccount(source.account || source.accountEmail || input.accountEmail);
+      const requestedAccount = source.account || source.accountEmail || input.accountEmail;
+      const requestedFolder = String(source.folder || input.folder || '').trim().toLowerCase();
+      const account = requestedFolder === 'instantly'
+        ? getProviderAccount(requestedAccount)
+        : getAccount(requestedAccount);
       if (!account) throw createStatusError('Mailbox-account niet gevonden.', 404);
-      const messageRef = parseMessageReference({
-        id: source.id || source.messageId,
-        folder: source.folder,
-        uid: source.uid,
-      });
-      const key = `${account.email}|${messageRef.folder}|${messageRef.uid}`;
+      const id = source.id || source.messageId;
+      const messageRef = requestedFolder === 'instantly'
+        ? { folder: 'instantly', uid: 0 }
+        : parseMessageReference({ id, folder: source.folder, uid: source.uid });
+      if (requestedFolder === 'instantly' && !/^instantly:[^:\s]+$/.test(String(id || ''))) {
+        throw createStatusError('Instantly-bericht niet gevonden.', 400);
+      }
+      const key = `${account.email}|${messageRef.folder}|${messageRef.uid || id}`;
       if (seen.has(key)) return;
       seen.add(key);
       targets.push({
         account,
-        id: source.id || source.messageId || `${messageRef.folder}:${messageRef.uid}`,
+        id: id || `${messageRef.folder}:${messageRef.uid}`,
         messageRef,
+        owner: source.owner || input.owner,
+        providerThreadId: source.providerThreadId || '',
       });
     });
     if (!targets.length) throw createStatusError('Geen geldig Softora-gesprek gekozen.', 400);
@@ -63,6 +73,7 @@ function createMailboxVisibilityService(deps = {}) {
     const completed = [];
     try {
       for (const target of targets) {
+        await assertTargetAuthorized(target);
         const result = await operation.call(mailboxIndexStore, {
           accountEmail: target.account.email,
           id: target.id,

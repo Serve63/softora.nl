@@ -215,6 +215,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerInstantlyRoutes(app, {
     ...instantly,
+    instantlyMailboxService: mailboxCoordinator?.instantlyMailboxService,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });

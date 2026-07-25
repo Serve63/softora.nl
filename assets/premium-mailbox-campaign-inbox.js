@@ -93,6 +93,14 @@
     return ACCOUNT_OWNERS[normalizeEmail(value)] || '';
   }
 
+  function getMessageOwner(mail) {
+    if (String(mail && mail.provider || '').trim().toLowerCase() === 'instantly') {
+      const provenOwner = String(mail && mail.providerOwner || '').trim().toLowerCase();
+      return isOwner(provenOwner) ? normalizeOwner(provenOwner) : '';
+    }
+    return getOwnerByAccount(mail && (mail.accountEmail || mail.campaign && mail.campaign.account));
+  }
+
   function resolveOwnerForSession(session) {
     const source = session && typeof session === 'object' ? session : {};
     const emailOwner = getOwnerByAccount(source.email);
@@ -304,9 +312,7 @@
     return groupConversationMessages(
       (Array.isArray(messages) ? messages : []).filter((mail) => {
         if (isAutomatedCampaignReply(mail)) return false;
-        const accountOwner = getOwnerByAccount(
-          mail && (mail.accountEmail || mail.campaign && mail.campaign.account)
-        );
+        const accountOwner = getMessageOwner(mail);
         return Boolean(accountOwner && accountOwner === owner);
       })
     );
@@ -366,6 +372,13 @@
       activityAt: Number.isFinite(Date.parse(activityAtValue || ''))
         ? new Date(activityAtValue).toISOString()
         : '',
+      provider: String(message.provider || mail && mail.provider || '').trim().toLowerCase(),
+      providerMessageId: String(message.providerMessageId || '').trim(),
+      providerThreadId: String(message.providerThreadId || '').trim(),
+      providerCampaignId: String(message.providerCampaignId || '').trim(),
+      providerAccountEmail: normalizeEmail(message.providerAccountEmail || accountEmail),
+      providerOwner: String(message.providerOwner || '').trim().toLowerCase(),
+      storageFolder: String(message.storageFolder || '').trim().toLowerCase(),
       campaign: message.campaign || null,
       outreach: message.outreach || null,
       conversationId: String(message.conversationId || mail && mail.conversationId || '').trim(),
@@ -386,7 +399,7 @@
   }
 
   function getFolder(mail, activeFolder) {
-    const folder = String(mail && mail.folder || activeFolder || '').trim().toLowerCase();
+    const folder = String(mail && (mail.storageFolder || mail.folder) || activeFolder || '').trim().toLowerCase();
     return folder && folder !== 'outreach' ? folder : 'inbox';
   }
 
@@ -402,7 +415,10 @@
 
   function renderDetailAccount(mail, escapeHtml) {
     if (!isCampaignMail(mail) || !mail.accountEmail || typeof escapeHtml !== 'function') return '';
-    return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}</div>`;
+    const providerLabel = String(mail.provider || '').trim().toLowerCase() === 'instantly'
+      ? ' · Instantly'
+      : '';
+    return `<div class="detail-campaign-account">${escapeHtml(mail.accountEmail)}${providerLabel}</div>`;
   }
 
   function renderMessageRouting(mail, escapeHtml) {
@@ -710,7 +726,7 @@
   function renderThreadMessages(mail, escapeHtml, formatDate, options = {}) {
     if (!mail || typeof escapeHtml !== 'function') return '';
     const rootTimestamp = getMessageTimestamp(mail);
-    const mailboxOwner = getOwnerByAccount(mail.accountEmail) || activeOwner;
+    const mailboxOwner = getMessageOwner(mail) || activeOwner;
     const position = String(options.position || 'all').trim().toLowerCase();
     let messages = (Array.isArray(mail.threadMessages) ? mail.threadMessages : [])
       .filter((message) => {
@@ -734,7 +750,7 @@
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const folder = String(message && message.folder || 'sent').trim().toLowerCase();
       const sent = folder === 'sent';
-      const messageOwner = sent ? getOwnerByAccount(message.accountEmail) : '';
+      const messageOwner = sent ? getMessageOwner(message) : '';
       const owner = messageOwner ? getOwnerLabel(messageOwner) : '';
       const sentLabel = messageOwner && messageOwner === mailboxOwner ? 'Jouw bericht' : 'Eerdere mail';
       const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
@@ -988,7 +1004,12 @@
     const request = typeof fetchImpl === 'function'
       ? fetchImpl
       : global.fetch.bind(global);
-    const response = await request('/api/mailbox/campaign-replies?limit=100', {
+    const params = new URLSearchParams({
+      limit: '100',
+      owner: activeOwner,
+      refreshInstantly: '1',
+    });
+    const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
       credentials: 'same-origin',
       cache: 'no-store',
       headers: { Accept: 'application/json' },
@@ -1011,6 +1032,7 @@
     hasPageBootstrap,
     getOwner,
     getOwnerByAccount,
+    getMessageOwner,
     getOwnerLabel,
     getOwnerOptionsForMenu,
     getOwnerPinKeyForIdentity,

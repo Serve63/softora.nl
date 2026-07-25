@@ -474,6 +474,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       websiteLinkCoordinator: uiSeoRuntime.websiteLinkCoordinator,
       websitePreviewLibraryCoordinator: uiSeoRuntime.websitePreviewLibraryCoordinator,
       mailbox: {
+        env,
         logger: console,
         normalizeString: shared.normalizeString,
         truncateText: shared.truncateText,
