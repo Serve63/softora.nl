@@ -157,6 +157,14 @@
       time: mail.time,
       folder: mail.folder || options.activeFolder || 'inbox',
       accountEmail: getAccount(mail, options.fallbackAccount),
+      ...(String(mail.provider || '').trim()
+        ? {
+            provider: String(mail.provider || '').trim().toLowerCase(),
+            providerMessageId: String(mail.providerMessageId || '').trim(),
+            providerThreadId: String(mail.providerThreadId || '').trim(),
+            providerOwner: String(mail.providerOwner || '').trim().toLowerCase(),
+          }
+        : {}),
       originalSentMail: getOriginalSentMail(mail),
       mode: 'reply',
     };
@@ -192,6 +200,14 @@
       accountEmail,
       to,
       subject: String(latest.subject || mail.subject || '').trim(),
+      ...(String(latest.provider || mail.provider || '').trim()
+        ? {
+            provider: String(latest.provider || mail.provider || '').trim().toLowerCase(),
+            providerMessageId: String(latest.providerMessageId || mail.providerMessageId || '').trim(),
+            providerThreadId: String(latest.providerThreadId || mail.providerThreadId || '').trim(),
+            providerOwner: String(latest.providerOwner || mail.providerOwner || '').trim().toLowerCase(),
+          }
+        : {}),
       mode: 'new-message',
     };
   }

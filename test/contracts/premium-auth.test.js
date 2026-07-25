@@ -268,6 +268,10 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     true
   );
   assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/mailbox/instantly/sync' }),
+    true
+  );
+  assert.equal(
     manager.isPremiumPublicApiRequest({ method: 'GET', originalUrl: '/api/coldmailing/autopilot/run' }),
     true
   );
@@ -289,6 +293,10 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
   );
   assert.equal(
     manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/mailbox/sync' }),
+    false
+  );
+  assert.equal(
+    manager.isPremiumPublicApiRequest({ method: 'POST', originalUrl: '/api/mailbox/instantly/sync' }),
     false
   );
   assert.equal(

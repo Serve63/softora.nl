@@ -62,6 +62,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/mailbox/instantly/sync",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/coldmailing/autopilot/run",
       "schedule": "*/5 * * * *"
     },

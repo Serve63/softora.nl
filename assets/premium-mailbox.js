@@ -703,6 +703,7 @@ function toast(message, actionOptions) {
 }
 const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   fetch: (...args) => window.fetch(...args),
+  getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(),
   getDialogs: () => window.SoftoraDialogs,
   confirm: (message) => typeof window.confirm === 'function' && window.confirm(message),
   getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
@@ -927,6 +928,7 @@ async function persistMailReadState(mail) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         account: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
+        owner: window.SoftoraMailboxCampaignInbox.getOwner(),
         id: requestId,
         uid: mail.uid,
         folder: window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
@@ -1109,7 +1111,7 @@ if (mailboxAccountSwitcher) {
 if (mailboxAccountMenu) {
   mailboxAccountMenu.addEventListener('click', function(event) {
     const ownerButton = event.target.closest('[data-mailbox-owner], [data-mailbox-pin-owner]');
-    if (ownerButton) { if (ownerButton.dataset.mailboxPinOwner) { event.preventDefault(); event.stopPropagation(); void window.SoftoraMailboxCampaignInbox.pinOwner(ownerButton.dataset.mailboxPinOwner, window.SoftoraUiStateClient).then((result) => { activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); renderList(); toast(result.saved ? `Mailbox vastgepind: ${result.label}` : `Mailbox gekozen: ${result.label}. Vastpinnen opslaan mislukt.`); }); return; } window.SoftoraMailboxCampaignInbox.setOwner(ownerButton.dataset.mailboxOwner); activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); renderList(); return; }
+    if (ownerButton) { if (ownerButton.dataset.mailboxPinOwner) { event.preventDefault(); event.stopPropagation(); void window.SoftoraMailboxCampaignInbox.pinOwner(ownerButton.dataset.mailboxPinOwner, window.SoftoraUiStateClient).then((result) => { activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); void loadMailboxMessages({ skipPageBootstrap: true }); toast(result.saved ? `Mailbox vastgepind: ${result.label}` : `Mailbox gekozen: ${result.label}. Vastpinnen opslaan mislukt.`); }); return; } window.SoftoraMailboxCampaignInbox.setOwner(ownerButton.dataset.mailboxOwner); activeMail = null; closeMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount); resetDetailEmpty(); void loadMailboxMessages({ skipPageBootstrap: true }); return; }
     const pinButton = event.target.closest('[data-mailbox-pin-email]');
     if (pinButton) {
       event.preventDefault();
