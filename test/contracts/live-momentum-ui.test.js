@@ -33,14 +33,14 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
-  assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727a"><\/script>/);
+  assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260723d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260723a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260727b" defer><\/script>/);
   assert.match(html, /<div class="momentum-layout">/);
   assert.doesNotMatch(html, /<aside\b/);
   assert.doesNotMatch(html, /data-live-momentum-sidebar-host/);
@@ -243,6 +243,10 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   const videoJs = read('assets/live-momentum-video.js');
 
   assert.match(js, /window\.SoftoraMomentumCalendar/);
+  assert.match(js, /function applyConfirmedState\(response\)/);
+  assert.match(js, /const bootstrapState = window\.SoftoraUiStateClient\?\.peek\?\.\(STATE_SCOPE\);/);
+  assert.match(js, /const renderedBootstrapState = applyConfirmedState\(bootstrapState\);/);
+  assert.match(js, /if \(!renderedBootstrapState\) \{[\s\S]*void hydrateState\(\);/);
   assert.match(js, /calendar\.getCurrentPeriod\(\)/);
   assert.match(js, /function getCurrentPeriodDay\(date = new Date\(\)\)/);
   assert.match(js, /let TODAY = getCurrentPeriodDay\(\);/);
@@ -273,7 +277,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /endGameMissionCard:\s*endGameCards\.getLegacyMissionState\(\)/);
   assert.match(js, /endGameCards:\s*endGameCards\.getState\(\)/);
   assert.match(js, /progressElement:\s*endGameProgress/);
-  assert.match(js, /endGameCards\.render\(storedState\.endGameCards\)/);
+  assert.match(js, /endGameCards\.render\(storedState\?\.endGameCards\)/);
   assert.match(js, /endGameCards\.needsMigration\(parsed\.endGameCards\)/);
   assert.match(endGameCardsJs, /const CARD_CATALOG = \[/);
   assert.match(endGameCardsJs, /normalized\.__order = normalizeOrder\(value\?\.__order\)/);

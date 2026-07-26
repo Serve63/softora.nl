@@ -43,9 +43,11 @@ function sanitizeStateSnapshot(result) {
   const values = result && result.values && typeof result.values === 'object'
     ? result.values
     : {};
+  const source = String(result && result.source || '').trim() || 'bootstrap';
   return {
+    ok: result?.ok !== false && source.toLowerCase() === 'supabase',
     values,
-    source: String(result && result.source || '').trim() || 'bootstrap',
+    source,
     updatedAt: result && result.updatedAt ? result.updatedAt : null,
   };
 }
@@ -100,7 +102,9 @@ function createPremiumPageStateBootstrapService(deps = {}) {
       // bootstrap-snapshot in de browsercache belanden. De client zou die
       // placeholder anders 15 seconden hergebruiken voordat hij opnieuw leest.
       if (!result || typeof result !== 'object') return null;
-      const entry = [normalizedScope, sanitizeStateSnapshot(result)];
+      const snapshot = sanitizeStateSnapshot(result);
+      if (normalizedScope === 'premium_live_momentum' && !snapshot.ok) return null;
+      const entry = [normalizedScope, snapshot];
       scopeCache.set(normalizedScope, { entry, cachedAt: Date.now() });
       return entry;
     } catch (_error) {

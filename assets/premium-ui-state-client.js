@@ -13,9 +13,11 @@
 
     function normalizeStateSnapshot(value) {
         var snapshot = value && typeof value === "object" ? value : {};
+        var source = String(snapshot.source || "bootstrap");
         return {
+            ok: snapshot.ok !== false && source.toLowerCase() === "supabase",
             values: snapshot.values && typeof snapshot.values === "object" ? snapshot.values : {},
-            source: String(snapshot.source || "bootstrap"),
+            source: source,
             updatedAt: snapshot.updatedAt || null
         };
     }

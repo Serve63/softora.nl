@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   LIVE_MOMENTUM_ACCESS_COOKIE_NAME,
+  LIVE_MOMENTUM_ACCESS_TTL_MS,
   createLiveMomentumAccessGate,
 } = require('../../server/security/live-momentum-access');
 const { registerLiveMomentumAccessRoutes } = require('../../server/routes/live-momentum-access');
@@ -28,6 +29,8 @@ function createResponseRecorder() {
 }
 
 test('Live Momentum gate accepts only 808080 and binds its cookie to the current admin', () => {
+  assert.equal(LIVE_MOMENTUM_ACCESS_COOKIE_NAME, 'softora_live_momentum_access_v2');
+  assert.equal(LIVE_MOMENTUM_ACCESS_TTL_MS, 30 * 60 * 1000);
   let currentTime = 1_700_000_000_000;
   const gate = createLiveMomentumAccessGate({
     sessionSecret: 'live-momentum-test-secret',
@@ -54,6 +57,7 @@ test('Live Momentum gate accepts only 808080 and binds its cookie to the current
     '808080'
   );
   assert.equal(grant.ok, true);
+  assert.equal(grant.expiresInMs, LIVE_MOMENTUM_ACCESS_TTL_MS);
   assert.equal(grantedResponse.cookies.length, 1);
   assert.match(grantedResponse.cookies[0], new RegExp(`^${LIVE_MOMENTUM_ACCESS_COOKIE_NAME}=`));
   assert.match(grantedResponse.cookies[0], /HttpOnly/);
