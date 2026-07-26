@@ -303,16 +303,14 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com\/css2\?family=Inter/);
 });
 
-test('html page coordinator disables cross-document view transitions on Live Momentum', async () => {
+test('html page coordinator keeps fullscreen Winnen free of sidebar delivery assets', async () => {
   const { coordinator, pagesDir } = createFixture();
   fs.writeFileSync(
     path.join(pagesDir, 'live-momentum.html'),
     [
       '<!DOCTYPE html><html><head>',
       '<title>Live Momentum</title>',
-      '<link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">',
       '</head><body>',
-      '<aside class="sidebar" data-static-sidebar="1"><nav class="sidebar-nav"></nav></aside>',
       '<main class="main-content">Momentum</main>',
       '</body></html>',
     ].join('')
@@ -322,18 +320,15 @@ test('html page coordinator disables cross-document view transitions on Live Mom
   res.setHeader('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none'");
   res.setHeader('Permissions-Policy', 'autoplay=(self), camera=()');
   await coordinator.sendSeoManagedHtmlPageResponse(
-    { originalUrl: '/live-momentum' },
+    { originalUrl: '/winnen' },
     res,
     () => {},
     'live-momentum.html'
   );
 
   assert.equal(res.statusCode, 200);
-  const stabilityIndex = res.body.indexOf('/assets/premium-sidebar-stability.css');
-  const optoutIndex = res.body.indexOf('id="softora-live-momentum-view-transition-optout"');
-  assert.ok(stabilityIndex > -1, 'Live Momentum hoort de sidebar-stability assets te behouden');
-  assert.ok(optoutIndex > stabilityIndex, 'de route-optout hoort na de gedeelde stability CSS te staan');
-  assert.match(res.body, /@view-transition\{navigation:none;\}/);
+  assert.doesNotMatch(res.body, /premium-sidebar|personnel-theme|data-static-sidebar/);
+  assert.doesNotMatch(res.body, /softora-live-momentum-view-transition-optout/);
   assert.match(
     res.headers['Content-Security-Policy'],
     /default-src 'self'; frame-ancestors 'none'; frame-src 'self' https:\/\/www\.youtube-nocookie\.com/

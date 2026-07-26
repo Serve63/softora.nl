@@ -73,6 +73,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /data-settings-extra-open/);
   assert.match(userManagementSource, /goTo\('screen-extra'\)/);
   assert.match(userManagementSource, /var isWinning = label === 'Winnen';/);
+  assert.match(userManagementSource, /\? '\/winnen'/);
   assert.match(userManagementSource, /var isDatabase = label === 'Database';/);
   assert.match(userManagementSource, /var isHealth = label === "Servé's gezondheidsdossier";/);
   assert.match(userManagementSource, /var isOmzetwerk = label === 'OMZETWERK';/);
@@ -101,7 +102,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260726b/);
+  assert.match(source, /premium-user-management\.js\?v=20260727a/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);
