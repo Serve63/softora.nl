@@ -24,16 +24,15 @@ test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
   assert.match(html, /<title>ATTACK, ATTACK, ATTACK\. \| Softora<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/winnen">/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
-  assert.match(html, /href="\/assets\/personnel-theme\.css\?v=20260519b"/);
-  assert.match(html, /href="\/assets\/premium-sidebar-autopilot\.css\?v=20260611a"/);
+  assert.doesNotMatch(html, /personnel-theme|premium-sidebar/);
+  assert.doesNotMatch(html, /data-personnel-loading|data-sidebar-shell|data-static-sidebar/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260722b"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
-  assert.match(html, /<script src="\/assets\/personnel-theme\.js\?v=20260715a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/premium-sidebar-autopilot\.js\?v=20260611a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
@@ -42,11 +41,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260723a" defer><\/script>/);
-  assert.match(html, /<div class="dashboard-layout momentum-layout" data-sidebar-shell="canonical">/);
-  assert.match(html, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1" aria-label="Premium navigatie">/);
-  assert.match(html, /data-sidebar-key="dashboard"/);
-  assert.match(html, /data-sidebar-key="settings"/);
-  assert.match(html, /assets\/premium-sidebar-profile-prefill\.js\?v=20260715a/);
+  assert.match(html, /<div class="momentum-layout">/);
+  assert.doesNotMatch(html, /<aside\b/);
   assert.doesNotMatch(html, /data-live-momentum-sidebar-host/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">/);
@@ -233,7 +229,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(css, /\.closing-quote/);
   assert.match(css, /\.status:focus-visible::before\s*\{[\s\S]*box-shadow:\s*0 0 0 3px rgba\(86, 196, 134, \.3\);/);
   assert.match(css, /@media \(max-width:\s*780px\)/);
-  assert.match(mobileCss, /@media \(max-width:\s*900px\)[\s\S]*\.momentum-layout \.sidebar\s*\{[\s\S]*display:\s*none !important;/);
+  assert.match(mobileCss, /@media \(max-width:\s*900px\)[\s\S]*\.momentum-layout \.momentum-page\s*\{[\s\S]*width:\s*100% !important;/);
   assert.match(mobileCss, /\.chart-card::after\s*\{[\s\S]*content:\s*"AVARAGE";/);
   assert.match(mobileCss, /\.habit-spacer,\s*\.habit-name\s*\{[\s\S]*position:\s*sticky;[\s\S]*left:\s*0;/);
 });

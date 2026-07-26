@@ -73,8 +73,15 @@ const staticSidebarPages = [
   ...customLayoutPages,
   'premium-advertenties.html',
   'premium-socialmedia.html',
-  'live-momentum.html',
 ];
+
+test('Winnen is bewust fullscreen en laadt geen premium-sidebarketen', () => {
+  const pageSource = readRepoFile('live-momentum.html');
+
+  assert.doesNotMatch(pageSource, /<aside\b|data-sidebar-shell|data-static-sidebar/);
+  assert.doesNotMatch(pageSource, /personnel-theme|premium-sidebar/);
+  assert.match(pageSource, /<main class="main-content momentum-page"/);
+});
 
 test('premium database consistency assets stay outside the static sidebar', () => {
   const source = readRepoFile('premium-database.html');

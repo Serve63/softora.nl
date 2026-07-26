@@ -452,7 +452,7 @@ function mountExtraSettingsCategory() {
     var isOmzetwerk = label === 'OMZETWERK';
     var isLinkedModule = isWinning || isDatabase || isHealth || isOmzetwerk;
     var moduleHref = isWinning
-      ? '/live-momentum'
+      ? '/winnen'
       : isDatabase
         ? '/kvk-database'
         : isHealth

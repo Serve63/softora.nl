@@ -14,6 +14,7 @@ const defaultLegacyPrettyPageRedirectEntries = Object.freeze([
   ['opdracht-preview', 'premium-opdracht-preview'],
   ['premium-maandelijkse-kosten', 'premium-vaste-lasten'],
   ['sportschool', 'logboek'],
+  ['live-momentum', 'winnen'],
 ]);
 
 const legacyPrettyPageRedirects = new Map(defaultLegacyPrettyPageRedirectEntries);
@@ -51,6 +52,9 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   }
   if (map.has('premium-mailbox')) {
     map.set('mailbox', map.get('premium-mailbox'));
+  }
+  if (map.has('live-momentum')) {
+    map.set('winnen', map.get('live-momentum'));
   }
   return map;
 }
