@@ -18,6 +18,24 @@ function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
 }
 
+function selectSnapshotMessages(value) {
+  const source = Array.isArray(value) ? value : [];
+  if (source.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES) return source;
+  const selected = new Set();
+  source.forEach((message, index) => {
+    if (
+      selected.size < MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES &&
+      text(message && message.provider, 50).toLowerCase() === 'instantly'
+    ) {
+      selected.add(index);
+    }
+  });
+  for (let index = 0; index < source.length && selected.size < MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES; index += 1) {
+    selected.add(index);
+  }
+  return source.filter((_message, index) => selected.has(index));
+}
+
 function sanitizeCampaign(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const campaign = {
@@ -335,8 +353,7 @@ function fitSnapshotToBudget(snapshot) {
 }
 
 function serializeMailboxCampaignSnapshot(result, options = {}) {
-  const messages = (Array.isArray(result && result.messages) ? result.messages : [])
-    .slice(0, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES)
+  const messages = selectSnapshotMessages(result && result.messages)
     .map((message, index) => sanitizeMessage(message, {
       includeBody: index < MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT,
       includeImages: index < MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT,
