@@ -191,6 +191,122 @@ test('mailbox index store preserves exact Instantly HTML and link provenance mar
   assert.match(normalized.body, /webdesign hier \[https:\/\/www\.softora\.nl/);
 });
 
+test('mailbox index store joins exact active Instantly threads without a broad body scan', async () => {
+  const calls = [];
+  const rowBuilder = createMailboxIndexStore({
+    now: () => new Date('2026-07-26T16:00:00.000Z'),
+  });
+  const activeOutboundRow = rowBuilder.buildProviderMessageRow({
+    provider: 'instantly',
+    providerMessageId: 'provider-active-sent',
+    providerThreadId: 'provider-active-thread',
+    providerAccountEmail: 'serve-sender@example.com',
+    providerOwner: 'serve',
+    accountEmail: 'serve-sender@example.com',
+    folder: 'sent',
+    direction: 'sent',
+    from: 'Servé Creusen',
+    email: 'serve-sender@example.com',
+    to: 'prospect@example.org',
+    subject: 'Kleine vraag over jullie website',
+    body: 'Oude uitgaande mail',
+    date: '2026-06-05T12:00:00.000Z',
+    originalCampaignOutbound: true,
+    providerOriginalBodyEvidenceKnown: false,
+  });
+  const client = {
+    from(table) {
+      const queryState = { columns: '', filters: [] };
+      const query = {
+        select(columns) {
+          queryState.columns = columns;
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        eq(column, value) {
+          queryState.filters.push(['eq', column, value]);
+          calls.push(['eq', column, value]);
+          return query;
+        },
+        in(column, value) {
+          queryState.filters.push(['in', column, value]);
+          calls.push(['in', column, value]);
+          return query;
+        },
+        contains(column, value) {
+          queryState.filters.push(['contains', column, value]);
+          calls.push(['contains', column, value]);
+          return query;
+        },
+        is(column, value) {
+          queryState.filters.push(['is', column, value]);
+          calls.push(['is', column, value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        range(from, to) {
+          calls.push(['range', from, to]);
+          return Promise.resolve({
+            data: [{
+              account_email: 'serve-sender@example.com',
+              provider_thread_id: 'provider-active-thread',
+            }],
+            error: null,
+          });
+        },
+        then(resolve, reject) {
+          return Promise.resolve({
+            data: queryState.columns.startsWith('message_key,account_email,folder,')
+              ? [activeOutboundRow]
+              : [],
+            error: null,
+          }).then(resolve, reject);
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+  });
+
+  const messages = await store.listProviderActiveConversationAuditMessages({
+    provider: 'instantly',
+    accountEmails: ['serve-sender@example.com'],
+  });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].providerMessageId, 'provider-active-sent');
+  assert.equal(messages[0].providerThreadId, 'provider-active-thread');
+  assert.equal(
+    calls.some((call) => (
+      call[0] === 'select' &&
+      call[2] === 'account_email,provider_thread_id:payload->>providerThreadId'
+    )),
+    true
+  );
+  assert.equal(
+    calls.some((call) => (
+      call[0] === 'in' &&
+      call[1] === 'payload->>providerThreadId' &&
+      call[2][0] === 'provider-active-thread'
+    )),
+    true
+  );
+  assert.equal(
+    calls.some((call) => (
+      call[0] === 'contains' &&
+      call[1] === 'payload' &&
+      call[2].originalCampaignOutbound === true
+    )),
+    true
+  );
+});
+
 test('mailbox index store vindt de oudste campagne-uid zonder verwijderde historie uit te sluiten', async () => {
   const calls = [];
   const uidsByTerm = new Map([
