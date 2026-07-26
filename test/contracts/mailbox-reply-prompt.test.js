@@ -80,6 +80,7 @@ test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen a
   assert.match(prompt, /Iedere alinea en iedere zin moet rechtstreeks volgen/);
   assert.match(prompt, /geen generieke vulling, losse lof, boilerplate/);
   assert.match(prompt, /Een afwijzing mag concrete feedback nooit wissen/);
+  assert.match(prompt, /futureDoorOpenAllowed exact true/);
   assert.match(prompt, /antwoordBeleid\.ctaAllowed exact true/);
   assert.match(prompt, /volgende week \[dag\] even langskom/);
   assert.match(prompt, /de enige vaste waarheid/);
@@ -218,7 +219,7 @@ test('antwoordbeleid laat alleen expliciete vooruitgerichte signalen een CTA ope
   assert.equal(pricing.ctaAllowed, true);
 });
 
-test('Bossche Brouwers feedback blijft afsluitend en erft geen interesse uit geciteerde coldmail', () => {
+test('Bossche Brouwers feedback erft geen actieve CTA uit geciteerde coldmail', () => {
   const inbound = [
     'Beste Servé,',
     '',
@@ -241,7 +242,7 @@ test('Bossche Brouwers feedback blijft afsluitend en erft geen interesse uit gec
   );
 
   assert.match(result, /Dankjewel voor je uitgebreide en concrete feedback/);
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|verder bespreken|mogelijkheden/i);
+  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|verder bespreken/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
   assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });
@@ -272,6 +273,7 @@ test('Bossche Brouwers krijgt een inhoudelijke feedbackreactie ondanks de afwijz
   assert.equal(policy.intent, 'rejection');
   assert.equal(policy.ctaAllowed, false);
   assert.equal(policy.substantiveFeedback, true);
+  assert.equal(policy.futureDoorOpenAllowed, true);
   assert.deepEqual(
     policy.feedbackDetails.themes.map((theme) => theme.key),
     [
@@ -300,20 +302,50 @@ test('Bossche Brouwers krijgt een inhoudelijke feedbackreactie ondanks de afwijz
       firstName: 'Leonard',
       inboundText: inbound,
       senderName: 'Servé Creusen',
+      originalSentMail: {
+        body: [
+          'Goedendag,',
+          '',
+          'Afgelopen week kwam ik jullie website bosschebrouwers.nl tegen.',
+          '',
+          'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+        ].join('\n'),
+      },
     }
   );
 
   assert.equal(result, [
-    'Beste Leonard,',
+    'Goedendag Leonard,',
     '',
-    'Dankjewel dat je de tijd hebt genomen voor deze uitgebreide feedback. Fijn dat de sfeer en het overzicht wel goed overkwamen. 😁',
+    'Bedankt dat je er zo uitgebreid naar hebt gekeken en je eerlijke feedback hebt gedeeld! Fijn om te horen dat de sfeer en het overzicht wel goed overkwamen. 😁',
     '',
-    'Je punten over de te algemene identiteit, het gebruik van beelden die niet bij het bedrijf horen en het ontbreken van de huisstijl zijn helder. Dat helpt me om toekomstige ontwerpen specifieker en zorgvuldiger te maken.',
+    'Je punten over de algemene uitstraling, de beelden die niet bij jullie bedrijf passen en het ontbreken van jullie huisstijl zijn duidelijk. Daar kan ik zeker iets mee.',
+    '',
+    'Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor jullie website, dan mag je me altijd een berichtje sturen.',
     '',
     'Met vriendelijke groet,',
     'Servé Creusen',
   ].join('\n'));
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|prijs|vervolgvoorstel/i);
+  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|prijs|vervolgvoorstel|\?/i);
+});
+
+test('een expliciet verzoek om geen verder contact blokkeert ook de zachte toekomstzin', () => {
+  const inbound = [
+    'Bedankt voor je werk. De sfeer is goed, maar onze huisstijl ontbreekt en de beelden zijn niet van ons.',
+    'Mail ons niet meer en schrijf ons uit.',
+  ].join('\n');
+  const policy = analyzeMailboxReplyContext(inbound, {
+    originalText: 'Ik kwam jullie website tegen.',
+  });
+  const result = enforceMailboxReplyProfile('', {
+    inboundText: inbound,
+    originalSentMail: { body: 'Goedendag,\n\nIk kwam jullie website tegen.' },
+  });
+
+  assert.equal(policy.substantiveFeedback, true);
+  assert.equal(policy.noFurtherContact, true);
+  assert.equal(policy.futureDoorOpenAllowed, false);
+  assert.doesNotMatch(result, /in de toekomst|berichtje sturen|wat er mogelijk is/i);
 });
 
 test('interesse krijgt exact één concreet vrijblijvend voorstel met bewerkbare dag', () => {

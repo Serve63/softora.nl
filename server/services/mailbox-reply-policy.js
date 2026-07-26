@@ -1,7 +1,8 @@
 const REPLY_QUOTE_HEADER_PATTERN = /^(?:op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|op\s.+\sschreef\s.+:|on\s.+\swrote:|van:|from:)/i;
 const CTA_PATTERN = /\b(?:afspraak|langskom|langs\s+te\s+komen|volgende\s+week|\[dag\]|even\s+bellen|kennismak|verder\s+praten|samen\s+bespreken)\b/i;
 const GENERIC_FILLER_PATTERN = /\b(?:leuke\s+vraag|wat\s+leuk|ik\s+denk\s+graag\s+mee|mooie\s+kansen|interessante\s+mogelijkheden|hopelijk\s+kunnen\s+we|lijkt\s+me\s+goed|kijken\s+wat\s+er\s+mogelijk\s+is)\b/i;
-const REPLY_POLICY_VERSION = 'softora-grounded-reply-v3';
+const FUTURE_DOOR_OPEN_PATTERN = /\bmocht\s+je\s+in\s+de\s+toekomst\s+(?:toch\s+)?eens\s+willen\s+kijken\s+wat\s+er\s+mogelijk\s+is\s+voor\s+(?:je|jullie)\s+website,\s+dan\s+mag\s+je\s+me\s+altijd\s+een\s+berichtje\s+sturen\b/i;
+const REPLY_POLICY_VERSION = 'softora-grounded-reply-v4';
 const STOP_WORDS = new Set([
   'aan', 'als', 'ben', 'bij', 'dan', 'dat', 'de', 'deze', 'die', 'dit', 'een', 'en', 'er', 'geen',
   'heb', 'het', 'hier', 'hoe', 'ik', 'in', 'is', 'je', 'kan', 'maar', 'met', 'mijn', 'niet', 'nog',
@@ -107,7 +108,10 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
   const originalText = clean(options.originalText);
   const text = normalize(authoredText);
   const rejection = matches(text,
-    /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b|\b(?:wij|we|ik)\s+(?:gaan|zullen|willen)\s+(?:het|dit|dat)\s+(?:echter\s+)?niet\s+gebruiken\b/
+    /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bmail\s+(?:mij|ons)\s+niet\s+meer\b|\bschrijf\s+(?:mij|ons)\s+uit\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b|\b(?:wij|we|ik)\s+(?:gaan|zullen|willen)\s+(?:het|dit|dat)\s+(?:echter\s+)?niet\s+gebruiken\b/
+  );
+  const noFurtherContact = matches(text,
+    /\bniet\s+meer\s+mailen\b|\bmail\s+(?:mij|ons)\s+niet\s+meer\b|\bgeen\s+(?:verdere\s+)?berichten\b|\bschrijf\s+(?:mij|ons)\s+uit\b|\bafmelden\b|\buitschrijven\b|\bverwijder\s+(?:mij|ons)\b|\blaat\s+(?:mij|ons)\s+met\s+rust\b/
   );
   const satisfied = matches(text,
     /\btevreden\s+(?:ben|zijn)?\s*(?:met|over)\b|\b(?:website|site)\s+voldoet\b|\bhebben\s+al\s+(?:een\s+)?(?:goede\s+)?(?:partij|bouwer|website)\b|\bblij\s+met\s+(?:onze|mijn|de)\s+(?:huidige\s+)?(?:site|website|partij)\b/
@@ -129,6 +133,7 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
   const feedback = feedbackDetails.themes.length > 0 || matches(text,
     /\b(?:feedback|verbeter|tip|advies|opmerking|mis\s+ik|zou\s+ik|mag\s+meer|uitstraling|lettertype|kleurgebruik|persoonlijke\s+touch)\b/
   );
+  const audienceForm = /\bjullie\b/i.test(originalText) ? 'jullie' : 'je';
 
   let intent = 'ambiguous';
   if (rejection) intent = 'rejection';
@@ -154,6 +159,8 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
   if (priceQuestion) allowedEvidence.push('known.price-depends-on-scope');
   if (forwardCommercialSignal) allowedEvidence.push('received.forward-request');
   if (feedbackDetails.substantive) allowedEvidence.push('received.feedback-details');
+  const futureDoorOpenAllowed = feedbackDetails.substantive && !noFurtherContact;
+  if (futureDoorOpenAllowed) allowedEvidence.push('known.future-door-open');
 
   return Object.freeze({
     version: REPLY_POLICY_VERSION,
@@ -162,6 +169,7 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
     conceptText,
     originalText,
     rejection,
+    noFurtherContact,
     satisfied,
     priceQuestion,
     previewRequest,
@@ -169,6 +177,8 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
     feedback,
     feedbackDetails,
     substantiveFeedback: feedbackDetails.substantive,
+    audienceForm,
+    futureDoorOpenAllowed,
     forwardCommercialSignal,
     ctaAllowed: forwardCommercialSignal,
     allowedEvidence: Object.freeze(allowedEvidence),
@@ -217,6 +227,13 @@ function paragraphHasGrounding(paragraph, policy) {
     return true;
   }
   if (
+    evidence.includes('known.future-door-open') &&
+    policy.futureDoorOpenAllowed &&
+    FUTURE_DOOR_OPEN_PATTERN.test(text)
+  ) {
+    return true;
+  }
+  if (
     evidence.includes('received.feedback-details') &&
     policy.feedbackDetails.themes.some((theme) => theme.response.test(text))
   ) {
@@ -239,10 +256,11 @@ function paragraphHasGrounding(paragraph, policy) {
 
 function hasUnsafeOrIrrelevantText(value, policy) {
   const text = clean(value);
-  if (!text || GENERIC_FILLER_PATTERN.test(text)) return true;
+  const isAllowedFutureDoorOpen = policy.futureDoorOpenAllowed && FUTURE_DOOR_OPEN_PATTERN.test(text);
+  if (!text || (GENERIC_FILLER_PATTERN.test(text) && !isAllowedFutureDoorOpen)) return true;
   if (/^(?:beste|hoi|hallo|geachte)\b/i.test(text)) return true;
   if (/\bmet\s+vriendelijke\s+groet\b/i.test(text)) return true;
-  if (/\bjullie\b|\buw\b|\bu\b/i.test(text)) return true;
+  if ((/\bjullie\b/i.test(text) && policy.audienceForm !== 'jullie') || /\buw\b|\bu\b/i.test(text)) return true;
   if (/(?:€|\beuro\b|\b\d+(?:[.,]\d+)?\s*(?:per|,-))/i.test(text)) return true;
   if (/\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i.test(text)) return true;
   if (!policy.ctaAllowed && CTA_PATTERN.test(text)) return true;
@@ -269,19 +287,35 @@ function joinDutchPhrases(values) {
   return `${items.slice(0, -1).join(', ')} en ${items.at(-1)}`;
 }
 
+function feedbackThemePhrase(theme, audienceForm) {
+  if (theme.key === 'generic_identity') return 'de algemene uitstraling';
+  if (theme.key === 'non_own_imagery') {
+    return `de beelden die niet bij ${audienceForm} bedrijf passen`;
+  }
+  if (theme.key === 'missing_brand_style') {
+    return `het ontbreken van ${audienceForm} huisstijl`;
+  }
+  return theme.phrase;
+}
+
 function deterministicDetailedFeedbackParagraphs(policy) {
   const positives = policy.feedbackDetails.positiveThemes.slice(0, 2);
   const themes = policy.feedbackDetails.themes.slice(0, 3);
   const opening = [
-    'Dankjewel dat je de tijd hebt genomen voor deze uitgebreide feedback.',
+    'Bedankt dat je er zo uitgebreid naar hebt gekeken en je eerlijke feedback hebt gedeeld!',
     positives.length
-      ? `Fijn dat ${joinDutchPhrases(positives.map((theme) => theme.phrase))} wel goed ${
+      ? `Fijn om te horen dat ${joinDutchPhrases(positives.map((theme) => theme.phrase))} wel goed ${
           positives.length === 1 ? 'overkwam' : 'overkwamen'
         }.`
       : '',
   ].filter(Boolean).join(' ');
-  const details = `Je punten over ${joinDutchPhrases(themes.map((theme) => theme.phrase))} zijn helder. Dat helpt me om toekomstige ontwerpen specifieker en zorgvuldiger te maken.`;
-  return ensureOneSmile([opening, details]);
+  const details = `Je punten over ${joinDutchPhrases(
+    themes.map((theme) => feedbackThemePhrase(theme, policy.audienceForm))
+  )} zijn duidelijk. Daar kan ik zeker iets mee.`;
+  const futureDoorOpen = policy.futureDoorOpenAllowed
+    ? `Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor ${policy.audienceForm} website, dan mag je me altijd een berichtje sturen.`
+    : '';
+  return ensureOneSmile([opening, details, futureDoorOpen]);
 }
 
 function deterministicParagraphs(policy) {
@@ -339,7 +373,10 @@ function hasRequiredDetailedFeedbackCoverage(paragraphs, policy) {
     /\bdank\w*\b/i.test(response) &&
     coveredThemes >= requiredThemeCount &&
     positiveCovered &&
-    /\b(?:toekomst|toekomstige|volgende)\b[^.!?]{0,80}\bontwerp/i.test(response)
+    (
+      !policy.futureDoorOpenAllowed ||
+      FUTURE_DOOR_OPEN_PATTERN.test(response)
+    )
   );
 }
 
