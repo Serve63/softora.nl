@@ -1,0 +1,137 @@
+.kvk-stat-card-enhanced {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 94px;
+  overflow: hidden;
+  padding: 0;
+}
+
+.kvk-stat-card-enhanced .stat-main {
+  flex: 1;
+  padding: 13px 17px 12px;
+}
+
+.kvk-stat-card-enhanced .stat-main-full {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-card-usable {
+  border-color: rgba(46, 115, 95, 0.72);
+}
+
+.stat-delta {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: auto;
+  padding: 8px 17px;
+  border-top: 1px solid var(--line);
+  background: #f8f4ef;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.stat-delta-number {
+  display: inline !important;
+  color: var(--green) !important;
+}
+
+.stat-delta-label {
+  display: inline !important;
+  color: var(--muted) !important;
+}
+
+.stat-delta.is-zero .stat-delta-number {
+  color: var(--muted) !important;
+}
+
+.unusable-grade-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.unusable-grade-grid > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 13px 9px 10px;
+}
+
+.unusable-grade-grid > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.unusable-grade-grid span {
+  color: var(--muted);
+  font-size: 0.56rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.unusable-grade-grid strong {
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+.unusable-grade-grid small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.unusable-grade-delta-values {
+  display: flex !important;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.unusable-grade-delta-added,
+.unusable-grade-delta-removed {
+  display: inline !important;
+  font-size: 0.53rem !important;
+  font-weight: 950;
+}
+
+.unusable-grade-delta-added {
+  color: #8b3b32 !important;
+}
+
+.unusable-grade-delta-removed {
+  color: var(--green) !important;
+}
+
+.unusable-grade-delta-label {
+  display: block !important;
+  margin-top: 4px;
+  font-size: 0.41rem !important;
+}
+
+.kvk-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (max-width: 1180px) {
+  .kvk-stat-card-enhanced {
+    min-height: 92px;
+  }
+}

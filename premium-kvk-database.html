@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
+  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260726a">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260726b">
 </head>
 <body>
@@ -34,29 +35,59 @@
     </header>
 
     <section class="stats-grid" aria-label="Scraper status">
-      <article class="stat-card stat-card-primary">
-        <span>Totaal Gevonden</span>
-        <strong id="companies-total">0</strong>
+      <article class="stat-card stat-card-primary kvk-stat-card-enhanced">
+        <div class="stat-main stat-main-full">
+          <span>Totaal Gevonden</span>
+          <strong id="companies-total">0</strong>
+        </div>
       </article>
-      <article class="stat-card">
-        <span>Totaal Behandeld</span>
-        <strong id="companies-treated">0</strong>
+      <article class="stat-card kvk-stat-card-enhanced">
+        <div class="stat-main">
+          <span>Totaal Behandeld</span>
+          <strong id="companies-treated">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-treated-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card">
-        <span>Bruikbaar</span>
-        <strong id="companies-usable">0</strong>
+      <article class="stat-card stat-card-usable kvk-stat-card-enhanced">
+        <div class="stat-main">
+          <span>Bruikbaar</span>
+          <strong id="companies-usable">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-usable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card">
-        <span>Mét Website</span>
-        <strong id="companies-with-website">0</strong>
+      <article class="stat-card kvk-stat-card-enhanced">
+        <div class="stat-main">
+          <span>Mét Website</span>
+          <strong id="companies-with-website">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-with-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card">
-        <span>Zonder Werkende Website</span>
-        <strong id="companies-without-website">0</strong>
+      <article class="stat-card kvk-stat-card-enhanced">
+        <div class="stat-main">
+          <span>Zonder Werkende Website</span>
+          <strong id="companies-without-website">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-without-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      <article class="stat-card">
-        <span>Onbruikbare Bedrijven</span>
-        <strong id="companies-unusable">0</strong>
+      <article class="stat-card stat-card-unusable kvk-stat-card-enhanced" aria-label="Onbruikbare bedrijven per reviewgrade">
+        <strong id="companies-unusable" class="kvk-visually-hidden" aria-hidden="true">0</strong>
+        <div class="unusable-grade-grid">
+          <div>
+            <span>Grade 1</span>
+            <strong id="companies-unusable-grade-1">0</strong>
+            <small id="companies-unusable-grade-1-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span><span class="unusable-grade-delta-removed">-0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
+          </div>
+          <div>
+            <span>Grade 2</span>
+            <strong id="companies-unusable-grade-2">0</strong>
+            <small id="companies-unusable-grade-2-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span><span class="unusable-grade-delta-removed">-0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
+          </div>
+          <div>
+            <span>Grade 3</span>
+            <strong id="companies-unusable-grade-3">0</strong>
+            <small id="companies-unusable-grade-3-last60"><span class="unusable-grade-delta-values"><span class="unusable-grade-delta-added">+0</span></span><span class="unusable-grade-delta-label">laatste 60 min</span></small>
+          </div>
+        </div>
       </article>
     </section>
 
@@ -223,6 +254,7 @@
 
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database.js?v=20260726b"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20260726a"></script>
   <script src="/assets/kvk-database-control.js?v=20260726b"></script>
 </body>
 </html>
