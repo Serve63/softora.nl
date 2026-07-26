@@ -223,6 +223,56 @@ test('mailbox campaign snapshot bewaart volledige Instantly provenance voor root
   assert.equal(message.threadMessages[0].direction, 'sent');
 });
 
+test('mailbox campaign snapshot bewaart oudere Instantly-gesprekken van beide eigenaren binnen de limiet', () => {
+  const regularMessages = Array.from({ length: 100 }, (_, index) => ({
+    id: `inbox:${index + 1}`,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: `bedrijf-${index}@example.test`,
+    subject: `Reactie ${index}`,
+    date: new Date(Date.UTC(2026, 6, 26, 18, 0, 0) - index * 60_000).toISOString(),
+  }));
+  const instantlyMessages = [{
+    id: 'serve@websoftora.com|instantly-thread:ramon-thread',
+    provider: 'instantly',
+    providerMessageId: 'ramon-reply',
+    providerThreadId: 'ramon-thread',
+    providerAccountEmail: 'serve@websoftora.com',
+    providerOwner: 'serve',
+    folder: 'inbox',
+    accountEmail: 'serve@websoftora.com',
+    email: 'info@ramoncc.nl',
+    date: '2026-07-07T10:47:10.000Z',
+  }, {
+    id: 'martijn@websoftora.com|instantly-thread:martijn-thread',
+    provider: 'instantly',
+    providerMessageId: 'martijn-reply',
+    providerThreadId: 'martijn-thread',
+    providerAccountEmail: 'martijn@websoftora.com',
+    providerOwner: 'martijn',
+    folder: 'inbox',
+    accountEmail: 'martijn@websoftora.com',
+    email: 'contact@example.test',
+    date: '2026-06-01T10:00:00.000Z',
+  }];
+
+  const parsed = parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [...regularMessages, ...instantlyMessages],
+  }));
+
+  assert.equal(parsed.messages.length, 100);
+  assert.ok(parsed.messages.some((message) => message.email === 'info@ramoncc.nl'));
+  assert.deepEqual(
+    parsed.messages
+      .filter((message) => message.provider === 'instantly')
+      .map((message) => message.providerOwner),
+    ['serve', 'martijn']
+  );
+  assert.equal(parsed.messages.some((message) => message.id === 'inbox:99'), false);
+  assert.equal(parsed.messages.some((message) => message.id === 'inbox:100'), false);
+});
+
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
     version: 4,
