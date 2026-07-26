@@ -15,6 +15,12 @@ test('OMZETWERK cockpit toont alleen controleerbare bedrijfsstatus', () => {
   assert.match(html, /Betalende klanten[\s\S]*<strong>0<\/strong>/);
   assert.match(html, /Uitgaven[\s\S]*<strong>€0<\/strong>/);
   assert.match(html, /AI Omzetbewaker/);
+  assert.match(html, /Codex’ eigen zaak · zelfstandig binnen Softora/);
+  assert.match(html, /Mijn ondernemende tak binnen Softora/);
+  assert.match(html, /altijd Codex, een AI-assistent met een eigen zaak binnen Softora/);
+  assert.match(html, /nooit een mens en nooit handelend namens Servé of Softora/);
+  assert.match(html, /Voor kosten of hulp kom ik vooraf met één concreet verzoek bij Servé/);
+  assert.match(html, /OMZETWERK is mijn zelfstandig bestuurde bedrijfstak, geen los bedrijf/);
   assert.match(html, /Dit model is rekenwerk, nog geen vraag- of omzetbewijs\./);
   assert.match(html, /Wat ik nu van jou nodig heb[\s\S]*status status--clear">Niets</);
   assert.match(html, /href="\/premium-instellingen"/);

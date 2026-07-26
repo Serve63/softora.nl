@@ -101,7 +101,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260726a/);
+  assert.match(source, /premium-user-management\.js\?v=20260726b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);
@@ -111,7 +111,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /Flynow/);
   assert.match(userManagementSource, /Transfermarkt/);
   assert.match(userManagementSource, /OMZETWERK/);
-  assert.match(userManagementSource, /Codex’ bedrijfscockpit: keuzes, voortgang en bewijs richting €1\.000\.000\./);
+  assert.match(userManagementSource, /Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1\.000\.000\./);
   assert.match(userManagementSource, /Ruben’s Trading System/);
   assert.match(userManagementSource, /Winnen/);
   assert.match(userManagementSource, /Database/);

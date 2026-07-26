@@ -537,7 +537,7 @@ function mountExtraSettingsCategory() {
             : isHealth
               ? 'WHOOP-herstel, slaap en trainingen, dagelijks automatisch bijgewerkt.'
             : isOmzetwerk
-              ? 'Codex’ bedrijfscockpit: keuzes, voortgang en bewijs richting €1.000.000.'
+              ? 'Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1.000.000.'
             : label === 'Flynow'
               ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
             : 'Interne template-module die later verder ingevuld kan worden.'
