@@ -24,6 +24,7 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
   ]);
   assert.deepEqual(PAGE_STATE_SCOPES['premium-seo-crm-system.html'], ['premium_seo_crm']);
   assert.deepEqual(PAGE_STATE_SCOPES['premium-vaste-lasten.html'], ['premium_monthly_costs']);
+  assert.deepEqual(PAGE_STATE_SCOPES['premium-instellingen.html'], ['premium_toto_lab']);
   assert.deepEqual(PAGE_STATE_SCOPES['sportschool.html'], ['sportschool_logboek']);
 
   const primaryBootstrapMarkers = {
@@ -103,7 +104,7 @@ test('pagina-bootstrap blokkeert de pagina niet als één scope faalt', async ()
   assert.equal(await service.buildPageStateBootstrapPayload('index.html'), null);
 });
 
-test('beschermde pagina zonder eigen scope krijgt de bevestigde sessie direct mee', async () => {
+test('beschermde instellingenpagina krijgt sessie en TOTO-scope direct mee', async () => {
   const service = createPremiumPageStateBootstrapService();
   const payload = await service.buildPageStateBootstrapPayload('premium-instellingen.html', {
     session: {
@@ -117,7 +118,13 @@ test('beschermde pagina zonder eigen scope krijgt de bevestigde sessie direct me
   assert.equal(payload.ok, true);
   assert.equal(payload.session.displayName, 'Servé Creusen');
   assert.equal(Object.hasOwn(payload.session, 'token'), false);
-  assert.deepEqual(payload.scopes, {});
+  assert.deepEqual(payload.scopes, {
+    premium_toto_lab: {
+      values: {},
+      source: 'unavailable',
+      updatedAt: null,
+    },
+  });
 });
 
 test('mailbox-bootstrap levert sessie en berichten direct mee en hergebruikt het snapshot', async () => {
