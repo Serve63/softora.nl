@@ -12,6 +12,11 @@ test('premium ui-state client centraliseert gedeelde read/write fallback routes'
   assert.match(source, /set: setUiState/);
   assert.match(source, /peek: peekUiState/);
   assert.match(source, /prime: primeUiState/);
+  assert.match(source, /invalidate: invalidateUiState/);
+  assert.match(source, /function isUsableBootstrapSnapshot\(scope, value\)/);
+  assert.match(source, /String\(scope \|\| ""\) === "premium_live_momentum"/);
+  assert.match(source, /String\(snapshot\.source \|\| ""\)\.toLowerCase\(\) !== "supabase"/);
+  assert.match(source, /if \(!isUsableBootstrapSnapshot\(scope, scopes\[scope\]\)\) return count;/);
   assert.match(source, /"softoraPageStateBootstrap"/);
   assert.match(source, /"softoraCustomersBootstrap"/);
   assert.match(source, /payload\.pageStateScopes/);

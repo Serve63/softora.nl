@@ -42,7 +42,9 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
       pageSource,
       fileName === 'premium-mailbox.html'
         ? /premium-ui-state-client\.js\?v=20260723c/
-        : /premium-ui-state-client\.js\?v=20260722b/,
+        : fileName === 'live-momentum.html'
+          ? /premium-ui-state-client\.js\?v=20260727a/
+          : /premium-ui-state-client\.js\?v=20260722b/,
       fileName
     );
   });
@@ -101,6 +103,30 @@ test('pagina-bootstrap blokkeert de pagina niet als één scope faalt', async ()
   assert.equal(payload.ok, true);
   assert.deepEqual(Object.keys(payload.scopes), ['premium_coldmailing_settings']);
   assert.equal(await service.buildPageStateBootstrapPayload('index.html'), null);
+});
+
+test('pagina-bootstrap cachet een mislukte scope-read niet als lege state', async () => {
+  let reads = 0;
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async () => {
+      reads += 1;
+      return reads === 1
+        ? null
+        : { values: { live: 'state' }, source: 'supabase' };
+    },
+  });
+
+  const first = await service.buildPageStateBootstrapPayload('live-momentum.html', {
+    session: { authenticated: true, email: 'serve@softora.nl' },
+  });
+  const second = await service.buildPageStateBootstrapPayload('live-momentum.html', {
+    session: { authenticated: true, email: 'serve@softora.nl' },
+  });
+
+  assert.deepEqual(first.scopes, {});
+  assert.equal(second.scopes.premium_live_momentum.source, 'supabase');
+  assert.equal(second.scopes.premium_live_momentum.values.live, 'state');
+  assert.equal(reads, 2);
 });
 
 test('beschermde pagina zonder eigen scope krijgt de bevestigde sessie direct mee', async () => {
