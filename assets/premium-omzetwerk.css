@@ -376,6 +376,10 @@ body[data-omzetwerk-page] .omzetwerk-main .hero {
   color: white;
 }
 
+.panel--offer .panel-heading {
+  flex-wrap: wrap;
+}
+
 .panel-heading {
   display: flex;
   align-items: flex-start;
@@ -405,6 +409,12 @@ body[data-omzetwerk-page] .omzetwerk-main .hero {
   border-color: rgba(39, 166, 103, 0.24);
   background: rgba(39, 166, 103, 0.1);
   color: #137547;
+}
+
+.status--decision {
+  border-color: rgba(255, 107, 53, 0.32);
+  background: rgba(255, 107, 53, 0.12);
+  color: #a53a12;
 }
 
 .panel-intro,
@@ -527,6 +537,88 @@ body[data-omzetwerk-page] .omzetwerk-main .hero {
   font-size: 14px;
 }
 
+.panel--evidence {
+  grid-column: 1 / -1;
+}
+
+.signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.signal-grid article {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.signal-grid span,
+.candidate-state {
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.signal-grid strong {
+  display: block;
+  margin-top: 9px;
+  font-size: 15px;
+}
+
+.signal-grid p,
+.evidence-links {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.candidate-table {
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.candidate-row {
+  display: grid;
+  grid-template-columns: 0.75fr 1.7fr 1.1fr 0.65fr;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 18px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.candidate-row:first-child {
+  border-top: 0;
+}
+
+.candidate-row--head {
+  background: rgba(17, 19, 24, 0.05);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.evidence-links a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.evidence-links a:hover {
+  color: var(--blue);
+}
+
 .decision-log {
   display: grid;
   grid-template-columns: 0.55fr 1.45fr;
@@ -606,8 +698,17 @@ footer span {
 
   .hero,
   .dashboard-grid,
-  .decision-log {
+  .decision-log,
+  .signal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .candidate-row {
+    grid-template-columns: 0.75fr 1.6fr 1fr;
+  }
+
+  .candidate-row > :last-child {
+    grid-column: 1 / -1;
   }
 
   .hero {
@@ -678,6 +779,19 @@ footer span {
   .facts div {
     grid-template-columns: 1fr;
     gap: 7px;
+  }
+
+  .candidate-row,
+  .candidate-row--head {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-row--head {
+    display: none;
+  }
+
+  .candidate-row > :last-child {
+    grid-column: auto;
   }
 
   footer {
