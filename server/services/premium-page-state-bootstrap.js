@@ -96,6 +96,10 @@ function createPremiumPageStateBootstrapService(deps = {}) {
         ignoreSupabaseRestFailureCooldown: true,
         suppressSupabaseRestFailureCooldown: true,
       });
+      // Een time-out of mislukte Supabase-read mag nooit als een vers, leeg
+      // bootstrap-snapshot in de browsercache belanden. De client zou die
+      // placeholder anders 15 seconden hergebruiken voordat hij opnieuw leest.
+      if (!result || typeof result !== 'object') return null;
       const entry = [normalizedScope, sanitizeStateSnapshot(result)];
       scopeCache.set(normalizedScope, { entry, cachedAt: Date.now() });
       return entry;

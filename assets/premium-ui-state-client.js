@@ -50,6 +50,27 @@
         return true;
     }
 
+    function invalidateUiState(scope) {
+        var cacheKey = String(scope || "");
+        if (!cacheKey) return false;
+        delete readCache[cacheKey];
+        return true;
+    }
+
+    function isUsableBootstrapSnapshot(scope, value) {
+        var snapshot = value && typeof value === "object" ? value : null;
+        if (!snapshot) return false;
+        // Live Momentum accepteert uitsluitend door Supabase bevestigde state.
+        // Cache dus geen lege timeout-placeholder die de echte read blokkeert.
+        if (
+            String(scope || "") === "premium_live_momentum" &&
+            String(snapshot.source || "").toLowerCase() !== "supabase"
+        ) {
+            return false;
+        }
+        return true;
+    }
+
     function readPageStateBootstrap() {
         var doc = getBootstrapDocument();
         if (!doc) return 0;
@@ -74,6 +95,7 @@
                         : {};
                 return total + Object.keys(scopes).reduce(function (count, scope) {
                     if (primedScopes[scope]) return count;
+                    if (!isUsableBootstrapSnapshot(scope, scopes[scope])) return count;
                     var primed = primeUiState(scope, scopes[scope], {
                         bootstrap: true,
                         // De server heeft deze data al voor de huidige navigatie opgehaald.
@@ -225,6 +247,7 @@
         set: setUiState,
         peek: peekUiState,
         prime: primeUiState,
+        invalidate: invalidateUiState,
         bootstrappedScopeCount: bootstrappedScopeCount
     };
 })(window);

@@ -941,6 +941,9 @@
       try {
         const response = await uiStateClient.get(STATE_SCOPE);
         if (!response?.ok || response.source !== 'supabase') {
+          if (typeof uiStateClient.invalidate === 'function') {
+            uiStateClient.invalidate(STATE_SCOPE);
+          }
           throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
         }
         const values = response.values || {};

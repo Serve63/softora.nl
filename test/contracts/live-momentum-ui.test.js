@@ -33,7 +33,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
-  assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
+  assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727a"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
@@ -430,6 +430,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /calendar\.getMonthStateKey\(PERIOD_KEY\)/);
   assert.match(js, /window\.SoftoraUiStateClient/);
   assert.match(js, /uiStateClient\.get\(STATE_SCOPE\)/);
+  assert.match(js, /uiStateClient\.invalidate\(STATE_SCOPE\)/);
   assert.match(js, /uiStateClient\.set\(STATE_SCOPE/);
   assert.match(js, /patch:\s*\{ \[STATE_KEY\]: JSON\.stringify\(snapshot\) \}/);
   assert.doesNotMatch(js, /replace:\s*true/);
