@@ -595,7 +595,7 @@ function createMailboxService(deps = {}) {
       mailboxIndexStore,
       dataOpsStore,
     }),
-    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getUiStateValues, setUiStateValues, logger }),
+    instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
   } = deps;
   const mailboxWebdesignImageDelivery = normalizeMailboxWebdesignImageDelivery(
     deps.webdesignImageDelivery ||

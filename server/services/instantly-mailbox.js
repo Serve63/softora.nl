@@ -1,6 +1,7 @@
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const { parseProviderHtml } = require('./mailbox-provider-rich-body');
 const {
+  buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
   extractLeadId,
 } = require('./instantly-original-message-source');
@@ -131,6 +132,7 @@ function createInstantlyMailboxService(deps = {}) {
     config = {},
     mailboxIndexStore,
     fetchJsonWithTimeout = async () => ({ response: { ok: false, status: 500 }, data: null }),
+    getCustomerSourcesByEmails = async () => [],
     getUiStateValues = async () => ({ values: {} }),
     setUiStateValues = async () => null,
     now = () => new Date(),
@@ -415,6 +417,45 @@ function createInstantlyMailboxService(deps = {}) {
       },
     });
     const rawMessages = extractInstantlyItems(data);
+    const originalRecipients = Array.from(new Set(
+      rawMessages
+        .filter((rawMessage) => (
+          getEmailDirection(rawMessage, exactAccountEmail) === 'sent' &&
+          normalizeText(rawMessage.ue_type || rawMessage.email_type || rawMessage.type).toLowerCase() === '1'
+        ))
+        .map((rawMessage) => extractAddressList(
+          rawMessage.to_address_email_list,
+          rawMessage.to_address_json,
+          rawMessage.to,
+          rawMessage.to_address_email
+        )[0])
+        .filter(Boolean)
+    ));
+    const customerSourcesByEmail = new Map();
+    if (originalRecipients.length) {
+      try {
+        const customers = await getCustomerSourcesByEmails({
+          emails: originalRecipients,
+          bypassReadCache: true,
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+        });
+        const candidatesByEmail = new Map();
+        for (const customer of Array.isArray(customers) ? customers : []) {
+          const customerEmail = normalizeEmail(customer?.email || customer?.contactEmail);
+          if (!customerEmail || !originalRecipients.includes(customerEmail)) continue;
+          const candidates = candidatesByEmail.get(customerEmail) || [];
+          candidates.push(customer);
+          candidatesByEmail.set(customerEmail, candidates);
+        }
+        candidatesByEmail.forEach((candidates, customerEmail) => {
+          customerSourcesByEmail.set(customerEmail, candidates.length === 1 ? candidates[0] : null);
+        });
+      } catch (error) {
+        logger.warn('[InstantlyMailbox][CustomerOriginalSource]', error?.message || error);
+      }
+    }
     const leadSourceCache = new Map();
     const enrichedMessages = [];
     for (const rawMessage of rawMessages) {
@@ -432,6 +473,22 @@ function createInstantlyMailboxService(deps = {}) {
         rawMessage.to,
         rawMessage.to_address_email
       )[0];
+      const exactCustomer = customerSourcesByEmail.get(recipientEmail);
+      const customerQuotedSource = exactCustomer
+        ? buildCustomerQuotedMessageSource(
+            rawMessage,
+            rawMessages,
+            exactCustomer,
+            { accountEmail: exactAccountEmail, recipientEmail }
+          )
+        : null;
+      if (customerQuotedSource?.available === true) {
+        enrichedMessages.push({
+          ...rawMessage,
+          __softoraOriginalMessageSource: customerQuotedSource,
+        });
+        continue;
+      }
       const leadId = extractLeadId(rawMessage);
       const leadCacheKey = leadId || `${normalizeText(rawMessage.campaign_id)}|${recipientEmail}`;
       try {

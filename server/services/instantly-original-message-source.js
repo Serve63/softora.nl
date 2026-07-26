@@ -8,6 +8,7 @@ const SOFTORA_SOURCE_TEXT_KEYS = Object.freeze([
   'softora_instantly_email_body',
   'softora_mail_body',
 ]);
+const QUOTED_REPLY_HEADER_PATTERN = /^(?:op\s.+\sschreef\s.+:|op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|on\s.+\swrote:)/i;
 
 function text(value) {
   return String(value || '').trim();
@@ -85,6 +86,117 @@ function bodyMatchesProviderCopy(providerBody, sourceBody) {
   return matchingTokens / providerTokens.length >= 0.9;
 }
 
+function getRawMessageBody(rawMessage = {}) {
+  const html = text(rawMessage.body?.html || rawMessage.body_html || rawMessage.email_html);
+  return parseProviderHtml(html).body || text(
+    rawMessage.body?.text || rawMessage.body_text || rawMessage.email_text
+  );
+}
+
+function extractQuotedOriginalBody(rawMessages = [], options = {}) {
+  const expectedSender = email(options.accountEmail);
+  for (const rawMessage of Array.isArray(rawMessages) ? rawMessages : []) {
+    const body = getRawMessageBody(rawMessage);
+    if (!body) continue;
+    const lines = body.split(/\r?\n/);
+    const quoteIndex = lines.findIndex((line) => {
+      const normalized = text(line).replace(/^>\s*/, '');
+      return QUOTED_REPLY_HEADER_PATTERN.test(normalized) &&
+        (!expectedSender || email(extractEmail(normalized)) === expectedSender);
+    });
+    if (quoteIndex < 0) continue;
+    const quotedBody = lines
+      .slice(quoteIndex + 1)
+      .map((line) => line.replace(/^\s*>\s?/, ''))
+      .join('\n')
+      .trim();
+    if (quotedBody) return quotedBody;
+  }
+  return '';
+}
+
+function normalizeExactWebdesignUrl(value, expectedCustomerId) {
+  try {
+    const url = new URL(text(value));
+    const hostname = url.hostname.toLowerCase();
+    if (!['softora.nl', 'www.softora.nl'].includes(hostname)) return '';
+    if (!url.pathname.startsWith('/webdesign/')) return '';
+    if (expectedCustomerId && url.searchParams.get('cid') !== expectedCustomerId) return '';
+    if (!url.searchParams.get('sender')) return '';
+    return url.toString();
+  } catch (_) {
+    return '';
+  }
+}
+
+function insertExactWebdesignUrl(body, exactUrl) {
+  const marker = `hier [${exactUrl}]`;
+  if (body.includes(marker)) return body;
+  const exactCta = /(\bwebdesign\s+)hier(\s+bekijken\b)/i;
+  if (!exactCta.test(body)) return '';
+  return body.replace(exactCta, `$1${marker}$2`);
+}
+
+function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], customer = {}, options = {}) {
+  const expectedCampaignId = text(rawMessage.campaign_id);
+  const expectedRecipient = email(options.recipientEmail);
+  const expectedSender = email(options.accountEmail);
+  const expectedLeadId = extractLeadId(rawMessage);
+  const customerId = text(customer.id || customer.customer_id);
+  const customerRecipient = email(customer.email || customer.contactEmail);
+  const customerCampaignId = text(
+    customer.instantlyCampaignId ||
+    customer.lastColdmailCampaignId
+  );
+  const customerSender = email(
+    customer.instantlyActualSenderEmail ||
+    customer.lastColdmailSenderEmail ||
+    customer.instantlySenderEmail
+  );
+  const customerLeadId = text(
+    customer.instantlyLeadId ||
+    customer.lastColdmailLeadId
+  );
+  const exactPublicUrl = normalizeExactWebdesignUrl(
+    customer.instantlyPublicPreviewUrl,
+    customerId
+  );
+  const identityMatches = Boolean(
+    customerId &&
+    expectedCampaignId &&
+    customerCampaignId === expectedCampaignId &&
+    expectedRecipient &&
+    customerRecipient === expectedRecipient &&
+    expectedSender &&
+    customerSender === expectedSender &&
+    customerLeadId &&
+    (!expectedLeadId || customerLeadId === expectedLeadId) &&
+    exactPublicUrl
+  );
+  if (!identityMatches) {
+    return { evidenceKnown: true, available: false, reason: 'customer-identity-mismatch' };
+  }
+
+  const providerBody = getRawMessageBody(rawMessage);
+  const quotedBody = extractQuotedOriginalBody(rawMessages, { accountEmail: expectedSender });
+  if (!quotedBody || !bodyMatchesProviderCopy(providerBody, quotedBody)) {
+    return { evidenceKnown: true, available: false, reason: 'quoted-content-mismatch' };
+  }
+  const sourceBody = insertExactWebdesignUrl(quotedBody, exactPublicUrl);
+  if (!sourceBody) {
+    return { evidenceKnown: true, available: false, reason: 'quoted-link-marker-missing' };
+  }
+
+  return {
+    evidenceKnown: true,
+    available: true,
+    body: sourceBody,
+    webdesignLinkEvidenceKnown: true,
+    webdesignLinkUrl: exactPublicUrl,
+    reason: 'exact-customer-and-delivered-quote-source',
+  };
+}
+
 function buildOriginalMessageSource(rawMessage = {}, rawLead = {}, options = {}) {
   const lead = unwrapLead(rawLead);
   const variables = extractVariables(lead);
@@ -149,7 +261,9 @@ function buildOriginalMessageSource(rawMessage = {}, rawLead = {}, options = {})
 
 module.exports = {
   bodyMatchesProviderCopy,
+  buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
   canonicalizeComparableBody,
+  extractQuotedOriginalBody,
   extractLeadId,
 };
