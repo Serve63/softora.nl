@@ -59,8 +59,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260726b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260726a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260726b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260726b/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
@@ -146,15 +146,20 @@ test('kvk database shows completed locations crossed out with usable company tot
 test('kvk database renders refresh age in seconds and a real fill control', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
+  const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
 
   assert.match(pageSource, /id="database-fill-toggle"/);
-  assert.match(pageSource, /Database vullen starten/);
+  assert.match(pageSource, /database-fill-toggle__caption">Database vullen/);
+  assert.match(pageSource, /id="database-fill-toggle-label"[^>]*>UIT</);
   assert.match(pageSource, /-- seconden geleden/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
   assert.match(controlSource, /window\.setInterval\(renderRefreshAge, 1000\)/);
   assert.match(controlSource, /fetch\('\/api\/kvk-database\/control'/);
   assert.match(controlSource, /'X-Softora-Requested-With': 'premium'/);
   assert.match(controlSource, /JSON\.stringify\(\{ enabled: !state\.control\.enabled \}\)/);
+  assert.match(controlSource, /fillButtonLabel\.textContent = enabled \? 'AAN' : 'UIT'/);
+  assert.match(controlStyles, /\.database-fill-toggle__track/);
+  assert.match(controlStyles, /translateX\(15px\)/);
 });
 
 test('kvk database snapshot API is wired and only public for token-protected sync posts', () => {

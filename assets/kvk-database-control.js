@@ -88,18 +88,11 @@
     fillButton.classList.toggle('is-on', enabled);
     fillButton.classList.toggle('is-error', workerState === 'error');
     fillButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    if (state.loading) {
-      fillButtonLabel.textContent = 'Even wachten…';
-    } else if (enabled && running) {
-      fillButtonLabel.textContent = 'Database vullen: aan';
-    } else if (enabled) {
-      fillButtonLabel.textContent = 'Start aangevraagd';
-    } else if (running) {
-      fillButtonLabel.textContent = 'Na deze batch stoppen';
-    } else {
-      fillButtonLabel.textContent = 'Database vullen starten';
-    }
-    fillButton.title = workerMessage || (enabled ? 'Klik om na de lopende batch te stoppen.' : 'Klik om de database veilig te vullen.');
+    fillButtonLabel.textContent = enabled ? 'AAN' : 'UIT';
+    const actionLabel = enabled ? 'uit te zetten' : 'aan te zetten';
+    fillButton.setAttribute('aria-label', `Database vullen staat ${enabled ? 'aan' : 'uit'}. Klik om ${actionLabel}.`);
+    const pendingStopMessage = !enabled && running ? 'De lopende batch wordt nog veilig afgemaakt; daarna stopt database vullen.' : '';
+    fillButton.title = pendingStopMessage || workerMessage || (enabled ? 'Klik om na de lopende batch te stoppen.' : 'Klik om database vullen aan te zetten.');
   }
 
   async function loadControl() {
