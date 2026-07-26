@@ -9,6 +9,7 @@ const {
   isPublicationInWindow,
 } = require('../../server/services/seo-machine-publication-ledger');
 const {
+  getSeoContentGrowthEventPlan,
   getPublicSeoGrowthEventPlan,
 } = require('../../server/services/seo-machine-publication-plan');
 
@@ -84,6 +85,21 @@ test('public SEO refreshes have an explicit machine-readable event plan', () => 
       ['/bedrijfssoftware-op-maat', '2026-07-06', 'substantial_refresh'],
       ['/crm-systeem-op-maat', '2026-07-04', 'substantial_refresh'],
       ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
+    ]
+  );
+});
+
+test('content refreshes have an explicit machine-readable event plan', () => {
+  const events = getSeoContentGrowthEventPlan({ now: new Date('2026-07-26T12:00:00.000Z') });
+  assert.deepEqual(
+    events.map((event) => [event.path, event.eventAt, event.publicationKind, event.status]),
+    [
+      [
+        '/kennisbank/wat-is-interne-linkstructuur',
+        '2026-07-26',
+        'substantial_refresh',
+        'live',
+      ],
     ]
   );
 });

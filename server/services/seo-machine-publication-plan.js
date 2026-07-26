@@ -1,4 +1,9 @@
-const { getSeoContentPublicationPlan } = require('./seo-content');
+const {
+  SEO_CONTENT_ITEMS,
+  getSeoContentClusterForItem,
+  getSeoContentPathForItem,
+  getSeoContentPublicationPlan,
+} = require('./seo-content');
 const { INDEXABLE_PUBLIC_SEO_PAGES } = require('./public-seo');
 
 function publicationDayMs(value) {
@@ -26,9 +31,29 @@ function getPublicSeoGrowthEventPlan({ now = new Date() } = {}) {
     });
 }
 
+function getSeoContentGrowthEventPlan({ now = new Date() } = {}) {
+  const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  return SEO_CONTENT_ITEMS
+    .filter((item) => item.growthEventKind && item.growthEventAt)
+    .map((item) => {
+      const eventMs = publicationDayMs(item.growthEventAt);
+      return {
+        collection: item.collection,
+        path: getSeoContentPathForItem(item),
+        title: item.title,
+        cluster: getSeoContentClusterForItem(item).key,
+        publishedAt: item.publishedAt,
+        eventAt: item.growthEventAt,
+        publicationKind: item.growthEventKind,
+        status: Number.isFinite(eventMs) && eventMs <= nowMs ? 'live' : 'scheduled',
+      };
+    });
+}
+
 function getSeoMachinePublicationPlan({ now = new Date() } = {}) {
   return [
     ...getSeoContentPublicationPlan({ now }),
+    ...getSeoContentGrowthEventPlan({ now }),
     ...getPublicSeoGrowthEventPlan({ now }),
   ].sort((a, b) => (
     String(a.eventAt || a.publishedAt).localeCompare(String(b.eventAt || b.publishedAt))
@@ -38,5 +63,6 @@ function getSeoMachinePublicationPlan({ now = new Date() } = {}) {
 
 module.exports = {
   getPublicSeoGrowthEventPlan,
+  getSeoContentGrowthEventPlan,
   getSeoMachinePublicationPlan,
 };
