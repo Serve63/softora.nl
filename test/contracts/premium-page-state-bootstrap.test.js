@@ -214,3 +214,56 @@ test('mailbox-bootstrap leest bij een koude server eerst het duurzame snapshot',
   assert.equal(payload.mailbox.sync.source, 'campaign-replies-snapshot');
   assert.equal(mailboxReads, 1);
 });
+
+test('mailbox-bootstrap weigert oude provenance-loze cache en laadt Ramon direct opnieuw', async () => {
+  let mailboxReads = 0;
+  const staleVersionThreeSnapshot = JSON.stringify({
+    version: 3,
+    savedAt: '2026-07-26T19:00:00.000Z',
+    ok: true,
+    messages: [{
+      id: 'ramon-without-provider-owner',
+      accountEmail: 'serve@websoftora.com',
+      email: 'info@ramoncc.nl',
+      conversationId: 'instantly:serve@websoftora.com:ramon-thread',
+    }],
+  });
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async (scope) => scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+      ? { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: staleVersionThreeSnapshot }, source: 'supabase' }
+      : { values: {}, source: 'supabase' },
+    mailboxCoordinator: {
+      listCampaignReplies: async (options) => {
+        mailboxReads += 1;
+        assert.equal(options.limit, 100);
+        assert.equal(options.owner, undefined);
+        return {
+          ok: true,
+          messages: [{
+            id: 'ramon',
+            mailboxId: 'instantly:ramon-reply',
+            provider: 'instantly',
+            providerMessageId: 'ramon-reply',
+            providerThreadId: 'ramon-thread',
+            providerAccountEmail: 'serve@websoftora.com',
+            providerOwner: 'serve',
+            storageFolder: 'instantly',
+            accountEmail: 'serve@websoftora.com',
+            email: 'info@ramoncc.nl',
+            conversationId: 'instantly:serve@websoftora.com:ramon-thread',
+            receivedAt: '2026-07-07T10:47:10.000Z',
+          }],
+          sync: { source: 'campaign-replies-index+instantly' },
+        };
+      },
+    },
+  });
+
+  const payload = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+
+  assert.equal(mailboxReads, 1);
+  assert.equal(payload.mailbox.messages[0].email, 'info@ramoncc.nl');
+  assert.equal(payload.mailbox.messages[0].provider, 'instantly');
+  assert.equal(payload.mailbox.messages[0].providerOwner, 'serve');
+  assert.equal(payload.mailbox.messages[0].providerThreadId, 'ramon-thread');
+});

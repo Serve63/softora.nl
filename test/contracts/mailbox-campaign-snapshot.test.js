@@ -148,9 +148,84 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
   assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
 });
 
+test('mailbox campaign snapshot bewaart volledige Instantly provenance voor root en thread', () => {
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'serve@websoftora.com|instantly-thread:ramon-thread',
+      mailboxId: 'instantly:ramon-reply',
+      provider: 'instantly',
+      providerMessageId: 'ramon-reply',
+      providerThreadId: 'ramon-thread',
+      providerCampaignId: 'campaign-serve',
+      providerAccountEmail: 'serve@websoftora.com',
+      providerOwner: 'serve',
+      storageFolder: 'instantly',
+      storageUid: 12345,
+      direction: 'received',
+      providerBodyHtmlEvidenceKnown: true,
+      providerRichBodyAvailable: true,
+      providerOriginalBodyEvidenceKnown: true,
+      providerOriginalBodyAvailable: true,
+      folder: 'inbox',
+      accountEmail: 'serve@websoftora.com',
+      email: 'info@ramoncc.nl',
+      body: 'Dank voor je bericht.',
+      date: '2026-07-07T10:47:10.000Z',
+      conversationId: 'instantly:serve@websoftora.com:ramon-thread',
+      campaign: {
+        provider: 'instantly',
+        campaignId: 'campaign-serve',
+        account: 'serve@websoftora.com',
+        company: 'Ramon Design Store',
+      },
+      outreach: {
+        provider: 'instantly',
+        threadId: 'ramon-thread',
+        owner: 'serve',
+      },
+      threadMessages: [{
+        id: 'instantly:ramon-original',
+        provider: 'instantly',
+        providerMessageId: 'ramon-original',
+        providerThreadId: 'ramon-thread',
+        providerCampaignId: 'campaign-serve',
+        providerAccountEmail: 'serve@websoftora.com',
+        providerOwner: 'serve',
+        storageFolder: 'instantly',
+        storageUid: 67890,
+        direction: 'sent',
+        providerOriginalBodyEvidenceKnown: true,
+        providerOriginalBodyAvailable: true,
+        folder: 'sent',
+        accountEmail: 'serve@websoftora.com',
+        body: 'De oorspronkelijke mail.',
+        date: '2026-07-07T05:52:41.000Z',
+      }],
+    }],
+  });
+  const [message] = parseMailboxCampaignSnapshot(serialized).messages;
+
+  assert.equal(message.provider, 'instantly');
+  assert.equal(message.providerOwner, 'serve');
+  assert.equal(message.providerAccountEmail, 'serve@websoftora.com');
+  assert.equal(message.providerThreadId, 'ramon-thread');
+  assert.equal(message.storageFolder, 'instantly');
+  assert.equal(message.storageUid, 12345);
+  assert.equal(message.campaign.provider, 'instantly');
+  assert.equal(message.campaign.campaignId, 'campaign-serve');
+  assert.equal(message.outreach.provider, 'instantly');
+  assert.equal(message.outreach.owner, 'serve');
+  assert.equal(message.threadMessages[0].provider, 'instantly');
+  assert.equal(message.threadMessages[0].providerOwner, 'serve');
+  assert.equal(message.threadMessages[0].providerMessageId, 'ramon-original');
+  assert.equal(message.threadMessages[0].storageFolder, 'instantly');
+  assert.equal(message.threadMessages[0].direction, 'sent');
+});
+
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 3,
+    version: 4,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{
@@ -277,4 +352,5 @@ test('mailbox campaign snapshot weigert lege en ongeldige data', () => {
   assert.equal(serializeMailboxCampaignSnapshot({ ok: true, messages: [] }), '');
   assert.equal(parseMailboxCampaignSnapshot('{kapot'), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 2, messages: [] })), null);
+  assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 3, messages: [{}] })), null);
 });

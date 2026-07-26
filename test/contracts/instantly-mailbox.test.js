@@ -1050,3 +1050,87 @@ test('an exact RFC message imported through Gmail and Instantly appears only onc
     'gmail-other',
   ]);
 });
+
+test('campaign aggregation retains both proven owners while refreshing only the selected owner', async () => {
+  const listedOwners = [];
+  const syncedOwners = [];
+  const providerMessages = {
+    serve: [{
+      id: 'ramon',
+      provider: 'instantly',
+      providerOwner: 'serve',
+      providerAccountEmail: 'serve@websoftora.com',
+      accountEmail: 'serve@websoftora.com',
+      messageId: '<ramon@example.org>',
+      activityAt: '2026-07-07T10:47:10.000Z',
+      threadMessages: [],
+    }],
+    martijn: [{
+      id: 'martijn-thread',
+      provider: 'instantly',
+      providerOwner: 'martijn',
+      providerAccountEmail: 'martijn-sender@example.org',
+      accountEmail: 'martijn-sender@example.org',
+      messageId: '<martijn@example.org>',
+      activityAt: '2026-07-07T10:48:10.000Z',
+      threadMessages: [],
+    }],
+  };
+  const instantlyMailboxService = {
+    isConfigured: () => true,
+    getConfiguredAccounts: (owner) => owner === 'serve'
+      ? [{ email: 'serve@websoftora.com' }]
+      : [{ email: 'martijn-sender@example.org' }],
+    async syncOwner(owner) {
+      syncedOwners.push(owner);
+      return { ok: true, owner };
+    },
+    async listOwnerConversations(owner) {
+      listedOwners.push(owner);
+      return providerMessages[owner];
+    },
+  };
+  const dependencies = {
+    limit: 100,
+    baseReplies: [],
+    instantlyMailboxService,
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, max) => String(value || '').slice(0, max),
+  };
+
+  const selectedOwnerRefresh = await mergeCampaignReplies({
+    ...dependencies,
+    owner: 'serve',
+    refreshInstantly: true,
+  });
+  assert.deepEqual(syncedOwners, ['serve']);
+  assert.deepEqual(listedOwners.sort(), ['martijn', 'serve']);
+  assert.deepEqual(
+    selectedOwnerRefresh.messages.map((message) => [message.id, message.providerOwner]),
+    [['ramon', 'serve']]
+  );
+  assert.deepEqual(
+    selectedOwnerRefresh.snapshotMessages.map((message) => [message.id, message.providerOwner]),
+    [['martijn-thread', 'martijn'], ['ramon', 'serve']]
+  );
+
+  listedOwners.length = 0;
+  const ownerlessBackgroundRefresh = await mergeCampaignReplies({
+    ...dependencies,
+    owner: '',
+    refreshInstantly: false,
+  });
+  assert.deepEqual(listedOwners.sort(), ['martijn', 'serve']);
+  assert.deepEqual(
+    ownerlessBackgroundRefresh.messages.map((message) => message.id),
+    ['martijn-thread', 'ramon']
+  );
+  await assert.rejects(
+    mergeCampaignReplies({
+      ...dependencies,
+      owner: 'onbekend',
+      refreshInstantly: false,
+    }),
+    { code: 'INSTANTLY_OWNER_REQUIRED', status: 400 }
+  );
+});

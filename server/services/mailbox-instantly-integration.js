@@ -150,10 +150,37 @@ async function mergeCampaignReplies({
   normalizeString,
   truncateText,
 }) {
+  const selectedOwner = normalizeString(owner).toLowerCase();
+  const knownOwners = ['serve', 'martijn'];
+  if (selectedOwner && !knownOwners.includes(selectedOwner)) {
+    const error = new Error('Kies eerst de mailbox van Servé of Martijn.');
+    error.status = 400;
+    error.code = 'INSTANTLY_OWNER_REQUIRED';
+    throw error;
+  }
+  const configuredOwners = typeof instantlyMailboxService?.getConfiguredAccounts === 'function'
+    ? knownOwners.filter((candidate) => {
+        const accounts = instantlyMailboxService.getConfiguredAccounts(candidate);
+        return Array.isArray(accounts) && accounts.length > 0;
+      })
+    : selectedOwner && knownOwners.includes(selectedOwner)
+      ? [selectedOwner]
+      : knownOwners;
   let instantlySync = null;
   if (refreshInstantly && instantlyMailboxService?.isConfigured?.()) {
     try {
-      instantlySync = await instantlyMailboxService.syncOwner(owner);
+      const ownersToSync = selectedOwner && knownOwners.includes(selectedOwner)
+        ? [selectedOwner]
+        : configuredOwners;
+      const syncResults = await Promise.all(
+        ownersToSync.map((candidate) => instantlyMailboxService.syncOwner(candidate))
+      );
+      instantlySync = syncResults.length === 1
+        ? syncResults[0]
+        : {
+            ok: syncResults.every((result) => result?.ok !== false),
+            owners: syncResults,
+          };
     } catch (error) {
       instantlySync = {
         ok: false,
@@ -162,33 +189,43 @@ async function mergeCampaignReplies({
       };
     }
   }
-  const instantlyReplies = owner && instantlyMailboxService?.isConfigured?.()
-    ? await instantlyMailboxService.listOwnerConversations(owner, {
-        limit: Number(limit || 100) || 100,
-      })
+  const allInstantlyReplies = instantlyMailboxService?.isConfigured?.()
+    ? (await Promise.all(configuredOwners.map((candidate) => (
+        instantlyMailboxService.listOwnerConversations(candidate, {
+          limit: Number(limit || 100) || 100,
+        })
+      )))).flat()
     : [];
+  const instantlyReplies = selectedOwner && knownOwners.includes(selectedOwner)
+    ? allInstantlyReplies.filter((message) => message?.providerOwner === selectedOwner)
+    : allInstantlyReplies;
   const getConversationMessages = (message) => [
     message,
     ...(Array.isArray(message?.threadMessages) ? message.threadMessages : []),
   ];
-  const providerMessageIds = new Set(
-    instantlyReplies.flatMap(getConversationMessages)
-      .map((message) => normalizeString(message?.messageId).toLowerCase())
-      .filter(Boolean)
-  );
-  const uniqueBaseReplies = (Array.isArray(baseReplies) ? baseReplies : []).filter((message) => {
-    const messageIds = getConversationMessages(message)
-      .map((entry) => normalizeString(entry?.messageId).toLowerCase())
-      .filter(Boolean);
-    return !messageIds.some((messageId) => providerMessageIds.has(messageId));
-  });
-  return {
-    messages: filterVisibleMailboxMessages([...uniqueBaseReplies, ...instantlyReplies]
+  function mergeWithBase(providerReplies) {
+    const providerMessageIds = new Set(
+      providerReplies.flatMap(getConversationMessages)
+        .map((message) => normalizeString(message?.messageId).toLowerCase())
+        .filter(Boolean)
+    );
+    const uniqueBaseReplies = (Array.isArray(baseReplies) ? baseReplies : []).filter((message) => {
+      const messageIds = getConversationMessages(message)
+        .map((entry) => normalizeString(entry?.messageId).toLowerCase())
+        .filter(Boolean);
+      return !messageIds.some((messageId) => providerMessageIds.has(messageId));
+    });
+    return filterVisibleMailboxMessages([...uniqueBaseReplies, ...providerReplies]
       .sort((left, right) => (
         Date.parse(right.activityAt || right.receivedAt || right.date || 0) -
         Date.parse(left.activityAt || left.receivedAt || left.date || 0)
-      ))),
+      )));
+  }
+  return {
+    messages: mergeWithBase(instantlyReplies),
+    snapshotMessages: mergeWithBase(allInstantlyReplies),
     instantlyReplies: filterVisibleMailboxMessages(instantlyReplies),
+    snapshotInstantlyReplies: filterVisibleMailboxMessages(allInstantlyReplies),
     instantlySync,
   };
 }

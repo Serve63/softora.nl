@@ -3697,7 +3697,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies:usr_serve');
+        assert.equal(key, 'mailbox_campaign_replies_v4:usr_serve');
         return {
           ok: true,
           messages: [{ id: 'reply-session-cache', from: 'Direct uit tabcache' }],
