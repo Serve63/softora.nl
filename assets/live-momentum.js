@@ -925,6 +925,41 @@
     clearStateLoadRetry();
     void hydrateState();
   }
+  function resolveStoredState(values = {}) {
+    let storedState = parseStoredState(values[STATE_KEY]);
+    if (!storedState && PERIOD_KEY === calendar.INITIAL_PERIOD_KEY) {
+      storedState = parseStoredState(values[calendar.LEGACY_STATE_KEY], { allowLegacy: true });
+    }
+    if (!storedState) {
+      const priorStateKey = calendar.findLatestPriorMonthStateKey(values, PERIOD_KEY);
+      const priorRawState = priorStateKey
+        ? values[priorStateKey]
+        : PERIOD_KEY > calendar.INITIAL_PERIOD_KEY
+          ? values[calendar.LEGACY_STATE_KEY]
+          : null;
+      storedState = parseCarriedState(priorRawState);
+    }
+    return storedState;
+  }
+  function applyConfirmedState(response) {
+    if (!response?.ok || response.source !== 'supabase') {
+      return false;
+    }
+    const storedState = resolveStoredState(response.values || {});
+    renderGridShell(storedState?.goals || getDefaultGoals());
+    endGameCards.render(storedState?.endGameCards);
+    refreshCellData();
+    getLabels().forEach(bindLabel);
+    updateChart();
+    stateReady = true;
+    stateLoadRetryCount = 0;
+    clearStateLoadRetry();
+    setPersistenceState('saved');
+    if (!storedState || storedState.needsMigration) {
+      markStateChanged();
+    }
+    return true;
+  }
   async function hydrateState() {
     if (stateReady || stateLoadInFlight) {
       return;
@@ -940,39 +975,11 @@
       setPersistenceState('loading');
       try {
         const response = await uiStateClient.get(STATE_SCOPE);
-        if (!response?.ok || response.source !== 'supabase') {
+        if (!applyConfirmedState(response)) {
           if (typeof uiStateClient.invalidate === 'function') {
             uiStateClient.invalidate(STATE_SCOPE);
           }
           throw new Error('Live Momentum kon geen geldige Supabase-state laden.');
-        }
-        const values = response.values || {};
-        let storedState = parseStoredState(values[STATE_KEY]);
-        if (!storedState && PERIOD_KEY === calendar.INITIAL_PERIOD_KEY) {
-          storedState = parseStoredState(values[calendar.LEGACY_STATE_KEY], { allowLegacy: true });
-        }
-        if (!storedState) {
-          const priorStateKey = calendar.findLatestPriorMonthStateKey(values, PERIOD_KEY);
-          const priorRawState = priorStateKey
-            ? values[priorStateKey]
-            : PERIOD_KEY > calendar.INITIAL_PERIOD_KEY
-              ? values[calendar.LEGACY_STATE_KEY]
-              : null;
-          storedState = parseCarriedState(priorRawState);
-        }
-        if (storedState) {
-          renderGridShell(storedState.goals);
-          endGameCards.render(storedState.endGameCards);
-          refreshCellData();
-          getLabels().forEach(bindLabel);
-          updateChart();
-        }
-        stateReady = true;
-        stateLoadRetryCount = 0;
-        clearStateLoadRetry();
-        setPersistenceState('saved');
-        if (!storedState || storedState.needsMigration) {
-          markStateChanged();
         }
       } catch (error) {
         shouldRetry = true;
@@ -987,13 +994,19 @@
     focusMobileCalendarOnToday();
   }
   renderChartShell();
-  renderGridShell(getDefaultGoals());
-  endGameCards.render();
-  refreshCellData();
-  getLabels().forEach(bindLabel);
-  updateChart();
+  const bootstrapState = window.SoftoraUiStateClient?.peek?.(STATE_SCOPE);
+  const renderedBootstrapState = applyConfirmedState(bootstrapState);
+  if (!renderedBootstrapState) {
+    renderGridShell(getDefaultGoals());
+    endGameCards.render();
+    refreshCellData();
+    getLabels().forEach(bindLabel);
+    updateChart();
+  }
   focusMobileCalendarOnToday();
-  void hydrateState();
+  if (!renderedBootstrapState) {
+    void hydrateState();
+  }
   window.setInterval(refreshToday, TODAY_REFRESH_MS);
   window.addEventListener('focus', () => {
     refreshToday();

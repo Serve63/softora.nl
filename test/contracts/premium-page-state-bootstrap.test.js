@@ -43,7 +43,7 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
       fileName === 'premium-mailbox.html'
         ? /premium-ui-state-client\.js\?v=20260723c/
         : fileName === 'live-momentum.html'
-          ? /premium-ui-state-client\.js\?v=20260727a/
+          ? /premium-ui-state-client\.js\?v=20260727b/
           : /premium-ui-state-client\.js\?v=20260722b/,
       fileName
     );
@@ -88,6 +88,7 @@ test('pagina-bootstrap leest scopes parallel en levert een veilig snapshot', asy
   assert.equal(calls.length, 3);
   assert.ok(calls.some((call) => call.scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE));
   assert.ok(calls.every((call) => call.options.preferSupabaseRestRead === true));
+  assert.equal(payload.scopes.premium_mailbox_preferences.ok, true);
 });
 
 test('pagina-bootstrap blokkeert de pagina niet als één scope faalt', async () => {
@@ -126,6 +127,26 @@ test('pagina-bootstrap cachet een mislukte scope-read niet als lege state', asyn
   assert.deepEqual(first.scopes, {});
   assert.equal(second.scopes.premium_live_momentum.source, 'supabase');
   assert.equal(second.scopes.premium_live_momentum.values.live, 'state');
+  assert.equal(reads, 2);
+});
+
+test('Live Momentum cachet alleen een door Supabase bevestigde bootstrap-state', async () => {
+  let reads = 0;
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async () => {
+      reads += 1;
+      return reads === 1
+        ? { values: {}, source: 'unavailable' }
+        : { values: { live: 'state' }, source: 'supabase' };
+    },
+  });
+
+  const first = await service.buildPageStateBootstrapPayload('live-momentum.html');
+  const second = await service.buildPageStateBootstrapPayload('live-momentum.html');
+
+  assert.deepEqual(first.scopes, {});
+  assert.equal(second.scopes.premium_live_momentum.ok, true);
+  assert.equal(second.scopes.premium_live_momentum.source, 'supabase');
   assert.equal(reads, 2);
 });
 

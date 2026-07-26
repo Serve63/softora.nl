@@ -101,8 +101,13 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(userManagementSource, /var targetWindow = window\.top && window\.top !== window \? window\.top : window;/);
   assert.match(userManagementSource, /targetWindow\.location\.href = moduleHref;/);
   assert.match(userManagementSource, /navigateToSettingsModule\(moduleHref\);/);
+  assert.match(userManagementSource, /function openLockedWinningModuleFromUrl\(\)/);
+  assert.match(userManagementSource, /currentUrl\.searchParams\.get\('liveMomentumLocked'\) !== '1'/);
+  assert.match(userManagementSource, /currentUrl\.searchParams\.delete\('liveMomentumLocked'\)/);
+  assert.match(userManagementSource, /goTo\('screen-extra'\);[\s\S]*openWinningModule\('\/winnen'\)/);
+  assert.match(userManagementSource, /mountExtraSettingsCategory\(\);\s*openLockedWinningModuleFromUrl\(\);/);
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
-  assert.match(source, /premium-user-management\.js\?v=20260727a/);
+  assert.match(source, /premium-user-management\.js\?v=20260727b/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(userManagementSource, /'Winnen',[\s\S]*'Database',[\s\S]*"Servé's gezondheidsdossier"/);

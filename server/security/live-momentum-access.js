@@ -2,8 +2,8 @@ const { timingSafeEqualStrings } = require('./crypto-utils');
 const { createPremiumSessionManager } = require('./premium-session');
 
 const LIVE_MOMENTUM_ACCESS_CODE = '808080';
-const LIVE_MOMENTUM_ACCESS_COOKIE_NAME = 'softora_live_momentum_access';
-const LIVE_MOMENTUM_ACCESS_TTL_MS = 12 * 60 * 60 * 1000;
+const LIVE_MOMENTUM_ACCESS_COOKIE_NAME = 'softora_live_momentum_access_v2';
+const LIVE_MOMENTUM_ACCESS_TTL_MS = 30 * 60 * 1000;
 const LIVE_MOMENTUM_ACCESS_USER_ID = 'live-momentum';
 const LIVE_MOMENTUM_ACCESS_ROLE = 'gate';
 

@@ -554,6 +554,22 @@ function mountExtraSettingsCategory() {
   overviewScreen.insertAdjacentElement('afterend', extraScreen);
 }
 
+function openLockedWinningModuleFromUrl() {
+  var currentUrl;
+  try {
+    currentUrl = new URL(window.location.href);
+  } catch (_error) {
+    return;
+  }
+  if (currentUrl.searchParams.get('liveMomentumLocked') !== '1') return;
+  currentUrl.searchParams.delete('liveMomentumLocked');
+  window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
+  goTo('screen-extra');
+  window.requestAnimationFrame(function () {
+    void openWinningModule('/winnen');
+  });
+}
+
 function renderAccessDenied() {
   document.getElementById('list-count').textContent = '';
   document.getElementById('tegel-count').textContent = 'Geen toegang';
@@ -1073,6 +1089,7 @@ function showToast(msg) {
 }
 
 mountExtraSettingsCategory();
+openLockedWinningModuleFromUrl();
 
 (async function bootstrapPersoneelManager() {
   try {
