@@ -28,6 +28,11 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.match(source, /id="admin-action-pin-input" name="softora_action_code" autocomplete="one-time-code"/);
   assert.match(source, /data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"/);
   assert.match(source, /class="settings-overview-grid"/);
+  assert.match(source, /#admin-pin-overlay \.modal\s*\{[\s\S]*width:\s*min\(340px, calc\(100vw - 24px\)\);/);
+  assert.match(source, /\.admin-pin-numpad\s*\{[\s\S]*grid-template-rows:\s*repeat\(4, 42px\);[\s\S]*max-width:\s*230px;/);
+  assert.match(source, /\.admin-pin-icon,\s*\.admin-pin-eyebrow\s*\{\s*display:\s*none;/);
+  assert.match(source, /class="admin-pin-cancel"[^>]*data-settings-action="cancel-admin-pin"/);
+  assert.doesNotMatch(source, /#admin-pin-overlay[\s\S]{0,1800}<div class="modal-foot">/);
   assert.doesNotMatch(source, /href="\/premium-vaste-lasten\?view=klantdekking"/);
   assert.doesNotMatch(source, /Worden alle kosten betaald\?/);
   assert.doesNotMatch(source, /Klantkosten-check/);

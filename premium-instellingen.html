@@ -1119,12 +1119,13 @@ main.main.is-premium-boot-host {
 }
 
 #admin-pin-overlay .modal {
-  width: min(420px, calc(100vw - 32px));
+  width: min(340px, calc(100vw - 24px));
   overflow: visible;
+  border-radius: 16px;
 }
 
 #admin-pin-overlay .modal-body.admin-pin-modal-body {
-  padding: 0 22px 22px;
+  padding: 10px;
 }
 
 .admin-pin-modal-inner {
@@ -1133,16 +1134,16 @@ main.main.is-premium-boot-host {
 
 .admin-pin-x {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   z-index: 2;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--card-bg);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   color: var(--text-light);
   display: flex;
@@ -1161,15 +1162,14 @@ main.main.is-premium-boot-host {
   overflow: hidden;
   background: var(--card-bg);
   border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 20px;
-  padding: 40px 28px 28px;
-  margin-top: 4px;
+  border-radius: 13px;
+  padding: 24px 18px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   box-shadow:
-    0 4px 6px rgba(17, 19, 34, 0.03),
-    0 22px 50px rgba(17, 19, 34, 0.08);
+    0 2px 4px rgba(17, 19, 34, 0.025),
+    0 14px 32px rgba(17, 19, 34, 0.07);
 }
 
 .admin-pin-box::before {
@@ -1189,72 +1189,47 @@ main.main.is-premium-boot-host {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
-.admin-pin-icon {
-  width: 52px;
-  height: 52px;
-  background: linear-gradient(145deg, rgba(139, 34, 82, 0.1), rgba(139, 34, 82, 0.04));
-  border: 1px solid rgba(139, 34, 82, 0.12);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
-}
-
-.admin-pin-icon svg {
-  width: 22px;
-  height: 22px;
-  color: var(--crimson);
-  stroke-width: 1.65;
-}
-
+.admin-pin-icon,
 .admin-pin-eyebrow {
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--crimson);
-  margin-bottom: 6px;
+  display: none;
 }
 
 .admin-pin-title {
   font-family: 'Inter', sans-serif;
-  font-size: 1.28rem;
+  font-size: 1.12rem;
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--text-dark);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   line-height: 1.2;
 }
 
 .admin-pin-desc {
-  font-size: 0.875rem;
+  font-size: 0.78rem;
   font-weight: 400;
   color: var(--text-mid);
-  margin-bottom: 20px;
+  margin-bottom: 13px;
   text-align: center;
   line-height: 1.5;
-  max-width: 300px;
+  max-width: 250px;
 }
 
 .admin-pin-dots {
   display: flex;
-  gap: 10px;
-  margin-bottom: 22px;
-  padding: 10px 14px;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 7px 11px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.025);
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .admin-pin-dot {
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   border: 2px solid rgba(22, 25, 44, 0.12);
   background: transparent;
@@ -1279,18 +1254,18 @@ main.main.is-premium-boot-host {
 .admin-pin-numpad {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(4, minmax(52px, 58px));
-  gap: 11px;
+  grid-template-rows: repeat(4, 42px);
+  gap: 8px;
   width: 100%;
-  max-width: 280px;
+  max-width: 230px;
 }
 
 .admin-num-btn {
   border: 1px solid rgba(22, 25, 44, 0.08);
-  border-radius: 12px;
+  border-radius: 9px;
   background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
   font-family: 'Inter', sans-serif;
-  font-size: 1.35rem;
+  font-size: 1rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--text-dark);
@@ -1333,21 +1308,35 @@ main.main.is-premium-boot-host {
 
 .admin-num-btn-back svg,
 .admin-num-btn-clear svg {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
 }
 
 .admin-pin-msg {
   font-size: 0.75rem;
   color: #c0392b;
-  margin-top: 14px;
-  min-height: 1.25em;
+  margin-top: 6px;
+  min-height: 1em;
   font-weight: 500;
   text-align: center;
 }
 
-#admin-pin-overlay .modal-foot {
-  justify-content: center;
+.admin-pin-cancel {
+  margin-top: 2px;
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-light);
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.admin-pin-cancel:hover {
+  color: var(--crimson);
 }
 
 .btn-save,
@@ -2094,11 +2083,9 @@ body {
             </button>
           </div>
           <div class="admin-pin-msg" id="admin-pin-msg"></div>
+          <button class="admin-pin-cancel" type="button" data-settings-action="cancel-admin-pin">Annuleren</button>
         </div>
       </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn-cancel" type="button" data-settings-action="cancel-admin-pin">Annuleren</button>
     </div>
   </div>
 </div>
