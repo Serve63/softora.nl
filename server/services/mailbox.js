@@ -2417,7 +2417,7 @@ function createMailboxService(deps = {}) {
             payload.ontvangenMail?.body,
             payload.ontvangenMail?.preview,
           ].filter(Boolean).join('\n'),
-          senderName: payload.afzenderContext?.naam,
+          accountEmail: resolvedAccountEmail, conceptText: draft, senderName: payload.afzenderContext?.naam, originalSentMail: payload.oorspronkelijkeVerzondenMail,
         }), 8000)
       : generatedText;
     if (!text) {

@@ -7,6 +7,9 @@ const {
   createInstantlyMailboxService,
   normalizeAccountOwnership,
 } = require('../../server/services/instantly-mailbox');
+const {
+  buildOriginalMessageSource,
+} = require('../../server/services/instantly-original-message-source');
 const { createMailboxService } = require('../../server/services/mailbox');
 const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 const {
@@ -171,6 +174,118 @@ test('Instantly never invents a webdesign link when exact provider HTML has none
   assert.equal(message.body, 'Je kunt het webdesign hier bekijken.');
   assert.equal(message.webdesignLinkEvidenceKnown, false);
   assert.equal(message.webdesignLinkUrl, '');
+});
+
+test('exact lead source restores Ramon-style emoji and direct hier link after strict provenance checks', async () => {
+  const exactUrl = 'https://www.softora.nl/webdesign/ramon-design-store?cid=exact&sender=serve';
+  const providerHtml = [
+    '<div>Goedendag,</div>',
+    '<div><br></div>',
+    '<div>Ik ben benieuwd wat je ervan vindt en hoor graag je eerlijke mening </div>',
+    '<div>Je kunt het webdesign <a href="https://inst.example.test/lt/click-token">hier</a> bekijken </div>',
+    '<div>Servé Creusen</div>',
+    '<div>Den Bosch</div>',
+  ].join('');
+  const sourceHtml = [
+    '<div>Goedendag,</div>',
+    '<div><br></div>',
+    '<div>Ik ben benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁</div>',
+    `<div>Je kunt het webdesign <a href="${exactUrl}">hier</a> bekijken 👈</div>`,
+    '<div>Servé Creusen</div>',
+    '<div>📍 Den Bosch</div>',
+  ].join('');
+  const rawSent = incoming({
+    id: 'ramon-sent',
+    lead: 'prospect@example.org',
+    email_type: '1',
+    campaign_id: 'campaign-serve',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    subject: 'Kleine vraag over jullie website',
+    body: { html: providerHtml },
+  });
+  const rawReceived = incoming({ id: 'ramon-received' });
+  const lead = {
+    id: 'lead-ramon',
+    campaign: 'campaign-serve',
+    contact: 'prospect@example.org',
+    payload: {
+      softora_sender_email: 'serve-sender@example.com',
+      softora_subject: 'Kleine vraag over jullie website',
+      softora_webdesign_public_url: exactUrl,
+      softora_instantly_email_html: sourceHtml,
+    },
+  };
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith('/leads/lead-ramon')) {
+        return { response: { ok: true, status: 200 }, data: lead };
+      }
+      if (parsed.pathname.endsWith('/leads/list')) {
+        return { response: { ok: true, status: 200 }, data: { items: [lead] } };
+      }
+      if (parsed.searchParams.get('search') === 'thread:thread-serve') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { items: [rawSent, rawReceived] },
+        };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+  store.rows.push(
+    service.normalizeInstantlyMessage(rawReceived),
+    service.normalizeInstantlyMessage(rawSent)
+  );
+
+  await service.syncOwner('serve');
+
+  const restored = store.rows.find((message) => message.providerMessageId === 'ramon-sent');
+  assert.equal(restored.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.webdesignLinkEvidenceKnown, true);
+  assert.equal(restored.webdesignLinkUrl, exactUrl);
+  assert.match(restored.body, /eerlijke mening 😁/u);
+  assert.match(restored.body, new RegExp(`hier \\[${exactUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\] bekijken 👈`));
+  assert.match(restored.body, /📍 Den Bosch/u);
+  const leadRequest = requests.find((request) => request.url.endsWith('/leads/list'));
+  assert.ok(leadRequest);
+  assert.deepEqual(JSON.parse(leadRequest.options.body), {
+    campaign: 'campaign-serve',
+    contacts: ['prospect@example.org'],
+    limit: 2,
+  });
+});
+
+test('exact lead source fails closed when campaign or recipient provenance drifts', () => {
+  const result = buildOriginalMessageSource({
+    lead_id: 'lead-1',
+    campaign_id: 'campaign-serve',
+    subject: 'Kleine vraag',
+    body: { html: '<p>Dit is een voldoende lange providertekst met concrete inhoud voor een betrouwbare vergelijking van dezelfde originele mail.</p>' },
+  }, {
+    id: 'lead-1',
+    campaign: 'campaign-other',
+    email: 'ander@example.org',
+    payload: {
+      softora_sender_email: 'serve-sender@example.com',
+      softora_subject: 'Kleine vraag',
+      softora_webdesign_public_url: 'https://www.softora.nl/webdesign/prospect',
+      softora_instantly_email_html: '<p>Dit is een voldoende lange providertekst met concrete inhoud voor een betrouwbare vergelijking van dezelfde originele mail. 😁</p><p><a href="https://www.softora.nl/webdesign/prospect">hier</a></p>',
+    },
+  }, {
+    accountEmail: 'serve-sender@example.com',
+    recipientEmail: 'prospect@example.org',
+  });
+
+  assert.deepEqual(result, {
+    evidenceKnown: true,
+    available: false,
+    reason: 'identity-mismatch',
+  });
 });
 
 test('sync queries only the selected owner accounts and drops unmapped or conflicting messages', async () => {

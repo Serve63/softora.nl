@@ -2634,7 +2634,11 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
         data: {
           model: 'gpt-test',
           usage: { total_tokens: 123 },
-          choices: [{ message: { content: 'Hoi klant,\n\nVerbeterde tekst.' } }],
+          choices: [{ message: { content: JSON.stringify({
+            intent: 'acknowledgement',
+            ctaAllowed: false,
+            paragraphs: [{ text: 'Dankjewel voor je vraag.', evidence: ['received.intent'] }],
+          }) } }],
         },
       };
     },
@@ -2662,7 +2666,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     },
   });
 
-  assert.equal(result.text, 'Beste,\n\nVerbeterde tekst. 😁\n\nMet vriendelijke groet,\nServé Creusen');
+  assert.equal(result.text, 'Beste,\n\nDankjewel voor je vraag. 😁\n\nMet vriendelijke groet,\nServé Creusen');
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
@@ -2671,12 +2675,11 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
   assert.equal(calls[0].timeout, 65000);
   assert.equal(calls[0].payload.model, 'gpt-test');
   assert.match(calls[0].payload.messages[0].content, /Verzin geen feiten/);
-  assert.match(calls[0].payload.messages[0].content, /centraal antwoordprofiel serve-mailbox-reply-v1/);
+  assert.match(calls[0].payload.messages[0].content, /centraal antwoordprofiel serve-mailbox-reply-v2/);
   assert.match(calls[0].payload.messages[0].content, /Schrijf altijd namens Servé Creusen/);
-  assert.match(calls[0].payload.messages[0].content, /exact één keer 😁/);
-  assert.match(calls[0].payload.messages[0].content, /nooit met jullie/);
-  assert.match(calls[0].payload.messages[0].content, /zonder nieuwe verkooppoging/);
-  assert.match(calls[0].payload.messages[0].content, /Met vriendelijke groet,[\s\S]*Servé Creusen/);
+  assert.match(calls[0].payload.messages[0].content, /server voegt de bewezen aanhef, exact één 😁/);
+  assert.match(calls[0].payload.messages[0].content, /iedere zin moet rechtstreeks volgen/i);
+  assert.match(calls[0].payload.messages[0].content, /uitsluitend geldige JSON/);
   assert.match(calls[0].payload.messages[1].content, /"ontvangenMail"/);
   assert.match(calls[0].payload.messages[1].content, /Kan dit voor vrijdag/);
   assert.match(calls[0].payload.messages[1].content, /hoi ik stuur dit ff/);
@@ -2723,11 +2726,13 @@ test('mailbox service schrijft zonder concept een voorgestelde reactie vanuit de
   assert.doesNotMatch(result.text, /Servé Creusen/);
   assert.match(calls[0].messages[0].content, /Schrijf zelfstandig de best passende reactie/);
   assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
-  assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v1/);
-  assert.match(calls[0].messages[0].content, /verzin geen prijs/i);
+  assert.match(calls[0].messages[0].content, /serve-mailbox-reply-v2/);
+  assert.match(calls[0].messages[0].content, /prijsvraag blijft de enige vaste waarheid/i);
   assert.match(calls[0].messages[1].content, /stuur de online preview maar door/);
   assert.match(calls[0].messages[1].content, /"conceptAntwoord":""/);
   assert.match(calls[0].messages[1].content, /"aanhefNaam":"Lisa"/);
+  assert.match(calls[0].messages[1].content, /"intent":"price_question"/);
+  assert.match(calls[0].messages[1].content, /"ctaAllowed":true/);
   assert.doesNotMatch(calls[0].messages[1].content, /afzenderProfiel/);
 });
 
@@ -2819,16 +2824,13 @@ test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail
   );
   assert.equal(promptPayload.antwoordContext.aanhefNaam, '');
   assert.match(result.text, /^Beste,/);
-  assert.match(result.text, /Ik bouw dit soort websites meestal helemaal op maat met code\./);
-  assert.match(result.text, /indeling, uitstraling en werking gericht afstemmen/);
-  assert.match(result.text, /zonder vast te zitten aan de standaardmogelijkheden van een websitebouwer/);
-  assert.match(result.text, /Misschien is het leuk als ik volgende week een keer langskom\?/);
-  assert.match(result.text, /rustig samen naar je huidige website en het ontwerp kijken en de mogelijkheden bespreken\./);
+  assert.match(result.text, /Het ontwerp dat ik stuurde heb ik volledig op maat met code gebouwd\./);
+  assert.match(result.text, /indeling, uitstraling en werking precies afstemmen/);
+  assert.match(result.text, /zonder vast te zitten aan een standaard websitebouwer/);
   assert.doesNotMatch(result.text, /Hoi Salon|Leuke vraag|dus niet in Webflow|Webflow kan ik|Wij hebben nu|\bWebflow\b|\bjullie\b|laagdrempelig|\bkansen\b|denk ik graag even met je mee|Als je wilt/i);
   assert.equal((result.text.match(/Als je wilt/g) || []).length, 0);
   assert.equal((result.text.match(/\bWebflow\b/gi) || []).length, 0);
-  assert.doesNotMatch(result.text, /\[dag\]/);
-  assert.equal((result.text.match(/volgende week een keer langskom/g) || []).length, 1);
+  assert.doesNotMatch(result.text, /\[dag\]|langskom|volgende week|afspraak/i);
   assert.doesNotMatch(result.text, /\b(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i);
   assert.equal((result.text.match(/😁/gu) || []).length, 1);
   assert.equal(result.text.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
