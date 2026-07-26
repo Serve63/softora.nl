@@ -93,6 +93,76 @@ async function hydrateIndexedThreadMessageEvidence(options = {}) {
   return { exactIndexedMessages, exactProviderMessagesUnavailable, rawMessages };
 }
 
+function mergeActiveConversationAuditMessages(options = {}) {
+  const indexedThreadMessages = options.indexedThreadMessages instanceof Map
+    ? options.indexedThreadMessages
+    : new Map();
+  const threadCandidates = options.threadCandidates instanceof Map
+    ? options.threadCandidates
+    : new Map();
+  const selectedOwner = text(options.selectedOwner).toLowerCase();
+  const messages = Array.isArray(options.messages) ? options.messages : [];
+  messages.forEach((message) => {
+    if (
+      text(message?.providerOwner).toLowerCase() !== selectedOwner ||
+      message?.originalCampaignOutbound !== true ||
+      !text(message?.providerThreadId) ||
+      !email(message?.providerAccountEmail)
+    ) {
+      return;
+    }
+    const key = `${email(message.providerAccountEmail)}|${text(message.providerThreadId)}`;
+    if (!indexedThreadMessages.has(key)) indexedThreadMessages.set(key, []);
+    const threadMessages = indexedThreadMessages.get(key);
+    if (!threadMessages.some((candidate) => (
+      text(candidate?.providerMessageId) === text(message.providerMessageId)
+    ))) {
+      threadMessages.push(message);
+    }
+    if (
+      message.providerBodyHtmlEvidenceKnown !== true ||
+      message.providerOriginalBodyEvidenceKnown !== true
+    ) {
+      threadCandidates.set(key, message);
+    }
+  });
+  return { indexedThreadMessages, threadCandidates };
+}
+
+function buildIndexedThreadAuditState(options = {}) {
+  const indexedThreadMessages = new Map();
+  const threadCandidates = options.threadCandidates instanceof Map
+    ? options.threadCandidates
+    : new Map();
+  (Array.isArray(options.indexedMessages) ? options.indexedMessages : []).forEach((message) => {
+    const key = `${email(message?.providerAccountEmail)}|${text(message?.providerThreadId)}`;
+    if (!message?.providerThreadId) return;
+    if (!indexedThreadMessages.has(key)) indexedThreadMessages.set(key, []);
+    indexedThreadMessages.get(key).push(message);
+  });
+  mergeActiveConversationAuditMessages({
+    indexedThreadMessages,
+    threadCandidates,
+    selectedOwner: options.selectedOwner,
+    messages: options.activeConversationAuditMessages,
+  });
+  indexedThreadMessages.forEach((messages, key) => {
+    const incoming = messages.find((message) => message.folder !== 'sent');
+    const needsExactProviderBody = messages.some((message) => (
+      message.folder === 'sent' &&
+      message.originalCampaignOutbound === true &&
+      (
+        message.providerBodyHtmlEvidenceKnown !== true ||
+        message.providerOriginalBodyEvidenceKnown !== true
+      )
+    ));
+    if (incoming && needsExactProviderBody && !threadCandidates.has(key)) {
+      threadCandidates.set(key, incoming);
+    }
+  });
+  return { indexedThreadMessages, threadCandidates };
+}
+
 function unwrapLead(value) {
   const source = value && typeof value === 'object' ? value : {};
   for (const candidate of [source.lead, source.data?.lead, source.data, source]) {
@@ -437,10 +507,12 @@ function buildOriginalMessageSource(rawMessage = {}, rawLead = {}, options = {})
 
 module.exports = {
   bodyMatchesProviderCopy,
+  buildIndexedThreadAuditState,
   buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
   canonicalizeComparableBody,
   extractQuotedOriginalBody,
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
+  mergeActiveConversationAuditMessages,
 };

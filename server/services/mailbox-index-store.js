@@ -14,6 +14,8 @@ const BODY_MAX_CHARS = 200 * 1024;
 const SYNC_LOCK_TTL_MS = 90_000;
 const MAILBOX_INDEX_PAGE_SIZE = 1000;
 const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
+const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
+const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
   'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated,payload';
 
@@ -429,6 +431,83 @@ function createMailboxIndexStore(deps = {}) {
     );
     if (!result.ok) return null;
     return (result.data || []).map((row) => normalizeMessageRow(row, { includeBody }));
+  }
+
+  async function listProviderActiveConversationAuditMessages({
+    provider,
+    accountEmails = [],
+  } = {}) {
+    const normalizedProvider = normalizeString(provider).toLowerCase();
+    const normalizedAccounts = Array.from(
+      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
+    );
+    if (!normalizedProvider || !normalizedAccounts.length) return [];
+
+    const activeThreadKeys = new Set();
+    for (
+      let offset = 0;
+      offset < PROVIDER_ACTIVE_THREAD_MAX_COUNT;
+      offset += MAILBOX_INDEX_PAGE_SIZE
+    ) {
+      const result = await run(
+        `list-provider-active-thread-ids:${normalizedProvider}:${offset}`,
+        (client) =>
+          client
+            .from(MAILBOX_INDEX_TABLES.messages)
+            .select('account_email,provider_thread_id:payload->>providerThreadId')
+            .eq('folder', normalizedProvider)
+            .in('account_email', normalizedAccounts)
+            .eq('payload->>direction', 'received')
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .range(offset, offset + MAILBOX_INDEX_PAGE_SIZE - 1)
+      );
+      if (!result.ok) return null;
+      const page = Array.isArray(result.data) ? result.data : [];
+      page.forEach((row) => {
+        const accountEmail = normalizeEmail(row && row.account_email);
+        const threadId = normalizeString(row && row.provider_thread_id);
+        if (accountEmail && threadId) activeThreadKeys.add(`${accountEmail}|${threadId}`);
+      });
+      if (page.length < MAILBOX_INDEX_PAGE_SIZE) break;
+    }
+    if (!activeThreadKeys.size) return [];
+
+    const threadIds = Array.from(
+      new Set(Array.from(activeThreadKeys, (key) => key.slice(key.indexOf('|') + 1)))
+    );
+    const rowsByKey = new Map();
+    for (
+      let offset = 0;
+      offset < threadIds.length;
+      offset += PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE
+    ) {
+      const batch = threadIds.slice(offset, offset + PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE);
+      const result = await run(
+        `list-provider-active-audit-messages:${normalizedProvider}:${offset}`,
+        (client) =>
+          client
+            .from(MAILBOX_INDEX_TABLES.messages)
+            .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
+            .eq('folder', normalizedProvider)
+            .in('account_email', normalizedAccounts)
+            .in('payload->>providerThreadId', batch)
+            .contains('payload', { originalCampaignOutbound: true })
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+      );
+      if (!result.ok) return null;
+      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+        const messageKey = normalizeString(row && row.message_key);
+        if (messageKey && !rowsByKey.has(messageKey)) rowsByKey.set(messageKey, row);
+      });
+    }
+
+    return Array.from(rowsByKey.values())
+      .map((row) => normalizeMessageRow(row))
+      .filter((message) => activeThreadKeys.has(
+        `${normalizeEmail(message.providerAccountEmail || message.accountEmail)}|${normalizeString(message.providerThreadId)}`
+      ));
   }
 
   async function getProviderMessage({ provider, providerMessageId, accountEmail } = {}) {
@@ -938,6 +1017,7 @@ function createMailboxIndexStore(deps = {}) {
     listMessages,
     listMessagesForAccounts,
     listProviderMessages,
+    listProviderActiveConversationAuditMessages,
     markMessageDeleted,
     markMessageRead,
     restoreMessage,

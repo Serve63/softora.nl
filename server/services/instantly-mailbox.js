@@ -1,6 +1,7 @@
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const { parseProviderHtml } = require('./mailbox-provider-rich-body');
 const {
+  buildIndexedThreadAuditState,
   buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
   extractLeadId,
@@ -750,27 +751,18 @@ function createInstantlyMailboxService(deps = {}) {
           limit: 2000,
           includeBody: false,
         });
-        const indexedThreadMessages = new Map();
-        (Array.isArray(indexed) ? indexed : []).forEach((message) => {
-          const key = `${message.providerAccountEmail}|${message.providerThreadId}`;
-          if (message.providerThreadId) {
-            if (!indexedThreadMessages.has(key)) indexedThreadMessages.set(key, []);
-            indexedThreadMessages.get(key).push(message);
-          }
-        });
-        indexedThreadMessages.forEach((messages, key) => {
-          const incoming = messages.find((message) => message.folder !== 'sent');
-          const needsExactProviderBody = messages.some((message) => (
-            message.folder === 'sent' &&
-            message.originalCampaignOutbound === true &&
-            (
-              message.providerBodyHtmlEvidenceKnown !== true ||
-              message.providerOriginalBodyEvidenceKnown !== true
-            )
-          ));
-          if (incoming && needsExactProviderBody && !threadCandidates.has(key)) {
-            threadCandidates.set(key, incoming);
-          }
+        const activeConversationAuditMessages =
+          typeof mailboxIndexStore.listProviderActiveConversationAuditMessages === 'function'
+            ? await mailboxIndexStore.listProviderActiveConversationAuditMessages({
+                provider: 'instantly',
+                accountEmails: accounts.map((account) => account.email),
+              })
+            : [];
+        const { indexedThreadMessages } = buildIndexedThreadAuditState({
+          indexedMessages: indexed,
+          activeConversationAuditMessages,
+          threadCandidates,
+          selectedOwner,
         });
         const pendingThreadHydrations = Array.from(threadCandidates.entries())
           .filter(([key]) => {

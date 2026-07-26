@@ -54,6 +54,22 @@ function createStore(initialMessages = []) {
     async listProviderMessages({ accountEmails }) {
       return rows.filter((message) => accountEmails.includes(message.accountEmail));
     },
+    async listProviderActiveConversationAuditMessages({ accountEmails }) {
+      const activeThreadKeys = new Set(
+        rows
+          .filter((message) => (
+            accountEmails.includes(message.accountEmail) &&
+            message.direction === 'received' &&
+            message.providerThreadId
+          ))
+          .map((message) => `${message.accountEmail}|${message.providerThreadId}`)
+      );
+      return rows.filter((message) => (
+        accountEmails.includes(message.accountEmail) &&
+        message.originalCampaignOutbound === true &&
+        activeThreadKeys.has(`${message.accountEmail}|${message.providerThreadId}`)
+      ));
+    },
     async getProviderMessage({ providerMessageId, accountEmail }) {
       const exactProviderMessageId = String(providerMessageId || '').replace(/^instantly:/, '');
       return rows.find((message) => (
@@ -941,6 +957,64 @@ test('one sync audits every active rich-body candidate within the bounded audit 
       message.providerOriginalBodyEvidenceKnown === true &&
       message.providerOriginalBodyAvailable === false
     )),
+    true
+  );
+});
+
+test('active Instantly replies outside the newest 2000-message window are still audited exactly', async () => {
+  const targetReceived = incoming({
+    id: 'outside-window-received',
+    thread_id: 'outside-window-thread',
+    from_address_email: 'outside-window@example.org',
+  });
+  const targetSent = incoming({
+    id: 'outside-window-sent',
+    thread_id: 'outside-window-thread',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['outside-window@example.org'],
+    body: {
+      text: 'Dit oude originele campagnebericht staat buiten het algemene venster en heeft geen rijke bron.',
+    },
+  });
+  const store = createStore();
+  const normalizer = buildService({ store }).service;
+  store.rows.push(
+    normalizer.normalizeInstantlyMessage(targetReceived),
+    normalizer.normalizeInstantlyMessage(targetSent)
+  );
+  store.listProviderMessages = async () => [];
+  store.listProviderActiveConversationAuditMessages =
+    createStore(store.rows).listProviderActiveConversationAuditMessages;
+
+  const { service, requests } = buildService({
+    store,
+    getCustomerSourcesByEmails: async () => [],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('search') === 'thread:outside-window-thread') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { items: [targetReceived] },
+        };
+      }
+      if (parsed.pathname.endsWith('/emails/outside-window-sent')) {
+        return {
+          response: { ok: false, status: 404 },
+          data: { message: 'not found' },
+        };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+
+  await service.syncOwner('serve');
+
+  const audited = store.rows.find((message) => message.providerMessageId === 'outside-window-sent');
+  assert.equal(audited.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(audited.providerOriginalBodyAvailable, false);
+  assert.equal(
+    requests.some((request) => request.url.endsWith('/emails/outside-window-sent')),
     true
   );
 });
