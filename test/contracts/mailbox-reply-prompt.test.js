@@ -79,6 +79,7 @@ test('centraal replyprofiel dwingt Servé-stijl, waarheid en beide mailbronnen a
   assert.match(prompt, /server voegt de bewezen aanhef, exact één 😁 en de juiste afzenderondertekening toe/);
   assert.match(prompt, /Iedere alinea en iedere zin moet rechtstreeks volgen/);
   assert.match(prompt, /geen generieke vulling, losse lof, boilerplate/);
+  assert.match(prompt, /Een afwijzing mag concrete feedback nooit wissen/);
   assert.match(prompt, /antwoordBeleid\.ctaAllowed exact true/);
   assert.match(prompt, /volgende week \[dag\] even langskom/);
   assert.match(prompt, /de enige vaste waarheid/);
@@ -243,6 +244,76 @@ test('Bossche Brouwers feedback blijft afsluitend en erft geen interesse uit gec
   assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|verder bespreken|mogelijkheden/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
   assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
+});
+
+test('Bossche Brouwers krijgt een inhoudelijke feedbackreactie ondanks de afwijzing', () => {
+  const inbound = [
+    'Hallo Servé',
+    '',
+    'Leuk dat je aandacht schenkt aan ons bedrijf.',
+    'Je design ziet er netjes uit. We gaan het echter niet gebruiken :)',
+    'Een paar reacties:',
+    '',
+    'Het design is voor ons bedrijf wat te vlak/algemeen. Dit zou voor iedere brouwerij gebruikt kunnen worden.',
+    '- Het is te duidelijk ai',
+    '- Het eten wat je toont is niet door onze koks gemaakt',
+    '- Onze huisstijl komt nergens terug in het design',
+    '- De glazen zijn niet onze glazen, en de kleur van het bier klopt niet helemaal.',
+    "- De silo's met lichtreclame zijn niet aanwezig op de Tramkade en de tekst van de lichtreclame valt door ai uit elkaar.",
+    '',
+    'Wat ik goed vind aan je design is sfeer en overzicht. Wat we missen is identiteit.',
+    'Goed dat je hiermee bezig bent, heel veel succes!',
+    '',
+    'Vriendelijke groet;',
+    'Leonard Hamers',
+  ].join('\n');
+  const policy = analyzeMailboxReplyContext(inbound);
+
+  assert.equal(policy.intent, 'rejection');
+  assert.equal(policy.ctaAllowed, false);
+  assert.equal(policy.substantiveFeedback, true);
+  assert.deepEqual(
+    policy.feedbackDetails.themes.map((theme) => theme.key),
+    [
+      'generic_identity',
+      'non_own_imagery',
+      'missing_brand_style',
+      'inaccurate_details',
+      'broken_text',
+    ]
+  );
+  assert.deepEqual(
+    policy.feedbackDetails.positiveThemes.map((theme) => theme.key),
+    ['atmosphere', 'overview', 'presentation']
+  );
+
+  const result = enforceMailboxReplyProfile(
+    JSON.stringify({
+      intent: 'rejection',
+      ctaAllowed: false,
+      paragraphs: [{
+        text: 'Dankjewel voor je reactie.',
+        evidence: ['received.intent'],
+      }],
+    }),
+    {
+      firstName: 'Leonard',
+      inboundText: inbound,
+      senderName: 'Servé Creusen',
+    }
+  );
+
+  assert.equal(result, [
+    'Beste Leonard,',
+    '',
+    'Dankjewel dat je de tijd hebt genomen voor deze uitgebreide feedback. Fijn dat de sfeer en het overzicht wel goed overkwamen. 😁',
+    '',
+    'Je punten over de te algemene identiteit, het gebruik van beelden die niet bij het bedrijf horen en het ontbreken van de huisstijl zijn helder. Dat helpt me om toekomstige ontwerpen specifieker en zorgvuldiger te maken.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n'));
+  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|prijs|vervolgvoorstel/i);
 });
 
 test('interesse krijgt exact één concreet vrijblijvend voorstel met bewerkbare dag', () => {

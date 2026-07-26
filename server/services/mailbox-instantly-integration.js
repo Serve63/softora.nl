@@ -21,6 +21,7 @@ function createDefaultInstantlyMailboxService({
       syncOverlapMinutes: env.INSTANTLY_MAILBOX_SYNC_OVERLAP_MINUTES,
       pageLimit: env.INSTANTLY_MAILBOX_PAGE_LIMIT,
       maxPages: env.INSTANTLY_MAILBOX_MAX_PAGES,
+      richBodyAuditLimit: env.INSTANTLY_MAILBOX_RICH_BODY_AUDIT_LIMIT,
     },
     mailboxIndexStore,
     fetchJsonWithTimeout,

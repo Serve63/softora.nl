@@ -9,6 +9,8 @@ const SOFTORA_SOURCE_TEXT_KEYS = Object.freeze([
   'softora_mail_body',
 ]);
 const QUOTED_REPLY_HEADER_PATTERN = /^(?:op\s.+\sschreef\s.+:|op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|on\s.+\swrote:)/i;
+const OUTLOOK_FROM_HEADER_PATTERN = /^(?:van|from):\s*(.+)$/i;
+const OUTLOOK_SUBJECT_HEADER_PATTERN = /^(?:onderwerp|subject):/i;
 
 function text(value) {
   return String(value || '').trim();
@@ -93,26 +95,126 @@ function getRawMessageBody(rawMessage = {}) {
   );
 }
 
-function extractQuotedOriginalBody(rawMessages = [], options = {}) {
+function stripQuotePrefix(value) {
+  return String(value || '').replace(/^\s*>\s?/, '').trim();
+}
+
+function getProviderFirstLine(providerBody) {
+  return text(providerBody)
+    .split(/\r?\n/)
+    .map(text)
+    .find(Boolean) || '';
+}
+
+function isProviderBodyStartLine(line, providerBody) {
+  const firstProviderLine = getProviderFirstLine(providerBody);
+  return Boolean(
+    firstProviderLine &&
+    canonicalizeComparableBody(stripQuotePrefix(line)) ===
+      canonicalizeComparableBody(firstProviderLine)
+  );
+}
+
+function findProviderBodyStart(lines, providerBody) {
+  const firstProviderLine = getProviderFirstLine(providerBody);
+  if (!firstProviderLine) return 0;
+  const index = lines.findIndex((line) => isProviderBodyStartLine(line, providerBody));
+  return index >= 0 ? index : 0;
+}
+
+function extractQuotedOriginalBodyEvidence(rawMessages = [], options = {}) {
   const expectedSender = email(options.accountEmail);
+  const providerBody = text(options.providerBody);
+  const sourceMessageId = text(options.sourceMessageId);
   for (const rawMessage of Array.isArray(rawMessages) ? rawMessages : []) {
+    if (
+      sourceMessageId &&
+      sourceMessageId === text(rawMessage.id || rawMessage.email_id || rawMessage.uuid)
+    ) {
+      continue;
+    }
     const body = getRawMessageBody(rawMessage);
     if (!body) continue;
     const lines = body.split(/\r?\n/);
     const quoteIndex = lines.findIndex((line) => {
-      const normalized = text(line).replace(/^>\s*/, '');
+      const normalized = stripQuotePrefix(line);
       return QUOTED_REPLY_HEADER_PATTERN.test(normalized) &&
         (!expectedSender || email(extractEmail(normalized)) === expectedSender);
     });
-    if (quoteIndex < 0) continue;
-    const quotedBody = lines
-      .slice(quoteIndex + 1)
+    if (quoteIndex >= 0) {
+      const quotedLines = lines.slice(quoteIndex + 1);
+      const startIndex = findProviderBodyStart(quotedLines, providerBody);
+      const quotedBody = quotedLines
+        .slice(startIndex)
+        .map((line) => line.replace(/^\s*>\s?/, ''))
+        .join('\n')
+        .trim();
+      if (quotedBody) {
+        return {
+          body: quotedBody,
+          senderEmail: expectedSender,
+          source: 'standard-reply-header',
+        };
+      }
+    }
+
+    const outlookFromIndex = lines.findIndex((line) => {
+      const match = stripQuotePrefix(line).match(OUTLOOK_FROM_HEADER_PATTERN);
+      return match && (!expectedSender || email(extractEmail(match[1])) === expectedSender);
+    });
+    if (outlookFromIndex < 0) continue;
+    const subjectOffset = lines
+      .slice(outlookFromIndex + 1, outlookFromIndex + 12)
+      .findIndex((line) => OUTLOOK_SUBJECT_HEADER_PATTERN.test(stripQuotePrefix(line)));
+    if (subjectOffset < 0) continue;
+    const quotedLines = lines.slice(outlookFromIndex + subjectOffset + 2);
+    const startIndex = findProviderBodyStart(quotedLines, providerBody);
+    const quotedBody = quotedLines
+      .slice(startIndex)
       .map((line) => line.replace(/^\s*>\s?/, ''))
       .join('\n')
       .trim();
-    if (quotedBody) return quotedBody;
+    if (quotedBody) {
+      return {
+        body: quotedBody,
+        senderEmail: expectedSender,
+        source: 'outlook-original-message-header',
+      };
+    }
   }
-  return '';
+
+  if (providerBody) {
+    for (const rawMessage of Array.isArray(rawMessages) ? rawMessages : []) {
+      if (
+        sourceMessageId &&
+        sourceMessageId === text(rawMessage.id || rawMessage.email_id || rawMessage.uuid)
+      ) {
+        continue;
+      }
+      const body = getRawMessageBody(rawMessage);
+      if (!body) continue;
+      const lines = body.split(/\r?\n/);
+      for (let index = 0; index < lines.length; index += 1) {
+        if (!isProviderBodyStartLine(lines[index], providerBody)) continue;
+        const candidate = lines
+          .slice(index)
+          .map((line) => line.replace(/^\s*>\s?/, ''))
+          .join('\n')
+          .trim();
+        if (!bodyMatchesProviderCopy(providerBody, candidate)) continue;
+        return {
+          body: candidate,
+          senderEmail: '',
+          source: 'exact-thread-content-match',
+        };
+      }
+    }
+  }
+  return { body: '', senderEmail: '', source: '' };
+}
+
+function extractQuotedOriginalBody(rawMessages = [], options = {}) {
+  return extractQuotedOriginalBodyEvidence(rawMessages, options).body;
 }
 
 function normalizeExactWebdesignUrl(value, expectedCustomerId) {
@@ -161,6 +263,22 @@ function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], cus
     customer.instantlyPublicPreviewUrl,
     customerId
   );
+  const providerBody = getRawMessageBody(rawMessage);
+  const quotedEvidence = extractQuotedOriginalBodyEvidence(rawMessages, {
+    accountEmail: expectedSender,
+    providerBody,
+    sourceMessageId: text(rawMessage.id || rawMessage.email_id || rawMessage.uuid),
+  });
+  const sameOwnerAccountEmails = new Set(
+    (Array.isArray(options.sameOwnerAccountEmails) ? options.sameOwnerAccountEmails : [])
+      .map(email)
+      .filter(Boolean)
+  );
+  const senderMatches = customerSender === expectedSender || (
+    sameOwnerAccountEmails.has(customerSender) &&
+    sameOwnerAccountEmails.has(expectedSender) &&
+    quotedEvidence.senderEmail === expectedSender
+  );
   const identityMatches = Boolean(
     customerId &&
     expectedCampaignId &&
@@ -168,7 +286,7 @@ function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], cus
     expectedRecipient &&
     customerRecipient === expectedRecipient &&
     expectedSender &&
-    customerSender === expectedSender &&
+    senderMatches &&
     customerLeadId &&
     (!expectedLeadId || customerLeadId === expectedLeadId) &&
     exactPublicUrl
@@ -177,8 +295,7 @@ function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], cus
     return { evidenceKnown: true, available: false, reason: 'customer-identity-mismatch' };
   }
 
-  const providerBody = getRawMessageBody(rawMessage);
-  const quotedBody = extractQuotedOriginalBody(rawMessages, { accountEmail: expectedSender });
+  const quotedBody = quotedEvidence.body;
   if (!quotedBody || !bodyMatchesProviderCopy(providerBody, quotedBody)) {
     return { evidenceKnown: true, available: false, reason: 'quoted-content-mismatch' };
   }
@@ -193,7 +310,7 @@ function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], cus
     body: sourceBody,
     webdesignLinkEvidenceKnown: true,
     webdesignLinkUrl: exactPublicUrl,
-    reason: 'exact-customer-and-delivered-quote-source',
+    reason: `exact-customer-and-delivered-quote-source:${quotedEvidence.source}`,
   };
 }
 

@@ -9,6 +9,7 @@ const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
 const DEFAULT_MAX_PAGES = 4;
+const DEFAULT_RICH_BODY_AUDIT_LIMIT = 25;
 const INSTANTLY_MAILBOX_SYNC_SCOPE = 'instantly_mailbox_sync';
 const VALID_OWNERS = new Set(['serve', 'martijn']);
 
@@ -153,6 +154,10 @@ function createInstantlyMailboxService(deps = {}) {
     ),
     pageLimit: Math.max(1, Math.min(100, Number(config.pageLimit) || DEFAULT_PAGE_LIMIT)),
     maxPages: Math.max(1, Math.min(10, Number(config.maxPages) || DEFAULT_MAX_PAGES)),
+    richBodyAuditLimit: Math.max(
+      4,
+      Math.min(50, Number(config.richBodyAuditLimit) || DEFAULT_RICH_BODY_AUDIT_LIMIT)
+    ),
   });
   const accountOwnership = normalizeAccountOwnership(config.accountOwners);
   const campaignOwnership = normalizeCampaignOwnership(config.campaignOwners);
@@ -479,7 +484,12 @@ function createInstantlyMailboxService(deps = {}) {
             rawMessage,
             rawMessages,
             exactCustomer,
-            { accountEmail: exactAccountEmail, recipientEmail }
+            {
+              accountEmail: exactAccountEmail,
+              recipientEmail,
+              sameOwnerAccountEmails: getConfiguredAccounts(exactOwner)
+                .map((account) => account.email),
+            }
           )
         : null;
       if (customerQuotedSource?.available === true) {
@@ -734,7 +744,7 @@ function createInstantlyMailboxService(deps = {}) {
             ));
             return hasMissingThreadMember || needsExactProviderBody;
           })
-          .slice(0, 4);
+          .slice(0, normalizedConfig.richBodyAuditLimit);
         for (const [key, candidate] of pendingThreadHydrations) {
           const indexedMessages = indexedThreadMessages.get(key) || [];
           const hasMissingThreadMember = indexedMessages.length <= 1;

@@ -272,6 +272,237 @@ test('exact customer and delivered quote restore Ramon emoji and the proven dire
   assert.equal(requests.some((request) => /\/leads(?:\/|$)/.test(new URL(request.url).pathname)), false);
 });
 
+test('Vught Outlook quote restores exact rich body across a stale same-owner sender alias', async () => {
+  const customerId = 'safe-dedupe-vught';
+  const exactUrl = `https://www.softora.nl/webdesign/gemeente-vught?cid=${customerId}&sender=serve`;
+  const providerBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website vught.nl tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening',
+    '',
+    'Je kunt het webdesign hier bekijken',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    "'s-Hertogenbosch",
+  ].join('\n');
+  const rawSent = incoming({
+    id: 'vught-sent',
+    thread_id: 'vught-thread',
+    email_type: '1',
+    eaccount: 'serve-alias@example.com',
+    from_address_email: 'serve-alias@example.com',
+    to_address_email_list: ['gemeente@vught.nl'],
+    subject: 'Kleine vraag over jullie website',
+    body: { text: providerBody },
+  });
+  const rawReceived = incoming({
+    id: 'vught-received',
+    thread_id: 'vught-thread',
+    eaccount: 'serve-alias@example.com',
+    from_address_email: 'communicatie@vught.nl',
+    to_address_email_list: ['serve-alias@example.com'],
+    body: {
+      text: [
+        'Dag Servé,',
+        '',
+        'Hartelijk dank, maar we hebben geen interesse.',
+        '',
+        'Van: Servé Creusen <serve-alias@example.com>',
+        'Verzonden: dinsdag 7 juli 2026 10:13',
+        'Aan: Vught, gemeente <gemeente@vught.nl>',
+        'Onderwerp: Kleine vraag over jullie website',
+        '',
+        'Let op: deze mail komt van buiten de organisatie.',
+        '',
+        'Goedendag,',
+        '',
+        'Afgelopen week kwam ik jullie website vught.nl tegen.',
+        '',
+        'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+        '',
+        'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+        '',
+        'Je kunt het webdesign hier bekijken 👈',
+        '',
+        'Met vriendelijke groet,',
+        'Servé Creusen',
+        "📍 's-Hertogenbosch",
+      ].join('\n'),
+    },
+  });
+  const exactCustomer = {
+    id: customerId,
+    email: 'gemeente@vught.nl',
+    instantlyCampaignId: 'campaign-serve',
+    instantlyLeadId: 'lead-vught',
+    instantlyActualSenderEmail: 'serve-sender@example.com',
+    instantlyPublicPreviewUrl: exactUrl,
+  };
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    config: {
+      accountOwners: {
+        'serve-sender@example.com': 'serve',
+        'serve-alias@example.com': 'serve',
+        'martijn-sender@example.com': 'martijn',
+      },
+    },
+    getCustomerSourcesByEmails: async () => [exactCustomer],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('search') === 'thread:vught-thread') {
+        return { response: { ok: true, status: 200 }, data: { items: [rawSent, rawReceived] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+
+  await service.hydrateThread({
+    threadId: 'vught-thread',
+    accountEmail: 'serve-alias@example.com',
+    owner: 'serve',
+  });
+
+  const restored = store.rows.find((message) => message.providerMessageId === 'vught-sent');
+  assert.equal(restored.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.webdesignLinkUrl, exactUrl);
+  assert.match(restored.body, /eerlijke mening 😁/u);
+  assert.match(restored.body, /hier \[https:\/\/www\.softora\.nl\/webdesign\/gemeente-vught/);
+  assert.doesNotMatch(restored.body, /Let op: deze mail komt van buiten/);
+  assert.equal(
+    requests.some((request) => /\/leads(?:\/|$)/.test(new URL(request.url).pathname)),
+    false
+  );
+});
+
+test('same-owner alias exception never crosses from Martijn provenance into Servé', () => {
+  const result = buildCustomerQuotedMessageSource({
+    id: 'cross-owner-sent',
+    campaign_id: 'campaign-serve',
+    from_address_email: 'serve-alias@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    body: {
+      text: 'Goedendag. Dit is een voldoende lange originele campagneboodschap die uitsluitend voor deze ontvanger en campagne is verstuurd. Je kunt het webdesign hier bekijken.',
+    },
+  }, [{
+    id: 'cross-owner-received',
+    body: {
+      text: [
+        'Van: Servé <serve-alias@example.com>',
+        'Verzonden: gisteren',
+        'Aan: prospect@example.org',
+        'Onderwerp: Kleine vraag',
+        '',
+        'Goedendag. Dit is een voldoende lange originele campagneboodschap die uitsluitend voor deze ontvanger en campagne is verstuurd 😁. Je kunt het webdesign hier bekijken 👈',
+      ].join('\n'),
+    },
+  }], {
+    id: 'customer-cross-owner',
+    email: 'prospect@example.org',
+    instantlyCampaignId: 'campaign-serve',
+    instantlyLeadId: 'lead-cross-owner',
+    instantlyActualSenderEmail: 'martijn-sender@example.com',
+    instantlyPublicPreviewUrl: 'https://www.softora.nl/webdesign/prospect?cid=customer-cross-owner&sender=serve',
+  }, {
+    accountEmail: 'serve-alias@example.com',
+    recipientEmail: 'prospect@example.org',
+    sameOwnerAccountEmails: ['serve-alias@example.com', 'serve-sender@example.com'],
+  });
+
+  assert.deepEqual(result, {
+    evidenceKnown: true,
+    available: false,
+    reason: 'customer-identity-mismatch',
+  });
+});
+
+test('Martijn original body restores from an exact same-thread content match without a standard quote header', () => {
+  const customerId = 'safe-dedupe-martijn';
+  const exactUrl = `https://www.softora.nl/webdesign/tete-a-tete?cid=${customerId}&sender=martijn`;
+  const providerBody = [
+    'Goedendag,',
+    '',
+    'Dit is een voldoende lange originele campagneboodschap voor dezelfde ontvanger en campagne.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening',
+    '',
+    'Je kunt het webdesign hier bekijken',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+    'Alphen',
+  ].join('\n');
+  const rawSent = incoming({
+    id: 'martijn-nonstandard-sent',
+    campaign_id: 'campaign-martijn',
+    eaccount: 'martijn-sender@example.com',
+    email_type: '1',
+    from_address_email: 'martijn-sender@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    body: { text: providerBody },
+  });
+  const rawReceived = incoming({
+    id: 'martijn-nonstandard-received',
+    campaign_id: 'campaign-martijn',
+    eaccount: 'martijn-sender@example.com',
+    from_address_email: 'prospect@example.org',
+    body: {
+      text: [
+        'Bedankt voor je bericht.',
+        '',
+        '-------- Oorspronkelijke bericht --------',
+        'Onderwerp: Kleine vraag over jullie website',
+        'Datum: gisteren',
+        'Afzender: Martijn van de Ven <martijn-sender@example.com>',
+        'Ontvanger: prospect@example.org',
+        '',
+        'Goedendag,',
+        '',
+        'Dit is een voldoende lange originele campagneboodschap voor dezelfde ontvanger en campagne.',
+        '',
+        'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+        '',
+        'Je kunt het webdesign hier bekijken 👈',
+        '',
+        'Met vriendelijke groet,',
+        'Martijn van de Ven',
+        '📍 Alphen',
+      ].join('\n'),
+    },
+  });
+
+  const result = buildCustomerQuotedMessageSource(
+    rawSent,
+    [rawSent, rawReceived],
+    {
+      id: customerId,
+      email: 'prospect@example.org',
+      instantlyCampaignId: 'campaign-martijn',
+      instantlyLeadId: 'lead-martijn',
+      instantlyActualSenderEmail: 'martijn-sender@example.com',
+      instantlyPublicPreviewUrl: exactUrl,
+    },
+    {
+      accountEmail: 'martijn-sender@example.com',
+      recipientEmail: 'prospect@example.org',
+      sameOwnerAccountEmails: ['martijn-sender@example.com'],
+    }
+  );
+
+  assert.equal(result.available, true);
+  assert.equal(result.reason, 'exact-customer-and-delivered-quote-source:exact-thread-content-match');
+  assert.equal(result.webdesignLinkUrl, exactUrl);
+  assert.match(result.body, /eerlijke mening 😁/u);
+  assert.match(result.body, /📍 Alphen/u);
+});
+
 test('delivered quote restoration fails closed when exact customer provenance drifts', () => {
   const result = buildCustomerQuotedMessageSource({
     campaign_id: 'campaign-serve',
@@ -480,6 +711,74 @@ test('complete recent threads cannot starve an older exact-body hydration', asyn
   assert.match(restored.body, /😁/u);
   assert.equal(
     requests.some((request) => new URL(request.url).searchParams.get('search') === 'thread:older-thread'),
+    true
+  );
+});
+
+test('one sync audits every active rich-body candidate within the bounded audit budget', async () => {
+  const store = createStore();
+  const rawThreads = new Map();
+  const { service, requests } = buildService({
+    store,
+    getCustomerSourcesByEmails: async () => [],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      const search = parsed.searchParams.get('search');
+      if (search?.startsWith('thread:')) {
+        return {
+          response: { ok: true, status: 200 },
+          data: { items: rawThreads.get(search.slice('thread:'.length)) || [] },
+        };
+      }
+      if (parsed.pathname.endsWith('/leads/list')) {
+        return { response: { ok: true, status: 200 }, data: { items: [] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+
+  for (let index = 0; index < 6; index += 1) {
+    const threadId = `audit-thread-${index}`;
+    const recipient = `audit-${index}@example.org`;
+    const rawSent = incoming({
+      id: `audit-sent-${index}`,
+      thread_id: threadId,
+      email_type: '1',
+      from_address_email: 'serve-sender@example.com',
+      to_address_email_list: [recipient],
+      body: {
+        text: 'Goedendag. Dit originele campagnebericht heeft voldoende inhoud voor een veilige audit, maar geen bewezen rijke bron.',
+      },
+    });
+    const rawReceived = incoming({
+      id: `audit-received-${index}`,
+      thread_id: threadId,
+      from_address_email: recipient,
+      to_address_email_list: ['serve-sender@example.com'],
+      body: { text: 'Bedankt, maar geen interesse.' },
+    });
+    rawThreads.set(threadId, [rawSent, rawReceived]);
+    store.rows.push(
+      service.normalizeInstantlyMessage(rawSent),
+      service.normalizeInstantlyMessage(rawReceived)
+    );
+  }
+
+  await service.syncOwner('serve');
+
+  const threadSearches = requests.filter(
+    (request) => new URL(request.url).searchParams.get('search')?.startsWith('thread:')
+  );
+  assert.equal(threadSearches.length, 6);
+  const auditedSent = store.rows.filter(
+    (message) => message.originalCampaignOutbound === true
+  );
+  assert.equal(auditedSent.length, 6);
+  assert.equal(
+    auditedSent.every((message) => (
+      message.providerOriginalBodyEvidenceKnown === true &&
+      message.providerOriginalBodyAvailable === false
+    )),
     true
   );
 });

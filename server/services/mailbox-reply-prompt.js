@@ -164,6 +164,7 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Gebruik geen generieke vulling, losse lof, boilerplate, marketingtaal, herhaling of overgang die inhoudelijk niet uit de ontvangen mail volgt.',
     'Als je geen nuttig gegrond antwoord kunt formuleren, geef alleen de kortste beleefde erkenning.',
     'Negatieve intentie, tevredenheid met de huidige site, feedback zonder vervolg en neutrale erkenning blokkeren elke CTA, afspraak, bezoek, prijsbespreking en [dag]-placeholder.',
+    'Een afwijzing mag concrete feedback nooit wissen: bij meerdere specifieke feedbackpunten bedank je voor de genomen tijd, benoem je natuurlijk één tot drie representatieve punten, erken je een genoemd sterk punt en leg je kort uit dat dit nuttig is voor toekomstige ontwerpen, zonder belofte of vervolgvoorstel.',
     'Een CTA mag alleen als antwoordBeleid.ctaAllowed exact true is; gebruik dan maximaal één natuurlijke vervolgstap die direct aansluit op de bewezen vraag of interesse.',
     `Bij een toegestane afspraakoptie mag je maximaal eenmaal deze lijn gebruiken: "${MAILBOX_REPLY_NEXT_STEP}"`,
     `Bij een prijsvraag blijft de enige vaste waarheid: "${MAILBOX_REPLY_PRICE_EXPLANATION}"`,
@@ -245,6 +246,10 @@ function buildMailboxReplyPromptPayload(options = {}) {
       intent: answerPolicy.intent,
       ctaAllowed: answerPolicy.ctaAllowed,
       allowedEvidence: answerPolicy.allowedEvidence,
+      substantiveFeedback: answerPolicy.substantiveFeedback,
+      feedbackThemes: answerPolicy.feedbackDetails.themes.map((theme) => theme.key),
+      positiveFeedbackThemes: answerPolicy.feedbackDetails.positiveThemes
+        .map((theme) => theme.key),
     };
     payload.afzenderContext = {
       accountEmail: normalizeEmail(accountEmail),
