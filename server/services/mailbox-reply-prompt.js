@@ -163,14 +163,16 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Iedere alinea en iedere zin moet rechtstreeks volgen uit een concrete vraag, feit, voorkeur of intentie uit de nieuwste zelfgeschreven reactie, of uit een expliciet toegestane Softora-feitregel in antwoordBeleid.allowedEvidence.',
     'Gebruik geen generieke vulling, losse lof, boilerplate, marketingtaal, herhaling of overgang die inhoudelijk niet uit de ontvangen mail volgt.',
     'Als je geen nuttig gegrond antwoord kunt formuleren, geef alleen de kortste beleefde erkenning.',
-    'Negatieve intentie, tevredenheid met de huidige site, feedback zonder vervolg en neutrale erkenning blokkeren elke CTA, afspraak, bezoek, prijsbespreking en [dag]-placeholder.',
-    'Een afwijzing mag concrete feedback nooit wissen: bij meerdere specifieke feedbackpunten bedank je voor de genomen tijd, benoem je natuurlijk één tot drie representatieve punten, erken je een genoemd sterk punt en leg je kort uit dat dit nuttig is voor toekomstige ontwerpen, zonder belofte of vervolgvoorstel.',
+    'Negatieve intentie, tevredenheid met de huidige site, feedback zonder vervolg en neutrale erkenning blokkeren elke actieve CTA, afspraak, bezoek, prijsbespreking en [dag]-placeholder.',
+    'Een afwijzing mag concrete feedback nooit wissen: bij meerdere specifieke feedbackpunten bedank je op een warme, informele manier, benoem je natuurlijk één tot drie representatieve punten en erken je een genoemd sterk punt.',
+    'Als antwoordBeleid.futureDoorOpenAllowed exact true is, sluit je na inhoudelijke feedback af met één rustige vrijblijvende zin dat de ontvanger je in de toekomst altijd een berichtje mag sturen om te kijken wat er mogelijk is voor de website. Dit is geen afspraakvoorstel en bevat geen vraag.',
+    'Als antwoordBeleid.futureDoorOpenAllowed false is, doe je geen toekomstig voorstel of uitnodiging.',
     'Een CTA mag alleen als antwoordBeleid.ctaAllowed exact true is; gebruik dan maximaal één natuurlijke vervolgstap die direct aansluit op de bewezen vraag of interesse.',
     `Bij een toegestane afspraakoptie mag je maximaal eenmaal deze lijn gebruiken: "${MAILBOX_REPLY_NEXT_STEP}"`,
     `Bij een prijsvraag blijft de enige vaste waarheid: "${MAILBOX_REPLY_PRICE_EXPLANATION}"`,
     `Bij een technische platformvraag mag je de bewezen lijn gebruiken: "${MAILBOX_REPLY_WEBFLOW_ANSWER}"`,
     'Vertel nooit de eigen software, websiteopzet of woorden van de ontvanger terug om begrip te veinzen; beweer nooit dat Servé Webflow gebruikt.',
-    'Gebruik je en nooit jullie, u of uw. Verzin geen feiten, bedragen, namen, afspraken, URLs, voorwaarden of beloftes.',
+    'Gebruik antwoordBeleid.audienceForm: je of jullie. Gebruik nooit u of uw. Verzin geen feiten, bedragen, namen, afspraken, URLs, voorwaarden of beloftes.',
     'Geef uitsluitend geldige JSON terug met exact deze vorm: {"intent":"<antwoordBeleid.intent>","ctaAllowed":<antwoordBeleid.ctaAllowed>,"paragraphs":[{"text":"<alinea>","evidence":["<een of meer waarden uit antwoordBeleid.allowedEvidence>"]}]}.',
     'Geen markdown, aanhef, ondertekening, onderwerpregel, uitleg of andere JSON-velden.',
   ].join('\n');
@@ -247,6 +249,8 @@ function buildMailboxReplyPromptPayload(options = {}) {
       ctaAllowed: answerPolicy.ctaAllowed,
       allowedEvidence: answerPolicy.allowedEvidence,
       substantiveFeedback: answerPolicy.substantiveFeedback,
+      audienceForm: answerPolicy.audienceForm,
+      futureDoorOpenAllowed: answerPolicy.futureDoorOpenAllowed,
       feedbackThemes: answerPolicy.feedbackDetails.themes.map((theme) => theme.key),
       positiveFeedbackThemes: answerPolicy.feedbackDetails.positiveThemes
         .map((theme) => theme.key),
@@ -277,7 +281,15 @@ function classifyMailboxReplyIntent(inboundText) {
 
 function enforceMailboxReplyProfile(value, options = {}) {
   const firstName = normalizeFirstName(options.firstName);
-  const greeting = firstName ? `Beste ${firstName},` : MAILBOX_REPLY_PROFILE.greetingFallback;
+  const originalOpening = cleanLine(
+    String(options.originalSentMail?.body || options.originalSentMail?.preview || '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')[0]
+  );
+  const mirrorsGoodDay = /^goedendag[!,]?$/i.test(originalOpening);
+  const greeting = mirrorsGoodDay
+    ? (firstName ? `Goedendag ${firstName},` : 'Goedendag,')
+    : (firstName ? `Beste ${firstName},` : MAILBOX_REPLY_PROFILE.greetingFallback);
   const sender = resolveMailboxReplySenderProfile({
     accountEmail: options.accountEmail,
     senderName: options.senderName,
