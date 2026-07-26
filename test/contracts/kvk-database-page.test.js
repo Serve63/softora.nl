@@ -140,9 +140,10 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.match(pageSource, /id="companies-without-website-last60"/);
   assert.match(pageSource, /id="companies-unusable-grade-1"/);
   assert.match(pageSource, /id="companies-unusable-grade-2"/);
-  assert.match(pageSource, /id="companies-unusable-grade-3"/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260726a/);
+  assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
+  assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260727a/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260727a/);
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
   assert.match(metricsSource, /unusable_grade_activity/);

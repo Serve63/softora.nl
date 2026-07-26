@@ -56,10 +56,8 @@
       withoutWebsite: documentRef.getElementById('companies-without-website-last60'),
       unusableGrade1: documentRef.getElementById('companies-unusable-grade-1'),
       unusableGrade2: documentRef.getElementById('companies-unusable-grade-2'),
-      unusableGrade3: documentRef.getElementById('companies-unusable-grade-3'),
       unusableGrade1Last60: documentRef.getElementById('companies-unusable-grade-1-last60'),
       unusableGrade2Last60: documentRef.getElementById('companies-unusable-grade-2-last60'),
-      unusableGrade3Last60: documentRef.getElementById('companies-unusable-grade-3-last60'),
     };
 
     function renderMetrics() {
@@ -77,7 +75,6 @@
 
       elements.unusableGrade1.textContent = numberFormat.format(Number(unusableGrades['1'] || 0));
       elements.unusableGrade2.textContent = numberFormat.format(Number(unusableGrades['2'] || 0));
-      elements.unusableGrade3.textContent = numberFormat.format(Number(unusableGrades['3'] || 0));
       renderUnusableGradeLast60(
         elements.unusableGrade1Last60,
         unusableGradeActivity['1'],
@@ -87,12 +84,6 @@
         elements.unusableGrade2Last60,
         unusableGradeActivity['2'],
         unusableGradeLast60['2'],
-      );
-      renderUnusableGradeLast60(
-        elements.unusableGrade3Last60,
-        unusableGradeActivity['3'],
-        unusableGradeLast60['3'],
-        false,
       );
     }
 

@@ -44,10 +44,8 @@ test('kvk database metrics render current last-hour and grade values without ano
     'companies-without-website-last60': createElement(deltaSelectors),
     'companies-unusable-grade-1': createElement(),
     'companies-unusable-grade-2': createElement(),
-    'companies-unusable-grade-3': createElement(),
     'companies-unusable-grade-1-last60': createElement(gradeSelectors),
     'companies-unusable-grade-2-last60': createElement(gradeSelectors),
-    'companies-unusable-grade-3-last60': createElement(gradeSelectors),
   };
   const scraperState = {
     unusable_grades: { 1: 24_412, 2: 30, 3: 121 },
@@ -81,9 +79,7 @@ test('kvk database metrics render current last-hour and grade values without ano
   assert.equal(elements['companies-without-website-last60'].nodes['.stat-delta-number'].textContent, '+1');
   assert.equal(elements['companies-unusable-grade-1'].textContent, '24.412');
   assert.equal(elements['companies-unusable-grade-2'].textContent, '30');
-  assert.equal(elements['companies-unusable-grade-3'].textContent, '121');
   assert.equal(elements['companies-unusable-grade-1-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
   assert.equal(elements['companies-unusable-grade-1-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-2');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+1');
-  assert.equal(elements['companies-unusable-grade-3-last60'].nodes['.unusable-grade-delta-removed'].hidden, true);
 });
