@@ -4,6 +4,7 @@ const {
   buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
   extractLeadId,
+  hydrateIndexedThreadMessageEvidence,
 } = require('./instantly-original-message-source');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
@@ -104,20 +105,6 @@ function extractInstantlyItems(data) {
     if (Array.isArray(candidate)) return candidate;
   }
   return [];
-}
-
-function extractInstantlyItem(data) {
-  for (const candidate of [data?.email, data?.data, data]) {
-    if (
-      candidate &&
-      typeof candidate === 'object' &&
-      !Array.isArray(candidate) &&
-      normalizeText(candidate.id || candidate.email_id || candidate.uuid)
-    ) {
-      return candidate;
-    }
-  }
-  return null;
 }
 
 function extractCursor(data) {
@@ -435,43 +422,17 @@ function createInstantlyMailboxService(deps = {}) {
         sort_order: 'asc',
       },
     });
-    const rawMessages = extractInstantlyItems(data);
-    const rawMessageIds = new Set(
-      rawMessages
-        .map((rawMessage) => normalizeText(rawMessage?.id || rawMessage?.email_id || rawMessage?.uuid))
-        .filter(Boolean)
-    );
-    const exactIndexedMessages = (Array.isArray(indexedMessages) ? indexedMessages : [])
-      .filter((message) => (
-        normalizeText(message?.providerThreadId) === exactThreadId &&
-        normalizeEmail(message?.providerAccountEmail || message?.accountEmail) === exactAccountEmail
-      ));
-    const needsExactOriginalAudit = exactIndexedMessages.some((message) => (
-      message?.originalCampaignOutbound === true &&
-      (
-        message?.providerBodyHtmlEvidenceKnown !== true ||
-        message?.providerOriginalBodyEvidenceKnown !== true
-      )
-    ));
-    for (const indexedMessage of needsExactOriginalAudit ? exactIndexedMessages : []) {
-      const providerMessageId = normalizeText(
-        indexedMessage?.providerMessageId ||
-        String(indexedMessage?.id || '').replace(/^instantly:/, '')
-      );
-      if (!providerMessageId || rawMessageIds.has(providerMessageId)) continue;
-      try {
-        const exactData = await apiRequest(`emails/${encodeURIComponent(providerMessageId)}`);
-        const exactMessage = extractInstantlyItem(exactData);
-        const exactMessageId = normalizeText(
-          exactMessage?.id || exactMessage?.email_id || exactMessage?.uuid
-        );
-        if (!exactMessage || exactMessageId !== providerMessageId) continue;
-        rawMessages.push(exactMessage);
-        rawMessageIds.add(providerMessageId);
-      } catch (error) {
-        if (Number(error?.providerStatus) !== 404) throw error;
-      }
-    }
+    const {
+      exactIndexedMessages,
+      exactProviderMessagesUnavailable,
+      rawMessages,
+    } = await hydrateIndexedThreadMessageEvidence({
+      rawMessages: extractInstantlyItems(data),
+      indexedMessages,
+      threadId: exactThreadId,
+      accountEmail: exactAccountEmail,
+      apiRequest,
+    });
     const originalRecipients = Array.from(new Set(
       rawMessages
         .filter((rawMessage) => (
@@ -612,6 +573,37 @@ function createInstantlyMailboxService(deps = {}) {
         message.providerAccountEmail === exactAccountEmail &&
         message.providerThreadId === exactThreadId
       ));
+    if (
+      exactProviderMessagesUnavailable.size &&
+      typeof mailboxIndexStore.getProviderMessage === 'function'
+    ) {
+      for (const providerMessageId of exactProviderMessagesUnavailable) {
+        const indexedMessage = exactIndexedMessages.find((message) => (
+          normalizeText(message?.providerMessageId) === providerMessageId
+        ));
+        if (indexedMessage?.originalCampaignOutbound !== true) continue;
+        const storedMessage = await mailboxIndexStore.getProviderMessage({
+          provider: 'instantly',
+          providerMessageId,
+          accountEmail: exactAccountEmail,
+        });
+        if (
+          !storedMessage ||
+          storedMessage.providerOwner !== exactOwner ||
+          storedMessage.providerThreadId !== exactThreadId ||
+          storedMessage.originalCampaignOutbound !== true
+        ) {
+          continue;
+        }
+        messages.push({
+          ...storedMessage,
+          folder: 'sent',
+          direction: 'sent',
+          providerOriginalBodyEvidenceKnown: true,
+          providerOriginalBodyAvailable: false,
+        });
+      }
+    }
     const upsert = await mailboxIndexStore.upsertProviderMessages({
       provider: 'instantly',
       messages,
