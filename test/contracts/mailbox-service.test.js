@@ -283,6 +283,70 @@ test('campaign mailbox response excludes delivery-system conversations but keeps
   assert.equal(sourceMessages[0].id, 'bounce');
 });
 
+test('selected owner response stays isolated while durable snapshot retains both Instantly owners', async () => {
+  let savedSnapshot = '';
+  const messagesByOwner = {
+    serve: [{
+      id: 'ramon',
+      mailboxId: 'instantly:ramon-reply',
+      provider: 'instantly',
+      providerMessageId: 'ramon-reply',
+      providerThreadId: 'ramon-thread',
+      providerAccountEmail: 'serve@websoftora.com',
+      providerOwner: 'serve',
+      storageFolder: 'instantly',
+      accountEmail: 'serve@websoftora.com',
+      email: 'info@ramoncc.nl',
+      conversationId: 'instantly:serve@websoftora.com:ramon-thread',
+      activityAt: '2026-07-07T10:47:10.000Z',
+      messageId: '<ramon@example.org>',
+      threadMessages: [],
+    }],
+    martijn: [{
+      id: 'martijn-thread',
+      mailboxId: 'instantly:martijn-reply',
+      provider: 'instantly',
+      providerMessageId: 'martijn-reply',
+      providerThreadId: 'martijn-thread',
+      providerAccountEmail: 'martijn-sender@example.org',
+      providerOwner: 'martijn',
+      storageFolder: 'instantly',
+      accountEmail: 'martijn-sender@example.org',
+      email: 'prospect@example.org',
+      conversationId: 'instantly:martijn-sender@example.org:martijn-thread',
+      activityAt: '2026-07-07T10:48:10.000Z',
+      messageId: '<martijn@example.org>',
+      threadMessages: [],
+    }],
+  };
+  const service = createMailboxService({
+    mailboxCampaignRepliesService: { listReplies: async () => [] },
+    instantlyMailboxService: {
+      isConfigured: () => true,
+      getConfiguredAccounts: (owner) => owner === 'serve'
+        ? [{ email: 'serve@websoftora.com' }]
+        : [{ email: 'martijn-sender@example.org' }],
+      listOwnerConversations: async (owner) => messagesByOwner[owner],
+    },
+    setUiStateValues: async (_scope, values) => {
+      savedSnapshot = values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY];
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.campaignRepliesResponse({
+    query: { limit: '100', owner: 'serve', refreshInstantly: '0' },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.messages.map((message) => message.id), ['ramon']);
+  const persisted = parseMailboxCampaignSnapshot(savedSnapshot);
+  assert.deepEqual(
+    persisted.messages.map((message) => [message.id, message.providerOwner]),
+    [['martijn-thread', 'martijn'], ['ramon', 'serve']]
+  );
+});
+
 test('mailbox service sends mail through selected account smtp', async () => {
   const sent = [];
   const service = createMailboxService({

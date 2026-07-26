@@ -5,7 +5,7 @@ const {
 } = require('./mailbox-message-image');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 3;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 4;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -20,22 +20,56 @@ function text(value, maxLength = 1000) {
 
 function sanitizeCampaign(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return {
+  const campaign = {
     company: text(value.company, 500),
     account: text(value.account, 320).toLowerCase(),
     customerId: text(value.customerId, 320),
     status: text(value.status, 80),
     actionRequired: Boolean(value.actionRequired),
   };
+  const provider = text(value.provider, 50).toLowerCase();
+  const campaignId = text(value.campaignId, 500);
+  if (provider) campaign.provider = provider;
+  if (campaignId) campaign.campaignId = campaignId;
+  return campaign;
 }
 
 function sanitizeOutreach(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return {
+  const outreach = {
     customerId: text(value.customerId, 320),
     company: text(value.company, 500),
     email: text(value.email, 320).toLowerCase(),
     status: text(value.status, 80),
+  };
+  const provider = text(value.provider, 50).toLowerCase();
+  const threadId = text(value.threadId, 500);
+  const owner = text(value.owner, 50).toLowerCase();
+  if (provider) outreach.provider = provider;
+  if (threadId) outreach.threadId = threadId;
+  if (owner) outreach.owner = owner;
+  return outreach;
+}
+
+function sanitizeProviderProvenance(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const provider = text(source.provider, 50).toLowerCase();
+  if (!provider) return {};
+  return {
+    provider,
+    providerMessageId: text(source.providerMessageId, 500),
+    providerThreadId: text(source.providerThreadId, 500),
+    providerCampaignId: text(source.providerCampaignId, 500),
+    providerAccountEmail: text(source.providerAccountEmail || source.accountEmail, 320).toLowerCase(),
+    providerOwner: text(source.providerOwner, 50).toLowerCase(),
+    storageFolder: text(source.storageFolder, 50).toLowerCase(),
+    storageUid: Number.isFinite(Number(source.storageUid)) ? Number(source.storageUid) : 0,
+    direction: text(source.direction, 50).toLowerCase(),
+    bodyLoaded: source.bodyLoaded === true,
+    providerBodyHtmlEvidenceKnown: source.providerBodyHtmlEvidenceKnown === true,
+    providerRichBodyAvailable: source.providerRichBodyAvailable === true,
+    providerOriginalBodyEvidenceKnown: source.providerOriginalBodyEvidenceKnown === true,
+    providerOriginalBodyAvailable: source.providerOriginalBodyAvailable === true,
   };
 }
 
@@ -91,6 +125,7 @@ function sanitizeThreadMessage(value, options = {}) {
       Object.prototype.hasOwnProperty.call(source, 'embeddedImageCount')
     );
   return {
+    ...sanitizeProviderProvenance(source),
     id: text(source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,
     folder: text(source.folder || 'sent', 50).toLowerCase() || 'sent',
@@ -167,6 +202,7 @@ function sanitizeMessage(value, options = {}) {
       Object.prototype.hasOwnProperty.call(source, 'embeddedImageCount')
     );
   return {
+    ...sanitizeProviderProvenance(source),
     id: text(source.id, 500),
     mailboxId: text(source.mailboxId || source.id, 500),
     uid: Number.isFinite(Number(source.uid)) ? Number(source.uid) : 0,

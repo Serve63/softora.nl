@@ -2472,7 +2472,7 @@ function createMailboxService(deps = {}) {
     const replies = await mailboxCampaignRepliesService.listReplies({
       limit: Number(limit || 100) || 100,
     });
-    const { messages, instantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
+    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
     const result = {
       ok: true,
       messages,
@@ -2485,7 +2485,7 @@ function createMailboxService(deps = {}) {
         instantly: instantlySync,
       },
     };
-    const serializedSnapshot = serializeMailboxCampaignSnapshot(result);
+    const serializedSnapshot = serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
     if (serializedSnapshot) {
       try {
         await setUiStateValues(

@@ -3,6 +3,10 @@ const assert = require('node:assert/strict');
 
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox.js');
 const compose = require('../../assets/premium-mailbox-compose.js');
+const {
+  parseMailboxCampaignSnapshot,
+  serializeMailboxCampaignSnapshot,
+} = require('../../server/services/mailbox-campaign-snapshot');
 
 test('Instantly rows are filtered only by server-proven owner, never by display name or guessed account', () => {
   const messages = [
@@ -40,6 +44,50 @@ test('Instantly rows are filtered only by server-proven owner, never by display 
     campaignInbox.filterMessages(messages, 'martijn').map((message) => message.id),
     ['martijn']
   );
+});
+
+test('first-paint snapshot houdt Ramon bij Servé en Martijn strikt in zijn eigen view', () => {
+  const snapshot = parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'ramon',
+      mailboxId: 'instantly:ramon-reply',
+      provider: 'instantly',
+      providerMessageId: 'ramon-reply',
+      providerThreadId: 'ramon-thread',
+      providerAccountEmail: 'serve@websoftora.com',
+      providerOwner: 'serve',
+      storageFolder: 'instantly',
+      accountEmail: 'serve@websoftora.com',
+      email: 'info@ramoncc.nl',
+      conversationId: 'instantly:serve@websoftora.com:ramon-thread',
+      receivedAt: '2026-07-07T10:47:10.000Z',
+    }, {
+      id: 'martijn-reply',
+      mailboxId: 'instantly:martijn-reply',
+      provider: 'instantly',
+      providerMessageId: 'martijn-reply',
+      providerThreadId: 'martijn-thread',
+      providerAccountEmail: 'martijn-sender@example.com',
+      providerOwner: 'martijn',
+      storageFolder: 'instantly',
+      accountEmail: 'martijn-sender@example.com',
+      email: 'prospect@example.org',
+      conversationId: 'instantly:martijn-sender@example.com:martijn-thread',
+      receivedAt: '2026-07-07T10:48:10.000Z',
+    }],
+  }));
+
+  assert.deepEqual(
+    campaignInbox.filterMessages(snapshot.messages, 'serve').map((message) => message.id),
+    ['ramon']
+  );
+  assert.deepEqual(
+    campaignInbox.filterMessages(snapshot.messages, 'martijn').map((message) => message.id),
+    ['martijn-reply']
+  );
+  assert.equal(snapshot.messages[0].providerOwner, 'serve');
+  assert.equal(snapshot.messages[1].providerOwner, 'martijn');
 });
 
 test('campaign loader requests only the currently selected owner and asks for safe polling', async () => {

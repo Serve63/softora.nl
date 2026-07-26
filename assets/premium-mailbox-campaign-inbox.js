@@ -7,7 +7,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v4';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
