@@ -486,7 +486,7 @@ test('premium database mail ROI calculator uses the live Softora mail count', as
   assert.equal(nodes.mailRoiRatio.textContent, '1 op 3');
 });
 
-test('premium database mail ROI calculator toont vandaag verstuurd en totale bounces live in dezelfde kaartjesrij', async () => {
+test('premium database mail ROI calculator toont vandaag verstuurd en uitsluitend harde bounces', async () => {
   const requestedUrls = [];
   const nodes = {
     systemMailSentTodayCount: { textContent: '' },
@@ -513,6 +513,7 @@ test('premium database mail ROI calculator toont vandaag verstuurd en totale bou
             systemSentToday: 31,
             bounces: 9,
             bouncesToday: 4,
+            bounceTypes: { hard: 3, soft: 4, unknown: 2 },
             webdesignSentToday: 26,
             systemTotalSent: 355,
             webdesignTotalSent: 385,
@@ -527,12 +528,69 @@ test('premium database mail ROI calculator toont vandaag verstuurd en totale bou
   await systemMailCountClient.refreshTodaySentCount();
 
   assert.equal(nodes.systemMailSentTodayCount.textContent, '31');
-  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '9');
+  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '3');
   assert.equal(nodes.systemMailSentCount.textContent, '355');
   assert.equal(requestedUrls[0], '/api/coldmailing/stats');
 });
 
-test('premium database verlaagt een bewezen cumulatieve bounceteller niet door een tijdelijke nulmeting', async () => {
+test('premium database bootstrap toont nooit het algemene bouncetotaal als harde bounces', () => {
+  const nodes = {
+    softoraCustomersBootstrap: {
+      textContent: JSON.stringify({
+        mailStats: { sentToday: 0, bounces: 59, hardBounces: 27, totalSent: 2000 },
+      }),
+    },
+    systemMailSentTodayCount: { textContent: '' },
+    systemMailBouncesTodayCount: { textContent: '' },
+    systemMailSentCount: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const systemMailCountClient = loadDatabaseSystemMailCountClient({
+    document: {
+      hidden: false,
+      getElementById: (id) => nodes[id] || null,
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+    },
+    fetch: () => new Promise(() => {}),
+    setInterval: () => 0,
+  });
+
+  systemMailCountClient.render([], { dataLoading: false });
+
+  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '27');
+});
+
+test('premium database presenteert geen algemene bounceteller wanneer de harde uitsplitsing ontbreekt', async () => {
+  const nodes = {
+    systemMailSentTodayCount: { textContent: '' },
+    systemMailBouncesTodayCount: { textContent: '' },
+    systemMailSentCount: { textContent: '' },
+    mailRoiDealsCount: { textContent: '' },
+    mailRoiRatio: { textContent: '' },
+  };
+  const systemMailCountClient = loadDatabaseSystemMailCountClient({
+    document: {
+      hidden: false,
+      getElementById: (id) => nodes[id] || null,
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+    },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ ok: true, stats: { bounces: 59, totalBounces: 59 } }),
+    }),
+    setInterval: () => 0,
+  });
+
+  systemMailCountClient.render([], { dataLoading: false });
+  await systemMailCountClient.refreshTodaySentCount();
+
+  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '--');
+});
+
+test('premium database verlaagt een bewezen cumulatieve harde-bounceteller niet door een tijdelijke nulmeting', async () => {
   let requestCount = 0;
   const nodes = {
     systemMailSentTodayCount: { textContent: '' },
@@ -554,7 +612,12 @@ test('premium database verlaagt een bewezen cumulatieve bounceteller niet door e
         ok: true,
         json: async () => ({
           ok: true,
-          stats: { sentToday: 0, bounces: requestCount === 1 ? 29 : 0, totalSent: 1393 },
+          stats: {
+            sentToday: 0,
+            bounces: requestCount === 1 ? 59 : 0,
+            bounceTypes: { hard: requestCount === 1 ? 27 : 0, soft: 20, unknown: 12 },
+            totalSent: 1393,
+          },
         }),
       };
     },
@@ -565,7 +628,7 @@ test('premium database verlaagt een bewezen cumulatieve bounceteller niet door e
   await systemMailCountClient.refreshTodaySentCount();
   await systemMailCountClient.refreshTodaySentCount();
 
-  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '29');
+  assert.equal(nodes.systemMailBouncesTodayCount.textContent, '27');
 });
 
 test('premium database autopilot toggle switches the real coldmail autopilot state only', async () => {
@@ -1411,7 +1474,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.match(pageSource, /class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot" id="databaseAutopilotCard" data-autopilot-state="loading"[\s\S]*?id="databaseAutopilotToggle"[\s\S]*?id="databaseAutopilotToggleLabel">Laden<\/span>[\s\S]*?class="mail-roi-card mail-roi-card--today"/);
-  assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?id="systemMailSentTodayCount"[\s\S]*?class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Bounces<\/div>[\s\S]*?id="systemMailBouncesTodayCount"/);
+  assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"[\s\S]*?id="systemMailSentTodayCount"[\s\S]*?class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-label">Harde bounces<\/div>[\s\S]*?id="systemMailBouncesTodayCount"/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"[\s\S]*?class="mail-roi-note">Break-even: 1 klant van €850 per 10\.000 mails\.<\/div>[\s\S]*?class="mail-roi-label">Mails verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-cards"/);
   assert.match(pageSource, /\.filter-bar\s*\{[\s\S]*align-items: center;/);
@@ -1423,7 +1486,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--today"/);
   assert.match(pageSource, /class="mail-roi-label">Vandaag verstuurd<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--bounces"/);
-  assert.match(pageSource, /class="mail-roi-label">Bounces<\/div>/);
+  assert.match(pageSource, /class="mail-roi-label">Harde bounces<\/div>/);
   assert.match(pageSource, /class="mail-roi-card mail-roi-card--autopilot"/);
   assert.match(pageSource, /class="mail-roi-label">Autopilot<\/div>/);
   assert.match(pageSource, /id="databaseAutopilotToggle"/);
@@ -1857,7 +1920,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260617d/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260710c/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260727a/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2136,7 +2199,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260722b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260710c"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-available-import\.js\?v=20260606d"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260727a"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);

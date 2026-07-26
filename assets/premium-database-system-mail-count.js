@@ -8,7 +8,7 @@
     let todaySentRefreshBound = false;
     let todaySentRefreshPromise = null;
     let lastTodaySentCount = null;
-    let lastTodayBouncesCount = null;
+    let lastHardBouncesCount = null;
     let lastStatsMailCount = null;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
@@ -181,11 +181,11 @@
             const mailStats = payload && payload.mailStats && typeof payload.mailStats === "object" ? payload.mailStats : {};
             const roi = payload && payload.mailRoi && typeof payload.mailRoi === "object" ? payload.mailRoi : {};
             const sentToday = readNonNegativeInteger(mailStats.sentToday);
-            const bounces = readNonNegativeInteger(mailStats.bounces);
+            const hardBounces = readNonNegativeInteger(mailStats.hardBounces);
             const totalSent = readNonNegativeInteger(mailStats.totalSent);
             const dealCount = readNonNegativeInteger(roi.dealCount);
             if (sentToday !== null) lastTodaySentCount = sentToday;
-            if (bounces !== null) lastTodayBouncesCount = bounces;
+            if (hardBounces !== null) lastHardBouncesCount = hardBounces;
             if (totalSent !== null) {
                 lastStatsMailCount = totalSent;
                 lastRenderedMailCount = totalSent;
@@ -348,21 +348,21 @@
         return null;
     }
 
-    function readBouncesCountFromStats(stats) {
-        const directFields = ["bounces", "totalBounces", "bouncesTotal", "bouncesToday", "todayBounces"];
+    function readHardBouncesCountFromStats(stats) {
+        const directFields = ["hardBounces", "totalHardBounces"];
         for (let index = 0; index < directFields.length; index += 1) {
             const count = readNonNegativeInteger(stats && stats[directFields[index]]);
             if (count !== null) return count;
         }
-        const groupedTotalStats = stats && stats.bounceStats && typeof stats.bounceStats === "object"
+        const bounceTypes = stats && stats.bounceTypes && typeof stats.bounceTypes === "object"
+            ? stats.bounceTypes
+            : null;
+        const hardBounceCount = readNonNegativeInteger(bounceTypes && bounceTypes.hard);
+        if (hardBounceCount !== null) return hardBounceCount;
+        const groupedStats = stats && stats.bounceStats && typeof stats.bounceStats === "object"
             ? stats.bounceStats
             : null;
-        const groupedTotalCount = readNonNegativeInteger(groupedTotalStats && groupedTotalStats.total);
-        if (groupedTotalCount !== null) return groupedTotalCount;
-        const groupedStats = stats && stats.todayBounceStats && typeof stats.todayBounceStats === "object"
-            ? stats.todayBounceStats
-            : null;
-        return readNonNegativeInteger(groupedStats && groupedStats.total);
+        return readNonNegativeInteger(groupedStats && groupedStats.hard);
     }
 
     function renderTodaySentCount(value, isLoading) {
@@ -382,25 +382,25 @@
         element.textContent = count.toLocaleString("nl-NL");
     }
 
-    function renderTodayBouncesCount(value, isLoading) {
+    function renderHardBouncesCount(value, isLoading) {
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailBouncesTodayCount");
         if (!element) return;
-        if (isLoading && lastTodayBouncesCount === null) {
+        if (isLoading && lastHardBouncesCount === null) {
             element.textContent = "--";
             return;
         }
-        const count = value === null || value === undefined ? lastTodayBouncesCount : readNonNegativeInteger(value);
+        const count = value === null || value === undefined ? lastHardBouncesCount : readNonNegativeInteger(value);
         if (count === null || count === undefined) {
             element.textContent = "--";
             return;
         }
-        // Bounces zijn een cumulatieve teller. Een tijdelijke lege/partiele
+        // Harde bounces zijn een cumulatieve teller. Een tijdelijke lege/partiele
         // backend-read mag een al bewezen totaal nooit zichtbaar verlagen.
-        const stableCount = lastTodayBouncesCount === null
+        const stableCount = lastHardBouncesCount === null
             ? count
-            : Math.max(lastTodayBouncesCount, count);
-        lastTodayBouncesCount = stableCount;
+            : Math.max(lastHardBouncesCount, count);
+        lastHardBouncesCount = stableCount;
         element.textContent = stableCount.toLocaleString("nl-NL");
     }
 
@@ -448,10 +448,10 @@
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
             const sentToday = readTodaySentCountFromStats(stats);
-            const bounces = readBouncesCountFromStats(stats);
+            const hardBounces = readHardBouncesCountFromStats(stats);
             const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, false);
-            renderTodayBouncesCount(bounces, false);
+            renderHardBouncesCount(hardBounces, false);
             if (systemMailCount !== null) {
                 lastStatsMailCount = systemMailCount;
                 renderSystemMailCount(systemMailCount, false);
@@ -459,7 +459,7 @@
             return sentToday;
         }).catch(function (error) {
             renderTodaySentCount(lastTodaySentCount, lastTodaySentCount === null);
-            renderTodayBouncesCount(lastTodayBouncesCount, lastTodayBouncesCount === null);
+            renderHardBouncesCount(lastHardBouncesCount, lastHardBouncesCount === null);
             renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
             if (typeof console !== "undefined" && typeof console.warn === "function") console.warn("Vandaag verstuurd laden mislukt:", error && error.message ? error.message : error);
             return lastTodaySentCount;
@@ -472,7 +472,7 @@
     function bindTodaySentRefresh() {
         applyBootstrapState();
         renderTodaySentCount(lastTodaySentCount, true);
-        renderTodayBouncesCount(lastTodayBouncesCount, true);
+        renderHardBouncesCount(lastHardBouncesCount, true);
         if (todaySentRefreshBound) return;
         todaySentRefreshBound = true;
         void refreshTodaySentCount();
