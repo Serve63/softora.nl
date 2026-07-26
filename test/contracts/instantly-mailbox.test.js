@@ -260,6 +260,109 @@ test('exact lead source restores Ramon-style emoji and direct hier link after st
   });
 });
 
+test('complete recent threads cannot starve an older exact-body hydration', async () => {
+  const exactUrl = 'https://www.softora.nl/webdesign/older-prospect?cid=exact&sender=serve';
+  const providerHtml = [
+    '<p>Goedendag,</p>',
+    '<p>Dit is een voldoende lange originele campagneboodschap voor betrouwbare vergelijking.</p>',
+    '<p>Je kunt het webdesign <a href="https://inst.example.test/lt/older">hier</a> bekijken.</p>',
+  ].join('');
+  const sourceHtml = [
+    '<p>Goedendag,</p>',
+    '<p>Dit is een voldoende lange originele campagneboodschap voor betrouwbare vergelijking 😁</p>',
+    `<p>Je kunt het webdesign <a href="${exactUrl}">hier</a> bekijken 👈</p>`,
+  ].join('');
+  const recentIncoming = Array.from({ length: 4 }, (_, index) => incoming({
+    id: `recent-incoming-${index}`,
+    thread_id: `recent-thread-${index}`,
+    from_address_email: `recent-${index}@example.org`,
+    timestamp_email: `2026-07-25T11:0${index}:00.000Z`,
+  }));
+  const targetReceived = incoming({
+    id: 'older-received',
+    thread_id: 'older-thread',
+    from_address_email: 'older@example.org',
+    timestamp_email: '2026-07-07T10:47:10.000Z',
+  });
+  const targetSent = incoming({
+    id: 'older-sent',
+    lead: 'older@example.org',
+    thread_id: 'older-thread',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['older@example.org'],
+    subject: 'Kleine vraag over jullie website',
+    body: { html: providerHtml },
+    timestamp_email: '2026-07-07T05:52:41.000Z',
+  });
+  const lead = {
+    id: 'older-lead',
+    campaign: 'campaign-serve',
+    contact: 'older@example.org',
+    payload: {
+      softora_sender_email: 'serve-sender@example.com',
+      softora_subject: 'Kleine vraag over jullie website',
+      softora_webdesign_public_url: exactUrl,
+      softora_instantly_email_html: sourceHtml,
+    },
+  };
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith('/leads/list')) {
+        return { response: { ok: true, status: 200 }, data: { items: [lead] } };
+      }
+      if (parsed.searchParams.get('search') === 'thread:older-thread') {
+        return {
+          response: { ok: true, status: 200 },
+          data: { items: [targetSent, targetReceived] },
+        };
+      }
+      if (parsed.pathname.endsWith('/emails')) {
+        return {
+          response: { ok: true, status: 200 },
+          data: { items: [...recentIncoming, targetReceived] },
+        };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+
+  recentIncoming.forEach((rawIncoming, index) => {
+    const rawSent = incoming({
+      id: `recent-sent-${index}`,
+      thread_id: `recent-thread-${index}`,
+      email_type: '1',
+      from_address_email: 'serve-sender@example.com',
+      to_address_email_list: [`recent-${index}@example.org`],
+      body: { html: '<p>Volledig recent uitgaand bericht met voldoende inhoud.</p>' },
+    });
+    const normalizedSent = service.normalizeInstantlyMessage(rawSent);
+    normalizedSent.providerBodyHtmlEvidenceKnown = true;
+    normalizedSent.providerOriginalBodyEvidenceKnown = true;
+    normalizedSent.providerOriginalBodyAvailable = true;
+    store.rows.push(service.normalizeInstantlyMessage(rawIncoming), normalizedSent);
+  });
+  store.rows.push(
+    service.normalizeInstantlyMessage(targetReceived),
+    service.normalizeInstantlyMessage(targetSent)
+  );
+
+  await service.syncOwner('serve');
+
+  const restored = store.rows.find((message) => message.providerMessageId === 'older-sent');
+  assert.equal(restored.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.webdesignLinkUrl, exactUrl);
+  assert.match(restored.body, /😁/u);
+  assert.equal(
+    requests.some((request) => new URL(request.url).searchParams.get('search') === 'thread:older-thread'),
+    true
+  );
+});
+
 test('exact lead source fails closed when campaign or recipient provenance drifts', () => {
   const result = buildOriginalMessageSource({
     lead_id: 'lead-1',
