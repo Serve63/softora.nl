@@ -143,6 +143,48 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
   assert.equal(detailMessage.body, 'Volledige tekst');
 });
 
+test('mailbox index store preserves exact Instantly HTML and link provenance markers', () => {
+  const store = createMailboxIndexStore({
+    now: () => new Date('2026-07-26T16:00:00.000Z'),
+  });
+  const exactUrl = 'https://www.softora.nl/webdesign/bossche-brouwers?cid=exact';
+  const row = store.buildProviderMessageRow({
+    provider: 'instantly',
+    providerMessageId: 'provider-message-42',
+    providerThreadId: 'provider-thread-7',
+    providerCampaignId: 'provider-campaign-3',
+    providerAccountEmail: 'serve@softora.nl',
+    providerOwner: 'serve',
+    accountEmail: 'serve@softora.nl',
+    folder: 'sent',
+    direction: 'sent',
+    from: 'Servé Creusen',
+    email: 'serve@softora.nl',
+    to: 'administratie@bosschebrouwers.nl',
+    subject: 'Kleine vraag over jullie website',
+    body: `Je kunt het webdesign hier [${exactUrl}] bekijken`,
+    date: '2026-07-26T15:58:00.000Z',
+    originalCampaignOutbound: true,
+    providerBodyHtmlEvidenceKnown: true,
+    providerRichBodyAvailable: true,
+    webdesignLinkEvidenceKnown: true,
+    webdesignLinkUrl: exactUrl,
+  });
+
+  assert.equal(row.payload.providerBodyHtmlEvidenceKnown, true);
+  assert.equal(row.payload.providerRichBodyAvailable, true);
+  assert.equal(row.payload.webdesignLinkEvidenceKnown, true);
+  assert.equal(row.payload.webdesignLinkUrl, exactUrl);
+
+  const normalized = store.normalizeMessageRow(row, { includeBody: true });
+  assert.equal(normalized.provider, 'instantly');
+  assert.equal(normalized.providerBodyHtmlEvidenceKnown, true);
+  assert.equal(normalized.providerRichBodyAvailable, true);
+  assert.equal(normalized.webdesignLinkEvidenceKnown, true);
+  assert.equal(normalized.webdesignLinkUrl, exactUrl);
+  assert.match(normalized.body, /webdesign hier \[https:\/\/www\.softora\.nl/);
+});
+
 test('mailbox index store vindt de oudste campagne-uid zonder verwijderde historie uit te sluiten', async () => {
   const calls = [];
   const uidsByTerm = new Map([

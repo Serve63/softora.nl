@@ -303,6 +303,8 @@ function createMailboxIndexStore(deps = {}) {
       normalized.providerCampaignId = normalizeString(payload.providerCampaignId);
       normalized.providerAccountEmail = normalizeEmail(payload.providerAccountEmail || row.account_email);
       normalized.providerOwner = normalizeString(payload.providerOwner).toLowerCase();
+      normalized.providerBodyHtmlEvidenceKnown = payload.providerBodyHtmlEvidenceKnown === true;
+      normalized.providerRichBodyAvailable = payload.providerRichBodyAvailable === true;
       normalized.storageFolder = normalizeFolder(row.folder);
       normalized.storageUid = uid;
       normalized.uid = 0;
@@ -371,6 +373,10 @@ function createMailboxIndexStore(deps = {}) {
         attachments: normalizeAttachments(message.attachments),
         attachmentSource: provider,
         originalCampaignOutbound: message.originalCampaignOutbound === true,
+        providerBodyHtmlEvidenceKnown: message.providerBodyHtmlEvidenceKnown === true,
+        providerRichBodyAvailable: message.providerRichBodyAvailable === true,
+        webdesignLinkEvidenceKnown: message.webdesignLinkEvidenceKnown === true,
+        webdesignLinkUrl: truncateText(normalizeString(message.webdesignLinkUrl), 4000),
       },
       updated_at: isoNow(),
     };

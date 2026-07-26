@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  isAutomatedDeliveryFailureMessage,
   mergeBounceRecords,
   summarizeMailboxBounceStats,
 } = require('../../server/services/coldmail-bounce-stats');
@@ -120,6 +121,21 @@ test('mailbox bounce stats keep a filtered coldmail-label DSN visible', () => {
   assert.equal(stats.totalBounces, 1);
   assert.equal(stats.bounceMessages, 1);
   assert.equal(stats.bounceItems[0].email, 'oud@example.test');
+});
+
+test('mailbox display filter hides only proven automated delivery failures', () => {
+  assert.equal(isAutomatedDeliveryFailureMessage({
+    sender_email: 'mailer-daemon@googlemail.com',
+    sender_name: 'Mail Delivery Subsystem',
+    subject: 'Delivery Status Notification (Failure)',
+    body_text: 'Final-Recipient: rfc822; oud@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
+  }), true);
+  assert.equal(isAutomatedDeliveryFailureMessage({
+    sender_email: 'klant@example.test',
+    sender_name: 'Echte klant',
+    subject: 'Re: Website',
+    body_text: 'Wij hadden eerder een delivery failure, maar deze menselijke reactie komt nu wel aan.',
+  }), false);
 });
 
 test('bounce record merge deduplicates database and mailbox signals by recipient', () => {

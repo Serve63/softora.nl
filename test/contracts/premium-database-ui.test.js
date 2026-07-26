@@ -1595,12 +1595,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260718a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260726a/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
-  assert.match(webdesignVariantPickerScriptSource, /V2 — Visuele stijlmatch/);
-  assert.match(webdesignVariantPickerScriptSource, /V1 — Originele generator/);
+  assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
+  assert.doesNotMatch(webdesignVariantPickerScriptSource, /Kies de ontwerpvariant|V2 — Visuele stijlmatch|V1 — Originele generator|webdesign-variant-dialog/);
   assert.match(webdesignActionScriptSource, /const FALLBACK_ICON = "<span class=\\"photo-fallback-icon\\" aria-hidden=\\"true\\"><\/span>";/);
   assert.match(webdesignActionScriptSource, /\.photo-fallback-icon\{display:none\}/);
   assert.doesNotMatch(webdesignActionScriptSource, /photo-fallback-icon[^\n]*>!<\/span>/);
@@ -1849,7 +1849,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/);
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260529d/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260726a/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260714b/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260616b/);
@@ -2000,11 +2000,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260710b/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723d/);
-  assert.match(webdesignActionScriptSource, /picker\.choose\(\{ company: normalizeString\(target && target\.bedrijf\) \}\)/);
-  assert.match(webdesignActionScriptSource, /Keuze tussen V1 en V2 kon niet worden geladen/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260726a/);
+  assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
+  assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
+  assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
+  assert.match(webdesignActionScriptSource, /variant: "v2-visual-dna"/);
   assert.doesNotMatch(webdesignActionScriptSource, /DEFAULT_SINGLE_VARIANT/);
-  assert.match(webdesignActionScriptSource, /onCancel:function\(result\)/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
   assert.match(webdesignBulkScriptSource, /const WORKER_KICK_INTERVAL_MS = 8000;/);
@@ -2039,7 +2040,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260723d/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260726a/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
@@ -3236,7 +3237,7 @@ test('premium database webdesign bulk retries restore after a temporary batch li
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/run'));
 });
 
-test('premium database webdesign action sends only the explicitly selected V2 variant', async () => {
+test('premium database webdesign action directly starts only the fixed V2 variant', async () => {
   let postedBody = null;
   let pickerCalls = 0;
   const chargeLabels = [];
@@ -3316,7 +3317,7 @@ test('premium database webdesign action sends only the explicitly selected V2 va
   assert.equal(postedBody.customer.bedrijf, 'Bliv Makelaardij');
 });
 
-test('premium database webdesign action never starts a job when variant choice is cancelled', async () => {
+test('premium database webdesign action fails closed when the picker does not return V2', async () => {
   let fetchCalls = 0;
   const webdesignActionClient = loadDatabaseWebdesignActionClient({
     document: {
@@ -3356,11 +3357,11 @@ test('premium database webdesign action never starts a job when variant choice i
   const result = await controller.generateForCustomer('customer-cancelled');
 
   assert.equal(result.started, false);
-  assert.equal(result.cancelled, true);
+  assert.equal(result.failed, true);
   assert.equal(fetchCalls, 0);
 });
 
-test('premium database webdesign action fails closed when the V1/V2 picker is unavailable', async () => {
+test('premium database webdesign action fails closed when the V2 picker is unavailable', async () => {
   let fetchCalls = 0;
   const messages = [];
   const webdesignActionClient = loadDatabaseWebdesignActionClient({
@@ -3388,7 +3389,7 @@ test('premium database webdesign action fails closed when the V1/V2 picker is un
   assert.equal(result.started, false);
   assert.equal(result.failed, true);
   assert.equal(fetchCalls, 0);
-  assert.match(messages[0].message, /Keuze tussen V1 en V2/);
+  assert.match(messages[0].message, /V2-webdesigngenerator kon niet worden geladen/);
 });
 
 test('premium database webdesign action keeps a failed job visible and never announces false success', async () => {

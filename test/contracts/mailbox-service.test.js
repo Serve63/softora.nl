@@ -179,6 +179,110 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
   );
 });
 
+test('mailbox service excludes automated delivery failures from list and detail without touching human replies', async () => {
+  const automated = {
+    id: 'inbox:1',
+    uid: 1,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'mailer-daemon@googlemail.com',
+    from: 'Mail Delivery Subsystem',
+    subject: 'Delivery Status Notification (Failure)',
+    preview: 'Final-Recipient: rfc822; fout@example.test',
+    body: 'Final-Recipient: rfc822; fout@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
+    hasBody: true,
+    bodyImageEvidenceKnown: true,
+    embeddedImageCount: 0,
+  };
+  const human = {
+    id: 'inbox:2',
+    uid: 2,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'klant@example.test',
+    from: 'Echte klant',
+    subject: 'Re: Website',
+    preview: 'Eerder was er een delivery failure, nu lukt het wel.',
+    body: 'Eerder was er een delivery failure, nu lukt het wel.',
+    hasBody: true,
+    bodyImageEvidenceKnown: true,
+    embeddedImageCount: 0,
+  };
+  const mailboxIndexStore = {
+    isAvailable: () => true,
+    listMessages: async () => [automated, human],
+    getSyncState: async () => ({ last_synced_at: '2026-07-26T12:00:00.000Z' }),
+    isSyncStateStale: () => false,
+    getMessage: async ({ id }) => id === 'inbox:1' ? automated : human,
+  };
+  const service = createMailboxService({
+    mailConfig: {
+      mailFromAddress: 'serve@softora.nl',
+      mailFromName: 'Servé Creusen',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    },
+    mailboxIndexStore,
+  });
+
+  const messages = await service.listMessages({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+  });
+  assert.deepEqual(messages.map((message) => message.id), ['inbox:2']);
+  await assert.rejects(
+    service.getMessage({
+      accountEmail: 'serve@softora.nl',
+      folder: 'inbox',
+      id: 'inbox:1',
+    }),
+    { status: 404 }
+  );
+  assert.equal((await service.getMessage({
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    id: 'inbox:2',
+  })).id, 'inbox:2');
+});
+
+test('campaign mailbox response excludes delivery-system conversations but keeps them in source storage', async () => {
+  const sourceMessages = [
+    {
+      id: 'bounce',
+      email: 'mailer-daemon@googlemail.com',
+      from: 'Mail Delivery Subsystem',
+      subject: 'Delivery Status Notification (Failure)',
+      body: 'Final-Recipient: rfc822; fout@example.test\nDiagnostic-Code: smtp; 5.1.1 user unknown',
+      date: '2026-07-26T12:00:00.000Z',
+    },
+    {
+      id: 'human',
+      email: 'klant@example.test',
+      from: 'Klant',
+      subject: 'Re: Website',
+      body: 'De eerdere delivery failure is opgelost; bedankt.',
+      date: '2026-07-26T12:01:00.000Z',
+    },
+  ];
+  const service = createMailboxService({
+    mailboxCampaignRepliesService: {
+      listReplies: async () => sourceMessages,
+    },
+    instantlyMailboxService: {
+      isConfigured: () => false,
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.campaignRepliesResponse({ query: { limit: '100' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.messages.map((message) => message.id), ['human']);
+  assert.equal(sourceMessages.length, 2);
+  assert.equal(sourceMessages[0].id, 'bounce');
+});
+
 test('mailbox service sends mail through selected account smtp', async () => {
   const sent = [];
   const service = createMailboxService({

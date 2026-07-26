@@ -533,6 +533,7 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(nvmrcSource.trim(), '22');
   assert.equal(packageJson.dependencies.nodemailer, '^9.0.1');
   assert.equal(packageJson.dependencies.mailparser, '^3.9.14');
+  assert.equal(packageJson.dependencies.htmlparser2, '^10.1.0');
   assert.equal(packageJson.dependencies.sharp, '^0.35.3');
   assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.3');
   assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.2');
