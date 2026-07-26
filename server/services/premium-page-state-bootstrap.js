@@ -23,6 +23,7 @@ const PAGE_STATE_SCOPES = Object.freeze({
   'premium-opdracht-dossier.html': Object.freeze(['premium_active_orders']),
   'premium-opdracht-preview.html': Object.freeze(['premium_active_orders']),
   'premium-personeel-dashboard.html': Object.freeze(['premium_dashboard_ai_management']),
+  'premium-instellingen.html': Object.freeze(['premium_toto_lab']),
   'premium-socialmedia.html': Object.freeze(['premium_socialmedia_content_lock']),
   'premium-seo-crm-system.html': Object.freeze(['premium_seo_crm']),
   'premium-vaste-lasten.html': Object.freeze(['premium_monthly_costs']),

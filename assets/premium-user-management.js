@@ -450,14 +450,17 @@ function mountExtraSettingsCategory() {
     var isDatabase = label === 'Database';
     var isHealth = label === "Servé's gezondheidsdossier";
     var isOmzetwerk = label === 'OMZETWERK';
-    var isLinkedModule = isWinning || isDatabase || isHealth || isOmzetwerk;
+    var isToto = label === 'Ruben zet toto';
+    var isLinkedModule = isWinning || isDatabase || isHealth || isOmzetwerk || isToto;
     var moduleHref = isWinning
       ? '/live-momentum'
       : isDatabase
         ? '/kvk-database'
         : isHealth
           ? '/premium-gezondheidsdossier'
-          : '/premium-omzetwerk';
+          : isOmzetwerk
+            ? '/premium-omzetwerk'
+            : '#toto-forward-lab';
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {
@@ -466,6 +469,14 @@ function mountExtraSettingsCategory() {
       card.addEventListener('click', function () {
         if (isWinning) {
           void openWinningModule(moduleHref);
+          return;
+        }
+        if (isToto) {
+          if (window.SoftoraToto && typeof window.SoftoraToto.open === 'function') {
+            window.SoftoraToto.open();
+          } else {
+            showToast('TOTO Forward Lab kon niet worden geladen.');
+          }
           return;
         }
         navigateToSettingsModule(moduleHref);
@@ -536,8 +547,10 @@ function mountExtraSettingsCategory() {
             ? 'Lokale database voor het scrapen en behandelen van bedrijven.'
             : isHealth
               ? 'WHOOP-herstel, slaap en trainingen, dagelijks automatisch bijgewerkt.'
-            : isOmzetwerk
-              ? 'Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1.000.000.'
+              : isOmzetwerk
+                ? 'Codex’ eigen zaak binnen Softora: koers, voortgang en bewijs richting €1.000.000.'
+                : isToto
+                  ? 'Paper-bankroll, forward voorspellingen, modelkalibratie en harde risicorails.'
             : label === 'Flynow'
               ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
             : 'Interne template-module die later verder ingevuld kan worden.'
@@ -546,7 +559,7 @@ function mountExtraSettingsCategory() {
       card,
       'div',
       'tegel-count',
-      isLinkedModule ? 'Extra ' + number : 'Vergrendeld'
+      isToto ? 'Simulatie actief' : isLinkedModule ? 'Extra ' + number : 'Vergrendeld'
     );
     extraGrid.appendChild(card);
   });
