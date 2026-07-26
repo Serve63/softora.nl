@@ -8,6 +8,7 @@ const PREMIUM_ADMIN_ONLY_HTML_FILE_NAMES = Object.freeze([
   'premium-gezondheidsdossier.html',
   'premium-wachtwoordenregister.html',
   'premium-flynow.html',
+  'premium-omzetwerk.html',
   'live-momentum.html',
 ]);
 

@@ -67,6 +67,7 @@ test('marketing premium landing pages are not auth-gated', () => {
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-instellingen.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-wachtwoordenregister.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-flynow.html'), true);
+  assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-omzetwerk.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('live-momentum.html'), true);
 });
 

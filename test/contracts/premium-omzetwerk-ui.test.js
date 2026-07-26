@@ -1,0 +1,26 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const repoRoot = path.resolve(__dirname, '../..');
+
+test('OMZETWERK cockpit toont alleen controleerbare bedrijfsstatus', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-omzetwerk.html'), 'utf8');
+  const css = fs.readFileSync(path.join(repoRoot, 'assets/premium-omzetwerk.css'), 'utf8');
+
+  assert.match(html, /<title>OMZETWERK \| Commandocentrum<\/title>/);
+  assert.match(html, /€1\.000\.000 ontvangen omzet/);
+  assert.match(html, /Ontvangen omzet[\s\S]*<strong>€0<\/strong>/);
+  assert.match(html, /Betalende klanten[\s\S]*<strong>0<\/strong>/);
+  assert.match(html, /Uitgaven[\s\S]*<strong>€0<\/strong>/);
+  assert.match(html, /AI Omzetbewaker/);
+  assert.match(html, /Dit model is rekenwerk, nog geen vraag- of omzetbewijs\./);
+  assert.match(html, /Wat ik nu van jou nodig heb[\s\S]*status status--clear">Niets</);
+  assert.match(html, /href="\/premium-instellingen"/);
+  assert.match(html, /meta name="robots" content="noindex,nofollow"/);
+  assert.match(html, /premium-omzetwerk\.css\?v=20260726a/);
+  assert.doesNotMatch(html, /(?:onclick|onchange|oninput)=/);
+  assert.match(css, /@font-face[\s\S]*inter-latin\.woff2/);
+  assert.match(css, /@media \(max-width: 560px\)/);
+});

@@ -1,0 +1,668 @@
+@font-face {
+  font-family: "Omzetwerk Inter";
+  src: url("/assets/fonts/inter-latin.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Omzetwerk Oswald";
+  src: url("/assets/fonts/oswald-latin.woff2") format("woff2");
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --ink: #111318;
+  --muted: #676b73;
+  --paper: #f1f0eb;
+  --card: rgba(255, 255, 255, 0.76);
+  --line: rgba(17, 19, 24, 0.12);
+  --acid: #d6ff4b;
+  --acid-dark: #789800;
+  --orange: #ff6b35;
+  --blue: #3268ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--paper);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background:
+    linear-gradient(rgba(17, 19, 24, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 19, 24, 0.035) 1px, transparent 1px),
+    var(--paper);
+  background-size: 48px 48px;
+  color: var(--ink);
+  font-family: "Omzetwerk Inter", Inter, sans-serif;
+}
+
+.ambient {
+  position: fixed;
+  z-index: 0;
+  width: 36rem;
+  height: 36rem;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.ambient--one {
+  top: -20rem;
+  right: -8rem;
+  background: var(--acid);
+}
+
+.ambient--two {
+  bottom: -24rem;
+  left: -12rem;
+  background: var(--blue);
+}
+
+.command {
+  position: relative;
+  z-index: 1;
+  width: min(1460px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 28px 0 46px;
+}
+
+.topbar,
+.hero,
+.target,
+.panel,
+.kpis article,
+.decision-log {
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: 0 22px 80px rgba(17, 19, 24, 0.05);
+  backdrop-filter: blur(18px);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 0 20px;
+  border-radius: 16px;
+}
+
+.back-link {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--blue);
+}
+
+.visibility {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.visibility span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #27a667;
+  box-shadow: 0 0 0 5px rgba(39, 166, 103, 0.12);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 40px;
+  margin-top: 18px;
+  padding: clamp(32px, 5vw, 74px);
+  border-radius: 28px;
+}
+
+.eyebrow,
+.section-kicker {
+  margin: 0 0 11px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: "Omzetwerk Oswald", Impact, sans-serif;
+  font-size: clamp(64px, 10vw, 146px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 0.82;
+}
+
+.hero h1 span {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--ink);
+}
+
+.hero-lede {
+  max-width: 760px;
+  margin: 32px 0 0;
+  font-size: clamp(18px, 2.1vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.22;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.hero-tags span,
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 31px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.live-card {
+  align-self: end;
+  padding: 25px;
+  border-radius: 20px;
+  background: var(--ink);
+  color: white;
+  box-shadow: 14px 14px 0 var(--acid);
+}
+
+.live-card p,
+.live-card span {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-card strong {
+  display: block;
+  margin: 18px 0 24px;
+  font-size: clamp(21px, 2vw, 29px);
+  line-height: 1.14;
+}
+
+.target {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px 48px;
+  margin-top: 18px;
+  padding: 34px;
+  overflow: hidden;
+  border-radius: 22px;
+}
+
+.target::after {
+  position: absolute;
+  top: -52px;
+  right: 27%;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: var(--acid);
+  content: "";
+  opacity: 0.6;
+  filter: blur(2px);
+}
+
+.target > * {
+  position: relative;
+  z-index: 1;
+}
+
+.target h2,
+.panel h2,
+.decision-log h2 {
+  margin: 0;
+  font-family: "Omzetwerk Oswald", Impact, sans-serif;
+  font-size: clamp(28px, 3vw, 42px);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.target p:not(.section-kicker, .progress-label) {
+  max-width: 660px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.target-number {
+  align-self: center;
+  text-align: right;
+}
+
+.target-number strong {
+  display: block;
+  font-family: "Omzetwerk Oswald", Impact, sans-serif;
+  font-size: 54px;
+  line-height: 1;
+}
+
+.target-number span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.progress {
+  grid-column: 1 / -1;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(17, 19, 24, 0.09);
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+}
+
+.progress-label {
+  grid-column: 1 / -1;
+  margin: -7px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.kpis article {
+  min-height: 150px;
+  padding: 24px;
+  border-radius: 18px;
+}
+
+.kpis span,
+.kpis small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.kpis strong {
+  display: block;
+  margin: 18px 0 11px;
+  font-family: "Omzetwerk Oswald", Impact, sans-serif;
+  font-size: 38px;
+  line-height: 1;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 30px;
+  border-radius: 22px;
+}
+
+.panel--offer {
+  background: var(--ink);
+  color: white;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.panel--offer .section-kicker,
+.panel--offer .panel-intro,
+.panel--offer dt {
+  color: rgba(255, 255, 255, 0.57);
+}
+
+.status--testing {
+  border-color: rgba(214, 255, 75, 0.45);
+  background: rgba(214, 255, 75, 0.12);
+  color: var(--acid);
+}
+
+.status--active {
+  border-color: rgba(50, 104, 255, 0.25);
+  background: rgba(50, 104, 255, 0.1);
+  color: var(--blue);
+}
+
+.status--clear {
+  border-color: rgba(39, 166, 103, 0.24);
+  background: rgba(39, 166, 103, 0.1);
+  color: #137547;
+}
+
+.panel-intro,
+.serve-answer {
+  margin: 25px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.facts {
+  display: grid;
+  gap: 0;
+  margin: 24px 0 0;
+}
+
+.facts div {
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 18px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.facts dt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.worklist,
+.proof-list {
+  display: grid;
+  gap: 0;
+  margin: 23px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.worklist li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 14px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  opacity: 0.46;
+}
+
+.worklist li > span,
+.proof-list li > span {
+  color: var(--muted);
+  font-family: "Omzetwerk Oswald", Impact, sans-serif;
+  font-size: 14px;
+}
+
+.worklist li.is-active,
+.worklist li.is-done {
+  opacity: 1;
+}
+
+.worklist li.is-active > span {
+  color: var(--blue);
+}
+
+.worklist li.is-done > span {
+  color: #168453;
+}
+
+.worklist strong,
+.worklist small {
+  display: block;
+}
+
+.worklist strong {
+  font-size: 14px;
+}
+
+.worklist small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.proof-list li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 14px;
+  padding: 17px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.next-update {
+  display: grid;
+  gap: 6px;
+  margin-top: 28px;
+  padding: 18px;
+  border-left: 4px solid var(--acid-dark);
+  background: rgba(214, 255, 75, 0.18);
+}
+
+.next-update span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.next-update strong {
+  font-size: 14px;
+}
+
+.decision-log {
+  display: grid;
+  grid-template-columns: 0.55fr 1.45fr;
+  gap: 50px;
+  margin-top: 18px;
+  padding: 34px;
+  border-radius: 22px;
+}
+
+.log-items {
+  display: grid;
+}
+
+.log-items article {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.log-items time {
+  color: var(--blue);
+  font-family: "Omzetwerk Oswald", Impact, sans-serif;
+  font-size: 16px;
+}
+
+.log-items p {
+  margin: 0;
+}
+
+.log-items strong,
+.log-items span {
+  display: block;
+}
+
+.log-items strong {
+  font-size: 14px;
+}
+
+.log-items span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 4px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+footer p {
+  margin: 0;
+}
+
+footer span {
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 920px) {
+  .command {
+    width: min(100% - 28px, 720px);
+    padding-top: 14px;
+  }
+
+  .hero,
+  .dashboard-grid,
+  .decision-log {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    gap: 34px;
+    padding: 36px 28px;
+  }
+
+  .live-card {
+    box-shadow: 8px 8px 0 var(--acid);
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decision-log {
+    gap: 22px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    padding: 0 15px;
+  }
+
+  .visibility {
+    font-size: 0;
+  }
+
+  .visibility::after {
+    font-size: 10px;
+    content: "Privé";
+  }
+
+  .hero h1 {
+    font-size: clamp(58px, 18vw, 88px);
+  }
+
+  .target {
+    grid-template-columns: 1fr;
+    padding: 26px 22px;
+  }
+
+  .target-number {
+    text-align: left;
+  }
+
+  .kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .kpis article {
+    min-height: 126px;
+  }
+
+  .panel {
+    padding: 24px 21px;
+  }
+
+  .panel-heading {
+    display: grid;
+  }
+
+  .status {
+    justify-self: start;
+  }
+
+  .facts div {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  footer {
+    display: grid;
+  }
+}
