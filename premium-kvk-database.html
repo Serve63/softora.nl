@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
-  <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260726a">
+  <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260726b">
 </head>
 <body>
   <main class="app-shell">
@@ -19,9 +19,12 @@
         <h1>Bedrijven Scraper</h1>
       </div>
       <div class="header-controls">
-        <button id="database-fill-toggle" class="database-fill-toggle" type="button" aria-pressed="false">
-          <span class="database-fill-toggle__dot" aria-hidden="true"></span>
-          <span id="database-fill-toggle-label">Database vullen starten</span>
+        <button id="database-fill-toggle" class="database-fill-toggle" type="button" aria-pressed="false" aria-label="Database vullen staat uit. Klik om aan te zetten.">
+          <span class="database-fill-toggle__caption">Database vullen</span>
+          <span class="database-fill-toggle__track" aria-hidden="true">
+            <span class="database-fill-toggle__thumb"></span>
+          </span>
+          <strong id="database-fill-toggle-label" class="database-fill-toggle__state">UIT</strong>
         </button>
         <div class="runtime-pill" aria-label="Tijd sinds laatste refresh">
           <span class="status-dot"></span>
@@ -220,6 +223,6 @@
 
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database.js?v=20260726b"></script>
-  <script src="/assets/kvk-database-control.js?v=20260726a"></script>
+  <script src="/assets/kvk-database-control.js?v=20260726b"></script>
 </body>
 </html>
