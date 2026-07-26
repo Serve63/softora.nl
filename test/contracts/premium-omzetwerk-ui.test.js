@@ -25,7 +25,11 @@ test('OMZETWERK cockpit toont alleen controleerbare bedrijfsstatus', () => {
   assert.match(html, /Wat ik nu van jou nodig heb[\s\S]*status status--clear">Niets</);
   assert.match(html, /href="\/premium-instellingen"/);
   assert.match(html, /meta name="robots" content="noindex,nofollow"/);
-  assert.match(html, /premium-omzetwerk\.css\?v=20260726a/);
+  assert.match(html, /premium-omzetwerk\.css\?v=20260726b/);
+  assert.match(html, /data-sidebar-shell="canonical"/);
+  assert.match(html, /data-static-sidebar="1"/);
+  assert.match(html, /data-sidebar-key="settings"/);
+  assert.match(html, /class="main-content omzetwerk-main"/);
   assert.doesNotMatch(html, /(?:onclick|onchange|oninput)=/);
   assert.match(css, /@font-face[\s\S]*inter-latin\.woff2/);
   assert.match(css, /@media \(max-width: 560px\)/);

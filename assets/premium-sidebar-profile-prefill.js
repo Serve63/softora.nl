@@ -66,6 +66,7 @@
         if (p.indexOf("/premium-kladblok") === 0) return "notepad";
         if (p.indexOf("/premium-word") === 0) return "word";
         if (p.indexOf("/premium-wachtwoordenregister") === 0) return "passwords";
+        if (p.indexOf("/premium-omzetwerk") === 0) return "settings";
         if (p.indexOf("/premium-instellingen") === 0) return "settings";
         return "dashboard";
     }

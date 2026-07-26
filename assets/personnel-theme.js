@@ -528,7 +528,7 @@
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo"; if (p.indexOf("/premium-qr-code") === 0 || p.indexOf("/premium-qrcode") === 0) return "qr_code";
         if (p.indexOf("/premium-pakketten") === 0) return "packages"; if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
         if (p.indexOf("/premium-wachtwoordenregister") === 0) return "passwords"; if (p.indexOf("/premium-gezondheidsdossier") === 0) return "health_dossier";
-        if (p.indexOf("/premium-instellingen") === 0) return "settings"; if (p.indexOf("/premium-kladblok") === 0) return "notepad";
+        if (p.indexOf("/premium-omzetwerk") === 0 || p.indexOf("/premium-instellingen") === 0) return "settings"; if (p.indexOf("/premium-kladblok") === 0) return "notepad";
         if (p.indexOf("/premium-word") === 0) return "word";
         if (
             p.indexOf("/premium-financiele-kosten") === 0 ||
