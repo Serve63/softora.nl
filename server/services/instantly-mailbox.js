@@ -663,7 +663,22 @@ function createInstantlyMailboxService(deps = {}) {
             threadCandidates.set(key, incoming);
           }
         });
-        for (const [key, candidate] of Array.from(threadCandidates.entries()).slice(0, 4)) {
+        const pendingThreadHydrations = Array.from(threadCandidates.entries())
+          .filter(([key]) => {
+            const indexedMessages = indexedThreadMessages.get(key) || [];
+            const hasMissingThreadMember = indexedMessages.length <= 1;
+            const needsExactProviderBody = indexedMessages.some((message) => (
+              message.folder === 'sent' &&
+              message.originalCampaignOutbound === true &&
+              (
+                message.providerBodyHtmlEvidenceKnown !== true ||
+                message.providerOriginalBodyEvidenceKnown !== true
+              )
+            ));
+            return hasMissingThreadMember || needsExactProviderBody;
+          })
+          .slice(0, 4);
+        for (const [key, candidate] of pendingThreadHydrations) {
           const indexedMessages = indexedThreadMessages.get(key) || [];
           const hasMissingThreadMember = indexedMessages.length <= 1;
           const needsExactProviderBody = indexedMessages.some((message) => (
