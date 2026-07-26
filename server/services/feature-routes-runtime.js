@@ -54,6 +54,7 @@ const {
   createPremiumDatabaseMailReadySnapshotService,
 } = require('./premium-database-mail-ready-snapshot');
 const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
+const { createKvkDatabaseControlService } = require('./kvk-database-control');
 const {
   createPremiumDatabaseMassResearchCoordinator,
 } = require('./premium-database-mass-research');
@@ -134,6 +135,10 @@ function registerFeatureRoutes(app, deps = {}) {
     dataOpsStore: deps.dataOpsStore,
   });
   const kvkDatabaseSnapshotCoordinator = createKvkDatabaseSnapshotService({
+    ...(kvkDatabaseSnapshot || {}),
+    fallbackSyncToken: mailboxCronSecret,
+  });
+  const kvkDatabaseControlCoordinator = createKvkDatabaseControlService({
     ...(kvkDatabaseSnapshot || {}),
     fallbackSyncToken: mailboxCronSecret,
   });
@@ -260,6 +265,8 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerKvkDatabaseRoutes(app, {
     coordinator: kvkDatabaseSnapshotCoordinator,
+    controlCoordinator: kvkDatabaseControlCoordinator,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerPremiumDatabaseMassResearchRoutes(app, {
     coordinator: premiumDatabaseMassResearchCoordinator,

@@ -1,0 +1,109 @@
+.header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.header-controls .runtime-pill {
+  margin-top: 0;
+}
+
+.database-fill-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 37px;
+  padding: 0 14px;
+  border: 1px solid rgba(142, 47, 95, 0.42);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--accent-dark);
+  font-size: 0.68rem;
+  font-weight: 900;
+  box-shadow: 0 5px 18px rgba(44, 37, 31, 0.07);
+}
+
+.database-fill-toggle:hover,
+.database-fill-toggle:focus-visible {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(142, 47, 95, 0.12);
+}
+
+.database-fill-toggle:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.database-fill-toggle__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #b7b0b8;
+  box-shadow: 0 0 0 5px rgba(127, 122, 132, 0.1);
+}
+
+.database-fill-toggle.is-on {
+  border-color: rgba(46, 115, 95, 0.48);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.database-fill-toggle.is-on .database-fill-toggle__dot {
+  background: var(--green);
+  box-shadow: 0 0 0 5px rgba(46, 115, 95, 0.12);
+}
+
+.database-fill-toggle.is-error {
+  border-color: rgba(139, 59, 50, 0.48);
+  color: #8b3b32;
+}
+
+.location-button.is-complete {
+  color: #8b838c;
+}
+
+.location-button.is-complete .location-main {
+  position: relative;
+}
+
+.location-button.is-complete .location-main::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(142, 47, 95, 0.58);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.location-button.is-complete .location-path {
+  color: #8b838c;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(142, 47, 95, 0.55);
+  text-decoration-skip-ink: none;
+}
+
+.location-button.is-complete .badge {
+  opacity: 0.78;
+}
+
+@media (max-width: 860px) {
+  .header-controls {
+    align-items: stretch;
+    flex-direction: column;
+    margin-top: 0;
+  }
+
+  .database-fill-toggle,
+  .header-controls .runtime-pill {
+    align-self: flex-start;
+  }
+}

@@ -58,7 +58,9 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260726a/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260726b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260726a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260726a/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
@@ -127,15 +129,54 @@ test('kvk database refreshes live counters and latest treated rows while the pag
   assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
 });
 
+test('kvk database shows completed locations crossed out with usable company totals', () => {
+  const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
+  const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
+
+  assert.match(controlSource, /statusBoxes\.length >= 2/);
+  assert.match(controlSource, /every\(\(box\) => box\.classList\.contains\('is-done'\)\)/);
+  assert.match(controlSource, /classList\.toggle\('is-complete', complete\)/);
+  assert.match(controlSource, /bruikbareBedrijven/);
+  assert.match(controlSource, /\/api\/kvk-database\/location-stats/);
+  assert.match(controlSource, /Bruikbare bedrijven/);
+  assert.match(controlStyles, /\.location-button\.is-complete \.location-path/);
+  assert.match(controlStyles, /text-decoration: line-through/);
+});
+
+test('kvk database renders refresh age in seconds and a real fill control', () => {
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
+
+  assert.match(pageSource, /id="database-fill-toggle"/);
+  assert.match(pageSource, /Database vullen starten/);
+  assert.match(pageSource, /-- seconden geleden/);
+  assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
+  assert.match(controlSource, /window\.setInterval\(renderRefreshAge, 1000\)/);
+  assert.match(controlSource, /fetch\('\/api\/kvk-database\/control'/);
+  assert.match(controlSource, /'X-Softora-Requested-With': 'premium'/);
+  assert.match(controlSource, /JSON\.stringify\(\{ enabled: !state\.control\.enabled \}\)/);
+});
+
 test('kvk database snapshot API is wired and only public for token-protected sync posts', () => {
   const routesSource = fs.readFileSync(path.join(repoRoot, 'server/routes/kvk-database.js'), 'utf8');
   const runtimeSource = fs.readFileSync(path.join(repoRoot, 'server/services/feature-routes-runtime.js'), 'utf8');
   const authSource = fs.readFileSync(path.join(repoRoot, 'server/security/premium-auth.js'), 'utf8');
+  const requestContextSource = fs.readFileSync(path.join(repoRoot, 'server/security/request-context.js'), 'utf8');
 
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/snapshot'/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/snapshot'/);
+  assert.match(routesSource, /app\.get\('\/api\/kvk-database\/location-stats', requirePremiumAdminApiAccess/);
+  assert.match(routesSource, /app\.get\('\/api\/kvk-database\/control', requirePremiumAdminApiAccess/);
+  assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control', requirePremiumAdminApiAccess/);
+  assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control\/poll'/);
+  assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control\/worker'/);
   assert.match(runtimeSource, /createKvkDatabaseSnapshotService/);
+  assert.match(runtimeSource, /createKvkDatabaseControlService/);
   assert.match(runtimeSource, /registerKvkDatabaseRoutes/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'POST'/);
   assert.doesNotMatch(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'GET'/);
+  assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/poll'/);
+  assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/worker'/);
+  assert.match(requestContextSource, /'\/api\/kvk-database\/control\/poll'/);
+  assert.match(requestContextSource, /'\/api\/kvk-database\/control\/worker'/);
 });
