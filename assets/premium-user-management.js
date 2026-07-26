@@ -316,7 +316,7 @@ function mountExtraSettingsCategory() {
     'world watcher',
     'Flynow',
     'Transfermarkt',
-    'Ruben’s Company',
+    'OMZETWERK',
     'Ruben’s Trading System',
   ];
 
@@ -449,12 +449,15 @@ function mountExtraSettingsCategory() {
     var isWinning = label === 'Winnen';
     var isDatabase = label === 'Database';
     var isHealth = label === "Servé's gezondheidsdossier";
-    var isLinkedModule = isWinning || isDatabase || isHealth;
+    var isOmzetwerk = label === 'OMZETWERK';
+    var isLinkedModule = isWinning || isDatabase || isHealth || isOmzetwerk;
     var moduleHref = isWinning
       ? '/live-momentum'
       : isDatabase
         ? '/kvk-database'
-        : '/premium-gezondheidsdossier';
+        : isHealth
+          ? '/premium-gezondheidsdossier'
+          : '/premium-omzetwerk';
     var card = document.createElement(isLinkedModule ? 'button' : 'div');
     card.className = 'tegel settings-extra-card';
     if (isLinkedModule) {
@@ -533,6 +536,8 @@ function mountExtraSettingsCategory() {
             ? 'Lokale database voor het scrapen en behandelen van bedrijven.'
             : isHealth
               ? 'WHOOP-herstel, slaap en trainingen, dagelijks automatisch bijgewerkt.'
+            : isOmzetwerk
+              ? 'Codex’ bedrijfscockpit: keuzes, voortgang en bewijs richting €1.000.000.'
             : label === 'Flynow'
               ? 'AI reisdeals en tripselectie met gegenereerde FLYNOW beelden.'
             : 'Interne template-module die later verder ingevuld kan worden.'
