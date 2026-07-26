@@ -45,6 +45,20 @@ body {
   font-family: "Omzetwerk Inter", Inter, sans-serif;
 }
 
+body[data-omzetwerk-page] .dashboard-layout {
+  min-height: 100vh;
+}
+
+body[data-omzetwerk-page] .omzetwerk-main {
+  position: relative;
+  overflow: hidden;
+}
+
+body[data-omzetwerk-page] .omzetwerk-main .hero {
+  display: grid !important;
+  gap: 40px !important;
+}
+
 .ambient {
   position: fixed;
   z-index: 0;
@@ -581,6 +595,10 @@ footer span {
 }
 
 @media (max-width: 920px) {
+  body[data-omzetwerk-page] .omzetwerk-main .hero {
+    gap: 34px !important;
+  }
+
   .command {
     width: min(100% - 28px, 720px);
     padding-top: 14px;

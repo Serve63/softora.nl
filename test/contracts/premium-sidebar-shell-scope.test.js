@@ -44,6 +44,7 @@ const canonicalPages = [
   'premium-boekhouding.html',
   'premium-gezondheidsdossier.html',
   'premium-instellingen.html',
+  'premium-omzetwerk.html',
   'premium-kladblok.html',
   'premium-word.html',
   'premium-pakketten.html',
@@ -106,6 +107,23 @@ test('gezondheidsdossier krijgt een eigen actief sidebar-item onder Extra', () =
   assert.match(themeSource, /p\.indexOf\("\/premium-gezondheidsdossier"\) === 0\) return "health_dossier"/);
   assert.match(themeSource, /key: "health_dossier"[\s\S]*href: "\/premium-gezondheidsdossier"[\s\S]*label: "Gezondheidsdossier"/);
   assert.match(themeSource, /ensureStaticSidebarLink\([\s\S]*"extra",[\s\S]*getHealthDossierSidebarLink\(\),[\s\S]*\["monthly_costs"/);
+});
+
+test('OMZETWERK behoudt de canonical premium-sidebar en markeert Instellingen actief', () => {
+  const pageSource = readRepoFile('premium-omzetwerk.html');
+  const themeSource = readRepoFile('assets/personnel-theme.js');
+  const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
+
+  assert.match(pageSource, /<body data-omzetwerk-page>/);
+  assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
+  assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">/);
+  assert.match(pageSource, /<main class="main-content omzetwerk-main">/);
+  assert.match(pageSource, /class="sidebar-link magnetic active" data-sidebar-key="settings"/);
+  assert.match(pageSource, /assets\/personnel-theme\.css\?v=20260519b/);
+  assert.match(pageSource, /assets\/personnel-theme\.js\?v=20260519b/);
+  assert.match(pageSource, /assets\/premium-sidebar-profile-prefill\.js\?v=20260424a/);
+  assert.match(themeSource, /p\.indexOf\("\/premium-omzetwerk"\) === 0 \|\| p\.indexOf\("\/premium-instellingen"\) === 0\) return "settings"/);
+  assert.match(prefillSource, /p\.indexOf\("\/premium-omzetwerk"\) === 0\) return "settings"/);
 });
 
 test('opdrachtdossier editor-assets blijven buiten de statische premium-sidebar', () => {
