@@ -144,6 +144,7 @@ async function mergeCampaignReplies({
   limit,
   owner,
   refreshInstantly,
+  filterVisibleMailboxMessages = (messages) => messages,
   normalizeString,
   truncateText,
 }) {
@@ -180,12 +181,12 @@ async function mergeCampaignReplies({
     return !messageIds.some((messageId) => providerMessageIds.has(messageId));
   });
   return {
-    messages: [...uniqueBaseReplies, ...instantlyReplies]
+    messages: filterVisibleMailboxMessages([...uniqueBaseReplies, ...instantlyReplies]
       .sort((left, right) => (
         Date.parse(right.activityAt || right.receivedAt || right.date || 0) -
         Date.parse(left.activityAt || left.receivedAt || left.date || 0)
-      )),
-    instantlyReplies,
+      ))),
+    instantlyReplies: filterVisibleMailboxMessages(instantlyReplies),
     instantlySync,
   };
 }

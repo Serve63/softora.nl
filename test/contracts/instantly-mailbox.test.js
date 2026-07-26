@@ -118,6 +118,61 @@ test('Instantly account ownership is exact and rejects incomplete entries', () =
   assert.equal(ownership.has('broken'), false);
 });
 
+test('Instantly original HTML keeps paragraph structure and the exact proven webdesign anchor', () => {
+  const { service } = buildService();
+  const message = service.normalizeInstantlyMessage(incoming({
+    id: 'rich-outbound',
+    email_type: 'sent',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    body: {
+      text: 'Goedendag, Dit is plat. Je kunt het webdesign hier bekijken.',
+      html: [
+        '<div class="softora-instantly-email-body">',
+        '<p>Goedendag,</p>',
+        '<p>Dit is de tweede alinea.</p>',
+        '<p>Je kunt het webdesign <a href="https://www.softora.nl/webdesign/prospect?cid=exact">hier</a> bekijken.</p>',
+        '<script>niet-tonen()</script>',
+        '<p><a href="javascript:alert(1)">onveilig</a></p>',
+        '</div>',
+      ].join(''),
+    },
+  }));
+
+  assert.equal(message.body, [
+    'Goedendag,',
+    '',
+    'Dit is de tweede alinea.',
+    '',
+    'Je kunt het webdesign hier [https://www.softora.nl/webdesign/prospect?cid=exact] bekijken.',
+    '',
+    'onveilig',
+  ].join('\n'));
+  assert.equal(message.providerBodyHtmlEvidenceKnown, true);
+  assert.equal(message.providerRichBodyAvailable, true);
+  assert.equal(message.webdesignLinkEvidenceKnown, true);
+  assert.equal(
+    message.webdesignLinkUrl,
+    'https://www.softora.nl/webdesign/prospect?cid=exact'
+  );
+  assert.doesNotMatch(message.body, /script|javascript|niet-tonen/);
+});
+
+test('Instantly never invents a webdesign link when exact provider HTML has none', () => {
+  const { service } = buildService();
+  const message = service.normalizeInstantlyMessage(incoming({
+    id: 'no-rich-link',
+    body: {
+      text: 'Je kunt het webdesign hier bekijken.',
+      html: '<p>Je kunt het webdesign hier bekijken.</p>',
+    },
+  }));
+
+  assert.equal(message.body, 'Je kunt het webdesign hier bekijken.');
+  assert.equal(message.webdesignLinkEvidenceKnown, false);
+  assert.equal(message.webdesignLinkUrl, '');
+});
+
 test('sync queries only the selected owner accounts and drops unmapped or conflicting messages', async () => {
   const rawMessages = [
     incoming(),
@@ -152,6 +207,62 @@ test('sync queries only the selected owner accounts and drops unmapped or confli
   const query = new URL(requests[0].url).searchParams;
   assert.equal(query.get('eaccount'), 'serve-sender@example.com');
   assert.equal(query.get('limit'), '100');
+});
+
+test('sync rehydrates a visible older thread only when its exact provider HTML is still unknown', async () => {
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    fetchJsonWithTimeout: async (url) => {
+      const query = new URL(url).searchParams;
+      if (query.get('search') === 'thread:thread-serve') {
+        return {
+          response: { ok: true, status: 200 },
+          data: {
+            items: [
+              incoming({
+                id: 'old-sent',
+                email_type: '1',
+                from_address_email: 'serve-sender@example.com',
+                to_address_email_list: ['prospect@example.org'],
+                body: {
+                  text: 'Goedendag, Je kunt het webdesign hier bekijken.',
+                  html: '<p>Goedendag,</p><p>Je kunt het webdesign <a href="https://www.softora.nl/webdesign/prospect">hier</a> bekijken.</p>',
+                },
+              }),
+              incoming(),
+            ],
+          },
+        };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+  store.rows.push(
+    service.normalizeInstantlyMessage(incoming()),
+    {
+      ...service.normalizeInstantlyMessage(incoming({
+        id: 'old-sent',
+        email_type: '1',
+        from_address_email: 'serve-sender@example.com',
+        to_address_email_list: ['prospect@example.org'],
+        body: { text: 'Alles stond hier eerst als één platte regel.' },
+      })),
+      providerBodyHtmlEvidenceKnown: false,
+      providerRichBodyAvailable: false,
+    }
+  );
+
+  await service.syncOwner('serve');
+
+  const hydrated = store.rows.find((message) => message.providerMessageId === 'old-sent');
+  assert.match(hydrated.body, /Goedendag,\n\nJe kunt het webdesign hier \[/);
+  assert.equal(hydrated.providerBodyHtmlEvidenceKnown, true);
+  assert.equal(hydrated.webdesignLinkEvidenceKnown, true);
+  assert.equal(
+    requests.filter((request) => new URL(request.url).searchParams.get('search') === 'thread:thread-serve').length,
+    1
+  );
 });
 
 test('owner conversation listing never leaks the other owner and preserves exact thread chronology', async () => {

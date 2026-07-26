@@ -1,4 +1,5 @@
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
+const { parseProviderHtml } = require('./mailbox-provider-rich-body');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -289,7 +290,8 @@ function createInstantlyMailboxService(deps = {}) {
     );
     const text = normalizeText(rawMessage.body?.text || rawMessage.body_text || rawMessage.email_text);
     const html = normalizeText(rawMessage.body?.html || rawMessage.body_html || rawMessage.email_html);
-    const body = text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const providerHtml = parseProviderHtml(html);
+    const body = providerHtml.body || text;
     const date = parseDate(
       rawMessage.timestamp_email ||
       rawMessage.timestamp_created ||
@@ -336,6 +338,10 @@ function createInstantlyMailboxService(deps = {}) {
       bodyTruncated: false,
       attachments: normalizeAttachmentList(rawMessage.attachment_json || rawMessage.attachments),
       originalCampaignOutbound: direction === 'sent' && lifecycleType === '1',
+      providerBodyHtmlEvidenceKnown: Boolean(html),
+      providerRichBodyAvailable: Boolean(providerHtml.body),
+      webdesignLinkEvidenceKnown: providerHtml.webdesignLinkEvidenceKnown,
+      webdesignLinkUrl: providerHtml.webdesignLinkUrl,
       indexed: true,
     };
   }
@@ -546,15 +552,34 @@ function createInstantlyMailboxService(deps = {}) {
           limit: 2000,
           includeBody: false,
         });
-        const indexedThreadCounts = new Map();
+        const indexedThreadMessages = new Map();
         (Array.isArray(indexed) ? indexed : []).forEach((message) => {
           const key = `${message.providerAccountEmail}|${message.providerThreadId}`;
           if (message.providerThreadId) {
-            indexedThreadCounts.set(key, (indexedThreadCounts.get(key) || 0) + 1);
+            if (!indexedThreadMessages.has(key)) indexedThreadMessages.set(key, []);
+            indexedThreadMessages.get(key).push(message);
+          }
+        });
+        indexedThreadMessages.forEach((messages, key) => {
+          const incoming = messages.find((message) => message.folder !== 'sent');
+          const needsExactProviderBody = messages.some((message) => (
+            message.folder === 'sent' &&
+            message.originalCampaignOutbound === true &&
+            message.providerBodyHtmlEvidenceKnown !== true
+          ));
+          if (incoming && needsExactProviderBody && !threadCandidates.has(key)) {
+            threadCandidates.set(key, incoming);
           }
         });
         for (const [key, candidate] of Array.from(threadCandidates.entries()).slice(0, 4)) {
-          if ((indexedThreadCounts.get(key) || 0) > 1) continue;
+          const indexedMessages = indexedThreadMessages.get(key) || [];
+          const hasMissingThreadMember = indexedMessages.length <= 1;
+          const needsExactProviderBody = indexedMessages.some((message) => (
+            message.folder === 'sent' &&
+            message.originalCampaignOutbound === true &&
+            message.providerBodyHtmlEvidenceKnown !== true
+          ));
+          if (!hasMissingThreadMember && !needsExactProviderBody) continue;
           const hydrated = await hydrateThread({
             threadId: candidate.providerThreadId,
             accountEmail: candidate.providerAccountEmail,

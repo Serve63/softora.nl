@@ -24,6 +24,7 @@ const {
 } = require('./mailbox-campaign-sync');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance');
+const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
@@ -67,7 +68,6 @@ const {
   OUTBOUND_SENDER_DISPLAY_NAMES: MAILBOX_DISPLAY_NAMES,
   OUTBOUND_SENDER_LOCATION_NAMES: MAILBOX_LOCATION_NAMES,
 } = require('./outbound-sender-identity');
-
 const DEFAULT_MAILBOX_EMAILS = [
   'info@softora.nl',
   'zakelijk@softora.nl',
@@ -2152,7 +2152,7 @@ function createMailboxService(deps = {}) {
     if (Array.isArray(indexedMessages) && indexedMessages.length) {
       const sync = await getMailboxSyncMeta({ account, folder: normalizedFolder });
       return {
-        messages: indexedMessages,
+        messages: filterVisibleMailboxMessages(indexedMessages),
         sync: {
           ...sync,
           stale: Boolean(sync.stale),
@@ -2196,7 +2196,7 @@ function createMailboxService(deps = {}) {
       };
     }
 
-    const messages = await fetchMessagesFromImap({ account, folder: normalizedFolder, limit: safeLimit });
+    const messages = filterVisibleMailboxMessages(await fetchMessagesFromImap({ account, folder: normalizedFolder, limit: safeLimit }));
     return {
       messages,
       sync: {
@@ -2225,6 +2225,7 @@ function createMailboxService(deps = {}) {
         folder: normalizedFolder,
         id,
       });
+      if (indexed) assertMailboxMessageVisible(indexed);
       const recipientRoutingNeedsHydration = Boolean(
         indexed &&
         indexed.recipientRoutingEvidenceKnown !== true &&
@@ -2256,7 +2257,7 @@ function createMailboxService(deps = {}) {
         messages: [live],
       }).catch((error) => logger.error('[Mailbox][MessageIndex]', error?.message || error));
     }
-    return live;
+    return assertMailboxMessageVisible(live);
   }
 
   async function markMessageRead({ accountEmail, id, folder, uid, owner }) {
@@ -2467,12 +2468,11 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-
   async function listCampaignReplies({ limit = 100, owner = '', refreshInstantly = false } = {}) {
     const replies = await mailboxCampaignRepliesService.listReplies({
       limit: Number(limit || 100) || 100,
     });
-    const { messages, instantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, instantlyMailboxService, limit, owner, refreshInstantly, normalizeString, truncateText });
+    const { messages, instantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
     const result = {
       ok: true,
       messages,

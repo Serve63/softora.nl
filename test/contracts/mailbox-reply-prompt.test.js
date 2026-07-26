@@ -197,6 +197,8 @@ test('Salon TOF krijgt een inhoudelijk code-antwoord en één natuurlijke uitnod
 
 test('replyprofiel classificeert interesse, prijs en afwijzing vóór afspraaklogica', () => {
   assert.equal(classifyMailboxReplyIntent('Ik ben benieuwd, kan je de preview sturen?'), 'interest');
+  assert.equal(classifyMailboxReplyIntent('Ik vind dit wel interessant.'), 'interest');
+  assert.equal(classifyMailboxReplyIntent('Dit vinden wij wel interessant.'), 'interest');
   assert.equal(classifyMailboxReplyIntent('Heb je voorbeelden van wat er mogelijk is?'), 'interest');
   assert.equal(classifyMailboxReplyIntent('Met welk programma werk je? Wij hebben nu Webflow.'), 'interest');
   assert.equal(classifyMailboxReplyIntent('Wat kost dit ontwerp ongeveer?'), 'price');
@@ -208,6 +210,34 @@ test('replyprofiel classificeert interesse, prijs en afwijzing vóór afspraaklo
   assert.equal(classifyMailboxReplyIntent('We willen geen gebruik maken van je aanbod.'), 'rejection');
   assert.equal(classifyMailboxReplyIntent('Dank voor het ontwerp.'), 'neutral');
   assert.equal(classifyMailboxReplyIntent('Bedankt voor je bericht.'), 'neutral');
+});
+
+test('Bossche Brouwers feedback blijft afsluitend en erft geen interesse uit geciteerde coldmail', () => {
+  const inbound = [
+    'Beste Servé,',
+    '',
+    'Dank voor de moeite. De opzet ziet er verzorgd uit.',
+    'Als feedback zou ik vooral meer van onze eigen sfeer en brouwerij laten terugkomen.',
+    'Succes met je verdere werk.',
+    '',
+    'Op vr 24 jul 2026 om 09:10 schreef Servé Creusen:',
+    '> Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
+    '> Je kunt het webdesign hier bekijken.',
+  ].join('\n');
+  assert.equal(classifyMailboxReplyIntent(inbound), 'neutral');
+
+  const result = enforceMailboxReplyProfile(
+    'Dankjewel voor je uitgebreide en concrete feedback. Daar kan ik iets mee. Misschien is het leuk als ik volgende week [dag] een keer langskom om verder te bespreken wat er mogelijk is.',
+    {
+      firstName: '',
+      inboundText: inbound,
+    }
+  );
+
+  assert.match(result, /Dankjewel voor je uitgebreide en concrete feedback/);
+  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|verder bespreken|mogelijkheden/i);
+  assert.equal((result.match(/😁/gu) || []).length, 1);
+  assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });
 
 test('interesse krijgt exact één concreet vrijblijvend voorstel met bewerkbare dag', () => {

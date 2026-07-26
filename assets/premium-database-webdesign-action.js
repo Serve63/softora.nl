@@ -764,7 +764,7 @@
             }
         }
 
-        async function generateForCustomer(customerId) { const target = getCustomerById(customerId), picker = global.SoftoraDatabaseWebdesignVariantPicker; if (!picker || typeof picker.choose !== "function") { setStatusMessage("Keuze tussen V1 en V2 kon niet worden geladen. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } const variant = await picker.choose({ company: normalizeString(target && target.bedrijf) }); if (!variant) return { started: false, cancelled: true }; return startJobForTarget(target, { quiet: false, deferRender: false, pollDelay: 0, variant: normalizeVariant(variant) }); }
+        async function generateForCustomer(customerId) { const target = getCustomerById(customerId), picker = global.SoftoraDatabaseWebdesignVariantPicker; if (!picker || typeof picker.choose !== "function") { setStatusMessage("De V2-webdesigngenerator kon niet worden geladen. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } const variant = await picker.choose(); if (normalizeVariant(variant) !== "v2-visual-dna") { setStatusMessage("De V2-webdesigngenerator kon niet veilig worden gestart. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } return startJobForTarget(target, { quiet: false, deferRender: false, pollDelay: 0, variant: "v2-visual-dna" }); }
 
         async function generateBatchForCustomers(customers, batchOptions) {
             const targets = (Array.isArray(customers) ? customers : []).filter(Boolean), total = targets.length;

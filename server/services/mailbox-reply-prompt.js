@@ -166,6 +166,8 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Gebruik nooit de woorden "laagdrempelig", "kansen" of "verbeterpunten" en zet de ontvanger niet aan tot een verkoopgesprek of beoordeling.',
     'Negatieve intentie in ontvangenMail gaat altijd vóór interesse-indicatoren, een open campagnecontext of oorspronkelijkeVerzondenMail.',
     'Bij geen interesse, geen behoefte, geen vervolgtraject, buiten-scope, een beleefde afwijzing of een verzoek om niet door te gaan: reageer kort en respectvol zonder nieuwe verkooppoging; bedank; zeg eventueel dat de ontvanger later zelf contact mag opnemen; stel nooit een bezoek, afspraak, vervolgstap, prijsbespreking of meedenken voor.',
+    'Dank, lof, uitgebreide inhoudelijke feedback of een neutrale erkenning is op zichzelf geen commerciële interesse. Sluit zo’n reactie warm en kort af zonder bezoek, afspraak, [dag], vervolgstap of CTA.',
+    'Een bezoekvoorstel mag alleen bij expliciete vooruitgerichte interesse of een rechtstreeks verzoek om prijs, preview, mogelijkheden, verder overleg of een afspraak. Baseer dit uitsluitend op het nieuwste zelfgeschreven deel van de ontvangen mail, nooit op geciteerde eerdere tekst.',
     'Als iemand al tevreden is met een andere partij, benoem juist dat dit begrijpelijk en fijn is.',
     'Feitelijke waarheid gaat altijd voor stijl. Het actuele ontwerp uit deze coldmail is met code gebouwd.',
     `Bij een technische vraag over het programma, platform of de bouwwijze: geef eerst een inhoudelijk antwoord met echte waarde volgens deze vaste lijn: "${MAILBOX_REPLY_WEBFLOW_ANSWER}" Leg uit wat maatwerkcode praktisch mogelijk maakt, maar herhaal of beoordeel de eigen tool van de ontvanger niet.`,
@@ -280,7 +282,7 @@ function normalizeClassifierText(value) {
 }
 
 function classifyMailboxReplyIntent(inboundText) {
-  const text = normalizeClassifierText(inboundText);
+  const text = normalizeClassifierText(getNewestReplyLines(inboundText).join(' '));
   if (!text) return 'neutral';
   if (
     /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b/.test(text) ||
@@ -302,8 +304,14 @@ function classifyMailboxReplyIntent(inboundText) {
     return 'price';
   }
   if (
-    /\b(?:interesse|interessant|benieuwd|graag|preview|meer\s+informatie|vertel\s+meer)\b/.test(text) ||
-    /\b(?:hoe|waarmee|wanneer|waarom|wat|welk|welke|kan\s+je|kun\s+je|zou\s+je|heb\s+je|is\s+het\s+mogelijk)\b[^?]{0,240}\?/.test(text)
+    /\b(?:ik|we|wij)\s+(?:ben|heb|hebben|zijn)\s+(?:wel\s+)?(?:interesse|geinteresseerd|benieuwd)\b/.test(text) ||
+    /\b(?:ik|we|wij)\s+(?:vind|vinden)\s+(?:dit|dat|het)?\s*(?:wel\s+)?interessant\b/.test(text) ||
+    /\b(?:dit|dat|het)\s+(?:(?:lijkt|klinkt)\s+(?:ons|mij)|(?:vind|vinden)\s+(?:ik|we|wij))?\s*(?:wel\s+)?interessant\b/.test(text) ||
+    /\b(?:stuur|deel|laat|toon)\b[^.!?]{0,100}\b(?:preview|meer\s+informatie|mogelijkheden)\b/.test(text) ||
+    /\b(?:graag|wil|willen|zou)\b[^.!?]{0,120}\b(?:preview|meer\s+informatie|verder\s+praten|bespreken|afspreken|langskomen|bellen|mogelijkheden)\b/.test(text) ||
+    /\b(?:welk(?:e)?\s+(?:programma|tool|platform|systeem)|waarmee\s+(?:werk|bouw|maak)|wat\s+gebruik\s+je)\b[^?]{0,160}\?/.test(text) ||
+    /\b(?:kan\s+je|kun\s+je)\s+(?:vertellen|uitleggen)\s+(?:hoe|waarmee|wat)\b[^?]*\?/.test(text) ||
+    /\b(?:kan\s+je|kun\s+je|zou\s+je|heb\s+je|is\s+het\s+mogelijk)\b[^?]{0,180}\b(?:voorbeelden|preview|meer\s+vertellen|toelichten|bespreken|afspreken|langskomen|bellen|mogelijkheden|mogelijk)\b[^?]*\?/.test(text)
   ) {
     return 'interest';
   }

@@ -65,6 +65,24 @@ function isMailboxBounceMessage(message = {}) {
   );
 }
 
+function isAutomatedDeliveryFailureMessage(message = {}) {
+  const subject = normalizeString(message.subject);
+  const sender = normalizeString(
+    `${message.sender_email || message.senderEmail || message.email || ''} ${message.sender_name || message.senderName || message.from || ''}`
+  );
+  const text = buildMailboxBounceText(message);
+  const automatedSender =
+    /\b(?:mailer-daemon|postmaster)@/i.test(sender) ||
+    /\b(?:mail delivery (?:subsystem|system|agent)|delivery status notification)\b/i.test(sender);
+  if (!automatedSender) return false;
+  return Boolean(
+    COLDMAIL_DELIVERY_FAILURE_PATTERN.test(subject) ||
+    /\b(?:final-recipient|original-recipient|diagnostic-code|x-failed-recipients)\s*:/i.test(text) ||
+    COLDMAIL_HARD_BOUNCE_PATTERN.test(text) ||
+    COLDMAIL_SOFT_BOUNCE_PATTERN.test(text)
+  );
+}
+
 function getMailboxBounceType(message = {}) {
   const text = buildMailboxBounceText(message);
   if (COLDMAIL_HARD_BOUNCE_PATTERN.test(text)) return 'hard';
@@ -249,6 +267,7 @@ module.exports = {
   COLDMAIL_HARD_BOUNCE_PATTERN,
   COLDMAIL_SOFT_BOUNCE_PATTERN,
   buildBounceTypeCounts,
+  isAutomatedDeliveryFailureMessage,
   mergeBounceRecords,
   summarizeMailboxBounceStats,
 };
