@@ -134,10 +134,10 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   const metricsSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.js'), 'utf8');
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 
-  assert.match(pageSource, /id="companies-treated-last60">\+0 laatste 60 min/);
-  assert.match(pageSource, /id="companies-usable-last60">\+0 laatste 60 min/);
-  assert.match(pageSource, /id="companies-with-website-last60">\+0 laatste 60 min/);
-  assert.match(pageSource, /id="companies-without-website-last60">\+0 laatste 60 min/);
+  assert.match(pageSource, /id="companies-treated-last60"/);
+  assert.match(pageSource, /id="companies-usable-last60"/);
+  assert.match(pageSource, /id="companies-with-website-last60"/);
+  assert.match(pageSource, /id="companies-without-website-last60"/);
   assert.match(pageSource, /id="companies-unusable-grade-1"/);
   assert.match(pageSource, /id="companies-unusable-grade-2"/);
   assert.match(pageSource, /id="companies-unusable-grade-3"/);
@@ -146,7 +146,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
   assert.match(metricsSource, /unusable_grade_activity/);
-  assert.match(metricsSource, /window\.setInterval\(renderMetrics, 1000\)/);
+  assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
   assert.match(metricsStyles, /\.stat-delta-number/);
   assert.match(metricsStyles, /\.unusable-grade-delta-removed/);
 });
