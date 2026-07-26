@@ -106,6 +106,20 @@ function extractInstantlyItems(data) {
   return [];
 }
 
+function extractInstantlyItem(data) {
+  for (const candidate of [data?.email, data?.data, data]) {
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate) &&
+      normalizeText(candidate.id || candidate.email_id || candidate.uuid)
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 function extractCursor(data) {
   return normalizeText(
     data?.next_starting_after ||
@@ -400,7 +414,7 @@ function createInstantlyMailboxService(deps = {}) {
     return data;
   }
 
-  async function hydrateThread({ threadId, accountEmail, owner }) {
+  async function hydrateThread({ threadId, accountEmail, owner, indexedMessages = [] }) {
     const exactThreadId = normalizeText(threadId);
     const exactAccountEmail = normalizeEmail(accountEmail);
     const exactOwner = assertOwner(owner);
@@ -422,6 +436,42 @@ function createInstantlyMailboxService(deps = {}) {
       },
     });
     const rawMessages = extractInstantlyItems(data);
+    const rawMessageIds = new Set(
+      rawMessages
+        .map((rawMessage) => normalizeText(rawMessage?.id || rawMessage?.email_id || rawMessage?.uuid))
+        .filter(Boolean)
+    );
+    const exactIndexedMessages = (Array.isArray(indexedMessages) ? indexedMessages : [])
+      .filter((message) => (
+        normalizeText(message?.providerThreadId) === exactThreadId &&
+        normalizeEmail(message?.providerAccountEmail || message?.accountEmail) === exactAccountEmail
+      ));
+    const needsExactOriginalAudit = exactIndexedMessages.some((message) => (
+      message?.originalCampaignOutbound === true &&
+      (
+        message?.providerBodyHtmlEvidenceKnown !== true ||
+        message?.providerOriginalBodyEvidenceKnown !== true
+      )
+    ));
+    for (const indexedMessage of needsExactOriginalAudit ? exactIndexedMessages : []) {
+      const providerMessageId = normalizeText(
+        indexedMessage?.providerMessageId ||
+        String(indexedMessage?.id || '').replace(/^instantly:/, '')
+      );
+      if (!providerMessageId || rawMessageIds.has(providerMessageId)) continue;
+      try {
+        const exactData = await apiRequest(`emails/${encodeURIComponent(providerMessageId)}`);
+        const exactMessage = extractInstantlyItem(exactData);
+        const exactMessageId = normalizeText(
+          exactMessage?.id || exactMessage?.email_id || exactMessage?.uuid
+        );
+        if (!exactMessage || exactMessageId !== providerMessageId) continue;
+        rawMessages.push(exactMessage);
+        rawMessageIds.add(providerMessageId);
+      } catch (error) {
+        if (Number(error?.providerStatus) !== 404) throw error;
+      }
+    }
     const originalRecipients = Array.from(new Set(
       rawMessages
         .filter((rawMessage) => (
@@ -761,6 +811,7 @@ function createInstantlyMailboxService(deps = {}) {
             threadId: candidate.providerThreadId,
             accountEmail: candidate.providerAccountEmail,
             owner: selectedOwner,
+            indexedMessages,
           });
           stored += hydrated.stored;
         }
