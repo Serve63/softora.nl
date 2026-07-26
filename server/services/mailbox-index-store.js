@@ -305,6 +305,8 @@ function createMailboxIndexStore(deps = {}) {
       normalized.providerOwner = normalizeString(payload.providerOwner).toLowerCase();
       normalized.providerBodyHtmlEvidenceKnown = payload.providerBodyHtmlEvidenceKnown === true;
       normalized.providerRichBodyAvailable = payload.providerRichBodyAvailable === true;
+      normalized.providerOriginalBodyEvidenceKnown = payload.providerOriginalBodyEvidenceKnown === true;
+      normalized.providerOriginalBodyAvailable = payload.providerOriginalBodyAvailable === true;
       normalized.storageFolder = normalizeFolder(row.folder);
       normalized.storageUid = uid;
       normalized.uid = 0;
@@ -375,6 +377,8 @@ function createMailboxIndexStore(deps = {}) {
         originalCampaignOutbound: message.originalCampaignOutbound === true,
         providerBodyHtmlEvidenceKnown: message.providerBodyHtmlEvidenceKnown === true,
         providerRichBodyAvailable: message.providerRichBodyAvailable === true,
+        providerOriginalBodyEvidenceKnown: message.providerOriginalBodyEvidenceKnown === true,
+        providerOriginalBodyAvailable: message.providerOriginalBodyAvailable === true,
         webdesignLinkEvidenceKnown: message.webdesignLinkEvidenceKnown === true,
         webdesignLinkUrl: truncateText(normalizeString(message.webdesignLinkUrl), 4000),
       },

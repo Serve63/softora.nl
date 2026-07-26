@@ -1,5 +1,9 @@
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const { parseProviderHtml } = require('./mailbox-provider-rich-body');
+const {
+  buildOriginalMessageSource,
+  extractLeadId,
+} = require('./instantly-original-message-source');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -291,7 +295,13 @@ function createInstantlyMailboxService(deps = {}) {
     const text = normalizeText(rawMessage.body?.text || rawMessage.body_text || rawMessage.email_text);
     const html = normalizeText(rawMessage.body?.html || rawMessage.body_html || rawMessage.email_html);
     const providerHtml = parseProviderHtml(html);
-    const body = providerHtml.body || text;
+    const originalSource = rawMessage.__softoraOriginalMessageSource &&
+      typeof rawMessage.__softoraOriginalMessageSource === 'object'
+      ? rawMessage.__softoraOriginalMessageSource
+      : null;
+    const body = originalSource?.available
+      ? normalizeText(originalSource.body)
+      : providerHtml.body || text;
     const date = parseDate(
       rawMessage.timestamp_email ||
       rawMessage.timestamp_created ||
@@ -340,8 +350,14 @@ function createInstantlyMailboxService(deps = {}) {
       originalCampaignOutbound: direction === 'sent' && lifecycleType === '1',
       providerBodyHtmlEvidenceKnown: Boolean(html),
       providerRichBodyAvailable: Boolean(providerHtml.body),
-      webdesignLinkEvidenceKnown: providerHtml.webdesignLinkEvidenceKnown,
-      webdesignLinkUrl: providerHtml.webdesignLinkUrl,
+      providerOriginalBodyEvidenceKnown: originalSource?.evidenceKnown === true,
+      providerOriginalBodyAvailable: originalSource?.available === true,
+      webdesignLinkEvidenceKnown: originalSource?.available
+        ? originalSource.webdesignLinkEvidenceKnown === true
+        : providerHtml.webdesignLinkEvidenceKnown,
+      webdesignLinkUrl: originalSource?.available
+        ? normalizeText(originalSource.webdesignLinkUrl)
+        : providerHtml.webdesignLinkUrl,
       indexed: true,
     };
   }
@@ -398,7 +414,80 @@ function createInstantlyMailboxService(deps = {}) {
         sort_order: 'asc',
       },
     });
-    const messages = extractInstantlyItems(data)
+    const rawMessages = extractInstantlyItems(data);
+    const leadSourceCache = new Map();
+    const enrichedMessages = [];
+    for (const rawMessage of rawMessages) {
+      const direction = getEmailDirection(rawMessage, exactAccountEmail);
+      const lifecycleType = normalizeText(
+        rawMessage.ue_type || rawMessage.email_type || rawMessage.type
+      ).toLowerCase();
+      if (direction !== 'sent' || lifecycleType !== '1') {
+        enrichedMessages.push(rawMessage);
+        continue;
+      }
+      const recipientEmail = extractAddressList(
+        rawMessage.to_address_email_list,
+        rawMessage.to_address_json,
+        rawMessage.to,
+        rawMessage.to_address_email
+      )[0];
+      const leadId = extractLeadId(rawMessage);
+      const leadCacheKey = leadId || `${normalizeText(rawMessage.campaign_id)}|${recipientEmail}`;
+      try {
+        if (!leadSourceCache.has(leadCacheKey)) {
+          if (leadId) {
+            leadSourceCache.set(leadCacheKey, await apiRequest(`leads/${encodeURIComponent(leadId)}`));
+          } else if (recipientEmail && normalizeText(rawMessage.campaign_id)) {
+            const leadList = await apiRequest('leads/list', {
+              method: 'POST',
+              body: {
+                campaign: normalizeText(rawMessage.campaign_id),
+                contacts: [recipientEmail],
+                limit: 2,
+              },
+            });
+            const exactLeads = extractInstantlyItems(leadList).filter((lead) => (
+              normalizeText(lead?.campaign || lead?.campaign_id) === normalizeText(rawMessage.campaign_id) &&
+              normalizeEmail(lead?.email || lead?.contact) === recipientEmail
+            ));
+            leadSourceCache.set(leadCacheKey, exactLeads.length === 1 ? exactLeads[0] : null);
+          } else {
+            leadSourceCache.set(leadCacheKey, null);
+          }
+        }
+        const exactLead = leadSourceCache.get(leadCacheKey);
+        enrichedMessages.push({
+          ...rawMessage,
+          __softoraOriginalMessageSource: exactLead
+            ? buildOriginalMessageSource(
+                rawMessage,
+                exactLead,
+                { accountEmail: exactAccountEmail, recipientEmail }
+              )
+            : {
+                evidenceKnown: true,
+                available: false,
+                reason: 'exact-lead-not-found',
+              },
+        });
+      } catch (error) {
+        if (Number(error?.providerStatus) === 404) {
+          enrichedMessages.push({
+            ...rawMessage,
+            __softoraOriginalMessageSource: {
+              evidenceKnown: true,
+              available: false,
+              reason: 'lead-not-found',
+            },
+          });
+          continue;
+        }
+        logger.warn('[InstantlyMailbox][OriginalSource]', error?.message || error);
+        enrichedMessages.push(rawMessage);
+      }
+    }
+    const messages = enrichedMessages
       .map(normalizeInstantlyMessage)
       .filter((message) => (
         message &&
@@ -565,7 +654,10 @@ function createInstantlyMailboxService(deps = {}) {
           const needsExactProviderBody = messages.some((message) => (
             message.folder === 'sent' &&
             message.originalCampaignOutbound === true &&
-            message.providerBodyHtmlEvidenceKnown !== true
+            (
+              message.providerBodyHtmlEvidenceKnown !== true ||
+              message.providerOriginalBodyEvidenceKnown !== true
+            )
           ));
           if (incoming && needsExactProviderBody && !threadCandidates.has(key)) {
             threadCandidates.set(key, incoming);
@@ -577,7 +669,10 @@ function createInstantlyMailboxService(deps = {}) {
           const needsExactProviderBody = indexedMessages.some((message) => (
             message.folder === 'sent' &&
             message.originalCampaignOutbound === true &&
-            message.providerBodyHtmlEvidenceKnown !== true
+            (
+              message.providerBodyHtmlEvidenceKnown !== true ||
+              message.providerOriginalBodyEvidenceKnown !== true
+            )
           ));
           if (!hasMissingThreadMember && !needsExactProviderBody) continue;
           const hydrated = await hydrateThread({

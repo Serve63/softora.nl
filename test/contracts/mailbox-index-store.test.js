@@ -167,12 +167,16 @@ test('mailbox index store preserves exact Instantly HTML and link provenance mar
     originalCampaignOutbound: true,
     providerBodyHtmlEvidenceKnown: true,
     providerRichBodyAvailable: true,
+    providerOriginalBodyEvidenceKnown: true,
+    providerOriginalBodyAvailable: true,
     webdesignLinkEvidenceKnown: true,
     webdesignLinkUrl: exactUrl,
   });
 
   assert.equal(row.payload.providerBodyHtmlEvidenceKnown, true);
   assert.equal(row.payload.providerRichBodyAvailable, true);
+  assert.equal(row.payload.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(row.payload.providerOriginalBodyAvailable, true);
   assert.equal(row.payload.webdesignLinkEvidenceKnown, true);
   assert.equal(row.payload.webdesignLinkUrl, exactUrl);
 
@@ -180,6 +184,8 @@ test('mailbox index store preserves exact Instantly HTML and link provenance mar
   assert.equal(normalized.provider, 'instantly');
   assert.equal(normalized.providerBodyHtmlEvidenceKnown, true);
   assert.equal(normalized.providerRichBodyAvailable, true);
+  assert.equal(normalized.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(normalized.providerOriginalBodyAvailable, true);
   assert.equal(normalized.webdesignLinkEvidenceKnown, true);
   assert.equal(normalized.webdesignLinkUrl, exactUrl);
   assert.match(normalized.body, /webdesign hier \[https:\/\/www\.softora\.nl/);
