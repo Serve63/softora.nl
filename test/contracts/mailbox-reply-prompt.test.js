@@ -215,8 +215,64 @@ test('antwoordbeleid laat alleen expliciete vooruitgerichte signalen een CTA ope
   assert.equal(technical.ctaAllowed, false);
   assert.equal(feedback.intent, 'feedback_only');
   assert.equal(feedback.ctaAllowed, false);
+  assert.equal(feedback.futureDoorOpenAllowed, true);
   assert.equal(pricing.intent, 'price_question');
   assert.equal(pricing.ctaAllowed, true);
+});
+
+test('De Krekul krijgt een persoonlijke tevredenheidsreactie met jubileum en zachte toekomstdeur', () => {
+  const inbound = [
+    'Hoi Servé,',
+    '',
+    'Je bent net te laat...',
+    'Ik wist niet dat jij ook websites kon bouwen.',
+    '',
+    'We hebben onze site net geheel vernieuwd en zijn heel tevreden met de nieuwe uitstraling en huisstijl.',
+    '',
+    'Voorlopig gaan we geen aanpassingen doen. Komend jaar vieren we ons 60-jarig jubileum en bouwen verder aan deze huisstijl.',
+    '',
+    'Dank voor interesse.',
+    '',
+    'Met vriendelijke groet,',
+    'Marie-José Inneme - de Jong',
+  ].join('\n');
+  const policy = analyzeMailboxReplyContext(inbound, {
+    originalText: 'Goedendag,\n\nAfgelopen week kwam ik jullie website tegen.',
+  });
+  const firstName = inferMailboxReplyFirstName({
+    from: 'Voorzitter De Krekul',
+    body: inbound,
+  });
+  const result = enforceMailboxReplyProfile('', {
+    firstName,
+    inboundText: inbound,
+    originalSentMail: {
+      body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website tegen.',
+    },
+  });
+
+  assert.equal(policy.intent, 'satisfied');
+  assert.equal(firstName, 'Marie-José');
+  assert.equal(policy.ctaAllowed, false);
+  assert.equal(policy.futureDoorOpenAllowed, true);
+  assert.deepEqual(policy.replyHighlights, {
+    lateTiming: true,
+    recentWebsiteRenewal: true,
+    anniversaryYears: 60,
+  });
+  assert.equal(result, [
+    'Goedendag Marie-José,',
+    '',
+    'Dan ben ik inderdaad net te laat! Fijn om te horen dat jullie website helemaal is vernieuwd en dat jullie zo tevreden zijn met de nieuwe uitstraling en huisstijl. 😁',
+    '',
+    'Alvast veel succes met jullie 60-jarig jubileum!',
+    '',
+    'Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor jullie website, dan mag je me altijd een berichtje sturen.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n'));
+  assert.doesNotMatch(result, /afspraak|langskom|\[dag\]|helemaal duidelijk/i);
 });
 
 test('Bossche Brouwers feedback erft geen actieve CTA uit geciteerde coldmail', () => {
@@ -374,6 +430,7 @@ test('afwijzing verwijdert ieder afspraakvoorstel en blijft kort respectvol', ()
   );
 
   assert.doesNotMatch(result, /afspraak|langskom|volgende week|\[dag\]/i);
+  assert.match(result, /Mocht je in de toekomst/);
   assert.match(result, /^Beste Daffy,/);
   assert.equal((result.match(/😁/gu) || []).length, 1);
 });
@@ -400,8 +457,9 @@ test('Hoogstam Brigade afwijzing blokkeert ieder bezoek en generieke interessehe
   );
 
   assert.match(result, /^Beste Hub,/);
-  assert.match(result, /Dankjewel voor je duidelijke reactie/);
-  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|meedenk|mogelijkheden|prijs|vervolgstap|traject/i);
+  assert.match(result, /Bedankt voor je duidelijke reactie/);
+  assert.match(result, /Mocht je in de toekomst/);
+  assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|meedenk|prijs|vervolgstap|traject/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
   assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
 });
@@ -481,8 +539,9 @@ test('Christine Jetten tevredenheid blokkeert een bezoek ondanks een slechte AI-
   );
 
   assert.match(result, /^Beste Christine,/);
-  assert.match(result, /Dankjewel voor je duidelijke reactie/);
-  assert.doesNotMatch(result, /langskom|\[dag\]|afspraak|mogelijkheden/i);
+  assert.match(result, /Fijn om te horen dat je tevreden bent met je huidige website/);
+  assert.match(result, /Mocht je in de toekomst/);
+  assert.doesNotMatch(result, /langskom|\[dag\]|afspraak/i);
 });
 
 test('iedere modelalinea moet relevante bewijslabels en inhoud hebben of valt veilig terug', () => {
