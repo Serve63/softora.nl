@@ -382,6 +382,161 @@ test('Vught Outlook quote restores exact rich body across a stale same-owner sen
   );
 });
 
+test('rich-body audit falls back to exact provider messages when Instantly thread search is empty', async () => {
+  const customerId = 'fallback-customer';
+  const exactUrl = `https://www.softora.nl/webdesign/fallback?cid=${customerId}&sender=serve`;
+  const providerBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website fallback.example tegen.',
+    '',
+    'Dit originele ontwerpbericht bevat voldoende inhoud om de providertekst veilig te vergelijken.',
+    '',
+    'Je kunt het webdesign hier bekijken',
+  ].join('\n');
+  const rawSent = incoming({
+    id: 'fallback-sent',
+    thread_id: 'fallback-thread',
+    email_type: '1',
+    lead_id: 'fallback-lead',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['fallback@example.org'],
+    subject: 'Kleine vraag over jullie website',
+    body: { text: providerBody },
+  });
+  const rawReceived = incoming({
+    id: 'fallback-received',
+    thread_id: 'fallback-thread',
+    from_address_email: 'fallback@example.org',
+    to_address_email_list: ['serve-sender@example.com'],
+    body: {
+      text: [
+        'Dank voor je bericht.',
+        '',
+        'Op di 7 jul 2026 om 10:12 schreef Servé Creusen <serve-sender@example.com>:',
+        '> Goedendag,',
+        '>',
+        '> Afgelopen week kwam ik jullie website fallback.example tegen.',
+        '>',
+        '> Dit originele ontwerpbericht bevat voldoende inhoud om de providertekst veilig te vergelijken. 😁',
+        '>',
+        '> Je kunt het webdesign hier bekijken 👈',
+        '>',
+        "> 📍 's-Hertogenbosch",
+      ].join('\n'),
+    },
+  });
+  const exactCustomer = {
+    id: customerId,
+    email: 'fallback@example.org',
+    instantlyCampaignId: 'campaign-serve',
+    instantlyLeadId: 'fallback-lead',
+    instantlyActualSenderEmail: 'serve-sender@example.com',
+    instantlyPublicPreviewUrl: exactUrl,
+  };
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    getCustomerSourcesByEmails: async () => [exactCustomer],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('search') === 'thread:fallback-thread') {
+        return { response: { ok: true, status: 200 }, data: { items: [] } };
+      }
+      if (parsed.pathname.endsWith('/emails/fallback-sent')) {
+        return { response: { ok: true, status: 200 }, data: { email: rawSent } };
+      }
+      if (parsed.pathname.endsWith('/emails/fallback-received')) {
+        return { response: { ok: true, status: 200 }, data: { data: rawReceived } };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+  const indexedMessages = [
+    service.normalizeInstantlyMessage(rawSent),
+    service.normalizeInstantlyMessage(rawReceived),
+  ];
+  store.rows.push(...indexedMessages);
+
+  await service.hydrateThread({
+    threadId: 'fallback-thread',
+    accountEmail: 'serve-sender@example.com',
+    owner: 'serve',
+    indexedMessages,
+  });
+
+  const restored = store.rows.find((message) => message.providerMessageId === 'fallback-sent');
+  assert.equal(restored.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.webdesignLinkUrl, exactUrl);
+  assert.match(restored.body, /😁/u);
+  assert.match(restored.body, /👈/u);
+  assert.match(restored.body, /📍/u);
+  assert.equal(
+    requests.filter((request) => new URL(request.url).pathname.includes('/emails/fallback-')).length,
+    2
+  );
+});
+
+test('exact provider fallback records unavailable rich evidence without inventing a link', async () => {
+  const rawSent = incoming({
+    id: 'unavailable-sent',
+    thread_id: 'unavailable-thread',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['unavailable@example.org'],
+    body: {
+      text: 'Goedendag. Dit originele campagnebericht bevat voldoende inhoud, maar heeft geen exacte rijke Softora-bron of bewezen webdesignlink.',
+    },
+  });
+  const rawReceived = incoming({
+    id: 'unavailable-received',
+    thread_id: 'unavailable-thread',
+    from_address_email: 'unavailable@example.org',
+    to_address_email_list: ['serve-sender@example.com'],
+    body: { text: 'Bedankt, maar geen interesse.' },
+  });
+  const store = createStore();
+  const { service } = buildService({
+    store,
+    getCustomerSourcesByEmails: async () => [],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('search') === 'thread:unavailable-thread') {
+        return { response: { ok: true, status: 200 }, data: { items: [] } };
+      }
+      if (parsed.pathname.endsWith('/emails/unavailable-sent')) {
+        return { response: { ok: true, status: 200 }, data: rawSent };
+      }
+      if (parsed.pathname.endsWith('/emails/unavailable-received')) {
+        return { response: { ok: true, status: 200 }, data: rawReceived };
+      }
+      if (parsed.pathname.endsWith('/leads/list')) {
+        return { response: { ok: true, status: 200 }, data: { items: [] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+  const indexedMessages = [
+    service.normalizeInstantlyMessage(rawSent),
+    service.normalizeInstantlyMessage(rawReceived),
+  ];
+  store.rows.push(...indexedMessages);
+
+  await service.hydrateThread({
+    threadId: 'unavailable-thread',
+    accountEmail: 'serve-sender@example.com',
+    owner: 'serve',
+    indexedMessages,
+  });
+
+  const audited = store.rows.find((message) => message.providerMessageId === 'unavailable-sent');
+  assert.equal(audited.providerOriginalBodyEvidenceKnown, true);
+  assert.equal(audited.providerOriginalBodyAvailable, false);
+  assert.equal(audited.webdesignLinkEvidenceKnown, false);
+  assert.equal(audited.webdesignLinkUrl, '');
+});
+
 test('same-owner alias exception never crosses from Martijn provenance into Servé', () => {
   const result = buildCustomerQuotedMessageSource({
     id: 'cross-owner-sent',
