@@ -58,7 +58,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260618b/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260726a/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
@@ -115,6 +115,16 @@ test('kvk database page loads its protected live snapshot with an empty embedded
   assert.match(scriptSource, /credentials:"same-origin"/);
   assert.match(scriptSource, /await loadRemoteSnapshot\(\),bindEvents/);
   assert.match(scriptSource, /await loadRemoteSnapshot\(\);const\[t,a\]=await Promise\.all/);
+});
+
+test('kvk database refreshes live counters and latest treated rows while the page stays open', () => {
+  const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
+
+  assert.match(scriptSource, /const DASHBOARD_REFRESH_INTERVAL_MS=15e3/);
+  assert.match(scriptSource, /window\.setInterval\(\(\)=>refreshDashboardWhenVisible\(\),DASHBOARD_REFRESH_INTERVAL_MS\)/);
+  assert.match(scriptSource, /window\.addEventListener\("focus",\(\)=>refreshDashboardWhenVisible\(\{reloadTables:!0\}\)\)/);
+  assert.match(scriptSource, /document\.addEventListener\("visibilitychange",\(\)=>refreshDashboardWhenVisible\(\{reloadTables:!0\}\)\)/);
+  assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
 });
 
 test('kvk database snapshot API is wired and only public for token-protected sync posts', () => {
