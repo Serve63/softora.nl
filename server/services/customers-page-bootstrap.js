@@ -67,10 +67,13 @@ function createCustomersPageBootstrapService(deps = {}) {
     const autopilotValues = autopilotState && autopilotState.values && typeof autopilotState.values === 'object' ? autopilotState.values : {};
     const autopilot = parseJsonObject(autopilotValues[DATABASE_AUTOPILOT_KEY]);
     const dealCount = pickNonNegativeInteger(roi, ['dealCount', 'dealsCount', 'count']);
+    const hardBounces = pickNonNegativeInteger(stats, ['hardBounces', 'totalHardBounces'])
+      ?? pickNonNegativeInteger(stats.bounceTypes, ['hard']);
     return {
       mailStats: {
         sentToday: pickNonNegativeInteger(stats, ['systemSentToday', 'sentToday', 'webdesignSentToday']),
         bounces: pickNonNegativeInteger(stats, ['bounces', 'totalBounces', 'bouncesTotal']),
+        hardBounces,
         totalSent: pickNonNegativeInteger(stats, ['systemTotalSent', 'totalSent', 'webdesignTotalSent', 'centralGuardTotalSent']),
         updatedAt: normalizeString(stats.updatedAt) || null,
       },
