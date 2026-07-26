@@ -54,6 +54,13 @@ function createStore(initialMessages = []) {
     async listProviderMessages({ accountEmails }) {
       return rows.filter((message) => accountEmails.includes(message.accountEmail));
     },
+    async getProviderMessage({ providerMessageId, accountEmail }) {
+      const exactProviderMessageId = String(providerMessageId || '').replace(/^instantly:/, '');
+      return rows.find((message) => (
+        message.providerMessageId === exactProviderMessageId &&
+        message.accountEmail === accountEmail
+      )) || null;
+    },
   };
 }
 
@@ -505,11 +512,11 @@ test('exact provider fallback records unavailable rich evidence without inventin
       if (parsed.searchParams.get('search') === 'thread:unavailable-thread') {
         return { response: { ok: true, status: 200 }, data: { items: [] } };
       }
-      if (parsed.pathname.endsWith('/emails/unavailable-sent')) {
-        return { response: { ok: true, status: 200 }, data: rawSent };
-      }
-      if (parsed.pathname.endsWith('/emails/unavailable-received')) {
-        return { response: { ok: true, status: 200 }, data: rawReceived };
+      if (parsed.pathname.includes('/emails/unavailable-')) {
+        return {
+          response: { ok: false, status: 404 },
+          data: { message: 'Exact providerbericht is niet meer beschikbaar.' },
+        };
       }
       if (parsed.pathname.endsWith('/leads/list')) {
         return { response: { ok: true, status: 200 }, data: { items: [] } };

@@ -34,6 +34,65 @@ function extractLeadId(rawMessage = {}) {
   );
 }
 
+function extractInstantlyItem(data) {
+  for (const candidate of [data?.email, data?.data, data]) {
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate) &&
+      text(candidate.id || candidate.email_id || candidate.uuid)
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+async function hydrateIndexedThreadMessageEvidence(options = {}) {
+  const rawMessages = Array.isArray(options.rawMessages) ? [...options.rawMessages] : [];
+  const indexedMessages = Array.isArray(options.indexedMessages) ? options.indexedMessages : [];
+  const threadId = text(options.threadId);
+  const accountEmail = email(options.accountEmail);
+  const apiRequest = options.apiRequest;
+  const exactIndexedMessages = indexedMessages.filter((message) => (
+    text(message?.providerThreadId) === threadId &&
+    email(message?.providerAccountEmail || message?.accountEmail) === accountEmail
+  ));
+  const needsExactOriginalAudit = exactIndexedMessages.some((message) => (
+    message?.originalCampaignOutbound === true &&
+    (
+      message?.providerBodyHtmlEvidenceKnown !== true ||
+      message?.providerOriginalBodyEvidenceKnown !== true
+    )
+  ));
+  const exactProviderMessagesUnavailable = new Set();
+  const rawMessageIds = new Set(
+    rawMessages.map((message) => text(message?.id || message?.email_id || message?.uuid)).filter(Boolean)
+  );
+  for (const indexedMessage of needsExactOriginalAudit ? exactIndexedMessages : []) {
+    const providerMessageId = text(
+      indexedMessage?.providerMessageId ||
+      String(indexedMessage?.id || '').replace(/^instantly:/, '')
+    );
+    if (!providerMessageId || rawMessageIds.has(providerMessageId)) continue;
+    try {
+      const exactData = await apiRequest(`emails/${encodeURIComponent(providerMessageId)}`);
+      const exactMessage = extractInstantlyItem(exactData);
+      const exactMessageId = text(exactMessage?.id || exactMessage?.email_id || exactMessage?.uuid);
+      if (!exactMessage || exactMessageId !== providerMessageId) {
+        exactProviderMessagesUnavailable.add(providerMessageId);
+        continue;
+      }
+      rawMessages.push(exactMessage);
+      rawMessageIds.add(providerMessageId);
+    } catch (error) {
+      if (Number(error?.providerStatus) !== 404) throw error;
+      exactProviderMessagesUnavailable.add(providerMessageId);
+    }
+  }
+  return { exactIndexedMessages, exactProviderMessagesUnavailable, rawMessages };
+}
+
 function unwrapLead(value) {
   const source = value && typeof value === 'object' ? value : {};
   for (const candidate of [source.lead, source.data?.lead, source.data, source]) {
@@ -383,4 +442,5 @@ module.exports = {
   canonicalizeComparableBody,
   extractQuotedOriginalBody,
   extractLeadId,
+  hydrateIndexedThreadMessageEvidence,
 };
