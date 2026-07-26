@@ -1,11 +1,63 @@
 const REPLY_QUOTE_HEADER_PATTERN = /^(?:op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|op\s.+\sschreef\s.+:|on\s.+\swrote:|van:|from:)/i;
 const CTA_PATTERN = /\b(?:afspraak|langskom|langs\s+te\s+komen|volgende\s+week|\[dag\]|even\s+bellen|kennismak|verder\s+praten|samen\s+bespreken)\b/i;
 const GENERIC_FILLER_PATTERN = /\b(?:leuke\s+vraag|wat\s+leuk|ik\s+denk\s+graag\s+mee|mooie\s+kansen|interessante\s+mogelijkheden|hopelijk\s+kunnen\s+we|lijkt\s+me\s+goed|kijken\s+wat\s+er\s+mogelijk\s+is)\b/i;
-const REPLY_POLICY_VERSION = 'softora-grounded-reply-v2';
+const REPLY_POLICY_VERSION = 'softora-grounded-reply-v3';
 const STOP_WORDS = new Set([
   'aan', 'als', 'ben', 'bij', 'dan', 'dat', 'de', 'deze', 'die', 'dit', 'een', 'en', 'er', 'geen',
   'heb', 'het', 'hier', 'hoe', 'ik', 'in', 'is', 'je', 'kan', 'maar', 'met', 'mijn', 'niet', 'nog',
   'om', 'ons', 'ook', 'op', 'te', 'van', 'voor', 'wat', 'we', 'wel', 'wij', 'wil', 'zijn', 'zou',
+]);
+const FEEDBACK_THEMES = Object.freeze([
+  Object.freeze({
+    key: 'generic_identity',
+    detect: /\b(?:te\s+(?:vlak|algemeen|generiek)|algemene\s+(?:identiteit|uitstraling)|mist?\s+(?:een\s+)?identiteit|identiteit\s+(?:mist|ontbreekt)|voor\s+iedere\s+\w+\s+gebruikt)\b/i,
+    phrase: 'de te algemene identiteit',
+    response: /\b(?:algemen|generiek|vlak)[a-z]*\s+(?:identiteit|uitstraling)|identiteit\b/i,
+  }),
+  Object.freeze({
+    key: 'non_own_imagery',
+    detect: /\b(?:fotografie|foto(?:'s|s)?|beelden?|eten)\b[^.!?\n]{0,100}\b(?:niet\s+(?:van|door|eigen)|verkeerd|generiek|klopt?\s+niet)\b|\bniet\s+door\s+(?:onze|mijn)\s+\w+\s+gemaakt\b/i,
+    phrase: 'het gebruik van beelden die niet bij het bedrijf horen',
+    response: /\b(?:beelden?|fotografie|foto(?:'s|s)?)\b[^.!?]{0,100}\b(?:niet\s+bij|eigen|bedrijf)\b/i,
+  }),
+  Object.freeze({
+    key: 'missing_brand_style',
+    detect: /\b(?:huisstijl|eigen\s+stijl)\b[^.!?\n]{0,100}\b(?:niet|nergens|mist|ontbreekt|terug)\b|\b(?:mist|ontbreekt)\b[^.!?\n]{0,80}\b(?:huisstijl|eigen\s+stijl)\b/i,
+    phrase: 'het ontbreken van de huisstijl',
+    response: /\b(?:huisstijl|eigen\s+stijl)\b/i,
+  }),
+  Object.freeze({
+    key: 'inaccurate_details',
+    detect: /\b(?:glazen?|bierkleur|kleur\s+van\s+het\s+bier|producten?|aanbod|silo(?:'s|s)?|lichtreclame|locatie|tramkade)\b[^.!?\n]{0,120}\b(?:niet|onjuist|verkeerd|klopt|aanwezig|eigen)\b|\b(?:niet|onjuist|verkeerd)\b[^.!?\n]{0,120}\b(?:glazen?|bierkleur|producten?|silo(?:'s|s)?|locatie|tramkade)\b/i,
+    phrase: 'de onjuiste product- en locatiedetails',
+    response: /\b(?:product|locatie|detail|kleur|glas|glazen|aanbod)\b/i,
+  }),
+  Object.freeze({
+    key: 'broken_text',
+    detect: /\b(?:tekst|letters?|lichtreclame)\b[^.!?\n]{0,100}\b(?:valt?\s+uit\s+elkaar|afgebroken|kapot|onleesbaar|fout)\b|\bte\s+duidelijk\s+ai\b/i,
+    phrase: 'de tekst die visueel uit elkaar viel',
+    response: /\b(?:tekst|letters?|lichtreclame)\b[^.!?]{0,100}\b(?:uit\s+elkaar|afgebroken|kapot|onleesbaar|fout)\b/i,
+  }),
+]);
+const POSITIVE_FEEDBACK_THEMES = Object.freeze([
+  Object.freeze({
+    key: 'atmosphere',
+    detect: /\b(?:goed|sterk|mooi|fijn|geslaagd|waardeer\w*)\b[^.!?\n]{0,100}\bsfeer\b|\bsfeer\b[^.!?\n]{0,60}\b(?:goed|sterk|mooi|fijn|geslaagd)\b/i,
+    phrase: 'de sfeer',
+    response: /\bsfeer\b/i,
+  }),
+  Object.freeze({
+    key: 'overview',
+    detect: /\b(?:goed|sterk|mooi|fijn|geslaagd|waardeer\w*)\b[^.!?\n]{0,100}\boverzicht\b|\boverzicht\b[^.!?\n]{0,60}\b(?:goed|sterk|mooi|fijn|geslaagd)\b/i,
+    phrase: 'het overzicht',
+    response: /\boverzicht\b/i,
+  }),
+  Object.freeze({
+    key: 'presentation',
+    detect: /\b(?:design|ontwerp|opzet)\b[^.!?\n]{0,80}\b(?:netjes|verzorgd|mooi|goed)\b|\b(?:netjes|verzorgd|mooi|goed)\b[^.!?\n]{0,80}\b(?:design|ontwerp|opzet)\b/i,
+    phrase: 'de verzorgde opzet',
+    response: /\b(?:verzorgd|netjes|opzet)\b/i,
+  }),
 ]);
 
 function normalize(value) {
@@ -31,13 +83,31 @@ function matches(value, pattern) {
   return pattern.test(value);
 }
 
+function extractFeedbackDetails(value) {
+  const authoredText = authoredReplyText(value);
+  const themes = FEEDBACK_THEMES.filter((theme) => theme.detect.test(authoredText));
+  const positiveThemes = POSITIVE_FEEDBACK_THEMES.filter(
+    (theme) => theme.detect.test(authoredText)
+  );
+  const bulletCount = authoredText
+    .split('\n')
+    .filter((line) => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(line))
+    .length;
+  return Object.freeze({
+    themes: Object.freeze(themes),
+    positiveThemes: Object.freeze(positiveThemes),
+    bulletCount,
+    substantive: themes.length >= 2 || (themes.length >= 1 && bulletCount >= 2),
+  });
+}
+
 function analyzeMailboxReplyContext(inboundText, options = {}) {
   const authoredText = authoredReplyText(inboundText);
   const conceptText = clean(options.conceptText);
   const originalText = clean(options.originalText);
   const text = normalize(authoredText);
   const rejection = matches(text,
-    /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b/
+    /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b|\b(?:wij|we|ik)\s+(?:gaan|zullen|willen)\s+(?:het|dit|dat)\s+(?:echter\s+)?niet\s+gebruiken\b/
   );
   const satisfied = matches(text,
     /\btevreden\s+(?:ben|zijn)?\s*(?:met|over)\b|\b(?:website|site)\s+voldoet\b|\bhebben\s+al\s+(?:een\s+)?(?:goede\s+)?(?:partij|bouwer|website)\b|\bblij\s+met\s+(?:onze|mijn|de)\s+(?:huidige\s+)?(?:site|website|partij)\b/
@@ -55,7 +125,8 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
   const explicitInterest = matches(text,
     /\b(?:ik|we|wij)\s+(?:ben|zijn|hebben)\s+(?:wel\s+)?(?:interesse|geinteresseerd|benieuwd)\b|\b(?:ik|we|wij)\s+(?:vind|vinden)\b[^.!?]{0,60}\binteressant\b|\b(?:dit|dat|het)\s+(?:lijkt|klinkt|vinden|vind)\b[^.!?]{0,60}\binteressant\b|\bwillen\s+(?:hier\s+)?(?:graag\s+)?(?:meer\s+over\s+weten|mee\s+verder)\b/
   );
-  const feedback = matches(text,
+  const feedbackDetails = extractFeedbackDetails(authoredText);
+  const feedback = feedbackDetails.themes.length > 0 || matches(text,
     /\b(?:feedback|verbeter|tip|advies|opmerking|mis\s+ik|zou\s+ik|mag\s+meer|uitstraling|lettertype|kleurgebruik|persoonlijke\s+touch)\b/
   );
 
@@ -82,6 +153,7 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
   if (technicalQuestion) allowedEvidence.push('known.design-built-with-code');
   if (priceQuestion) allowedEvidence.push('known.price-depends-on-scope');
   if (forwardCommercialSignal) allowedEvidence.push('received.forward-request');
+  if (feedbackDetails.substantive) allowedEvidence.push('received.feedback-details');
 
   return Object.freeze({
     version: REPLY_POLICY_VERSION,
@@ -95,6 +167,8 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
     previewRequest,
     technicalQuestion,
     feedback,
+    feedbackDetails,
+    substantiveFeedback: feedbackDetails.substantive,
     forwardCommercialSignal,
     ctaAllowed: forwardCommercialSignal,
     allowedEvidence: Object.freeze(allowedEvidence),
@@ -142,6 +216,12 @@ function paragraphHasGrounding(paragraph, policy) {
   if (evidence.includes('received.forward-request') && CTA_PATTERN.test(text) && policy.ctaAllowed) {
     return true;
   }
+  if (
+    evidence.includes('received.feedback-details') &&
+    policy.feedbackDetails.themes.some((theme) => theme.response.test(text))
+  ) {
+    return true;
+  }
   if (evidence.includes('received.intent') && /\b(?:dankjewel|duidelijk|begrijpelijk|interesse|feedback|preview|reactie)\b/i.test(text)) {
     return true;
   }
@@ -182,7 +262,32 @@ function ensureOneSmile(paragraphs) {
   return cleaned;
 }
 
+function joinDutchPhrases(values) {
+  const items = values.filter(Boolean);
+  if (items.length < 2) return items[0] || '';
+  if (items.length === 2) return `${items[0]} en ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')} en ${items.at(-1)}`;
+}
+
+function deterministicDetailedFeedbackParagraphs(policy) {
+  const positives = policy.feedbackDetails.positiveThemes.slice(0, 2);
+  const themes = policy.feedbackDetails.themes.slice(0, 3);
+  const opening = [
+    'Dankjewel dat je de tijd hebt genomen voor deze uitgebreide feedback.',
+    positives.length
+      ? `Fijn dat ${joinDutchPhrases(positives.map((theme) => theme.phrase))} wel goed ${
+          positives.length === 1 ? 'overkwam' : 'overkwamen'
+        }.`
+      : '',
+  ].filter(Boolean).join(' ');
+  const details = `Je punten over ${joinDutchPhrases(themes.map((theme) => theme.phrase))} zijn helder. Dat helpt me om toekomstige ontwerpen specifieker en zorgvuldiger te maken.`;
+  return ensureOneSmile([opening, details]);
+}
+
 function deterministicParagraphs(policy) {
+  if (policy.substantiveFeedback) {
+    return deterministicDetailedFeedbackParagraphs(policy);
+  }
   if (policy.rejection || policy.satisfied) {
     return ['Dankjewel voor je duidelijke reactie. Helemaal duidelijk 😁'];
   }
@@ -219,6 +324,25 @@ function deterministicParagraphs(policy) {
   return ['Dankjewel voor je reactie 😁'];
 }
 
+function hasRequiredDetailedFeedbackCoverage(paragraphs, policy) {
+  if (!policy.substantiveFeedback) return true;
+  const response = paragraphs.join(' ');
+  const requiredThemeCount = Math.min(2, policy.feedbackDetails.themes.length);
+  const coveredThemes = policy.feedbackDetails.themes.filter(
+    (theme) => theme.response.test(response)
+  ).length;
+  const positiveCovered = (
+    !policy.feedbackDetails.positiveThemes.length ||
+    policy.feedbackDetails.positiveThemes.some((theme) => theme.response.test(response))
+  );
+  return (
+    /\bdank\w*\b/i.test(response) &&
+    coveredThemes >= requiredThemeCount &&
+    positiveCovered &&
+    /\b(?:toekomst|toekomstige|volgende)\b[^.!?]{0,80}\bontwerp/i.test(response)
+  );
+}
+
 function validateStructuredParagraphs(structured, policy) {
   if (structured.intent !== policy.intent) return null;
   if (structured.ctaAllowed !== policy.ctaAllowed) return null;
@@ -238,6 +362,7 @@ function validateStructuredParagraphs(structured, policy) {
     paragraphs.push(value);
   }
   if (ctaCount > 1 || (!policy.ctaAllowed && ctaCount)) return null;
+  if (!hasRequiredDetailedFeedbackCoverage(paragraphs, policy)) return null;
   return ensureOneSmile(paragraphs);
 }
 
