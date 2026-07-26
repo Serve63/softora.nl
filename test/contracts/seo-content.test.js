@@ -791,7 +791,9 @@ test('seo linkmachine run date keeps fresh support articles above orphan risk', 
   const internalLinkStructure = pages.find((page) => page.path === '/kennisbank/wat-is-interne-linkstructuur');
   assert.ok(internalLinkStructure.html.includes('href="/bedrijfssoftware-op-maat"'));
   assert.ok(internalLinkStructure.html.includes('href="/crm-systeem-op-maat"'));
-  assert.match(internalLinkStructure.html, /CRM, dashboards, klantportalen en offerteflows/);
+  assert.ok(internalLinkStructure.html.includes('href="/ai-automatisering"'));
+  assert.ok(internalLinkStructure.html.includes('href="/website-laten-maken"'));
+  assert.match(internalLinkStructure.html, /Controleer op orphan pages, doodlopende routes en overlap/);
 });
 
 test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op publicatiedatum', () => {
@@ -864,7 +866,10 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
     assert.ok(item.wordCount >= getSeoContentMinimumWordCount(item), `${item.slug} mist berekende woordkwaliteit.`);
     assert.ok(item.author && item.author.name === 'Martijn van de Ven', `${item.slug} mist auteur.`);
     assert.ok(item.reviewedBy && item.reviewedBy.name === 'Martijn van de Ven', `${item.slug} mist review-signaal.`);
-    assert.ok(Array.isArray(item.faq) && item.faq.length >= 3, `${item.slug} mist FAQ-verdieping.`);
+    assert.ok(Array.isArray(item.faq), `${item.slug} mist een geldige FAQ-collectie.`);
+    if (Number(item.qualityVersion) < 2) {
+      assert.ok(item.faq.length >= 3, `${item.slug} mist FAQ-verdieping.`);
+    }
     assert.ok(item.relatedLinks.length >= 3, item.slug);
     assert.ok(item.relatedLinks.every((link) => String(link.href || '').startsWith('/')), item.slug);
     assert.ok(clusterKeys.has(cluster.key), item.slug);
@@ -876,6 +881,27 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
       assert.equal(item.schemaType, 'Service', item.slug);
     }
   }
+});
+
+test('interne-linkgids gebruikt native quality v2 zonder generieke opvulling', () => {
+  const item = getSeoContentItem('kennisbank', 'wat-is-interne-linkstructuur', {
+    now: new Date('2026-07-26T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, {
+    siteOrigin: 'https://www.softora.nl',
+  });
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.updatedAt, '2026-07-26');
+  assert.ok(item.wordCount >= 850);
+  assert.equal(item.faq.length, 0);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-interne-linkstructuur">/);
+  assert.match(html, /"dateModified":"2026-07-26"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat<\/a>/);
+  assert.match(html, /href="\/crm-systeem-op-maat">CRM op maat<\/a>/);
+  assert.match(html, /href="\/ai-automatisering">AI-automatisering voor een controleerbare workflow<\/a>/);
+  assert.doesNotMatch(html, /<section class="artikel-faq"/);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 });
 
 test('live seo content links only to public or stable pages', () => {

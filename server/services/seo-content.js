@@ -1,3 +1,7 @@
+const {
+  INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
+} = require('./seo-content-interne-linkstructuur');
+
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
 const DEFAULT_LOGO_PATH = '/assets/softora-touch-icon.png';
@@ -959,52 +963,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
     ]),
   }),
-  Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-interne-linkstructuur',
-    title: 'Wat is een interne linkstructuur?',
-    description:
-      'Een duidelijke uitleg van interne linkstructuur en waarom goede links tussen diensten, blogs en kennisbankpagina’s belangrijk zijn voor SEO.',
-    category: 'Websites',
-    intent: 'Uitleg',
-    publishedAt: '2026-06-01',
-    updatedAt: '2026-06-01',
-    readTime: '5 min',
-    summary:
-      'Interne linkstructuur helpt bezoekers en Google begrijpen welke pagina’s bij elkaar horen en welke pagina’s commercieel belangrijk zijn.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Interne links zijn de routes binnen je website',
-        paragraphs: Object.freeze([
-          'Een interne link is een link van de ene pagina op je website naar een andere pagina op dezelfde website. Denk aan een blog die verwijst naar een dienstpagina of een kennisbankartikel dat doorlinkt naar een passende uitleg.',
-          'Voor bezoekers maakt dat navigeren makkelijker. Voor Google laat het zien welke onderwerpen samenhangen en welke pagina’s belangrijk zijn.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Money pages hebben ondersteunende pagina’s nodig',
-        paragraphs: Object.freeze([
-          'Een dienstpagina zoals website laten maken, bedrijfssoftware op maat of AI automatisering hoeft niet elke vraag zelf te beantwoorden. Blogs en kennisbankstukken kunnen die vragen opvangen en daarna teruglinken naar de dienstpagina.',
-          'Voor bedrijfssoftware werkt dat bijvoorbeeld met uitleg over CRM, dashboards, klantportalen en offerteflows. Die ondersteunende pagina’s geven context, terwijl de dienstpagina bedrijfssoftware op maat de commerciële keuze en contactstap scherp houdt.',
-          'Zo blijft de commerciële pagina scherp, terwijl de site toch veel nuttige uitleg biedt.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Vermijd losse pagina’s zonder route',
-        paragraphs: Object.freeze([
-          'Een pagina die nergens logisch naartoe linkt, voelt voor bezoekers als een dood einde. Ook voor SEO is dat zwakker, omdat de pagina minder duidelijk onderdeel is van een cluster.',
-          'Softora bouwt content daarom rondom clusters: websites, AI automatisering, software, CRM, chatbots, AI telefonie en lokale SEO.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Blog', href: '/blog' }),
-      Object.freeze({ label: 'Diensten', href: '/diensten' }),
-      Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
-    ]),
-  }),
+  INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
   Object.freeze({
     collection: 'branches',
     slug: 'installateurs',
