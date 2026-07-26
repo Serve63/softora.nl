@@ -8,6 +8,7 @@ const {
   normalizeAccountOwnership,
 } = require('../../server/services/instantly-mailbox');
 const {
+  buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
 } = require('../../server/services/instantly-original-message-source');
 const { createMailboxService } = require('../../server/services/mailbox');
@@ -76,6 +77,7 @@ function buildService(overrides = {}) {
       ...(overrides.config || {}),
     },
     mailboxIndexStore: store,
+    getCustomerSourcesByEmails: overrides.getCustomerSourcesByEmails,
     getUiStateValues: overrides.getUiStateValues,
     setUiStateValues: overrides.setUiStateValues,
     now: () => new Date('2026-07-25T12:00:00.000Z'),
@@ -174,6 +176,125 @@ test('Instantly never invents a webdesign link when exact provider HTML has none
   assert.equal(message.body, 'Je kunt het webdesign hier bekijken.');
   assert.equal(message.webdesignLinkEvidenceKnown, false);
   assert.equal(message.webdesignLinkUrl, '');
+});
+
+test('exact customer and delivered quote restore Ramon emoji and the proven direct hier link without lead API access', async () => {
+  const customerId = 'safe-dedupe-20260615-row-2586-0163075ffe';
+  const exactUrl = `https://www.softora.nl/webdesign/ramon-design-store?cid=${customerId}&sender=serve`;
+  const rawSent = incoming({
+    id: 'ramon-local-sent',
+    thread_id: 'ramon-local-thread',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['info@ramoncc.nl'],
+    subject: 'Kleine vraag over jullie website',
+    body: {
+      text: [
+        'Goedendag,',
+        '',
+        'Afgelopen week kwam ik jullie website ramoncc.nl tegen.',
+        'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+        'Ik ben benieuwd wat je ervan vindt en hoor graag je eerlijke mening.',
+        'Je kunt het webdesign hier bekijken.',
+        'Servé Creusen',
+        "'s-Hertogenbosch",
+      ].join('\n'),
+    },
+  });
+  const rawReceived = incoming({
+    id: 'ramon-local-received',
+    thread_id: 'ramon-local-thread',
+    from_address_email: 'info@ramoncc.nl',
+    body: {
+      text: [
+        'Dank voor je mail.',
+        '',
+        'Op di 7 jul 2026 om 07:52 schreef Servé Creusen <serve-sender@example.com>:',
+        '> Goedendag,',
+        '>',
+        '> Afgelopen week kwam ik jullie website ramoncc.nl tegen.',
+        '> Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+        '> Ik ben benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+        '> Je kunt het webdesign hier bekijken 👈',
+        '> Servé Creusen',
+        "> 📍 's-Hertogenbosch",
+      ].join('\n'),
+    },
+  });
+  const exactCustomer = {
+    id: customerId,
+    email: 'info@ramoncc.nl',
+    instantlyCampaignId: 'campaign-serve',
+    instantlyLeadId: 'lead-ramon-local',
+    instantlyActualSenderEmail: 'serve-sender@example.com',
+    instantlyPublicPreviewUrl: exactUrl,
+  };
+  const source = buildCustomerQuotedMessageSource(
+    rawSent,
+    [rawSent, rawReceived],
+    exactCustomer,
+    { accountEmail: 'serve-sender@example.com', recipientEmail: 'info@ramoncc.nl' }
+  );
+  assert.equal(source.available, true);
+  assert.equal(source.webdesignLinkUrl, exactUrl);
+  assert.match(source.body, /eerlijke mening 😁/u);
+  assert.match(source.body, new RegExp(`hier \\[${exactUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\] bekijken 👈`));
+  assert.match(source.body, /📍 's-Hertogenbosch/u);
+
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    getCustomerSourcesByEmails: async ({ emails }) => {
+      assert.deepEqual(emails, ['info@ramoncc.nl']);
+      return [exactCustomer];
+    },
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      assert.equal(parsed.pathname.endsWith('/leads/list'), false);
+      assert.equal(parsed.pathname.includes('/leads/'), false);
+      if (parsed.searchParams.get('search') === 'thread:ramon-local-thread') {
+        return { response: { ok: true, status: 200 }, data: { items: [rawSent, rawReceived] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    },
+  });
+
+  await service.hydrateThread({
+    threadId: 'ramon-local-thread',
+    accountEmail: 'serve-sender@example.com',
+    owner: 'serve',
+  });
+
+  const restored = store.rows.find((message) => message.providerMessageId === 'ramon-local-sent');
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.webdesignLinkUrl, exactUrl);
+  assert.match(restored.body, /😁/u);
+  assert.equal(requests.some((request) => /\/leads(?:\/|$)/.test(new URL(request.url).pathname)), false);
+});
+
+test('delivered quote restoration fails closed when exact customer provenance drifts', () => {
+  const result = buildCustomerQuotedMessageSource({
+    campaign_id: 'campaign-serve',
+    body: { text: 'Dit is een voldoende lange providertekst voor een betrouwbare vergelijking van exact dezelfde verzonden campagne-inhoud en geen andere boodschap.' },
+  }, [{
+    body: { text: 'Op di 7 jul 2026 om 07:52 schreef Servé <serve-sender@example.com>:\nDit is een voldoende lange providertekst voor een betrouwbare vergelijking van exact dezelfde verzonden campagne-inhoud en geen andere boodschap. 😁\nJe kunt het webdesign hier bekijken 👈' },
+  }], {
+    id: 'customer-1',
+    email: 'prospect@example.org',
+    instantlyCampaignId: 'campaign-other',
+    instantlyLeadId: 'lead-1',
+    instantlyActualSenderEmail: 'serve-sender@example.com',
+    instantlyPublicPreviewUrl: 'https://www.softora.nl/webdesign/prospect?cid=customer-1&sender=serve',
+  }, {
+    accountEmail: 'serve-sender@example.com',
+    recipientEmail: 'prospect@example.org',
+  });
+
+  assert.deepEqual(result, {
+    evidenceKnown: true,
+    available: false,
+    reason: 'customer-identity-mismatch',
+  });
 });
 
 test('exact lead source restores Ramon-style emoji and direct hier link after strict provenance checks', async () => {
