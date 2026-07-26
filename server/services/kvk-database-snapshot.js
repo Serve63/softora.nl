@@ -125,6 +125,34 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     });
   }
 
+  async function sendGetLocationStatsResponse(_req, res) {
+    const result = await fetchSupabaseRowByKeyViaRest(snapshotStateKey, 'payload,updated_at', {
+      timeoutMs: snapshotReadTimeoutMs,
+      ignoreFailureCooldown: true,
+      suppressFailureCooldown: true,
+    });
+    if (!result || !result.ok) {
+      return res.status(503).json({
+        ok: false,
+        error: truncateText(result?.error || 'KVK locatiestatistieken konden niet worden geladen.', 500),
+      });
+    }
+    const row = Array.isArray(result.body) ? result.body[0] || null : result.body || null;
+    const snapshot = row?.payload?.snapshot;
+    if (!snapshot || !Array.isArray(snapshot.locations)) {
+      return res.status(404).json({ ok: false, error: 'Nog geen live KVK locatiestatistieken opgeslagen.' });
+    }
+    const locations = snapshot.locations.map((location) => ({
+      woonplaatscode: normalizeString(location?.woonplaatscode || ''),
+      land: normalizeString(location?.land || ''),
+      provincie: normalizeString(location?.provincie || ''),
+      gemeente: normalizeString(location?.gemeente || ''),
+      woonplaats: normalizeString(location?.woonplaats || ''),
+      bruikbareBedrijven: Math.max(0, Number(location?.bruikbare_bedrijven || 0)),
+    }));
+    return res.status(200).json({ ok: true, locations });
+  }
+
   async function sendPostSnapshotResponse(req, res) {
     if (!getAcceptedTokens().length) {
       return res.status(503).json({ ok: false, error: 'KVK sync-token is niet geconfigureerd.' });
@@ -174,6 +202,7 @@ function createKvkDatabaseSnapshotService(deps = {}) {
   }
 
   return {
+    sendGetLocationStatsResponse,
     sendGetSnapshotResponse,
     sendPostSnapshotResponse,
     snapshotStateKey,

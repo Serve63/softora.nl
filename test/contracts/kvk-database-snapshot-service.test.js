@@ -161,3 +161,40 @@ test('kvk database snapshot service allows custom storage timeouts for live sync
   assert.equal(savedOptions.ignoreFailureCooldown, true);
   assert.equal(savedOptions.suppressFailureCooldown, true);
 });
+
+test('kvk database snapshot service exposes compact usable totals per location', async () => {
+  const snapshot = createSnapshot();
+  snapshot.locations = [
+    {
+      woonplaatscode: 'WP0001',
+      land: 'Nederland',
+      provincie: 'Noord-Brabant',
+      gemeente: 'Vught',
+      woonplaats: 'Vught',
+      inwoners: 33010,
+      bruikbare_bedrijven: 321,
+    },
+  ];
+  const service = createKvkDatabaseSnapshotService({
+    fetchSupabaseRowByKeyViaRest: async () => ({
+      ok: true,
+      body: { payload: { snapshot } },
+    }),
+  });
+  const response = createJsonResponse();
+
+  await service.sendGetLocationStatsResponse({}, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.payload.locations, [
+    {
+      woonplaatscode: 'WP0001',
+      land: 'Nederland',
+      provincie: 'Noord-Brabant',
+      gemeente: 'Vught',
+      woonplaats: 'Vught',
+      bruikbareBedrijven: 321,
+    },
+  ]);
+  assert.equal('inwoners' in response.payload.locations[0], false);
+});
