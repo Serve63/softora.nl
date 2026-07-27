@@ -7,7 +7,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v4';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v5';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -806,28 +806,36 @@
     }
   }
 
-  function readPageBootstrap() {
+  function readPageBootstrap(value) {
     if (pageBootstrapConsumed) return null;
-    const mailbox = readPageBootstrapPayload()?.mailbox;
-    return mailbox && mailbox.ok !== false && Array.isArray(mailbox.messages) ? mailbox : null;
+    const payload = readPageBootstrapPayload();
+    const mailbox = payload?.mailbox;
+    if (!mailbox || mailbox.ok === false || !Array.isArray(mailbox.messages)) return null;
+    const requestedOwner = normalizeOwner(value == null ? activeOwner : value);
+    const snapshotOwner = isOwner(mailbox.owner)
+      ? normalizeOwner(mailbox.owner)
+      : resolveOwnerForSession(payload?.session);
+    return snapshotOwner === requestedOwner ? { ...mailbox, owner: snapshotOwner } : null;
   }
 
-  function getMailboxTabCacheKey() {
+  function getMailboxTabCacheKey(value) {
     const session = getPageBootstrapSession();
     const identity = normalizeEmail(session && (session.userId || session.email));
-    return identity ? `${MAILBOX_SESSION_CACHE_KEY}:${identity}` : '';
+    const owner = normalizeOwner(value == null ? activeOwner : value);
+    return identity ? `${MAILBOX_SESSION_CACHE_KEY}:${identity}:${owner}` : '';
   }
 
-  function readSessionMailboxSnapshot() {
+  function readSessionMailboxSnapshot(value) {
     const cache = global.SoftoraPageBootstrapSession?.cache;
-    const cacheKey = getMailboxTabCacheKey();
+    const cacheKey = getMailboxTabCacheKey(value);
     const mailbox = cache?.read?.(cacheKey, MAILBOX_SESSION_CACHE_MAX_AGE_MS);
     return mailbox && Array.isArray(mailbox.messages) ? mailbox : null;
   }
 
-  function writeSessionMailboxSnapshot(data) {
+  function writeSessionMailboxSnapshot(data, value) {
     const cache = global.SoftoraPageBootstrapSession?.cache;
-    const cacheKey = getMailboxTabCacheKey();
+    const owner = normalizeOwner(value == null ? activeOwner : value);
+    const cacheKey = getMailboxTabCacheKey(owner);
     if (!cache || !cacheKey || !data || !Array.isArray(data.messages)) return false;
     const messages = data.messages.slice(0, 100).map((message) => {
       const source = message && typeof message === 'object' ? message : {};
@@ -863,14 +871,15 @@
       savedAt: Number.isFinite(Date.parse(String(data.savedAt || '')))
         ? new Date(data.savedAt).toISOString()
         : new Date().toISOString(),
+      owner,
       messages,
       sync: data.sync && typeof data.sync === 'object' ? data.sync : null,
     });
   }
 
-  function readInitialMailboxSnapshot() {
-    const pageSnapshot = readPageBootstrap();
-    const sessionSnapshot = readSessionMailboxSnapshot();
+  function readInitialMailboxSnapshot(value) {
+    const pageSnapshot = readPageBootstrap(value);
+    const sessionSnapshot = readSessionMailboxSnapshot(value);
     return pageSnapshot || sessionSnapshot;
   }
 
@@ -894,7 +903,8 @@
   }
 
   function removeCachedMessage(mail) {
-    const snapshot = readSessionMailboxSnapshot();
+    const owner = getMessageOwner(mail) || activeOwner;
+    const snapshot = readSessionMailboxSnapshot(owner);
     if (!snapshot || !mail) return false;
     const messages = snapshot.messages.filter((candidate) => !matchesMessageIdentity(candidate, mail));
     if (messages.length === snapshot.messages.length) return false;
@@ -902,7 +912,7 @@
       ...snapshot,
       savedAt: new Date().toISOString(),
       messages,
-    });
+    }, owner);
   }
 
   function publishMessageDeletion(mail) {
@@ -973,12 +983,17 @@
   }
 
   function hasPageBootstrap(folder) {
-    return folder === 'outreach' && Boolean(readInitialMailboxSnapshot());
+    return folder === 'outreach' && Boolean(readInitialMailboxSnapshot(activeOwner));
   }
 
-  function normalizeLoadResult(data, normalizeMessage, fromBootstrap) {
+  function normalizeLoadResult(data, normalizeMessage, fromBootstrap, value) {
+    const owner = normalizeOwner(value == null ? activeOwner : value);
     const result = {
-      messages: (Array.isArray(data && data.messages) ? data.messages : []).map(normalizeMessage),
+      owner,
+      messages: filterMessages(
+        (Array.isArray(data && data.messages) ? data.messages : []).map(normalizeMessage),
+        owner
+      ),
       sync: data?.sync && typeof data.sync === 'object'
         ? data.sync
         : {
@@ -990,35 +1005,40 @@
           },
       fromBootstrap: Boolean(fromBootstrap),
     };
-    writeSessionMailboxSnapshot({ ...data, messages: result.messages, sync: result.sync });
+    writeSessionMailboxSnapshot({ ...data, owner, messages: result.messages, sync: result.sync }, owner);
     return result;
   }
 
   async function load(folder, normalizeMessage, fetchImpl, options) {
     if (folder !== 'outreach') return null;
-    const bootstrap = !(options && options.skipBootstrap) ? readInitialMailboxSnapshot() : null;
+    const owner = normalizeOwner(options && options.owner != null ? options.owner : activeOwner);
+    const bootstrap = !(options && options.skipBootstrap) ? readInitialMailboxSnapshot(owner) : null;
     if (bootstrap) {
       pageBootstrapConsumed = true;
-      return normalizeLoadResult(bootstrap, normalizeMessage, true);
+      return normalizeLoadResult(bootstrap, normalizeMessage, true, owner);
     }
     const request = typeof fetchImpl === 'function'
       ? fetchImpl
       : global.fetch.bind(global);
     const params = new URLSearchParams({
       limit: '100',
-      owner: activeOwner,
+      owner,
       refreshInstantly: '1',
     });
     const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
       credentials: 'same-origin',
       cache: 'no-store',
       headers: { Accept: 'application/json' },
+      ...(options && options.signal ? { signal: options.signal } : {}),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.ok) {
       throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
     }
-    return normalizeLoadResult(data, normalizeMessage, false);
+    if (isOwner(data.owner) && normalizeOwner(data.owner) !== owner) {
+      throw new Error('De mailboxresponse hoort bij een andere eigenaar.');
+    }
+    return normalizeLoadResult(data, normalizeMessage, false, owner);
   }
 
   const campaignInboxApi = {
@@ -1034,6 +1054,7 @@
     getOwnerByAccount,
     getMessageOwner,
     getOwnerLabel,
+    getMailboxTabCacheKey,
     getOwnerOptionsForMenu,
     getOwnerPinKeyForIdentity,
     getPageBootstrapSession,

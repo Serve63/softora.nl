@@ -1,4 +1,17 @@
 const { createInstantlyMailboxService } = require('./instantly-mailbox');
+const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+
+function getMailboxMessageOwner(message) {
+  const provider = String(message?.provider || '').trim().toLowerCase();
+  if (provider === 'instantly') {
+    const providerOwner = String(message?.providerOwner || '').trim().toLowerCase();
+    return ['serve', 'martijn'].includes(providerOwner) ? providerOwner : '';
+  }
+  const accountEmail = String(
+    message?.accountEmail || message?.campaign?.account || ''
+  ).trim().toLowerCase();
+  return getOutboundSenderIdentity(accountEmail)?.profileKey || '';
+}
 
 function createDefaultInstantlyMailboxService({
   env,
@@ -204,13 +217,18 @@ async function mergeCampaignReplies({
     message,
     ...(Array.isArray(message?.threadMessages) ? message.threadMessages : []),
   ];
-  function mergeWithBase(providerReplies) {
+  const selectedBaseReplies = selectedOwner
+    ? (Array.isArray(baseReplies) ? baseReplies : []).filter(
+        (message) => getMailboxMessageOwner(message) === selectedOwner
+      )
+    : (Array.isArray(baseReplies) ? baseReplies : []);
+  function mergeWithBase(providerReplies, sourceBaseReplies) {
     const providerMessageIds = new Set(
       providerReplies.flatMap(getConversationMessages)
         .map((message) => normalizeString(message?.messageId).toLowerCase())
         .filter(Boolean)
     );
-    const uniqueBaseReplies = (Array.isArray(baseReplies) ? baseReplies : []).filter((message) => {
+    const uniqueBaseReplies = (Array.isArray(sourceBaseReplies) ? sourceBaseReplies : []).filter((message) => {
       const messageIds = getConversationMessages(message)
         .map((entry) => normalizeString(entry?.messageId).toLowerCase())
         .filter(Boolean);
@@ -223,8 +241,8 @@ async function mergeCampaignReplies({
       )));
   }
   return {
-    messages: mergeWithBase(instantlyReplies),
-    snapshotMessages: mergeWithBase(allInstantlyReplies),
+    messages: mergeWithBase(instantlyReplies, selectedBaseReplies),
+    snapshotMessages: mergeWithBase(allInstantlyReplies, baseReplies),
     instantlyReplies: filterVisibleMailboxMessages(instantlyReplies),
     snapshotInstantlyReplies: filterVisibleMailboxMessages(allInstantlyReplies),
     instantlySync,
@@ -301,6 +319,7 @@ module.exports = {
   getInstantlyProviderAccount,
   getInstantlyStatus,
   getInstantlyVisibilityDeps,
+  getMailboxMessageOwner,
   markInstantlyMessageRead,
   mergeCampaignReplies,
   resolveReplyIdentity,

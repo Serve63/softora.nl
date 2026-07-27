@@ -130,6 +130,59 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
   });
 });
 
+test('compose controller weigert een oude replycontext na eigenaarwissel', async () => {
+  const requests = [];
+  let owner = 'serve';
+  const values = {
+    'c-to': { value: '' },
+    'c-cc': { value: '' },
+    'c-bcc': { value: '' },
+    'c-subject': { value: '' },
+    'c-body': { value: 'Antwoord' },
+    'compose-overlay': { classList: { add() {}, remove() {} } },
+  };
+  const mail = {
+    id: 'serve-message',
+    accountEmail: 'serve@softora.nl',
+    email: 'prospect@example.nl',
+    subject: 'Vraag',
+  };
+  const controller = composeController.create({
+    document: {
+      getElementById: (id) => values[id] || null,
+      querySelector: () => null,
+    },
+    compose: {
+      buildReplyContext: () => ({ id: mail.id, accountEmail: mail.accountEmail }),
+      getAttachments: () => [],
+      reset() {},
+      resetOptionalFields() {},
+    },
+    campaignInbox: {
+      getAccount: (message) => message.accountEmail,
+      getMessageOwner: () => 'serve',
+    },
+    display: {
+      getReplyToAddress: () => mail.email,
+      formatDetailSubject: (value) => value,
+    },
+    findMail: () => mail,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    getAccount: () => 'martijn@softora.nl',
+    getOwner: () => owner,
+    getActiveFolder: () => 'outreach',
+    fetch: async (...args) => {
+      requests.push(args);
+      return { ok: true, json: async () => ({ ok: true }) };
+    },
+    toast() {},
+  });
+  controller.reply(mail);
+  owner = 'martijn';
+  await controller.send();
+  assert.equal(requests.length, 0);
+});
+
 test('verbergen gebruikt uitsluitend Softora hide en restore en nooit een bronmail-delete', async () => {
   const requests = [];
   const controller = mailboxDelete.create({

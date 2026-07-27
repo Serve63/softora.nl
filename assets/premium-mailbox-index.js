@@ -106,6 +106,8 @@ async function loadBody({
   normalizeOptOutUrl,
   getActiveMail,
   openMail,
+  isCurrent,
+  signal,
 }) {
   const mail = getMail(id);
   if (!mail || mail.bodyLoading) return;
@@ -116,11 +118,13 @@ async function loadBody({
       credentials: 'same-origin',
       cache: 'no-store',
       headers: { Accept: 'application/json' },
+      ...(signal ? { signal } : {}),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.ok || !data.message) {
       throw new Error(data?.detail || data?.error || 'Bericht laden mislukt');
     }
+    if (typeof isCurrent === 'function' && !isCurrent()) return;
     const body = normalizeText(data.message.body || '');
     mail.body = body;
     mail.bodyImages = normalizeBodyImages(data.message.bodyImages || mail.bodyImages);
@@ -148,11 +152,16 @@ async function loadBody({
     mail.recipientRoutingEvidenceKnown = data.message.recipientRoutingEvidenceKnown === true;
     mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
   } catch (error) {
+    if (typeof isCurrent === 'function' && !isCurrent()) return;
     mail.bodyLoadError = String(error?.message || error || 'Bericht laden mislukt');
     mail.bodyLoaded = false;
   } finally {
     mail.bodyLoading = false;
-    if (typeof getActiveMail === 'function' && String(getActiveMail()) === String(id)) {
+    if (
+      (typeof isCurrent !== 'function' || isCurrent()) &&
+      typeof getActiveMail === 'function' &&
+      String(getActiveMail()) === String(id)
+    ) {
       openMail(id, { skipBodyFetch: true });
     }
   }
@@ -232,7 +241,11 @@ async function loadThreadBodies({
   getActiveMail,
   openMail,
   fetchImpl,
+  isCurrent,
+  signal,
 }) {
+  const stillCurrent = () => typeof isCurrent !== 'function' || isCurrent();
+  if (!stillCurrent()) return false;
   if (!mail || mail.threadBodiesLoading) return false;
   const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
   const targets = messages.filter((message) => (
@@ -272,6 +285,7 @@ async function loadThreadBodies({
           credentials: 'same-origin',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          ...(signal ? { signal } : {}),
           body: JSON.stringify({
             messages: targetReferences.slice(offset, offset + 20),
           }),
@@ -280,6 +294,7 @@ async function loadThreadBodies({
         if (!response.ok || !data?.ok || !Array.isArray(data.messages)) {
           throw new Error(data?.detail || data?.error || 'Berichtinhoud laden mislukt');
         }
+        if (!stillCurrent()) return false;
         data.messages.forEach((source) => {
           const identity = `${normalizeText(source.accountEmail).toLowerCase()}|${normalizeText(source.folder).toLowerCase()}|${Number(source.uid) || normalizeText(source.id)}`;
           const target = targetByIdentity.get(identity);
@@ -296,6 +311,7 @@ async function loadThreadBodies({
       }
     }
 
+    if (!stillCurrent()) return false;
     targets.forEach((message) => {
       message.bodyLoading =
         needsThreadBodyHydration(message) ||
@@ -328,9 +344,11 @@ async function loadThreadBodies({
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { Accept: 'application/json' },
+            ...(signal ? { signal } : {}),
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok || !data?.ok || !data.message) return;
+          if (!stillCurrent()) return;
           updated = applyThreadMessagePayload(
             message,
             data.message,
@@ -351,6 +369,7 @@ async function loadThreadBodies({
     });
     mail.threadBodiesLoading = false;
     if (
+      stillCurrent() &&
       typeof openMail === 'function' &&
       typeof getActiveMail === 'function' &&
       String(getActiveMail()) === String(mail.id)
