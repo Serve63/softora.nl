@@ -259,6 +259,7 @@ test('De Krekul krijgt een persoonlijke tevredenheidsreactie met jubileum en zac
     lateTiming: true,
     recentWebsiteRenewal: true,
     anniversaryYears: 60,
+    styleBrandName: '',
   });
   assert.equal(result, [
     'Goedendag Marie-José,',
@@ -273,6 +274,56 @@ test('De Krekul krijgt een persoonlijke tevredenheidsreactie met jubileum en zac
     'Servé Creusen',
   ].join('\n'));
   assert.doesNotMatch(result, /afspraak|langskom|\[dag\]|helemaal duidelijk/i);
+});
+
+test('Bliss by Patty krijgt een concrete stijlreactie in plaats van generieke feedbacktekst', () => {
+  const inbound = [
+    'Goeiemiddag,',
+    '',
+    'Bedankt voor je mailtje en leuk dat je geïnteresseerd bent in mijn bedrijf.',
+    'Ik vind jouw webdesign niet echt bij Bliss passen, sorry... is veel te strak,',
+    'clean en chique.',
+    'Bliss staat juist voor vrolijk, speels met een Ibiza vibe en ik vind de',
+    'uitstraling die de website op dit moment daar goed bij passen.',
+    '',
+    'Wel heel leuk dat je dit initiatief hebt genomen!',
+    '',
+    'Grts, Patty',
+  ].join('\n');
+  const policy = analyzeMailboxReplyContext(inbound, {
+    originalText: 'Goedendag,\n\nAfgelopen week kwam ik jullie website blissbypatty.nl tegen.',
+  });
+  const firstName = inferMailboxReplyFirstName({
+    from: 'Bliss.by.Patty',
+    body: inbound,
+  });
+  const result = enforceMailboxReplyProfile('', {
+    firstName,
+    inboundText: inbound,
+    originalSentMail: {
+      body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website blissbypatty.nl tegen.',
+    },
+  });
+
+  assert.equal(firstName, 'Patty');
+  assert.equal(policy.intent, 'feedback_only');
+  assert.equal(policy.substantiveFeedback, true);
+  assert.equal(policy.futureDoorOpenAllowed, true);
+  assert.deepEqual(policy.feedbackDetails.themes.map((theme) => theme.key), ['style_mismatch']);
+  assert.equal(policy.replyHighlights.styleBrandName, 'Bliss');
+  assert.equal(result, [
+    'Goedendag Patty,',
+    '',
+    'Bedankt voor je eerlijke feedback! 😁',
+    '',
+    'Ik snap wat je bedoelt: mijn ontwerp is inderdaad te strak, clean en chique voor de vrolijke, speelse Ibiza-uitstraling van Bliss. Daar kan ik zeker iets mee.',
+    '',
+    'Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor jullie website, dan mag je me altijd een berichtje sturen.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n'));
+  assert.doesNotMatch(result, /Dankjewel voor je uitgebreide en concrete feedback|afspraak|langskom|\[dag\]/i);
 });
 
 test('Bossche Brouwers feedback erft geen actieve CTA uit geciteerde coldmail', () => {
@@ -297,7 +348,8 @@ test('Bossche Brouwers feedback erft geen actieve CTA uit geciteerde coldmail', 
     }
   );
 
-  assert.match(result, /Dankjewel voor je uitgebreide en concrete feedback/);
+  assert.match(result, /Bedankt voor je eerlijke en duidelijke feedback/);
+  assert.match(result, /jullie eigen sfeer en identiteit/);
   assert.doesNotMatch(result, /langskom|afspraak|\[dag\]|verder bespreken/i);
   assert.equal((result.match(/😁/gu) || []).length, 1);
   assert.equal(result.endsWith('Met vriendelijke groet,\nServé Creusen'), true);
@@ -557,7 +609,8 @@ test('iedere modelalinea moet relevante bewijslabels en inhoud hebben of valt ve
     { inboundText: 'Als feedback mis ik vooral onze eigen sfeer en fotografie.' }
   );
 
-  assert.match(result, /uitgebreide en concrete feedback/);
+  assert.match(result, /eerlijke en duidelijke feedback/);
+  assert.match(result, /jullie eigen sfeer en identiteit/);
   assert.doesNotMatch(result, /Hopelijk|kansen|samen|langskom|\[dag\]/i);
 });
 
