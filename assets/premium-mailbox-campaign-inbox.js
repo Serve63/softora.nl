@@ -25,7 +25,7 @@
   let defaultOwner = 'serve';
   let pinnedOwner = '';
   let preferenceIdentity = 'anonymous';
-  let pageBootstrapConsumed = false;
+  const pageBootstrapConsumedOwners = new Set();
 
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
@@ -807,15 +807,18 @@
   }
 
   function readPageBootstrap(value) {
-    if (pageBootstrapConsumed) return null;
+    const requestedOwner = normalizeOwner(value == null ? activeOwner : value);
+    if (pageBootstrapConsumedOwners.has(requestedOwner)) return null;
     const payload = readPageBootstrapPayload();
     const mailbox = payload?.mailbox;
     if (!mailbox || mailbox.ok === false || !Array.isArray(mailbox.messages)) return null;
-    const requestedOwner = normalizeOwner(value == null ? activeOwner : value);
-    const snapshotOwner = isOwner(mailbox.owner)
-      ? normalizeOwner(mailbox.owner)
-      : resolveOwnerForSession(payload?.session);
-    return snapshotOwner === requestedOwner ? { ...mailbox, owner: snapshotOwner } : null;
+    const snapshotOwner = isOwner(mailbox.owner) ? normalizeOwner(mailbox.owner) : '';
+    if (snapshotOwner && snapshotOwner !== requestedOwner) return null;
+    return {
+      ...mailbox,
+      owner: requestedOwner,
+      messages: filterMessages(mailbox.messages, requestedOwner),
+    };
   }
 
   function getMailboxTabCacheKey(value) {
@@ -1014,7 +1017,7 @@
     const owner = normalizeOwner(options && options.owner != null ? options.owner : activeOwner);
     const bootstrap = !(options && options.skipBootstrap) ? readInitialMailboxSnapshot(owner) : null;
     if (bootstrap) {
-      pageBootstrapConsumed = true;
+      pageBootstrapConsumedOwners.add(owner);
       return normalizeLoadResult(bootstrap, normalizeMessage, true, owner);
     }
     const request = typeof fetchImpl === 'function'

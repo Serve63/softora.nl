@@ -221,7 +221,7 @@
       reset();
       options.closeMenu?.();
       options.updateAccountUi?.();
-      void load({ skipPageBootstrap: true, openLatest: false });
+      void load({ openLatest: false });
       return owner;
     }
 
