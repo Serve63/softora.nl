@@ -7,7 +7,8 @@ const {
 } = require('./mailbox-reply-policy');
 
 const REPLY_QUOTE_HEADER_PATTERN = /^(?:op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|op\s.+\sschreef\s.+:|on\s.+\swrote:|van:|from:)/i;
-const REPLY_SIGNOFF_PATTERN = /^(?:met\svriendelijke\sgroet|vriendelijke\sgroet|groetjes|groet|mvg)[,!]?$/i;
+const REPLY_SIGNOFF_PATTERN = /^(?:met\svriendelijke\sgroet|vriendelijke\sgroet|groetjes|groeten|groet|grts|gr|mvg)[,.;!]?$/i;
+const INLINE_REPLY_SIGNOFF_PATTERN = /^(?:met\svriendelijke\sgroet|vriendelijke\sgroet|groetjes|groeten|groet|grts|gr|mvg)[,.;!]\s*(.+)$/i;
 const UNSAFE_FIRST_NAMES = new Set([
   'administratie',
   'contact',
@@ -129,6 +130,16 @@ function getNewestReplyLines(body) {
 function inferMailboxReplyFirstName(context) {
   const raw = context && typeof context === 'object' ? context : {};
   const lines = getNewestReplyLines(raw.body || raw.preview || '');
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const inlineSignoff = lines[index].match(INLINE_REPLY_SIGNOFF_PATTERN);
+    if (!inlineSignoff) continue;
+    const signatureIdentity = cleanLine(inlineSignoff[1]);
+    if (!signatureIdentity || BUSINESS_NAME_PATTERN.test(signatureIdentity) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(signatureIdentity)) {
+      continue;
+    }
+    const name = normalizeFirstName(signatureIdentity);
+    if (name) return name;
+  }
   for (let index = lines.length - 2; index >= 0; index -= 1) {
     if (!REPLY_SIGNOFF_PATTERN.test(lines[index])) continue;
     const signatureIdentity = cleanLine(lines[index + 1]);
@@ -162,6 +173,7 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '' } = {
     'Schrijf alleen de inhoudelijke alinea’s; de server voegt de bewezen aanhef, exact één 😁 en de juiste afzenderondertekening toe.',
     'Iedere alinea en iedere zin moet rechtstreeks volgen uit een concrete vraag, feit, voorkeur of intentie uit de nieuwste zelfgeschreven reactie, of uit een expliciet toegestane Softora-feitregel in antwoordBeleid.allowedEvidence.',
     'Reageer altijd eerst op de meest menselijke en concrete details uit de nieuwste mail, zoals een luchtige opmerking, een recente websitevernieuwing, tevredenheid of een jubileum. Vervang zulke details nooit door "helemaal duidelijk" of andere standaardtekst.',
+    'Bij kritiek op een ontwerp benoem je altijd de concrete tegenstelling uit de mail: wat volgens de ontvanger niet past én welke uitstraling, sfeer of identiteit juist wel past. Alleen bedanken voor "feedback" is ongeldig.',
     'Sluit in warmte, directheid, aanspreekvorm en woordkeuze aan op de oorspronkelijke verzonden mail en de nieuwste reactie, zonder de tekst letterlijk na te praten.',
     'Gebruik geen generieke vulling, losse lof, boilerplate, marketingtaal, herhaling of overgang die inhoudelijk niet uit de ontvangen mail volgt.',
     'Als je geen nuttig gegrond antwoord kunt formuleren, geef alleen de kortste beleefde erkenning.',

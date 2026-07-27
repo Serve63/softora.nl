@@ -2,7 +2,7 @@ const REPLY_QUOTE_HEADER_PATTERN = /^(?:op\s.+\sheeft\s.+\shet\svolgende\sgeschr
 const CTA_PATTERN = /\b(?:afspraak|langskom|langs\s+te\s+komen|volgende\s+week|\[dag\]|even\s+bellen|kennismak|verder\s+praten|samen\s+bespreken)\b/i;
 const GENERIC_FILLER_PATTERN = /\b(?:leuke\s+vraag|wat\s+leuk|ik\s+denk\s+graag\s+mee|mooie\s+kansen|interessante\s+mogelijkheden|hopelijk\s+kunnen\s+we|lijkt\s+me\s+goed|kijken\s+wat\s+er\s+mogelijk\s+is)\b/i;
 const FUTURE_DOOR_OPEN_PATTERN = /\bmocht\s+je\s+in\s+de\s+toekomst\s+(?:toch\s+)?eens\s+willen\s+kijken\s+wat\s+er\s+mogelijk\s+is\s+voor\s+(?:je|jullie)\s+website,\s+dan\s+mag\s+je\s+me\s+altijd\s+een\s+berichtje\s+sturen\b/i;
-const REPLY_POLICY_VERSION = 'softora-grounded-reply-v5';
+const REPLY_POLICY_VERSION = 'softora-grounded-reply-v6';
 const STOP_WORDS = new Set([
   'aan', 'als', 'ben', 'bij', 'dan', 'dat', 'de', 'deze', 'die', 'dit', 'een', 'en', 'er', 'geen',
   'heb', 'het', 'hier', 'hoe', 'ik', 'in', 'is', 'je', 'kan', 'maar', 'met', 'mijn', 'niet', 'nog',
@@ -10,10 +10,22 @@ const STOP_WORDS = new Set([
 ]);
 const FEEDBACK_THEMES = Object.freeze([
   Object.freeze({
+    key: 'style_mismatch',
+    detect: /(?=[\s\S]*\b(?:te\s+(?:strak|clean|chique|zakelijk|formeel|donker|druk|rustig|minimalistisch)|niet\s+(?:echt\s+)?(?:bij|passend))\b)(?=[\s\S]*\b(?:vrolijk|speels|ibiza(?:\s+vibe)?|warm|persoonlijk|kleurrijk|eigenzinnig|stoer|luxe|uitbundig)\b)/i,
+    phrase: 'het verschil tussen de strakke, cleane en chique richting en de vrolijke, speelse Ibiza-uitstraling',
+    response: /\b(?:strak|clean|chique)\b[\s\S]{0,180}\b(?:vrolijk|speels|ibiza)\b|\b(?:vrolijk|speels|ibiza)\b[\s\S]{0,180}\b(?:strak|clean|chique)\b/i,
+  }),
+  Object.freeze({
     key: 'generic_identity',
     detect: /\b(?:te\s+(?:vlak|algemeen|generiek)|algemene\s+(?:identiteit|uitstraling)|mist?\s+(?:een\s+)?identiteit|identiteit\s+(?:mist|ontbreekt)|voor\s+iedere\s+\w+\s+gebruikt)\b/i,
     phrase: 'de te algemene identiteit',
     response: /\b(?:algemen|generiek|vlak)[a-z]*\s+(?:identiteit|uitstraling)|identiteit\b/i,
+  }),
+  Object.freeze({
+    key: 'authentic_atmosphere',
+    detect: /\b(?:meer\s+van\s+(?:onze|mijn)|mis(?:sen)?\s+(?:ik|we)?\s*(?:vooral\s+)?(?:onze|mijn))\s+eigen\s+sfeer\b/i,
+    phrase: 'meer van de eigen sfeer en identiteit',
+    response: /\b(?:eigen\s+sfeer|sfeer[^.!?]{0,100}identiteit|identiteit[^.!?]{0,100}sfeer)\b/i,
   }),
   Object.freeze({
     key: 'non_own_imagery',
@@ -98,7 +110,7 @@ function extractFeedbackDetails(value) {
     themes: Object.freeze(themes),
     positiveThemes: Object.freeze(positiveThemes),
     bulletCount,
-    substantive: themes.length >= 2 || (themes.length >= 1 && bulletCount >= 2),
+    substantive: themes.length >= 1,
   });
 }
 
@@ -138,6 +150,7 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
     /\b(?:we|wij|ons|onze)\b/i.test(authoredText)
   ) ? 'jullie' : 'je';
   const anniversaryMatch = authoredText.match(/\b(\d{1,3})\s*[- ]?\s*jarig(?:e)?\s+jubileum\b/i);
+  const styleBrandMatch = authoredText.match(/\b([\p{L}][\p{L}0-9.&'’-]{1,50})\s+staat\s+juist\s+voor\b/iu);
   const replyHighlights = Object.freeze({
     lateTiming: /\b(?:net|helaas)\s+te\s+laat\b/i.test(authoredText),
     recentWebsiteRenewal: (
@@ -145,6 +158,7 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
       /\b(?:net|recent|onlangs)\b[^.!?\n]{0,80}\b(?:site|website)\b[^.!?\n]{0,80}\bvernieuwd\b/i.test(authoredText)
     ),
     anniversaryYears: anniversaryMatch ? Number(anniversaryMatch[1]) : null,
+    styleBrandName: styleBrandMatch ? styleBrandMatch[1] : '',
   });
 
   let intent = 'ambiguous';
@@ -304,6 +318,9 @@ function joinDutchPhrases(values) {
 
 function feedbackThemePhrase(theme, audienceForm) {
   if (theme.key === 'generic_identity') return 'de algemene uitstraling';
+  if (theme.key === 'authentic_atmosphere') {
+    return `meer van ${audienceForm} eigen sfeer en identiteit`;
+  }
   if (theme.key === 'non_own_imagery') {
     return `de beelden die niet bij ${audienceForm} bedrijf passen`;
   }
@@ -316,17 +333,27 @@ function feedbackThemePhrase(theme, audienceForm) {
 function deterministicDetailedFeedbackParagraphs(policy) {
   const positives = policy.feedbackDetails.positiveThemes.slice(0, 2);
   const themes = policy.feedbackDetails.themes.slice(0, 3);
+  const hasStyleMismatch = themes.some((theme) => theme.key === 'style_mismatch');
   const opening = [
-    'Bedankt dat je er zo uitgebreid naar hebt gekeken en je eerlijke feedback hebt gedeeld!',
+    hasStyleMismatch
+      ? 'Bedankt voor je eerlijke feedback!'
+      : themes.length === 1
+      ? 'Bedankt voor je eerlijke en duidelijke feedback!'
+      : 'Bedankt dat je er zo uitgebreid naar hebt gekeken en je eerlijke feedback hebt gedeeld!',
     positives.length
       ? `Fijn om te horen dat ${joinDutchPhrases(positives.map((theme) => theme.phrase))} wel goed ${
           positives.length === 1 ? 'overkwam' : 'overkwamen'
         }.`
       : '',
   ].filter(Boolean).join(' ');
-  const details = `Je punten over ${joinDutchPhrases(
-    themes.map((theme) => feedbackThemePhrase(theme, policy.audienceForm))
-  )} zijn duidelijk. Daar kan ik zeker iets mee.`;
+  const styleBrandName = policy.replyHighlights?.styleBrandName;
+  const details = hasStyleMismatch
+    ? `Ik snap wat je bedoelt: mijn ontwerp is inderdaad te strak, clean en chique voor de vrolijke, speelse Ibiza-uitstraling van ${
+        styleBrandName || `${policy.audienceForm} bedrijf`
+      }. Daar kan ik zeker iets mee.`
+    : `Je punten over ${joinDutchPhrases(
+        themes.map((theme) => feedbackThemePhrase(theme, policy.audienceForm))
+      )} zijn duidelijk. Daar kan ik zeker iets mee.`;
   const futureDoorOpen = policy.futureDoorOpenAllowed
     ? `Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor ${policy.audienceForm} website, dan mag je me altijd een berichtje sturen.`
     : '';
@@ -369,7 +396,13 @@ function deterministicParagraphs(policy) {
     return ensureOneSmile(['Bedankt voor je duidelijke reactie.', futureDoorOpen]);
   }
   if (policy.intent === 'feedback_only') {
-    return ['Dankjewel voor je uitgebreide en concrete feedback, daar heb ik zeker iets aan 😁'];
+    const futureDoorOpen = policy.futureDoorOpenAllowed
+      ? `Mocht je in de toekomst toch eens willen kijken wat er mogelijk is voor ${policy.audienceForm} website, dan mag je me altijd een berichtje sturen.`
+      : '';
+    return ensureOneSmile([
+      'Bedankt voor je eerlijke feedback. Ik neem je concrete punten over de gewenste uitstraling mee.',
+      futureDoorOpen,
+    ]);
   }
   if (policy.technicalQuestion) {
     const paragraphs = [
