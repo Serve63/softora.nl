@@ -1555,11 +1555,13 @@ test('an exact RFC message imported through Gmail and Instantly appears only onc
     baseReplies: [
       {
         id: 'gmail-copy',
+        accountEmail: 'serve@softora.nl',
         messageId: '<same-reply@example.org>',
         activityAt: '2026-07-25T11:00:00.000Z',
       },
       {
         id: 'gmail-other',
+        accountEmail: 'serve@softora.nl',
         messageId: '<other-reply@example.org>',
         activityAt: '2026-07-25T10:00:00.000Z',
       },

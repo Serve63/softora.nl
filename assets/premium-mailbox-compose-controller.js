@@ -2,6 +2,7 @@
   function create(options = {}) {
     const documentRef = options.document || global.document;
     let replyContext = null;
+    let replyOwner = '';
 
     function fieldValue(id) {
       return String(documentRef?.getElementById(id)?.value || '');
@@ -15,6 +16,16 @@
             getAccount: options.campaignInbox.getAccount,
           })
         : null;
+      replyOwner = mail
+        ? String(options.campaignInbox?.getMessageOwner?.(mail) || options.getOwner?.() || '').trim().toLowerCase()
+        : '';
+    }
+
+    function assertReplyOwner() {
+      const selectedOwner = String(options.getOwner?.() || '').trim().toLowerCase();
+      if (replyOwner && selectedOwner && replyOwner !== selectedOwner) {
+        throw new Error('Deze composer hoort bij een andere mailbox. Open het bericht opnieuw.');
+      }
     }
 
     function buildRewriteContext() {
@@ -77,6 +88,9 @@
         latestMessage: action.message,
         fallbackAccount: options.getAccount(),
       });
+      replyOwner = String(
+        options.campaignInbox?.getMessageOwner?.(mail) || options.getOwner?.() || ''
+      ).trim().toLowerCase();
       if (!replyContext) {
         options.toast('Ontvanger of afzender ontbreekt');
         return;
@@ -106,6 +120,7 @@
       }
       if (sendBtn) sendBtn.disabled = true;
       try {
+        assertReplyOwner();
         const replyAccount = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
         const senderProfile = await options.loadSenderProfile(replyAccount);
         const response = await options.fetch('/api/mailbox/rewrite', {
@@ -153,6 +168,7 @@
       const sendBtn = documentRef?.querySelector('.btn-send');
       if (sendBtn) sendBtn.disabled = true;
       try {
+        assertReplyOwner();
         const provider = String(replyContext && replyContext.provider || '').trim().toLowerCase();
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
