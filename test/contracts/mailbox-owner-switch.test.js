@@ -47,12 +47,14 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   let activeMail = 'oude-serve-mail';
   let composeClosed = 0;
   const pending = new Map();
+  const requestedOptions = new Map();
   const campaignInboxStub = {
     setOwner(value) { owner = value; return owner; },
     filterMessages(value, selectedOwner) {
       return value.filter((message) => message.owner === selectedOwner);
     },
     load(_folder, _normalize, _fetch, options) {
+      requestedOptions.set(options.owner, options);
       return new Promise((resolve) => pending.set(options.owner, resolve));
     },
   };
@@ -83,6 +85,7 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   assert.equal(activeMail, null);
   assert.equal(composeClosed, 1);
   assert.equal(pending.has('martijn'), true);
+  assert.notEqual(requestedOptions.get('martijn').skipBootstrap, true);
 
   pending.get('serve')({ messages: [{ id: 'stale', owner: 'serve' }], sync: {} });
   assert.equal(await staleServeLoad, false);
@@ -91,6 +94,73 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   pending.get('martijn')({ messages: [{ id: 'actueel', owner: 'martijn' }], sync: {} });
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(messages.map((message) => message.id), ['actueel']);
+});
+
+test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen berichten bij wisselen', async () => {
+  const previousDocument = globalThis.document;
+  const previousBootstrapSession = globalThis.SoftoraPageBootstrapSession;
+  const previousApi = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  globalThis.document = {
+    getElementById(id) {
+      if (id !== 'softoraPageStateBootstrap') return null;
+      return {
+        textContent: JSON.stringify({
+          session: { authenticated: true, userId: 'user-1', email: 'serve@softora.nl' },
+          mailbox: {
+            ok: true,
+            messages: [
+              { id: 'serve-imap', accountEmail: 'serve@softora.nl' },
+              { id: 'martijn-imap', accountEmail: 'martijn@softora.nl' },
+              { id: 'serve-instantly', provider: 'instantly', providerOwner: 'serve' },
+              { id: 'martijn-instantly', provider: 'instantly', providerOwner: 'martijn' },
+            ],
+            sync: { source: 'campaign-replies-snapshot' },
+          },
+        }),
+      };
+    },
+  };
+  globalThis.SoftoraPageBootstrapSession = {
+    get: () => ({ authenticated: true, userId: 'user-1', email: 'serve@softora.nl' }),
+    cache: { read: () => null, write: () => true },
+  };
+  delete require.cache[modulePath];
+  const freshCampaignInbox = require(modulePath);
+
+  try {
+    const unexpectedFetch = async () => {
+      throw new Error('de gedeelde bootstrap hoort beide eigenaarwissels te dragen');
+    };
+    const serve = await freshCampaignInbox.load(
+      'outreach',
+      (message) => message,
+      unexpectedFetch,
+      { owner: 'serve' }
+    );
+    const martijn = await freshCampaignInbox.load(
+      'outreach',
+      (message) => message,
+      unexpectedFetch,
+      { owner: 'martijn' }
+    );
+
+    assert.equal(serve.fromBootstrap, true);
+    assert.equal(martijn.fromBootstrap, true);
+    assert.deepEqual(serve.messages.map((message) => message.id), [
+      'serve-imap',
+      'serve-instantly',
+    ]);
+    assert.deepEqual(martijn.messages.map((message) => message.id), [
+      'martijn-imap',
+      'martijn-instantly',
+    ]);
+  } finally {
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraPageBootstrapSession = previousBootstrapSession;
+    globalThis.SoftoraMailboxCampaignInbox = previousApi;
+  }
 });
 
 test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gescheiden', () => {
