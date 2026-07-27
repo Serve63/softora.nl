@@ -58,7 +58,7 @@ test('kvk database metrics render current last-hour and grade values without ano
       unusable_grade_activity: {
         1: { added: 6, removed: 2 },
         2: { added: 1, removed: 0 },
-        3: { added: 0, removed: 0 },
+        3: { added: 4, removed: 3 },
       },
     },
   };
@@ -78,8 +78,47 @@ test('kvk database metrics render current last-hour and grade values without ano
   assert.equal(elements['companies-with-website-last60'].nodes['.stat-delta-number'].textContent, '+5');
   assert.equal(elements['companies-without-website-last60'].nodes['.stat-delta-number'].textContent, '+1');
   assert.equal(elements['companies-unusable-grade-1'].textContent, '24.412');
-  assert.equal(elements['companies-unusable-grade-2'].textContent, '30');
+  assert.equal(elements['companies-unusable-grade-2'].textContent, '151');
   assert.equal(elements['companies-unusable-grade-1-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
   assert.equal(elements['companies-unusable-grade-1-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-2');
-  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+1');
+  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+5');
+  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-3');
+});
+
+test('kvk database metrics combine legacy grade 3 fallback deltas into Definitief', () => {
+  const gradeSelectors = [
+    '.unusable-grade-delta-added',
+    '.unusable-grade-delta-removed',
+    '.unusable-grade-delta-label',
+  ];
+  const elements = {
+    'companies-treated-last60': createElement(),
+    'companies-usable-last60': createElement(),
+    'companies-with-website-last60': createElement(),
+    'companies-without-website-last60': createElement(),
+    'companies-unusable-grade-1': createElement(),
+    'companies-unusable-grade-2': createElement(),
+    'companies-unusable-grade-1-last60': createElement(gradeSelectors),
+    'companies-unusable-grade-2-last60': createElement(gradeSelectors),
+  };
+  const controller = createController({
+    document: {
+      getElementById(id) {
+        return elements[id] || null;
+      },
+    },
+    getState: () => ({
+      unusable_grades: { 1: 10, 2: 2, 3: 4 },
+      last_60_minutes: {
+        unusable_grades: { 1: 0, 2: 2, 3: 4 },
+        unusable_grade_activity: {},
+      },
+    }),
+  });
+
+  controller.renderMetrics();
+
+  assert.equal(elements['companies-unusable-grade-2'].textContent, '6');
+  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
+  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-0');
 });

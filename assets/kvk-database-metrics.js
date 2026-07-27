@@ -21,6 +21,24 @@
 })(typeof globalThis === 'object' ? globalThis : this, function createKvkDatabaseMetricsApi() {
   const numberFormat = new Intl.NumberFormat('nl-NL');
 
+  function sumCounts(...values) {
+    return values.reduce((total, value) => {
+      const count = Number(value || 0);
+      return total + (Number.isFinite(count) ? Math.max(0, count) : 0);
+    }, 0);
+  }
+
+  function mergeGradeActivity(...activities) {
+    const available = activities.filter((activity) => activity && typeof activity === 'object');
+    if (!available.length) return undefined;
+    const hasAdded = available.some((activity) => activity.added !== null && activity.added !== undefined);
+    const hasRemoved = available.some((activity) => activity.removed !== null && activity.removed !== undefined);
+    return {
+      added: hasAdded ? sumCounts(...available.map((activity) => activity.added)) : undefined,
+      removed: hasRemoved ? sumCounts(...available.map((activity) => activity.removed)) : undefined,
+    };
+  }
+
   function renderLast60Delta(element, value) {
     if (!element) return;
     const count = Math.max(0, Number(value || 0));
@@ -74,7 +92,9 @@
       renderLast60Delta(elements.withoutWebsite, last60.without_website);
 
       elements.unusableGrade1.textContent = numberFormat.format(Number(unusableGrades['1'] || 0));
-      elements.unusableGrade2.textContent = numberFormat.format(Number(unusableGrades['2'] || 0));
+      elements.unusableGrade2.textContent = numberFormat.format(
+        sumCounts(unusableGrades['2'], unusableGrades['3']),
+      );
       renderUnusableGradeLast60(
         elements.unusableGrade1Last60,
         unusableGradeActivity['1'],
@@ -82,8 +102,8 @@
       );
       renderUnusableGradeLast60(
         elements.unusableGrade2Last60,
-        unusableGradeActivity['2'],
-        unusableGradeLast60['2'],
+        mergeGradeActivity(unusableGradeActivity['2'], unusableGradeActivity['3']),
+        sumCounts(unusableGradeLast60['2'], unusableGradeLast60['3']),
       );
     }
 
