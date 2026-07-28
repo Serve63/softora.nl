@@ -41,6 +41,49 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
+test('bootstrapverversing hervat exact het actieve gesprek en ruimt een verdwenen nepthread op', async () => {
+  async function runScenario(liveMessages) {
+    let calls = 0;
+    let messages = [];
+    let activeMail = 'altiflex-thread';
+    let opened = 0;
+    let reset = 0;
+    const view = ownerSession.createView({
+      getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+      campaignInbox: {
+        async load() {
+          calls += 1;
+          return calls === 1
+            ? { fromBootstrap: true, messages: [{ id: 'altiflex-thread', owner: 'serve' }], sync: {} }
+            : { fromBootstrap: false, messages: liveMessages, sync: {} };
+        },
+        filterMessages: (value) => value,
+      },
+      getMessages: () => messages,
+      setMessages: (value) => { messages = value; },
+      filterDeleted: (value) => value,
+      getActiveMail: () => activeMail,
+      setActiveMail: (value) => { activeMail = value; },
+      getListElement: () => ({ setAttribute() {} }),
+      renderList() {},
+      openMail: () => { opened += 1; },
+      resetDetail: () => { reset += 1; },
+      setSync() {},
+      setStatus() {},
+    });
+
+    await view.load();
+    await new Promise((resolve) => setImmediate(resolve));
+    return { activeMail, calls, opened, reset };
+  }
+
+  const retained = await runScenario([{ id: 'altiflex-thread', owner: 'serve' }]);
+  assert.deepEqual(retained, { activeMail: 'altiflex-thread', calls: 2, opened: 1, reset: 0 });
+
+  const removed = await runScenario([]);
+  assert.deepEqual(removed, { activeMail: null, calls: 2, opened: 0, reset: 1 });
+});
+
 test('eigenaarwissel leegt de oude view direct en een late response kan nooit terugschrijven', async () => {
   let owner = 'serve';
   let messages = [{ id: 'oude-serve-mail' }];
@@ -171,11 +214,11 @@ test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gesc
   try {
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('serve'),
-      'mailbox_campaign_replies_v5:user-1:serve'
+      'mailbox_campaign_replies_v6:user-1:serve'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('martijn'),
-      'mailbox_campaign_replies_v5:user-1:martijn'
+      'mailbox_campaign_replies_v6:user-1:martijn'
     );
   } finally {
     global.SoftoraPageBootstrapSession = previousSession;

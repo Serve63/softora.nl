@@ -324,7 +324,70 @@ test('campaign reply service shows filtered replies and bounces once without exp
   assert.equal(replies.some((message) => message.id === 'coldmail:22'), false);
 });
 
-test('campaign mailbox sorteert gesprekken op hun nieuwste echte activiteit', () => {
+test('campaign mailbox classificeert Gmail-dot-aliassen als eigen outbound en bouwt geen Altiflex-megathread', async () => {
+  const ownColdmailCopies = Array.from({ length: 60 }, (_item, index) => ({
+    id: `coldmail:${index + 1}`,
+    uid: index + 1,
+    folder: 'coldmail',
+    accountEmail: 'servecreusen7@gmail.com',
+    from: 'Servé Creusen',
+    email: 'serve.creusen7@gmail.com',
+    to: index === 0 ? 'info@altiflexpersoneelsdiensten.nl' : `bedrijf-${index}@example.nl`,
+    subject: 'Kleine vraag over jullie website',
+    date: new Date(Date.UTC(2026, 6, 28, 12, index)).toISOString(),
+    messageId: `<outbound-${index}@gmail.com>`,
+    hasBody: true,
+  }));
+  const sentCopies = ownColdmailCopies.map((message, index) => ({
+    ...message,
+    id: `sent:${index + 1}`,
+    uid: index + 101,
+    folder: 'sent',
+  }));
+  const realReply = {
+    id: 'coldmail:reply',
+    uid: 900,
+    folder: 'coldmail',
+    accountEmail: 'servecreusen7@gmail.com',
+    from: 'Bedrijf 3',
+    email: 'bedrijf-3@example.nl',
+    to: 'serve.creusen7@gmail.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-28T15:30:00.000Z',
+    messageId: '<reply-3@example.nl>',
+    inReplyTo: '<outbound-3@gmail.com>',
+    references: '<outbound-3@gmail.com>',
+    hasBody: true,
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'coldmail' ? [realReply, ...ownColdmailCopies] : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'sent' ? sentCopies : folder === 'coldmail' ? [realReply, ...ownColdmailCopies] : [],
+      listMessagesByMessageIdsForAccounts: async () => [sentCopies[3]],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async ({ emails }) => emails.map((email) => ({
+        id: email,
+        bedrijf: email,
+        email,
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      })),
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100 });
+
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].id, 'coldmail:reply');
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), ['sent:4']);
+  assert.equal(replies[0].threadMessages[0].direction, 'sent');
+  assert.equal(replies[0].threadMessages[0].folder, 'sent');
+  assert.equal(replies.some((message) => String(message.to).includes('altiflex')), false);
+});
+
+test('campaign mailbox sorteert alleen op exact gekoppelde threadactiviteit', () => {
   const conversations = attachSentThreadMessages(
     [
       {
@@ -351,9 +414,9 @@ test('campaign mailbox sorteert gesprekken op hun nieuwste echte activiteit', ()
     }]
   );
 
-  assert.equal(conversations[0].email, 'rruyters@road2value.com');
-  assert.equal(conversations[0].activityAt, '2026-06-23T11:32:58.000Z');
-  assert.equal(conversations[1].email, 'later@example.test');
+  assert.equal(conversations[0].email, 'later@example.test');
+  assert.equal(conversations[1].email, 'rruyters@road2value.com');
+  assert.equal(conversations[1].threadMessages.length, 0);
 });
 
 test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een ander contactadres', () => {
@@ -389,7 +452,7 @@ test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een an
   assert.equal(conversations.length, 1);
   assert.equal(
     conversations[0].conversationId,
-    'conversation:serve290@gmail.com|contact:info@vangestelsteigerbouw.nl'
+    'conversation:serve290@gmail.com|initial-vangestel@gmail.com'
   );
   assert.deepEqual(
     conversations[0].threadMessages.map((message) => message.id),
@@ -667,7 +730,7 @@ test('campaign reply service houdt vervolgreacties in één bestaande conversati
   assert.equal(replies[0].unread, true);
   assert.equal(
     replies[0].conversationId,
-    'conversation:martijnven123@gmail.com|contact:info@seats2meetstationdenbosch.nl'
+    'conversation:martijnven123@gmail.com|222ba73e-2480-c995-627e-2386c4ef08da@gmail.com'
   );
   assert.deepEqual(
     replies[0].threadMessages.map((message) => message.id),
@@ -677,7 +740,7 @@ test('campaign reply service houdt vervolgreacties in één bestaande conversati
   assert.equal(replies[0].threadMessages[1].folder, 'inbox');
 });
 
-test('campaign reply service houdt historische vervolgreacties binnen een begrensde scan', async () => {
+test('campaign reply service koppelt alleen exact bewezen historische vervolgreacties', async () => {
   const inboxMessage = {
     id: 'inbox:23',
     uid: 23,
@@ -759,14 +822,14 @@ test('campaign reply service houdt historische vervolgreacties binnen een begren
   assert.equal(replies.length, 1);
   assert.equal(
     replies[0].conversationId,
-    'conversation:martijn@softora.nl|contact:rruyters@road2value.com'
+    'conversation:martijn@softora.nl|martijn-reply@example.test'
   );
-  assert.equal(replies[0].activityAt, '2026-06-23T11:32:58.000Z');
+  assert.equal(replies[0].activityAt, '2026-06-16T12:31:32.000Z');
   assert.deepEqual(
     replies[0].threadMessages.map((message) => message.id),
-    ['sent:149', 'sent:111']
+    ['sent:111']
   );
-  assert.deepEqual(replies[0].threadMessages.map((message) => message.body), [undefined, undefined]);
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.body), [undefined]);
 });
 
 test('campaign reply service koppelt Brigit, Karlien en Marjolein via exacte oude Sent-ouders buiten de globale scan', async () => {
@@ -895,6 +958,9 @@ test('campaign reply service hydrateert alleen de zichtbare conversatieroots en 
     subject: 'Re: Kleine vraag over jullie website',
     preview: 'Grote historische body blijft ongehydrateerd.',
     body: '',
+    messageId: `<sent-${index + 1}-${threadIndex + 1}@example.nl>`,
+    inReplyTo: reply.messageId,
+    references: reply.messageId,
     date: new Date(Date.UTC(2026, 6, 25, threadIndex, 0)).toISOString(),
   })));
   const service = createMailboxCampaignRepliesService({

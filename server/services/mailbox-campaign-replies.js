@@ -16,12 +16,17 @@ const CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT = 500;
 const CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT = 2000;
 const CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT = 1000;
 const CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE = 100;
-const CAMPAIGN_THREAD_FALLBACK_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
   'Kleine vraag over jullie website',
   'Nieuw webdesign',
 ]);
 const CAMPAIGN_INCOMING_FOLDERS = Object.freeze(['coldmail', 'inbox']);
+const {
+  getMailboxMessageDirection,
+  getMessageSourceFolders,
+  isSameMailboxIdentity,
+  normalizeMessageProvenance,
+} = require('./mailbox-message-provenance');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -300,7 +305,7 @@ function getCampaignConversationId(message, disjointSet) {
 
 function isSentReplyForMessage(sentMessage, inboxMessage) {
   if (
-    normalizeText(sentMessage && sentMessage.folder).toLowerCase() !== 'sent' ||
+    getMailboxMessageDirection(sentMessage) !== 'sent' ||
     normalizeEmail(sentMessage && sentMessage.accountEmail) !== normalizeEmail(inboxMessage && inboxMessage.accountEmail)
   ) {
     return false;
@@ -309,44 +314,19 @@ function isSentReplyForMessage(sentMessage, inboxMessage) {
   const inboxAt = parseMessageDate(inboxMessage && inboxMessage.date);
   if (!sentAt || !inboxAt || sentAt <= inboxAt) return false;
 
-  const inboxMessageId = normalizeMessageId(inboxMessage && inboxMessage.messageId);
-  if (messageReferencesId(sentMessage, inboxMessageId)) return true;
-
-  const senderEmail = normalizeEmail(inboxMessage && inboxMessage.email);
-  const recipients = extractEmailAddresses(sentMessage && sentMessage.to);
-  const sameSubject = normalizeSubject(sentMessage && sentMessage.subject) === normalizeSubject(inboxMessage && inboxMessage.subject);
-  return Boolean(
-    senderEmail &&
-    recipients.includes(senderEmail) &&
-    sameSubject &&
-    sentAt - inboxAt <= CAMPAIGN_THREAD_FALLBACK_WINDOW_MS
-  );
-}
-
-function getCampaignContactEmail(message) {
-  const folder = normalizeText(message && message.folder).toLowerCase();
-  const account = normalizeEmail(message && message.accountEmail);
-  if (folder !== 'sent') return normalizeEmail(message && message.email);
-  return extractEmailAddresses(message && message.to)
-    .find((email) => email && email !== account) || '';
-}
-
-function getContactConversationId(message, contactEmail = getCampaignContactEmail(message)) {
-  const account = normalizeEmail(message && message.accountEmail);
-  const contact = normalizeEmail(contactEmail);
-  return account && contact ? `conversation:${account}|contact:${contact}` : '';
+  return messageReferencesId(sentMessage, normalizeMessageId(inboxMessage && inboxMessage.messageId));
 }
 
 function attachSentThreadMessages(replies, sentMessages) {
   const sourceReplies = dedupeCampaignMessages(replies)
-    .filter((message) => normalizeText(message && message.folder).toLowerCase() !== 'sent');
+    .filter((message) => getMailboxMessageDirection(message) !== 'sent');
   const candidates = dedupeCampaignMessages(sentMessages)
-    .filter((message) => normalizeText(message && message.folder).toLowerCase() === 'sent');
+    .filter((message) => getMailboxMessageDirection(message) === 'sent');
   const disjointSet = createConversationDisjointSet([...sourceReplies, ...candidates]);
   const replyGroups = new Map();
 
   sourceReplies.forEach((reply) => {
-    const conversationId = getContactConversationId(reply);
+    const conversationId = getCampaignConversationId(reply, disjointSet);
     if (!conversationId) return;
     if (!replyGroups.has(conversationId)) replyGroups.set(conversationId, []);
     replyGroups.get(conversationId).push(reply);
@@ -354,37 +334,10 @@ function attachSentThreadMessages(replies, sentMessages) {
 
   const sentByConversation = new Map();
   candidates.forEach((message) => {
-    const account = normalizeEmail(message && message.accountEmail);
-    const recipients = extractEmailAddresses(message && message.to);
-    const explicitConversationIds = new Set(
-      sourceReplies
-        .filter((reply) =>
-          normalizeEmail(reply && reply.accountEmail) === account &&
-          (
-            isSentReplyForMessage(message, reply) ||
-            (
-              getCampaignConversationId(message, disjointSet) &&
-              getCampaignConversationId(message, disjointSet) ===
-                getCampaignConversationId(reply, disjointSet)
-            )
-          )
-        )
-        .map((reply) => getContactConversationId(reply))
-        .filter(Boolean)
-    );
-    recipients.forEach((contactEmail) => {
-      const conversationId = getContactConversationId(
-        { ...message, accountEmail: account },
-        contactEmail
-      );
-      if (conversationId && replyGroups.has(conversationId)) {
-        explicitConversationIds.add(conversationId);
-      }
-    });
-    explicitConversationIds.forEach((conversationId) => {
-      if (!sentByConversation.has(conversationId)) sentByConversation.set(conversationId, []);
-      sentByConversation.get(conversationId).push(message);
-    });
+    const conversationId = getCampaignConversationId(message, disjointSet);
+    if (!conversationId || !replyGroups.has(conversationId)) return;
+    if (!sentByConversation.has(conversationId)) sentByConversation.set(conversationId, []);
+    sentByConversation.get(conversationId).push(message);
   });
 
   return Array.from(replyGroups.entries())
@@ -482,7 +435,8 @@ function isCampaignReplySubject(message) {
 
 function dedupeCampaignMessages(messages) {
   const messagesByIdentity = new Map();
-  (Array.isArray(messages) ? messages : []).forEach((message) => {
+  (Array.isArray(messages) ? messages : []).forEach((rawMessage) => {
+    const message = normalizeMessageProvenance(rawMessage);
     const messageId = normalizeMessageId(message && message.messageId);
     const account = normalizeEmail(message && message.accountEmail);
     const folder = normalizeText(message && message.folder).toLowerCase();
@@ -498,28 +452,32 @@ function dedupeCampaignMessages(messages) {
       ...(Array.isArray(message?.sourceFolders) ? message.sourceFolders : []),
       folder,
     ].filter(Boolean)));
-    const preferCandidate =
-      !existing ||
-      (folder === 'coldmail' && normalizeText(existing.folder).toLowerCase() !== 'coldmail');
-    messagesByIdentity.set(key, {
+    const existingDirection = getMailboxMessageDirection(existing);
+    const candidateDirection = getMailboxMessageDirection(message);
+    const preferCandidate = !existing ||
+      (candidateDirection === 'sent' && existingDirection !== 'sent') ||
+      (
+        candidateDirection === existingDirection &&
+        folder === 'coldmail' &&
+        normalizeText(existing.storageFolder || existing.folder).toLowerCase() !== 'coldmail'
+      );
+    messagesByIdentity.set(key, normalizeMessageProvenance({
       ...(preferCandidate ? message : existing),
       sourceFolders,
-    });
+    }));
   });
   return Array.from(messagesByIdentity.values());
 }
 
 function hasCampaignLabelProvenance(message) {
-  return [
-    normalizeText(message && message.folder).toLowerCase(),
-    ...(Array.isArray(message?.sourceFolders) ? message.sourceFolders : []),
-  ].includes('coldmail');
+  return getMessageSourceFolders(message).includes('coldmail');
 }
 
 function isExternalCampaignMessage(message) {
+  if (getMailboxMessageDirection(message) === 'sent') return false;
   const account = normalizeEmail(message && message.accountEmail);
   const sender = normalizeEmail(message && message.email);
-  return Boolean(sender && (!account || sender !== account));
+  return Boolean(sender && (!account || !isSameMailboxIdentity(sender, account)));
 }
 
 function shouldShowCampaignMessage(message) {
