@@ -437,7 +437,12 @@
     syncCellA11y(cell);
   }
   function toggleCell(cell) {
-    if (isChecked(cell)) {
+    const isMobileToday = cell.classList.contains('is-today')
+      && document.body.dataset.momentumMobileView === 'today'
+      && window.matchMedia('(max-width: 900px)').matches;
+    if (isMobileToday) {
+      if (isChecked(cell)) setEmpty(cell); else setChecked(cell, true);
+    } else if (isChecked(cell)) {
       setChecked(cell, false);
     } else if (isTracked(cell)) {
       setEmpty(cell);
