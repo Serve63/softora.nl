@@ -15,7 +15,6 @@ const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-ref
 const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
 const composeControllerScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-controller.js');
 const ownerSessionScriptPath = path.join(__dirname, '../../assets/premium-mailbox-owner-session.js');
-const provenanceScriptPath = path.join(__dirname, '../../assets/premium-mailbox-message-provenance.js');
 const toastScriptPath = path.join(__dirname, '../../assets/premium-mailbox-toast.js');
 const listScriptPath = path.join(__dirname, '../../assets/premium-mailbox-list.js');
 const deleteScriptPath = path.join(__dirname, '../../assets/premium-mailbox-delete.js');
@@ -42,10 +41,6 @@ function readScript() {
 
 function readIndexScript() {
   return fs.readFileSync(indexScriptPath, 'utf8');
-}
-
-function readProvenanceScript() {
-  return fs.readFileSync(provenanceScriptPath, 'utf8');
 }
 
 function readDisplayScript() {
@@ -174,7 +169,6 @@ function loadMailboxHelpersForTest(options = {}) {
     'window.__mailboxTest = { renderMailBody, renderMailboxRootIncomingMeta, normalizeMailboxApiMessage, formatMailDate, display: window.SoftoraMailboxDisplay, index: window.SoftoraMailboxIndex, openMail, setMails(value) { mails = value; }, getActiveMail() { return activeMail; }, getElement(id) { return document.getElementById(id); } }; bindMailboxActions();'
   );
   vm.createContext(context);
-  vm.runInContext(readProvenanceScript(), context);
   vm.runInContext(readDisplayScript(), context);
   vm.runInContext(readIndexScript(), context);
   vm.runInContext(source, context);
