@@ -44,6 +44,10 @@ function readIndexScript() {
   return fs.readFileSync(indexScriptPath, 'utf8');
 }
 
+function readProvenanceScript() {
+  return fs.readFileSync(provenanceScriptPath, 'utf8');
+}
+
 function readDisplayScript() {
   return fs.readFileSync(displayScriptPath, 'utf8');
 }
@@ -170,7 +174,7 @@ function loadMailboxHelpersForTest(options = {}) {
     'window.__mailboxTest = { renderMailBody, renderMailboxRootIncomingMeta, normalizeMailboxApiMessage, formatMailDate, display: window.SoftoraMailboxDisplay, index: window.SoftoraMailboxIndex, openMail, setMails(value) { mails = value; }, getActiveMail() { return activeMail; }, getElement(id) { return document.getElementById(id); } }; bindMailboxActions();'
   );
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(provenanceScriptPath, 'utf8'), context);
+  vm.runInContext(readProvenanceScript(), context);
   vm.runInContext(readDisplayScript(), context);
   vm.runInContext(readIndexScript(), context);
   vm.runInContext(source, context);
