@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512"><link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
 <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
 <title>Mailbox – Softora.nl</title>
@@ -337,6 +337,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   color: var(--crimson);
 }
 </style>
+<link rel="stylesheet" href="assets/premium-mailbox-mobile.css?v=20260728a">
 </head>
 <body>
 <div class="dashboard-layout">
@@ -402,6 +403,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
             </div>
           </div>
         </aside>
+        <button class="mailbox-mobile-sidebar-backdrop" type="button" data-mailbox-mobile-action="close-navigation" aria-label="Navigatie sluiten" hidden></button>
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
 
   <main class="main-content is-premium-boot-host">
@@ -414,6 +416,16 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     </div>
     <div class="premium-boot-shell is-booting" aria-busy="true">
     <div class="mail-page-shell">
+
+<header class="mailbox-mobile-appbar">
+  <button class="mailbox-mobile-icon-button" type="button" data-mailbox-mobile-action="toggle-navigation" aria-label="Navigatie openen" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <a class="mailbox-mobile-brand" href="/premium-personeel-dashboard"><strong>Softora.nl</strong><span>Mailbox</span></a>
+  <a class="mailbox-mobile-icon-button" href="/premium-instellingen" aria-label="Instellingen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"/></svg>
+  </a>
+</header>
 
 <!-- TOP BAR -->
 <div class="topbar">
@@ -453,10 +465,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <!-- COMPOSE -->
-<div class="compose-overlay" id="compose-overlay">
+<div class="compose-overlay" id="compose-overlay" role="dialog" aria-modal="true" aria-labelledby="compose-title" aria-hidden="true">
   <div class="compose-box">
     <div class="compose-head">
-      <div class="compose-head-title">Nieuwe mail</div>
+      <div class="compose-head-title" id="compose-title">Nieuwe mail</div>
       <button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×</button>
     </div>
     <div class="compose-field"><div class="compose-field-label">Aan</div><input type="email" id="c-to" placeholder="ontvanger@email.nl"><button class="compose-copy-toggle" type="button" data-mailbox-action="toggle-copy-fields" aria-controls="c-copy-fields">CC/BCC</button></div>
@@ -492,5 +504,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
 <script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260727b"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260727b"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260725a"></script><script src="assets/premium-mailbox-list.js?v=20260724b"></script><script src="assets/premium-mailbox-index.js?v=20260727a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260727a"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260724c"></script>
 <script src="assets/premium-mailbox.js?v=20260727a"></script>
+<script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
 </html>

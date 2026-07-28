@@ -25,14 +25,15 @@ test('live momentum page renders the requested dashboard surface', () => {
 
   assert.match(html, /<title>ATTACK, ATTACK, ATTACK\. \| Softora<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/winnen">/);
+  assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
   assert.match(html, /href="\/assets\/fonts\.css\?v=20260409a"/);
   assert.doesNotMatch(html, /personnel-theme|premium-sidebar/);
   assert.doesNotMatch(html, /data-personnel-loading|data-sidebar-shell|data-static-sidebar/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260722b"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260728a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260723a"/);
-  assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260722a"/);
+  assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260728a"/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
@@ -46,6 +47,9 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.doesNotMatch(html, /data-live-momentum-sidebar-host/);
   assert.match(html, /<main class="main-content momentum-page" aria-labelledby="momentum-title">/);
   assert.match(html, /<nav class="momentum-mobile-nav" aria-label="Mobiele navigatie">/);
+  assert.match(html, /class="momentum-persistence-status" role="status" aria-live="polite" aria-atomic="true"/);
+  assert.match(html, /data-momentum-state="loading">Doelen laden…/);
+  assert.match(html, /data-momentum-state="error">Laden of opslaan lukt nog niet\./);
   assert.match(html, /<h2 class="end-game-title">HET EINDSPEL<\/h2>/);
   assert.match(html, /class="end-game-progress" role="progressbar" aria-label="Voortgang van Het Eindspel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-end-game-progress/);
   assert.match(html, /data-end-game-progress-value>0%<\/strong>/);
@@ -69,8 +73,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<div class="habit-grid" role="table" aria-label="Momentum taken"><\/div>/);
   assert.match(html, /live-momentum-calendar\.js\?v=/);
   assert.ok(html.indexOf('live-momentum-calendar.js') < html.indexOf('live-momentum.js'));
-  assert.match(html, /<\/section>\s*<div class="end-game-heading">[\s\S]*?<h2 class="end-game-title">HET EINDSPEL<\/h2>[\s\S]*?<\/div>\s*<section class="end-game-goals"/);
-  assert.match(html, /<div class="end-game-heading">[\s\S]*?<h2 class="end-game-title">HET EINDSPEL<\/h2>[\s\S]*?<\/div>\s*<section class="end-game-goals" aria-label="Het Eindspel doelen">/);
+  assert.match(html, /<\/section>\s*<div class="end-game-heading">[\s\S]*?<h2 class="end-game-title">HET EINDSPEL<\/h2>[\s\S]*?<\/div>\s*<p class="end-game-scroll-hint"/);
+  assert.match(html, /<p class="end-game-scroll-hint" id="end-game-scroll-hint">Veeg over een kaart om te bladeren\. Sleep het nummer om te ordenen\.<\/p>\s*<section class="end-game-goals" aria-label="Het Eindspel doelen" aria-describedby="end-game-scroll-hint">/);
   assert.match(html, /<div class="end-game-goal-track"><\/div>/);
   assert.doesNotMatch(html, /data-end-game-goal-index|Schrijf je doel/);
   assert.deepEqual(
@@ -124,7 +128,10 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(videoCss, /\.momentum-video-dialog::backdrop\s*\{[\s\S]*backdrop-filter:\s*blur\(12px\);/);
   assert.match(videoCss, /\.momentum-video-dialog\s*\{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*0;[\s\S]*width:\s*100vw;[\s\S]*height:\s*100dvh;/);
   assert.match(videoCss, /\.momentum-video-dialog\[open\]\s*\{[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/);
-  assert.match(videoCss, /\.momentum-video-shell\s*\{[\s\S]*width:\s*min\(88vw, 430px, calc\(\(100dvh - 110px\) \* \.5625\)\);/);
+  assert.match(videoCss, /--momentum-video-safe-top:\s*max\(12px, env\(safe-area-inset-top\)\);/);
+  assert.match(videoCss, /\.momentum-video-dialog\s*\{[\s\S]*padding:\s*var\(--momentum-video-safe-top\)[\s\S]*overflow:\s*auto;[\s\S]*overscroll-behavior:\s*contain;/);
+  assert.match(videoCss, /\.momentum-video-shell\s*\{[\s\S]*width:\s*min\(88vw, 430px, calc\(\(100dvh - var\(--momentum-video-safe-top\) - var\(--momentum-video-safe-bottom\) - 86px\) \* \.5625\)\);/);
+  assert.match(videoCss, /\.momentum-video-close\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*touch-action:\s*manipulation;/);
   assert.match(videoCss, /\.momentum-video-stage\s*\{[\s\S]*aspect-ratio:\s*9 \/ 16;/);
   assert.match(videoCss, /body\.momentum-video-open\s*\{[\s\S]*overflow:\s*hidden;/);
   const letterSpacingValues = Array.from(css.matchAll(/letter-spacing:\s*([^;]+);/g), (match) => match[1].trim());
@@ -230,8 +237,27 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.status:focus-visible::before\s*\{[\s\S]*box-shadow:\s*0 0 0 3px rgba\(86, 196, 134, \.3\);/);
   assert.match(css, /@media \(max-width:\s*780px\)/);
   assert.match(mobileCss, /@media \(max-width:\s*900px\)[\s\S]*\.momentum-layout \.momentum-page\s*\{[\s\S]*width:\s*100% !important;/);
-  assert.match(mobileCss, /\.chart-card::after\s*\{[\s\S]*content:\s*"AVARAGE";/);
+  assert.match(mobileCss, /--momentum-safe-start:\s*max\(16px, env\(safe-area-inset-left\)\);/);
+  assert.match(mobileCss, /padding:\s*0 var\(--momentum-safe-end\) calc\(32px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
+  assert.match(mobileCss, /\.momentum-mobile-links a\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*touch-action:\s*manipulation;/);
+  assert.match(mobileCss, /\.chart-card::after\s*\{[\s\S]*content:\s*"GEMIDDELDE";[\s\S]*font-size:\s*12px;/);
   assert.match(mobileCss, /\.habit-spacer,\s*\.habit-name\s*\{[\s\S]*position:\s*sticky;[\s\S]*left:\s*0;/);
+  assert.match(mobileCss, /\.habit-label\s*\{[\s\S]*font-size:\s*16px;/);
+  assert.match(mobileCss, /\.goal-icon-button,\s*\.goal-drag-handle\s*\{[\s\S]*width:\s*44px;[\s\S]*min-width:\s*44px;[\s\S]*height:\s*44px;/);
+  assert.match(mobileCss, /\.add-goal\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/);
+  assert.match(mobileCss, /\.bar-chart-viewport\s*\{[\s\S]*scroll-behavior:\s*auto;[\s\S]*scroll-snap-type:\s*x proximity;/);
+  assert.match(mobileCss, /\.bar\.is-today\s*\{[\s\S]*scroll-snap-align:\s*center;[\s\S]*scroll-snap-stop:\s*always;/);
+  assert.match(mobileCss, /\.habit-day\.is-today\s*\{[\s\S]*scroll-snap-align:\s*start;[\s\S]*scroll-snap-stop:\s*always;/);
+  assert.match(mobileCss, /\.momentum-page \.end-game-card-slot\s*\{[\s\S]*scroll-snap-align:\s*start;[\s\S]*touch-action:\s*pan-x pan-y;/);
+  assert.match(mobileCss, /\.momentum-page \.end-game-card-number\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;[\s\S]*touch-action:\s*none;/);
+  assert.match(mobileCss, /\.icon-picker\s*\{[\s\S]*max-height:\s*calc\(100dvh/);
+  assert.match(mobileCss, /\.icon-picker-close\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/);
+  assert.match(mobileCss, /\.icon-picker-search\s*\{[\s\S]*height:\s*48px;[\s\S]*font-size:\s*16px;/);
+  assert.match(mobileCss, /\.icon-picker-category\s*\{[\s\S]*min-height:\s*44px;/);
+  assert.match(mobileCss, /@media \(max-width:\s*900px\) and \(orientation:\s*landscape\)/);
+  assert.match(mobileCss, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*transition:\s*none !important;/);
+  assert.match(videoCss, /@media \(max-width:\s*520px\)[\s\S]*\.momentum-video-trigger\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;/);
+  assert.match(videoCss, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*transition:\s*none;/);
 });
 
 test('live momentum script wires habit toggles to chart and persisted state', () => {

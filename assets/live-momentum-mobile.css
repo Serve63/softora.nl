@@ -1,6 +1,10 @@
 .momentum-mobile-nav {
   display: none;
 }
+.momentum-persistence-status,
+.end-game-scroll-hint {
+  display: none;
+}
 
 @media (max-width: 1200px) {
   .bar-chart-viewport {
@@ -18,17 +22,19 @@
     display: none !important;
   }
   .momentum-layout .momentum-page {
+    --momentum-safe-start: max(16px, env(safe-area-inset-left));
+    --momentum-safe-end: max(16px, env(safe-area-inset-right));
     width: 100% !important;
     min-height: 100dvh !important;
-    padding: 0 16px 32px !important;
+    padding: 0 var(--momentum-safe-end) calc(32px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important;
   }
   .momentum-mobile-nav {
     position: relative;
     z-index: 5;
     display: flex;
-    min-height: 62px;
-    margin: 0 -16px 24px;
-    padding: 0 16px;
+    min-height: calc(62px + env(safe-area-inset-top));
+    margin: 0 calc(-1 * var(--momentum-safe-end)) 24px calc(-1 * var(--momentum-safe-start));
+    padding: env(safe-area-inset-top) var(--momentum-safe-end) 0 var(--momentum-safe-start);
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--line);
@@ -36,6 +42,9 @@
     backdrop-filter: blur(14px);
   }
   .momentum-mobile-logo {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
     color: #a52055;
     font-family: var(--font-display);
     font-size: 1.35rem;
@@ -50,14 +59,15 @@
   }
   .momentum-mobile-links a {
     display: grid;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     place-items: center;
     border: 1px solid rgba(26, 26, 46, .08);
     border-radius: 12px;
     background: rgba(255, 255, 255, .72);
     color: var(--muted);
     text-decoration: none;
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
   .momentum-mobile-links a:focus-visible {
@@ -69,6 +79,33 @@
     height: 19px;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  .momentum-persistence-status {
+    position: relative;
+    z-index: 5;
+    min-height: 0;
+    margin: -15px 0 16px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: center;
+  }
+  .momentum-persistence-status span {
+    display: none;
+  }
+  body[data-momentum-persistence="loading"] .momentum-persistence-status,
+  body[data-momentum-persistence="pending"] .momentum-persistence-status,
+  body[data-momentum-persistence="saving"] .momentum-persistence-status,
+  body[data-momentum-persistence="error"] .momentum-persistence-status,
+  body[data-momentum-persistence="loading"] .momentum-persistence-status [data-momentum-state="loading"],
+  body[data-momentum-persistence="pending"] .momentum-persistence-status [data-momentum-state="pending"],
+  body[data-momentum-persistence="saving"] .momentum-persistence-status [data-momentum-state="saving"],
+  body[data-momentum-persistence="error"] .momentum-persistence-status [data-momentum-state="error"] {
+    display: block;
+  }
+  body[data-momentum-persistence="error"] .momentum-persistence-status {
+    color: #b93630;
   }
   .momentum-head {
     align-items: center;
@@ -98,9 +135,9 @@
     transform: translateY(-100%);
     background: var(--page-bg);
     color: var(--muted);
-    content: "AVARAGE";
+    content: "GEMIDDELDE";
     font-family: var(--font-display);
-    font-size: .64rem;
+    font-size: 12px;
     font-weight: 600;
     line-height: 1;
     pointer-events: none;
@@ -109,12 +146,13 @@
     top: calc(14px + var(--chart-total-height) - var(--chart-max-height) - var(--chart-axis-height));
     bottom: calc(10px + var(--chart-axis-height));
     width: 38px;
-    font-size: .65rem;
+    font-size: 12px;
   }
   .bar-chart-viewport {
     overflow-x: auto;
     overscroll-behavior-inline: contain;
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
@@ -129,20 +167,25 @@
   .bar {
     width: 24px;
   }
+  .bar.is-today {
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
   .bar-label {
-    font-size: .68rem;
+    font-size: 12px;
   }
   .habit-board {
     margin-top: 1.05rem;
     overscroll-behavior-inline: contain;
-    scroll-behavior: smooth;
-    scroll-padding-inline-start: 176px;
+    scroll-behavior: auto;
+    scroll-padding-inline-start: 192px;
+    scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
   }
   .habit-grid {
     width: max-content;
     min-width: 0;
-    grid-template-columns: 176px repeat(var(--day-count, 31), 44px);
+    grid-template-columns: 192px repeat(var(--day-count, 31), 44px);
   }
   .habit-grid > * {
     min-height: 48px;
@@ -150,6 +193,7 @@
   .habit-spacer,
   .habit-day {
     min-height: 58px;
+    font-size: 12px;
   }
   .habit-spacer,
   .habit-name {
@@ -167,17 +211,41 @@
     gap: 7px;
     min-height: 48px;
     padding: 0 8px 0 12px;
-    font-size: .76rem;
+    font-size: 12px;
   }
   .habit-label {
     min-width: 0;
     overflow: hidden;
+    font-size: 16px;
     text-overflow: ellipsis;
   }
+  .habit-day.is-today {
+    scroll-margin-inline-start: 44px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  .goal-icon-button,
+  .goal-drag-handle,
+  .add-goal {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .goal-icon-button,
   .goal-drag-handle {
-    width: 26px;
-    min-width: 26px;
-    height: 38px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+  .goal-drag-handle {
+    padding: 8px;
+  }
+  .habit-name:has(.add-goal) {
+    padding-left: 44px;
+  }
+  .add-goal {
+    left: 0;
+    width: 44px;
+    height: 44px;
   }
   .status::before {
     width: 22px;
@@ -190,7 +258,41 @@
   .end-game-goals {
     margin-top: 1.4rem;
     padding-bottom: .5rem;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
+  }
+  .end-game-scroll-hint {
+    display: block;
+    margin: 1.2rem 0 -.8rem;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .momentum-page .end-game-card-slot {
+    scroll-snap-align: start;
+    touch-action: pan-x pan-y;
+  }
+  .end-game-goal-card--mission {
+    touch-action: pan-x pan-y;
+  }
+  .momentum-page .end-game-card-number {
+    display: grid;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -.35rem auto -.2rem;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(26, 26, 46, .045);
+    cursor: grab;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .momentum-page .end-game-progress-scale,
+  .momentum-page .end-game-progress-scale strong {
+    font-size: 12px;
   }
   .end-game-goal-track {
     gap: 12px;
@@ -211,6 +313,41 @@
     top: 75%;
     right: -2%;
     font-size: clamp(2.7rem, 15vw, 4.3rem);
+  }
+  .icon-picker-backdrop {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+  }
+  .icon-picker {
+    max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom)));
+    padding: 16px;
+    overscroll-behavior: contain;
+  }
+  .icon-picker-close {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    touch-action: manipulation;
+  }
+  .icon-picker-search {
+    height: 48px;
+    font-size: 16px;
+  }
+  .icon-picker-categories {
+    overscroll-behavior-inline: contain;
+  }
+  .icon-picker-category {
+    min-height: 44px;
+    font-size: 12px;
+    touch-action: manipulation;
+  }
+  .icon-picker-results {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overscroll-behavior: contain;
+  }
+  .icon-picker-result {
+    min-height: 72px;
+    touch-action: manipulation;
   }
 }
 
@@ -244,39 +381,73 @@
 
 @media (max-width: 520px) {
   .momentum-layout .momentum-page {
-    padding-right: 12px !important;
-    padding-left: 12px !important;
+    --momentum-safe-start: max(12px, env(safe-area-inset-left));
+    --momentum-safe-end: max(12px, env(safe-area-inset-right));
   }
   .momentum-mobile-nav {
-    min-height: 58px;
-    margin-right: -12px;
+    min-height: calc(58px + env(safe-area-inset-top));
+    margin-right: calc(-1 * var(--momentum-safe-end));
     margin-bottom: 20px;
-    margin-left: -12px;
-    padding: 0 12px;
+    margin-left: calc(-1 * var(--momentum-safe-start));
+    padding-right: var(--momentum-safe-end);
+    padding-left: var(--momentum-safe-start);
   }
   .momentum-head {
     gap: 12px;
   }
   .momentum-head h1 {
-    max-width: 260px;
-    font-size: clamp(1.45rem, 7vw, 1.75rem);
+    max-width: none;
+    font-size: clamp(1.4rem, 6.1vw, 1.55rem);
+    white-space: nowrap;
   }
   .habit-grid {
-    grid-template-columns: 168px repeat(var(--day-count, 31), 44px);
+    grid-template-columns: 192px repeat(var(--day-count, 31), 44px);
   }
   .habit-board {
-    scroll-padding-inline-start: 168px;
+    scroll-padding-inline-start: 192px;
   }
   .end-game-goals {
-    width: calc(100% + 24px);
-    margin-right: -12px;
-    margin-left: -12px;
-    padding-right: 12px;
-    padding-left: 12px;
-    scroll-padding-inline-start: 12px;
+    width: calc(100% + var(--momentum-safe-start) + var(--momentum-safe-end));
+    margin-right: calc(-1 * var(--momentum-safe-end));
+    margin-left: calc(-1 * var(--momentum-safe-start));
+    padding-right: var(--momentum-safe-end);
+    padding-left: var(--momentum-safe-start);
+    scroll-padding-inline-start: var(--momentum-safe-start);
   }
   .end-game-goal-card {
     flex-basis: min(78vw, 275px);
     min-height: clamp(385px, 61vh, 445px);
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .momentum-mobile-nav {
+    margin-bottom: 14px;
+  }
+  .momentum-head {
+    padding-bottom: 1rem;
+  }
+  .end-game-title {
+    margin-top: 2.2rem;
+  }
+  .end-game-goal-card {
+    min-height: clamp(300px, 76dvh, 390px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-chart-viewport,
+  .habit-board,
+  .end-game-goals {
+    scroll-behavior: auto !important;
+  }
+  .bar,
+  .end-game-goal-card,
+  .end-game-card-slot,
+  .end-game-progress-fill,
+  .add-goal,
+  .goal-icon-button {
+    animation: none !important;
+    transition: none !important;
   }
 }

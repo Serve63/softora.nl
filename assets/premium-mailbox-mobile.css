@@ -1,0 +1,307 @@
+.mailbox-mobile-appbar,
+.mailbox-mobile-sidebar-backdrop,
+.mailbox-mobile-detail-toolbar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  .dashboard-layout {
+    display: block !important;
+    width: 100% !important;
+    min-height: 100dvh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  .main-content {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin-left: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .premium-boot-shell,
+  .mail-page-shell {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .mailbox-mobile-appbar {
+    min-height: calc(56px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, .96);
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    flex: 0 0 auto;
+    z-index: 210;
+  }
+
+  .mailbox-mobile-icon-button {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-dark);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mailbox-mobile-icon-button:active { background: var(--tag); }
+  .mailbox-mobile-icon-button:focus-visible { outline: 2px solid rgba(155, 35, 85, .4); outline-offset: -2px; }
+  .mailbox-mobile-icon-button svg { width: 22px; height: 22px; }
+
+  .mailbox-mobile-brand {
+    min-width: 0;
+    color: var(--text-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    line-height: 1.05;
+  }
+
+  .mailbox-mobile-brand strong {
+    color: var(--crimson);
+    font: 800 18px/1 'Barlow Condensed', sans-serif;
+    letter-spacing: .04em;
+  }
+
+  .mailbox-mobile-brand span {
+    margin-top: 3px;
+    color: var(--text-light);
+    font: 700 9px/1 'Barlow', sans-serif;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: min(86vw, 320px) !important;
+    max-width: 320px !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    padding: calc(18px + env(safe-area-inset-top)) 0 env(safe-area-inset-bottom) !important;
+    border: 0 !important;
+    border-right: 1px solid var(--border) !important;
+    box-shadow: 20px 0 60px rgba(22, 20, 30, .18) !important;
+    overflow: hidden !important;
+    transform: translate3d(-104%, 0, 0) !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: transform .24s ease, visibility 0s linear .24s !important;
+    z-index: 260 !important;
+  }
+
+  body.mailbox-mobile-nav-open .dashboard-layout > .sidebar[data-static-sidebar="1"] {
+    transform: translate3d(0, 0, 0) !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transition: transform .24s ease, visibility 0s !important;
+  }
+
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-logo {
+    min-height: 44px !important;
+    margin-bottom: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-nav {
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 0 8px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    white-space: normal !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-section {
+    width: 100% !important;
+    display: block !important;
+    margin: 0 0 8px !important;
+  }
+
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-section-label { display: block !important; }
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-flow-section::before { display: block !important; }
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-link {
+    min-height: 44px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    display: flex !important;
+    white-space: normal !important;
+  }
+
+  .dashboard-layout > .sidebar[data-static-sidebar="1"] .sidebar-footer {
+    width: 100% !important;
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .mailbox-mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(18, 16, 24, .42);
+    backdrop-filter: blur(2px);
+    z-index: 250;
+  }
+
+  .mailbox-mobile-sidebar-backdrop:not([hidden]) { display: block; }
+  .topbar { height: 56px; padding: 0 12px; gap: 8px; }
+  .topbar-title-wrap { flex: 1; max-width: calc(100% - 52px); }
+  .topbar-mailbox-switcher { width: 100%; min-height: 44px; }
+  .topbar-mailbox-switcher-label { max-width: 100%; }
+  .topbar-mailbox-menu { left: 0; width: min(300px, calc(100vw - 24px)); min-width: 0; max-height: min(360px, calc(100dvh - 132px)); }
+  .topbar-mailbox-option-row { min-height: 44px; }
+  .topbar-mailbox-option { min-height: 44px; padding-block: 10px; }
+  .topbar-mailbox-pin { width: 44px; height: 44px; flex: 0 0 44px; }
+  .topbar-refresh-wrap { gap: 4px; }
+  .topbar-refresh { width: 44px; height: 44px; }
+  .layout { min-height: 0; }
+  .mail-list { width: min(310px, 42vw); }
+  .mail-item,
+  .mail-item-open { min-height: 60px; }
+  .detail-hide-conversation,
+  .detail-reply { min-width: 44px; min-height: 44px; }
+  .toast { bottom: calc(16px + env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); white-space: normal; line-height: 1.35; }
+  .toast-action { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+@media (max-width: 720px) {
+  .layout { position: relative; display: block; overflow: hidden; }
+  .mail-list,
+  .mail-detail {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border: 0;
+    transition: transform .22s ease, opacity .18s ease, visibility 0s linear .22s;
+  }
+
+  .mail-list { z-index: 2; transform: translate3d(0, 0, 0); opacity: 1; visibility: visible; }
+  .mail-detail { z-index: 3; transform: translate3d(100%, 0, 0); opacity: 0; visibility: hidden; pointer-events: none; }
+  .mail-page-shell.is-mobile-detail-open .mail-list { transform: translate3d(-18%, 0, 0); opacity: 0; visibility: hidden; pointer-events: none; }
+  .mail-page-shell.is-mobile-detail-open .mail-detail { transform: translate3d(0, 0, 0); opacity: 1; visibility: visible; pointer-events: auto; }
+  .detail-body { padding: 0 !important; overscroll-behavior-y: contain; }
+  .mailbox-mobile-detail-toolbar {
+    position: sticky;
+    top: 0;
+    min-height: 56px;
+    padding: 6px max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, .97);
+    display: flex;
+    align-items: center;
+    z-index: 8;
+  }
+
+  .mailbox-mobile-back {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px 0 6px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--crimson);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font: 700 14px/1 'Barlow', sans-serif;
+    cursor: pointer;
+  }
+
+  .mailbox-mobile-back svg { width: 21px; height: 21px; }
+  .detail-mail-block { width: 100%; min-height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  .detail-header { padding: 18px 16px; }
+  .detail-subject-row { flex-direction: row; gap: 10px; }
+  .detail-subject { font-size: 20px; }
+  .detail-head-tools { width: auto; }
+  .detail-divider { margin: 0 16px; padding: 0; }
+  .detail-body-text { padding: 20px 16px; font-size: 15px; line-height: 1.65; }
+  .detail-mail-section-history-sent,
+  .detail-mail-section-sent,
+  .detail-mail-section-received { padding: 14px; }
+
+  .compose-overlay {
+    inset: var(--mailbox-viewport-offset-top, 0px) 0 auto;
+    width: 100vw;
+    height: var(--mailbox-viewport-height, 100dvh);
+    padding: 0;
+    align-items: stretch;
+    z-index: 400;
+  }
+
+  .compose-box {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .compose-head { position: sticky; top: 0; min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 10px 0 16px; z-index: 3; }
+  .compose-x { width: 44px; height: 44px; font-size: 24px; }
+  .compose-field { min-height: 52px; }
+  .compose-field-label { width: 78px; padding: 12px; font-size: 11px; }
+  .compose-field input { min-width: 0; padding: 12px 8px; }
+  .compose-copy-toggle,
+  .compose-attach-button { min-height: 44px; }
+  .compose-attachment-row { padding-inline: 10px; }
+  .compose-attachment-chip button { width: 44px; height: 44px; }
+  .compose-body { flex: 1 0 140px; min-height: 140px; }
+  .compose-body textarea { min-height: 140px; padding: 16px; }
+  .compose-footer { position: sticky; bottom: 0; min-height: calc(68px + env(safe-area-inset-bottom)); padding: 10px 12px max(10px, env(safe-area-inset-bottom)); background: var(--card); z-index: 3; }
+  .btn-rewrite-compose,
+  .btn-send { min-height: 44px; padding: 10px 14px; }
+}
+
+@media (max-width: 360px) {
+  .topbar-refresh-age { display: none; }
+  .topbar-title-wrap { max-width: calc(100% - 44px); }
+  .compose-footer { align-items: stretch; }
+  .compose-footer-actions { flex: 1; }
+  .btn-rewrite-compose,
+  .btn-send { width: 100%; }
+}
+
+@media (max-width: 900px) and (max-height: 520px) and (orientation: landscape) {
+  .mailbox-mobile-appbar { min-height: calc(48px + env(safe-area-inset-top)); }
+  .topbar { height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-layout > .sidebar[data-static-sidebar="1"],
+  .mail-list,
+  .mail-detail,
+  .compose-box,
+  .toast { animation: none !important; transition: none !important; }
+}
