@@ -2,7 +2,7 @@
 <html lang="nl" data-theme-mode="light" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>ATTACK, ATTACK, ATTACK. | Softora</title>
   <link rel="canonical" href="https://www.softora.nl/winnen">
@@ -11,10 +11,10 @@
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
   <link rel="stylesheet" href="/assets/live-momentum.css?v=20260723a">
-  <link rel="stylesheet" href="/assets/live-momentum-mobile.css?v=20260722b">
+  <link rel="stylesheet" href="/assets/live-momentum-mobile.css?v=20260728a">
   <link rel="stylesheet" href="/assets/live-momentum-endgame-progress.css?v=20260722a">
   <link rel="stylesheet" href="/assets/live-momentum-endgame-numbers.css?v=20260723a">
-  <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260722a">
+  <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260728a">
 </head>
 <body data-live-momentum-page>
   <div class="momentum-layout">
@@ -46,6 +46,12 @@
         </a>
       </div>
     </nav>
+    <div class="momentum-persistence-status" role="status" aria-live="polite" aria-atomic="true">
+      <span data-momentum-state="loading">Doelen laden…</span>
+      <span data-momentum-state="pending">Wijzigingen voorbereiden…</span>
+      <span data-momentum-state="saving">Wijzigingen opslaan…</span>
+      <span data-momentum-state="error">Laden of opslaan lukt nog niet. We proberen het opnieuw.</span>
+    </div>
     <div class="momentum-art-quotes" aria-hidden="true">
       <span class="momentum-art-quote is-end-game">The end game is to win</span>
       <span class="momentum-art-quote is-attack">Attack, attack, attack</span>
@@ -97,7 +103,8 @@
         <span>100%</span>
       </div>
     </div>
-    <section class="end-game-goals" aria-label="Het Eindspel doelen">
+    <p class="end-game-scroll-hint" id="end-game-scroll-hint">Veeg over een kaart om te bladeren. Sleep het nummer om te ordenen.</p>
+    <section class="end-game-goals" aria-label="Het Eindspel doelen" aria-describedby="end-game-scroll-hint">
       <div class="end-game-goal-track"></div>
     </section>
     </main>
