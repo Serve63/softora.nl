@@ -7,12 +7,8 @@
 .momentum-layout .sidebar { display: none !important; }
 .momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: 0 var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
 .momentum-art-quotes { display: none; }
-.momentum-mobile-nav { position: relative; z-index: 8; display: flex; min-height: calc(62px + env(safe-area-inset-top)); margin: 0 calc(-1 * var(--momentum-safe-end)); padding: env(safe-area-inset-top) var(--momentum-safe-end) 0 var(--momentum-safe-start); align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(26, 26, 46, .07); background: rgba(248, 247, 244, .94); backdrop-filter: blur(18px); }
+.momentum-mobile-nav { position: relative; z-index: 8; display: flex; min-height: calc(62px + env(safe-area-inset-top)); margin: 0 calc(-1 * var(--momentum-safe-end)); padding: env(safe-area-inset-top) var(--momentum-safe-end) 0 var(--momentum-safe-start); align-items: center; border-bottom: 1px solid rgba(26, 26, 46, .07); background: rgba(248, 247, 244, .94); backdrop-filter: blur(18px); }
 .momentum-mobile-logo { display: flex; min-height: 44px; align-items: center; color: #a52055; font-family: var(--font-display); font-size: 1.28rem; font-weight: 700; line-height: 1; text-decoration: none; text-transform: uppercase; }
-.momentum-mobile-links { display: flex; gap: 6px; }
-.momentum-mobile-links a { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid rgba(26, 26, 46, .075); border-radius: 14px; background: rgba(255, 255, 255, .78); color: var(--muted); text-decoration: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-.momentum-mobile-links a:focus-visible { outline: 3px solid rgba(46, 204, 113, .3); outline-offset: 2px; }
-.momentum-mobile-links svg { width: 19px; height: 19px; stroke-linecap: round; stroke-linejoin: round; }
 .momentum-persistence-status { position: relative; z-index: 8; min-height: 0; margin: 9px 0 -2px; color: var(--muted); font-size: 11px; font-weight: 650; line-height: 1.35; text-align: center; }
 .momentum-persistence-status span { display: none; }
 body[data-momentum-persistence="loading"] .momentum-persistence-status, body[data-momentum-persistence="pending"] .momentum-persistence-status, body[data-momentum-persistence="saving"] .momentum-persistence-status, body[data-momentum-persistence="error"] .momentum-persistence-status, body[data-momentum-persistence="loading"] .momentum-persistence-status [data-momentum-state="loading"], body[data-momentum-persistence="pending"] .momentum-persistence-status [data-momentum-state="pending"], body[data-momentum-persistence="saving"] .momentum-persistence-status [data-momentum-state="saving"], body[data-momentum-persistence="error"] .momentum-persistence-status [data-momentum-state="error"] { display: block; }
@@ -38,15 +34,13 @@ body[data-momentum-persistence="error"] .momentum-persistence-status { color: #b
 .momentum-mobile-score-ring strong { font-family: var(--font-display); font-size: 1.72rem; line-height: 1; }
 .momentum-mobile-score-ring small { margin-top: 3px; color: rgba(255, 255, 255, .52); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .momentum-mobile-summary-copy h2 { margin: 0; font-family: var(--font-display); font-size: 1.52rem; line-height: 1; text-transform: uppercase; }
-.momentum-mobile-summary-copy p { min-height: 3.8em; margin: 8px 0 11px; color: rgba(255, 255, 255, .68); font-size: 12px; line-height: 1.45; }
-.momentum-mobile-summary-copy button { min-height: 40px; padding: 0 13px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 11px; background: rgba(255, 255, 255, .08); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
-.momentum-mobile-summary-copy button:focus-visible { outline: 3px solid rgba(66, 217, 129, .42); outline-offset: 2px; }
+.momentum-mobile-summary-copy p { margin: 8px 0 0; color: rgba(255, 255, 255, .68); font-size: 12px; line-height: 1.45; }
 .momentum-mobile-summary-footer { margin-top: 17px; padding-top: 13px; border-top: 1px solid rgba(255, 255, 255, .09); color: rgba(255, 255, 255, .56); font-size: 10px; font-weight: 650; }
 .momentum-mobile-summary-footer strong { margin-right: 3px; color: #fff; font-size: 12px; }
 .momentum-mobile-list-heading { display: flex; margin: 24px 2px 11px; align-items: end; justify-content: space-between; gap: 14px; }
 .momentum-mobile-list-heading span, .momentum-mobile-month-heading > span { color: #a52055; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .momentum-mobile-list-heading h2, .momentum-mobile-month-heading h2 { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.35rem; line-height: 1; text-transform: uppercase; }
-.momentum-mobile-list-heading p, .momentum-mobile-month-heading p { margin: 0; color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; text-align: right; }
+.momentum-mobile-month-heading p { margin: 0; color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; text-align: right; }
 body[data-momentum-mobile-view="today"] .chart-card, body[data-momentum-mobile-view="today"] .momentum-mobile-month-heading, body[data-momentum-mobile-view="today"] .end-game-heading, body[data-momentum-mobile-view="today"] .end-game-scroll-hint, body[data-momentum-mobile-view="today"] .end-game-goals, body[data-momentum-mobile-view="month"] .momentum-head, body[data-momentum-mobile-view="month"] .momentum-mobile-summary, body[data-momentum-mobile-view="month"] .momentum-mobile-list-heading, body[data-momentum-mobile-view="month"] .end-game-heading, body[data-momentum-mobile-view="month"] .end-game-scroll-hint, body[data-momentum-mobile-view="month"] .end-game-goals, body[data-momentum-mobile-view="endgame"] .momentum-hero, body[data-momentum-mobile-view="endgame"] .momentum-mobile-list-heading, body[data-momentum-mobile-view="endgame"] .habit-board { display: none; }
 body[data-momentum-mobile-view="month"] .momentum-mobile-month-heading { display: block; padding: 4px 2px 11px; }
 body[data-momentum-mobile-view="month"] .momentum-mobile-month-heading p { max-width: 31em; margin-top: 7px; font-size: 12px; text-align: left; }
@@ -124,8 +118,6 @@ body[data-momentum-mobile-view="endgame"] .end-game-mission-actions button { fle
 .momentum-mobile-summary-copy h2 { font-size: 1.38rem; }
 }
 @media (max-width: 380px) { .momentum-mobile-logo { font-size: 1.15rem; }
-.momentum-mobile-links { gap: 3px; }
-.momentum-mobile-links a { width: 42px; height: 42px; }
 .momentum-mobile-summary-main { grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
 .momentum-mobile-score-ring { width: 96px; height: 96px; }
 .momentum-mobile-summary-copy p { min-height: 0; }

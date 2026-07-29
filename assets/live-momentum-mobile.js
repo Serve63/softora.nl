@@ -5,7 +5,6 @@
   const habitBoard = document.querySelector('.habit-board');
   const chartViewport = document.querySelector('.bar-chart-viewport');
   const viewButtons = Array.from(document.querySelectorAll('[data-momentum-mobile-view-target]'));
-  const openMonthButton = document.querySelector('[data-momentum-mobile-open-month]');
   const dateLabel = document.querySelector('[data-momentum-mobile-date]');
   const scoreRing = document.querySelector('[data-momentum-mobile-score-ring]');
   const scoreValue = document.querySelector('[data-momentum-mobile-score]');
@@ -95,8 +94,6 @@
   viewButtons.forEach((button) => {
     button.addEventListener('click', () => setView(button.dataset.momentumMobileViewTarget));
   });
-  openMonthButton?.addEventListener('click', () => setView('month'));
-
   if (dateLabel) {
     dateLabel.textContent = new Intl.DateTimeFormat('nl-NL', {
       weekday: 'long',

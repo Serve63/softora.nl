@@ -273,7 +273,7 @@
       }
     } catch (error) {
       stateDirty = true;
-      setPersistenceState('error');
+      setPersistenceState(saveRetryCount < MAX_SAVE_RETRIES ? 'saving' : 'error');
       console.error('[LiveMomentum][state-save]', error?.message || error);
     } finally {
       writeInFlight = false;
@@ -346,7 +346,7 @@
     const checked = isChecked(cell);
     const tracked = isTracked(cell);
     const empty = isEmpty(cell);
-    const missed = tracked && !checked && day > 0 && day <= TODAY;
+    const missed = tracked && !checked && day > 0 && day < TODAY;
     cell.classList.toggle('is-missed', missed);
     cell.setAttribute('role', 'checkbox');
     cell.setAttribute('tabindex', '0');
@@ -960,7 +960,7 @@
     stateLoadRetryCount = 0;
     clearStateLoadRetry();
     setPersistenceState('saved');
-    if (!storedState || storedState.needsMigration) {
+    if (storedState?.needsMigration) {
       markStateChanged();
     }
     return true;
