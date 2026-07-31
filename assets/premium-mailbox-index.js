@@ -4,6 +4,7 @@
 let syncInFlight = false;
 let lastBackgroundSyncAt = 0;
 const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_THREAD_HYDRATION_TARGETS = 40;
 const LEGACY_MAILBOX_MEDIA_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -183,7 +184,7 @@ function needsThreadBodyHydration(message) {
 
 function getThreadMessageRequest(message, mail) {
   const account = normalizeText(message && (message.accountEmail || mail && mail.accountEmail)).toLowerCase();
-  const folder = normalizeText(message && message.folder || 'sent').toLowerCase() || 'sent';
+  const folder = normalizeText(message && (message.storageFolder || message.folder) || 'sent').toLowerCase() || 'sent';
   const id = normalizeText(message && (message.mailboxId || message.id));
   return { account, folder, id, uid: Number(message && message.uid) || 0 };
 }
@@ -243,21 +244,34 @@ async function loadThreadBodies({
   fetchImpl,
   isCurrent,
   signal,
+  targetMessages,
+  retryFailed = false,
 }) {
   const stillCurrent = () => typeof isCurrent !== 'function' || isCurrent();
   if (!stillCurrent()) return false;
   if (!mail || mail.threadBodiesLoading) return false;
-  const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
-  const targets = messages.filter((message) => (
-    needsThreadBodyHydration(message) ||
-    needsThreadImageHydration(message) ||
-    needsThreadLinkHydration(message)
+  const messages = Array.isArray(targetMessages)
+    ? targetMessages
+    : Array.isArray(mail.threadMessages) ? mail.threadMessages : [];
+  const pendingTargets = messages.filter((message) => (
+    (retryFailed || !normalizeText(message && message.bodyLoadError)) &&
+    (
+      needsThreadBodyHydration(message) ||
+      needsThreadImageHydration(message) ||
+      needsThreadLinkHydration(message)
+    )
   ));
+  const targets = pendingTargets.slice(0, MAX_THREAD_HYDRATION_TARGETS);
+  pendingTargets.slice(MAX_THREAD_HYDRATION_TARGETS).forEach((message) => {
+    message.bodyLoading = false;
+    message.bodyLoadError = 'Dit bericht wacht op een losse laadpoging.';
+  });
   if (!targets.length) return false;
 
   const request = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   mail.threadBodiesLoading = true;
   targets.forEach((message) => {
+    message.bodyLoadError = '';
     message.bodyLoading =
       needsThreadBodyHydration(message) ||
       needsThreadLinkHydration(message);
@@ -305,6 +319,9 @@ async function loadThreadBodies({
             normalizeBodyImages,
             normalizeOptOutUrl
           ) || updated;
+          if (!needsThreadBodyHydration(target.message) && !needsThreadLinkHydration(target.message)) {
+            target.message.bodyLoadError = '';
+          }
         });
       } catch (_) {
         // De gerichte detailfallback hieronder houdt oude of nog niet geïndexeerde berichten leesbaar.
@@ -333,7 +350,10 @@ async function loadThreadBodies({
     for (let offset = 0; offset < detailTargets.length; offset += 2) {
       await Promise.all(detailTargets.slice(offset, offset + 2).map(async (message) => {
         const { account, folder, id } = getThreadMessageRequest(message, mail);
-        if (!account || !id) return;
+        if (!account || !id) {
+          message.bodyLoadError = 'Volledig bericht kon niet worden geladen.';
+          return;
+        }
         message.imageLoading = true;
         message.bodyLoading =
           needsThreadBodyHydration(message) ||
@@ -347,7 +367,9 @@ async function loadThreadBodies({
             ...(signal ? { signal } : {}),
           });
           const data = await response.json().catch(() => ({}));
-          if (!response.ok || !data?.ok || !data.message) return;
+          if (!response.ok || !data?.ok || !data.message) {
+            throw new Error(data?.detail || data?.error || 'Volledig bericht kon niet worden geladen.');
+          }
           if (!stillCurrent()) return;
           updated = applyThreadMessagePayload(
             message,
@@ -355,8 +377,13 @@ async function loadThreadBodies({
             normalizeBodyImages,
             normalizeOptOutUrl
           ) || updated;
-        } catch (_) {
-          // Houd de eerlijke laadstatus zichtbaar; opnieuw openen probeert exact dit bericht nogmaals.
+          message.bodyLoadError = (
+            needsThreadBodyHydration(message) || needsThreadLinkHydration(message)
+          ) ? 'Volledig bericht kon niet worden geladen.' : '';
+        } catch (error) {
+          if (stillCurrent() && !(error && error.name === 'AbortError')) {
+            message.bodyLoadError = 'Volledig bericht kon niet worden geladen.';
+          }
         } finally {
           message.bodyLoading = false;
           message.imageLoading = false;

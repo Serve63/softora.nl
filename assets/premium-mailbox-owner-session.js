@@ -133,9 +133,18 @@
           options.setSync?.(campaignResult.sync);
           const ownerMessages = options.campaignInbox.filterMessages(campaignResult.messages, scope.owner);
           const messages = options.filterDeleted?.(ownerMessages) || [];
+          const activeId = options.getActiveMail?.();
           options.setMessages?.(messages);
           options.prewarm?.(messages);
           options.renderList?.({ openLatest: loadOptions.openLatest !== false });
+          if (loadOptions.openLatest === false && activeId) {
+            if (messages.some((message) => String(message && message.id) === String(activeId))) {
+              options.openMail?.(activeId);
+            } else {
+              options.setActiveMail?.(null);
+              options.resetDetail?.();
+            }
+          }
           options.setStatus?.('');
           setBusy(false);
           if (campaignResult.fromBootstrap && isCurrent(candidate)) {

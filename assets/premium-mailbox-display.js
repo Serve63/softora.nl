@@ -173,6 +173,8 @@
   }
 
   function isSentMessage(mail, options) {
+    const resolver = global.SoftoraMailboxMessageProvenance;
+    if (resolver && typeof resolver.isSent === 'function') return resolver.isSent(mail, options);
     return String(mail && (mail.folder || (options && options.activeFolder)) || '').toLowerCase() === 'sent';
   }
 

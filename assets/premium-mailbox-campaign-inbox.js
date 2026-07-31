@@ -7,7 +7,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v5';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v6';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -197,6 +197,14 @@
     return Number.isFinite(timestamp) ? timestamp : 0;
   }
 
+  function isSentMessageByProvenance(message, account) {
+    const resolver = global.SoftoraMailboxMessageProvenance;
+    if (resolver && typeof resolver.isSent === 'function') {
+      return resolver.isSent(message, { account });
+    }
+    return String(message && message.folder || '').trim().toLowerCase() === 'sent';
+  }
+
   function normalizeMessageId(value) {
     return String(value || '')
       .trim()
@@ -256,8 +264,7 @@
       .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0];
     const isRoot = latest.mailboxConversationRoot === true;
     const exactCopy = isRoot && mail.copyContext && mail.copyContext.evidenceKnown === true;
-    const outbound = exactCopy ||
-      String(latest && latest.folder || '').trim().toLowerCase() === 'sent';
+    const outbound = exactCopy || isSentMessageByProvenance(latest, mail.accountEmail);
     return {
       kind: outbound ? 'new-message' : 'reply',
       message: latest,
@@ -379,6 +386,8 @@
       providerAccountEmail: normalizeEmail(message.providerAccountEmail || accountEmail),
       providerOwner: String(message.providerOwner || '').trim().toLowerCase(),
       storageFolder: String(message.storageFolder || '').trim().toLowerCase(),
+      direction: String(message.direction || '').trim().toLowerCase(),
+      sourceFolders: Array.isArray(message.sourceFolders) ? message.sourceFolders : [],
       campaign: message.campaign || null,
       outreach: message.outreach || null,
       conversationId: String(message.conversationId || mail && mail.conversationId || '').trim(),
@@ -684,7 +693,7 @@
     );
     if (!quotedText) return false;
     const sentMessages = (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
-      .filter((message) => String(message && message.folder || '').trim().toLowerCase() === 'sent');
+      .filter((message) => isSentMessageByProvenance(message, mail && mail.accountEmail));
     if (looksLikeOriginalCampaignText(quotedText)) {
       const originalCampaignMessage = sentMessages.find((message) => {
         const authoredText = stripQuotedReply(
@@ -744,18 +753,20 @@
       messages = messages.slice().sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
     }
     return messages.map((message) => {
-      const loading = isMessageBodyPending(message);
+      const loadError = String(message && message.bodyLoadError || '').trim();
+      const loading = !loadError && isMessageBodyPending(message);
       const body = loading ? '' : stripQuotedReply(message && message.body);
-      if (!body && !loading) return '';
+      if (!body && !loading && !loadError) return '';
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
-      const folder = String(message && message.folder || 'sent').trim().toLowerCase();
-      const sent = folder === 'sent';
+      const sent = isSentMessageByProvenance(message, mail.accountEmail);
       const messageOwner = sent ? getMessageOwner(message) : '';
       const owner = messageOwner ? getOwnerLabel(messageOwner) : '';
       const sentLabel = messageOwner && messageOwner === mailboxOwner ? 'Jouw bericht' : 'Eerdere mail';
       const dateLabel = [when && when.date, when && when.time].filter(Boolean).join(', ');
       const meta = [dateLabel, owner].filter(Boolean).join(' · ');
-      const renderedBody = loading
+      const renderedBody = loadError
+        ? `<div class="detail-mail-load-error" role="alert"><span>${escapeHtml(loadError)}</span><button type="button" data-mailbox-action="retry-thread-message" data-mailbox-id="${escapeHtml(mail.id)}" data-mailbox-thread-key="${escapeHtml(getActionMessageKey(message))}">Opnieuw proberen</button></div>`
+        : loading
         ? '<div class="detail-mail-loading" role="status">Volledig bericht laden…</div>'
         : typeof options.renderMessageBody === 'function'
         ? options.renderMessageBody({ message, body, sent })
@@ -1051,6 +1062,7 @@
     getAccount,
     getConversationId,
     getConversationAction,
+    getActionMessageKey,
     getFolder,
     hasPageBootstrap,
     getOwner,

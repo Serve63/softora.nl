@@ -483,11 +483,7 @@ function renderMailboxBodySection(section, imageState, leadingHtml = '', options
 function normalizeMailboxBodyImages(images) {
   return window.SoftoraMailboxImages?.normalize?.(images) || [];
 }
-function isMailboxRootIncoming(mail) {
-  if (!mail) return false;
-  if (mail.copyContext && mail.copyContext.evidenceKnown === true) return false;
-  return String(mail.folder || '').trim().toLowerCase() !== 'sent';
-}
+function isMailboxRootIncoming(mail) { return Boolean(mail) && !(mail.copyContext && mail.copyContext.evidenceKnown === true) && !window.SoftoraMailboxDisplay.isSentMessage(mail, { account: mail.accountEmail }); }
 function renderMailboxRootIncomingMeta(mail, senderLabel) {
   if (!isMailboxRootIncoming(mail)) return '';
   const timestamp = [mail && mail.date, mail && mail.time]
@@ -930,6 +926,15 @@ async function loadMailboxMessageBody(id) {
     signal: token.signal,
   });
 }
+function retryMailboxThreadMessage(id, messageKey) {
+  const mail = findMailById(id); const token = mailboxOwnerView.getToken();
+  if (!mail || !isMailboxViewCurrent(token)) return;
+  const message = (Array.isArray(mail.threadMessages) ? mail.threadMessages : []).find((candidate) => window.SoftoraMailboxCampaignInbox.getActionMessageKey(candidate) === String(messageKey || ''));
+  if (!message) return;
+  message.bodyLoadError = ''; message.bodyLoading = true;
+  openMail(mail.id, { skipBodyFetch: true, skipThreadBodyFetch: true });
+  void window.SoftoraMailboxIndex.loadThreadBodies({ mail, targetMessages: [message], retryFailed: true, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail, isCurrent: () => isMailboxViewCurrent(token), signal: token.signal });
+}
 function openMail(id, options = {}) {
   const m = findMailById(id);
   if (!m) return;
@@ -1049,6 +1054,9 @@ function handleMailboxAction(actionEl) {
       break;
     case 'delete-mail':
       void deleteMail(id);
+      break;
+    case 'retry-thread-message':
+      retryMailboxThreadMessage(id, actionEl.getAttribute('data-mailbox-thread-key'));
       break;
   }
 }

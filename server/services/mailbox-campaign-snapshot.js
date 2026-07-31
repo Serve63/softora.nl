@@ -5,7 +5,7 @@ const {
 } = require('./mailbox-message-image');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 4;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 5;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -72,17 +72,27 @@ function sanitizeOutreach(value) {
 function sanitizeProviderProvenance(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const provider = text(source.provider, 50).toLowerCase();
-  if (!provider) return {};
+  const provenance = {};
+  const storageFolder = text(source.storageFolder, 50).toLowerCase();
+  const direction = text(source.direction, 50).toLowerCase();
+  const sourceFolders = Array.from(new Set(
+      (Array.isArray(source.sourceFolders) ? source.sourceFolders : [])
+        .map((folder) => text(folder, 50).toLowerCase())
+        .filter(Boolean)
+    )).slice(0, 10);
+  if (storageFolder) provenance.storageFolder = storageFolder;
+  if (direction) provenance.direction = direction;
+  if (sourceFolders.length) provenance.sourceFolders = sourceFolders;
+  if (!provider) return provenance;
   return {
+    ...provenance,
     provider,
     providerMessageId: text(source.providerMessageId, 500),
     providerThreadId: text(source.providerThreadId, 500),
     providerCampaignId: text(source.providerCampaignId, 500),
     providerAccountEmail: text(source.providerAccountEmail || source.accountEmail, 320).toLowerCase(),
     providerOwner: text(source.providerOwner, 50).toLowerCase(),
-    storageFolder: text(source.storageFolder, 50).toLowerCase(),
     storageUid: Number.isFinite(Number(source.storageUid)) ? Number(source.storageUid) : 0,
-    direction: text(source.direction, 50).toLowerCase(),
     bodyLoaded: source.bodyLoaded === true,
     providerBodyHtmlEvidenceKnown: source.providerBodyHtmlEvidenceKnown === true,
     providerRichBodyAvailable: source.providerRichBodyAvailable === true,
