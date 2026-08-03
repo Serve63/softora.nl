@@ -96,6 +96,19 @@
     const isCurrent = (candidate = token) => session.isCurrent(candidate, getScope());
     const setBusy = (busy) => options.getListElement?.()?.setAttribute?.('aria-busy', String(Boolean(busy)));
 
+    function keepConversationOpen(messages, previousActiveId, loadOptions = {}) {
+      if (loadOptions.openLatest !== false) return;
+      const activeMessage = (Array.isArray(messages) ? messages : []).find(
+        (message) => String(message && message.id) === String(previousActiveId || '')
+      );
+      const nextMessage = activeMessage || (Array.isArray(messages) ? messages[0] : null);
+      if (nextMessage) options.openMail?.(nextMessage.id);
+      else {
+        options.setActiveMail?.(null);
+        options.resetDetail?.();
+      }
+    }
+
     async function hydrateOutreachContexts(candidate) {
       const index = options.index;
       if (!index || typeof index.hydrateOutreachContexts !== 'function') return;
@@ -137,14 +150,7 @@
           options.setMessages?.(messages);
           options.prewarm?.(messages);
           options.renderList?.({ openLatest: loadOptions.openLatest !== false });
-          if (loadOptions.openLatest === false && activeId) {
-            if (messages.some((message) => String(message && message.id) === String(activeId))) {
-              options.openMail?.(activeId);
-            } else {
-              options.setActiveMail?.(null);
-              options.resetDetail?.();
-            }
-          }
+          keepConversationOpen(messages, activeId, loadOptions);
           options.setStatus?.('');
           setBusy(false);
           if (campaignResult.fromBootstrap && isCurrent(candidate)) {
@@ -179,6 +185,7 @@
         options.setMessages?.(messages);
         options.prewarm?.(messages);
         options.renderList?.({ openLatest: loadOptions.openLatest !== false });
+        keepConversationOpen(messages, options.getActiveMail?.(), loadOptions);
         void hydrateOutreachContexts(candidate).catch(() => {});
         options.setStatus?.(sync?.warming ? 'Mailbox wordt bijgewerkt…' : '');
         if (sync?.refreshRecommended && !loadOptions.skipBackgroundSync) {

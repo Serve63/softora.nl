@@ -23,6 +23,10 @@
 
     function assertReplyOwner() {
       const selectedOwner = String(options.getOwner?.() || '').trim().toLowerCase();
+      if (selectedOwner === 'both') {
+        if (replyOwner && options.campaignInbox?.isPersonalOwner?.(replyOwner)) return;
+        throw new Error('De echte afzender van dit bericht kon niet veilig worden vastgesteld.');
+      }
       if (replyOwner && selectedOwner && replyOwner !== selectedOwner) {
         throw new Error('Deze composer hoort bij een andere mailbox. Open het bericht opnieuw.');
       }
@@ -46,11 +50,13 @@
         options.compose.resetOptionalFields();
       }
       options.compose.reset(Boolean(replyContext && replyContext.mode !== 'new-message'));
+      options.composeWindow?.reset?.();
       documentRef?.getElementById('compose-overlay')?.classList.add('open');
     }
 
     function close() {
       documentRef?.getElementById('compose-overlay')?.classList.remove('open');
+      options.composeWindow?.reset?.();
       setReplyContext(null);
       options.compose.reset(false);
       options.compose.resetOptionalFields();
@@ -183,7 +189,7 @@
             account,
             ...(provider
               ? {
-                  owner: options.campaignInbox?.getOwner?.(),
+                  owner: replyOwner,
                   provider,
                   providerMessageId: String(replyContext && replyContext.providerMessageId || '').trim(),
                   providerThreadId: String(replyContext && replyContext.providerThreadId || '').trim(),

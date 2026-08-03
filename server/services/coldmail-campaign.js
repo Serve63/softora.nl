@@ -12,6 +12,7 @@ const {
 } = require('./customer-lifecycle');
 const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
+const autopilotResilience = require('./coldmail-autopilot-resilience');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
   fitWebdesignPreviewForEmail,
@@ -312,6 +313,11 @@ function createColdmailCampaignService(deps = {}) {
       .replace(/[.,;:!?]+$/g, '')
       .trim();
   }
+
+  const loadCriticalUiState = autopilotResilience.createCriticalUiStateReader({ getUiStateValues, sleep });
+  const normalizeColdmailAutopilotLog = autopilotResilience.createAutopilotLogNormalizer({
+    normalizeEmailAddress, normalizeString, truncateText,
+  });
 
   function isLikelyValidEmail(value) {
     const email = normalizeEmailAddress(value);
@@ -3029,9 +3035,13 @@ function createColdmailCampaignService(deps = {}) {
       });
   }
 
-  async function loadColdmailSendGuardState() {
-    const state = await getUiStateValues(coldmailSendGuardScope);
-    const values = state && typeof state.values === 'object' ? state.values : {};
+  async function loadColdmailSendGuardState(options = {}) {
+    const { state, values } = await loadCriticalUiState(coldmailSendGuardScope, options);
+    if (options.required && !state) {
+      const error = new Error('Coldmail send-guard kon na meerdere pogingen niet uit Supabase worden geladen.');
+      error.code = 'COLDMAIL_SEND_GUARD_UNAVAILABLE';
+      throw error;
+    }
     const parsed = safeJsonParse(values[coldmailSendGuardKey] || '{}', {});
     return {
       entries: pruneColdmailSendGuardEntries(parsed && parsed.entries),
@@ -3072,7 +3082,7 @@ function createColdmailCampaignService(deps = {}) {
 
   async function getColdmailSendQuota(senderEmail) {
     const selectedSenderEmail = normalizeEmailAddress(senderEmail);
-    const state = await loadColdmailSendGuardState();
+    const state = await loadColdmailSendGuardState({ required: true, attempts: 3 });
     const entries = state.entries;
     const currentDayKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
     const dayEntries = entries.filter((entry) =>
@@ -4442,22 +4452,6 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  function normalizeColdmailAutopilotLog(entries) {
-    return (Array.isArray(entries) ? entries : [])
-      .filter((entry) => entry && typeof entry === 'object')
-      .map((entry) => ({
-        at: normalizeString(entry.at),
-        ok: entry.ok !== false,
-        skipped: Boolean(entry.skipped),
-        reason: truncateText(normalizeString(entry.reason), 120),
-        message: truncateText(normalizeString(entry.message), 240),
-        sent: Math.max(0, Number(entry.sent || 0) || 0),
-        senderEmail: normalizeEmailAddress(entry.senderEmail),
-      }))
-      .filter((entry) => entry.at)
-      .slice(-30);
-  }
-
   function findJsonObjectKeyValueStart(rawText, key) {
     const marker = `"${key}"`;
     const keyIndex = rawText.indexOf(marker);
@@ -4608,9 +4602,10 @@ function createColdmailCampaignService(deps = {}) {
     };
   }
 
-  async function loadColdmailAutopilotStateRecord() {
-    const state = await getUiStateValues(coldmailAutopilotScope);
-    const values = state && typeof state.values === 'object' ? state.values : {};
+  async function loadColdmailAutopilotStateRecord(options = {}) {
+    const { state, values } = await loadCriticalUiState(coldmailAutopilotScope, {
+      ...options, key: coldmailAutopilotKey, requireKey: true,
+    });
     const rawValue = values[coldmailAutopilotKey];
     const hasValue = Object.prototype.hasOwnProperty.call(values, coldmailAutopilotKey) &&
       Boolean(normalizeString(rawValue));
@@ -5367,13 +5362,14 @@ function createColdmailCampaignService(deps = {}) {
                 : undefined,
             }
           : undefined,
+      replySync: autopilotResilience.summarizeReplySync(result.replySync, { normalizeString, truncateText }),
       agendaBlocked: Boolean(result.agendaBlocked),
     };
   }
 
   async function finishColdmailAutopilotRun(state, result, actor, options = {}) {
     const compactResult = compactColdmailAutopilotResult(result);
-    const latestStateRecord = await loadColdmailAutopilotStateRecord().catch(() => null);
+    const latestStateRecord = await loadColdmailAutopilotStateRecord({ attempts: 3 }).catch(() => null);
     const latestState = latestStateRecord && latestStateRecord.hasValue
       ? latestStateRecord.state
       : null;
@@ -5434,7 +5430,7 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   async function assertColdmailAutopilotStillEnabledBeforeSend() {
-    const latestStateRecord = await loadColdmailAutopilotStateRecord().catch(() => null);
+    const latestStateRecord = await loadColdmailAutopilotStateRecord({ attempts: 3 }).catch(() => null);
     if (!latestStateRecord || !latestStateRecord.hasValue) {
       const error = new Error(
         'Autopilot-state kon vlak voor verzenden niet veilig uit Supabase worden geladen. Er is niets verzonden.'
@@ -5466,10 +5462,15 @@ function createColdmailCampaignService(deps = {}) {
 
   async function runColdmailAutopilot(input = {}) {
     const actor = truncateText(normalizeString(input.actor), 120) || 'Coldmail Autopilot';
-    const stateRecord = await loadColdmailAutopilotStateRecord();
+    const stateRecord = await loadColdmailAutopilotStateRecord({ attempts: 3 });
     let state = stateRecord.state;
 
     if (!stateRecord.hasValue) {
+      logger.warn('[ColdmailAutopilot][state-unavailable]', {
+        at: now().toISOString(),
+        actor,
+        attempts: 3,
+      });
       return compactColdmailAutopilotResult(buildColdmailAutopilotSkipResult(
         'state_unavailable',
         'Autopilot-state kon niet veilig uit Supabase worden geladen. Er is niets verzonden en niets overschreven.'
@@ -5529,17 +5530,7 @@ function createColdmailCampaignService(deps = {}) {
     );
 
     try {
-      let replySync = null;
-      try {
-        replySync = await syncInboundColdmailRepliesFromImap({ force: false, maxMessages: 30 });
-      } catch (error) {
-        replySync = {
-          ok: false,
-          skipped: true,
-          reason: 'reply_sync_failed',
-          message: truncateText(normalizeString(error && error.message), 240),
-        };
-      }
+      const replySync = autopilotResilience.getDedicatedMailboxSyncResult();
 
       const settings = await loadColdmailingSenderSettings();
       const candidates = getColdmailAutopilotSenderCandidates(state, settings);
@@ -6052,7 +6043,9 @@ function createColdmailCampaignService(deps = {}) {
     const readyWebdesignMatcher = shouldRequireWebdesign
       ? createReadyWebdesignMatcher(customerRows, customerPhotoMap)
       : null;
-    const sendGuardState = mode === 'mail' ? await loadColdmailSendGuardState() : { recipientEntries: [] };
+    const sendGuardState = mode === 'mail'
+      ? await loadColdmailSendGuardState({ required: true, attempts: 3 })
+      : { recipientEntries: [] };
     const recipientGuardEntries = sendGuardState.recipientEntries || [];
 
     const failed = [];

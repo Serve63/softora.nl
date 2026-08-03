@@ -89,6 +89,7 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   let messages = [{ id: 'oude-serve-mail' }];
   let activeMail = 'oude-serve-mail';
   let composeClosed = 0;
+  const opened = [];
   const pending = new Map();
   const requestedOptions = new Map();
   const campaignInboxStub = {
@@ -113,6 +114,7 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
     setActiveMail: (value) => { activeMail = value; },
     getListElement: () => listElement,
     renderList() {},
+    openMail: (id) => { opened.push(id); activeMail = id; },
     setSync() {},
     setStatus() {},
     closeCompose: () => { composeClosed += 1; },
@@ -137,6 +139,8 @@ test('eigenaarwissel leegt de oude view direct en een late response kan nooit te
   pending.get('martijn')({ messages: [{ id: 'actueel', owner: 'martijn' }], sync: {} });
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(messages.map((message) => message.id), ['actueel']);
+  assert.deepEqual(opened, ['actueel']);
+  assert.equal(activeMail, 'actueel');
 });
 
 test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen berichten bij wisselen', async () => {
@@ -187,6 +191,12 @@ test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen ber
       unexpectedFetch,
       { owner: 'martijn' }
     );
+    const both = await freshCampaignInbox.load(
+      'outreach',
+      (message) => message,
+      unexpectedFetch,
+      { owner: 'both' }
+    );
 
     assert.equal(serve.fromBootstrap, true);
     assert.equal(martijn.fromBootstrap, true);
@@ -196,6 +206,12 @@ test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen ber
     ]);
     assert.deepEqual(martijn.messages.map((message) => message.id), [
       'martijn-imap',
+      'martijn-instantly',
+    ]);
+    assert.deepEqual(both.messages.map((message) => message.id), [
+      'serve-imap',
+      'martijn-imap',
+      'serve-instantly',
       'martijn-instantly',
     ]);
   } finally {
@@ -220,9 +236,38 @@ test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gesc
       campaignInbox.getMailboxTabCacheKey('martijn'),
       'mailbox_campaign_replies_v7:user-1:martijn'
     );
+    assert.equal(
+      campaignInbox.getMailboxTabCacheKey('both'),
+      'mailbox_campaign_replies_v7:user-1:both'
+    );
   } finally {
     global.SoftoraPageBootstrapSession = previousSession;
   }
+});
+
+test('gecombineerde eigenaar haalt beide bewezen mailboxen op zonder server-owner te vervalsen', async () => {
+  const requested = [];
+  const result = await campaignInbox.load(
+    'outreach',
+    (message) => message,
+    async (url) => {
+      requested.push(url);
+      return response({
+        ok: true,
+        owner: '',
+        messages: [
+          { id: 'serve-1', accountEmail: 'serve@softora.nl' },
+          { id: 'martijn-1', accountEmail: 'martijn@softora.nl' },
+          { id: 'unknown-1', accountEmail: 'info@softora.nl' },
+        ],
+      });
+    },
+    { owner: 'both', skipBootstrap: true }
+  );
+
+  assert.match(requested[0], /owner=&/);
+  assert.deepEqual(result.messages.map((message) => message.id), ['serve-1', 'martijn-1']);
+  assert.equal(result.owner, 'both');
 });
 
 test('campaign load houdt de aangevraagde eigenaar vast als de globale selectie tussentijds wijzigt', async () => {

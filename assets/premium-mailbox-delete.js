@@ -62,7 +62,7 @@
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          owner: normalize(options.getOwner?.()),
+          owner: normalize(options.getOwner?.(mail)),
           account: root.account,
           id: root.id,
           uid: root.uid,
