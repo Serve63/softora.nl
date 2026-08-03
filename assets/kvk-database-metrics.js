@@ -69,6 +69,7 @@
     const getState = typeof deps.getState === 'function' ? deps.getState : () => null;
     const elements = {
       successfulFound: documentRef.getElementById('companies-successful-found'),
+      successfulFoundLast60: documentRef.getElementById('companies-successful-found-last60'),
       treated: documentRef.getElementById('companies-treated-last60'),
       usable: documentRef.getElementById('companies-usable-last60'),
       withWebsite: documentRef.getElementById('companies-with-website-last60'),
@@ -95,6 +96,7 @@
           ),
         );
       }
+      renderLast60Delta(elements.successfulFoundLast60, last60.usable);
       renderLast60Delta(elements.treated, last60.treated);
       renderLast60Delta(elements.usable, last60.usable);
       renderLast60Delta(elements.withWebsite, last60.with_website);
