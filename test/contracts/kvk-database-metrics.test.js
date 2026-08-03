@@ -38,6 +38,7 @@ test('kvk database metrics render current last-hour and grade values without ano
     '.unusable-grade-delta-label',
   ];
   const elements = {
+    'companies-successful-found': createElement(),
     'companies-treated-last60': createElement(deltaSelectors),
     'companies-usable-last60': createElement(deltaSelectors),
     'companies-with-website-last60': createElement(deltaSelectors),
@@ -48,6 +49,7 @@ test('kvk database metrics render current last-hour and grade values without ano
     'companies-unusable-grade-2-last60': createElement(gradeSelectors),
   };
   const scraperState = {
+    successful_found: 6_993,
     unusable_grades: { 1: 24_412, 2: 30, 3: 121 },
     last_60_minutes: {
       treated: 12,
@@ -73,6 +75,7 @@ test('kvk database metrics render current last-hour and grade values without ano
 
   controller.renderMetrics();
 
+  assert.equal(elements['companies-successful-found'].textContent, '6.993');
   assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+12');
   assert.equal(elements['companies-usable-last60'].nodes['.stat-delta-number'].textContent, '+6');
   assert.equal(elements['companies-with-website-last60'].nodes['.stat-delta-number'].textContent, '+5');
