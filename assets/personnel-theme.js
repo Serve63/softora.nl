@@ -634,8 +634,6 @@
         ];
     }
 
-    function getHealthDossierSidebarLink() { return { key: "health_dossier", href: "/premium-gezondheidsdossier", label: "Gezondheidsdossier", icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h3l1.5-4.5 3 9 1.5-4.5h2.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25C7.5 17.5 4.5 14.5 4.5 10.25A4.5 4.5 0 0 1 12 6.9a4.5 4.5 0 0 1 7.5 3.35c0 4.25-3 7.25-7.5 10Z"></path></svg>' }; }
-
     function isPremiumAdminSession(session) {
         return Boolean(
             session &&
@@ -885,7 +883,7 @@
             },
         ];
 
-        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([getHealthDossierSidebarLink(), {
+        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([{
                 key: "monthly_costs",
                 href: "/premium-vaste-lasten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg>',
@@ -961,7 +959,7 @@
     function pruneDeprecatedSidebarLinks(sidebar) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const legacyAnalyticsLinks = sidebar.querySelectorAll(
-            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"]'
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"], a[data-sidebar-key="coldmailing"], a[data-sidebar-key="health_dossier"]'
         );
         legacyAnalyticsLinks.forEach(function (link) {
             if (link && link.parentNode) {
@@ -1072,7 +1070,6 @@
             );
         }
 
-        ensureStaticSidebarLink(sidebar, "extra", getHealthDossierSidebarLink(), ["monthly_costs", "bookkeeping", "notepad", "word", "settings"]);
         if (overviewSection) {
             const overviewDatabaseLink = ensureStaticSidebarLink(
                 sidebar,
