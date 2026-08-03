@@ -348,10 +348,10 @@
     const empty = isEmpty(cell);
     const missed = tracked && !checked && day > 0 && day <= TODAY;
     cell.classList.toggle('is-missed', missed);
-    cell.setAttribute('role', 'checkbox');
-    cell.setAttribute('tabindex', '0');
+    cell.setAttribute('role', 'checkbox'); cell.setAttribute('aria-disabled', String(day > TODAY));
+    cell.setAttribute('tabindex', day > TODAY ? '-1' : '0');
     cell.setAttribute('aria-checked', checked ? 'true' : 'false');
-    const statusLabel = checked ? ', afgerond' : empty ? ', leeg' : tracked ? ', niet afgerond' : ', nog niet bijgehouden';
+    const statusLabel = day > TODAY ? ', nog niet beschikbaar' : checked ? ', afgerond' : empty ? ', leeg' : tracked ? ', niet afgerond' : ', nog niet bijgehouden';
     cell.setAttribute('aria-label', `${getLabelText(taskIndex)}, ${formatDay(day)}${statusLabel}`);
   }
   function getDayScore(day) {
@@ -1059,7 +1059,7 @@
       return;
     }
     const cell = event.target.closest('.status');
-    if (!cell || !grid.contains(cell)) {
+    if (!cell || !grid.contains(cell) || getDay(cell) > TODAY) {
       return;
     }
     toggleCell(cell);
@@ -1083,7 +1083,7 @@
       return;
     }
     const cell = event.target.closest('.status');
-    if (!cell || !grid.contains(cell) || ![' ', 'Enter'].includes(event.key)) {
+    if (!cell || !grid.contains(cell) || getDay(cell) > TODAY || ![' ', 'Enter'].includes(event.key)) {
       return;
     }
     event.preventDefault();
