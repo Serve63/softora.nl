@@ -68,6 +68,7 @@
     const documentRef = deps.document;
     const getState = typeof deps.getState === 'function' ? deps.getState : () => null;
     const elements = {
+      successfulFound: documentRef.getElementById('companies-successful-found'),
       treated: documentRef.getElementById('companies-treated-last60'),
       usable: documentRef.getElementById('companies-usable-last60'),
       withWebsite: documentRef.getElementById('companies-with-website-last60'),
@@ -86,6 +87,14 @@
       const unusableGradeLast60 = last60.unusable_grades || {};
       const unusableGradeActivity = last60.unusable_grade_activity || {};
 
+      if (elements.successfulFound) {
+        elements.successfulFound.textContent = numberFormat.format(
+          Number(
+            scraperState.successful_found ??
+              sumCounts(scraperState.with_website, scraperState.without_website),
+          ),
+        );
+      }
       renderLast60Delta(elements.treated, last60.treated);
       renderLast60Delta(elements.usable, last60.usable);
       renderLast60Delta(elements.withWebsite, last60.with_website);

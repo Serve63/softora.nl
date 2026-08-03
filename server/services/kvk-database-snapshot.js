@@ -72,11 +72,65 @@ function createKvkDatabaseSnapshotService(deps = {}) {
       snapshot && typeof snapshot.companyTotals === 'object' ? snapshot.companyTotals : {};
     return {
       companiesFound: Number(state.companies_found || companyTotals.all || 0),
+      successfulFound: getSuccessfulFoundCount(snapshot),
       usable: Number(companyTotals.usable || 0),
       withWebsite: Number(state.with_website || companyTotals.with_website || 0),
       withoutWebsite: Number(state.without_website || companyTotals.without_website || 0),
       unusable: Number(state.unusable || companyTotals.unusable || 0),
       generatedAt: normalizeString(snapshot?.generatedAt || ''),
+    };
+  }
+
+  function normalizeCount(value) {
+    const count = Number(value);
+    return Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  }
+
+  function getUsableCount(snapshot) {
+    const state = snapshot && typeof snapshot.state === 'object' ? snapshot.state : {};
+    const companyTotals =
+      snapshot && typeof snapshot.companyTotals === 'object' ? snapshot.companyTotals : {};
+    if (companyTotals.usable !== null && companyTotals.usable !== undefined) {
+      return normalizeCount(companyTotals.usable);
+    }
+    return normalizeCount(state.with_website) + normalizeCount(state.without_website);
+  }
+
+  function getSuccessfulFoundCount(snapshot, fallback = 0) {
+    const state = snapshot && typeof snapshot.state === 'object' ? snapshot.state : {};
+    if (state.successful_found !== null && state.successful_found !== undefined) {
+      return normalizeCount(state.successful_found);
+    }
+    return normalizeCount(fallback || getUsableCount(snapshot));
+  }
+
+  function withSuccessfulFoundCount(snapshot, successfulFound) {
+    return {
+      ...snapshot,
+      state: {
+        ...snapshot.state,
+        successful_found: normalizeCount(successfulFound),
+      },
+    };
+  }
+
+  function buildSuccessfulFoundTracker(snapshot, storedPayload) {
+    const currentUsable = getUsableCount(snapshot);
+    const storedSnapshot = storedPayload?.snapshot;
+    if (!storedSnapshot || typeof storedSnapshot !== 'object') {
+      return { total: currentUsable, currentUsable };
+    }
+
+    const storedTracker = storedPayload?.successfulFoundTracker;
+    const previousUsable = normalizeCount(
+      storedTracker?.currentUsable ?? getUsableCount(storedSnapshot)
+    );
+    const previousTotal = normalizeCount(
+      storedTracker?.total ?? getSuccessfulFoundCount(storedSnapshot, previousUsable)
+    );
+    return {
+      total: previousTotal + Math.max(0, currentUsable - previousUsable),
+      currentUsable,
     };
   }
 
@@ -112,7 +166,13 @@ function createKvkDatabaseSnapshotService(deps = {}) {
 
     const row = Array.isArray(result.body) ? result.body[0] || null : result.body || null;
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : null;
-    const snapshot = payload && payload.snapshot ? payload.snapshot : null;
+    const storedSnapshot = payload && payload.snapshot ? payload.snapshot : null;
+    const successfulFound = normalizeCount(
+      payload?.successfulFoundTracker?.total ?? getSuccessfulFoundCount(storedSnapshot)
+    );
+    const snapshot = storedSnapshot
+      ? withSuccessfulFoundCount(storedSnapshot, successfulFound)
+      : null;
     if (!snapshot || typeof snapshot !== 'object') {
       return res.status(404).json({ ok: false, error: 'Nog geen live KVK snapshot opgeslagen.' });
     }
@@ -120,7 +180,7 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     return res.status(200).json({
       ok: true,
       updatedAt: normalizeString(payload.updatedAt || row.updated_at || ''),
-      summary: payload.summary || summarizeSnapshot(snapshot),
+      summary: summarizeSnapshot(snapshot),
       snapshot,
     });
   }
@@ -167,11 +227,43 @@ function createKvkDatabaseSnapshotService(deps = {}) {
       return res.status(400).json({ ok: false, error: validationError });
     }
 
+    const storedResult = await fetchSupabaseRowByKeyViaRest(
+      snapshotStateKey,
+      'payload,updated_at',
+      {
+        timeoutMs: snapshotReadTimeoutMs,
+        ignoreFailureCooldown: true,
+        suppressFailureCooldown: true,
+      }
+    );
+    if (!storedResult || !storedResult.ok) {
+      return res.status(502).json({
+        ok: false,
+        error: truncateText(
+          storedResult?.error || 'Bestaande teller voor succesvol gevonden kon niet worden geladen.',
+          500
+        ),
+      });
+    }
+
+    const storedRow = Array.isArray(storedResult.body)
+      ? storedResult.body[0] || null
+      : storedResult.body || null;
+    const storedPayload =
+      storedRow?.payload && typeof storedRow.payload === 'object' ? storedRow.payload : null;
+    const successfulFoundTracker = buildSuccessfulFoundTracker(snapshot, storedPayload);
+    const enrichedSnapshot = withSuccessfulFoundCount(snapshot, successfulFoundTracker.total);
+    const enrichedValidationError = validateSnapshot(enrichedSnapshot);
+    if (enrichedValidationError) {
+      return res.status(400).json({ ok: false, error: enrichedValidationError });
+    }
+
     const updatedAt = now().toISOString();
     const payload = {
-      snapshot,
+      snapshot: enrichedSnapshot,
       updatedAt,
-      summary: summarizeSnapshot(snapshot),
+      summary: summarizeSnapshot(enrichedSnapshot),
+      successfulFoundTracker,
     };
     const result = await upsertSupabaseRowViaRest(
       {

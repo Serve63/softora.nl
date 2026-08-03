@@ -48,6 +48,12 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
   assert.match(pageSource, /id="companies-treated"/);
+  assert.match(pageSource, /id="companies-successful-found"/);
+  assert.ok(
+    pageSource.indexOf('id="companies-successful-found"') <
+      pageSource.indexOf('id="companies-usable"'),
+    'Succesvol Gevonden hoort direct voor Bruikbaar te staan'
+  );
   assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.match(pageSource, /id="planning-search-input"/);
   assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
@@ -135,6 +141,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 
   assert.match(pageSource, /id="companies-treated-last60"/);
+  assert.match(pageSource, /id="companies-successful-found"/);
   assert.match(pageSource, /id="companies-usable-last60"/);
   assert.match(pageSource, /id="companies-with-website-last60"/);
   assert.match(pageSource, /id="companies-without-website-last60"/);
@@ -145,8 +152,11 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260803b/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260727a/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260803c/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260803a/);
+  assert.match(metricsSource, /companies-successful-found/);
+  assert.match(metricsSource, /successful_found/);
+  assert.match(metricsStyles, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
   assert.match(metricsSource, /unusable_grade_activity/);
