@@ -17,12 +17,25 @@
       ['bcc', 'cc'].includes(String(mail.copyContext.kind || '').toLowerCase())
       ? String(mail.copyContext.kind).toUpperCase()
       : '';
+    const providerKind = String(mail && mail.provider || '').trim().toLowerCase() === 'instantly'
+      ? 'INSTANTLY'
+      : '';
+    const conversationAction = global.SoftoraMailboxCampaignInbox &&
+      typeof global.SoftoraMailboxCampaignInbox.getConversationAction === 'function'
+      ? global.SoftoraMailboxCampaignInbox.getConversationAction(mail)
+      : null;
+    const needsReply = conversationAction && conversationAction.kind === 'reply';
+    const badges = [
+      copyKind ? `<span class="mail-copy-badge">${escapeHtml(copyKind)}</span>` : '',
+      providerKind ? `<span class="mail-source-badge mail-source-badge-instantly">${escapeHtml(providerKind)}</span>` : '',
+    ].filter(Boolean).join('');
     return `
-    <div class="mail-item ${mail.unread ? 'unread' : ''} ${String(options.activeMail) === String(mail.id) ? 'active' : ''}" data-mailbox-received-at="${escapeHtml(activityAt)}">
+    <div class="mail-item ${mail.unread ? 'unread' : ''} ${needsReply ? 'needs-reply' : ''} ${String(options.activeMail) === String(mail.id) ? 'active' : ''}" data-mailbox-received-at="${escapeHtml(activityAt)}">
       ${mail.unread ? '<div class="unread-dot"></div>' : ''}
+      ${needsReply ? '<span class="mail-reply-corner" role="img" aria-label="Wacht op jouw antwoord" title="Wacht op jouw antwoord"></span>' : ''}
       <button class="mail-item-open" type="button" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(mail.id)}" aria-label="${escapeHtml(primaryText)} openen">
         <span class="mail-item-top">
-          <span class="mail-from">${escapeHtml(primaryText)}${copyKind ? `<span class="mail-copy-badge">${escapeHtml(copyKind)}</span>` : ''}</span>
+          <span class="mail-from">${escapeHtml(primaryText)}${badges}</span>
           <time class="mail-time" datetime="${escapeHtml(activityAt)}">
             ${listDate ? `<span class="mail-date-label">${escapeHtml(listDate)}</span>` : ''}
             <span class="mail-time-value">${escapeHtml(listTime)}</span>

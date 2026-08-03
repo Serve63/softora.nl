@@ -275,7 +275,7 @@ test('mailbox campaign snapshot bewaart oudere Instantly-gesprekken van beide ei
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 5,
+    version: 6,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{

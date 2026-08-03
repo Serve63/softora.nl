@@ -2129,8 +2129,8 @@ function createMailboxService(deps = {}) {
     defaultFolders: DEFAULT_SYNC_FOLDERS,
     defaultLimit: DEFAULT_SYNC_LIMIT,
   });
-  const { getMessageBodiesResponse } = createMailboxMessageBodiesService({
-    mailboxIndexStore, assertReadableAccount, normalizeFolder, logger,
+  const { getInstantlyMessage, getMessageBodiesResponse } = createMailboxMessageBodiesService({
+    mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, logger,
   });
   function getElapsedMs(startedAt) {
     return Math.max(0, Date.now() - startedAt);
@@ -2215,10 +2215,10 @@ function createMailboxService(deps = {}) {
     const result = await listMessagesWithMeta(options);
     return result.messages;
   }
-
   async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
-    const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder);
+    if (normalizedFolder === 'instantly') return getInstantlyMessage({ accountEmail, id });
+    const account = assertReadableAccount(accountEmail);
     if (canUseMailboxIndex() && typeof mailboxIndexStore.getMessage === 'function') {
       const indexed = await mailboxIndexStore.getMessage({
         accountEmail: account.email,

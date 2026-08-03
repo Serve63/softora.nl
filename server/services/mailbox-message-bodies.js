@@ -7,9 +7,52 @@ function normalizeText(value) {
 function createMailboxMessageBodiesService({
   mailboxIndexStore,
   assertReadableAccount,
+  getProviderAccount,
+  canUseMailboxIndex,
+  assertMailboxMessageVisible,
   normalizeFolder,
   logger = console,
 } = {}) {
+  async function getInstantlyMessage({ accountEmail, id = '' } = {}) {
+    const account = typeof getProviderAccount === 'function'
+      ? getProviderAccount(accountEmail)
+      : null;
+    if (!account || !normalizeText(account.email)) {
+      const error = new Error('Instantly-mailboxaccount niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    const providerId = normalizeText(id);
+    if (!/^instantly:[a-z0-9-]+$/i.test(providerId)) {
+      const error = new Error('Ongeldige Instantly-berichtreferentie.');
+      error.status = 400;
+      throw error;
+    }
+    if (
+      typeof canUseMailboxIndex !== 'function' ||
+      !canUseMailboxIndex() ||
+      !mailboxIndexStore ||
+      typeof mailboxIndexStore.getMessage !== 'function'
+    ) {
+      const error = new Error('Mailbox-index voor Instantly is niet beschikbaar.');
+      error.status = 503;
+      throw error;
+    }
+    const indexed = await mailboxIndexStore.getMessage({
+      accountEmail: normalizeText(account.email).toLowerCase(),
+      folder: 'instantly',
+      id: providerId,
+    });
+    if (!indexed) {
+      const error = new Error('Instantly-mailboxbericht niet gevonden.');
+      error.status = 404;
+      throw error;
+    }
+    return typeof assertMailboxMessageVisible === 'function'
+      ? assertMailboxMessageVisible(indexed)
+      : indexed;
+  }
+
   async function getMessageBodies({ messages = [] } = {}) {
     const source = Array.isArray(messages) ? messages : [];
     if (!source.length || source.length > MAX_MAILBOX_BODY_BATCH_SIZE) {
@@ -26,9 +69,31 @@ function createMailboxMessageBodiesService({
     }
 
     const references = source.map((message) => {
-      const account = assertReadableAccount(message && message.account);
       const folder = normalizeFolder(message && message.folder);
       const id = normalizeText(message && message.id);
+      if (folder === 'instantly') {
+        const account = typeof getProviderAccount === 'function'
+          ? getProviderAccount(message && message.account)
+          : null;
+        if (!account || !normalizeText(account.email)) {
+          const error = new Error('Instantly-mailboxaccount niet gevonden.');
+          error.status = 404;
+          throw error;
+        }
+        if (!/^instantly:[a-z0-9-]+$/i.test(id)) {
+          const error = new Error('Ongeldige Instantly-berichtreferentie.');
+          error.status = 400;
+          throw error;
+        }
+        return {
+          id,
+          uid: 0,
+          folder,
+          accountEmail: normalizeText(account.email).toLowerCase(),
+        };
+      }
+
+      const account = assertReadableAccount(message && message.account);
       const uid = Number(message && message.uid) ||
         Number(id.match(/:(\d+)$/)?.[1] || id);
       if (!Number.isSafeInteger(uid) || uid <= 0) {
@@ -85,7 +150,7 @@ function createMailboxMessageBodiesService({
     }
   }
 
-  return { getMessageBodies, getMessageBodiesResponse };
+  return { getInstantlyMessage, getMessageBodies, getMessageBodiesResponse };
 }
 
 module.exports = {

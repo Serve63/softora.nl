@@ -16,6 +16,7 @@ const CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT = 500;
 const CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT = 2000;
 const CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT = 1000;
 const CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE = 100;
+const CAMPAIGN_UNREFERENCED_PARENT_WINDOW_MS = 15 * 60 * 1000;
 const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
   'Kleine vraag over jullie website',
   'Nieuw webdesign',
@@ -46,6 +47,13 @@ function normalizeSubject(value) {
   return normalizeClassifierText(value)
     .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/g, '')
     .trim();
+}
+
+function getCanonicalCampaignSubject(value) {
+  const normalized = normalizeSubject(value);
+  return CAMPAIGN_SUBJECT_TERMS
+    .map((term) => normalizeSubject(term))
+    .find((term) => normalized === term || normalized.endsWith(term)) || '';
 }
 
 function extractEmailAddresses(value) {
@@ -348,9 +356,14 @@ function attachSentThreadMessages(replies, sentMessages) {
       const primaryReply = sortedReplies[0];
       const primaryIdentity = getMessageIdentity(primaryReply);
       const seen = new Set(primaryIdentity ? [primaryIdentity] : []);
+      const exactSentMessages = sentByConversation.get(conversationId) || [];
+      const strictUnreferencedParent = exactSentMessages.length
+        ? null
+        : getStrictUnreferencedCampaignParent(primaryReply, candidates);
       const threadMessages = dedupeCampaignMessages([
         ...sortedReplies.slice(1),
-        ...(sentByConversation.get(conversationId) || []),
+        ...exactSentMessages,
+        ...(strictUnreferencedParent ? [strictUnreferencedParent] : []),
       ])
         .filter((message) => {
           const identity = getMessageIdentity(message);
@@ -408,6 +421,8 @@ function isAutomatedCampaignReply(message) {
     /^email received\b/,
     /^bericht ontvangen\b/,
     /\buw mail is ontvangen\b/,
+    /\bserviceaanvraag ontvangen\b/,
+    /\bbedankt voor (?:je|jouw|uw) (?:e-?mail|mail|bericht)\b/,
   ];
   const automatedContentPatterns = [
     /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
@@ -417,12 +432,45 @@ function isAutomatedCampaignReply(message) {
     /\bis ons kantoor gesloten\b/,
     /\bop dit moment ben ik op vakantie\b/,
     /\bberichten worden (?:in deze periode )?niet gelezen\b/,
+    /\bplease type your reply above this line\b/,
+    /\buw aanvraag\s*\([^)]{1,40}\)\s+is ontvangen\b/,
+    /\byour request\s*\([^)]{1,40}\)\s+has been received\b/,
   ];
 
   return (
     automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
     automatedContentPatterns.some((pattern) => pattern.test(content))
   );
+}
+
+function getStrictUnreferencedCampaignParent(reply, sentMessages) {
+  if (!isAutomatedCampaignReply(reply) || getMessageReferenceIds(reply).length) return null;
+  const account = normalizeEmail(reply && reply.accountEmail);
+  const sender = normalizeEmail(reply && reply.email);
+  const subject = getCanonicalCampaignSubject(reply && reply.subject);
+  const replyAt = getMessageTimestamp(reply);
+  if (!account || !sender || !subject || !replyAt) return null;
+
+  const matches = (Array.isArray(sentMessages) ? sentMessages : [])
+    .filter((message) => {
+      if (getMailboxMessageDirection(message) !== 'sent') return false;
+      if (normalizeEmail(message && message.accountEmail) !== account) return false;
+      if (message && message.originalCampaignOutbound !== true) return false;
+      if (getCanonicalCampaignSubject(message && message.subject) !== subject) return false;
+      if (!extractEmailAddresses(message && message.to).includes(sender)) return false;
+      const sentAt = getMessageTimestamp(message);
+      return Boolean(
+        sentAt &&
+        sentAt < replyAt &&
+        replyAt - sentAt <= CAMPAIGN_UNREFERENCED_PARENT_WINDOW_MS
+      );
+    })
+    .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
+  if (matches.length !== 1) return null;
+  return {
+    ...matches[0],
+    threadCorrelationEvidence: 'exact-account-recipient-subject-nearby-auto-reply',
+  };
 }
 
 function isCampaignReplySubject(message) {
@@ -764,6 +812,7 @@ module.exports = {
   buildCampaignReply,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
+  getStrictUnreferencedCampaignParent,
   getCampaignConversationId,
   getMessageReferenceIds,
   getMessageReferenceLookupValues,

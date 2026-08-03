@@ -736,24 +736,59 @@ function createMailboxIndexStore(deps = {}) {
           .filter(Boolean)
       )
     ).slice(0, 100);
-    if (!messageKeys.length) return source;
+    const providerReferences = source
+      .filter((message) => normalizeFolder(message && message.folder) === 'instantly')
+      .map((message) => ({
+        accountEmail: normalizeEmail(message && message.accountEmail),
+        providerId: normalizeString(message && message.id),
+      }))
+      .filter((message) => message.accountEmail && /^instantly:[a-z0-9-]+$/i.test(message.providerId));
+    if (!messageKeys.length && !providerReferences.length) return source;
 
-    const result = await run('hydrate-message-bodies', (client) =>
-      client
-        .from(MAILBOX_INDEX_TABLES.messages)
-        .select('message_key,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text')
-        .in('message_key', messageKeys)
-        .is('deleted_at', null)
-    );
-    if (!result.ok) return source;
+    const selectedColumns = 'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text';
+    const [messageResult, providerResult] = await Promise.all([
+      messageKeys.length
+        ? run('hydrate-message-bodies', (client) =>
+            client
+              .from(MAILBOX_INDEX_TABLES.messages)
+              .select(selectedColumns)
+              .in('message_key', messageKeys)
+              .is('deleted_at', null)
+          )
+        : Promise.resolve({ ok: true, data: [] }),
+      providerReferences.length
+        ? run('hydrate-provider-message-bodies', (client) =>
+            client
+              .from(MAILBOX_INDEX_TABLES.messages)
+              .select(selectedColumns)
+              .eq('folder', 'instantly')
+              .in('account_email', Array.from(new Set(providerReferences.map((message) => message.accountEmail))))
+              .in('provider_id', Array.from(new Set(providerReferences.map((message) => message.providerId))))
+              .is('deleted_at', null)
+          )
+        : Promise.resolve({ ok: true, data: [] }),
+    ]);
+    if (!messageResult.ok && !providerResult.ok) return source;
 
     const bodyByMessageKey = new Map(
-      (result.data || []).map((row) => [normalizeString(row.message_key), row])
+      (messageResult.data || []).map((row) => [normalizeString(row.message_key), row])
+    );
+    const bodyByProviderIdentity = new Map(
+      (providerResult.data || []).map((row) => [
+        `${normalizeEmail(row.account_email)}|${normalizeString(row.provider_id)}`,
+        row,
+      ])
     );
     return source.map((message) => {
       const uid = Number(message && message.uid) || 0;
-      const messageKey = uid ? buildMessageKey(message.accountEmail, message.folder, uid) : '';
-      const row = bodyByMessageKey.get(messageKey);
+      const folder = normalizeFolder(message && message.folder);
+      const messageKey = uid && folder !== 'instantly'
+        ? buildMessageKey(message.accountEmail, folder, uid)
+        : '';
+      const providerIdentity = folder === 'instantly'
+        ? `${normalizeEmail(message && message.accountEmail)}|${normalizeString(message && message.id)}`
+        : '';
+      const row = bodyByMessageKey.get(messageKey) || bodyByProviderIdentity.get(providerIdentity);
       if (!row) return message;
       const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
       const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');

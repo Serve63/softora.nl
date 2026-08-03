@@ -70,6 +70,26 @@
     );
   }
 
+  function collapseDuplicateAdjacentUrlAnnotations(lines) {
+    const source = Array.isArray(lines) ? lines.map((line) => String(line || '')) : [];
+    const result = [];
+    for (let index = 0; index < source.length; index += 1) {
+      const current = source[index];
+      const next = source[index + 1] || '';
+      const currentUrl = current.trim().match(/(https?:\/\/[^\s\]]+)\s*$/i)?.[1] || '';
+      const annotationUrl = next.trim().match(/^\[(https?:\/\/[^\]\s]+)\]$/i)?.[1] || '';
+      result.push(current);
+      if (
+        currentUrl &&
+        annotationUrl &&
+        normalizeComparableMailUrl(currentUrl) === normalizeComparableMailUrl(annotationUrl)
+      ) {
+        index += 1;
+      }
+    }
+    return result;
+  }
+
   function normalizeRepeatedLine(value) {
     return String(value || '')
       .trim()
@@ -311,6 +331,7 @@
   global.SoftoraMailboxDisplay = {
     applySenderCtaLinks,
     collapseDuplicateAnnotations,
+    collapseDuplicateAdjacentUrlAnnotations,
     formatDetailSubject,
     isSentMessage,
     isGeneratedImageDescriptionLine,
