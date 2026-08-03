@@ -82,7 +82,7 @@ test('kvk database metrics render current last-hour and grade values without ano
   assert.equal(elements['companies-unusable-grade-1-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
   assert.equal(elements['companies-unusable-grade-1-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-2');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+5');
-  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-3');
+  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].hidden, true);
 });
 
 test('kvk database metrics combine legacy grade 3 fallback deltas into Definitief', () => {
@@ -120,5 +120,5 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
 
   assert.equal(elements['companies-unusable-grade-2'].textContent, '6');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
-  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].textContent, '-0');
+  assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].hidden, true);
 });

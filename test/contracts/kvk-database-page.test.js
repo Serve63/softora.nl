@@ -145,7 +145,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260727b/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260803b/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260727a/);
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
@@ -154,6 +154,9 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
   assert.match(metricsStyles, /\.stat-delta-number/);
   assert.match(metricsStyles, /\.unusable-grade-delta-removed/);
+  const definitiveDeltaMarkup = pageSource.match(/<small id="companies-unusable-grade-2-last60">([\s\S]*?)<\/small>/)?.[1] || '';
+  assert.doesNotMatch(definitiveDeltaMarkup, /unusable-grade-delta-removed/);
+  assert.match(metricsSource, /elements\.unusableGrade2Last60,[\s\S]*?false,/);
 });
 
 test('kvk database shows completed locations crossed out with usable company totals', () => {
