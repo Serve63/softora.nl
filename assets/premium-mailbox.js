@@ -175,7 +175,9 @@ const MAILBOX_WEBDESIGN_MOCKUP_CAPTION = 'Hieronder zie je een korte indruk van 
 const MAILBOX_REPLY_HEADER_PATTERNS = [
   /^op .+\bheeft\s+.+\s+het volgende geschreven\s*:\s*$/i,
   /^op .+\bschreef\b.+:\s*$/i,
+  /^op .+\bschreef\b\s+[^:\r\n]+?\s*$/i,
   /^op .+\bschreef\b[:\s]*$/i,
+  /^on .+\bwrote\b\s+[^:\r\n]+?\s*$/i,
   /^on .+\bwrote\b[:\s]*$/i,
   /^van:\s.+$/i,
   /^from:\s.+$/i,
