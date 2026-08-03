@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox.js');
 const compose = require('../../assets/premium-mailbox-compose.js');
+const composeWindow = require('../../assets/premium-mailbox-compose-window.js');
 const composeController = require('../../assets/premium-mailbox-compose-controller.js');
 const mailboxDelete = require('../../assets/premium-mailbox-delete.js');
 const mailboxToast = require('../../assets/premium-mailbox-toast.js');
@@ -183,9 +184,151 @@ test('compose controller weigert een oude replycontext na eigenaarwissel', async
   assert.equal(requests.length, 0);
 });
 
+test('gecombineerde mailbox verstuurt een Instantly-antwoord uitsluitend via de bewezen eigenaar', async () => {
+  const requests = [];
+  const values = {
+    'c-to': { value: '' },
+    'c-cc': { value: '' },
+    'c-bcc': { value: '' },
+    'c-subject': { value: '' },
+    'c-body': { value: 'Dankjewel voor je bericht.' },
+    'compose-overlay': { classList: { add() {}, remove() {} } },
+  };
+  const mail = {
+    id: 'instantly:reply-1',
+    provider: 'instantly',
+    providerOwner: 'serve',
+    providerMessageId: 'message-1',
+    providerThreadId: 'thread-1',
+    accountEmail: 'serve@softora.nl',
+    email: 'prospect@example.nl',
+    subject: 'Re: Website',
+  };
+  const controller = composeController.create({
+    document: {
+      getElementById: (id) => values[id] || null,
+      querySelector: () => null,
+    },
+    compose: {
+      buildReplyContext: () => ({
+        id: mail.id,
+        accountEmail: mail.accountEmail,
+        provider: mail.provider,
+        providerMessageId: mail.providerMessageId,
+        providerThreadId: mail.providerThreadId,
+      }),
+      getAttachments: () => [],
+      reset() {},
+      resetOptionalFields() {},
+    },
+    campaignInbox: {
+      getAccount: (message) => message.accountEmail,
+      getMessageOwner: () => 'serve',
+      isPersonalOwner: (owner) => owner === 'serve' || owner === 'martijn',
+    },
+    display: {
+      getReplyToAddress: () => mail.email,
+      formatDetailSubject: (value) => value,
+    },
+    findMail: () => mail,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    getAccount: () => 'serve@softora.nl',
+    getOwner: () => 'both',
+    getActiveFolder: () => 'outreach',
+    fetch: async (url, options) => {
+      requests.push({ url, options });
+      return { ok: true, json: async () => ({ ok: true }) };
+    },
+    toast() {},
+  });
+
+  controller.reply(mail);
+  await controller.send();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, '/api/mailbox/send');
+  assert.equal(JSON.parse(requests[0].options.body).owner, 'serve');
+});
+
+test('composevenster is sleepbaar en scrolt de mailbox achter de overlay', () => {
+  const listeners = {};
+  const handle = {
+    addEventListener(type, handler) { listeners[`handle:${type}`] = handler; },
+    setPointerCapture() {},
+    releasePointerCapture() {},
+  };
+  const style = {
+    removeProperty(property) { delete this[property]; },
+  };
+  const box = {
+    style,
+    getBoundingClientRect: () => ({ left: 100, top: 80, width: 500, height: 400 }),
+    setAttribute(name, value) { this[name] = value; },
+    removeAttribute(name) { delete this[name]; },
+    contains: () => false,
+  };
+  const overlay = {
+    style: { pointerEvents: '' },
+    classList: { contains: (name) => name === 'open' },
+    querySelector(selector) { return selector === '.compose-box' ? box : handle; },
+    addEventListener(type, handler) { listeners[`overlay:${type}`] = handler; },
+  };
+  const scrollTarget = {
+    scrollHeight: 1200,
+    clientHeight: 600,
+    scrollWidth: 600,
+    clientWidth: 600,
+    scrollBy(options) { this.lastScroll = options; },
+    parentElement: null,
+  };
+  const documentRef = {
+    getElementById: () => overlay,
+    elementFromPoint: () => scrollTarget,
+    documentElement: { clientWidth: 1200, clientHeight: 800 },
+    scrollingElement: scrollTarget,
+  };
+  const windowRef = {
+    innerWidth: 1200,
+    innerHeight: 800,
+    getComputedStyle: () => ({ overflowY: 'auto' }),
+    addEventListener(type, handler) { listeners[`window:${type}`] = handler; },
+  };
+  const controller = composeWindow.create({ document: documentRef, window: windowRef });
+  controller.bind();
+
+  listeners['handle:pointerdown']({
+    button: 0,
+    pointerId: 1,
+    clientX: 120,
+    clientY: 100,
+    target: { closest: () => null },
+    preventDefault() {},
+  });
+  listeners['handle:pointermove']({
+    pointerId: 1,
+    clientX: 250,
+    clientY: 220,
+    preventDefault() {},
+  });
+  assert.equal(box.style.left, '230px');
+  assert.equal(box.style.top, '200px');
+
+  let prevented = false;
+  listeners['overlay:wheel']({
+    target: overlay,
+    clientX: 20,
+    clientY: 200,
+    deltaX: 0,
+    deltaY: 160,
+    preventDefault() { prevented = true; },
+  });
+  assert.deepEqual(scrollTarget.lastScroll, { left: 0, top: 160, behavior: 'auto' });
+  assert.equal(prevented, true);
+});
+
 test('verbergen gebruikt uitsluitend Softora hide en restore en nooit een bronmail-delete', async () => {
   const requests = [];
   const controller = mailboxDelete.create({
+    getOwner: () => 'serve',
     getAccount: (mail) => mail.accountEmail,
     getFolder: (mail) => mail.folder,
     getRequestId: (mail) => mail.id,
@@ -210,6 +353,7 @@ test('verbergen gebruikt uitsluitend Softora hide en restore en nooit een bronma
   };
   assert.equal((await controller.remove(mail)).ok, true);
   assert.equal(requests[0].url, '/api/mailbox/messages/hide');
+  assert.equal(JSON.parse(requests[0].options.body).owner, 'serve');
   assert.equal(JSON.parse(requests[0].options.body).messages.length, 2);
   assert.equal((await controller.restore(mail)).ok, true);
   assert.equal(requests[1].url, '/api/mailbox/messages/restore');

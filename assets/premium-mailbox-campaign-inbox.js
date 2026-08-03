@@ -4,6 +4,7 @@
   const OWNER_OPTIONS = Object.freeze([
     Object.freeze({ key: 'serve', label: 'Servé Creusen' }),
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
+    Object.freeze({ key: 'both', label: 'Martijn en Servé' }),
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
@@ -81,10 +82,16 @@
     const owner = String(value || '').trim().toLowerCase();
     if (owner === 'serve' || owner === 'servé') return 'serve';
     if (owner === 'martijn') return 'martijn';
+    if (owner === 'both' || owner === 'all') return 'both';
     return 'serve';
   }
 
   function isOwner(value) {
+    const owner = String(value || '').trim().toLowerCase();
+    return owner === 'serve' || owner === 'servé' || owner === 'martijn' || owner === 'both' || owner === 'all';
+  }
+
+  function isPersonalOwner(value) {
     const owner = String(value || '').trim().toLowerCase();
     return owner === 'serve' || owner === 'servé' || owner === 'martijn';
   }
@@ -96,7 +103,7 @@
   function getMessageOwner(mail) {
     if (String(mail && mail.provider || '').trim().toLowerCase() === 'instantly') {
       const provenOwner = String(mail && mail.providerOwner || '').trim().toLowerCase();
-      return isOwner(provenOwner) ? normalizeOwner(provenOwner) : '';
+      return isPersonalOwner(provenOwner) ? normalizeOwner(provenOwner) : '';
     }
     return getOwnerByAccount(mail && (mail.accountEmail || mail.campaign && mail.campaign.account));
   }
@@ -282,7 +289,13 @@
   function groupConversationMessages(messages) {
     const groups = new Map();
     sortMessagesNewestFirst(messages).forEach((mail) => {
-      const conversationId = getConversationId(mail) || getMessageIdentity(mail);
+      const isolatedId = String(mail && (mail.providerMessageId || mail.mailboxId || mail.id) || '').trim();
+      const conversationId = getConversationId(mail) || getMessageIdentity(mail) || [
+        'isolated',
+        getMessageOwner(mail) || 'unknown',
+        String(mail && mail.provider || 'imap').trim().toLowerCase(),
+        isolatedId || String(groups.size),
+      ].join(':');
       if (!groups.has(conversationId)) groups.set(conversationId, []);
       groups.get(conversationId).push(mail);
     });
@@ -320,13 +333,13 @@
       (Array.isArray(messages) ? messages : []).filter((mail) => {
         if (isAutomatedCampaignReply(mail)) return false;
         const accountOwner = getMessageOwner(mail);
-        return Boolean(accountOwner && accountOwner === owner);
+        return Boolean(accountOwner && (owner === 'both' || accountOwner === owner));
       })
     );
   }
 
   function getOwnerOptionsForMenu(primaryOwner) {
-    const primary = isOwner(primaryOwner) ? normalizeOwner(primaryOwner) : '';
+    const primary = isPersonalOwner(primaryOwner) ? normalizeOwner(primaryOwner) : '';
     const personalOptions = OWNER_OPTIONS.slice();
     if (primary === 'serve' || primary === 'martijn') {
       personalOptions.sort((left, right) => {
@@ -918,15 +931,20 @@
 
   function removeCachedMessage(mail) {
     const owner = getMessageOwner(mail) || activeOwner;
-    const snapshot = readSessionMailboxSnapshot(owner);
-    if (!snapshot || !mail) return false;
-    const messages = snapshot.messages.filter((candidate) => !matchesMessageIdentity(candidate, mail));
-    if (messages.length === snapshot.messages.length) return false;
-    return writeSessionMailboxSnapshot({
-      ...snapshot,
-      savedAt: new Date().toISOString(),
-      messages,
-    }, owner);
+    if (!mail) return false;
+    let updated = false;
+    Array.from(new Set([owner, 'both'])).forEach((cacheOwner) => {
+      const snapshot = readSessionMailboxSnapshot(cacheOwner);
+      if (!snapshot) return;
+      const messages = snapshot.messages.filter((candidate) => !matchesMessageIdentity(candidate, mail));
+      if (messages.length === snapshot.messages.length) return;
+      updated = writeSessionMailboxSnapshot({
+        ...snapshot,
+        savedAt: new Date().toISOString(),
+        messages,
+      }, cacheOwner) || updated;
+    });
+    return updated;
   }
 
   function publishMessageDeletion(mail) {
@@ -1036,7 +1054,7 @@
       : global.fetch.bind(global);
     const params = new URLSearchParams({
       limit: '100',
-      owner,
+      owner: owner === 'both' ? '' : owner,
       refreshInstantly: '1',
     });
     const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
@@ -1049,7 +1067,7 @@
     if (!response.ok || !data?.ok) {
       throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
     }
-    if (isOwner(data.owner) && normalizeOwner(data.owner) !== owner) {
+    if (owner !== 'both' && isPersonalOwner(data.owner) && normalizeOwner(data.owner) !== owner) {
       throw new Error('De mailboxresponse hoort bij een andere eigenaar.');
     }
     return normalizeLoadResult(data, normalizeMessage, false, owner);
@@ -1079,6 +1097,7 @@
     isAutomatedCampaignReply,
     isDuplicateStructuredOwnQuote,
     isOwner,
+    isPersonalOwner,
     isSafeImageSource,
     isCampaignMail,
     isCampaignAccount,

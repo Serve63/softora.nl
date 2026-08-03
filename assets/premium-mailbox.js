@@ -699,9 +699,15 @@ const mailboxToastController = window.SoftoraMailboxToast.create({ document });
 function toast(message, actionOptions) {
   mailboxToastController.show(message, actionOptions);
 }
+function getMailboxActionOwner(mail) {
+  const messageOwner = window.SoftoraMailboxCampaignInbox.getMessageOwner(mail);
+  if (window.SoftoraMailboxCampaignInbox.isPersonalOwner(messageOwner)) return messageOwner;
+  const selectedOwner = window.SoftoraMailboxCampaignInbox.getOwner();
+  return window.SoftoraMailboxCampaignInbox.isPersonalOwner(selectedOwner) ? selectedOwner : '';
+}
 const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   fetch: (...args) => window.fetch(...args),
-  getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(),
+  getOwner: getMailboxActionOwner,
   getDialogs: () => window.SoftoraDialogs,
   confirm: (message) => typeof window.confirm === 'function' && window.confirm(message),
   getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
@@ -710,6 +716,8 @@ const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   removeCached: (mail) => window.SoftoraMailboxCampaignInbox?.removeAndPublishMessageDeletion?.(mail),
   toast,
 }); window.SoftoraMailboxCampaignInbox?.bindMessageDeletionSync?.({ getMessages: () => mails, setMessages: (messages) => { mails = messages; }, getActiveId: () => activeMail, setActiveId: (id) => { activeMail = id; }, filterMessages: mailboxDeleteController.filterMessages, renderList, openMail, resetDetail: resetDetailEmpty });
+const mailboxComposeWindow = window.SoftoraMailboxComposeWindow.create({ document, window });
+mailboxComposeWindow.bind();
 const mailboxComposeController = window.SoftoraMailboxComposeController.create({
   document,
   fetch: (...args) => window.fetch(...args),
@@ -723,6 +731,7 @@ const mailboxComposeController = window.SoftoraMailboxComposeController.create({
   normalizeEmail: normalizeMailboxEmail,
   loadSenderProfile: loadMailboxSenderProfile,
   loadMessages: loadMailboxMessages,
+  composeWindow: mailboxComposeWindow,
   toast,
 });
 mailboxOwnerView = window.SoftoraMailboxOwnerSession.createView({
@@ -896,7 +905,7 @@ async function persistMailReadState(mail) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         account: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
-        owner: window.SoftoraMailboxCampaignInbox.getOwner(),
+        owner: getMailboxActionOwner(mail),
         id: requestId,
         uid: mail.uid,
         folder: window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),

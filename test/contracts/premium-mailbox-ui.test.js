@@ -13,6 +13,7 @@ const campaignInboxScriptPath = path.join(__dirname, '../../assets/premium-mailb
 const imagesScriptPath = path.join(__dirname, '../../assets/premium-mailbox-images.js');
 const refreshScriptPath = path.join(__dirname, '../../assets/premium-mailbox-refresh.js');
 const composeScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose.js');
+const composeWindowScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-window.js');
 const composeControllerScriptPath = path.join(__dirname, '../../assets/premium-mailbox-compose-controller.js');
 const ownerSessionScriptPath = path.join(__dirname, '../../assets/premium-mailbox-owner-session.js');
 const toastScriptPath = path.join(__dirname, '../../assets/premium-mailbox-toast.js');
@@ -26,6 +27,7 @@ global.SoftoraMailboxCampaignInbox = campaignInboxModule;
 const imagesModule = require('../../assets/premium-mailbox-images.js');
 const refreshModule = require('../../assets/premium-mailbox-refresh.js');
 const composeModule = require('../../assets/premium-mailbox-compose.js');
+const composeWindowModule = require('../../assets/premium-mailbox-compose-window.js');
 const composeControllerModule = require('../../assets/premium-mailbox-compose-controller.js');
 const toastModule = require('../../assets/premium-mailbox-toast.js');
 const listModule = require('../../assets/premium-mailbox-list.js');
@@ -65,6 +67,10 @@ function readRefreshScript() {
 
 function readComposeScript() {
   return fs.readFileSync(composeScriptPath, 'utf8');
+}
+
+function readComposeWindowScript() {
+  return fs.readFileSync(composeWindowScriptPath, 'utf8');
 }
 
 function readComposeControllerScript() {
@@ -135,6 +141,7 @@ function loadMailboxHelpersForTest(options = {}) {
     SoftoraMailboxMessageProvenance: provenanceModule,
     SoftoraMailboxOwnerSession: ownerSessionModule,
     SoftoraMailboxCompose: composeModule,
+    SoftoraMailboxComposeWindow: composeWindowModule,
     SoftoraMailboxComposeController: composeControllerModule,
     SoftoraMailboxToast: toastModule,
     SoftoraMailboxDelete: deleteModule,
@@ -1961,8 +1968,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260803a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260803b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260728a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2031,14 +2038,14 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
   assert.doesNotMatch(pageSource, /<span class="topbar-mailbox-account" id="topbar-mailbox-account"><\/span>/);
   assert.match(pageSource, /<button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">/);
-  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé &amp; Martijn<\/span>/);
+  assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé Creusen<\/span>/);
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"><\/div>/);
   assert.match(pageSource, /<button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox vernieuwen"/);
   assert.match(pageSource, /<span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">0 sec geleden<\/span>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260727a"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260724c"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2049,6 +2056,8 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(deleteSource, /\/api\/mailbox\/messages\/\$\{action\}/);
   assert.match(composeControllerSource, /\/api\/mailbox\/send/);
   assert.match(composeControllerSource, /\/api\/mailbox\/rewrite/);
+  assert.match(readComposeWindowScript(), /data-mailbox-compose-drag-handle/);
+  assert.match(readComposeWindowScript(), /elementFromPoint/);
   assert.doesNotMatch(readOutreachScript(), /\/api\/coldmailing\/outreach\/status/);
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(options = \{\}\)/);
@@ -2124,11 +2133,17 @@ test('coldmail eigenaarfilter houdt de negen campagneadressen gescheiden tussen 
     messages.slice(5, 9).map((message) => message.id)
   );
 
+  campaignInboxModule.setOwner('both');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn en Servé');
+  assert.deepEqual(
+    campaignInboxModule.filterMessages(messages).map((message) => message.id),
+    messages.slice(0, 9).map((message) => message.id)
+  );
+
   const ownerMenu = campaignInboxModule.renderOwnerMenu((value) => String(value));
   assert.match(ownerMenu, />Servé Creusen</);
   assert.match(ownerMenu, />Martijn van de Ven</);
-  assert.doesNotMatch(ownerMenu, />Servé & Martijn</);
-  assert.ok(ownerMenu.indexOf('Servé Creusen') < ownerMenu.indexOf('Martijn van de Ven'));
+  assert.match(ownerMenu, />Martijn en Servé</);
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('serve');
 });
@@ -2322,12 +2337,12 @@ test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als stand
   });
   assert.ok(serveMenu.indexOf('Servé Creusen') < serveMenu.indexOf('Martijn van de Ven'));
   assert.ok(martijnMenu.indexOf('Martijn van de Ven') < martijnMenu.indexOf('Servé Creusen'));
-  assert.doesNotMatch(serveMenu, /Servé & Martijn/);
-  assert.doesNotMatch(martijnMenu, /Servé & Martijn/);
+  assert.match(serveMenu, /Martijn en Servé/);
+  assert.match(martijnMenu, /Martijn en Servé/);
 });
 
-test('coldmail eigenaar kan alleen Servé of Martijn persoonlijk vastpinnen', () => {
-  for (const owner of ['serve', 'martijn']) {
+test('coldmail eigenaar kan Servé Martijn of de gecombineerde inbox vastpinnen', () => {
+  for (const owner of ['serve', 'martijn', 'both']) {
     const ownerMenu = campaignInboxModule.renderOwnerMenu(String, {
       defaultOwner: 'serve',
       pinnedOwner: owner,
@@ -2345,12 +2360,12 @@ test('coldmail eigenaar kan alleen Servé of Martijn persoonlijk vastpinnen', ()
   });
   assert.ok(martijnPinnedMenu.indexOf('Martijn van de Ven') < martijnPinnedMenu.indexOf('Servé Creusen'));
 
-  const legacyCombinedMenu = campaignInboxModule.renderOwnerMenu(String, {
+  const combinedMenu = campaignInboxModule.renderOwnerMenu(String, {
     defaultOwner: 'serve',
     pinnedOwner: 'both',
   });
-  assert.doesNotMatch(legacyCombinedMenu, /Servé & Martijn/);
-  assert.doesNotMatch(legacyCombinedMenu, /topbar-mailbox-option-row pinned/);
+  assert.match(combinedMenu, /Martijn en Servé/);
+  assert.match(combinedMenu, /topbar-mailbox-option-row pinned[\s\S]*data-mailbox-pin-owner="both"/);
 });
 
 test('coldmail eigenaarpin gebruikt een aparte server-state sleutel per gebruikersaccount', () => {
@@ -2393,8 +2408,8 @@ test('coldmail eigenaarpin leest en schrijft alleen de voorkeur van de actieve g
   );
   assert.deepEqual(serveState, {
     defaultOwner: 'serve',
-    pinnedOwner: '',
-    activeOwner: 'serve',
+    pinnedOwner: 'both',
+    activeOwner: 'both',
   });
   const result = await campaignInboxModule.pinOwner('serve', client);
   assert.equal(result.saved, true);

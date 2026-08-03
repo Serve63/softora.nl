@@ -5,6 +5,7 @@ const { simpleParser } = require('mailparser');
 const sharp = require('sharp');
 
 const { createColdmailCampaignService } = require('../../server/services/coldmail-campaign');
+const { createCriticalUiStateReader } = require('../../server/services/coldmail-autopilot-resilience');
 const {
   clearPreviewImageCache,
 } = require('../../server/services/coldmail-preview-image-cache');
@@ -1641,7 +1642,7 @@ test('coldmail autopilot does not overwrite live settings when state cannot be l
   };
   const { service, sentMessages, getAutopilotState, getSavedStates } = createService({
     autopilotState: liveState,
-    autopilotReadStates: [null],
+    autopilotReadStates: [null, null, null],
   });
 
   const result = await service.runColdmailAutopilot({
@@ -1655,6 +1656,65 @@ test('coldmail autopilot does not overwrite live settings when state cannot be l
   assert.equal(sentMessages.length, 0);
   assert.equal(getAutopilotState().enabled, true);
   assert.equal(getSavedStates().some((entry) => entry.scope === 'premium_coldmail_autopilot'), false);
+});
+
+test('coldmail autopilot herstelt een tijdelijke statusread met begrensde retries', async () => {
+  const liveState = {
+    enabled: true,
+    config: {
+      count: 1,
+      senderEmails: ['serve@softora.nl'],
+      senderProfiles: {
+        'serve@softora.nl': {
+          subject: 'Korte vraag voor {{bedrijf}}',
+          body: 'Goedemorgen {{naam}}, zou u openstaan voor een betere website?',
+        },
+      },
+    },
+    schedule: {
+      timezone: 'Europe/Amsterdam',
+      weekdaysOnly: true,
+      startHour: 15,
+      endHour: 17,
+      minIntervalMinutes: 5,
+    },
+  };
+  const { service, sentMessages, sleeps } = createService({
+    autopilotState: liveState,
+    autopilotReadStates: [null, null, liveState],
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.reason, 'outside_safe_hours');
+  assert.equal(sentMessages.length, 0);
+  assert.deepEqual(sleeps.slice(0, 2), [150, 300]);
+});
+
+test('coldmail autopilot herstelt ook een tijdelijke geworpen databasefout met begrensde retries', async () => {
+  let attempts = 0;
+  const sleeps = [];
+  const readCriticalState = createCriticalUiStateReader({
+    getUiStateValues: async () => {
+      attempts += 1;
+      if (attempts < 3) throw new Error('temporary Supabase timeout');
+      return { values: { softora_coldmail_autopilot_v1: '{"enabled":true}' } };
+    },
+    sleep: async (milliseconds) => sleeps.push(milliseconds),
+  });
+
+  const result = await readCriticalState('premium_coldmail_autopilot', {
+    attempts: 3,
+    key: 'softora_coldmail_autopilot_v1',
+    requireKey: true,
+  });
+
+  assert.equal(result.values.softora_coldmail_autopilot_v1, '{"enabled":true}');
+  assert.equal(attempts, 3);
+  assert.deepEqual(sleeps, [150, 300]);
 });
 
 test('coldmail autopilot does not treat an untrusted empty disabled state as a button off', async () => {
@@ -2051,8 +2111,52 @@ test('coldmail autopilot sends a small safe batch through the existing campaign 
   assert.equal(sentMessages[0].subject, 'Korte vraag voor Bakkerij Zon');
   assert.equal(sentMessages[1].subject, 'Korte vraag voor Kapsalon Luna');
   assert.equal(getAutopilotState().lastResult.reason, 'sent');
+  assert.deepEqual(getAutopilotState().lastResult.replySync, {
+    ok: true,
+    skipped: true,
+    reason: 'dedicated_mailbox_sync_cron',
+  });
   assert.equal(getAutopilotState().lock, null);
   assert.equal(getSendGuardState().entries.length, 2);
+});
+
+test('coldmail autopilot bewaart de laatste operationele dagreden naast compacte nachtlogs', async () => {
+  const previousReason = {
+    ok: true,
+    skipped: true,
+    reason: 'no_ready_sender',
+    message: 'Geen afzender was verzendklaar.',
+    at: '2026-04-24T10:00:00.000Z',
+    sent: 0,
+    failed: 0,
+  };
+  const { service, getAutopilotState } = createService({
+    autopilotState: {
+      enabled: true,
+      config: { count: 1, senderEmails: ['serve@softora.nl'] },
+      schedule: {
+        timezone: 'Europe/Amsterdam',
+        weekdaysOnly: true,
+        startHour: 15,
+        endHour: 17,
+        minIntervalMinutes: 5,
+      },
+      log: [previousReason],
+    },
+  });
+
+  for (let index = 0; index < 35; index += 1) {
+    const result = await service.runColdmailAutopilot({
+      publicBaseUrl: 'https://www.softora.nl',
+      actor: 'Coldmail Autopilot Cron',
+    });
+    assert.equal(result.reason, 'outside_safe_hours');
+  }
+
+  assert.deepEqual(
+    getAutopilotState().log.map((entry) => entry.reason),
+    ['no_ready_sender', 'outside_safe_hours']
+  );
 });
 
 test('coldmail autopilot keeps enabled state when latest state read is unavailable after send', async () => {
@@ -2115,7 +2219,7 @@ test('coldmail autopilot keeps enabled state when latest state read is unavailab
       },
     },
     autopilotState: liveState,
-    autopilotReadStates: [liveState, liveState, liveState, null],
+    autopilotReadStates: [liveState, liveState, liveState, null, null, null],
   });
 
   const result = await service.runColdmailAutopilot({

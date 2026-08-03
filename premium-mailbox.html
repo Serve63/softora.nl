@@ -165,7 +165,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .compose-overlay.open { display: flex; }
 .compose-box { width: min(1040px, calc(100vw - 28px)); max-width: 100%; min-height: min(90vh, 700px); max-height: calc(100vh - 28px); background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 72px rgba(0,0,0,.22); display: flex; flex-direction: column; overflow: hidden; animation: compose-pop .2s ease; }
 @keyframes compose-pop { from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none} }
-.compose-head { padding: 16px 20px; background: var(--crimson); color: #fff; display: flex; align-items: center; justify-content: space-between; }
+.compose-head { padding: 16px 20px; background: var(--crimson); color: #fff; display: flex; align-items: center; justify-content: space-between; cursor: grab; touch-action: none; user-select: none; }
+.compose-box[data-compose-dragging="true"] .compose-head { cursor: grabbing; }
 .compose-head-title { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .compose-x { background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer; font-size: 18px; line-height: 1; padding: 0; transition: color .15s; }
 .compose-x:hover { color: #fff; }
@@ -438,7 +439,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 <div class="topbar">
   <div class="topbar-title-wrap">
     <button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">
-      <span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé &amp; Martijn</span>
+      <span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé Creusen</span>
       <svg class="topbar-mailbox-switcher-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </button>
     <div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"></div>
@@ -474,7 +475,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 <!-- COMPOSE -->
 <div class="compose-overlay" id="compose-overlay" role="dialog" aria-modal="true" aria-labelledby="compose-title" aria-hidden="true">
   <div class="compose-box">
-    <div class="compose-head">
+    <div class="compose-head" data-mailbox-compose-drag-handle>
       <div class="compose-head-title" id="compose-title">Nieuwe mail</div>
       <button class="compose-x" type="button" data-mailbox-action="close-compose" aria-label="Sluiten">×</button>
     </div>
@@ -509,8 +510,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260728a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260803a"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260803a"></script><script src="assets/premium-mailbox-list.js?v=20260803a"></script><script src="assets/premium-mailbox-index.js?v=20260728a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260727a"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260724c"></script>
-<script src="assets/premium-mailbox.js?v=20260803a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260803b"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260803b"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260803a"></script><script src="assets/premium-mailbox-list.js?v=20260803a"></script><script src="assets/premium-mailbox-index.js?v=20260728a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-window.js?v=20260803a"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260803b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script>
+<script src="assets/premium-mailbox.js?v=20260803b"></script>
 <script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
 </html>
