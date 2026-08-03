@@ -59,8 +59,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260726b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260726b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260726b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260803a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260803a/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
@@ -185,6 +185,8 @@ test('kvk database renders refresh age in seconds and a real fill control', () =
   assert.match(controlSource, /'X-Softora-Requested-With': 'premium'/);
   assert.match(controlSource, /JSON\.stringify\(\{ enabled: !state\.control\.enabled \}\)/);
   assert.match(controlSource, /fillButtonLabel\.textContent = enabled \? 'AAN' : 'UIT'/);
+  assert.match(controlSource, /\['vuller', 'controle'\]/);
+  assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
   assert.match(controlStyles, /\.database-fill-toggle__track/);
   assert.match(controlStyles, /translateX\(15px\)/);
 });
