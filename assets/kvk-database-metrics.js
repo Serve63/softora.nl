@@ -104,6 +104,7 @@
         elements.unusableGrade2Last60,
         mergeGradeActivity(unusableGradeActivity['2'], unusableGradeActivity['3']),
         sumCounts(unusableGradeLast60['2'], unusableGradeLast60['3']),
+        false,
       );
     }
 
