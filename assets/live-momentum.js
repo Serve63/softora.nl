@@ -346,7 +346,7 @@
     const checked = isChecked(cell);
     const tracked = isTracked(cell);
     const empty = isEmpty(cell);
-    const missed = tracked && !checked && day > 0 && day < TODAY;
+    const missed = tracked && !checked && day > 0 && day <= TODAY;
     cell.classList.toggle('is-missed', missed);
     cell.setAttribute('role', 'checkbox');
     cell.setAttribute('tabindex', '0');
@@ -437,12 +437,7 @@
     syncCellA11y(cell);
   }
   function toggleCell(cell) {
-    const isMobileToday = cell.classList.contains('is-today')
-      && document.body.dataset.momentumMobileView === 'today'
-      && window.matchMedia('(max-width: 900px)').matches;
-    if (isMobileToday) {
-      if (isChecked(cell)) setEmpty(cell); else setChecked(cell, true);
-    } else if (isChecked(cell)) {
+    if (isChecked(cell)) {
       setChecked(cell, false);
     } else if (isTracked(cell)) {
       setEmpty(cell);
@@ -1068,6 +1063,9 @@
       return;
     }
     toggleCell(cell);
+    if (event.detail > 0) {
+      cell.blur();
+    }
   });
   grid.addEventListener('pointerdown', goalActions.handlePointerDown);
   grid.addEventListener('pointermove', goalActions.handlePointerMove);

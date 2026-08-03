@@ -41,7 +41,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260723d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260729a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260803a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260729a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
   assert.match(html, /<div class="momentum-layout">/);
@@ -289,9 +289,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /function getCurrentPeriodDay\(date = new Date\(\)\)/);
   assert.match(js, /let TODAY = getCurrentPeriodDay\(\);/);
   assert.match(js, /window\.setInterval\(refreshToday, TODAY_REFRESH_MS\);/);
-  assert.match(js, /const isMobileToday = cell\.classList\.contains\('is-today'\)[\s\S]*document\.body\.dataset\.momentumMobileView === 'today'[\s\S]*window\.matchMedia\('\(max-width: 900px\)'\)\.matches;/);
-  assert.match(js, /if \(isMobileToday\) \{[\s\S]*if \(isChecked\(cell\)\) setEmpty\(cell\); else setChecked\(cell, true\);/);
-  assert.match(js, /const missed = tracked && !checked && day > 0 && day < TODAY;/);
+  assert.doesNotMatch(js, /isMobileToday/);
+  assert.match(js, /const missed = tracked && !checked && day > 0 && day <= TODAY;/);
   assert.match(js, /window\.addEventListener\('focus', \(\) => \{[\s\S]*refreshToday\(\);[\s\S]*retryStateHydrationNow\(\);/);
   assert.match(mobileJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
   assert.match(mobileJs, /function setView\(view\)[\s\S]*page\.dataset\.momentumMobileView = nextView;/);
@@ -317,6 +316,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.doesNotMatch(js, /const CHART_MAX_HEIGHT/);
   assert.match(js, /function toggleCell\(cell\)/);
   assert.match(js, /if \(isChecked\(cell\)\)\s*\{[\s\S]*setChecked\(cell, false\);[\s\S]*else if \(isTracked\(cell\)\)\s*\{[\s\S]*setEmpty\(cell\);[\s\S]*else\s*\{[\s\S]*setChecked\(cell, true\);/);
+  assert.match(js, /toggleCell\(cell\);\s*if \(event\.detail > 0\) \{\s*cell\.blur\(\);/);
   assert.match(js, /emptyDays:\s*cells\.filter\(isEmpty\)\.map\(getDay\)/);
   assert.match(js, /emptyDays:\s*goal\.emptyDays/);
   assert.match(js, /function updateChart\(\)/);
