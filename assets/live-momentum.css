@@ -1089,6 +1089,13 @@ button {
   border-color: #cfcdd5;
   transform: translateY(-1px);
 }
+.status[aria-disabled="true"] {
+  cursor: default;
+}
+.status[aria-disabled="true"]:hover::before {
+  border-color: #e1e0e5;
+  transform: none;
+}
 .status:focus-visible {
   outline: none;
 }

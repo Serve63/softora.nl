@@ -41,7 +41,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260723d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260803a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260803b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260729a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
   assert.match(html, /<div class="momentum-layout">/);
@@ -213,6 +213,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(css, /\.status\.is-untracked::before,\s*\.status\.is-untracked\.is-empty::before\s*\{[\s\S]*width:\s*18px;[\s\S]*height:\s*18px;[\s\S]*border:\s*2px solid #e1e0e5;[\s\S]*background:\s*#fff;/);
   assert.doesNotMatch(css, /\.status\.is-untracked::before\s*\{[\s\S]*width:\s*6px;/);
   assert.match(css, /\.status\.is-missed::before\s*\{[\s\S]*background-color:\s*var\(--danger\);/);
+  assert.match(css, /\.status\[aria-disabled="true"\]\s*\{[\s\S]*cursor:\s*default;/);
+  assert.match(css, /\.status\[aria-disabled="true"\]:hover::before\s*\{[\s\S]*border-color:\s*#e1e0e5;[\s\S]*transform:\s*none;/);
   assert.doesNotMatch(css, /\.status\.is-soft|is-soft::before/);
   assert.match(css, /\.habit-label:focus\s*\{[\s\S]*box-shadow:\s*0 0 0 2px rgba\(86, 196, 134, \.34\);/);
   assert.match(css, /\.add-goal\s*\{[\s\S]*border:\s*0;/);
@@ -291,6 +293,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /window\.setInterval\(refreshToday, TODAY_REFRESH_MS\);/);
   assert.doesNotMatch(js, /isMobileToday/);
   assert.match(js, /const missed = tracked && !checked && day > 0 && day <= TODAY;/);
+  assert.match(js, /cell\.setAttribute\('aria-disabled', String\(day > TODAY\)\);/);
+  assert.match(js, /cell\.setAttribute\('tabindex', day > TODAY \? '-1' : '0'\);/);
   assert.match(js, /window\.addEventListener\('focus', \(\) => \{[\s\S]*refreshToday\(\);[\s\S]*retryStateHydrationNow\(\);/);
   assert.match(mobileJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
   assert.match(mobileJs, /function setView\(view\)[\s\S]*page\.dataset\.momentumMobileView = nextView;/);
@@ -316,7 +320,8 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.doesNotMatch(js, /const CHART_MAX_HEIGHT/);
   assert.match(js, /function toggleCell\(cell\)/);
   assert.match(js, /if \(isChecked\(cell\)\)\s*\{[\s\S]*setChecked\(cell, false\);[\s\S]*else if \(isTracked\(cell\)\)\s*\{[\s\S]*setEmpty\(cell\);[\s\S]*else\s*\{[\s\S]*setChecked\(cell, true\);/);
-  assert.match(js, /toggleCell\(cell\);\s*if \(event\.detail > 0\) \{\s*cell\.blur\(\);/);
+  assert.match(js, /if \(!cell \|\| !grid\.contains\(cell\) \|\| getDay\(cell\) > TODAY\) \{\s*return;\s*\}[\s\S]*toggleCell\(cell\);\s*if \(event\.detail > 0\) \{\s*cell\.blur\(\);/);
+  assert.match(js, /if \(!cell \|\| !grid\.contains\(cell\) \|\| getDay\(cell\) > TODAY \|\| !\[' ', 'Enter'\]\.includes\(event\.key\)\) \{/);
   assert.match(js, /emptyDays:\s*cells\.filter\(isEmpty\)\.map\(getDay\)/);
   assert.match(js, /emptyDays:\s*goal\.emptyDays/);
   assert.match(js, /function updateChart\(\)/);
