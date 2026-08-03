@@ -1,6 +1,5 @@
-const {
-  INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
-} = require('./seo-content-interne-linkstructuur');
+const { INTERNE_LINKSTRUCTUUR_CONTENT_ITEM } = require('./seo-content-interne-linkstructuur');
+const { BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM } = require('./seo-content-bedrijfssoftware-kosten');
 
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
@@ -964,6 +963,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
+  BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM,
   Object.freeze({
     collection: 'branches',
     slug: 'installateurs',
