@@ -83,6 +83,9 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .mail-item-top { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .mail-from { flex: 1; font-size: 14px; font-weight: 400; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .mail-copy-badge { display: inline-flex; margin-left: 7px; padding: 2px 6px; border-radius: 999px; background: rgba(155,35,85,.1); color: var(--crimson); font-size: 9px; font-weight: 800; line-height: 1.2; vertical-align: 1px; }
+.mail-source-badge { display: inline-flex; margin-left: 7px; padding: 2px 6px; border-radius: 999px; font-size: 9px; font-weight: 800; line-height: 1.2; vertical-align: 1px; }
+.mail-source-badge-instantly { background: rgba(37,99,235,.11); color: #2563eb; }
+.mail-reply-corner { position: absolute; top: 0; right: 0; z-index: 2; width: 15px; height: 15px; pointer-events: none; background: linear-gradient(225deg, var(--crimson) 0 49%, rgba(155,35,85,.2) 50% 69%, transparent 70%); }
 .mail-item.unread .mail-from { font-weight: 600; }
 .mail-time { flex-shrink: 0; color: var(--text-light); white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.15; text-align: right; }
 .mail-date-label { font-size: 10px; font-weight: 600; }
@@ -506,8 +509,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260728a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260728a"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260728a"></script><script src="assets/premium-mailbox-list.js?v=20260724b"></script><script src="assets/premium-mailbox-index.js?v=20260728a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260727a"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260724c"></script>
-<script src="assets/premium-mailbox.js?v=20260728a"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260728a"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260803a"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260803a"></script><script src="assets/premium-mailbox-list.js?v=20260803a"></script><script src="assets/premium-mailbox-index.js?v=20260728a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260727a"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260724c"></script>
+<script src="assets/premium-mailbox.js?v=20260803a"></script>
 <script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
 </html>

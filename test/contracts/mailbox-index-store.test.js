@@ -945,13 +945,92 @@ test('mailbox index store hydrates only selected message bodies in one query', a
   assert.equal(messages[0].originalCampaignOutbound, false);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',
-    'message_key,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text',
+    'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'in'), [
     'in',
     'message_key',
     ['serve@softora.nl|inbox|42'],
   ]);
+});
+
+test('mailbox index store hydrateert Instantly-body alleen via exact account en provider-id', async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      calls.push(['from', table]);
+      const filters = {};
+      return {
+        select(columns) {
+          calls.push(['select', columns]);
+          return this;
+        },
+        eq(column, value) {
+          filters[column] = value;
+          calls.push(['eq', column, value]);
+          return this;
+        },
+        in(column, values) {
+          filters[column] = values;
+          calls.push(['in', column, values]);
+          return this;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return Promise.resolve({
+            data: [{
+              message_key: 'serve@websoftora.com|instantly|0',
+              account_email: 'serve@websoftora.com',
+              provider_id: 'instantly:abc-123',
+              body_text: 'Exacte Instantly-body.',
+              has_body: true,
+              body_truncated: false,
+              payload: {
+                provider: 'instantly',
+                direction: 'sent',
+                providerOwner: 'serve',
+                embeddedImageCount: 0,
+                originalCampaignOutbound: true,
+              },
+              folder: 'instantly',
+              subject: 'Kleine vraag over jullie website',
+              preview: 'Korte preview',
+              in_reply_to: '',
+              references_text: '',
+            }],
+            error: null,
+          });
+        },
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const messages = await store.hydrateMessageBodies({
+    messages: [{
+      id: 'instantly:abc-123',
+      uid: 0,
+      accountEmail: 'serve@websoftora.com',
+      folder: 'instantly',
+      preview: 'Korte preview',
+    }],
+  });
+
+  assert.equal(messages[0].body, 'Exacte Instantly-body.');
+  assert.equal(messages[0].hasBody, true);
+  assert.equal(messages[0].originalCampaignOutbound, true);
+  assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'instantly']);
+  assert.deepEqual(
+    calls.filter((call) => call[0] === 'in'),
+    [
+      ['in', 'account_email', ['serve@websoftora.com']],
+      ['in', 'provider_id', ['instantly:abc-123']],
+    ]
+  );
 });
 
 test('mailbox index store uses sync locks to avoid duplicate mailbox syncs', async () => {

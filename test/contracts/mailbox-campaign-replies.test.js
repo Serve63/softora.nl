@@ -494,6 +494,48 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
   }), false);
 });
 
+test('campaign mailbox koppelt een unieke nabije automatische reactie zonder RFC-referenties fail-closed', () => {
+  const incoming = {
+    id: 'inbox:festival-cement',
+    folder: 'inbox',
+    accountEmail: 'servec321@gmail.com',
+    email: 'info@festivalcement.nl',
+    to: 'servec321@gmail.com',
+    subject: 'Bedankt voor jouw mail! Re: Kleine vraag over jullie website',
+    preview: 'Beste mailer, dank voor je mail.',
+    body: 'Beste mailer, dank voor je mail. Check vooral onze contactgegevens.',
+    date: '2026-07-28T13:17:06.000Z',
+    messageId: '<auto-reply@festivalcement.nl>',
+    inReplyTo: '',
+    references: '',
+  };
+  const sent = {
+    id: 'sent:festival-cement',
+    folder: 'sent',
+    accountEmail: 'servec321@gmail.com',
+    email: 'servec321@gmail.com',
+    to: 'info@festivalcement.nl',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-28T13:17:00.000Z',
+    messageId: '<campaign@servec321.gmail.com>',
+    originalCampaignOutbound: true,
+  };
+
+  const conversations = attachSentThreadMessages([incoming], [sent]);
+
+  assert.deepEqual(conversations[0].threadMessages.map((message) => message.id), [sent.id]);
+  assert.equal(
+    conversations[0].threadMessages[0].threadCorrelationEvidence,
+    'exact-account-recipient-subject-nearby-auto-reply'
+  );
+
+  const ambiguous = attachSentThreadMessages([incoming], [
+    sent,
+    { ...sent, id: 'sent:festival-cement-duplicate', messageId: '<campaign-2@servec321.gmail.com>' },
+  ]);
+  assert.deepEqual(ambiguous[0].threadMessages, []);
+});
+
 test('campaign reply service excludes duplicates and automatic replies before customer lookup', async () => {
   let lookedUpEmails = [];
   const service = createMailboxCampaignRepliesService({

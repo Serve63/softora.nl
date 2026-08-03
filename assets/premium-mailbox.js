@@ -225,7 +225,7 @@ function isMailboxTechnicalUrl(value, options) {
   return Boolean(options && options.standalone && isMailboxStandaloneAssetUrl(value));
 }
 function cleanMailboxText(value) {
-  const lines = window.SoftoraMailboxDisplay.normalizeCollapsedReplyStructure(value)
+  const normalizedLines = window.SoftoraMailboxDisplay.normalizeCollapsedReplyStructure(value)
     .replace(/\r\n?/g, '\n')
     .replace(/\u200B/g, '')
     .split('\n')
@@ -235,7 +235,8 @@ function cleanMailboxText(value) {
       .replace(/\s{2,}/g, ' ')
       .replace(/^[\t \u00a0]+/, '')
       .trimEnd())
-    .map((line) => window.SoftoraMailboxDisplay.collapseDuplicateAnnotations(line))
+    .map((line) => window.SoftoraMailboxDisplay.collapseDuplicateAnnotations(line));
+  const lines = window.SoftoraMailboxDisplay.collapseDuplicateAdjacentUrlAnnotations(normalizedLines)
     .filter((line) => {
       const value = String(line || '').trim();
       const url = value.match(/^\[(https?:\/\/[^\]]+)\]$/i)?.[1] ||

@@ -214,11 +214,11 @@ test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gesc
   try {
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('serve'),
-      'mailbox_campaign_replies_v6:user-1:serve'
+      'mailbox_campaign_replies_v7:user-1:serve'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('martijn'),
-      'mailbox_campaign_replies_v6:user-1:martijn'
+      'mailbox_campaign_replies_v7:user-1:martijn'
     );
   } finally {
     global.SoftoraPageBootstrapSession = previousSession;
