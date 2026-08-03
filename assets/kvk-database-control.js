@@ -3,7 +3,7 @@
   const fillButton = document.getElementById('database-fill-toggle');
   const fillButtonLabel = document.getElementById('database-fill-toggle-label');
   const state = {
-    control: { enabled: false, workerState: 'offline', workerMessage: '' },
+    control: { enabled: false, workerState: 'offline', workerMessage: '', workers: {} },
     usableByPath: new Map(),
     loading: false,
   };
@@ -82,7 +82,7 @@
 
   function renderControl() {
     if (!fillButton || !fillButtonLabel) return;
-    const { enabled, workerState, workerMessage } = state.control;
+    const { enabled, workerState, workerMessage, workers = {} } = state.control;
     const running = ['starting', 'running', 'waiting'].includes(workerState);
     fillButton.disabled = state.loading;
     fillButton.classList.toggle('is-on', enabled);
@@ -91,8 +91,13 @@
     fillButtonLabel.textContent = enabled ? 'AAN' : 'UIT';
     const actionLabel = enabled ? 'uit te zetten' : 'aan te zetten';
     fillButton.setAttribute('aria-label', `Database vullen staat ${enabled ? 'aan' : 'uit'}. Klik om ${actionLabel}.`);
-    const pendingStopMessage = !enabled && running ? 'De lopende batch wordt nog veilig afgemaakt; daarna stopt database vullen.' : '';
-    fillButton.title = pendingStopMessage || workerMessage || (enabled ? 'Klik om na de lopende batch te stoppen.' : 'Klik om database vullen aan te zetten.');
+    const laneMessage = ['vuller', 'controle']
+      .map((key) => workers[key])
+      .filter(Boolean)
+      .map((worker) => `${worker.workerKey === 'controle' ? 'Controle' : 'Vuller'}: ${worker.workerMessage || worker.workerState}`)
+      .join(' • ');
+    const pendingStopMessage = !enabled && running ? 'De lopende batches worden nog veilig afgemaakt; daarna stopt database vullen.' : '';
+    fillButton.title = pendingStopMessage || laneMessage || workerMessage || (enabled ? 'Klik om na de lopende batches te stoppen.' : 'Klik om database vullen aan te zetten.');
   }
 
   async function loadControl() {
@@ -141,7 +146,7 @@
   const locationList = document.getElementById('location-list');
   if (locationList) new MutationObserver(decorateLocations).observe(locationList, { childList: true, subtree: true });
   window.setInterval(renderRefreshAge, 1000);
-  window.setInterval(loadControl, 15_000);
+  window.setInterval(loadControl, 5_000);
   window.setInterval(loadLocationStats, 15_000);
   observeRefreshWrites();
   renderRefreshAge();
