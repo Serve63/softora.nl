@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-22",
+  "updatedAt": "2026-08-03",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -20,7 +20,9 @@
   "items": [
     {
       "id": "software-cost-001",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-03",
+      "shippedPath": "/blog/bedrijfssoftware-laten-maken-kosten",
       "path": "/blog/bedrijfssoftware-laten-maken-kosten",
       "contentType": "blog",
       "cluster": "software-crm",
@@ -33,17 +35,22 @@
       "demandEvidence": [
         {
           "type": "gsc",
-          "source": "GSC 28 dagen tot en met 2026-07-15",
-          "observedAt": "2026-07-16",
-          "detail": "Bedrijfssoftware laten maken had 156 impressies op gemiddelde positie 25.90; de live site mist een aparte kostenbehandeling voor deze koopvraag."
+          "source": "GSC 28 dagen tot en met 2026-08-02",
+          "observedAt": "2026-08-03",
+          "detail": "Bedrijfssoftware laten maken had 147 impressies, 0 klikken en gemiddelde positie 17.19; de bestaande money page verscheen wel, maar een aparte kosten- en budgetbehandeling ontbrak."
         }
       ],
+      "competitorPatterns": [
+        "Sterk uiteenlopende prijsbanden zonder gelijke scope of aantoonbare Softora-basis",
+        "Kostenlijsten waarin eenmalige bouw, interne inzet en doorlopend beheer door elkaar lopen",
+        "ROI- en besparingsclaims zonder controleerbare procesbaseline"
+      ],
       "overlap": {
-        "checkedAt": "2026-07-17",
+        "checkedAt": "2026-08-03",
         "closestPaths": [
           "/kennisbank/wat-is-bedrijfssoftware-op-maat",
           "/vergelijkingen/maatwerk-software-vs-standaard-software",
-          "/blog/crm-systeem-op-maat-spreadsheets-vervangen"
+          "/blog/maatwerk-software-offerte-beoordelen"
         ],
         "decision": "distinct",
         "rationale": "Bestaande content legt definitie en keuze uit, maar beantwoordt niet hoe budget, scope, fasering en terugkerende kosten van laten maken worden beoordeeld."
@@ -94,7 +101,90 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Controleer actuele SERP-vraagvormen en werk de kostenfactoren claim-safe uit."
+      "nextAction": "Wacht op indexatie en beoordeel op 2026-08-17, 2026-08-31 en 2026-09-28 de niet-branded ontdekking, klikontwikkeling en route naar /bedrijfssoftware-op-maat."
+    },
+    {
+      "id": "software-acceptance-021",
+      "status": "ready",
+      "path": "/kennisbank/software-acceptatiecriteria-opstellen",
+      "contentType": "kennisbank",
+      "cluster": "software-crm",
+      "primaryQuery": "software acceptatiecriteria opstellen",
+      "intent": "Toetsbare acceptatiecriteria en gebruikerstests voor maatwerk software opstellen",
+      "intentClass": "risk",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/bedrijfssoftware-op-maat",
+      "clusterRole": "Go-no-go- en acceptatiegids tussen oplevering, herstel en gecontroleerde livegang",
+      "demandEvidence": [
+        {
+          "type": "serp",
+          "source": "Nederlandse SERP voor software acceptatiecriteria opstellen en maatwerk software acceptatietest",
+          "observedAt": "2026-08-03",
+          "detail": "Actuele resultaten van Applinet, VFB en Atlassian behandelen testscenario's, SMART of atomair geformuleerde criteria, gebruikersacceptatie en het besluit vóór productie; dit is een concrete opdrachtgeversvraag die Softora nog niet als eigen paginarol afdekt."
+        }
+      ],
+      "competitorPatterns": [
+        "Juridisch zware acceptatie-uitleg zonder compacte werkwijze voor een MKB-proceseigenaar",
+        "Algemene agile definities zonder datamigratie, koppelingen, rollen en go-no-go-besluit",
+        "Testchecklists zonder onderscheid tussen defect, onduidelijke afspraak en nieuwe wens"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-03",
+        "closestPaths": [
+          "/blog/maatwerk-software-offerte-beoordelen",
+          "/blog/crm-implementatie-doorlooptijd-mkb",
+          "/blog/crm-eisen-wensenlijst-mkb"
+        ],
+        "decision": "distinct",
+        "rationale": "De offertegids controleert een voorstel, de implementatiegids plant CRM-fasen en de eisengids definieert vooraf requirements; deze kandidaat behandelt uitsluitend reproduceerbare acceptatiescenario's, bevindingclassificatie en het menselijke go-no-go-besluit na oplevering."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 4,
+        "nonBrandOpportunity": 4,
+        "attainability": 4,
+        "uniqueness": 5,
+        "cannibalizationRisk": 2,
+        "effort": 3
+      },
+      "weightedScore": 4.2,
+      "brief": {
+        "title": "Software acceptatiecriteria opstellen voor een beheerste livegang",
+        "metaDescription": "Maak toetsbare software-acceptatiecriteria voor processen, rollen, data, koppelingen, fouten en een duidelijk go-no-go-besluit vóór livegang.",
+        "h1": "Hoe stel je software acceptatiecriteria op?",
+        "outline": [
+          "Vertaal bedrijfsprocessen naar reproduceerbare scenario's",
+          "Maak verwachte uitkomsten en bewijslast expliciet",
+          "Test rollen, data, koppelingen en foutpaden",
+          "Scheid defects, onduidelijke afspraken en nieuwe wensen",
+          "Leg herstel, hertest en go-no-go vast"
+        ],
+        "buyerQuestions": [
+          "Wie hoort maatwerk software te accepteren?",
+          "Wanneer is een acceptatiecriterium toetsbaar genoeg?",
+          "Welke bevindingen blokkeren een livegang?"
+        ],
+        "incomingLinks": [
+          "/blog/maatwerk-software-offerte-beoordelen",
+          "/blog/bedrijfssoftware-laten-maken-kosten"
+        ],
+        "outgoingLinks": [
+          "/bedrijfssoftware-op-maat",
+          "/blog/maatwerk-software-offerte-beoordelen"
+        ],
+        "conversionPath": "Van een acceptatieplan naar een scopegesprek over toetsbare oplevering en gecontroleerde bedrijfssoftware.",
+        "claimRisk": "Geen foutloze software, volledige veiligheid of juridisch sluitende acceptatie beloven; markeer contractvragen als juridisch advies buiten Softora's expertise.",
+        "visualConcepts": [
+          "Acceptatiematrix met scenario, rol, input, verwachte uitkomst en bewijs",
+          "Go-no-go-flow voor bevinding, herstel, hertest en besluit"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Valideer actuele vraagvormen en werk een systeemneutrale acceptatiematrix uit met primaire gebruiker, data-eigenaar en proceseigenaar als menselijke beslissers."
     },
     {
       "id": "crm-migration-002",

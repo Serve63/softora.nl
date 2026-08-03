@@ -643,6 +643,31 @@ test('CRM-eisengids gebruikt twee eigen procesbeelden, FAQ en natuurlijke inkome
   assert.match(implementationHtml, /href="\/blog\/crm-eisen-wensenlijst-mkb"/);
 });
 
+test('bedrijfssoftware-kostengids gebruikt quality v2, twee eigen beelden en inkomende money-page-links', () => {
+  const item = getSeoContentItem('blog', 'bedrijfssoftware-laten-maken-kosten', {
+    now: new Date('2026-08-03T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const softwarePage = fs.readFileSync(path.join(repoRoot, 'premium-bedrijfssoftware.html'), 'utf8');
+  const crmPage = fs.readFileSync(path.join(repoRoot, 'crm-systeem-op-maat.html'), 'utf8');
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.targetMoneyPage, '/bedrijfssoftware-op-maat');
+  assert.ok(item.informationGain.includes('controleerbare kostenkaart'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.image.src, '/assets/seo-content/bedrijfssoftware-kosten-scopekaart-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/bedrijfssoftware-kosten-fasering-softora.jpg');
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+  assert.match(softwarePage, /href="\/blog\/bedrijfssoftware-laten-maken-kosten"/);
+  assert.match(crmPage, /href="\/blog\/bedrijfssoftware-laten-maken-kosten"/);
+});
+
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
     siteOrigin: 'https://www.softora.nl',
