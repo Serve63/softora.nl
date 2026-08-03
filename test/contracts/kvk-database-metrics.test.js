@@ -39,6 +39,7 @@ test('kvk database metrics render current last-hour and grade values without ano
   ];
   const elements = {
     'companies-successful-found': createElement(),
+    'companies-successful-found-last60': createElement(deltaSelectors),
     'companies-treated-last60': createElement(deltaSelectors),
     'companies-usable-last60': createElement(deltaSelectors),
     'companies-with-website-last60': createElement(deltaSelectors),
@@ -76,6 +77,10 @@ test('kvk database metrics render current last-hour and grade values without ano
   controller.renderMetrics();
 
   assert.equal(elements['companies-successful-found'].textContent, '6.993');
+  assert.equal(
+    elements['companies-successful-found-last60'].nodes['.stat-delta-number'].textContent,
+    '+6',
+  );
   assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+12');
   assert.equal(elements['companies-usable-last60'].nodes['.stat-delta-number'].textContent, '+6');
   assert.equal(elements['companies-with-website-last60'].nodes['.stat-delta-number'].textContent, '+5');
