@@ -86,7 +86,12 @@ test('vuller and controle report independently and both must be active', async (
   await service.sendReportWorkerResponse(
     {
       headers: { authorization: 'Bearer worker-token' },
-      body: { workerState: 'running', workerMessage: 'Batch loopt.', currentBatch: 'shard 1/10' },
+      body: {
+        workerKey: 'vuller',
+        workerState: 'running',
+        workerMessage: 'Batch loopt.',
+        currentBatch: 'shard 1/10',
+      },
     },
     report
   );
@@ -163,6 +168,16 @@ test('kvk database control validates browser and worker payloads', async () => {
     invalidWorker
   );
   assert.equal(invalidWorker.statusCode, 400);
+
+  const missingWorkerKey = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: { workerState: 'running' },
+    },
+    missingWorkerKey
+  );
+  assert.equal(missingWorkerKey.statusCode, 400);
 
   const invalidWorkerKey = createJsonResponse();
   await service.sendReportWorkerResponse(

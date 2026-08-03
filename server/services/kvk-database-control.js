@@ -260,7 +260,7 @@ function createKvkDatabaseControlService(deps = {}) {
     if (!WORKER_STATES.has(workerState)) {
       return res.status(400).json({ ok: false, error: 'Ongeldige workerState.' });
     }
-    const workerKey = normalizeString(req?.body?.workerKey || 'vuller').toLowerCase();
+    const workerKey = normalizeString(req?.body?.workerKey || '').toLowerCase();
     if (!WORKER_KEYS.has(workerKey)) {
       return res.status(400).json({ ok: false, error: 'Ongeldige workerKey.' });
     }
