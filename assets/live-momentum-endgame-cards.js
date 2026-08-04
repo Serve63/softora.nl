@@ -44,6 +44,7 @@
     { id: 'sponsorbord-nemelaer-2028', title: 'Sponsorbord bij Nemelaer', timeframe: 2028, imageId: 'sponsorbord-nemelaer' },
     { id: 'instagram-post-2027', title: 'Jaarlijkse Instagram-post 2027', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
     { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
+    { id: 'checkpoint-2028', title: '2028...', type: 'checkpoint', imageId: '2030' },
     { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
     { id: 'range-rover-sport-2035', title: 'Range Rover Sport kopen', timeframe: 2035, imageId: 'range-rover-sport' },
     { id: 'rolex-datejust-2035', title: 'Rolex Datejust kopen', timeframe: 2035, imageId: 'rolex-datejust' },
@@ -52,21 +53,26 @@
     { id: 'instagram-post-2030', title: 'Jaarlijkse Instagram-post 2030', timeframe: 2035, imageId: 'jaarlijkse-instagram-post' },
     { id: 'vakantiehuis-kopen-2035', title: 'Vakantiehuis kopen', timeframe: 2035, imageId: 'vakantiehuis-kopen' },
     { id: 'huis-miljoen-plus-2035', title: 'Huis van €1 miljoen+ kopen', timeframe: 2035, imageId: 'huis-miljoen-plus' },
-    { id: '2030', title: '2030...', type: 'destination' }
+    { id: '2035', title: '2035...', type: 'destination', imageId: '2030' }
   ];
   const ORIGIN_CARD_ID = 'oktober-2024';
-  const DESTINATION_CARD_ID = '2030';
+  const CHECKPOINT_CARD_ID = 'checkpoint-2028';
+  const DESTINATION_CARD_ID = '2035';
+  const FIXED_CARD_IDS = [ORIGIN_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID];
   const LEGACY_MISSION_ID = 'eigen-automaat-rijden';
   const DEFAULT_CARD_ORDER = CARD_CATALOG.map((card) => card.id);
 
   function normalizeOrder(value) {
     const validIds = new Set(DEFAULT_CARD_ORDER);
     const requestedOrder = Array.from(new Set((Array.isArray(value) ? value : [])
-      .filter((id) => validIds.has(id) && ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(id))));
+      .filter((id) => validIds.has(id) && !FIXED_CARD_IDS.includes(id))));
     const remainingOrder = DEFAULT_CARD_ORDER.filter((id) => (
-      ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(id) && !requestedOrder.includes(id)
+      !FIXED_CARD_IDS.includes(id) && !requestedOrder.includes(id)
     ));
-    return [ORIGIN_CARD_ID, ...requestedOrder, ...remainingOrder, DESTINATION_CARD_ID];
+    const missionOrder = requestedOrder.concat(remainingOrder);
+    const through2028 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe !== 2035);
+    const through2035 = missionOrder.filter((id) => CARD_CATALOG.find((card) => card.id === id)?.timeframe === 2035);
+    return [ORIGIN_CARD_ID, ...through2028, CHECKPOINT_CARD_ID, ...through2035, DESTINATION_CARD_ID];
   }
 
   function normalizeCardState(value) {
@@ -76,7 +82,7 @@
   function normalizeState(value, legacyMissionState) {
     const normalized = Object.fromEntries(CARD_CATALOG.map((card) => [
       card.id,
-      [ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(card.id)
+      FIXED_CARD_IDS.includes(card.id)
         ? { completed: false, deleted: false }
         : normalizeCardState(card.id === LEGACY_MISSION_ID && !value?.[card.id] ? legacyMissionState : value?.[card.id])
     ]));
@@ -138,7 +144,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804c`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804d`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
@@ -148,6 +154,8 @@
     top.className = 'end-game-card-kicker';
     top.textContent = card.type === 'origin'
       ? 'STARTPUNT'
+      : card.type === 'checkpoint'
+        ? 'CHECKPOINT'
       : card.type === 'destination'
         ? 'EINDPUNT'
         : card.timeframe
@@ -155,10 +163,14 @@
           : 'END GAME';
     title.className = 'end-game-card-name';
     title.textContent = card.title;
-    if (['origin', 'destination'].includes(card.type)) {
+    if (['origin', 'checkpoint', 'destination'].includes(card.type)) {
       const specialLabel = document.createElement('span');
       specialLabel.className = `end-game-card-special-label end-game-card-${card.type}-label`;
-      specialLabel.textContent = card.type === 'origin' ? 'HIER BEGON HET' : 'UITGESPEELD..';
+      specialLabel.textContent = card.type === 'origin'
+        ? 'HIER BEGON HET'
+        : card.type === 'checkpoint'
+          ? 'OP NAAR 2035'
+          : 'UITGESPEELD..';
       artwork.classList.add(`end-game-card-photo--${card.type}`);
       artwork.append(image, shade, top, title, specialLabel);
     } else {
@@ -189,17 +201,20 @@
     const slot = document.createElement('div');
     const article = document.createElement('article');
     const isOrigin = card.type === 'origin';
+    const isCheckpoint = card.type === 'checkpoint';
     const isDestination = card.type === 'destination';
-    const isFixed = isOrigin || isDestination;
-    slot.className = `end-game-card-slot${isOrigin ? ' end-game-card-slot--origin' : ''}${isDestination ? ' end-game-card-slot--destination' : ''}`;
+    const isFixed = isOrigin || isCheckpoint || isDestination;
+    slot.className = `end-game-card-slot${isOrigin ? ' end-game-card-slot--origin' : ''}${isCheckpoint ? ' end-game-card-slot--checkpoint' : ''}${isDestination ? ' end-game-card-slot--destination' : ''}`;
     slot.dataset.endGameCardId = card.id;
-    article.className = `end-game-goal-card end-game-goal-card--mission${isOrigin ? ' end-game-goal-card--origin' : ''}${isDestination ? ' end-game-goal-card--destination' : ''}`;
+    article.className = `end-game-goal-card end-game-goal-card--mission${isOrigin ? ' end-game-goal-card--origin' : ''}${isCheckpoint ? ' end-game-goal-card--checkpoint' : ''}${isDestination ? ' end-game-goal-card--destination' : ''}`;
     if (isFixed) {
       slot.dataset.endGameCardFixed = 'true';
       slot.setAttribute('role', 'img');
       slot.setAttribute('aria-label', isOrigin
         ? 'Startpunt: Oktober 2024. Hier begon het. Deze kaart staat vast op de eerste positie.'
-        : 'Eindpunt: 2030. Uitgespeeld. Deze kaart staat vast op de laatste positie.');
+        : isCheckpoint
+          ? 'Checkpoint: 2028. Op naar 2035. Deze kaart staat vast tussen de doelen tot 2028 en de doelen tot 2035.'
+          : 'Eindpunt: 2035. Uitgespeeld. Deze kaart staat vast op de laatste positie.');
     } else {
       slot.tabIndex = 0;
       slot.setAttribute('role', 'button');
@@ -245,7 +260,7 @@
 
     function updateProgress() {
       const missionCards = CARD_CATALOG.filter((card) => (
-        ![ORIGIN_CARD_ID, DESTINATION_CARD_ID].includes(card.id) && !state[card.id].deleted
+        !FIXED_CARD_IDS.includes(card.id) && !state[card.id].deleted
       ));
       const completedCards = missionCards.filter((card) => state[card.id].completed).length;
       const percentage = missionCards.length ? Math.round((completedCards / missionCards.length) * 100) : 0;

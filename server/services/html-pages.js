@@ -649,11 +649,15 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
-    const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-    if (!fileName) return next();
+    const requestedFileName = sanitizeKnownHtmlFileName(fileNameRaw);
+    if (!requestedFileName) return next();
 
-    const premiumPageAccess = await resolvePremiumHtmlPageAccess(req, res, fileName);
+    const premiumPageAccess = await resolvePremiumHtmlPageAccess(req, res, requestedFileName);
     if (premiumPageAccess.handled) return undefined;
+    const fileName = sanitizeKnownHtmlFileName(
+      premiumPageAccess.renderFileName || requestedFileName
+    );
+    if (!fileName) return next();
     const { isLoginPage, isProtectedPremiumPage } = premiumPageAccess;
     const publicDependencyWaitMs =
       !isLoginPage && !isProtectedPremiumPage ? getSafePublicPageDependencyWaitMs() : 0;
@@ -678,7 +682,7 @@ function createHtmlPageCoordinator(options = {}) {
         shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html
       );
       try {
-        const shouldLoadBootstrapData = !isLoginPage;
+        const shouldLoadBootstrapData = !isLoginPage && !premiumPageAccess.liveMomentumAccessRequired;
         const bootstrapTimeoutMs =
           publicDependencyWaitMs || (isProtectedPremiumPage ? getSafeProtectedPageBootstrapWaitMs(fileName) : 0);
         const bootstrapData = shouldLoadBootstrapData

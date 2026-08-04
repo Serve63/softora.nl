@@ -52,6 +52,7 @@ function createFixture() {
     'premium-personeel-login.html',
     'premium-personeel-agenda.html',
     'live-momentum.html',
+    'live-momentum-access.html',
   ]);
   const loggerCalls = [];
   const coordinator = createHtmlPageCoordinator({
@@ -208,6 +209,51 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.match(res.body, /href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a"/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com/);
   assert.doesNotMatch(res.body, /fonts\.gstatic\.com/);
+});
+
+test('html page coordinator serves the Winnen code gate at the same URL without dashboard markup', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-winnen-gate-'));
+  fs.writeFileSync(
+    path.join(pagesDir, 'live-momentum.html'),
+    '<!DOCTYPE html><html><body><main data-live-momentum>Private dashboard</main></body></html>'
+  );
+  fs.writeFileSync(
+    path.join(pagesDir, 'live-momentum-access.html'),
+    '<!DOCTYPE html><html><body data-live-momentum-access-page>Toegangscode</body></html>'
+  );
+  const knownFiles = new Set(['live-momentum.html', 'live-momentum-access.html']);
+  let bootstrapCalls = 0;
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    sanitizeKnownHtmlFileName: (value) => knownFiles.has(value) ? value : '',
+    normalizeString: (value) => String(value || '').trim(),
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isProtectedPremiumPage: true,
+      renderFileName: 'live-momentum-access.html',
+      liveMomentumAccessRequired: true,
+    }),
+    getSeoConfigCached: async () => ({}),
+    applySeoOverridesToHtml: (_fileName, html) => html,
+    getPageBootstrapData: async () => {
+      bootstrapCalls += 1;
+      return null;
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/winnen' },
+    res,
+    () => {},
+    'live-momentum.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /data-live-momentum-access-page/);
+  assert.match(res.body, /Toegangscode/);
+  assert.doesNotMatch(res.body, /Private dashboard|data-live-momentum>/);
+  assert.equal(bootstrapCalls, 0);
 });
 
 test('html page coordinator preloads public legacy service hero background images', async () => {

@@ -69,6 +69,7 @@ test('marketing premium landing pages are not auth-gated', () => {
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-flynow.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('premium-omzetwerk.html'), true);
   assert.equal(controller.isPremiumAdminOnlyHtmlFile('live-momentum.html'), true);
+  assert.equal(controller.isPremiumAdminOnlyHtmlFile('live-momentum-access.html'), true);
 });
 
 test('premium login page redirects authenticated users to a safe next path', async () => {
@@ -351,7 +352,7 @@ test('admin-only premium pages redirect non-admin users back to the dashboard an
   assert.equal(res.headers['X-Robots-Tag'], 'noindex');
 });
 
-test('live momentum requires the separate code gate even for an authenticated admin', async () => {
+test('live momentum renders its separate code gate on the requested page for an authenticated admin', async () => {
   const events = [];
   const controller = createPremiumHtmlPageAccessController({
     premiumPublicHtmlFiles: createPremiumPublicHtmlFilesSet(),
@@ -375,9 +376,10 @@ test('live momentum requires the separate code gate even for an authenticated ad
 
   const result = await controller.resolvePremiumHtmlPageAccess(req, res, 'live-momentum.html');
 
-  assert.equal(result.handled, true);
-  assert.equal(res.redirectCode, 302);
-  assert.equal(res.redirectLocation, '/premium-instellingen?liveMomentumLocked=1');
+  assert.equal(result.handled, false);
+  assert.equal(result.renderFileName, 'live-momentum-access.html');
+  assert.equal(result.liveMomentumAccessRequired, true);
+  assert.equal(res.redirectCode, null);
   assert.equal(events[0].reason, 'security_live_momentum_code_required');
 });
 
