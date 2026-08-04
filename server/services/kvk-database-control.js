@@ -3,8 +3,12 @@ const crypto = require('node:crypto');
 const DEFAULT_CONTROL_KEY_SUFFIX = 'kvk_database_control_v1';
 const DEFAULT_WORKER_KEY_SUFFIX = 'kvk_database_worker_v1';
 const WORKER_STATES = new Set(['offline', 'idle', 'starting', 'running', 'waiting', 'error']);
-const WORKER_KEYS = new Set(['vuller', 'controle']);
-const WORKER_LABELS = Object.freeze({ vuller: 'Vuller', controle: 'Controle' });
+const WORKER_KEYS = new Set(['vuller', 'controle', 'goedgekeurd']);
+const WORKER_LABELS = Object.freeze({
+  vuller: 'Vuller',
+  controle: 'Controle',
+  goedgekeurd: 'Goedgekeurd controle',
+});
 
 function createKvkDatabaseControlService(deps = {}) {
   const {
@@ -26,6 +30,7 @@ function createKvkDatabaseControlService(deps = {}) {
   const workerStateKeys = Object.freeze({
     vuller: workerStateKey,
     controle: `${workerStateKey}:controle`,
+    goedgekeurd: `${workerStateKey}:goedgekeurd`,
   });
 
   function constantTimeEquals(left, right) {
@@ -170,14 +175,19 @@ function createKvkDatabaseControlService(deps = {}) {
   }
 
   async function readControl() {
-    const [controlResult, vullerResult, controleResult] = await Promise.all([
+    const [controlResult, vullerResult, controleResult, goedgekeurdResult] = await Promise.all([
       readStateRow(controlStateKey, 'Databasevulling-besturing kon niet worden geladen.'),
       readStateRow(workerStateKeys.vuller, 'Databasevulling Vuller-status kon niet worden geladen.'),
       readStateRow(workerStateKeys.controle, 'Databasevulling Controle-status kon niet worden geladen.'),
+      readStateRow(
+        workerStateKeys.goedgekeurd,
+        'Databasevulling Goedgekeurd controle-status kon niet worden geladen.'
+      ),
     ]);
     if (!controlResult.ok) return controlResult;
     if (!vullerResult.ok) return vullerResult;
     if (!controleResult.ok) return controleResult;
+    if (!goedgekeurdResult.ok) return goedgekeurdResult;
     const control = normalizeControlRequest({ ...defaultControl(), ...controlResult.payload });
     const workers = {
       vuller: effectiveWorker(
@@ -187,6 +197,13 @@ function createKvkDatabaseControlService(deps = {}) {
       controle: effectiveWorker(
         control,
         normalizeWorker({ ...defaultWorker('controle'), ...controleResult.payload }, 'controle')
+      ),
+      goedgekeurd: effectiveWorker(
+        control,
+        normalizeWorker(
+          { ...defaultWorker('goedgekeurd'), ...goedgekeurdResult.payload },
+          'goedgekeurd'
+        )
       ),
     };
     return {
