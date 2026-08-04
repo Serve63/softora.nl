@@ -782,6 +782,106 @@ test('campaign reply service houdt vervolgreacties in één bestaande conversati
   assert.equal(replies[0].threadMessages[1].folder, 'inbox');
 });
 
+test('campaign mailbox houdt een menselijke vervolgthread heel wanneer RFC-headers halverwege ontbreken', () => {
+  const originalSent = {
+    id: 'sent:salon-original',
+    folder: 'sent',
+    accountEmail: 'serve290@gmail.com',
+    email: 'serve290@gmail.com',
+    to: 'Info | Salon TOF <info@salontof.nl>',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-24T12:59:00.000Z',
+    messageId: '<salon-original@gmail.com>',
+    originalCampaignOutbound: true,
+  };
+  const firstReply = {
+    id: 'coldmail:4',
+    folder: 'coldmail',
+    accountEmail: 'serve290@gmail.com',
+    from: 'Info | Salon TOF',
+    email: 'info@salontof.nl',
+    to: 'serve290@gmail.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-24T13:54:00.000Z',
+    messageId: '<salon-first-reply@salontof.nl>',
+    inReplyTo: originalSent.messageId,
+    references: originalSent.messageId,
+  };
+  const sentFollowUp = {
+    id: 'sent:salon-follow-up',
+    folder: 'sent',
+    accountEmail: 'serve290@gmail.com',
+    email: 'serve290@gmail.com',
+    to: 'Info | Salon TOF <info@salontof.nl>',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-08-01T11:42:00.000Z',
+    messageId: '<salon-follow-up@gmail.com>',
+    inReplyTo: '',
+    references: '',
+  };
+  const latestReply = {
+    ...firstReply,
+    id: 'coldmail:237',
+    date: '2026-08-01T12:35:00.000Z',
+    messageId: '<salon-latest-reply@salontof.nl>',
+    inReplyTo: sentFollowUp.messageId,
+    references: sentFollowUp.messageId,
+    unread: true,
+  };
+
+  const conversations = attachSentThreadMessages(
+    [latestReply, firstReply],
+    [sentFollowUp, originalSent]
+  );
+
+  assert.equal(conversations.length, 1);
+  assert.equal(conversations[0].id, latestReply.id);
+  assert.equal(conversations[0].unread, true);
+  assert.deepEqual(
+    conversations[0].threadMessages.map((message) => message.id),
+    [sentFollowUp.id, firstReply.id, originalSent.id]
+  );
+});
+
+test('campaign mailbox fallback blijft fail-closed voor andere accounts contacten en onderwerpen', () => {
+  const base = {
+    folder: 'inbox',
+    accountEmail: 'serve290@gmail.com',
+    email: 'info@salontof.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-08-01T12:35:00.000Z',
+    inReplyTo: '',
+    references: '',
+  };
+  const conversations = attachSentThreadMessages([
+    { ...base, id: 'same-thread', messageId: '<same-thread@salontof.nl>' },
+    {
+      ...base,
+      id: 'other-account',
+      accountEmail: 'servecreusen7@gmail.com',
+      messageId: '<other-account@salontof.nl>',
+    },
+    {
+      ...base,
+      id: 'other-contact',
+      email: 'boekhouding@salontof.nl',
+      messageId: '<other-contact@salontof.nl>',
+    },
+    {
+      ...base,
+      id: 'other-subject',
+      subject: 'Re: Nieuw webdesign',
+      messageId: '<other-subject@salontof.nl>',
+    },
+  ], []);
+
+  assert.equal(conversations.length, 4);
+  assert.deepEqual(
+    new Set(conversations.map((conversation) => conversation.id)),
+    new Set(['same-thread', 'other-account', 'other-contact', 'other-subject'])
+  );
+});
+
 test('campaign reply service koppelt alleen exact bewezen historische vervolgreacties', async () => {
   const inboxMessage = {
     id: 'inbox:23',

@@ -2018,7 +2018,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803c/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260803b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260804a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260728a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2094,7 +2094,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2308,6 +2308,85 @@ test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespre
   assert.equal(grouped[0].threadMessages.length, 1);
   assert.equal(grouped[0].threadMessages[0].mailboxId, 'inbox:37467');
   assert.equal(grouped[0].threadMessages[0].folder, 'inbox');
+});
+
+test('coldmail UI herstelt één gesprek bij gesplitste backend-ids met exact account contact en campagneonderwerp', () => {
+  const shared = {
+    folder: 'coldmail',
+    accountEmail: 'serve290@gmail.com',
+    from: 'Info | Salon TOF',
+    email: 'info@salontof.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    campaign: { account: 'serve290@gmail.com' },
+  };
+  const grouped = campaignInboxModule.filterMessages([
+    {
+      ...shared,
+      id: 'serve290@gmail.com|coldmail:237',
+      mailboxId: 'coldmail:237',
+      conversationId: 'conversation:serve290@gmail.com|salon-follow-up@gmail.com',
+      receivedAt: '2026-08-01T12:35:00.000Z',
+      unread: true,
+      threadMessages: [{
+        id: 'sent:salon-follow-up',
+        folder: 'sent',
+        accountEmail: 'serve290@gmail.com',
+        to: 'info@salontof.nl',
+        subject: 'Re: Kleine vraag over jullie website',
+        date: '2026-08-01T11:42:00.000Z',
+        messageId: '<salon-follow-up@gmail.com>',
+      }],
+    },
+    {
+      ...shared,
+      id: 'serve290@gmail.com|coldmail:4',
+      mailboxId: 'coldmail:4',
+      conversationId: 'conversation:serve290@gmail.com|salon-original@gmail.com',
+      receivedAt: '2026-07-24T13:54:00.000Z',
+      threadMessages: [{
+        id: 'sent:salon-original',
+        folder: 'sent',
+        accountEmail: 'serve290@gmail.com',
+        to: 'info@salontof.nl',
+        subject: 'Kleine vraag over jullie website',
+        date: '2026-07-24T12:59:00.000Z',
+        messageId: '<salon-original@gmail.com>',
+      }],
+    },
+  ], 'serve');
+
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].mailboxId, 'coldmail:237');
+  assert.equal(grouped[0].unread, true);
+  assert.deepEqual(
+    grouped[0].threadMessages.map((message) => message.id),
+    ['sent:salon-follow-up', 'serve290@gmail.com|coldmail:4', 'sent:salon-original']
+  );
+});
+
+test('coldmail UI fallback mengt geen andere accounts contacten onderwerpen of providers', () => {
+  const base = {
+    folder: 'inbox',
+    accountEmail: 'serve290@gmail.com',
+    email: 'info@salontof.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    receivedAt: '2026-08-01T12:35:00.000Z',
+    campaign: { account: 'serve290@gmail.com' },
+  };
+  const grouped = campaignInboxModule.filterMessages([
+    { ...base, id: 'base', mailboxId: 'base', conversationId: 'conversation:base' },
+    { ...base, id: 'other-account', mailboxId: 'other-account', accountEmail: 'servecreusen7@gmail.com', conversationId: 'conversation:other-account' },
+    { ...base, id: 'other-contact', mailboxId: 'other-contact', email: 'boekhouding@salontof.nl', conversationId: 'conversation:other-contact' },
+    { ...base, id: 'other-subject', mailboxId: 'other-subject', subject: 'Re: Nieuw webdesign', conversationId: 'conversation:other-subject' },
+    { ...base, id: 'instantly', mailboxId: 'instantly', provider: 'instantly', providerOwner: 'serve', conversationId: 'instantly:serve:salon' },
+  ], 'serve');
+
+  assert.equal(grouped.length, 5);
+  assert.equal(campaignInboxModule.getStableCampaignConversationId({
+    ...base,
+    folder: 'coldmail',
+    email: 'serve.290@gmail.com',
+  }), '');
 });
 
 test('coldmail lijst bewaart meer dan tien berichten in dezelfde conversatie', () => {
