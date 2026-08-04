@@ -1,3 +1,5 @@
+const { PASSWORD_REGISTER_SCOPE } = require('../security/password-register-access');
+
 function rejectUnwiredPasswordRegisterGuard(req, res, next) {
   const scope = String(
     req?.params?.scope || req?.query?.scope || req?.body?.actionConfirmScope || ''
@@ -7,6 +9,16 @@ function rejectUnwiredPasswordRegisterGuard(req, res, next) {
     ok: false,
     code: 'PASSWORD_REGISTER_SECURITY_NOT_WIRED',
     error: 'Wachtwoordenregister-beveiliging is tijdelijk niet beschikbaar.',
+  });
+}
+
+function rejectLegacyPasswordRegisterRead(req, res, next) {
+  const scope = String(req?.params?.scope || req?.query?.scope || '').trim().toLowerCase();
+  if (scope !== PASSWORD_REGISTER_SCOPE) return next();
+  return res.status(405).json({
+    ok: false,
+    code: 'PASSWORD_REGISTER_LEGACY_READ_DISABLED',
+    error: 'Gebruik de beveiligde wachtwoordenregister-read met een verse bevestiging.',
   });
 }
 
@@ -32,11 +44,17 @@ function registerRuntimeOpsRoutes(app, deps) {
   app.get('/api/security/audit-log', deps.requireRuntimeDebugAccess, (req, res) =>
     deps.coordinator.sendSecurityAuditLogResponse(req, res)
   );
-  app.get('/api/ui-state/:scope', requireFreshPasswordRegisterApiAccess, async (req, res) =>
-    deps.coordinator.sendUiStateGetResponse(req, res, req.params.scope)
+  app.get(
+    '/api/ui-state/:scope',
+    requireFreshPasswordRegisterApiAccess,
+    rejectLegacyPasswordRegisterRead,
+    async (req, res) => deps.coordinator.sendUiStateGetResponse(req, res, req.params.scope)
   );
-  app.get('/api/ui-state-get', requireFreshPasswordRegisterApiAccess, async (req, res) =>
-    deps.coordinator.sendUiStateGetResponse(req, res, req.query.scope)
+  app.get(
+    '/api/ui-state-get',
+    requireFreshPasswordRegisterApiAccess,
+    rejectLegacyPasswordRegisterRead,
+    async (req, res) => deps.coordinator.sendUiStateGetResponse(req, res, req.query.scope)
   );
   app.post(
     '/api/ui-state-read',

@@ -261,6 +261,16 @@ test('quality lock permits shared vault styling but rejects shared or inline vau
   assert.match(sharedScriptViolations.join('\n'), /scriptisolatie/i);
   assert.match(sharedScriptViolations.join('\n'), /scriptallowlist/i);
 
+  const legacyUiStateClientViolations = listQualityLockViolations({
+    readFile: readWithVaultHtml(
+      vaultHtml.replace(
+        '<script src="assets/premium-password-register-renderer.js',
+        '<script src="assets/premium-ui-state-client.js"></script>\n<script src="assets/premium-password-register-renderer.js'
+      )
+    ),
+  });
+  assert.match(legacyUiStateClientViolations.join('\n'), /scriptallowlist/i);
+
   const inlineScriptViolations = listQualityLockViolations({
     readFile: readWithVaultHtml(vaultHtml.replace('</body>', '<script>void 0</script>\n</body>')),
   });
