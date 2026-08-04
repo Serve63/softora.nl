@@ -125,6 +125,7 @@ function createMailboxMessageBodiesService({
       uid: Number(message && message.uid) || 0,
       folder: normalizeMessageFolder(message && message.folder),
       accountEmail: normalizeText(message && message.accountEmail).toLowerCase(),
+      resolved: message && message.bodyResolved === true,
       body: normalizeText(message && message.body),
       hasBody: Boolean(message && (message.hasBody || message.body)),
       bodyTruncated: Boolean(message && message.bodyTruncated),

@@ -790,12 +790,13 @@ function createMailboxIndexStore(deps = {}) {
         ? `${normalizeEmail(message && message.accountEmail)}|${normalizeString(message && message.id)}`
         : '';
       const row = bodyByMessageKey.get(messageKey) || bodyByProviderIdentity.get(providerIdentity);
-      if (!row) return message;
+      if (!row) return { ...message, bodyResolved: false };
       const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
       const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');
       const body = normalizeString(row.body_text);
       return {
         ...message,
+        bodyResolved: true,
         body,
         hasBody: Boolean(row.has_body),
         bodyTruncated: Boolean(row.body_truncated),

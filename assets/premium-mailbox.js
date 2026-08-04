@@ -240,7 +240,7 @@ function cleanMailboxText(value) {
     .map((line) => window.SoftoraMailboxDisplay.collapseDuplicateAnnotations(line));
   const lines = window.SoftoraMailboxDisplay.collapseDuplicateAdjacentUrlAnnotations(normalizedLines)
     .filter((line) => {
-      const value = String(line || '').trim();
+      const value = String(line || '').trim(); if (window.SoftoraMailboxDisplay.isCidArtifactLine(value)) return false;
       const url = value.match(/^\[(https?:\/\/[^\]]+)\]$/i)?.[1] ||
         value.match(/^<(https?:\/\/[^>]+)>$/i)?.[1] ||
         value.match(/^(https?:\/\/\S+)$/i)?.[1] ||

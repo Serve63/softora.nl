@@ -2431,8 +2431,8 @@ function createMailboxService(deps = {}) {
       });
     }
   }
-  async function listCampaignReplies({ limit = 100, owner = '', refreshInstantly = false } = {}) {
-    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner });
+  async function listCampaignReplies({ limit = 100, owner = '', refreshInstantly = false, includeSnapshotMessages = false, hydrateBodies = true } = {}) {
+    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies });
     const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
     const result = {
       ok: true,
@@ -2458,7 +2458,7 @@ function createMailboxService(deps = {}) {
         logger.warn('[Mailbox][CampaignSnapshot]', error?.message || error);
       }
     }
-    return result;
+    return includeSnapshotMessages ? { ...result, snapshotMessages } : result;
   }
 
   async function campaignRepliesResponse(req, res) {

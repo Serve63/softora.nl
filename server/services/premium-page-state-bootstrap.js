@@ -132,10 +132,16 @@ function createPremiumPageStateBootstrapService(deps = {}) {
       return null;
     }
     try {
-      const result = await mailboxCoordinator.listCampaignReplies({ limit: 100 });
+      const result = await mailboxCoordinator.listCampaignReplies({
+        limit: 200,
+        includeSnapshotMessages: true,
+        hydrateBodies: false,
+      });
       const snapshot = {
         ok: result && result.ok !== false,
-        messages: Array.isArray(result && result.messages) ? result.messages : [],
+        messages: Array.isArray(result && result.snapshotMessages)
+          ? result.snapshotMessages
+          : Array.isArray(result && result.messages) ? result.messages : [],
         sync: result && result.sync && typeof result.sync === 'object' ? result.sync : null,
       };
       const compactSnapshot = snapshot.messages.length
