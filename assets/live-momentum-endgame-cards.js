@@ -27,6 +27,31 @@
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
+    { id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' },
+    { id: 'droomkapsel-2028', title: 'Droomkapsel', timeframe: 2028, imageId: 'gewenst-lang-kapsel' },
+    { id: 'eigen-parfum-2028', title: 'Eigen parfum', timeframe: 2028, imageId: 'eigen-parfum' },
+    { id: 'kledingstijl-upgraden-2028', title: 'Kledingstijl upgraden', timeframe: 2028, imageId: 'gewenste-kledingkast' },
+    { id: 'inloopkast-2028', title: 'Inloopkast', timeframe: 2028, imageId: 'gewenste-kledingkast' },
+    { id: 'eigen-automaat-2028', title: 'Eigen automaat', timeframe: 2028, imageId: 'eigen-automaat-rijden' },
+    { id: 'starterswoning-kopen-2028', title: 'Starterswoning kopen', timeframe: 2028, imageId: 'eigen-koophuis-kopen' },
+    { id: 'eigen-kantoor-2028', title: 'Eigen kantoor', timeframe: 2028, imageId: 'eigen-kantoor' },
+    { id: 'maatpak-2028', title: 'Maatpak', timeframe: 2028, imageId: 'maatpak' },
+    { id: 'fotomuur-2028', title: 'Fotomuur', timeframe: 2028, imageId: 'fotomuur' },
+    { id: 'israel-bezoeken-2028', title: 'Israël bezoeken', timeframe: 2028, imageId: 'israel-bezoeken' },
+    { id: 'wereldkaart-bezochte-landen-2028', title: 'Wereldkaart met bezochte landen', timeframe: 2028, imageId: 'wereldkaart-bezochte-landen' },
+    { id: 'professionele-fotoshoot-2028', title: 'Professionele fotoshoot', timeframe: 2028, imageId: 'professionele-fotoshoot' },
+    { id: 'persoonlijke-handtekening-2028', title: 'Persoonlijke handtekening', timeframe: 2028, imageId: 'persoonlijke-handtekening' },
+    { id: 'sponsorbord-nemelaer-2028', title: 'Sponsorbord bij Nemelaer', timeframe: 2028, imageId: 'sponsorbord-nemelaer' },
+    { id: 'instagram-post-2027', title: 'Jaarlijkse Instagram-post 2027', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
+    { id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' },
+    { id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' },
+    { id: 'range-rover-sport-2035', title: 'Range Rover Sport kopen', timeframe: 2035, imageId: 'range-rover-sport' },
+    { id: 'rolex-datejust-2035', title: 'Rolex Datejust kopen', timeframe: 2035, imageId: 'rolex-datejust' },
+    { id: 'vip-box-psv-2035', title: 'VIP-box bij PSV', timeframe: 2035, imageId: 'vip-box-psv' },
+    { id: 'instagram-post-2029', title: 'Jaarlijkse Instagram-post 2029', timeframe: 2035, imageId: 'jaarlijkse-instagram-post' },
+    { id: 'instagram-post-2030', title: 'Jaarlijkse Instagram-post 2030', timeframe: 2035, imageId: 'jaarlijkse-instagram-post' },
+    { id: 'vakantiehuis-kopen-2035', title: 'Vakantiehuis kopen', timeframe: 2035, imageId: 'vakantiehuis-kopen' },
+    { id: 'huis-miljoen-plus-2035', title: 'Huis van €1 miljoen+ kopen', timeframe: 2035, imageId: 'huis-miljoen-plus' },
     { id: '2030', title: '2030...', type: 'destination' }
   ];
   const ORIGIN_CARD_ID = 'oktober-2024';
@@ -113,7 +138,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.id}.png?v=20260804b`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804c`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
@@ -121,7 +146,13 @@
     image.decoding = 'async';
     shade.className = 'end-game-card-photo-shade';
     top.className = 'end-game-card-kicker';
-    top.textContent = card.type === 'origin' ? 'STARTPUNT' : card.type === 'destination' ? 'EINDPUNT' : 'END GAME';
+    top.textContent = card.type === 'origin'
+      ? 'STARTPUNT'
+      : card.type === 'destination'
+        ? 'EINDPUNT'
+        : card.timeframe
+          ? `TOT ${card.timeframe}`
+          : 'END GAME';
     title.className = 'end-game-card-name';
     title.textContent = card.title;
     if (['origin', 'destination'].includes(card.type)) {
