@@ -1230,37 +1230,6 @@ function createColdmailCampaignService(deps = {}) {
     );
   }
 
-  function normalizeWebdesignPreparationUrl(value) {
-    const raw = normalizeString(value);
-    if (!raw) return '';
-    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      const parsed = new URL(candidate);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-      if (!parsed.hostname || parsed.hostname.indexOf('.') === -1) return '';
-      return parsed.toString();
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function getRowWebdesignPreparationUrl(row) {
-    return normalizeWebdesignPreparationUrl(
-      row &&
-        (
-          row.website ||
-          row.websiteUrl ||
-          row.website_url ||
-          row.url ||
-          row.dom ||
-          row.domain ||
-          row.site ||
-          row.domein ||
-          ''
-        )
-    );
-  }
-
   function getRowEmail(row) {
     return normalizeEmailAddress(row.email || row.contactEmail || row.mail || '');
   }
@@ -1693,89 +1662,6 @@ function createColdmailCampaignService(deps = {}) {
       };
     }
     return null;
-  }
-
-  async function getPreWebdesignColdmailBlock(item, recipientGuardEntries = []) {
-    const duplicateBlock = await getColdmailOutboundDuplicateBlock(item, recipientGuardEntries);
-    if (duplicateBlock) return duplicateBlock;
-    const email = getRowEmail(item && item.row);
-    if (!isTestRecipientRow(item && item.row, email) && shouldBlockPersonalMailboxDomains() && isPersonalMailboxDomain(email)) {
-      return {
-        id: item && item.id,
-        bedrijf: getRowCompany(item && item.row),
-        email,
-        error: `Persoonlijke mailbox overgeslagen voor coldmail: ${getEmailDomain(email)}.`,
-      };
-    }
-    if (!(await isDeliverableEmailDomain(email))) {
-      const domain = getEmailDomain(email);
-      return {
-        id: item && item.id,
-        bedrijf: getRowCompany(item && item.row),
-        email,
-        domain,
-        code: 'invalid_email_domain',
-        error: `E-maildomein bestaat niet of ontvangt geen mail: ${domain || email}`,
-      };
-    }
-    return null;
-  }
-
-  function buildWebdesignPreparationCustomer(item) {
-    const row = item && item.row ? item.row : {};
-    const websiteUrl = getRowWebdesignPreparationUrl(row);
-    return {
-      id: item && item.id,
-      bedrijf: getRowCompany(row),
-      naam: getRowContact(row),
-      tel: getRowPhone(row),
-      dom: getRowDomain(row) || websiteUrl,
-      website: websiteUrl,
-    };
-  }
-
-  function buildWebdesignPreparationJobId(item) {
-    const row = item && item.row ? item.row : {};
-    const seed = [
-      item && item.id,
-      getRowEmail(row),
-      getRowCompany(row),
-      getRowDomain(row),
-    ].map(normalizeString).join('|');
-    const hash = crypto.createHash('sha256').update(seed || `${Date.now()}`).digest('hex').slice(0, 24);
-    return `coldmail_webdesign_${hash}_${Date.now().toString(36)}`;
-  }
-
-  async function queueWebdesignPreparationForRecipient(item) {
-    if (
-      !item ||
-      !webdesignPreparationCoordinator ||
-      typeof webdesignPreparationCoordinator.startJob !== 'function'
-    ) {
-      return null;
-    }
-    const row = item.row || {};
-    const websiteUrl = getRowWebdesignPreparationUrl(row);
-    if (!websiteUrl) return null;
-    const customer = buildWebdesignPreparationCustomer(item);
-    if (!customer.id || !customer.bedrijf) return null;
-    const result = await webdesignPreparationCoordinator.startJob({
-      ownerKey: 'coldmail-autopilot::system',
-      jobId: buildWebdesignPreparationJobId(item),
-      customer,
-      websiteUrl,
-      source: 'coldmail-autopilot',
-    });
-    if (!result || result.ok === false) return null;
-    return {
-      queued: true,
-      existing: Boolean(result.existing),
-      customerId: customer.id,
-      bedrijf: customer.bedrijf,
-      email: getRowEmail(row),
-      websiteUrl,
-      job: result.job || null,
-    };
   }
 
   function getRowPhone(row) {
@@ -6038,11 +5924,6 @@ function createColdmailCampaignService(deps = {}) {
     } else {
       rows = customerRows;
     }
-    const shouldRequireWebdesign = requiresReadyWebdesign(input, mode);
-    const customerPhotoMap = shouldRequireWebdesign ? await loadCustomerPhotoMap(customerRows) : {};
-    const readyWebdesignMatcher = shouldRequireWebdesign
-      ? createReadyWebdesignMatcher(customerRows, customerPhotoMap)
-      : null;
     const sendGuardState = mode === 'mail'
       ? await loadColdmailSendGuardState({ required: true, attempts: 3 })
       : { recipientEntries: [] };
@@ -6056,33 +5937,12 @@ function createColdmailCampaignService(deps = {}) {
           ? isEligibleColdcallingRow(row, input.branch, input.radiusKm, blockedPhoneKeys)
           : isEligibleColdmailRow(row, input.branch, input.radiusKm, blockedEmailKeys)
       );
-    const candidateRows = [];
-    const selectedRows = [];
-    let webdesignPreparationCandidate = null;
-
+    const shouldRequireWebdesign = requiresReadyWebdesign(input, mode);
+    const precheckedRows = [];
     for (const item of eligibleRows) {
-      if (readyWebdesignMatcher && !readyWebdesignMatcher.hasRow(item.row, item.index)) {
-        if (mode === 'mail' && !webdesignPreparationCandidate) {
-          const preWebdesignBlock = await getPreWebdesignColdmailBlock(item, recipientGuardEntries);
-          if (preWebdesignBlock) {
-            failed.push(preWebdesignBlock);
-            continue;
-          }
-          webdesignPreparationCandidate = item;
-        }
-        failed.push({
-          id: item.id,
-          bedrijf: getRowCompany(item.row),
-          email: getRowEmail(item.row),
-          phone: getRowPhone(item.row),
-          error: `Nog geen website-design klaar voor ${getRowCompany(item.row) || 'dit bedrijf'}.`,
-        });
-        continue;
-      }
-      candidateRows.push(item);
       if (mode === 'call') {
-        selectedRows.push(item);
-        if (selectedRows.length >= count) break;
+        precheckedRows.push(item);
+        if (!shouldRequireWebdesign && precheckedRows.length >= count) break;
         continue;
       }
       const duplicateBlock = await getColdmailOutboundDuplicateBlock(item, recipientGuardEntries);
@@ -6100,10 +5960,7 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
-      if (await isDeliverableEmailDomain(email)) {
-        selectedRows.push(item);
-        if (selectedRows.length >= count) break;
-      } else {
+      if (!(await isDeliverableEmailDomain(email))) {
         const domain = getEmailDomain(email);
         failed.push({
           id: item.id,
@@ -6113,7 +5970,39 @@ function createColdmailCampaignService(deps = {}) {
           code: 'invalid_email_domain',
           error: `E-maildomein bestaat niet of ontvangt geen mail: ${domain || email}`,
         });
+        continue;
       }
+      precheckedRows.push(item);
+      if (!shouldRequireWebdesign && precheckedRows.length >= count) break;
+    }
+    const customerPhotoMap = shouldRequireWebdesign
+      ? mode === 'mail'
+        ? await loadExactCustomerPhotoMap(precheckedRows.map((item) => item.row))
+        : await loadCustomerPhotoMap(customerRows)
+      : {};
+    const readyWebdesignMatcher = shouldRequireWebdesign
+      ? createReadyWebdesignMatcher(
+          mode === 'mail' ? precheckedRows.map((item) => item.row) : customerRows,
+          customerPhotoMap
+        )
+      : null;
+    const candidateRows = [];
+    const selectedRows = [];
+
+    for (const item of precheckedRows) {
+      if (readyWebdesignMatcher && !readyWebdesignMatcher.hasRow(item.row, item.index)) {
+        failed.push({
+          id: item.id,
+          bedrijf: getRowCompany(item.row),
+          email: getRowEmail(item.row),
+          phone: getRowPhone(item.row),
+          error: `Nog geen website-design klaar voor ${getRowCompany(item.row) || 'dit bedrijf'}.`,
+        });
+        continue;
+      }
+      candidateRows.push(item);
+      selectedRows.push(item);
+      if (selectedRows.length >= count) break;
     }
 
     return {
@@ -6128,7 +6017,7 @@ function createColdmailCampaignService(deps = {}) {
       selectedRows,
       failed,
       customerPhotoMap,
-      webdesignPreparationCandidate,
+      webdesignPreparationCandidate: null,
     };
   }
 
@@ -7498,6 +7387,71 @@ function createColdmailCampaignService(deps = {}) {
     return parseCustomerPhotoMap(values[customerPhotoKey], values, rows);
   }
 
+  async function loadExactCustomerPhotoMap(rows = []) {
+    const safeRows = Array.isArray(rows) ? rows.filter((row) => row && typeof row === 'object') : [];
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') {
+      return loadCustomerPhotoMap(safeRows);
+    }
+    const photoMap = {};
+
+    const rowsByCustomerId = new Map();
+    safeRows.forEach((row) => {
+      const customerId = getExplicitRowId(row);
+      if (customerId) rowsByCustomerId.set(customerId.toLowerCase(), { customerId, row });
+    });
+    const customerIds = Array.from(rowsByCustomerId.values(), (entry) => entry.customerId);
+    for (let offset = 0; offset < customerIds.length; offset += 500) {
+      const batch = customerIds.slice(offset, offset + 500);
+      let signedRows = null;
+      try {
+        signedRows = await dataOpsStore.listDesignPhotosWithSignedUrls({
+          customerIds: batch,
+          maxMatches: batch.length,
+          expiresInSeconds: 24 * 60 * 60,
+          bypassReadCache: true,
+          bypassReadFailureCooldown: true,
+          suppressTransientReadFailureLog: true,
+          suppressReadFailureCooldown: true,
+        });
+      } catch (error) {
+        logger.warn('[ColdmailCampaign][exact-design-assets]', error && error.message ? error.message : error);
+      }
+      (Array.isArray(signedRows) ? signedRows : []).forEach((signed) => {
+        const exactMatch = rowsByCustomerId.get(normalizeString(signed && signed.customerId).toLowerCase());
+        if (!exactMatch) return;
+        const existing = photoMap[exactMatch.customerId] && typeof photoMap[exactMatch.customerId] === 'object'
+          ? photoMap[exactMatch.customerId]
+          : {};
+        const websitePhoto = normalizeString(signed.websitePhotoUrl || signed.websitePhoto);
+        const websiteMockup = normalizeString(signed.websiteMockupUrl || signed.websiteMockup);
+        photoMap[exactMatch.customerId] = {
+          ...existing,
+          id: exactMatch.customerId,
+          customerId: exactMatch.customerId,
+          identityKey: buildRowIdentityKey(exactMatch.row),
+          websitePhoto: websitePhoto || getWebdesignPhotoSource(existing),
+          websitePhotoUrl: websitePhoto || normalizeString(existing.websitePhotoUrl),
+          websitePhotoName: normalizeString(signed.fileName || existing.websitePhotoName) || 'Webdesign',
+          websiteMockup: websiteMockup || getWebdesignMockupSource(existing),
+          websiteMockupUrl: websiteMockup || normalizeString(existing.websiteMockupUrl),
+          websiteMockupName: normalizeString(signed.websiteMockupName || existing.websiteMockupName) || 'Mockup',
+          signedUrlExpiresAt: normalizeString(signed.signedUrlExpiresAt),
+        };
+      });
+    }
+    const unresolvedRows = safeRows.filter((row) => {
+      const customerId = getExplicitRowId(row);
+      return !customerId || !hasReadyWebdesignAssetRecord(photoMap[customerId]);
+    });
+    if (unresolvedRows.length) {
+      const legacyPhotoMap = await loadCustomerPhotoMap(unresolvedRows);
+      Object.keys(legacyPhotoMap).forEach((key) => {
+        if (!hasReadyWebdesignAssetRecord(photoMap[key])) photoMap[key] = legacyPhotoMap[key];
+      });
+    }
+    return photoMap;
+  }
+
   async function loadCustomerPhotoMapCached(rows = []) {
     const canReuseRows = !Array.isArray(rows) || rows.length === 0;
     if (
@@ -8464,24 +8418,30 @@ function createColdmailCampaignService(deps = {}) {
     const webdesignImageDelivery = getColdmailWebdesignImageDelivery(input);
 
     if (!candidateRows.length) {
-      const preparation = shouldIncludeWebdesignPhoto
-        ? await queueWebdesignPreparationForRecipient(resolvedRecipients.webdesignPreparationCandidate)
-        : null;
-      if (preparation && preparation.queued) {
-        const error = new Error(
-          preparation.existing
-            ? `Geen mailklare webdesigns meer. Er loopt al een voorbereiding voor ${preparation.bedrijf}.`
-            : `Geen mailklare webdesigns meer. Voorbereiding gestart voor ${preparation.bedrijf}.`
-        );
-        error.code = 'WEBDESIGN_PREPARATION_QUEUED';
-        error.failedItems = resolvedRecipients.failed;
-        error.webdesignPreparation = preparation;
-        throw error;
+      let invalidRecipientDomainsBlocked = 0;
+      if (!testMode && failed.some(isColdmailInvalidEmailDomainFailure)) {
+        const persistedInvalidDomains = await persistColdmailInvalidEmailDomainFailures({
+          rows,
+          values,
+          failed,
+          actor: input.actor || 'Coldmailing',
+        });
+        rows = persistedInvalidDomains.rows;
+        invalidRecipientDomainsBlocked = persistedInvalidDomains.marked;
       }
       const firstFailure = pickFailureMessage(resolvedRecipients.failed);
       const error = new Error(firstFailure || 'Geen geschikte e-mailadressen gevonden in de database.');
-      error.code = shouldIncludeWebdesignPhoto && firstFailure ? 'NO_WEBDESIGN_PHOTOS' : 'NO_RECIPIENTS';
+      const recipientGuardFailure = failed.length > 0 && failed.every((item) => isColdmailRecipientGuardFailure(item));
+      const invalidDomainFailure = failed.length > 0 && failed.every((item) => isColdmailInvalidEmailDomainFailure(item));
+      error.code = shouldIncludeWebdesignPhoto && firstFailure
+        ? 'NO_WEBDESIGN_PHOTOS'
+        : recipientGuardFailure
+          ? 'COLDMAIL_RECIPIENT_RECENTLY_SENT'
+          : invalidDomainFailure
+            ? 'NO_VALID_RECIPIENT_DOMAINS'
+            : 'NO_RECIPIENTS';
       error.failedItems = resolvedRecipients.failed;
+      error.invalidRecipientDomainsBlocked = invalidRecipientDomainsBlocked;
       throw error;
     }
 
@@ -8541,25 +8501,10 @@ function createColdmailCampaignService(deps = {}) {
       invalidRecipientDomainsBlocked = persistedInvalidDomains.marked;
     }
     const customerPhotoMap = shouldIncludeWebdesignPhoto
-      ? (resolvedRecipients.customerPhotoMap || await loadCustomerPhotoMap(candidateRows))
+      ? (resolvedRecipients.customerPhotoMap || await loadExactCustomerPhotoMap(candidateRows.map((item) => item.row)))
       : {};
 
     if (!selectedRows.length) {
-      const preparation = shouldIncludeWebdesignPhoto
-        ? await queueWebdesignPreparationForRecipient(resolvedRecipients.webdesignPreparationCandidate)
-        : null;
-      if (preparation && preparation.queued) {
-        const error = new Error(
-          preparation.existing
-            ? `Geen mailbare webdesigns meer. Er loopt al een voorbereiding voor ${preparation.bedrijf}.`
-            : `Geen mailbare webdesigns meer. Voorbereiding gestart voor ${preparation.bedrijf}.`
-        );
-        error.code = 'WEBDESIGN_PREPARATION_QUEUED';
-        error.failedItems = failed;
-        error.invalidRecipientDomainsBlocked = invalidRecipientDomainsBlocked;
-        error.webdesignPreparation = preparation;
-        throw error;
-      }
       const firstFailure = pickFailureMessage(failed, candidateRows);
       const recipientGuardFailure = failed.length > 0 && failed.every((item) => isColdmailRecipientGuardFailure(item));
       const error = new Error(firstFailure || 'Geen geldige e-maildomeinen gevonden in de database.');
