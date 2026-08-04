@@ -293,7 +293,7 @@ test('premium database source filter recognizes only durable KVK transfers', () 
   assert.equal(sourceFilter.isKvkTransferCustomer({ premiumTransferRunId: 'kvk-transfer-2026-08-04' }), true);
   assert.equal(sourceFilter.isKvkTransferCustomer({ hist: [{ messageKey: 'kvk-transfer:12345678' }] }), true);
   assert.equal(sourceFilter.isKvkTransferCustomer({ id: 'kvk-12345678', bronDatabase: '' }), false);
-  assert.equal(sourceFilter.getHeaderLabel('gevonden'), 'Succesvol gevonden');
+  assert.equal(sourceFilter.getHeaderLabel('beschikbaar'), "Foto's");
   assert.equal(sourceFilter.getHeaderLabel('benaderbaar'), 'Mailklaar');
   assert.deepEqual(
     { ...sourceFilter.normalizeCustomerSourceFields({ bronDatabase: ' Softora Bedrijven Scraper ', kvk_nummer: '12345678' }) },
@@ -1343,7 +1343,6 @@ test('premium database shows canonical available rows while keeping actions guar
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
 
   assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded && !state\.remoteCustomersLoaded/);
-  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailDisplayCandidate\(customer\)/);
   assert.match(pageSource, /function isColdmailBaseLeadEligible\(customer, eligibilityOptions\) \{ const displayOnly = Boolean\(eligibilityOptions && eligibilityOptions\.displayOnly\)/);
   assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false/);
   assert.match(pageSource, /if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false/);
@@ -1778,8 +1777,6 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignAssetStateScriptSource, /isMailReady: isMailReady/);
   assert.match(pageSource, /function hasApprovedWebdesignMockup\(customer\)/);
   assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.mockupApproved;/);
-  assert.match(pageSource, /function hasCompleteWebdesignAssets\(customer\)/);
-  assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.hasCompleteAssets;/);
   assert.match(pageSource, /function isColdmailReadyWebdesignLead\(customer\)/);
   assert.match(pageSource, /return buildCustomerWebdesignAssetState\(customer\)\.isMailReady;/);
   assert.match(pageSource, /outreachController\.hasInstantlyOutreachSignal\(customer\)/);
@@ -1787,7 +1784,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, \(customers \|\| \[\]\)\.length\)/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto's nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
-  assert.match(pageSource, /const availableStatus = \(state\.activeStatus === "beschikbaar" \|\| \(state\.activeStatus === "gevonden" && !hasCompleteWebdesignAssets\(customer\)\)\) \? getAvailablePreparationStatus\(customer\) : null;/);
+  assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null;/);
   assert.match(pageSource, /const statusClassName = availableStatus \? availableStatus\.className : customer\.status;/);
   assert.match(pageSource, /"<td><div class=\\"s-wrap s-" \+ escapeHtml\(statusClassName\)/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
@@ -4182,18 +4179,16 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters">\s*<span class="status-filter-label">Algemeen<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn act" data-s="gevonden" type="button">Succesvol gevonden<\/button>\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true">\s*<span class="status-filter-label">[\s\S]*status-filter-lock-icon[\s\S]*Coldcalling<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik<\/button>\s*<\/span>\s*<\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters">\s*<span class="status-filter-label">Algemeen<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn act" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true">\s*<span class="status-filter-label">[\s\S]*status-filter-lock-icon[\s\S]*Coldcalling<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik<\/button>\s*<\/span>\s*<\/div>/
   );
-  assert.match(pageSource, /activeStatus: "gevonden"/);
+  assert.match(pageSource, /activeStatus: "beschikbaar"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
   assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /data-s="beschikbaar" type="button">Beschikbaar<\/button>/);
-  assert.match(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
-  assert.match(pageSource, /state\.activeStatus === "gevonden"\) return state\.foundSnapshotLoaded && databaseSourceFilter\.isKvkTransferCustomer\(customer\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotFoundCustomer\(customer, state\.foundSnapshotCustomerIdSet\)/);
-  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260804a/);
-  assert.match(pageSource, /state\.activeStatus === "gevonden"\) return \(customers \|\| \[\]\)\.length/);
+  assert.doesNotMatch(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return \(state\.foundSnapshotLoaded && databaseSourceFilter\.isKvkTransferCustomer\(customer\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotFoundCustomer\(customer, state\.foundSnapshotCustomerIdSet\) && !isColdmailReadyWebdesignLead\(customer\)\) \|\| isAvailableColdmailDisplayCandidate\(customer\)/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260804b/);
   assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);
-  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailDisplayCandidate\(customer\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
   assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\)\) return matchesColdcallingStatusFilter\(customer, state\.activeStatus\);/);

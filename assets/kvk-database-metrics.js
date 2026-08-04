@@ -69,6 +69,7 @@
     const documentRef = deps.document;
     const getState = typeof deps.getState === 'function' ? deps.getState : () => null;
     const elements = {
+      treatedTotal: documentRef.getElementById('companies-treated'),
       successfulFound: documentRef.getElementById('companies-successful-found'),
       successfulFoundLast60: documentRef.getElementById('companies-successful-found-last60'),
       treated: documentRef.getElementById('companies-treated-last60'),
@@ -89,6 +90,20 @@
       const unusableGradeLast60 = last60.unusable_grades || {};
       const unusableGradeActivity = last60.unusable_grade_activity || {};
 
+      if (elements.treatedTotal) {
+        const treated = Number(
+          scraperState.treated ??
+            sumCounts(
+              scraperState.with_website,
+              scraperState.without_website,
+              scraperState.unusable,
+            ),
+        );
+        const treatedText = numberFormat.format(Number.isFinite(treated) ? Math.max(0, treated) : 0);
+        if (elements.treatedTotal.textContent !== treatedText) {
+          elements.treatedTotal.textContent = treatedText;
+        }
+      }
       if (elements.successfulFound) {
         elements.successfulFound.textContent = numberFormat.format(
           Number(
@@ -126,6 +141,12 @@
   function start(deps = {}) {
     const controller = createController(deps);
     controller.renderMetrics();
+    const treatedTotal = deps.document.getElementById('companies-treated');
+    if (treatedTotal && typeof deps.window.MutationObserver === 'function') {
+      const treatedObserver = new deps.window.MutationObserver(controller.renderMetrics);
+      treatedObserver.observe(treatedTotal, { childList: true, characterData: true, subtree: true });
+      controller.treatedObserver = treatedObserver;
+    }
     deps.window.setInterval(controller.renderMetrics, 1000);
     deps.window.addEventListener('focus', controller.renderMetrics);
     deps.document.addEventListener('visibilitychange', () => {

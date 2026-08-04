@@ -643,9 +643,11 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
     const blockedGuardKeys = new Set([...centralGuardKeys, ...legacyGuardKeys]);
     const finalComputeStartMs = Date.now();
-    const foundCustomerIds = transferredCandidates
+    const unguardedTransferredCandidates = transferredCandidates
       .filter((row) => !buildGuardKeysForRow(row).some((key) => blockedGuardKeys.has(key)))
-      .map(getRowId);
+      .filter((row) => !rowHasColdcallingSignal(row))
+      .map((row) => ({ row, photoFlag: getPhotoFlagForCustomer(row, photoMaps) }));
+    const foundCustomerIds = unguardedTransferredCandidates.map((item) => getRowId(item.row));
     const unguardedCandidates = basicCandidates
       .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)));
     let mailReadyRows = unguardedCandidates
@@ -655,6 +657,11 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       .filter((item) => !rowHasColdcallingSignal(item.row))
       .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
       .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag));
+    availableRows = dedupeCustomerRows(availableRows.concat(
+      unguardedTransferredCandidates
+        .filter((item) => !isBasicMailReadyCandidate(item.row, item.photoFlag))
+        .map((item) => buildAvailableSnapshotCustomer(item.row, item.photoFlag))
+    ));
     const computeMs = computeBeforeGuardsMs + (Date.now() - finalComputeStartMs);
     const mediaStartMs = Date.now();
     const bootstrapCustomerIds = Array.from(new Set(

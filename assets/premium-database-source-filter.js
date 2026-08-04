@@ -32,7 +32,6 @@
     }
 
     function getHeaderLabel(activeStatus) {
-        if (activeStatus === "gevonden") return "Succesvol gevonden";
         return activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's";
     }
 
