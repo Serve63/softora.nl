@@ -718,6 +718,15 @@ const mailboxDeleteController = window.SoftoraMailboxDelete.create({
   removeCached: (mail) => window.SoftoraMailboxCampaignInbox?.removeAndPublishMessageDeletion?.(mail),
   toast,
 }); window.SoftoraMailboxCampaignInbox?.bindMessageDeletionSync?.({ getMessages: () => mails, setMessages: (messages) => { mails = messages; }, getActiveId: () => activeMail, setActiveId: (id) => { activeMail = id; }, filterMessages: mailboxDeleteController.filterMessages, renderList, openMail, resetDetail: resetDetailEmpty });
+const mailboxReadController = window.SoftoraMailboxRead.create({
+  fetch: (...args) => window.fetch(...args),
+  getAccount: (mail) => window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
+  getFolder: (mail) => window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
+  getOwner: getMailboxActionOwner,
+  getRequestId: (mail) => window.SoftoraMailboxCampaignInbox.getRequestId(mail),
+  getConversationAction: (mail) => window.SoftoraMailboxCampaignInbox.getConversationAction(mail),
+  toast,
+});
 const mailboxComposeWindow = window.SoftoraMailboxComposeWindow.create({ document, window });
 mailboxComposeWindow.bind();
 const mailboxComposeController = window.SoftoraMailboxComposeController.create({
@@ -787,6 +796,7 @@ function normalizeMailboxApiMessage(message, options = {}) {
     uid: message.uid,
     unread: Boolean(message.unread),
     starred: Boolean(message.starred),
+    replyDismissedAt: String(message.replyDismissedAt || ''),
     tags: [],
   };
   const decoratedMail = window.SoftoraMailboxCampaignInbox?.decorateMessage(mail, message) || mail; return window.SoftoraMailboxIndex && typeof window.SoftoraMailboxIndex.decorateMessage === 'function'
@@ -897,30 +907,6 @@ function renderList(options = {}) {
   })).join('');
   if (!activeMail && options.openLatest !== false) openMail(list[0].id);
 }
-async function persistMailReadState(mail) {
-  if (!mail) return; const requestId = window.SoftoraMailboxCampaignInbox.getRequestId(mail); if (!requestId || !window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount)) return;
-  try {
-    const response = await fetch('/api/mailbox/messages/read', {
-      method: 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        account: window.SoftoraMailboxCampaignInbox.getAccount(mail, activeMailboxAccount),
-        owner: getMailboxActionOwner(mail),
-        id: requestId,
-        uid: mail.uid,
-        folder: window.SoftoraMailboxCampaignInbox.getFolder(mail, activeFolder),
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.detail || data?.error || 'Gelezen status opslaan mislukt');
-    }
-  } catch (error) {
-    toast(String(error?.message || error || 'Gelezen status opslaan mislukt'));
-  }
-}
 async function loadMailboxMessageBody(id) {
   if (!window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.loadBody !== 'function') return; const mail = findMailById(id); if (!mail) return;
   const token = mailboxOwnerView.getToken();
@@ -956,7 +942,7 @@ function openMail(id, options = {}) {
   activeMail = m.id;
   m.unread = false;
   renderList();
-  if (wasUnread) void persistMailReadState(m);
+  if (wasUnread) void mailboxReadController.persist(m);
   if (!m.bodyLoaded && !options.skipBodyFetch) void loadMailboxMessageBody(m.id);
   if (!options.skipThreadBodyFetch && activeFolder === 'outreach' && window.SoftoraMailboxCampaignInbox.isCampaignMail(m)) void window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail: m, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail, isCurrent: () => isMailboxViewCurrent(token), signal: token.signal });
   const conversationBodyImages = window.SoftoraMailboxImages?.getConversationImages?.(m) || m.bodyImages;
@@ -973,6 +959,7 @@ function openMail(id, options = {}) {
   const detailBody = m.body || '';
   const detailBodyImages = imagesPending ? [] : m.bodyImages;
   const rootIncomingMeta = renderMailboxRootIncomingMeta(m, detailPrimary);
+  const conversationAction = window.SoftoraMailboxCampaignInbox.getConversationAction(m); const replyHandled = !conversationAction || conversationAction.kind !== 'reply' || Boolean(conversationAction.message?.replyDismissedAt);
   document.getElementById('mail-detail').innerHTML = `
     <div class="detail-body">
       <article class="detail-mail-block">
@@ -980,6 +967,9 @@ function openMail(id, options = {}) {
           <div class="detail-subject-row">
             <div class="detail-subject">${escapeHtml(window.SoftoraMailboxDisplay.formatDetailSubject(m.subject))}</div>
             <div class="detail-head-tools">
+              <button class="detail-mark-read ${replyHandled ? 'is-complete' : ''}" type="button" data-mailbox-action="mark-read" data-mailbox-id="${escapeHtml(m.id)}" aria-label="${replyHandled ? 'Gesprek vraagt geen antwoord' : 'Als gelezen afhandelen'}" title="${replyHandled ? 'Geen antwoord nodig' : 'Als gelezen afhandelen'}" aria-pressed="${replyHandled ? 'true' : 'false'}" ${replyHandled ? 'disabled' : ''}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/><path d="m9 13.5 2 2 4-4"/></svg>
+              </button>
               <button class="detail-hide-conversation" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}" aria-label="Gesprek alleen uit Softora verbergen" title="Alleen uit Softora verbergen">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
               </button>
@@ -999,6 +989,13 @@ function openMail(id, options = {}) {
         <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending }))}</div>
       </article>
     </div>`;
+}
+async function markMailRead(id) {
+  const m = findMailById(id);
+  await mailboxReadController.dismissReply(m, { render() {
+    renderList({ openLatest: false });
+    openMail(m.id, { skipBodyFetch: true, skipThreadBodyFetch: true });
+  } });
 }
 async function deleteMail(id) {
   const m = findMailById(id);
@@ -1066,6 +1063,9 @@ function handleMailboxAction(actionEl) {
       break;
     case 'delete-mail':
       void deleteMail(id);
+      break;
+    case 'mark-read':
+      void markMailRead(id);
       break;
     case 'retry-thread-message':
       retryMailboxThreadMessage(id, actionEl.getAttribute('data-mailbox-thread-key'));

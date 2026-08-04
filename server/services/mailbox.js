@@ -8,9 +8,10 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxComposeSend } = require('./mailbox-compose-send');
-const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, markInstantlyMessageRead, mergeCampaignReplies, resolveReplyIdentity, sendMailboxMessage, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
+const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, mergeCampaignReplies, resolveReplyIdentity, sendMailboxMessage, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
+const { createMailboxReadMessageService } = require('./mailbox-read-message');
 const {
   CAMPAIGN_MAILBOX_ACCOUNTS,
   createMailboxCampaignRepliesService,
@@ -2260,55 +2261,17 @@ function createMailboxService(deps = {}) {
     return assertMailboxMessageVisible(live);
   }
 
-  async function markMessageRead({ accountEmail, id, folder, uid, owner }) {
-    const instantlyResult = await markInstantlyMessageRead({ input: { accountEmail, id, folder, uid, owner }, instantlyMailboxService, mailboxIndexStore });
-    if (instantlyResult) return instantlyResult;
-    const account = getAccount(accountEmail);
-    if (!account) {
-      const error = new Error('Mailbox-account niet gevonden.');
-      error.status = 404;
-      throw error;
-    }
-    if (!account.imapConfigured) {
-      const error = new Error('IMAP is niet geconfigureerd voor deze mailbox.');
-      error.status = 503;
-      throw error;
-    }
-    const messageRef = parseMessageReference({ id, folder, uid });
-    const result = {
-      account: account.email,
-      folder: messageRef.folder,
-      uid: messageRef.uid,
-      unread: false,
-    };
-    if (canUseMailboxIndex() && typeof mailboxIndexStore.markMessageRead === 'function') {
-      await mailboxIndexStore.markMessageRead({
-        accountEmail: account.email,
-        id,
-        folder: messageRef.folder,
-        uid: messageRef.uid,
-      }).catch((error) => {
-        logger.error('[Mailbox][MarkReadIndex]', error?.message || error);
-        return null;
-      });
-    }
-    const client = createClient(account);
-    try {
-      await client.connect();
-      const mailboxName = await resolveMailboxName(client, messageRef.folder);
-      const lock = await client.getMailboxLock(mailboxName);
-      try {
-        await client.messageFlagsAdd([messageRef.uid], ['\\Seen'], { uid: true });
-        return result;
-      } finally {
-        lock.release();
-      }
-    } finally {
-      try {
-        if (client.usable) await client.logout();
-      } catch (_) {}
-    }
-  }
+  const { markMessageRead } = createMailboxReadMessageService({
+    canUseMailboxIndex,
+    mailboxIndexStore,
+    getAccount,
+    parseMessageReference,
+    createClient,
+    instantlyMailboxService,
+    getUiStateValues,
+    setUiStateValues,
+    logger,
+  });
 
   const mailboxVisibility = createMailboxVisibilityService({
     getAccount,
@@ -2616,6 +2579,7 @@ function createMailboxService(deps = {}) {
         id: body.id || body.messageId,
         folder: body.folder,
         uid: body.uid, owner: body.owner,
+        dismissReply: body.dismissReply === true,
       });
       return res.status(200).json({ ok: true, result });
     } catch (error) {

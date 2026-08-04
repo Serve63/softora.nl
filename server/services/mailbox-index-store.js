@@ -17,7 +17,7 @@ const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
-  'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,has_body,body_truncated,payload';
+  'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,reply_dismissed_at,has_body,body_truncated,payload';
 
 function createMailboxIndexStore(deps = {}) {
   const {
@@ -289,6 +289,7 @@ function createMailboxIndexStore(deps = {}) {
       date: parseDateIso(row.date || row.internal_date),
       unread: Boolean(row.unread),
       starred: Boolean(row.starred),
+      replyDismissedAt: normalizeString(row.reply_dismissed_at),
       hasBody: Boolean(row.has_body),
       bodyTruncated: Boolean(row.body_truncated),
       bodyImageEvidenceKnown,
@@ -907,6 +908,33 @@ function createMailboxIndexStore(deps = {}) {
     });
   }
 
+  async function markMessageReplyDismissed({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
+    const normalizedFolder = normalizeFolder(folder);
+    const normalizedId = normalizeString(id);
+    const parsedUid = normalizedFolder === 'instantly'
+      ? 0
+      : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
+    const dismissedAt = isoNow();
+    const result = await run('mark-message-reply-dismissed', (client) => {
+      const query = client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .update({ unread: false, reply_dismissed_at: dismissedAt, updated_at: dismissedAt })
+        .eq('account_email', normalizeEmail(accountEmail))
+        .eq('folder', normalizedFolder)
+        .is('deleted_at', null);
+      if (Number.isSafeInteger(parsedUid) && parsedUid > 0) {
+        return query.eq('uid', parsedUid).select('message_key,reply_dismissed_at');
+      }
+      return query.eq('provider_id', normalizedId).select('message_key,reply_dismissed_at');
+    });
+    if (!result.ok || (Array.isArray(result.data) && result.data.length)) {
+      return { ...result, dismissedAt };
+    }
+    const error = new Error('Mailboxbericht ontbreekt in de duurzame index.');
+    error.code = 'MAILBOX_INDEX_MESSAGE_NOT_FOUND';
+    return { ok: false, unavailable: false, data: result.data, error, dismissedAt: '' };
+  }
+
   async function markMessageDeleted({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
     const normalizedFolder = normalizeFolder(folder);
     const normalizedId = normalizeString(id);
@@ -1055,6 +1083,7 @@ function createMailboxIndexStore(deps = {}) {
     listProviderActiveConversationAuditMessages,
     markMessageDeleted,
     markMessageRead,
+    markMessageReplyDismissed,
     restoreMessage,
     normalizeMessageRow,
     stableProviderUid,

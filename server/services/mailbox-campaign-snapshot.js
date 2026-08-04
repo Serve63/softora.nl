@@ -258,6 +258,7 @@ function sanitizeMessage(value, options = {}) {
     conversationId: text(source.conversationId, 2000),
     unread: Boolean(source.unread),
     starred: Boolean(source.starred),
+    replyDismissedAt: text(source.replyDismissedAt, 100),
     hasBody: Boolean(source.hasBody || rawBody),
     bodyImageEvidenceKnown,
     embeddedImageCount: bodyImageEvidenceKnown
@@ -451,10 +452,49 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
   };
 }
 
+function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, options = {}) {
+  const snapshot = parseMailboxCampaignSnapshot(rawValue);
+  if (!snapshot) return { changed: false, serialized: String(rawValue || '') };
+  const accountEmail = text(identity.accountEmail, 320).toLowerCase();
+  const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
+  const uid = Number(identity.uid) || 0;
+  const id = text(identity.id, 500);
+  const dismissedAt = text(options.dismissedAt || new Date().toISOString(), 100);
+  let changed = false;
+  const matches = (message) => {
+    const messageFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
+    const messageUid = Number(message.storageUid || message.uid) || 0;
+    if (message.accountEmail !== accountEmail || messageFolder !== folder) return false;
+    if (uid > 0 && messageUid > 0) return messageUid === uid;
+    return message.mailboxId === id || message.id === id;
+  };
+  const messages = snapshot.messages.map((message) => {
+    const threadMessages = (Array.isArray(message.threadMessages) ? message.threadMessages : []).map((threadMessage) => {
+      if (!matches(threadMessage)) return threadMessage;
+      changed = true;
+      return { ...threadMessage, unread: false, replyDismissedAt: dismissedAt };
+    });
+    if (!matches(message)) {
+      return { ...message, threadMessages };
+    }
+    changed = true;
+    return { ...message, unread: false, replyDismissedAt: dismissedAt, threadMessages };
+  });
+  if (!changed) return { changed: false, serialized: String(rawValue || '') };
+  return {
+    changed: true,
+    serialized: serializeMailboxCampaignSnapshot(
+      { ok: snapshot.ok, messages, sync: snapshot.sync },
+      { savedAt: options.savedAt || dismissedAt }
+    ),
+  };
+}
+
 module.exports = {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  markMailboxCampaignSnapshotReplyDismissed,
   parseMailboxCampaignSnapshot,
   removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
