@@ -13,6 +13,8 @@ const {
 const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const autopilotResilience = require('./coldmail-autopilot-resilience');
+const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-reconciliation');
+const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
   fitWebdesignPreviewForEmail,
@@ -301,6 +303,10 @@ function createColdmailCampaignService(deps = {}) {
     mailboxAccountsRaw,
     normalizeString,
     truncateText,
+  });
+  const postSmtpReconciliation = createColdmailPostSmtpReconciliation({
+    outboundRecipientGuardStore, dataOpsStore, now, logger, getSenderEmails: () => getConfiguredSenderEmails(),
+    finalizeEvidence: (evidence) => finalizeAcceptedColdmailEvidence(evidence),
   });
 
   function normalizeEmailAddress(value) {
@@ -1384,7 +1390,7 @@ function createColdmailCampaignService(deps = {}) {
     return match ? buildSupabaseOutboundGuardFailure(item, match) : null;
   }
 
-  async function reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor) {
+  async function reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor, context = {}) {
     if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.reserveRecipients !== 'function') {
       const error = new Error('Centrale outbound duplicate-guard ontbreekt; coldmail niet verzonden.');
       error.code = 'COLDMAIL_OUTBOUND_GUARD_UNAVAILABLE';
@@ -1404,6 +1410,11 @@ function createColdmailCampaignService(deps = {}) {
         payload: {
           customerId: item && item.id,
           bedrijf: getRowCompany(item && item.row),
+          expectedSubject: normalizeString(context.subject),
+          reference: normalizeString(context.reference),
+          durationDays: Number(context.durationDays) || 0,
+          specialAction: normalizeString(context.specialAction),
+          actor: normalizeString(actor),
         },
       }
     );
@@ -1421,50 +1432,6 @@ function createColdmailCampaignService(deps = {}) {
       throw error;
     }
     return reservation;
-  }
-
-  async function confirmSupabaseOutboundRecipientForColdmail(reservationId, sentItem) {
-    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.confirmReservation !== 'function') {
-      const error = new Error(
-        'Centrale outbound duplicate-guard kan niet permanent worden bevestigd na SMTP-acceptatie; coldmailing gepauzeerd.'
-      );
-      error.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
-      error.status = 502;
-      throw error;
-    }
-    if (!reservationId) {
-      const error = new Error(
-        'Centrale outbound duplicate-guard mist een reservering na SMTP-acceptatie; coldmailing gepauzeerd.'
-      );
-      error.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
-      error.status = 502;
-      throw error;
-    }
-    try {
-      const confirmation = await outboundRecipientGuardStore.confirmReservation(reservationId, {
-        status: 'sent',
-        permanent: true,
-        payload: {
-          messageId: sentItem && sentItem.messageId,
-          email: sentItem && sentItem.email,
-          bedrijf: sentItem && sentItem.bedrijf,
-        },
-      });
-      if (!confirmation || confirmation.ok !== true || Number(confirmation.count || 0) <= 0) {
-        const error = new Error('Centrale outbound duplicate-guard bevestigde geen bestaande reservering.');
-        error.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_EMPTY';
-        throw error;
-      }
-    } catch (error) {
-      logger.error('[OutboundRecipientGuard][coldmail-confirm]', error && error.message ? error.message : error);
-      const wrappedError = new Error(
-        'Centrale outbound duplicate-guard kon niet permanent worden bevestigd na SMTP-acceptatie; coldmailing gepauzeerd.'
-      );
-      wrappedError.code = 'COLDMAIL_OUTBOUND_GUARD_CONFIRM_FAILED';
-      wrappedError.status = 502;
-      wrappedError.cause = error;
-      throw wrappedError;
-    }
   }
 
   async function releaseSupabaseOutboundRecipientReservation(reservation, context = {}) {
@@ -3429,6 +3396,29 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  async function refreshCurrentDayColdmailStats(payload) {
+    if (!outboundRecipientGuardStore || typeof outboundRecipientGuardStore.listSentRecipientGroups !== 'function') return payload;
+    try {
+      const groups = await outboundRecipientGuardStore.listSentRecipientGroups({
+        provider: 'softora', channel: 'coldmail', keyType: 'email', maxRows: 1000, updatedSince: new Date(now().getTime() - (30 * 60 * 60 * 1000)).toISOString(),
+      });
+      const current = summarizeColdmailCentralGuardLiveStats(groups);
+      const dateKey = getColdmailAutopilotDateKey(now(), DEFAULT_COLDMAIL_AUTOPILOT_TIMEZONE);
+      const merged = mergeMonotonicCurrentDayStats(payload, { stats: {
+        reliable: current.available, dateKey, lastSuccessfulSendAt: current.lastSentAt, lastSenderEmail: current.lastSenderEmail,
+        centralGuardSentToday: mergeColdmailRecipientCountTotals({ recipientCounts: current.todayRecipientCounts }),
+      } }, now().toISOString());
+      if (merged !== payload) {
+        coldmailLiveStatsCache = { cachedAtMs: now().getTime(), payload: merged };
+        await persistDurableColdmailLiveStats(merged);
+      }
+      return merged;
+    } catch (error) {
+      logger.warn('[ColdmailLiveStats][current-day-refresh]', error && error.message ? error.message : error);
+      return payload;
+    }
+  }
+
   async function loadColdmailMailboxBounceCandidates() {
     if (!dataOpsStore || typeof dataOpsStore.listMailboxMessages !== 'function') {
       return {
@@ -3720,13 +3710,10 @@ function createColdmailCampaignService(deps = {}) {
     const cachedAtMs = Number(coldmailLiveStatsCache && coldmailLiveStatsCache.cachedAtMs) || 0;
     const cacheAgeMs = cachedAtMs ? now().getTime() - cachedAtMs : Number.POSITIVE_INFINITY;
     if (coldmailLiveStatsCache && cacheAgeMs < COLDMAIL_LIVE_STATS_MEMORY_TTL_MS) {
-      return coldmailLiveStatsCache.payload;
+      return refreshCurrentDayColdmailStats(coldmailLiveStatsCache.payload);
     }
     if (coldmailLiveStatsCache) {
-      refreshColdmailLiveStats().catch((error) => {
-        logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
-      });
-      return coldmailLiveStatsCache.payload;
+      return refreshColdmailLiveStats();
     }
     if (!coldmailLiveStatsDurableReadPromise) {
       coldmailLiveStatsDurableReadPromise = readDurableColdmailLiveStats().finally(() => {
@@ -3742,7 +3729,7 @@ function createColdmailCampaignService(deps = {}) {
       refreshColdmailLiveStats().catch((error) => {
         logger.warn('[ColdmailLiveStats][refresh]', error && error.message ? error.message : error);
       });
-      return durablePayload;
+      return refreshCurrentDayColdmailStats(durablePayload);
     }
     return refreshColdmailLiveStats();
   }
@@ -5348,6 +5335,8 @@ function createColdmailCampaignService(deps = {}) {
 
   async function runColdmailAutopilot(input = {}) {
     const actor = truncateText(normalizeString(input.actor), 120) || 'Coldmail Autopilot';
+    await reconcileColdmailPostSmtp({ maxRows: 100 }).catch((error) =>
+      logger.warn('[ColdmailAutopilot][post-smtp-reconcile]', error && error.message ? error.message : error));
     const stateRecord = await loadColdmailAutopilotStateRecord({ attempts: 3 });
     let state = stateRecord.state;
 
@@ -5596,27 +5585,24 @@ function createColdmailCampaignService(deps = {}) {
     }
   }
 
+  async function reconcileColdmailPostSmtp(input = {}) {
+    const result = await postSmtpReconciliation.reconcilePending({ maxRows: input.maxRows });
+    if (result.reconciled > 0) coldmailLiveStatsCache = null;
+    return result;
+  }
   async function runColdmailBeforeSendGuard(input = {}, context = {}) {
     if (typeof input.beforeSendGuard !== 'function') return;
     await input.beforeSendGuard(context);
   }
 
   async function recordColdmailSendGuardEntry({
-    senderEmail,
-    count,
-    personalCount = 0,
-    actor,
-    recipientKey = '',
-    recipientEmail = '',
-    recipientDomain = '',
-    recipientCompanyKey = '',
-    recipientId = '',
-    recipientCompany = '',
+    senderEmail, count, personalCount = 0, actor, recipientKey = '', recipientEmail = '',
+    recipientDomain = '', recipientCompanyKey = '', recipientId = '', recipientCompany = '', sentAt = '',
   }) {
     const safeCount = Math.max(0, Number(count || 0) || 0);
     if (!safeCount) return false;
     const state = await loadColdmailSendGuardState();
-    const at = now().toISOString();
+    const at = normalizeString(sentAt) || now().toISOString();
     const recipientEntry = {
       at,
       senderEmail: normalizeEmailAddress(senderEmail),
@@ -5627,6 +5613,10 @@ function createColdmailCampaignService(deps = {}) {
       recipientId: normalizeColdmailGuardKeyPart(recipientId),
       recipientCompany: truncateText(normalizeString(recipientCompany), 120),
     };
+    if ((state.recipientEntries || []).some((entry) =>
+      (recipientEntry.recipientEmail && entry.recipientEmail === recipientEntry.recipientEmail) ||
+      (recipientEntry.recipientId && entry.recipientId === recipientEntry.recipientId)
+    )) return false;
     state.entries.push({
       ...recipientEntry,
       count: safeCount,
@@ -5637,6 +5627,41 @@ function createColdmailCampaignService(deps = {}) {
       state.recipientEntries.push(recipientEntry);
     }
     await saveColdmailSendGuardState(state, actor);
+    return true;
+  }
+
+  async function finalizeAcceptedColdmailEvidence(evidence = {}) {
+    const customerState = await getUiStateValues(customerDbScope);
+    const values = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
+    const currentRows = parseDatabaseRows(values);
+    const recipientEmail = normalizeEmailAddress(evidence.recipientEmail);
+    const customerId = normalizeString(evidence.customerId);
+    const rowIndex = currentRows.findIndex((row, index) => (customerId && getRowId(row, index) === customerId) || (recipientEmail && getRowEmail(row) === recipientEmail));
+    const row = rowIndex >= 0 ? currentRows[rowIndex] : evidence.customerRow;
+    if (!row) throw new Error('Klantstatus kon niet veilig worden hersteld: verzonden klant niet gevonden.');
+    const recipientGuard = buildColdmailRecipientGuard(row, getRowId(row, rowIndex));
+    await runColdmailPostSmtpPersistenceStep('oude send_guard/teller', () => recordColdmailSendGuardEntry({
+      senderEmail: evidence.senderEmail, count: 1, personalCount: isPersonalMailboxDomain(recipientEmail) ? 1 : 0,
+      ...recipientGuard, actor: evidence.actor || 'Coldmail post-SMTP herstel', sentAt: evidence.sentAt,
+    }));
+    const evidenceMessageId = normalizeString(evidence.messageId);
+    const evidenceSentAt = normalizeString(evidence.sentAt);
+    const alreadyPersisted = evidenceMessageId
+      ? normalizeString(row.coldmailSentMessageId || row.outreachMessageId) === evidenceMessageId
+      : Boolean(evidenceSentAt && normalizeString(row.lastColdmailSentAt) === evidenceSentAt &&
+        normalizeEmailAddress(row.lastColdmailSenderEmail) === normalizeEmailAddress(evidence.senderEmail));
+    if (!alreadyPersisted) {
+      const markedRow = markRowAsMailed(row, evidence.actor, evidence.durationDays, {
+        senderEmail: evidence.senderEmail, specialAction: evidence.specialAction || 'webdesign',
+        messageId: evidence.messageId, trackingId: evidence.trackingId, sentAt: evidence.sentAt,
+      });
+      await runColdmailPostSmtpPersistenceStep('klantstatus/teller', async () => assertColdmailPostSmtpPersistenceResult(
+        'klantstatus/teller', await setUiStateValues(customerDbScope, buildCustomerRowsStateValues({}, [markedRow]), {
+          source: 'coldmail-campaign', actor: evidence.actor || 'Coldmail post-SMTP herstel', requireDataOps: true, upsertOnly: true,
+        })
+      ));
+    }
+    coldmailLiveStatsCache = null;
     return true;
   }
 
@@ -7525,7 +7550,8 @@ function createColdmailCampaignService(deps = {}) {
   }
 
   function markRowAsMailed(row, actor, durationDays, context = {}) {
-    const date = now().toISOString();
+    const sentAtMs = parseTimestampMs(context.sentAt);
+    const date = sentAtMs ? new Date(sentAtMs).toISOString() : now().toISOString();
     const safeDurationDays = normalizeCampaignDurationDays(durationDays);
     const campaignEndsAt = safeDurationDays > 0 ? addDaysIso(new Date(date), safeDurationDays) : '';
     const existingHistory = Array.isArray(row.hist) ? row.hist : [];
@@ -8764,7 +8790,9 @@ function createColdmailCampaignService(deps = {}) {
         let outboundReservation = null;
         try {
           outboundReservation = shouldReserveGuards
-            ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor)
+            ? await reserveSupabaseOutboundRecipientForColdmail(item, senderEmail, actor, {
+                subject, reference, durationDays: input.durationDays, specialAction: effectiveSpecialAction,
+              })
             : null;
         } catch (error) {
           await releaseSupabaseOutboundRecipientReservation(senderCooldownReservation, { to });
@@ -8806,59 +8834,30 @@ function createColdmailCampaignService(deps = {}) {
           response: truncateText(normalizeString(info && info.response), 500),
           accepted,
           rejected,
+          sentAt: now().toISOString(),
           sentCopySaved: false,
         };
-        if (!isTestRecipientRow(row, to)) {
-          await confirmSupabaseOutboundRecipientForColdmail(
-            outboundReservation && outboundReservation.reservationId,
-            sentItem
-          );
-        }
         const sentCopySaved = await saveSentCopy(senderEmail, mail, info, smtpAccount);
         sentItem.sentCopySaved = sentCopySaved;
         if (!isTestRecipientRow(row, to)) {
-          const recipientGuard = buildColdmailRecipientGuard(row, item.id);
-          await runColdmailPostSmtpPersistenceStep('oude send_guard/teller', () =>
-            recordColdmailSendGuardEntry({
+          await postSmtpReconciliation.persistAcceptedSend({
+              reservationId: outboundReservation && outboundReservation.reservationId,
+              customerId: item.id,
+              bedrijf: sentItem.bedrijf,
               senderEmail,
-              count: 1,
-              personalCount: isPersonalMailboxDomain(to) ? 1 : 0,
-              ...recipientGuard,
-              actor,
-            })
-          );
-          let markedRow = null;
-          const updatedRows = rows.map((currentRow, rowIndex) => {
-            const rowId = getRowId(currentRow, rowIndex);
-            if (rowId !== item.id) return currentRow;
-            markedRow = markRowAsMailed(currentRow, actor, input.durationDays, {
-              senderEmail,
+              recipientEmail: to,
+              subject,
+              expectedSubject: subject,
+              reference,
+              durationDays: input.durationDays,
               specialAction: effectiveSpecialAction,
+              actor,
               messageId: sentItem.messageId,
+              sentAt: sentItem.sentAt,
               trackingId: sentItem.trackingId,
+              postSmtpEvidence: 'smtp-accepted',
+              customerRow: row,
             });
-            return markedRow;
-          });
-          if (!markedRow) {
-            throw new Error('Klantstatus kon niet veilig worden opgeslagen: verzonden klant niet gevonden.');
-          }
-          await runColdmailPostSmtpPersistenceStep(
-            'klantstatus/teller',
-            async () => {
-              const result = await setUiStateValues(
-                customerDbScope,
-                buildCustomerRowsStateValues({}, [markedRow]),
-                {
-                  source: 'coldmail-campaign',
-                  actor,
-                  requireDataOps: true,
-                  upsertOnly: true,
-                }
-              );
-              return assertColdmailPostSmtpPersistenceResult('klantstatus/teller', result);
-            }
-          );
-          rows = updatedRows;
           persistedSentRowIds.add(item.id);
         }
         sent.push(sentItem);
@@ -9353,6 +9352,7 @@ function createColdmailCampaignService(deps = {}) {
     getColdmailUnsubscribePreview,
     listColdmailReplyFollowUps,
     recordColdmailOpen,
+    reconcileColdmailPostSmtp,
     runColdmailAutopilot,
     sendColdmailCampaign,
     setWebdesignPreparationCoordinator: (coordinator) => {

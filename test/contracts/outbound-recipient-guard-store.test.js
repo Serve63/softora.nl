@@ -238,6 +238,10 @@ test('outbound recipient guard store groups permanent sent guard rows by reserva
               calls.push({ type: 'eq', table, columns, column, value });
               return query;
             },
+            gte(column, value) {
+              calls.push({ type: 'gte', column, value });
+              return query;
+            },
             order(column, options) {
               calls.push({ type: 'order', column, options });
               return query;
@@ -258,6 +262,7 @@ test('outbound recipient guard store groups permanent sent guard rows by reserva
     provider: 'softora',
     channel: 'coldmail',
     keyType: 'email',
+    updatedSince: '2026-06-08T08:00:00.000Z',
   });
 
   assert.equal(groups.length, 2);
@@ -268,6 +273,63 @@ test('outbound recipient guard store groups permanent sent guard rows by reserva
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'provider' && call.value === 'softora'), true);
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'channel' && call.value === 'coldmail'), true);
   assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'key_type' && call.value === 'email'), true);
+  assert.equal(calls.some((call) => call.type === 'gte' && call.column === 'updated_at' && call.value === '2026-06-08T08:00:00.000Z'), true);
+});
+
+test('outbound recipient guard store exposes bounded pending permanent reservations for reconciliation', async () => {
+  const calls = [];
+  const rows = [{
+    reservation_id: 'pending-1',
+    guard_key: 'email:pending@example.test',
+    key_type: 'email',
+    provider: 'softora',
+    channel: 'coldmail',
+    recipient_email: 'pending@example.test',
+    recipient_id: 'pending-customer',
+    sender_email: 'serve@softora.nl',
+    status: 'reserved',
+    permanent: true,
+    source: 'softora-coldmail-pre-send',
+    payload: { expectedSubject: 'Kleine vraag over jullie website' },
+    created_at: '2026-06-08T09:00:00.000Z',
+    updated_at: '2026-06-08T09:00:00.000Z',
+  }];
+  const client = {
+    from(table) {
+      return {
+        select(columns) {
+          const query = {
+            eq(column, value) {
+              calls.push({ type: 'eq', table, columns, column, value });
+              return query;
+            },
+            gte(column, value) {
+              calls.push({ type: 'gte', column, value });
+              return query;
+            },
+            order() { return query; },
+            async limit() { return { data: rows, error: null }; },
+          };
+          return query;
+        },
+      };
+    },
+  };
+
+  const groups = await createStore(client).listReservedRecipientGroups({
+    provider: 'softora',
+    channel: 'coldmail',
+    keyType: 'email',
+    updatedSince: '2026-06-01T00:00:00.000Z',
+    maxRows: 100,
+  });
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].reservation_id, 'pending-1');
+  assert.equal(groups[0].status, 'reserved');
+  assert.equal(groups[0].payload.expectedSubject, 'Kleine vraag over jullie website');
+  assert.equal(calls.some((call) => call.type === 'eq' && call.column === 'status' && call.value === 'reserved'), true);
+  assert.equal(calls.some((call) => call.type === 'gte' && call.column === 'updated_at'), true);
 });
 
 test('outbound recipient guard store paginates sent guard rows beyond Supabase single-page caps', async () => {
