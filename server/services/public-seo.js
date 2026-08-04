@@ -404,6 +404,9 @@ function buildPublicSeoSitemapXml({ knownHtmlPageFiles, siteOrigin = DEFAULT_SIT
         '  <url>',
         `    <loc>${escapeXml(buildAbsoluteUrl(siteOrigin, entry.path))}</loc>`,
         entry.lastmod ? `    <lastmod>${escapeXml(entry.lastmod)}</lastmod>` : '',
+        ...(Array.isArray(entry.images) ? entry.images : []).map(
+          (image) => `    <image:image><image:loc>${escapeXml(buildAbsoluteUrl(siteOrigin, image.loc))}</image:loc></image:image>`
+        ),
         '  </url>',
       ]
         .filter(Boolean)
@@ -413,7 +416,7 @@ function buildPublicSeoSitemapXml({ knownHtmlPageFiles, siteOrigin = DEFAULT_SIT
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">',
     urlItems,
     '</urlset>',
     '',

@@ -35,6 +35,7 @@ test('SEO machine policy requires one automation with a daily public growth outp
   assert.equal(packageJson.scripts['seo:backlog:check'], 'node scripts/check-seo-machine-backlog.js');
   assert.equal(packageJson.scripts['seo:publications:report'], 'node scripts/seo-machine-publication-report.js');
   assert.equal(packageJson.scripts['seo:indexation:report'], 'node scripts/seo-machine-indexation-report.js');
+  assert.equal(packageJson.scripts['seo:visuals:check'], 'node scripts/check-seo-machine-visuals.js');
   assert.equal(packageJson.scripts['seo:cadence:check'], 'node scripts/check-seo-machine-cadence.js');
 });
 
@@ -46,5 +47,9 @@ test('SEO machine quality gates keep daily publishing claim-safe and visual-comp
   assert.match(policy, /Publiceer geen synoniempagina, dunne city-swap/i);
   assert.match(qualityGates, /exact twee nuttige eigen Softora-visuals/i);
   assert.match(qualityGates, /Geen stockfoto's/i);
+  assert.match(qualityGates, /zes recentste blogs/i);
+  assert.match(qualityGates, /overeenkomst van `0\.85` of hoger blokkeert/i);
+  assert.match(qualityGates, /16:9/i);
+  assert.match(qualityGates, /geen Google-rankingfactor/i);
   assert.match(qualityGates, /Doe geen backlink-outreach/i);
 });

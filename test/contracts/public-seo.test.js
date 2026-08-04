@@ -146,6 +146,11 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/ai-automatisering-mkb-waar-beginnen<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/website-laten-maken-kosten-2026<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/chatbot-laten-maken-wanneer-zinvol<\/loc>/);
+  assert.match(sitemap, /xmlns:image="http:\/\/www\.google\.com\/schemas\/sitemap-image\/1\.1"/);
+  assert.match(
+    sitemap,
+    /<image:loc>https:\/\/www\.softora\.nl\/assets\/seo-content\/chatbot-kosten-kostenlagen-softora\.jpg<\/image:loc>/
+  );
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank\/wat-is-bedrijfssoftware-op-maat<\/loc>/);
   assert.doesNotMatch(sitemap, /premium-bedrijfssoftware/);

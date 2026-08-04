@@ -34,6 +34,22 @@ Nieuwe en substantieel vernieuwde content gebruikt `qualityVersion: 2` en voldoe
 - Geen stockfoto's, placeholders, generieke kantoorbeelden of decoratieve filler.
 - Auteur, reviewer, claims, CTA, mobiel gedrag, schema en publieke/private scheiding zijn groen.
 
+## Google-Aligned Visual System
+
+Vanaf `2026-08-05` draait voor iedere nieuwe of substantieel vernieuwde blog eerst `npm run seo:visuals:check`. De regel van exact twee beelden is een interne Softora-kwaliteitskeuze, geen door Google gepubliceerde rankingfactor.
+
+- Het hero-beeld is representatief voor het concrete onderwerp, minimaal 1200 pixels breed, groter dan 300.000 pixels, 16:9, tekstarm en veilig als grote zoekpreview.
+- Het tweede beeld is verklarend: bijvoorbeeld een beslismatrix, beslisboom, procesdiagram, geannoteerde interface, architectuurplaat of datavisualisatie.
+- Hero en supportbeeld gebruiken verschillende `visualType`- en `visualFamily`-waarden. Een volgende publicatie hergebruikt geen visuele familie uit de zes recentste blogs.
+- Iedere beeldbrief beschrijft compositie, informatiedoel en het concrete verschil met recente Softora-beelden. Alleen "in Softora-stijl" is geen bruikbare brief.
+- De validator vergelijkt pixelkenmerken met de zes recentste blogs. Een gecombineerde overeenkomst van `0.85` of hoger blokkeert een nieuwe kandidaat. Dit is een interne kwaliteitsdrempel tegen repeterende beeldformules, geen Google-rankingfactor.
+- Historische gelijkenis van voor de ingangsdatum wordt als `quality_recovery`-schuld gerapporteerd en blokkeert niet stilletjes iedere toekomstige publicatie.
+- Bestanden blijven lokaal eigendom van Softora, hebben een beschrijvende bestandsnaam, betekenisvolle alt, vaste dimensies, gecontroleerd gewicht, een gewone `<img src>` en relevante omringende tekst.
+- Contentpagina's bieden `max-image-preview:large`, `og:image` met dimensies, een `ImageObject` in structured data en afbeeldingslocaties in de XML-sitemap.
+- AI-gegenereerde beelden krijgen broncode `trainedAlgorithmicMedia`. De machine verzint geen C2PA- of IPTC-bewijs dat niet werkelijk in het bestand aanwezig is.
+
+Deze poort volgt Google's openbare richtlijnen over [Google Images](https://developers.google.com/search/docs/appearance/google-images), [grote Discover-afbeeldingen](https://developers.google.com/search/docs/appearance/google-discover), [generatieve content](https://developers.google.com/search/docs/fundamentals/using-gen-ai-content) en [image metadata](https://developers.google.com/search/docs/appearance/structured-data/image-license-metadata). Visuele afwisseling is hier een middel voor relevantie, informatiewinst en bruikbaarheid; niet een verzonnen directe rankingbelofte.
+
 ## Corpusoriginaliteit
 
 De machine meet op de volledige contentverzameling:
@@ -66,6 +82,7 @@ Dit zijn interne alarmsignalen, geen Google-rankingfactoren. Overschrijding zet 
 - `npm run seo:backlog:check` is groen.
 - `npm run seo:publications:report -- --json` geeft een betrouwbare live ledger.
 - `npm run seo:indexation:report -- --json` geeft verse inspectiestatus of expliciet `data_degraded`.
+- `npm run seo:visuals:check` blokkeert nieuwe repeterende beeldfamilies, zwakke beeldbriefs en ongeschikte previewformaten.
 - `npm run seo:cadence:check` noemt toestand, verplichte actie, request evidence debt, nieuwe-URL-vloer, achterstand en maximum nieuwe URL's.
 - Gerichte tests en `npm run verify:critical` zijn groen.
 - PR, merge, productiecommit en live verificatie zijn aantoonbaar; merged-but-not-live telt nooit als publicatie.

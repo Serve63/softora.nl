@@ -1,4 +1,5 @@
 const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
+const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
 
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
@@ -3434,6 +3435,7 @@ function getSeoContentSitemapEntries(options = {}) {
   const itemEntries = getSeoContentItems(options).map((item) => ({
     path: getSeoContentPathForItem(item),
     lastmod: item.updatedAt || item.publishedAt,
+    images: getSeoImageSitemapEntries(getSeoContentImageForItem(item), item.secondaryImage),
   }));
   return [...collectionEntries, ...itemEntries].filter((entry) => entry.path);
 }
@@ -3456,14 +3458,14 @@ function getSeoContentPublicationPlan({ now = new Date() } = {}) {
   }).sort((a, b) => String(a.publishedAt).localeCompare(String(b.publishedAt)) || a.slug.localeCompare(b.slug));
 }
 
-function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', structuredData, imagePath }) {
-  const imageUrl = buildAbsoluteUrl(canonicalUrl, imagePath || DEFAULT_OG_IMAGE_PATH);
+function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', structuredData, image }) {
+  const imageUrl = buildAbsoluteUrl(canonicalUrl, image?.src || DEFAULT_OG_IMAGE_PATH);
   return [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     `<title>${escapeHtml(title)}</title>`,
     `<meta name="description" content="${escapeHtml(description)}">`,
-    '<meta name="robots" content="index, follow">',
+    '<meta name="robots" content="index, follow, max-image-preview:large">',
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     '<link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">',
     '<link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">',
@@ -3475,7 +3477,7 @@ function buildBaseHead({ title, description, canonicalUrl, ogType = 'website', s
     `<meta property="og:title" content="${escapeHtml(title)}">`,
     `<meta property="og:description" content="${escapeHtml(description)}">`,
     `<meta property="og:url" content="${escapeHtml(canonicalUrl)}">`,
-    `<meta property="og:image" content="${escapeHtml(imageUrl)}">`,
+    ...buildSeoImagePreviewMeta(escapeHtml(imageUrl), image),
     '<meta name="twitter:card" content="summary_large_image">',
     `<meta name="twitter:title" content="${escapeHtml(title)}">`,
     `<meta name="twitter:description" content="${escapeHtml(description)}">`,
@@ -3537,13 +3539,13 @@ function buildBreadcrumbItems(siteOrigin, entries) {
   }));
 }
 
-function buildContentShell({ title, description, canonicalUrl, structuredData, body, ogType = 'website', imagePath }) {
+function buildContentShell({ title, description, canonicalUrl, structuredData, body, ogType = 'website', image }) {
   const conversionPage = getPathFromUrl(canonicalUrl);
   return [
     '<!DOCTYPE html>',
     '<html lang="nl">',
     '<head>',
-    `    ${buildBaseHead({ title, description, canonicalUrl, structuredData, ogType, imagePath })}`,
+    `    ${buildBaseHead({ title, description, canonicalUrl, structuredData, ogType, image })}`,
     '</head>',
     '<body>',
     '  <nav>',
@@ -3729,7 +3731,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     headline: item.title,
     description: item.description,
     articleSection: cluster.label,
-    image: [imageUrl],
+    image: [buildSeoImageObject(imageUrl, image)],
     wordCount: Number(item.wordCount) || countSeoContentWords(item),
     about: {
       '@type': 'Thing',
@@ -3963,10 +3965,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
   const mainEntity = buildMainEntityForItem(item, site, canonicalUrl);
   const cluster = getSeoContentClusterForItem(item);
   const image = getSeoContentImageForItem(item);
-  const imageDimensions =
-    Number(image.width) > 0 && Number(image.height) > 0
-      ? ` width="${Number(image.width)}" height="${Number(image.height)}"`
-      : '';
+  const imageDimensions = Number(image.width) > 0 && Number(image.height) > 0 ? ` width="${Number(image.width)}" height="${Number(image.height)}"` : '';
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -4053,7 +4052,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     structuredData,
     body,
     ogType: item.schemaType === 'Service' ? 'website' : 'article',
-    imagePath: image.src,
+    image,
   });
 }
 
