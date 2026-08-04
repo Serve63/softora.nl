@@ -668,6 +668,37 @@ test('bedrijfssoftware-kostengids gebruikt quality v2, twee eigen beelden en ink
   assert.match(crmPage, /href="\/blog\/bedrijfssoftware-laten-maken-kosten"/);
 });
 
+test('chatbot-kostengids gebruikt quality v2, twee eigen beelden en inkomende money-page-links', () => {
+  const item = getSeoContentItem('blog', 'chatbot-kosten-mkb', {
+    now: new Date('2026-08-04T12:00:00.000Z'),
+  });
+  const html = buildSeoContentArticleHtml(item, { siteOrigin: 'https://www.softora.nl' });
+  const chatbotPage = fs.readFileSync(path.join(repoRoot, 'premium-chatbot.html'), 'utf8');
+  const aiPage = fs.readFileSync(path.join(repoRoot, 'ai-automatisering.html'), 'utf8');
+  const firstImagePath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
+  const secondImagePath = path.join(repoRoot, item.secondaryImage.src.replace(/^\//, ''));
+
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.targetMoneyPage, '/chatbot-laten-maken');
+  assert.ok(item.informationGain.includes('controleerbaar kostenmodel'));
+  assert.ok(item.wordCount >= 1500);
+  assert.equal(item.image.src, '/assets/seo-content/chatbot-kosten-kostenlagen-softora.jpg');
+  assert.equal(item.secondaryImage.src, '/assets/seo-content/chatbot-kosten-scopevergelijking-softora.jpg');
+  assert.deepEqual(readJpegDimensions(firstImagePath), { width: 1600, height: 1000 });
+  assert.deepEqual(readJpegDimensions(secondImagePath), { width: 1600, height: 1000 });
+  assert.ok(fs.statSync(firstImagePath).size < 300 * 1024);
+  assert.ok(fs.statSync(secondImagePath).size < 300 * 1024);
+  assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
+  assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
+  assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /href="\/chatbot-laten-maken"/);
+  assert.match(html, /href="\/blog\/chatbot-crm-koppeling-leads-opvolgen"/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+  assert.match(chatbotPage, /href="\/blog\/chatbot-kosten-mkb"/);
+  assert.match(aiPage, /href="\/blog\/chatbot-kosten-mkb"/);
+});
+
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
   const indexHtml = buildSeoContentIndexHtml('vergelijkingen', {
     siteOrigin: 'https://www.softora.nl',
