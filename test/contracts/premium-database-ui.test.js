@@ -1787,7 +1787,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /state\.activeStatus === "benaderbaar"[\s\S]*window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, \(customers \|\| \[\]\)\.length\)/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\) \{\s*return buildCustomerWebdesignAssetState\(customer\)\.canGeneratePhoto;/);
   assert.match(pageSource, /function getAvailablePreparationStatus\(customer\) \{[\s\S]*if \(!assetState\.hasPhoto\) return \{ className: "foto-nodig", label: "Foto's nodig" \};[\s\S]*if \(!assetState\.hasMockup\) return \{ className: "mockup-nodig", label: "Mockup nodig" \};/);
-  assert.match(pageSource, /const availableStatus = state\.activeStatus === "beschikbaar" \? getAvailablePreparationStatus\(customer\) : null;/);
+  assert.match(pageSource, /const availableStatus = \(state\.activeStatus === "beschikbaar" \|\| \(state\.activeStatus === "gevonden" && !hasCompleteWebdesignAssets\(customer\)\)\) \? getAvailablePreparationStatus\(customer\) : null;/);
   assert.match(pageSource, /const statusClassName = availableStatus \? availableStatus\.className : customer\.status;/);
   assert.match(pageSource, /"<td><div class=\\"s-wrap s-" \+ escapeHtml\(statusClassName\)/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);

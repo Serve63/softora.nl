@@ -189,6 +189,7 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.includes('customers-snapshot'), true);
   assert.equal(calls.includes('photo-flags'), true);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].bypassReadCache, true);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].maxRows, 25000);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'photo-flags-options')[1].bypassReadCache, true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'guard-keys'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), true);
