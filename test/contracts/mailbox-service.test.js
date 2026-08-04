@@ -246,7 +246,7 @@ test('mailbox service excludes automated delivery failures from list and detail 
   })).id, 'inbox:2');
 });
 
-test('campaign mailbox response excludes delivery-system conversations but keeps them in source storage', async () => {
+test('campaign mailbox response excludes delivery and support acknowledgements without hiding later human replies', async () => {
   const sourceMessages = [
     {
       id: 'bounce',
@@ -264,6 +264,29 @@ test('campaign mailbox response excludes delivery-system conversations but keeps
       body: 'De eerdere delivery failure is opgelost; bedankt.',
       date: '2026-07-26T12:01:00.000Z',
     },
+    {
+      id: 'support-acknowledgement',
+      email: 'helpdesknl@sbsupply.eu',
+      from: 'helpdesknl@sbsupply.eu',
+      subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+      preview: '##- Please type your reply above this line -##',
+      body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+      date: '2026-07-26T12:02:00.000Z',
+    },
+    {
+      id: 'human-support-reply',
+      email: 'helpdesknl@sbsupply.eu',
+      from: 'SBSupply support',
+      subject: 'Re: [Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+      preview: 'Dank voor het ontwerp. Kun je de preview doorsturen?',
+      body: [
+        'Dank voor het ontwerp. Kun je de preview doorsturen?',
+        '',
+        'On Tue, 29 Jul 2026, helpdesknl@sbsupply.eu wrote:',
+        'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+      ].join('\n'),
+      date: '2026-07-26T12:03:00.000Z',
+    },
   ];
   const service = createMailboxService({
     mailboxCampaignRepliesService: {
@@ -278,9 +301,10 @@ test('campaign mailbox response excludes delivery-system conversations but keeps
   await service.campaignRepliesResponse({ query: { limit: '100' } }, res);
 
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.body.messages.map((message) => message.id), ['human']);
-  assert.equal(sourceMessages.length, 2);
+  assert.deepEqual(res.body.messages.map((message) => message.id), ['human-support-reply', 'human']);
+  assert.equal(sourceMessages.length, 4);
   assert.equal(sourceMessages[0].id, 'bounce');
+  assert.equal(sourceMessages[2].id, 'support-acknowledgement');
 });
 
 test('selected owner response stays isolated while durable snapshot retains both Instantly owners', async () => {
