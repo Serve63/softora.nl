@@ -242,6 +242,29 @@
     return '';
   }
 
+  function getStableCampaignConversationId(mail) {
+    if (
+      !mail ||
+      !mail.campaign ||
+      mail.copyContext && mail.copyContext.evidenceKnown === true ||
+      String(mail.provider || '').trim().toLowerCase() === 'instantly'
+    ) {
+      return '';
+    }
+    const account = normalizeEmail(mail.accountEmail || mail.campaign.account);
+    const counterparty = normalizeEmail(mail.email);
+    if (isSentMessageByProvenance(mail, account)) return '';
+    const subject = normalizeClassifierText(mail.subject)
+      .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/g, '')
+      .trim();
+    const campaignSubject = [
+      'kleine vraag over jullie website',
+      'nieuw webdesign',
+    ].find((candidate) => subject === candidate || subject.endsWith(candidate)) || '';
+    if (!account || !counterparty || account === counterparty || !campaignSubject) return '';
+    return `campaign:${account}|${counterparty}|${campaignSubject}`;
+  }
+
   function getMessageIdentity(mail) {
     const account = normalizeEmail(mail && mail.accountEmail);
     const messageId = normalizeMessageId(mail && mail.messageId);
@@ -290,7 +313,7 @@
     const groups = new Map();
     sortMessagesNewestFirst(messages).forEach((mail) => {
       const isolatedId = String(mail && (mail.providerMessageId || mail.mailboxId || mail.id) || '').trim();
-      const conversationId = getConversationId(mail) || getMessageIdentity(mail) || [
+      const conversationId = getStableCampaignConversationId(mail) || getConversationId(mail) || getMessageIdentity(mail) || [
         'isolated',
         getMessageOwner(mail) || 'unknown',
         String(mail && mail.provider || 'imap').trim().toLowerCase(),
@@ -1079,6 +1102,7 @@
     filterMessages,
     getAccount,
     getConversationId,
+    getStableCampaignConversationId,
     getConversationAction,
     getActionMessageKey,
     getFolder,

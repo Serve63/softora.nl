@@ -61,6 +61,27 @@ function extractEmailAddresses(value) {
   return Array.from(new Set(matches || []));
 }
 
+function getCampaignCounterpartyEmail(message) {
+  const account = normalizeEmail(message && message.accountEmail);
+  if (!account) return '';
+  if (getMailboxMessageDirection(message) === 'sent') {
+    const recipients = extractEmailAddresses(message && message.to)
+      .filter((email) => !isSameMailboxIdentity(email, account));
+    return recipients.length === 1 ? recipients[0] : '';
+  }
+  const sender = normalizeEmail(message && message.email);
+  return sender && !isSameMailboxIdentity(sender, account) ? sender : '';
+}
+
+function getStableCampaignThreadKey(message) {
+  const account = normalizeEmail(message && message.accountEmail);
+  const counterparty = getCampaignCounterpartyEmail(message);
+  const subject = getCanonicalCampaignSubject(message && message.subject);
+  return account && counterparty && subject
+    ? `${account}|${counterparty}|${subject}`
+    : '';
+}
+
 function parseMessageDate(value) {
   const parsed = Date.parse(value || '');
   return Number.isFinite(parsed) ? parsed : 0;
@@ -311,6 +332,80 @@ function getCampaignConversationId(message, disjointSet) {
   ].join(':');
 }
 
+function mergeCampaignConversationsByStableIdentity(conversations, sentMessages) {
+  const sentByStableKey = new Map();
+  dedupeCampaignMessages(sentMessages)
+    .filter((message) => getMailboxMessageDirection(message) === 'sent')
+    .forEach((message) => {
+      const stableKey = getStableCampaignThreadKey(message);
+      if (!stableKey) return;
+      if (!sentByStableKey.has(stableKey)) sentByStableKey.set(stableKey, []);
+      sentByStableKey.get(stableKey).push(message);
+    });
+
+  const groups = new Map();
+  (Array.isArray(conversations) ? conversations : []).forEach((conversation, index) => {
+    const stableKey = getStableCampaignThreadKey(conversation);
+    const groupKey = stableKey
+      ? `stable:${stableKey}`
+      : `isolated:${conversation && conversation.conversationId || getMessageIdentity(conversation) || index}`;
+    if (!groups.has(groupKey)) groups.set(groupKey, { stableKey, conversations: [] });
+    groups.get(groupKey).conversations.push(conversation);
+  });
+
+  return Array.from(groups.values()).map(({ stableKey, conversations: groupedConversations }) => {
+    if (!stableKey) return groupedConversations[0];
+    const stableSentMessages = sentByStableKey.get(stableKey) || [];
+    const fallbackSentMessages = groupedConversations.length > 1 || stableSentMessages.length === 1
+      ? stableSentMessages
+      : [];
+    const groupedMessages = groupedConversations.flatMap((conversation) => {
+      const { threadMessages: nestedThreadMessages, ...rootMessage } = conversation || {};
+      return [
+        rootMessage,
+        ...(Array.isArray(nestedThreadMessages)
+          ? nestedThreadMessages.map((message) => {
+              const { threadMessages: _nestedThreadMessages, ...flatMessage } = message || {};
+              return flatMessage;
+            })
+          : []),
+      ];
+    });
+    const groupedMessageIdentities = new Set(groupedMessages.map(getMessageIdentity).filter(Boolean));
+    const messages = dedupeCampaignMessages([
+      ...groupedMessages,
+      ...fallbackSentMessages,
+    ]);
+    const primaryReply = messages
+      .filter((message) => getMailboxMessageDirection(message) !== 'sent')
+      .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0] ||
+      groupedConversations[0];
+    const primaryIdentity = getMessageIdentity(primaryReply);
+    const threadMessages = messages
+      .filter((message) => getMessageIdentity(message) !== primaryIdentity)
+      .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
+    const latestActivity = [primaryReply, ...threadMessages]
+      .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0];
+    const usedStableFallback = groupedConversations.length > 1 || fallbackSentMessages
+      .some((message) => !groupedMessageIdentities.has(getMessageIdentity(message)));
+    return {
+      ...primaryReply,
+      activityAt: normalizeText(latestActivity && (
+        latestActivity.receivedAt ||
+        latestActivity.internalDate ||
+        latestActivity.date
+      )),
+      unread: messages
+        .filter((message) => getMailboxMessageDirection(message) !== 'sent')
+        .some((message) => Boolean(message && message.unread)),
+      ...(usedStableFallback
+        ? { threadCorrelationEvidence: 'exact-account-counterparty-campaign-subject' }
+        : {}),
+      threadMessages,
+    };
+  });
+}
+
 function isSentReplyForMessage(sentMessage, inboxMessage) {
   if (
     getMailboxMessageDirection(sentMessage) !== 'sent' ||
@@ -348,7 +443,7 @@ function attachSentThreadMessages(replies, sentMessages) {
     sentByConversation.get(conversationId).push(message);
   });
 
-  return Array.from(replyGroups.entries())
+  const exactConversations = Array.from(replyGroups.entries())
     .map(([conversationId, groupedReplies]) => {
       const sortedReplies = groupedReplies
         .slice()
@@ -386,7 +481,8 @@ function attachSentThreadMessages(replies, sentMessages) {
         unread: sortedReplies.some((reply) => Boolean(reply && reply.unread)),
         threadMessages,
       };
-    })
+    });
+  return mergeCampaignConversationsByStableIdentity(exactConversations, candidates)
     .sort((left, right) => getConversationTimestamp(right) - getConversationTimestamp(left));
 }
 
@@ -818,6 +914,7 @@ module.exports = {
   getMessageReferenceLookupValues,
   getExactCrossAccountSentCopy,
   getExactMessageLineage,
+  getStableCampaignThreadKey,
   hasCampaignLabelProvenance,
   isAutomatedCampaignReply,
   isCampaignReplySubject,
@@ -826,6 +923,7 @@ module.exports = {
   isOwnMailboxCampaignCustomer,
   isWebdesignCampaignCustomer,
   listMessagesAcrossFolders,
+  mergeCampaignConversationsByStableIdentity,
   normalizeOutreachStatus,
   shouldShowCampaignMessage,
 };
