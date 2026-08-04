@@ -107,13 +107,18 @@ Spreid de productie bewust over blogs, kennisbank, vergelijkingen en commerciël
 
 Een kandidaat is pas publicatieklaar wanneer de zoekintentie, primaire money page, onderscheid met bestaande URL's, controleerbare vraagbronnen, unieke informatiewinst, contextuele interne links, conversiepad, claimrisico en twee nuttige visualconcepten vooraf zijn vastgelegd. Nieuwe content gebruikt `qualityVersion: 2`: geen automatische opvulsecties, geen verplichte generieke FAQ en geen vaste woordtelling als kwaliteitsbewijs. Publiceer geen synoniempagina, dunne city-swap of tekst die alleen een bestaand artikel herschrijft.
 
+Vanaf `2026-08-05` gebruikt iedere nieuwe of substantieel vernieuwde blog ook `visualQualityVersion: 2` en een machineleesbare `visualBrief`. Het hero-beeld is een onderwerp-eigen, tekstarm 16:9-beeld van minimaal 1200 pixels breed; het supportbeeld legt een beslissing, vergelijking, proces, interface, architectuur of dataset uit. Beide beelden verschillen in rol, beeldvorm en visuele familie. De machine roteert families over de zes recentste blogs en blokkeert een kandidaat wanneer de interne pixelovereenkomst `0.85` of hoger is. Die drempel en het exacte aantal van twee beelden zijn Softora-kwaliteitsregels, geen Google-rankingfactoren. Historische herhaling wordt als `quality_recovery` gerapporteerd zodat zij planbaar wordt zonder nieuwe publicatie structureel stil te leggen.
+
+Google-techniek blijft onderdeel van de beeldpoort: lokale crawlbare `<img src>`-bestanden, betekenisvolle alt, beschrijvende bestandsnaam, vaste dimensies, relevante omringende tekst, gecontroleerd gewicht, `max-image-preview:large`, representatieve `og:image`, `ImageObject`-schema en een image sitemap. AI-herkomst wordt eerlijk als `trainedAlgorithmicMedia` vastgelegd; de automation fabriceert geen provenance-metadata.
+
 ## Machine Enforcement
 
-De instructietekst is niet de poort. Deze vier commando's leveren de afdwingbare staat:
+De instructietekst is niet de poort. Deze vijf commando's leveren de afdwingbare staat:
 
 - `npm run seo:backlog:check` valideert het JSON-schema, minimaal 15 `ready` briefs, unieke URL's en ID's, de vaste scoreformule, exact drie overlap-URL's, publicatiebriefvelden en minimaal 70% commerciële intentie. Deze validator draait ook tegen het echte register in de contracttests van `verify:critical`.
 - `npm run seo:publications:report` bouwt een live cohortledger voor 7 en 28 dagen en splitst nieuwe URL's, substantiële refreshes en overige groei-acties. Een event telt uitsluitend wanneer productie exact op `origin/main` draait, de route HTTP 200 en HTML geeft, indexeerbaar is, self-canonical is, in de sitemap staat en de passende `datePublished` of `dateModified` toont.
 - `npm run seo:indexation:report` inspecteert money pages en recente D14/D28-cohorten met de officiele read-only URL Inspection API, zonder een gewone pagina via de Indexing API aan te melden.
+- `npm run seo:visuals:check` valideert beeldrollen, formaat, informatiewinst, familie-rotatie en pixelgelijkenis met de zes recentste blogs; vanaf de ingangsdatum blokkeert een rode kandidaat de publicatie.
 - `npm run seo:cadence:check` combineert backlog, live ledger, indexatie en corpusoriginaliteit. Exitcode `0` is gezond, exitcode `2` is `GROWTH_ACTION_REQUIRED` volgens de gekozen toestand en exitcode `1` is een operationele P0 die eerst veilig moet worden hersteld.
 
 De live cadence-check draait bewust niet als mergeblokker in CI. De dagelijkse automation behandelt exitcode `2` als uitvoeropdracht. Bij `newUrlRequired=true` is dat expliciet een nieuwe URL uit de gevalideerde backlog; anders volgt zij de normale actie van de gekozen toestand.

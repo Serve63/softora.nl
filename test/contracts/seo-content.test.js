@@ -424,7 +424,7 @@ test('seo content renders the existing blog visual language with real links', ()
   });
 
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog">/);
-  assert.match(html, /<meta name="robots" content="index, follow">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /data-softora-public-seo="structured-data"/);
   assert.match(html, /class="hero-banner"/);
   assert.match(html, /class="filter-bar"/);
@@ -467,7 +467,7 @@ test('seo content article pages render Article schema and self canonicals', () =
   );
   assert.match(html, /"@type":"Article"/);
   assert.match(html, /"articleSection":"AI automatisering"/);
-  assert.match(html, /"image":\["https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"\]/);
+  assert.match(html, /"image":\[\{"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
   assert.match(html, /"wordCount":\d{3,}/);
   assert.match(html, /"author":\{"@type":"Person","name":"Martijn van de Ven"/);
   assert.match(html, /"reviewedBy":\{"@type":"Person","name":"Martijn van de Ven"/);
@@ -691,12 +691,23 @@ test('chatbot-kostengids gebruikt quality v2, twee eigen beelden en inkomende mo
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
   assert.match(html, /width="1600" height="1000" loading="lazy"/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:image:width" content="1600">/);
+  assert.match(html, /<meta property="og:image:height" content="1000">/);
+  assert.match(html, /"image":\[\{"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/chatbot-kosten-kostenlagen-softora\.jpg"/);
   assert.match(html, /href="\/chatbot-laten-maken"/);
   assert.match(html, /href="\/blog\/chatbot-crm-koppeling-leads-opvolgen"/);
   assert.match(html, /"@type":"FAQPage"/);
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
   assert.match(chatbotPage, /href="\/blog\/chatbot-kosten-mkb"/);
   assert.match(aiPage, /href="\/blog\/chatbot-kosten-mkb"/);
+
+  const sitemapEntry = getSeoContentSitemapEntries({ now: new Date('2026-08-04T12:00:00.000Z') })
+    .find((entry) => entry.path === '/blog/chatbot-kosten-mkb');
+  assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
+    '/assets/seo-content/chatbot-kosten-kostenlagen-softora.jpg',
+    '/assets/seo-content/chatbot-kosten-scopevergelijking-softora.jpg',
+  ]);
 });
 
 test('seo content renders vergelijkingshub met koopintentie en CTA', () => {
