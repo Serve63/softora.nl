@@ -3,10 +3,36 @@ const assert = require('node:assert/strict');
 
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
+  markMailboxCampaignSnapshotReplyDismissed,
   parseMailboxCampaignSnapshot,
   removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
+
+test('mailbox campaign snapshot bewaart een afgehandelde antwoordherinnering', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:42',
+      uid: 42,
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      unread: true,
+      subject: 'Re: Kleine vraag',
+      date: '2026-08-04T14:00:00.000Z',
+    }],
+  });
+  const result = markMailboxCampaignSnapshotReplyDismissed(
+    raw,
+    { accountEmail: 'serve@softora.nl', folder: 'inbox', id: 'inbox:42', uid: 42 },
+    { dismissedAt: '2026-08-04T15:10:00.000Z' }
+  );
+  const [message] = parseMailboxCampaignSnapshot(result.serialized).messages;
+
+  assert.equal(result.changed, true);
+  assert.equal(message.unread, false);
+  assert.equal(message.replyDismissedAt, '2026-08-04T15:10:00.000Z');
+});
 
 test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct', () => {
   const messages = Array.from({ length: 100 }, (_, index) => ({

@@ -8,12 +8,55 @@ const compose = require('../../assets/premium-mailbox-compose.js');
 const composeWindow = require('../../assets/premium-mailbox-compose-window.js');
 const composeController = require('../../assets/premium-mailbox-compose-controller.js');
 const mailboxDelete = require('../../assets/premium-mailbox-delete.js');
+const mailboxRead = require('../../assets/premium-mailbox-read.js');
 const mailboxToast = require('../../assets/premium-mailbox-toast.js');
 const mailboxList = require('../../assets/premium-mailbox-list.js');
 
 function assetSource(filename) {
   return fs.readFileSync(path.join(__dirname, '..', '..', 'assets', filename), 'utf8');
 }
+
+test('mailbox gelezen-module handelt een antwoordherinnering optimistisch en duurzaam af', async () => {
+  const renders = [];
+  const requests = [];
+  const latestReply = { id: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T15:00:00.000Z', unread: true, replyDismissedAt: '' };
+  const mail = { id: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl', date: '2026-08-04T14:00:00.000Z', unread: false, replyDismissedAt: '', threadMessages: [latestReply] };
+  const controller = mailboxRead.create({
+    getAccount: () => 'serve@softora.nl',
+    getFolder: () => 'inbox',
+    getOwner: () => 'serve',
+    getRequestId: (message) => message.id,
+    getConversationAction: campaignInbox.getConversationAction,
+    fetch: async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        json: async () => ({ ok: true, result: { replyDismissedAt: '2026-08-04T15:10:00.000Z' } }),
+      };
+    },
+  });
+
+  const result = await controller.dismissReply(mail, {
+    render: (message, target) => renders.push({
+      messageId: message.id,
+      unread: target.unread,
+      replyDismissedAt: target.replyDismissedAt,
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(mail.replyDismissedAt, '');
+  assert.equal(latestReply.unread, false);
+  assert.equal(latestReply.replyDismissedAt, '2026-08-04T15:10:00.000Z');
+  assert.deepEqual(requests, [{
+    url: '/api/mailbox/messages/read',
+    body: {
+      account: 'serve@softora.nl', owner: 'serve', id: 'inbox:43', uid: 43,
+      folder: 'inbox', dismissReply: true,
+    },
+  }]);
+  assert.equal(renders.length, 2);
+});
 
 test('mailbox featuremodules bepalen reply of nieuw bericht uit de nieuwste echte message', () => {
   const conversation = {

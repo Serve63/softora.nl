@@ -24,7 +24,7 @@
       typeof global.SoftoraMailboxCampaignInbox.getConversationAction === 'function'
       ? global.SoftoraMailboxCampaignInbox.getConversationAction(mail)
       : null;
-    const needsReply = conversationAction && conversationAction.kind === 'reply';
+    const needsReply = conversationAction && conversationAction.kind === 'reply' && !conversationAction.message?.replyDismissedAt;
     const badges = [
       copyKind ? `<span class="mail-copy-badge">${escapeHtml(copyKind)}</span>` : '',
       providerKind ? `<span class="mail-source-badge mail-source-badge-instantly">${escapeHtml(providerKind)}</span>` : '',

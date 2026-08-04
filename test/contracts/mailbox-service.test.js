@@ -2559,6 +2559,53 @@ test('mailbox service marks opened messages as seen through IMAP uid flags', asy
   ]);
 });
 
+test('mailbox service handelt een antwoordherinnering pas na een geslaagde leesactie duurzaam af', async () => {
+  const calls = [];
+  const dismissedAt = '2026-08-04T15:10:00.000Z';
+  const service = createMailboxService({
+    mailConfig: {},
+    mailboxAccountsRaw: JSON.stringify([{
+      email: 'serve@softora.nl',
+      name: 'Servé',
+      imapHost: 'imap.example.test',
+      imapUser: 'serve@softora.nl',
+      imapPass: 'secret',
+    }]),
+    createImapClient: () => ({
+      usable: true,
+      connect: async () => calls.push(['connect']),
+      list: async () => [{ path: 'INBOX' }],
+      getMailboxLock: async () => ({ release: () => calls.push(['release']) }),
+      messageFlagsAdd: async () => calls.push(['seen']),
+      logout: async () => calls.push(['logout']),
+    }),
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      listMessages: async () => [],
+      markMessageRead: async () => ({ ok: true }),
+      markMessageReplyDismissed: async (input) => {
+        calls.push(['dismiss', input]);
+        return { ok: true, data: [{ message_key: 'serve@softora.nl|inbox|42' }], dismissedAt };
+      },
+    },
+  });
+  const res = createResponseRecorder();
+
+  await service.markMessageReadResponse({
+    body: { account: 'serve@softora.nl', id: 'inbox:42', dismissReply: true },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.result.replyDismissedAt, dismissedAt);
+  assert.deepEqual(calls, [
+    ['connect'],
+    ['seen'],
+    ['dismiss', { accountEmail: 'serve@softora.nl', id: 'inbox:42', folder: 'inbox', uid: 42 }],
+    ['release'],
+    ['logout'],
+  ]);
+});
+
 test('mailbox service verbergt en herstelt een gesprek alleen in Softora zonder bronmailmutatie', async () => {
   const persistenceCalls = [];
   let savedSnapshot = '';

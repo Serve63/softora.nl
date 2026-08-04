@@ -254,6 +254,7 @@ create table if not exists public.softora_mailbox_messages (
   internal_date timestamptz,
   unread boolean not null default false,
   starred boolean not null default false,
+  reply_dismissed_at timestamptz,
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

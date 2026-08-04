@@ -102,12 +102,18 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .detail-header { background: var(--card); padding: 22px 24px 18px; flex-shrink: 0; min-width: 0; max-width: 100%; }
 .detail-subject-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; min-width: 0; }
 .detail-subject { flex: 1; min-width: 0; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: clamp(19px, 1.5vw, 24px); font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow-wrap: anywhere; }
-.detail-head-tools { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; }
+.detail-head-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
 .detail-date { font-size: 12px; color: var(--text-light); white-space: nowrap; }
+.detail-mark-read,
 .detail-hide-conversation { width: 32px; height: 32px; padding: 0; border: 1px solid rgba(155,35,85,.2); border-radius: 50%; background: var(--card); color: var(--crimson); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.detail-mark-read:hover,
 .detail-hide-conversation:hover { border-color: var(--crimson); background: rgba(155,35,85,.06); }
+.detail-mark-read:focus-visible,
 .detail-hide-conversation:focus-visible { outline: 2px solid rgba(155,35,85,.32); outline-offset: 2px; }
+.detail-mark-read svg,
 .detail-hide-conversation svg { width: 16px; height: 16px; }
+.detail-mark-read.is-complete,
+.detail-mark-read:disabled { border-color: rgba(32,126,84,.28); background: rgba(32,126,84,.08); color: #207e54; cursor: default; }
 .detail-meta { display: flex; align-items: center; min-width: 0; margin-top: 18px; }
 .detail-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--premium-sidebar-font-sans, 'Inter', sans-serif); font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .detail-from-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -510,8 +516,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
-<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260803b"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260804c"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260803a"></script><script src="assets/premium-mailbox-list.js?v=20260803a"></script><script src="assets/premium-mailbox-index.js?v=20260728a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-window.js?v=20260803a"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260803b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script>
-<script src="assets/premium-mailbox.js?v=20260803c"></script>
+<script src="assets/premium-ui-state-client.js?v=20260723c"></script><script src="assets/premium-campaign-sender-settings.js?v=20260722a"></script><script src="assets/premium-mailbox-outreach.js?v=20260720b"></script><script src="assets/premium-mailbox-owner-session.js?v=20260803b"></script><script src="assets/premium-mailbox-message-provenance.js?v=20260728a"></script><script src="assets/premium-mailbox-campaign-inbox.js?v=20260804c"></script><script src="assets/premium-mailbox-images.js?v=20260724c"></script><script src="assets/premium-mailbox-display.js?v=20260803a"></script><script src="assets/premium-mailbox-list.js?v=20260804d"></script><script src="assets/premium-mailbox-index.js?v=20260728a"></script><script src="assets/premium-mailbox-refresh.js?v=20260723f"></script><script src="assets/premium-mailbox-compose.js?v=20260725b"></script><script src="assets/premium-mailbox-compose-window.js?v=20260803a"></script><script src="assets/premium-mailbox-compose-controller.js?v=20260803b"></script><script src="assets/premium-mailbox-toast.js?v=20260724a"></script><script src="assets/premium-mailbox-delete.js?v=20260803b"></script><script src="assets/premium-mailbox-read.js?v=20260804a"></script>
+<script src="assets/premium-mailbox.js?v=20260804d"></script>
 <script src="assets/premium-mailbox-mobile.js?v=20260728a"></script>
 </body>
 </html>

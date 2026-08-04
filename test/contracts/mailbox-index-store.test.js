@@ -414,6 +414,43 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
   ]);
 });
 
+test('mailbox index store handelt de antwoordherinnering duurzaam af', async () => {
+  const calls = [];
+  const dismissedAt = '2026-08-04T15:10:00.000Z';
+  const query = {
+    update(patch) { calls.push(['update', patch]); return query; },
+    eq(column, value) { calls.push(['eq', column, value]); return query; },
+    is(column, value) { calls.push(['is', column, value]); return query; },
+    select(columns) { calls.push(['select', columns]); return query; },
+    then(resolve) {
+      resolve({ data: [{ message_key: 'serve@softora.nl|inbox|42', reply_dismissed_at: dismissedAt }], error: null });
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ from: (table) => { calls.push(['from', table]); return query; } }),
+    now: () => new Date(dismissedAt),
+  });
+
+  const result = await store.markMessageReplyDismissed({
+    accountEmail: 'SERVE@SOFTORA.NL',
+    folder: 'INBOX',
+    id: 'inbox:42',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.dismissedAt, dismissedAt);
+  assert.deepEqual(calls, [
+    ['from', 'softora_mailbox_messages'],
+    ['update', { unread: false, reply_dismissed_at: dismissedAt, updated_at: dismissedAt }],
+    ['eq', 'account_email', 'serve@softora.nl'],
+    ['eq', 'folder', 'inbox'],
+    ['is', 'deleted_at', null],
+    ['eq', 'uid', 42],
+    ['select', 'message_key,reply_dismissed_at'],
+  ]);
+});
+
 test('mailbox index store meldt het als een tombstone geen bericht raakt', async () => {
   const query = {
     update() { return query; },
@@ -1205,6 +1242,7 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   );
 
   assert.match(schema, /create table if not exists public\.softora_mailbox_messages/);
+  assert.match(schema, /reply_dismissed_at timestamptz/);
   assert.match(schema, /create table if not exists public\.softora_mailbox_sync_state/);
   assert.match(schema, /softora_mailbox_messages_account_folder_date_idx/);
   assert.match(schema, /softora_mailbox_sync_state_account_folder_idx/);

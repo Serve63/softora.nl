@@ -19,6 +19,7 @@ const ownerSessionScriptPath = path.join(__dirname, '../../assets/premium-mailbo
 const toastScriptPath = path.join(__dirname, '../../assets/premium-mailbox-toast.js');
 const listScriptPath = path.join(__dirname, '../../assets/premium-mailbox-list.js');
 const deleteScriptPath = path.join(__dirname, '../../assets/premium-mailbox-delete.js');
+const readScriptPath = path.join(__dirname, '../../assets/premium-mailbox-read.js');
 const ownerSessionModule = require('../../assets/premium-mailbox-owner-session.js');
 const provenanceModule = require('../../assets/premium-mailbox-message-provenance.js');
 global.SoftoraMailboxMessageProvenance = provenanceModule;
@@ -32,6 +33,7 @@ const composeControllerModule = require('../../assets/premium-mailbox-compose-co
 const toastModule = require('../../assets/premium-mailbox-toast.js');
 const listModule = require('../../assets/premium-mailbox-list.js');
 const deleteModule = require('../../assets/premium-mailbox-delete.js');
+const readModule = require('../../assets/premium-mailbox-read.js');
 
 function readPage() {
   return fs.readFileSync(pagePath, 'utf8');
@@ -93,11 +95,15 @@ function readDeleteScript() {
   return fs.readFileSync(deleteScriptPath, 'utf8');
 }
 
+function readReadScript() {
+  return fs.readFileSync(readScriptPath, 'utf8');
+}
+
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260804d/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -146,6 +152,7 @@ function loadMailboxHelpersForTest(options = {}) {
     SoftoraMailboxComposeController: composeControllerModule,
     SoftoraMailboxToast: toastModule,
     SoftoraMailboxDelete: deleteModule,
+    SoftoraMailboxRead: readModule,
     SoftoraMailboxList: listModule,
     SoftoraMailboxImages: options.SoftoraMailboxImages || imagesModule,
     SoftoraUiStateClient: null,
@@ -360,6 +367,33 @@ test('lijst toont een roze omgevouwen hoek alleen wanneer het nieuwste echte ber
 
   assert.match(listModule.renderItem(waitingForReply, baseOptions), /mail-reply-corner/);
   assert.match(listModule.renderItem(waitingForReply, baseOptions), /Wacht op jouw antwoord/);
+  assert.doesNotMatch(listModule.renderItem({
+    ...waitingForReply,
+    replyDismissedAt: '2026-08-04T15:10:00.000Z',
+  }, baseOptions), /mail-reply-corner/);
+  assert.match(listModule.renderItem({
+    ...waitingForReply,
+    replyDismissedAt: '2026-08-04T15:10:00.000Z',
+    receivedAt: '2026-08-03T10:00:00.000Z',
+    threadMessages: [{
+      id: 'inbox:new-reply',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      date: '2026-08-04T09:00:00.000Z',
+      replyDismissedAt: '',
+    }],
+  }, baseOptions), /mail-reply-corner/);
+  assert.doesNotMatch(listModule.renderItem({
+    ...waitingForReply,
+    receivedAt: '2026-08-03T10:00:00.000Z',
+    threadMessages: [{
+      id: 'inbox:handled-reply',
+      folder: 'inbox',
+      accountEmail: 'serve@softora.nl',
+      date: '2026-08-04T09:00:00.000Z',
+      replyDismissedAt: '2026-08-04T09:05:00.000Z',
+    }],
+  }, baseOptions), /mail-reply-corner/);
   assert.doesNotMatch(listModule.renderItem(answered, baseOptions), /mail-reply-corner/);
   assert.match(readPage(), /\.mail-reply-corner \{[^}]*var\(--crimson\)/);
 });
@@ -2017,7 +2051,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260804d/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260804c/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260728a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
@@ -2094,7 +2128,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804c"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804c"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260804a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260804d"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2695,6 +2729,7 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met
 test('geopend gesprek toont verbergen alleen in de detailkop en niet in de mailboxrij', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
+  const readSource = readReadScript();
   const listSource = fs.readFileSync(listScriptPath, 'utf8');
 
   assert.match(pageSource, /assets\/premium-mailbox-list\.js/);
@@ -2702,7 +2737,11 @@ test('geopend gesprek toont verbergen alleen in de detailkop en niet in de mailb
   assert.match(listSource, /class="mail-item-open"[\s\S]*data-mailbox-action="open-mail"/);
   assert.doesNotMatch(listSource, /data-mailbox-action="delete-mail"|mail-item-delete/);
   assert.match(scriptSource, /class="detail-hide-conversation"[\s\S]*data-mailbox-action="delete-mail"/);
+  assert.match(scriptSource, /class="detail-mark-read[\s\S]*data-mailbox-action="mark-read"[\s\S]*Als gelezen afhandelen/);
+  assert.match(scriptSource, /case 'mark-read':[\s\S]*markMailRead\(id\)/);
+  assert.match(readSource, /dismissReply:\s*persistOptions\.dismissReply === true/);
   assert.match(scriptSource, /aria-label="Gesprek alleen uit Softora verbergen"/);
+  assert.match(pageSource, /\.detail-mark-read[\s\S]*color:\s*var\(--crimson\)/);
   assert.match(pageSource, /\.detail-hide-conversation \{[\s\S]*color:\s*var\(--crimson\);[\s\S]*cursor:\s*pointer;/);
   assert.match(pageSource, /\.mail-item-open:focus-visible \{[\s\S]*outline:/);
 
@@ -2949,14 +2988,15 @@ test('compose toont optionele CC BCC en bijlagen maar verstuurt niets automatisc
 
 test('premium mailbox bewaart gelezen status via de mailbox API', () => {
   const scriptSource = readScript();
+  const readSource = readReadScript();
 
   assert.match(scriptSource, /uid: message\.uid,/);
-  assert.match(scriptSource, /async function persistMailReadState\(mail\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
-  assert.match(scriptSource, /body: JSON\.stringify\(\{[\s\S]*account: window\.SoftoraMailboxCampaignInbox\.getAccount\(mail, activeMailboxAccount\),[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder: window\.SoftoraMailboxCampaignInbox\.getFolder\(mail, activeFolder\),/);
-  assert.match(scriptSource, /catch \(error\) \{[\s\S]*toast\(String\(error\?\.message/);
-  assert.doesNotMatch(scriptSource, /catch \(error\) \{[\s\S]{0,120}mail\.unread = true;/);
-  assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*renderList\(\);[\s\S]*if \(wasUnread\) void persistMailReadState\(m\);/);
-  assert.match(scriptSource, /Gelezen status opslaan mislukt/);
+  assert.match(readSource, /async function persist\(mail, persistOptions = \{\}\) \{[\s\S]*\/api\/mailbox\/messages\/read/);
+  assert.match(readSource, /body: JSON\.stringify\(\{[\s\S]*account,[\s\S]*id: requestId,[\s\S]*uid: mail\.uid,[\s\S]*folder:/);
+  assert.match(readSource, /catch \(error\) \{[\s\S]*options\.toast/);
+  assert.doesNotMatch(readSource, /catch \(error\) \{[\s\S]{0,120}mail\.unread = true;/);
+  assert.match(scriptSource, /function openMail\(id, options = \{\}\) \{[\s\S]*const wasUnread = m\.unread;[\s\S]*m\.unread = false;[\s\S]*renderList\(\);[\s\S]*if \(wasUnread\) void mailboxReadController\.persist\(m\);/);
+  assert.match(readSource, /Gelezen status opslaan mislukt/);
 });
 
 test('premium mailbox verbergt alleen in Softora, biedt herstel en raakt geen bronmail-API', async () => {
