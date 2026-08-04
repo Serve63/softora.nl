@@ -28,6 +28,10 @@ const {
   isSameMailboxIdentity,
   normalizeMessageProvenance,
 } = require('./mailbox-message-provenance');
+const {
+  isAutomatedCampaignReply,
+  normalizeClassifierText,
+} = require('./mailbox-automated-reply');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -484,59 +488,6 @@ function attachSentThreadMessages(replies, sentMessages) {
     });
   return mergeCampaignConversationsByStableIdentity(exactConversations, candidates)
     .sort((left, right) => getConversationTimestamp(right) - getConversationTimestamp(left));
-}
-
-function normalizeClassifierText(value) {
-  return normalizeText(value)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
-}
-
-function isAutomatedCampaignReply(message) {
-  const subject = normalizeClassifierText(message && message.subject);
-  const content = normalizeClassifierText([
-    message && message.preview,
-    message && message.body,
-  ].filter(Boolean).join(' '));
-
-  const automatedSubjectPatterns = [
-    /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
-    /\bautomatisch antwoord\b/,
-    /\bautomatische (?:e-?mail|mail|reactie|ontvangstbevestiging)\b/,
-    /\bontvangstbevestiging\b/,
-    /\bautomatic (?:reply|response)\b/,
-    /\bauto[ -]?reply\b/,
-    /\bout[ -]?of[ -]?office\b/,
-    /\bafwezigheid(?:sbericht|melding)?\b/,
-    /\breturned mail\b/,
-    /\bundeliverable\b/,
-    /\bmail delivery (?:failure|failed)\b/,
-    /\bdelivery status notification\b/,
-    /^email received\b/,
-    /^bericht ontvangen\b/,
-    /\buw mail is ontvangen\b/,
-    /\bserviceaanvraag ontvangen\b/,
-    /\bbedankt voor (?:je|jouw|uw) (?:e-?mail|mail|bericht)\b/,
-  ];
-  const automatedContentPatterns = [
-    /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
-    /\bdit is (?:een )?automatisch(?:e)? (?:e-?mail|mail|bericht|antwoord|reactie|ontvangstbevestiging)\b/,
-    /\bthis is an automated (?:e-?mail|mail|message|reply|response)\b/,
-    /\bwe would like to acknowledge that we have received your request\b/,
-    /\bis ons kantoor gesloten\b/,
-    /\bop dit moment ben ik op vakantie\b/,
-    /\bberichten worden (?:in deze periode )?niet gelezen\b/,
-    /\bplease type your reply above this line\b/,
-    /\buw aanvraag\s*\([^)]{1,40}\)\s+is ontvangen\b/,
-    /\byour request\s*\([^)]{1,40}\)\s+has been received\b/,
-  ];
-
-  return (
-    automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
-    automatedContentPatterns.some((pattern) => pattern.test(content))
-  );
 }
 
 function getStrictUnreferencedCampaignParent(reply, sentMessages) {

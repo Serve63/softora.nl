@@ -481,6 +481,21 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
     body: 'Ik streef er naar om deze binnen 2 werkdagen te beantwoorden.',
   }), true);
   assert.equal(isAutomatedCampaignReply({
+    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    preview: '##- Please type your reply above this line -##',
+    body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Re: [Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    preview: 'Dank voor het ontwerp. Kun je de preview doorsturen?',
+    body: [
+      'Dank voor het ontwerp. Kun je de preview doorsturen?',
+      '',
+      'On Tue, 29 Jul 2026, helpdesknl@sbsupply.eu wrote:',
+      'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+    ].join('\n'),
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
     subject: 'Vraag over automatisch antwoorden in Gmail',
     preview: 'Kun je uitleggen hoe ik dit zelf instel?',
   }), false);
