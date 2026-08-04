@@ -1,6 +1,7 @@
 function registerPremiumDatabaseImportRoutes(app, deps = {}) {
   const {
     coordinator,
+    customersPageCoordinator,
     mailReadySnapshotService = null,
     requirePremiumApiAccess = (_req, _res, next) => next(),
   } = deps;
@@ -23,6 +24,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
 
   app.post('/api/premium-database/remove-webdesign-assets', requirePremiumApiAccess, (req, res) =>
     coordinator.sendRemoveWebdesignAssetsResponse(req, res)
+  );
+
+  app.get('/api/premium-database/customers', requirePremiumApiAccess, (req, res) =>
+    customersPageCoordinator.sendCustomersPageResponse(req, res)
   );
 
   app.get('/api/premium-database/mail-ready-snapshot', (req, res) =>

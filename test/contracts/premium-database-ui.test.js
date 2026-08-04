@@ -96,6 +96,14 @@ function loadDatabaseMailReadySnapshotClient(options = {}) {
   return sandbox.window.SoftoraDatabaseMailReadySnapshot;
 }
 
+function loadPremiumDatabaseCustomersClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-customers-loader.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox);
+  return sandbox.window.SoftoraPremiumDatabaseCustomers;
+}
+
 function loadDatabaseTableHelpersClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-table-helpers.js');
   const source = fs.readFileSync(scriptPath, 'utf8');
@@ -1102,6 +1110,46 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(client.isSnapshotAvailableCustomer(merged[2]), false);
 });
 
+test('premium database customer loader fetches every structured page and skips unchanged reloads', async () => {
+  const client = loadPremiumDatabaseCustomersClient();
+  const customers = Array.from({ length: 1601 }, (_item, index) => ({ id: `customer-${index + 1}` }));
+  const requests = [];
+  const fetchJsonWithTimeout = async (url) => {
+    requests.push(url);
+    const parsed = new URL(url, 'https://softora.test');
+    if (parsed.searchParams.get('meta') === '1') {
+      return { ok: true, json: async () => ({ ok: true, total: customers.length, snapshotVersion: '1601:v1', customers: [] }) };
+    }
+    const offset = Number(parsed.searchParams.get('offset')) || 0;
+    const limit = Number(parsed.searchParams.get('limit')) || 750;
+    return {
+      ok: true,
+      json: async () => ({
+        ok: true,
+        total: customers.length,
+        snapshotVersion: '1601:v1',
+        customers: customers.slice(offset, offset + limit),
+      }),
+    };
+  };
+
+  const loaded = await client.load({ fetchJsonWithTimeout });
+  assert.equal(loaded.changed, true);
+  assert.equal(loaded.total, 1601);
+  assert.equal(loaded.customers.length, 1601);
+  assert.deepEqual(requests.filter((url) => !url.includes('meta=1')).sort(), [
+    '/api/premium-database/customers?offset=0&limit=750',
+    '/api/premium-database/customers?offset=1500&limit=750',
+    '/api/premium-database/customers?offset=750&limit=750',
+  ]);
+
+  requests.length = 0;
+  const unchanged = await client.load({ previousSnapshotVersion: '1601:v1', fetchJsonWithTimeout });
+  assert.equal(unchanged.changed, false);
+  assert.equal(unchanged.total, 1601);
+  assert.deepEqual(requests, ['/api/premium-database/customers?meta=1']);
+});
+
 test('mail-ready snapshot client preserves valid rows when a response has a count without category rows', async () => {
   const warnings = [];
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: (...args) => warnings.push(args) } });
@@ -1247,7 +1295,7 @@ test('mail-ready snapshot client never lets an older response replace a newer co
 
 test('premium database applies remote customers once after guard and photo enrichment complete', () => {
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
-  assert.match(pageSource, /const \[remoteState, orderResult\] = await Promise\.all\(\[/);
+  assert.match(pageSource, /const \[customerResult, orderResult\] = await Promise\.all\(\[window\.SoftoraPremiumDatabaseCustomers\.load\(/);
   assert.match(pageSource, /const customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten\);/);
   assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\);/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
@@ -1264,7 +1312,7 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /const COLDMAIL_SEND_GUARD_KEY = "softora_coldmail_send_guard_v1";/);
   assert.match(pageSource, /function hasColdmailSendGuardSignal\(customer\)/);
   assert.match(pageSource, /if \(hasColdmailSendGuardSignal\(customer\)\) return false;/);
-  assert.match(pageSource, /Promise\.all\(\[[\s\S]*fetchUiStateGetWithFallback\(CUSTOMER_DB_SCOPE\)[\s\S]*refreshColdmailGuardState\(\)/);
+  assert.match(pageSource, /Promise\.all\(\[[\s\S]*window\.SoftoraPremiumDatabaseCustomers\.load\([\s\S]*refreshColdmailGuardState\(\)/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
 
   const controller = guardClient.createController({
@@ -1323,13 +1371,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /throw new Error\("Supabase-data reageert niet op tijd\."\);/);
   assert.match(resilienceSource, /function hasChunkedStateKey\(values, baseKey\) \{/);
   assert.match(pageSource, /state\.dataUnavailable = !hadBootstrapCustomers;/);
-  assert.match(pageSource, /if \(!window\.SoftoraDatabaseResilience\.hasChunkedStateKey\(remoteValues, CUSTOMER_DB_KEY\)\) throw new Error\("Geen Supabase-klantdata ontvangen\."\);/);
+  assert.match(pageSource, /window\.SoftoraPremiumDatabaseCustomers\.load\(\{ previousSnapshotVersion:/);
   assert.match(pageSource, /catch \(error\) \{[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);[\s\S]*state\.dataUnavailable = !hadBootstrapCustomers;/);
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260723a/);
-  assert.match(pageSource, /function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
+  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260804a/);
+  assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
   assert.match(snapshotSource, /fetchSnapshotPage\(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS\)/);
@@ -2222,8 +2271,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /\[getChunkMetaKey\(normalizedKey\)\]: JSON\.stringify\(\{/);
   assert.match(importScriptSource, /patch\[prefix \+ index\] = chunk;/);
   assert.match(pageSource, /patch: window\.SoftoraDatabaseImport\.buildChunkedStatePatch\(CUSTOMER_DB_KEY, JSON\.stringify\(normalizedCustomers\)\)/);
-  assert.match(pageSource, /const remoteValues = remoteState && remoteState\.values && typeof remoteState\.values === "object" \? remoteState\.values : \{\};/);
-  assert.match(pageSource, /const remoteCustomers = parseCustomers\(window\.SoftoraDatabaseImport\.readChunkedStateValue\(remoteValues, CUSTOMER_DB_KEY\)\);[\s\S]*if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
+  assert.match(pageSource, /const remoteCustomers = parseCustomers\(JSON\.stringify\(customerResult && customerResult\.customers \|\| \[\]\)\);[\s\S]*if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
+  assert.match(pageSource, /reconcileCanonicalAvailableSnapshot\(\);/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
   assert.match(pageSource, /function normalizeStoredAmount\(value\)/);
   assert.match(pageSource, /databaseStatus: status,/);
