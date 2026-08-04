@@ -979,6 +979,54 @@ test('coldmail live stats never overwrite reliable totals with a transient guard
   assert.equal(latestCache.stats.totalSent, 1);
 });
 
+test('coldmail live stats reconcile a stale durable zero with current-day central guards before first paint', async () => {
+  const calls = [];
+  const sentGroups = Array.from({ length: 11 }, (_, index) => ({
+    reservation_id: `today-send-${index + 1}`,
+    recipient_email: `today-${index + 1}@example.test`,
+    recipient_id: `today-${index + 1}`,
+    sender_email: index === 10 ? 'martijn@softora.nl' : 'serve@softora.nl',
+    provider: 'softora',
+    channel: 'coldmail',
+    source: 'softora-coldmail-pre-send',
+    updated_at: `2026-08-04T08:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const { service } = createService({
+    now: () => new Date('2026-08-04T15:00:00.000Z'),
+    coldmailStatsCacheRaw: JSON.stringify({
+      ok: true,
+      stats: {
+        reliable: true,
+        dateKey: '2026-08-04',
+        sentToday: 0,
+        systemSentToday: 0,
+        centralGuardSentToday: 0,
+        totalSent: 1543,
+        systemTotalSent: 1543,
+        centralGuardTotalSent: 1543,
+        bounceDeduplication: 'recipient-email',
+        updatedAt: '2026-08-04T14:59:00.000Z',
+      },
+    }),
+    outboundRecipientGuardStore: {
+      async listSentRecipientGroups(options) {
+        calls.push(options);
+        return sentGroups;
+      },
+    },
+    dataOpsStore: {
+      async listMailboxMessages() { return []; },
+    },
+  });
+
+  const result = await service.getColdmailLiveStats();
+
+  assert.equal(result.stats.sentToday, 11);
+  assert.equal(result.stats.centralGuardSentToday, 11);
+  assert.ok(result.stats.totalSent >= 11);
+  assert.equal(calls.some((options) => options && options.updatedSince && options.maxRows === 1000), true);
+});
+
 test('coldmail live stats preserve proven bounces when the targeted mailbox read temporarily fails', async () => {
   let clockMs = Date.parse('2026-04-24T12:00:00.000Z');
   let mailboxReadFails = false;
@@ -9545,6 +9593,80 @@ test('coldmail campaign reserves the recipient centrally before SMTP send and co
   const customerWriteIndex = calls.findIndex((call) => call.type === 'state:premium_customers_database');
   assert.ok(sendGuardWriteIndex > confirmIndex);
   assert.ok(customerWriteIndex > confirmIndex);
+});
+
+test('coldmail post-SMTP recovery finalizes customer and counters exactly once without another SMTP send', async () => {
+  let guard = {
+    reservation_id: 'recovery-reservation-1',
+    recipient_id: 'prospect-1',
+    recipient_email: 'ruben@example.test',
+    recipient_company: 'Bakkerij Zon',
+    sender_email: 'info@softora.nl',
+    provider: 'softora',
+    channel: 'coldmail',
+    source: 'softora-coldmail-pre-send',
+    status: 'reserved',
+    permanent: true,
+    created_at: '2026-04-24T11:59:30.000Z',
+    updated_at: '2026-04-24T11:59:30.000Z',
+    payload: {
+      customerId: 'prospect-1',
+      bedrijf: 'Bakkerij Zon',
+      expectedSubject: 'Kleine vraag over jullie website',
+      reference: 'SF-RECOVERY-1',
+      durationDays: 14,
+      specialAction: 'webdesign',
+      actor: 'Coldmail Autopilot',
+    },
+  };
+  const confirmations = [];
+  const store = {
+    async listReservedRecipientGroups() {
+      return guard.status === 'reserved' ? [guard] : [];
+    },
+    async listSentRecipientGroups() {
+      return guard.status === 'sent' ? [guard] : [];
+    },
+    async confirmReservation(reservationId, options) {
+      confirmations.push({ reservationId, options });
+      guard = { ...guard, status: options.status, payload: options.payload, updated_at: options.at };
+      return { ok: true, count: 4 };
+    },
+  };
+  const { service, sentMessages, getSavedStates, getSendGuardState } = createService({
+    outboundRecipientGuardStore: store,
+    dataOpsStore: {
+      async listMailboxMessages() {
+        return [{
+          account_email: 'info@softora.nl',
+          folder: 'sent',
+          recipients_text: 'Ruben <ruben@example.test>',
+          subject: 'Kleine vraag over jullie website',
+          body_text: 'Goedendag,\n\nSoftora referentie SF-RECOVERY-1',
+          date: '2026-04-24T12:00:00.000Z',
+          message_id: '<recovery-1@example.test>',
+          provider_id: 'sent:recovery-1',
+        }];
+      },
+    },
+  });
+
+  const first = await service.reconcileColdmailPostSmtp({ maxRows: 100 });
+  const second = await service.reconcileColdmailPostSmtp({ maxRows: 100 });
+
+  assert.equal(first.reconciled, 1);
+  assert.equal(second.reconciled, 0);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(confirmations.length, 2);
+  assert.equal(confirmations[0].options.payload.postSmtpReconciled, false);
+  assert.equal(confirmations[1].options.payload.postSmtpReconciled, true);
+  assert.equal(getSendGuardState().entries.filter((entry) => entry.count === 1).length, 1);
+  const customerWrites = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  assert.equal(customerWrites.length, 1);
+  const savedRow = JSON.parse(customerWrites[0].values.softora_customers_premium_v1)[0];
+  assert.equal(savedRow.status, 'gemaild');
+  assert.equal(savedRow.coldmailSentMessageId, '<recovery-1@example.test>');
+  assert.equal(savedRow.lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
 });
 
 test('coldmail campaign keeps sender cooldown preflight short and extends after SMTP accept', async () => {

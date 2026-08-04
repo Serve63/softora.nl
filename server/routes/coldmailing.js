@@ -367,7 +367,7 @@ function registerColdmailingRoutes(app, deps = {}) {
         return;
       }
       if (typeof res.setHeader === 'function') {
-        res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
+        res.setHeader('Cache-Control', 'no-store, private');
       }
       res.json(await coldmailCampaignService.getColdmailLiveStats());
     } catch (error) {
@@ -414,6 +414,23 @@ function registerColdmailingRoutes(app, deps = {}) {
       actor: getColdmailingActor(req, 'Coldmail Autopilot'),
       force: Boolean(req.body && req.body.force),
     });
+  });
+
+  app.post('/api/coldmailing/autopilot/reconcile-sent', requirePremiumAdminApiAccess, async (_req, res) => {
+    try {
+      if (typeof coldmailCampaignService.reconcileColdmailPostSmtp !== 'function') {
+        res.status(404).json({ ok: false, code: 'COLDMAIL_RECONCILIATION_UNAVAILABLE' });
+        return;
+      }
+      res.setHeader('Cache-Control', 'no-store, private');
+      res.json(await coldmailCampaignService.reconcileColdmailPostSmtp({ maxRows: 100 }));
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        code: normalizeString(error && error.code) || 'COLDMAIL_RECONCILIATION_FAILED',
+        message: truncateText(normalizeString(error && error.message) || 'Verzonden mails konden niet worden hersteld.', 500),
+      });
+    }
   });
 
   app.get('/api/coldmailing/autopilot/run', requireColdmailingCronAccess, async (req, res) => {

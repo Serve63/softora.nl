@@ -140,6 +140,7 @@ function createAutopilotRouteHarness(deps) {
   let adminRunHandlers = null;
   let statusHandlers = null;
   let settingsHandlers = null;
+  let reconcileHandlers = null;
   const app = {
     get(routePath, ...handlers) {
       if (routePath === '/api/coldmailing/autopilot/run') cronRunHandlers = handlers;
@@ -148,6 +149,7 @@ function createAutopilotRouteHarness(deps) {
     post(routePath, ...handlers) {
       if (routePath === '/api/coldmailing/autopilot/run') adminRunHandlers = handlers;
       if (routePath === '/api/coldmailing/autopilot/settings') settingsHandlers = handlers;
+      if (routePath === '/api/coldmailing/autopilot/reconcile-sent') reconcileHandlers = handlers;
     },
   };
 
@@ -156,6 +158,7 @@ function createAutopilotRouteHarness(deps) {
   assert.ok(Array.isArray(adminRunHandlers));
   assert.ok(Array.isArray(statusHandlers));
   assert.ok(Array.isArray(settingsHandlers));
+  assert.ok(Array.isArray(reconcileHandlers));
 
   async function callHandlers(handlers, req = {}) {
     const res = {
@@ -210,6 +213,10 @@ function createAutopilotRouteHarness(deps) {
       body,
       premiumAuth: { displayName: 'Servé' },
     }),
+    reconcile: (body = {}) => callHandlers(reconcileHandlers, {
+      body,
+      premiumAuth: { displayName: 'Servé' },
+    }),
   };
 }
 
@@ -228,7 +235,11 @@ function createStatsRouteHarness(deps) {
   return async function callStats(req = {}) {
     const res = {
       statusCode: 200,
+      headers: {},
       body: null,
+      setHeader(key, value) {
+        this.headers[key.toLowerCase()] = value;
+      },
       status(code) {
         this.statusCode = code;
         return this;
@@ -454,6 +465,7 @@ test('coldmailing autopilot cron route requires CRON_SECRET bearer access', asyn
       },
       getColdmailAutopilotStatus: async () => ({ ok: true, autopilot: { enabled: false } }),
       updateColdmailAutopilotSettings: async () => ({ ok: true, autopilot: { enabled: true } }),
+      reconcileColdmailPostSmtp: async () => ({ ok: true, checked: 0, reconciled: 0 }),
     },
     getEffectivePublicBaseUrl: () => 'https://www.softora.nl',
     normalizeString: (value) => String(value || '').trim(),
@@ -474,6 +486,34 @@ test('coldmailing autopilot cron route requires CRON_SECRET bearer access', asyn
   assert.equal(allowed.statusCode, 200);
   assert.equal(allowed.body.reason, 'disabled');
   assert.equal(runs, 1);
+});
+
+test('coldmailing post-SMTP reconciliation is admin-only and never invokes a send path', async () => {
+  let reconciliations = 0;
+  let sends = 0;
+  const autopilot = createAutopilotRouteHarness({
+    requirePremiumApiAccess: (_req, _res, next) => next(),
+    requirePremiumAdminApiAccess: (_req, _res, next) => next(),
+    coldmailCampaignService: {
+      runColdmailAutopilot: async () => { sends += 1; return { ok: true }; },
+      getColdmailAutopilotStatus: async () => ({ ok: true }),
+      updateColdmailAutopilotSettings: async () => ({ ok: true }),
+      reconcileColdmailPostSmtp: async (options) => {
+        reconciliations += 1;
+        assert.deepEqual(options, { maxRows: 100 });
+        return { ok: true, checked: 1, reconciled: 1, unresolved: 0, errors: [] };
+      },
+    },
+    normalizeString: (value) => String(value || '').trim(),
+  });
+
+  const res = await autopilot.reconcile();
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.reconciled, 1);
+  assert.equal(res.headers['cache-control'], 'no-store, private');
+  assert.equal(reconciliations, 1);
+  assert.equal(sends, 0);
 });
 
 test('coldmailing autopilot cron route skips safely during Supabase outage pause', async () => {
@@ -610,6 +650,7 @@ test('coldmailing stats route exposes live send counts to authenticated staff', 
   assert.equal(res.body.stats.systemTotalSent, 44);
   assert.equal(res.body.stats.totalSent, 44);
   assert.equal(res.body.stats.source, 'coldmail-send-guard-and-customer-database');
+  assert.equal(res.headers['cache-control'], 'no-store, private');
   assert.equal(premiumAccessCalls, 1);
   assert.equal(adminAccessCalls, 0);
 });

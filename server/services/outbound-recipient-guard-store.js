@@ -300,7 +300,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     return { ok: true, count };
   }
 
-  function mergeSentRecipientGroup(target, row = {}) {
+  function mergeRecipientGroup(target, row = {}) {
     [
       'recipient_email',
       'recipient_domain',
@@ -315,29 +315,39 @@ function createOutboundRecipientGuardStore(deps = {}) {
       'updated_at',
       'last_seen_at',
       'created_at',
+      'status',
+      'permanent',
     ].forEach((field) => {
       if (!normalizeString(target[field]) && normalizeString(row[field])) target[field] = row[field];
     });
+    if (
+      (!target.payload || typeof target.payload !== 'object' || Object.keys(target.payload).length === 0) &&
+      row.payload && typeof row.payload === 'object'
+    ) {
+      target.payload = row.payload;
+    }
     return target;
   }
 
-  async function listSentRecipientGroups(options = {}) {
+  async function listRecipientGroupsByStatus(status, options = {}) {
     const client = getClient();
     if (!client) return [];
     const maxRows = Math.max(1, Math.min(20_000, Number(options.maxRows) || 10_000));
     const provider = normalizeString(options.provider);
     const channel = normalizeString(options.channel);
     const keyType = normalizeString(options.keyType);
-    const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,created_at,updated_at,last_seen_at';
+    const updatedSince = normalizeString(options.updatedSince);
+    const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at,last_seen_at';
     const buildQuery = () => {
       let query = client
         .from(table)
         .select(selectColumns)
-        .eq('status', 'sent')
+        .eq('status', status)
         .eq('permanent', true);
       if (provider && query && typeof query.eq === 'function') query = query.eq('provider', provider);
       if (channel && query && typeof query.eq === 'function') query = query.eq('channel', channel);
       if (keyType && query && typeof query.eq === 'function') query = query.eq('key_type', keyType);
+      if (updatedSince && query && typeof query.gte === 'function') query = query.gte('updated_at', updatedSince);
       if (query && typeof query.order === 'function') query = query.order('updated_at', { ascending: false });
       return query;
     };
@@ -384,14 +394,25 @@ function createOutboundRecipientGuardStore(deps = {}) {
           channel: '',
           source: '',
           actor: '',
+          status: '',
+          permanent: true,
+          payload: {},
           updated_at: '',
           last_seen_at: '',
           created_at: '',
         });
       }
-      mergeSentRecipientGroup(groups.get(groupKey), row);
+      mergeRecipientGroup(groups.get(groupKey), row);
     });
     return Array.from(groups.values());
+  }
+
+  function listSentRecipientGroups(options = {}) {
+    return listRecipientGroupsByStatus('sent', options);
+  }
+
+  function listReservedRecipientGroups(options = {}) {
+    return listRecipientGroupsByStatus('reserved', options);
   }
 
   async function releaseReservation(reservationId) {
@@ -411,6 +432,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     findRecipientConflict,
     reserveRecipients,
     confirmReservation,
+    listReservedRecipientGroups,
     listSentRecipientGroups,
     releaseReservation,
   };
