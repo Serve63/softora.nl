@@ -38,7 +38,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260723d" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260804b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -363,7 +363,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.id\}\.png\?v=20260717c/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.id\}\.png\?v=20260804b/);
   assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
   assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
   assert.match(endGameCardsJs, /title:\s*'Ketting & Armband'/);
