@@ -1,4 +1,8 @@
 const { createPremiumAdminOnlyHtmlFilesSet } = require('../config/premium-admin-html-files');
+const {
+  createPasswordRegisterOwnerPolicy,
+  isPasswordRegisterPage,
+} = require('./password-register-access');
 
 function createPremiumHtmlPageAccessController(options = {}) {
   const {
@@ -20,6 +24,7 @@ function createPremiumHtmlPageAccessController(options = {}) {
     getClientIpFromRequest = () => '',
     getRequestOriginFromHeaders = () => '',
     hasLiveMomentumAccess = () => false,
+    passwordRegisterOwnerPolicy = createPasswordRegisterOwnerPolicy(),
   } = options;
 
   function normalizeFileName(value) {
@@ -50,11 +55,14 @@ function createPremiumHtmlPageAccessController(options = {}) {
     const isLoginPage = fileName === 'premium-personeel-login.html';
     const isProtectedPremiumPage = isPremiumProtectedHtmlFile(fileName);
     const isAdminOnlyPremiumPage = isProtectedPremiumPage && isPremiumAdminOnlyHtmlFile(fileName);
+    const isPasswordRegister = isPasswordRegisterPage(fileName);
     const authState =
       isLoginPage || isProtectedPremiumPage
         ? await getResolvedPremiumAuthState(req, {
             allowAnonymousWithoutHydration: isLoginPage || isProtectedPremiumPage,
-            allowTokenFallbackWithoutHydration: isLoginPage || isProtectedPremiumPage,
+            allowTokenFallbackWithoutHydration:
+              (isLoginPage || isProtectedPremiumPage) && !isPasswordRegister,
+            ...(isPasswordRegister ? { requireFreshUserHydration: true } : {}),
           })
         : null;
     const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
@@ -83,6 +91,42 @@ function createPremiumHtmlPageAccessController(options = {}) {
     if (isProtectedPremiumPage) {
       res.setHeader('Cache-Control', 'no-store, private');
       res.setHeader('X-Robots-Tag', noindexHeaderValue);
+
+      if (
+        isPasswordRegister &&
+        (
+          authState?.hydrationUnavailable ||
+          (
+            authState?.authenticated &&
+            (!authState?.freshUserValidated || !authState?.user || authState?.tokenFallback)
+          )
+        )
+      ) {
+        appendSecurityAuditEvent(
+          {
+            type: 'password_register_fresh_auth_required',
+            severity: 'warning',
+            success: false,
+            email: authState?.email || '',
+            ip: getClientIpFromRequest(req),
+            path: requestedPath,
+            origin: getRequestOriginFromHeaders(req),
+            userAgent: getRequestUserAgent(req),
+            detail: 'Wachtwoordenregister-pagina geweigerd omdat de gebruiker niet vers via Supabase kon worden bevestigd.',
+          },
+          'security_password_register_fresh_auth_required'
+        );
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.status(503).send('Wachtwoordenregister is tijdelijk niet beschikbaar omdat de sessie niet vers kon worden bevestigd.');
+        return {
+          handled: true,
+          authState,
+          fileName,
+          isLoginPage,
+          isProtectedPremiumPage,
+          isAdminOnlyPremiumPage,
+        };
+      }
 
       if (!authState?.configured) {
         res.redirect(302, `/premium-personeel-login?setup=1&next=${encodeURIComponent(requestedPath)}`);
@@ -170,6 +214,38 @@ function createPremiumHtmlPageAccessController(options = {}) {
           isProtectedPremiumPage,
           isAdminOnlyPremiumPage,
         };
+      }
+
+      if (isPasswordRegisterPage(fileName)) {
+        const ownerDecision = passwordRegisterOwnerPolicy.getAccessDecision(authState);
+        if (!ownerDecision.ok) {
+          appendSecurityAuditEvent(
+            {
+              type: 'password_register_owner_denied',
+              severity: 'warning',
+              success: false,
+              email: authState.email || '',
+              ip: getClientIpFromRequest(req),
+              path: requestedPath,
+              origin: getRequestOriginFromHeaders(req),
+              userAgent: getRequestUserAgent(req),
+              detail: ownerDecision.statusCode === 503
+                ? 'Wachtwoordenregister-pagina geweigerd omdat eigenaarstoegang niet geconfigureerd is.'
+                : 'Wachtwoordenregister-pagina geweigerd voor niet-eigenaar.',
+            },
+            'security_password_register_owner_denied'
+          );
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.status(ownerDecision.statusCode).send(ownerDecision.error);
+          return {
+            handled: true,
+            authState,
+            fileName,
+            isLoginPage,
+            isProtectedPremiumPage,
+            isAdminOnlyPremiumPage,
+          };
+        }
       }
 
       if (fileName === 'live-momentum.html' && !hasLiveMomentumAccess(req, authState)) {

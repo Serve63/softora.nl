@@ -2,24 +2,35 @@ const { timingSafeEqualStrings } = require('./crypto-utils');
 
 /**
  * Wanneer PREMIUM_SETTINGS_CONFIRM_PIN of (fallback) COLDCALLING_START_CONFIRM_PIN gezet is,
- * moeten gevoelige premium-admin-acties (zoals POST/PATCH /api/premium-users)
- * body.actionConfirmCode sturen. body.actionConfirmPin blijft tijdelijk werken voor oudere clients.
- * Als geen van beide env-vars gezet is, wordt niet gecontroleerd (lokaal/dev).
+ * moeten gevoelige premium-admin-acties body.actionConfirmCode sturen.
+ * body.actionConfirmPin blijft tijdelijk werken voor oudere clients. Een expliciet
+ * aangewezen gevoelige scope kan met requireConfigured gesloten falen.
  *
  * @param {object} body
  * @param {{ expectedPin?: string }} [options] — alleen voor tests
  */
 function validatePremiumAdminActionPin(body, options = {}) {
+  const hasExplicitPin = options && Object.prototype.hasOwnProperty.call(options, 'expectedPin');
   let expected = '';
-  if (options && Object.prototype.hasOwnProperty.call(options, 'expectedPin')) {
+  if (hasExplicitPin) {
     expected = String(options.expectedPin ?? '').trim();
   } else {
+    const env = options.env && typeof options.env === 'object' ? options.env : process.env;
+    const envName = String(options.envName || '').trim();
     expected = String(
-      process.env.PREMIUM_SETTINGS_CONFIRM_PIN || process.env.COLDCALLING_START_CONFIRM_PIN || ''
+      envName
+        ? env[envName] || ''
+        : env.PREMIUM_SETTINGS_CONFIRM_PIN || env.COLDCALLING_START_CONFIRM_PIN || ''
     ).trim();
   }
   if (!expected) {
-    return { ok: true };
+    if (!hasExplicitPin && !options.requireConfigured) return { ok: true };
+    return {
+      ok: false,
+      statusCode: 503,
+      code: 'ACTION_CONFIRM_PIN_NOT_CONFIGURED',
+      error: 'Bevestigingspin is niet veilig geconfigureerd op de server.',
+    };
   }
   const payload = body && typeof body === 'object' ? body : {};
   const provided = String(
@@ -28,7 +39,12 @@ function validatePremiumAdminActionPin(body, options = {}) {
       : payload.actionConfirmPin
   ).trim();
   if (!timingSafeEqualStrings(provided, expected)) {
-    return { ok: false, error: 'Bevestigingspin is onjuist of ontbreekt.' };
+    return {
+      ok: false,
+      statusCode: 403,
+      code: 'ACTION_CONFIRM_PIN_INVALID',
+      error: 'Bevestigingspin is onjuist of ontbreekt.',
+    };
   }
   return { ok: true };
 }

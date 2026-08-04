@@ -8,6 +8,10 @@ const { createRuntimeDebugAccessGuard } = require('../security/runtime-debug');
 const { createRuntimeEventStore } = require('../security/runtime-events');
 const { createPremiumHtmlPageAccessController } = require('../security/premium-pages');
 const { createLiveMomentumAccessGate } = require('../security/live-momentum-access');
+const { createPasswordRegisterOwnerPolicy } = require('../security/password-register-access');
+const {
+  createPasswordRegisterWriteProofGuard,
+} = require('../security/password-register-write-proof');
 const { createLeadOwnerService } = require('./lead-owners');
 const { createPremiumAuthRuntime } = require('./premium-auth-runtime');
 
@@ -153,7 +157,22 @@ function createSecurityRuntime(deps = {}) {
 
   const { appendDashboardActivity, appendSecurityAuditEvent } = runtimeEventStore;
 
-  const { requirePremiumAdminApiAccess, requirePremiumApiAccess } = createPremiumApiAccessGuard({
+  const passwordRegisterOwnerPolicy = createPasswordRegisterOwnerPolicy();
+  const {
+    manager: passwordRegisterWriteProofManager,
+    requirePasswordRegisterAccessProof,
+    requirePasswordRegisterWriteProof,
+  } = createPasswordRegisterWriteProofGuard({
+    sessionSecret: premiumSessionSecret,
+    ownerPolicy: passwordRegisterOwnerPolicy,
+    appendSecurityAuditEvent,
+  });
+
+  const {
+    requireFreshPasswordRegisterApiAccess,
+    requirePremiumAdminApiAccess,
+    requirePremiumApiAccess,
+  } = createPremiumApiAccessGuard({
     isPremiumPublicApiRequest,
     getResolvedPremiumAuthState,
     isPremiumAdminIpAllowed,
@@ -216,7 +235,12 @@ function createSecurityRuntime(deps = {}) {
     isPremiumAdminIpAllowed,
     normalizeLeadOwnerRecord,
     premiumUsersStore,
+    passwordRegisterOwnerPolicy,
+    passwordRegisterWriteProofManager,
     readPremiumSessionTokenFromRequest,
+    requireFreshPasswordRegisterApiAccess,
+    requirePasswordRegisterAccessProof,
+    requirePasswordRegisterWriteProof,
     requirePremiumAdminApiAccess,
     requirePremiumApiAccess,
     requireRuntimeDebugAccess,

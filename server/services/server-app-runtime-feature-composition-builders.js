@@ -243,6 +243,14 @@ function buildServerAppFeatureWiringRuntimeContext({
       handleRetellWebhook: coldcallingServiceRuntime.handleRetellWebhook,
       premiumRouteRuntime: {
         premiumLoginRateLimiter,
+        requireFreshPasswordRegisterApiAccess:
+          securityRuntime.requireFreshPasswordRegisterApiAccess,
+        requirePasswordRegisterWriteProof:
+          securityRuntime.requirePasswordRegisterWriteProof,
+        requirePasswordRegisterAccessProof:
+          securityRuntime.requirePasswordRegisterAccessProof,
+        passwordRegisterOwnerPolicy: securityRuntime.passwordRegisterOwnerPolicy,
+        passwordRegisterWriteProofManager: securityRuntime.passwordRegisterWriteProofManager,
         requirePremiumApiAccess: securityRuntime.requirePremiumApiAccess,
         requirePremiumAdminApiAccess: securityRuntime.requirePremiumAdminApiAccess,
         premiumUsersStore: securityRuntime.premiumUsersStore,

@@ -92,6 +92,22 @@ html,body{min-height:100vh;}
 </style>`,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
+const PASSWORD_REGISTER_CSP = [
+  "default-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "script-src 'self'",
+  "script-src-attr 'none'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "media-src 'self' data: blob:",
+  "worker-src 'none'",
+  "manifest-src 'self'",
+].join('; ');
 const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg?v=20260511a';
 const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
 const PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE = Object.freeze({
@@ -429,6 +445,20 @@ function createHtmlPageCoordinator(options = {}) {
     res.setHeader('Permissions-Policy', nextPermissions);
   }
 
+  function applyPasswordRegisterSecurityHeaders(res, fileName, renderedHtml = '') {
+    if (fileName !== 'premium-wachtwoordenregister.html' || !res || typeof res.setHeader !== 'function') {
+      return;
+    }
+    if (/\bdata-password-register-csp-ready=["']1["']/i.test(String(renderedHtml || ''))) {
+      res.setHeader(
+        'Content-Security-Policy',
+        [PASSWORD_REGISTER_CSP, ...(isProduction ? ['upgrade-insecure-requests'] : [])].join('; ')
+      );
+    }
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+  }
+
   function applyPremiumSidebarContentFrameHtml(html) {
     let renderedHtml = injectHtmlAttribute(html, 'data-softora-sidebar-content-frame="1"');
     renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, PREMIUM_SIDEBAR_CONTENT_FRAME_STYLE);
@@ -551,8 +581,9 @@ function createHtmlPageCoordinator(options = {}) {
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
 
     const isSidebarContentFrame = Boolean(options && options.isSidebarContentFrame);
+    const isPasswordRegister = fileName === 'premium-wachtwoordenregister.html';
     const hasStaticSidebar = hasPremiumStaticSidebar(renderedHtml);
-    if (hasStaticSidebar) {
+    if (hasStaticSidebar && !isPasswordRegister) {
       renderedHtml = injectSnippetAfterHeadOpen(
         renderedHtml,
         PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET,
@@ -580,7 +611,9 @@ function createHtmlPageCoordinator(options = {}) {
 
     renderedHtml = injectPremiumSidebarProfileHtml(renderedHtml, authState);
     renderedHtml = injectPremiumSessionWatchdog(renderedHtml, authState);
-    renderedHtml = inlinePremiumSidebarProfilePrefill(renderedHtml);
+    if (fileName !== 'premium-wachtwoordenregister.html') {
+      renderedHtml = inlinePremiumSidebarProfilePrefill(renderedHtml);
+    }
     if (isSidebarContentFrame) {
       renderedHtml = applyPremiumSidebarContentFrameHtml(renderedHtml);
     }
@@ -682,7 +715,10 @@ function createHtmlPageCoordinator(options = {}) {
         shouldApplySeoOverrides ? applySeoOverridesToHtml(fileName, html, config) : html
       );
       try {
-        const shouldLoadBootstrapData = !isLoginPage && !premiumPageAccess.liveMomentumAccessRequired;
+        const shouldLoadBootstrapData =
+          !isLoginPage &&
+          !premiumPageAccess.liveMomentumAccessRequired &&
+          fileName !== 'premium-wachtwoordenregister.html';
         const bootstrapTimeoutMs =
           publicDependencyWaitMs || (isProtectedPremiumPage ? getSafeProtectedPageBootstrapWaitMs(fileName) : 0);
         const bootstrapData = shouldLoadBootstrapData
@@ -716,6 +752,7 @@ function createHtmlPageCoordinator(options = {}) {
         res.setHeader('Content-Security-Policy', getPremiumSidebarContentFrameCsp());
       }
       applyLiveMomentumVideoSecurityHeaders(res, fileName);
+      applyPasswordRegisterSecurityHeaders(res, fileName, rendered);
       res.setHeader(
         'Cache-Control',
         isLoginPage || isProtectedPremiumPage

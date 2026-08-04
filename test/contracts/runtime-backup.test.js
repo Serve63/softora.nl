@@ -1,10 +1,34 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   buildRuntimeBackupEnvelope,
   createRuntimeBackupCoordinator,
 } = require('../../server/services/runtime-backup');
+
+const repoRoot = path.resolve(__dirname, '../..');
+
+test('runtime backup export locks the backup directory and file permissions', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'scripts/export-runtime-backup.js'), 'utf8');
+  assert.match(source, /mkdirSync\(backupsDir, \{ recursive: true, mode: 0o700 \}\)/);
+  assert.match(source, /chmodSync\(backupsDir, 0o700\)/);
+  assert.match(source, /O_NOFOLLOW/);
+  assert.match(source, /openSync\(outputFile, flags, 0o600\)/);
+  assert.match(source, /fchmodSync\(outputFd, 0o600\)/);
+});
+
+test('generic runtime backup payload never exposes the password-register vault', () => {
+  const coordinator = createRuntimeBackupCoordinator({
+    inMemoryUiStateByScope: new Map([[
+      'premium_password_register',
+      { entries_encrypted_v1: 'must-not-enter-debug-backup' },
+    ]]),
+  });
+  const serialized = JSON.stringify(coordinator.buildRuntimeBackupForOps());
+  assert.doesNotMatch(serialized, /premium_password_register|entries_encrypted_v1|must-not-enter/);
+});
 
 test('runtime backup envelope keeps rollback metadata and route manifest stable', () => {
   const payload = buildRuntimeBackupEnvelope({
