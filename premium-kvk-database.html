@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260803a">
-  <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260803a">
+  <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804a">
 </head>
 <body>
   <main class="app-shell">
@@ -27,10 +27,12 @@
           </span>
           <strong id="database-fill-toggle-label" class="database-fill-toggle__state">UIT</strong>
         </button>
-        <div class="runtime-pill" aria-label="Tijd sinds laatste refresh">
-          <span class="status-dot"></span>
-          <span id="last-refresh-time">-- seconden geleden</span>
-        </div>
+        <article class="luna-throughput-card" aria-label="Door Luna Max gevonden in de laatste 60 minuten">
+          <span>Luna Max gevonden</span>
+          <strong id="luna-max-found-last60">0</strong>
+          <small>laatste 60 min</small>
+        </article>
+        <span id="last-refresh-time" class="kvk-visually-hidden">--</span>
       </div>
     </header>
 
@@ -255,8 +257,8 @@
   </main>
 
   <script id="kvkSnapshot" type="application/json">{}</script>
-  <script src="/assets/kvk-database.js?v=20260726b"></script>
-  <script src="/assets/kvk-database-metrics.js?v=20260803d"></script>
-  <script src="/assets/kvk-database-control.js?v=20260803a"></script>
+  <script src="/assets/kvk-database.js?v=20260804a"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20260804a"></script>
+  <script src="/assets/kvk-database-control.js?v=20260804a"></script>
 </body>
 </html>

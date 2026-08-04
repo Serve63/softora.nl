@@ -64,9 +64,9 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260726b/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260803a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260803a/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804a/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
@@ -159,13 +159,16 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260803d/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260803a/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);
   assert.match(metricsStyles, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
+  assert.match(pageSource, /id="luna-max-found-last60"/);
+  assert.match(pageSource, /Luna Max gevonden/);
+  assert.match(metricsSource, /last60\.luna_max_found/);
   assert.match(metricsSource, /unusable_grade_activity/);
   assert.match(metricsSource, /unusableGrades\['3'\]/);
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
@@ -177,10 +180,15 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
 });
 
 test('kvk database shows completed locations crossed out with usable company totals', () => {
+  const mainSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
   const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
   const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
 
-  assert.match(controlSource, /statusBoxes\.length >= 2/);
+  assert.match(mainSource, /contact_review_completed_location_codes/);
+  assert.match(mainSource, /Controle volledig afgerond/);
+  assert.match(mainSource, /Controle nog niet volledig afgerond/);
+  assert.match(controlSource, /statusBoxes\.length >= 3/);
+  assert.match(controlSource, /slice\(0, 3\)/);
   assert.match(controlSource, /every\(\(box\) => box\.classList\.contains\('is-done'\)\)/);
   assert.match(controlSource, /classList\.toggle\('is-complete', complete\)/);
   assert.match(controlSource, /bruikbareBedrijven/);
@@ -190,7 +198,7 @@ test('kvk database shows completed locations crossed out with usable company tot
   assert.match(controlStyles, /text-decoration: line-through/);
 });
 
-test('kvk database renders refresh age in seconds and a real fill control', () => {
+test('kvk database renders Luna Max throughput and a real fill control', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
   const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
@@ -198,7 +206,8 @@ test('kvk database renders refresh age in seconds and a real fill control', () =
   assert.match(pageSource, /id="database-fill-toggle"/);
   assert.match(pageSource, /database-fill-toggle__caption">Database vullen/);
   assert.match(pageSource, /id="database-fill-toggle-label"[^>]*>UIT</);
-  assert.match(pageSource, /-- seconden geleden/);
+  assert.match(pageSource, /id="last-refresh-time" class="kvk-visually-hidden"/);
+  assert.doesNotMatch(pageSource, /Tijd sinds laatste refresh/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
   assert.match(controlSource, /window\.setInterval\(renderRefreshAge, 1000\)/);
   assert.match(controlSource, /fetch\('\/api\/kvk-database\/control'/);
