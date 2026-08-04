@@ -11,7 +11,7 @@ function normalizeCampaignText(value) {
 
 function getAuthoredMessageText(value) {
   const source = String(value || '').replace(/\r\n?/g, '\n');
-  const replyHeader = /^(?:op .+\b(?:schreef|heeft .+ geschreven)\s*:|on .+\bwrote\s*:|van:\s|from:\s|[- ]*oorspronkelijk bericht[- ]*)/im;
+  const replyHeader = /^(?:op .+\b(?:schreef(?:\s+[^:\n]+)?|heeft .+ geschreven)\s*:|on .+\bwrote\s*:|van:\s|from:\s|[- ]*oorspronkelijk bericht[- ]*)/im;
   const match = replyHeader.exec(source);
   return (match ? source.slice(0, match.index) : source).trim();
 }

@@ -486,6 +486,11 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
     body: 'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
   }), true);
   assert.equal(isAutomatedCampaignReply({
+    subject: 'We hebben jouw vraag met als onderwerp - Kleine vraag over jullie website ontvangen.',
+    preview: 'Hartelijk dank voor je bericht. Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
+    body: 'Van 24 juli t/m 5 augustus is de Typetuin gesloten. In deze periode beantwoorden wij geen e-mails.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
     subject: 'Re: [Serviceaanvraag ontvangen] Kleine vraag over jullie website',
     preview: 'Dank voor het ontwerp. Kun je de preview doorsturen?',
     body: [
@@ -493,6 +498,16 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
       '',
       'On Tue, 29 Jul 2026, helpdesknl@sbsupply.eu wrote:',
       'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+    ].join('\n'),
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Re: We hebben jouw vraag met als onderwerp - Kleine vraag over jullie website ontvangen.',
+    preview: 'Dank voor je mail. We bekijken het ontwerp graag.',
+    body: [
+      'Dank voor je mail. We bekijken het ontwerp graag.',
+      '',
+      'Op di 4 aug 2026 schreef Support De Typetuin:',
+      'Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
     ].join('\n'),
   }), false);
   assert.equal(isAutomatedCampaignReply({

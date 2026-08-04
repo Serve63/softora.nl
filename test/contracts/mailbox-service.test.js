@@ -287,6 +287,15 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
       ].join('\n'),
       date: '2026-07-26T12:03:00.000Z',
     },
+    {
+      id: 'typetuin-acknowledgement',
+      email: 'info@typetuin.nl',
+      from: 'Support De Typetuin',
+      subject: 'We hebben jouw vraag met als onderwerp - Kleine vraag over jullie website ontvangen.',
+      preview: 'Hartelijk dank voor je bericht. Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
+      body: 'Van 24 juli t/m 5 augustus is de Typetuin gesloten. In deze periode beantwoorden wij geen e-mails.',
+      date: '2026-07-26T12:04:00.000Z',
+    },
   ];
   const service = createMailboxService({
     mailboxCampaignRepliesService: {
@@ -302,9 +311,10 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.messages.map((message) => message.id), ['human-support-reply', 'human']);
-  assert.equal(sourceMessages.length, 4);
+  assert.equal(sourceMessages.length, 5);
   assert.equal(sourceMessages[0].id, 'bounce');
   assert.equal(sourceMessages[2].id, 'support-acknowledgement');
+  assert.equal(sourceMessages[4].id, 'typetuin-acknowledgement');
 });
 
 test('selected owner response stays isolated while durable snapshot retains both Instantly owners', async () => {
