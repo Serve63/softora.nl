@@ -17,6 +17,22 @@
         return Boolean(customer && customer.availableSnapshot === true && customer.mailReady !== true);
     }
 
+    function normalizeFoundCustomerIds(value) {
+        return Array.from(new Set((Array.isArray(value) ? value : []).map(function (id) {
+            return String(id == null ? "" : id).trim();
+        }).filter(Boolean)));
+    }
+
+    function isFoundSnapshotCategoryCoherent(totalRaw, customerIdsRaw) {
+        const customerIds = normalizeFoundCustomerIds(customerIdsRaw);
+        const total = Math.max(0, Number(totalRaw) || 0);
+        return total === customerIds.length;
+    }
+
+    function isSnapshotFoundCustomer(customer, customerIdSet) {
+        return Boolean(customer && customerIdSet instanceof Set && customerIdSet.has(String(customer.id || "").trim()));
+    }
+
     function isSnapshotCategoryCoherent(totalRaw, rowsRaw) {
         const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
         const total = Math.max(0, Number(totalRaw) || 0);
@@ -238,7 +254,7 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, generatedAt, pending) {
+    function publishSnapshot(config, snapshotCustomers, total, availableCustomers, availableTotal, foundCustomerIds, foundTotal, generatedAt, pending) {
         const state = config.state;
         if (!isSnapshotCategoryCoherent(total, snapshotCustomers) || !isSnapshotCategoryCoherent(availableTotal, availableCustomers)) return false;
         const incomingGeneratedAtMs = Date.parse(String(generatedAt || "").trim()) || 0;
@@ -254,6 +270,10 @@
         state.availableSnapshotLoaded = true;
         state.availableSnapshotTotal = availableCustomers.length;
         state.availableSnapshotCustomers = availableCustomers;
+        const coherentFoundSnapshot = isFoundSnapshotCategoryCoherent(foundTotal, foundCustomerIds);
+        state.foundSnapshotLoaded = coherentFoundSnapshot;
+        state.foundSnapshotTotal = coherentFoundSnapshot ? normalizeFoundCustomerIds(foundCustomerIds).length : null;
+        state.foundSnapshotCustomerIdSet = new Set(coherentFoundSnapshot ? normalizeFoundCustomerIds(foundCustomerIds) : []);
         state.dataUnavailable = false;
         clearRetry(state);
         if (typeof config.applyCustomerList === "function") {
@@ -290,18 +310,21 @@
         if (typeof fetchJsonWithTimeout !== "function") return false;
         config.fetchJsonWithTimeout = fetchJsonWithTimeout;
         state.mailReadySnapshotPending = true;
+        state.foundSnapshotLoaded = false;
+        state.foundSnapshotTotal = null;
+        state.foundSnapshotCustomerIdSet = new Set();
         try {
             const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
             let availableCustomers = normalizeAvailableSnapshotRows(firstPage.payload.availableCustomers, 0, config.normalizeCustomer);
             const hasRemainingPages = firstPage.total > firstPage.rows.length;
-            const published = publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.generatedAt, hasRemainingPages);
+            const published = publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.payload.foundCustomerIds, firstPage.payload.foundTotal, firstPage.generatedAt, hasRemainingPages);
             if (!published) { state.mailReadySnapshotPending = false; return false; }
             if (hasRemainingPages && firstPage.rows.length < MAX_SNAPSHOT_ROWS) {
                 try {
                     const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
                     snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
-                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.generatedAt, false);
+                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.payload.foundCustomerIds, firstPage.payload.foundTotal, firstPage.generatedAt, false);
                 } catch (error) {
                     state.mailReadySnapshotFailed = true;
                     state.mailReadySnapshotPending = true;
@@ -328,5 +351,5 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
 })(window);

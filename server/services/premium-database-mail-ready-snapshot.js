@@ -120,6 +120,14 @@ function getRowUpdatedAt(row = {}) {
   return pickRowValue(row, ['updatedAt', 'updated', 'updated_at', 'datum', 'paidAt']);
 }
 
+function isKvkTransferRow(row = {}) {
+  const payload = getRowPayload(row);
+  if (normalizeString(payload.bronDatabase).toLowerCase() === 'softora bedrijven scraper') return true;
+  if (/^kvk-transfer-/i.test(normalizeString(payload.premiumTransferRunId))) return true;
+  const history = Array.isArray(payload.hist) ? payload.hist : [];
+  return history.some((entry) => /^kvk-transfer:/i.test(normalizeString(entry && entry.messageKey)));
+}
+
 function dedupeCustomerRows(rows = []) {
   const byId = new Map();
   (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -422,6 +430,14 @@ function isBasicMailLeadEligible(row = {}) {
   return true;
 }
 
+function isActiveTransferredLead(row = {}) {
+  if (!isKvkTransferRow(row)) return false;
+  if (EXCLUDED_STATUSES.has(getRowStatus(row))) return false;
+  if (rowHasInstantlySignal(row)) return false;
+  if (rowHasColdmailSentSignal(row)) return false;
+  return Boolean(getRowId(row));
+}
+
 function buildSnapshotCustomer(row = {}, photoFlag = {}) {
   const id = getRowId(row);
   const company = getRowCompany(row);
@@ -607,7 +623,11 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const basicCandidates = customerRows
       .map((row) => ({ row, photoFlag: getPhotoFlagForCustomer(row, photoMaps) }))
       .filter((item) => isBasicMailLeadEligible(item.row));
-    const guardKeys = Array.from(new Set(basicCandidates.flatMap((item) => buildGuardKeysForRow(item.row))));
+    const transferredCandidates = customerRows.filter(isActiveTransferredLead);
+    const guardKeys = Array.from(new Set(
+      basicCandidates.flatMap((item) => buildGuardKeysForRow(item.row))
+        .concat(transferredCandidates.flatMap(buildGuardKeysForRow))
+    ));
     const computeBeforeGuardsMs = Date.now() - computeStartMs;
 
     const guardsStartMs = Date.now();
@@ -622,6 +642,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
     const blockedGuardKeys = new Set([...centralGuardKeys, ...legacyGuardKeys]);
     const finalComputeStartMs = Date.now();
+    const foundCustomerIds = transferredCandidates
+      .filter((row) => !buildGuardKeysForRow(row).some((key) => blockedGuardKeys.has(key)))
+      .map(getRowId);
     const unguardedCandidates = basicCandidates
       .filter((item) => !buildGuardKeysForRow(item.row).some((key) => blockedGuardKeys.has(key)));
     let mailReadyRows = unguardedCandidates
@@ -647,6 +670,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       generatedAt: now().toISOString(),
       customers: mailReadyRows,
       availableCustomers: availableRows,
+      foundCustomerIds,
       timings: {
         customersMs,
         photosMs,
@@ -851,9 +875,12 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     return snapshotDataCache.data;
   }
 
-  async function getMailReadySnapshotData() {
+  async function getMailReadySnapshotData(options = {}) {
     if (snapshotInvalidated) return startSnapshotRefresh();
     await hydrateDurableSnapshotData({ force: Boolean(snapshotDataCache) });
+    if (options.requireFoundSnapshot === true && (!snapshotDataCache || !Array.isArray(snapshotDataCache.data.foundCustomerIds))) {
+      return startSnapshotRefresh();
+    }
     if (snapshotDataCache && snapshotNeedsBootstrapSignedMedia(snapshotDataCache.data)) {
       startSnapshotMediaRefresh(snapshotDataCache.data).catch((error) => {
         if (logger && typeof logger.warn === 'function') logger.warn('[PremiumDatabaseMailReadySnapshot][media-refresh]', error?.message || error);
@@ -892,7 +919,6 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       invalidate();
       return false;
     }
-
     const withoutRemoved = (customers) => (Array.isArray(customers) ? customers : []).filter((customer) => (
       !removedIds.has(normalizeString(customer && customer.id))
     ));
@@ -901,6 +927,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       generatedAt: now().toISOString(),
       customers: withoutRemoved(baseData.customers),
       availableCustomers: withoutRemoved(baseData.availableCustomers),
+      ...(Array.isArray(baseData.foundCustomerIds) ? {
+        foundCustomerIds: baseData.foundCustomerIds.filter((customerId) => !removedIds.has(normalizeString(customerId))),
+      } : {}),
     };
     nextData.total = nextData.customers.length;
     nextData.availableTotal = nextData.availableCustomers.length;
@@ -1073,7 +1102,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function buildMailReadySnapshot(options = {}) {
     const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
     const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
-    const snapshotData = await getMailReadySnapshotData();
+    const snapshotData = await getMailReadySnapshotData({ requireFoundSnapshot: options.includeFoundSnapshot === true });
     const allCustomers = Array.isArray(snapshotData.customers) ? snapshotData.customers : [];
     const allAvailableCustomers = Array.isArray(snapshotData.availableCustomers) ? snapshotData.availableCustomers : [];
     return {
@@ -1086,6 +1115,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       customers: allCustomers.slice(offset, offset + limit),
       availableTotal: allAvailableCustomers.length,
       availableCustomers: allAvailableCustomers.slice(offset, offset + limit),
+      foundTotal: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds.length : 0,
+      foundCustomerIds: Array.isArray(snapshotData.foundCustomerIds) ? snapshotData.foundCustomerIds : [],
       timings: snapshotData.timings,
     };
   }
@@ -1095,6 +1126,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       const payload = await buildMailReadySnapshot({
         limit: req && req.query ? req.query.limit : undefined,
         offset: req && req.query ? req.query.offset : undefined,
+        includeFoundSnapshot: true,
       });
       res.setHeader('Cache-Control', 'private, no-store, max-age=0');
       res.setHeader('Pragma', 'no-cache');
@@ -1138,6 +1170,8 @@ module.exports = {
   createPremiumDatabaseMailReadySnapshotService,
   isBasicMailReadyCandidate,
   isBasicMailLeadEligible,
+  isActiveTransferredLead,
+  isKvkTransferRow,
   isMailReadySnapshotCoherent,
   legacyGuardEntriesToKeySet,
   parseMailReadySnapshotCacheValue,

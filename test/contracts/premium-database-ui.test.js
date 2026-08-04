@@ -1072,7 +1072,7 @@ test('premium database webdesign asset state keeps mail-ready and photo-target d
   assert.equal(missingPhoto.isMailReady, false);
 });
 
-test('mail-ready snapshot client loads compact rows before full database restore', async () => {
+test('mail-ready snapshot client loads compact rows and the guarded scraper inventory before full database restore', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('snapshot should not warn'); } } });
   const state = { mailReadySnapshotLoaded: false, mailReadySnapshotStale: true, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotTotal: null, mailReadySnapshotCustomers: [], availableSnapshotLoaded: false, availableSnapshotTotal: null, availableSnapshotCustomers: [], dataUnavailable: true, remoteCustomersLoaded: false, activeStatus: 'benaderbaar' };
   const applied = [];
@@ -1085,7 +1085,7 @@ test('mail-ready snapshot client loads compact rows before full database restore
     applyCustomerList: (customers, forceRender) => applied.push({ customers, forceRender }),
     fetchJsonWithTimeout: async (...args) => {
       requests.push(args);
-      return { ok: true, json: async () => ({ ok: true, total: 1, customers: [{ id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', hasPhoto: true, hasMockup: true, mailReady: true }], availableTotal: 1, availableCustomers: [{ id: 'customer-available', bedrijf: 'Nieuw BV', email: 'info@nieuw.nl', hasPhoto: false, hasMockup: false, availableSnapshot: true }] }) };
+      return { ok: true, json: async () => ({ ok: true, total: 1, customers: [{ id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', hasPhoto: true, hasMockup: true, mailReady: true }], availableTotal: 1, availableCustomers: [{ id: 'customer-available', bedrijf: 'Nieuw BV', email: 'info@nieuw.nl', hasPhoto: false, hasMockup: false, availableSnapshot: true }], foundTotal: 2, foundCustomerIds: ['customer-ready', 'customer-found'] }) };
     },
   });
 
@@ -1104,6 +1104,13 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(state.availableSnapshotLoaded, true);
   assert.equal(state.availableSnapshotTotal, 1);
   assert.equal(state.availableSnapshotCustomers.length, 1);
+  assert.equal(state.foundSnapshotLoaded, true);
+  assert.equal(state.foundSnapshotTotal, 2);
+  assert.deepEqual(Array.from(state.foundSnapshotCustomerIdSet), ['customer-ready', 'customer-found']);
+  assert.equal(client.isSnapshotFoundCustomer({ id: 'customer-found' }, state.foundSnapshotCustomerIdSet), true);
+  assert.equal(client.isSnapshotFoundCustomer({ id: 'already-mailed' }, state.foundSnapshotCustomerIdSet), false);
+  assert.equal(client.isFoundSnapshotCategoryCoherent(2, ['customer-ready', 'customer-found']), true);
+  assert.equal(client.isFoundSnapshotCategoryCoherent(2, ['customer-ready']), false);
   assert.equal(state.dataUnavailable, false);
   assert.equal(applied.length, 1);
   assert.equal(applied[0].forceRender, false);
@@ -1420,7 +1427,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260804c/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
@@ -1429,6 +1436,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(snapshotSource, /global\.SoftoraDatabaseMailReadySnapshot =/);
   assert.match(snapshotSource, /state\.mailReadySnapshotStale = false;/);
   assert.match(snapshotSource, /state\.mailReadySnapshotCustomers = snapshotCustomers;/);
+  assert.match(snapshotSource, /state\.foundSnapshotCustomerIdSet = new Set/);
   assert.match(snapshotSource, /function mergeAssetFlags\(customers, snapshotCustomers, availableSnapshotCustomers\)/);
   assert.match(snapshotSource, /function moveCustomerToAvailable\(state, customer\)/);
   assert.match(pageSource, /function isMailReadyCalculationPending\(\) \{/);
@@ -4181,7 +4189,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /data-s="beschikbaar" type="button">Beschikbaar<\/button>/);
   assert.match(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
-  assert.match(pageSource, /state\.activeStatus === "gevonden"\) return databaseSourceFilter\.isKvkTransferCustomer\(customer\)/);
+  assert.match(pageSource, /state\.activeStatus === "gevonden"\) return state\.foundSnapshotLoaded && databaseSourceFilter\.isKvkTransferCustomer\(customer\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotFoundCustomer\(customer, state\.foundSnapshotCustomerIdSet\)/);
   assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260804a/);
   assert.match(pageSource, /state\.activeStatus === "gevonden"\) return \(customers \|\| \[\]\)\.length/);
   assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);

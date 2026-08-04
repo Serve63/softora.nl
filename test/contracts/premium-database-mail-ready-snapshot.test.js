@@ -9,6 +9,8 @@ const {
   MAIL_READY_SNAPSHOT_CACHE_KEY,
   MAIL_READY_SNAPSHOT_CACHE_SCOPE,
   createPremiumDatabaseMailReadySnapshotService,
+  isActiveTransferredLead,
+  isKvkTransferRow,
 } = require('../../server/services/premium-database-mail-ready-snapshot');
 
 function createService(overrides = {}) {
@@ -72,6 +74,47 @@ function createService(overrides = {}) {
     }),
   };
 }
+
+test('premium database transfer snapshot only recognizes active unsent scraper rows', () => {
+  const sourceRow = {
+    customer_id: 'kvk-active',
+    company: 'Actief BV',
+    payload: { bronDatabase: 'Softora Bedrijven Scraper' },
+  };
+  assert.equal(isKvkTransferRow(sourceRow), true);
+  assert.equal(isKvkTransferRow({ customer_id: 'other', payload: {} }), false);
+  assert.equal(isActiveTransferredLead(sourceRow), true);
+  assert.equal(isActiveTransferredLead({ ...sourceRow, database_status: 'gemaild' }), false);
+  assert.equal(isActiveTransferredLead({ ...sourceRow, payload: { ...sourceRow.payload, lastColdmailSentAt: '2026-08-04T10:00:00.000Z' } }), false);
+  assert.equal(isActiveTransferredLead({ ...sourceRow, payload: { ...sourceRow.payload, lastColdmailProvider: 'instantly' } }), false);
+});
+
+test('premium database transfer snapshot excludes every customer covered by an outbound guard', async () => {
+  const transferPayload = { bronDatabase: 'Softora Bedrijven Scraper' };
+  const customers = [
+    { customer_id: 'active-transfer', company: 'Actief BV', email: 'info@actief.nl', website: 'actief.nl', database_status: 'prospect', payload: transferPayload },
+    { customer_id: 'guarded-email', company: 'E-mail Guard BV', email: 'info@emailguard.nl', website: 'emailguard.nl', database_status: 'prospect', payload: transferPayload },
+    { customer_id: 'guarded-domain', company: 'Domein Guard BV', email: 'nieuw@domeinguard.nl', website: 'domeinguard.nl', database_status: 'prospect', payload: transferPayload },
+    { customer_id: 'guarded-company', company: 'Bedrijf Guard BV', email: 'info@nieuwbedrijf.nl', website: 'nieuwbedrijf.nl', database_status: 'prospect', payload: transferPayload },
+    { customer_id: 'guarded-id', company: 'Klant ID Guard BV', email: 'info@nieuwe-id.nl', website: 'nieuwe-id.nl', database_status: 'prospect', payload: transferPayload },
+    { customer_id: 'status-transfer', company: 'Status Gemaild BV', email: 'info@statusgemaild.nl', website: 'statusgemaild.nl', database_status: 'gemaild', payload: transferPayload },
+    { customer_id: 'other-source', company: 'Andere Bron BV', email: 'info@anderebron.nl', website: 'anderebron.nl', database_status: 'prospect', payload: {} },
+  ];
+  const { service } = createService({
+    customers,
+    centralGuardKeys: [
+      'email:info@emailguard.nl',
+      'domain:domeinguard-nl',
+      'company:bedrijf-guard-bv',
+      'id:guarded-id',
+    ],
+  });
+
+  const payload = await service.buildMailReadySnapshot({ limit: 10, includeFoundSnapshot: true });
+
+  assert.equal(payload.foundTotal, 1);
+  assert.deepEqual(payload.foundCustomerIds, ['active-transfer']);
+});
 
 test('premium database mail-ready snapshot filters safely and returns a compact shape', async () => {
   const customers = [
