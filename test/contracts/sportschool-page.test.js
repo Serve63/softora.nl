@@ -23,6 +23,7 @@ test('sportschool logboek page is available as installable pretty page', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const stylesSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.css'), 'utf8');
   const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek.js'), 'utf8');
+  const stateScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-state.js'), 'utf8');
   const syncScriptSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-logboek-sync.js'), 'utf8');
   const migrationSource = fs.readFileSync(path.join(__dirname, '../../assets/sportschool-program-migration.js'), 'utf8');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -57,7 +58,8 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek-sync\.js\?v=20260724a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260724a/);
+  assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/sportschool-program-migration\.js\?v=20260711a/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
@@ -89,7 +91,9 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(scriptSource, /allowConcurrent/);
   assert.match(scriptSource, /exerciseSources/);
   assert.match(scriptSource, /exerciseKeyForTitle/);
-  assert.match(scriptSource, /mergeExerciseSource/);
+  assert.match(scriptSource, /readCanonicalExerciseSource/);
+  assert.match(stateScriptSource, /mergeExerciseSource/);
+  assert.match(stateScriptSource, /reconcileExerciseSources/);
   assert.match(scriptSource, /if \(isApplyingRemoteState \|\| !isReady\) return;/);
   assert.match(scriptSource, /window\.setTimeout\(boot, REMOTE_RETRY_DELAY_MS\)/);
   assert.match(scriptSource, /keepalive: options\.keepalive === true/);

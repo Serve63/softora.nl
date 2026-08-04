@@ -71,7 +71,8 @@
   const app = document.querySelector('[data-gym-app]');
   if (!app) return;
   const logbookSync = window.SoftoraSportschoolLogbookSync;
-  if (!logbookSync) return;
+  const logbookStateApi = window.SoftoraSportschoolLogbookState;
+  if (!logbookSync || !logbookStateApi) return;
 
   const list = app.querySelector('[data-exercise-list]');
   const restDay = app.querySelector('[data-rest-day]');
@@ -217,30 +218,13 @@
     return explicitKey || exerciseSlotKey(day, order);
   }
 
-  function mergeExerciseSource(existing, incoming, fallback = {}) {
-    if (!existing) return { ...incoming };
-    const merged = { ...existing };
-    ['notes', 'sets', 'reps', 'kg'].forEach((field) => {
-      const incomingValue = String(incoming[field] ?? '');
-      const existingValue = String(existing[field] ?? '');
-      const fallbackValue = String(fallback[field] ?? '');
-      if (!incomingValue) return;
-      if (!existingValue || (existingValue === fallbackValue && incomingValue !== fallbackValue)) {
-        merged[field] = incomingValue;
-      }
-    });
-    if (!merged.title && incoming.title) merged.title = incoming.title;
-    return merged;
-  }
-
   function getExerciseSource(day, order, stored = {}, options = {}) {
-    const fallback = normalizeExerciseSource(day, order, stored, options);
-    const exerciseKey = resolveExerciseKey(day, order, { ...fallback, ...stored });
+    const normalized = normalizeExerciseSource(day, order, stored, options);
+    const exerciseKey = resolveExerciseKey(day, order, { ...normalized, ...stored });
     const sources = ensureExerciseSources();
-    sources[exerciseKey] = mergeExerciseSource(sources[exerciseKey], fallback, normalizeExerciseSource(day, order));
     return {
       exerciseKey,
-      source: sources[exerciseKey],
+      source: logbookStateApi.readCanonicalExerciseSource(sources, exerciseKey, normalized),
     };
   }
 
@@ -309,7 +293,7 @@
       const previousExercise = readExercise(day, order);
       const nextExerciseKey = exerciseKeyForTitle(title, exerciseSlotKey(day, order));
       const sources = ensureExerciseSources();
-      sources[nextExerciseKey] = mergeExerciseSource(
+      sources[nextExerciseKey] = logbookStateApi.mergeExerciseSource(
         sources[nextExerciseKey],
         { ...previousExercise, title },
         normalizeExerciseSource(day, order)
@@ -398,45 +382,54 @@
     if (!snapshot || typeof snapshot !== 'object') return false;
     isApplyingRemoteState = true;
     try {
-      const nextState = { version: 2, exerciseSources: {}, days: {} };
+      const canonicalSources = {};
+      const nextDays = {};
+      const entries = [];
       if (snapshot.exerciseSources && typeof snapshot.exerciseSources === 'object' && !Array.isArray(snapshot.exerciseSources)) {
         Object.entries(snapshot.exerciseSources).forEach(([exerciseKey, source]) => {
           const key = String(exerciseKey || '').trim();
           if (!key) return;
-          nextState.exerciseSources[key] = normalizeExerciseSource('monday', 0, source, { markLegacyNotes: true });
+          canonicalSources[key] = normalizeExerciseSource('monday', 0, source, { markLegacyNotes: true });
         });
       } else {
         shouldPersistLoadedSnapshot = true;
       }
       STORAGE_DAYS.forEach((day) => {
         const dayState = snapshot.days?.[day];
-        if (!dayState || typeof dayState !== 'object') {
-          nextState.days[day] = createDefaultDayState(day, nextState);
-          return;
+        const hasStoredDay = dayState && typeof dayState === 'object';
+        let orders;
+        if (hasStoredDay) {
+          orders = Array.isArray(dayState.orders)
+            ? [...new Set(dayState.orders.map((order) => Number.parseInt(order, 10)).filter(Number.isFinite))]
+            : [];
+          if (!Array.isArray(dayState.orders)) shouldPersistLoadedSnapshot = true;
+        } else {
+          orders = (DEFAULT_DAY_EXERCISES[day] || []).map((exercise) => exercise.order);
+          shouldPersistLoadedSnapshot = true;
         }
-        const orders = Array.isArray(dayState.orders)
-          ? dayState.orders.map((order) => Number.parseInt(order, 10)).filter(Number.isFinite)
-          : [];
-        nextState.days[day] = {
-          orders,
-          exercises: Object.fromEntries(
-            orders.map((order) => {
-              const stored = dayState.exercises?.[String(order)] || {};
-              const normalized = normalizeExerciseSource(day, order, stored, { markLegacyNotes: true });
-              const exerciseKey = resolveExerciseKey(day, order, { ...normalized, ...stored });
-              const fallback = normalizeExerciseSource(day, order);
-              nextState.exerciseSources[exerciseKey] = mergeExerciseSource(
-                nextState.exerciseSources[exerciseKey],
-                normalized,
-                fallback
-              );
-              if (!stored.exerciseKey) shouldPersistLoadedSnapshot = true;
-              return [String(order), { exerciseKey, ...nextState.exerciseSources[exerciseKey] }];
-            })
-          ),
-        };
+        nextDays[day] = { orders, exercises: {} };
+        orders.forEach((order) => {
+          const stored = hasStoredDay
+            ? dayState.exercises?.[String(order)] || {}
+            : defaultExerciseForDay(day, order);
+          const normalized = normalizeExerciseSource(day, order, stored, { markLegacyNotes: true });
+          const exerciseKey = resolveExerciseKey(day, order, { ...normalized, ...stored });
+          entries.push({
+            day,
+            order,
+            exerciseKey,
+            source: normalized,
+            fallback: normalizeExerciseSource(day, order),
+          });
+          if (!stored.exerciseKey) shouldPersistLoadedSnapshot = true;
+        });
       });
-      logbookState = nextState;
+      const reconciled = logbookStateApi.reconcileExerciseSources(canonicalSources, entries);
+      reconciled.entries.forEach(({ day, order, exerciseKey, source }) => {
+        nextDays[day].exercises[String(order)] = { exerciseKey, ...source };
+      });
+      if (reconciled.repaired) shouldPersistLoadedSnapshot = true;
+      logbookState = { version: 2, exerciseSources: reconciled.exerciseSources, days: nextDays };
       return true;
     } finally {
       isApplyingRemoteState = false;
