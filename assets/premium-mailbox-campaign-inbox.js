@@ -49,6 +49,7 @@
     ].filter(Boolean).join(' '));
     const automatedSubjectPatterns = [
       /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
+      /^(?:(?:re|fw|fwd)\s*:\s*)*(?:zomer|winter|vakantie|kerst|feestdagen?|bouwvak)[ -]?sluiting\b/,
       /\bautomatisch antwoord\b/,
       /\bautomatische (?:e-?mail|mail|reactie|ontvangstbevestiging)\b/,
       /\bontvangstbevestiging\b/,

@@ -2018,7 +2018,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803c/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260804b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260804c/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260728a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2094,7 +2094,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804c"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2207,6 +2207,16 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
       receivedAt: '2026-07-23T09:00:00.000Z',
     },
     {
+      id: 'impressioni-summer-closure',
+      accountEmail: 'serve@softora.nl',
+      provider: 'instantly',
+      providerOwner: 'serve',
+      subject: 'zomersluiting Re: Kleine vraag over jullie website',
+      preview: 'Beste mailer, Tot 1 juli is impressioni gesloten. Daarna helpen we u graag weer!',
+      body: 'Beste mailer,\n\nTot 1 juli is impressioni gesloten.\nDaarna helpen we u graag weer!',
+      receivedAt: '2026-07-23T09:30:00.000Z',
+    },
+    {
       id: 'qccs-away',
       accountEmail: 'martijn@softora.nl',
       subject: 'Afwezigheidmelding Re: Kleine vraag over jullie website',
@@ -2256,13 +2266,15 @@ test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessie
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[1]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[2]), true);
   assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[3]), true);
-  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[4]), false);
-  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[5]), true);
-  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[6]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[4]), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[5]), false);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[6]), true);
+  assert.equal(campaignInboxModule.isAutomatedCampaignReply(messages[7]), false);
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages, 'martijn').map((message) => message.id),
     ['human-automation-question', 'human-about-automation', 'human']
   );
+  assert.deepEqual(campaignInboxModule.filterMessages(messages, 'serve'), []);
 });
 
 test('coldmail lijst groepeert een nieuw antwoord direct in het bestaande gespreksvak', () => {
