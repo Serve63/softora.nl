@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder, TextDecoder } = require('node:util');
 const { findUnsafeCredentialFixtures } = require('../testlib/credential-fixture-safety');
@@ -207,15 +206,14 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.doesNotMatch(combinedSource, /document\.execCommand\s*\(/);
   assert.match(storeSource, /finally \{\s*wipeEntries\(parsedEntries\);\s*decryptedBytes\.fill\(0\);/);
   assert.match(storeSource, /finally \{\s*wipeEntries\(loadedEntries\);\s*\}/);
-  for (const scriptTag of pageSource.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-    assert.match(scriptTag[1], /\bsrc=/, 'uitvoerbare scripts moeten externe self-assets zijn');
-    assert.equal(scriptTag[2].trim(), '');
-  }
+  assert.equal(
+    (pageSource.match(/<script\b/gi) || []).length,
+    executableScriptSources.length,
+    'iedere script-tag moet een extern self-asset uit de allowlist zijn'
+  );
 });
 
 function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = {}) {
-  const storePath = path.join(__dirname, '../../assets/premium-password-register-store.js');
-  const source = fs.readFileSync(storePath, 'utf8');
   const postBodies = [];
   const requests = [];
   let values = { ...initialValues };
@@ -245,15 +243,14 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = 
     updatedAt = nextUpdatedAt();
   }
 
-  const window = {
+  const browserWindow = {
     crypto: webcrypto,
     setTimeout,
     clearTimeout,
     btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
     atob: (value) => Buffer.from(value, 'base64').toString('binary'),
   };
-  const context = {
-    window,
+  Object.assign(browserWindow, {
     fetch: async (url, fetchOptions = {}) => {
       const method = String(fetchOptions.method || 'GET').toUpperCase();
       requests.push({ url: String(url), method });
@@ -327,16 +324,21 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = 
       throw new Error(`Onverwacht testverzoek: ${method} ${url}`);
     },
     AbortController,
-    Buffer,
     TextDecoder,
     TextEncoder,
-    console,
-    setTimeout,
-    clearTimeout,
-  };
-  vm.createContext(context);
-  vm.runInContext(source, context);
-  const rawCreateStore = context.window.SoftoraPasswordRegisterStore.create;
+  });
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-store.js');
+  try {
+    global.window = browserWindow;
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-store.js');
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+  const rawCreateStore = browserWindow.SoftoraPasswordRegisterStore.create;
   return {
     createStore: (storeOptions) => {
       const store = rawCreateStore(storeOptions);
@@ -728,10 +730,6 @@ test('premium wachtwoordenregister zet een late opslag na lock niet terug in geh
 });
 
 test('premium wachtwoordenregister verifieert een verse rekey-PIN server-side en failt gesloten', async () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, '../../assets/premium-password-register-pin.js'),
-    'utf8'
-  );
   const fetchCalls = [];
   const scheduledCallbacks = [];
   let nextScheduledCallbackId = 1;
@@ -745,22 +743,20 @@ test('premium wachtwoordenregister verifieert een verse rekey-PIN server-side en
     writeProof: 'opaque-test-write-proof',
     writeProofExpiresAt: new Date(Date.now() + 300000).toISOString(),
   };
-  const context = {
-    window: {
-      AbortController,
-      setTimeout: (callback) => {
-        callback.timerId = nextScheduledCallbackId;
-        nextScheduledCallbackId += 1;
-        scheduledCallbacks.push(callback);
-        return callback.timerId;
-      },
-      clearTimeout: (timerId) => {
-        const index = scheduledCallbacks.findIndex((callback) => callback.timerId === timerId);
-        if (index >= 0) scheduledCallbacks.splice(index, 1);
-      },
-      setInterval,
-      clearInterval,
+  const browserWindow = {
+    AbortController,
+    setTimeout: (callback) => {
+      callback.timerId = nextScheduledCallbackId;
+      nextScheduledCallbackId += 1;
+      scheduledCallbacks.push(callback);
+      return callback.timerId;
     },
+    clearTimeout: (timerId) => {
+      const index = scheduledCallbacks.findIndex((callback) => callback.timerId === timerId);
+      if (index >= 0) scheduledCallbacks.splice(index, 1);
+    },
+    setInterval,
+    clearInterval,
     document: {
       getElementById: (id) => id === 'pin-msg' ? pinMessage : null,
       querySelectorAll: () => [],
@@ -779,12 +775,19 @@ test('premium wachtwoordenregister verifieert een verse rekey-PIN server-side en
         json: async () => responseData,
       };
     },
-    setTimeout,
-    clearTimeout,
   };
-  vm.createContext(context);
-  vm.runInContext(source, context);
-  const pinController = context.window.SoftoraPasswordRegisterPin.create({
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-pin.js');
+  try {
+    global.window = browserWindow;
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-pin.js');
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+  const pinController = browserWindow.SoftoraPasswordRegisterPin.create({
     unlock: async (receivedVerification) => {
       unlockVerification = { ...receivedVerification };
       if (unlockFailure) throw unlockFailure;

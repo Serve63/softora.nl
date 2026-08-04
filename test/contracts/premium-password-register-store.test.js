@@ -1,18 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder, TextDecoder } = require('node:util');
 
 const TEST_WRITE_PROOF = 'test-write-proof-v1';
 
 function loadStore(initialValues = {}, options = {}) {
-  const source = fs.readFileSync(
-    path.join(__dirname, '../../assets/premium-password-register-store.js'),
-    'utf8'
-  );
   const posts = [];
   const requests = [];
   const requestOptions = [];
@@ -39,21 +32,17 @@ function loadStore(initialValues = {}, options = {}) {
     updatedAt = `2026-08-04T12:00:${String(revision).padStart(2, '0')}.000Z`;
   }
 
-  const window = {
+  const browserWindow = {
     crypto: webcrypto,
     setTimeout,
     clearTimeout,
     btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
     atob: (value) => Buffer.from(value, 'base64').toString('binary'),
   };
-  const context = {
-    window,
+  Object.assign(browserWindow, {
     AbortController,
-    Buffer,
     TextDecoder,
     TextEncoder,
-    setTimeout,
-    clearTimeout,
     fetch: async (url, fetchOptions = {}) => {
       const method = String(fetchOptions.method || 'GET').toUpperCase();
       requests.push({ url: String(url), method });
@@ -125,12 +114,21 @@ function loadStore(initialValues = {}, options = {}) {
 
       throw new Error(`Onverwacht testverzoek: ${method} ${url}`);
     },
-  };
-  vm.createContext(context);
-  vm.runInContext(source, context);
+  });
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-store.js');
+  try {
+    global.window = browserWindow;
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-store.js');
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
 
   return {
-    create: context.window.SoftoraPasswordRegisterStore.create,
+    create: browserWindow.SoftoraPasswordRegisterStore.create,
     advanceRemote: commit,
     getCount: () => gets,
     posts: () => posts.slice(),

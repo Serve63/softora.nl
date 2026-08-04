@@ -1,6 +1,11 @@
 (function (global) {
   "use strict";
 
+  var AbortController = global.AbortController;
+  var TextDecoder = global.TextDecoder;
+  var TextEncoder = global.TextEncoder;
+  var fetch = global.fetch;
+
   var PASSWORD_REGISTER_SCOPE = "premium_password_register";
   var PASSWORD_REGISTER_ENCRYPTED_KEY = "entries_encrypted_v1";
   var PASSWORD_REGISTER_LEGACY_ENTRIES_KEY = "entries_json";
@@ -85,7 +90,7 @@
     if (!cryptoObj.subtle || typeof cryptoObj.getRandomValues !== "function") {
       throw new Error("Deze browser ondersteunt geen veilige WebCrypto-kluis.");
     }
-    if (typeof TextEncoder !== "function" || typeof TextDecoder !== "function") {
+    if (typeof global.TextEncoder !== "function" || typeof global.TextDecoder !== "function") {
       throw new Error("Deze browser mist tekstcodering voor de versleutelde kluis.");
     }
     return cryptoObj;
@@ -177,6 +182,9 @@
   }
 
   async function fetchWithTimeout(url, options, timeoutMs) {
+    if (typeof AbortController !== "function" || typeof fetch !== "function") {
+      throw new Error("Deze browser kan de beveiligde kluisverbinding niet veilig uitvoeren.");
+    }
     var controller = new AbortController();
     var timeoutId = global.setTimeout(function () {
       controller.abort();

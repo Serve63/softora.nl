@@ -1,6 +1,10 @@
 (function (global) {
   "use strict";
 
+  var document = global.document;
+  var fetch = global.fetch;
+  var window = global;
+
   function createPinController(options) {
     var config = options || {};
     var state = {
@@ -59,7 +63,7 @@
     }
 
     async function verifyPin(pin) {
-      if (typeof global.AbortController !== "function") {
+      if (typeof global.AbortController !== "function" || typeof global.fetch !== "function") {
         throw new Error("Deze browser kan de beveiligings-PIN niet veilig controleren.");
       }
       var rawPin = String(pin == null ? "" : pin);
