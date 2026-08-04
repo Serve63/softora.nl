@@ -190,7 +190,7 @@
         if (state && String(state.query || "").trim()) return count;
         if (!state) return count;
         if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded && Number.isFinite(Number(state.mailReadySnapshotTotal)) && isSnapshotCategoryCoherent(state.mailReadySnapshotTotal, state.mailReadySnapshotCustomers)) return Math.max(0, Number(state.mailReadySnapshotTotal));
-        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && Number.isFinite(Number(state.availableSnapshotTotal)) && isSnapshotCategoryCoherent(state.availableSnapshotTotal, state.availableSnapshotCustomers)) return Math.max(0, Number(state.availableSnapshotTotal));
+        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && !state.remoteCustomersLoaded && Number.isFinite(Number(state.availableSnapshotTotal)) && isSnapshotCategoryCoherent(state.availableSnapshotTotal, state.availableSnapshotCustomers)) return Math.max(0, Number(state.availableSnapshotTotal));
         return count;
     }
 

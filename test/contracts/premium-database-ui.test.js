@@ -1093,6 +1093,8 @@ test('mail-ready snapshot client loads compact rows before full database restore
   assert.equal(client.getDisplayCount(state, applied[0].customers.length), 1);
   state.activeStatus = 'beschikbaar';
   assert.equal(client.getDisplayCount(state, applied[0].customers.length), 1);
+  state.remoteCustomersLoaded = true;
+  assert.equal(client.getDisplayCount(state, 8856), 8856);
 
   const merged = client.mergeAssetFlags([
     { id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', website: 'https://demo.nl' },
@@ -1397,7 +1399,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260804b/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
