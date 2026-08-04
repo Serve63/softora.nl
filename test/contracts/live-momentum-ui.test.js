@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const endGameCardFiles = [
-  '2030.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
+  '2030.png', '2035.png', 'bestaanszekerheid-bedrijf.png', 'black-gel-voorraad.png', 'bodyfat-onder-13.png',
   'eigen-automaat-rijden.png', 'eigen-boot.png', 'eigen-cinema.png', 'eigen-kantoor.png',
   'eigen-koophuis-kopen.png', 'eigen-parfum.png', 'fotomuur.png', 'gewenst-lang-kapsel.png',
   'gewenste-kledingkast.png', 'gezichtsbeharing-naar-wens.png', 'gezondheidscenter.png',
@@ -43,7 +43,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260804d" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260804e" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -371,7 +371,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.imageId \|\| card\.id\}\.png\?v=20260804d/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.imageId \|\| card\.id\}\.png\?v=20260804e/);
   assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
   assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
   assert.match(endGameCardsJs, /title:\s*'Ketting & Armband'/);
@@ -386,7 +386,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' \}/);
   assert.match(endGameCardsJs, /\{ id: 'huis-miljoen-plus-2035', title: 'Huis van €1 miljoen\+ kopen', timeframe: 2035, imageId: 'huis-miljoen-plus' \}/);
   assert.match(endGameCardsJs, /\{ id: 'checkpoint-2028', title: '2028\.\.\.', type: 'checkpoint', imageId: '2030' \}/);
-  assert.match(endGameCardsJs, /\{ id: '2035', title: '2035\.\.\.', type: 'destination', imageId: '2030' \}/);
+  assert.match(endGameCardsJs, /\{ id: '2035', title: '2035\.\.\.', type: 'destination', imageId: '2035' \}/);
   assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…', type: 'origin' \}/);
   assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.through2028, CHECKPOINT_CARD_ID, \.\.\.through2035, DESTINATION_CARD_ID\]/);
   assert.match(endGameCardsJs, /const FIXED_CARD_IDS = \[ORIGIN_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID\]/);
