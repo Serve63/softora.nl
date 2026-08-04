@@ -41,7 +41,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260723d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260803b" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20260729a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
   assert.match(html, /<div class="momentum-layout">/);
@@ -326,6 +326,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /emptyDays:\s*goal\.emptyDays/);
   assert.match(js, /function updateChart\(\)/);
   assert.match(js, /function getDayScore\(day\)/);
+  assert.match(js, /const cellsForDay = statusCells\.filter\(\(cell\) => getDay\(cell\) === day\);/);
+  assert.doesNotMatch(js, /const cellsForDay = statusCells\.filter\(\(cell\) => getDay\(cell\) === day && isTracked\(cell\)\);/);
+  assert.match(js, /Math\.round\(\(checkedCount \/ cellsForDay\.length\) \* 100\)/);
   assert.match(js, /function renderChartShell\(\)/);
   assert.match(js, /endGameMissionCard:\s*endGameCards\.getLegacyMissionState\(\)/);
   assert.match(js, /endGameCards:\s*endGameCards\.getState\(\)/);
