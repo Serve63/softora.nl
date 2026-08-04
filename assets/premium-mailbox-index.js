@@ -114,6 +114,58 @@ async function loadBody({
   if (!mail || mail.bodyLoading) return;
   mail.bodyLoading = true;
   try {
+    try {
+      const indexedResponse = await fetch('/api/mailbox/messages/bodies', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        ...(signal ? { signal } : {}),
+        body: JSON.stringify({
+          messages: [{ account, folder, id: String(requestId || id) }],
+        }),
+      });
+      const indexedData = await indexedResponse.json().catch(() => ({}));
+      const indexedMessage = Array.isArray(indexedData && indexedData.messages)
+        ? indexedData.messages[0]
+        : null;
+      if (
+        indexedResponse.ok &&
+        indexedData?.ok &&
+        indexedMessage &&
+        indexedMessage.resolved !== false
+      ) {
+        const indexedBody = normalizeText(indexedMessage.body || '');
+        mail.body = indexedBody;
+        mail.hasBody = Boolean(indexedMessage.hasBody || indexedBody);
+        mail.bodyTruncated = Boolean(indexedMessage.bodyTruncated);
+        mail.bodyLoaded = Boolean(
+          !mail.bodyTruncated && (indexedBody || indexedMessage.hasBody === false)
+        );
+        mail.bodyImageEvidenceKnown = Boolean(indexedMessage.bodyImageEvidenceKnown);
+        mail.embeddedImageCount = Math.max(
+          0,
+          Math.min(8, Number(indexedMessage.embeddedImageCount) || 0)
+        );
+        mail.originalCampaignOutbound = Boolean(indexedMessage.originalCampaignOutbound);
+        mail.webdesignLinkEvidenceKnown = Boolean(indexedMessage.webdesignLinkEvidenceKnown);
+        mail.webdesignLinkUrl = normalizeText(indexedMessage.webdesignLinkUrl);
+        mail.bodyLoadError = '';
+        const needsLiveCampaignEnrichment = Boolean(
+          mail.originalCampaignOutbound &&
+          (
+            !mail.bodyImageEvidenceKnown ||
+            mail.embeddedImageCount > 0 ||
+            !mail.webdesignLinkEvidenceKnown
+          )
+        );
+        if (mail.bodyLoaded && !needsLiveCampaignEnrichment) return;
+      }
+    } catch (error) {
+      if (error && error.name === 'AbortError') throw error;
+      // De exacte detailroute hieronder blijft de fallback voor nog niet
+      // geïndexeerde berichten en ontbrekende media- of linkprovenance.
+    }
     const params = new URLSearchParams({ account, folder, id: String(requestId || id) });
     const response = await fetch(`/api/mailbox/message?${params.toString()}`, {
       credentials: 'same-origin',
@@ -310,6 +362,7 @@ async function loadThreadBodies({
         }
         if (!stillCurrent()) return false;
         data.messages.forEach((source) => {
+          if (source && source.resolved === false) return;
           const identity = `${normalizeText(source.accountEmail).toLowerCase()}|${normalizeText(source.folder).toLowerCase()}|${Number(source.uid) || normalizeText(source.id)}`;
           const target = targetByIdentity.get(identity);
           if (!target) return;
@@ -382,7 +435,9 @@ async function loadThreadBodies({
           ) ? 'Volledig bericht kon niet worden geladen.' : '';
         } catch (error) {
           if (stillCurrent() && !(error && error.name === 'AbortError')) {
-            message.bodyLoadError = 'Volledig bericht kon niet worden geladen.';
+            message.bodyLoadError = (
+              needsThreadBodyHydration(message) || needsThreadLinkHydration(message)
+            ) ? 'Volledig bericht kon niet worden geladen.' : '';
           }
         } finally {
           message.bodyLoading = false;

@@ -282,7 +282,11 @@ test('mailbox-bootstrap weigert oude provenance-loze cache en laadt Ramon direct
     mailboxCoordinator: {
       listCampaignReplies: async (options) => {
         mailboxReads += 1;
-        assert.equal(options.limit, 100);
+        assert.deepEqual(options, {
+          limit: 200,
+          includeSnapshotMessages: true,
+          hydrateBodies: false,
+        });
         assert.equal(options.owner, undefined);
         return {
           ok: true,

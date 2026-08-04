@@ -3,16 +3,21 @@ const {
   buildMailboxMessageImageUrl,
   isMailboxMessageImageUrl,
 } = require('./mailbox-message-image');
+const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 6;
-const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 100;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 7;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
-const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
-const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
+// Keep the durable bootstrap focused on the complete conversation list. The
+// newest few bodies remain instant; older bodies are fetched from the mailbox
+// index only when opened, so hundreds of historical rows still fit in the
+// first HTML response without delaying it.
+const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = 10;
+const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
@@ -22,13 +27,26 @@ function selectSnapshotMessages(value) {
   const source = Array.isArray(value) ? value : [];
   if (source.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES) return source;
   const selected = new Set();
-  source.forEach((message, index) => {
-    if (
-      selected.size < MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES &&
-      text(message && message.provider, 50).toLowerCase() === 'instantly'
-    ) {
+  const ownerQuota = Math.floor(MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES / 2);
+  function getOwner(message) {
+    const explicitOwner = text(
+      message && (message.providerOwner || message.outreach && message.outreach.owner),
+      50
+    ).toLowerCase();
+    if (['serve', 'martijn'].includes(explicitOwner)) return explicitOwner;
+    const accountEmail = text(
+      message && (message.accountEmail || message.campaign && message.campaign.account),
+      320
+    ).toLowerCase();
+    return getOutboundSenderIdentity(accountEmail)?.profileKey || '';
+  }
+  ['serve', 'martijn'].forEach((owner) => {
+    let ownerCount = 0;
+    source.forEach((message, index) => {
+      if (ownerCount >= ownerQuota || getOwner(message) !== owner) return;
       selected.add(index);
-    }
+      ownerCount += 1;
+    });
   });
   for (let index = 0; index < source.length && selected.size < MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES; index += 1) {
     selected.add(index);

@@ -41,6 +41,7 @@ function createService(overrides = {}) {
       async hydrateMessageBodies({ messages }) {
         return messages.map((message) => ({
           ...message,
+          bodyResolved: true,
           body: `Volledige inhoud voor ${message.id}`,
           hasBody: true,
           bodyTruncated: false,
@@ -79,6 +80,7 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     uid: 42,
     folder: 'sent',
     accountEmail: 'serve@softora.nl',
+    resolved: true,
     body: 'Volledige inhoud voor sent:42',
     hasBody: true,
     bodyTruncated: false,
@@ -92,6 +94,7 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     uid: 43,
     folder: 'inbox',
     accountEmail: 'serve@softora.nl',
+    resolved: true,
     body: 'Volledige inhoud voor inbox:43',
     hasBody: true,
     bodyTruncated: false,
@@ -174,6 +177,7 @@ test('mailbox body batch hydrateert Instantly via exact provideraccount en provi
     uid: 0,
     folder: 'instantly',
     accountEmail: 'serve@websoftora.com',
+    resolved: true,
     body: 'Volledige inhoud voor instantly:abc-123',
     hasBody: true,
     bodyTruncated: false,

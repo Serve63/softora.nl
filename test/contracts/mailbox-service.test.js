@@ -3358,7 +3358,8 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   );
   assert.equal(persistedSnapshot.messages[0].from, 'Marie-José');
   assert.equal(persistedSnapshot.messages[1].from, 'Studio Noord');
-  assert.equal(persistedSnapshot.messages[1].body, 'Volledige inhoud voor inbox:42');
+  assert.equal(persistedSnapshot.messages[1].body, '');
+  assert.equal(persistedSnapshot.messages[1].hasBody, false);
 });
 
 test('mailbox routes expose accounts, messages, send, local hide restore and rewrite endpoints', () => {

@@ -8,7 +8,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v7';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v8';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -888,7 +888,7 @@
     const owner = normalizeOwner(value == null ? activeOwner : value);
     const cacheKey = getMailboxTabCacheKey(owner);
     if (!cache || !cacheKey || !data || !Array.isArray(data.messages)) return false;
-    const messages = data.messages.slice(0, 100).map((message) => {
+    const messages = data.messages.slice(0, 200).map((message) => {
       const source = message && typeof message === 'object' ? message : {};
       const sourceBodyImages = Array.isArray(source.bodyImages) ? source.bodyImages : [];
       const bodyImages = sourceBodyImages.filter((image) => {

@@ -89,8 +89,12 @@ test('campaign mailbox applies the selected owner before limiting older conversa
   });
 
   assert.deepEqual(result.messages.map((reply) => reply.id), ['serve:2', 'serve:1', 'serve:0']);
-  assert.equal(result.snapshotMessages.length, 100);
-  assert.ok(result.snapshotMessages.every((reply) => reply.accountEmail === 'martijn@softora.nl'));
+  assert.equal(result.snapshotMessages.length, 103);
+  assert.deepEqual(
+    result.snapshotMessages.filter((reply) => reply.accountEmail !== 'martijn@softora.nl')
+      .map((reply) => reply.id),
+    ['serve:2', 'serve:1', 'serve:0']
+  );
   requestedAccountSets.forEach((accounts) => assert.deepEqual(
     accounts,
     CAMPAIGN_MAILBOX_ACCOUNTS.slice().sort()

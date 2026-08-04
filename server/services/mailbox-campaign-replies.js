@@ -52,6 +52,30 @@ function getCampaignMailboxAccounts(owner) {
   );
 }
 
+function getCampaignConversationOwner(message) {
+  return getOutboundSenderIdentity(normalizeEmail(message && message.accountEmail))?.profileKey || '';
+}
+
+function selectSnapshotConversations(conversations, limit) {
+  const source = Array.isArray(conversations) ? conversations : [];
+  const safeLimit = Math.max(0, Number(limit) || 0);
+  if (!safeLimit) return [];
+  const selected = new Set();
+  ['serve', 'martijn'].forEach((owner) => {
+    let ownerCount = 0;
+    source.forEach((message, index) => {
+      if (ownerCount >= safeLimit || getCampaignConversationOwner(message) !== owner) return;
+      selected.add(index);
+      ownerCount += 1;
+    });
+  });
+  source.forEach((message, index) => {
+    if (selected.size >= safeLimit * 2) return;
+    if (!getCampaignConversationOwner(message)) selected.add(index);
+  });
+  return source.filter((_message, index) => selected.has(index));
+}
+
 function normalizeMessageId(value) {
   return normalizeText(value)
     .toLowerCase()
@@ -723,7 +747,12 @@ function createMailboxCampaignRepliesService(deps = {}) {
     dataOpsStore = null,
   } = deps;
 
-  async function listRepliesWithSnapshot({ limit = 100, owner = '', snapshotLimit = 0 } = {}) {
+  async function listRepliesWithSnapshot({
+    limit = 100,
+    owner = '',
+    snapshotLimit = 0,
+    hydrateBodies = true,
+  } = {}) {
     const safeLimit = Math.max(1, Math.min(CAMPAIGN_REPLY_LIMIT, Number(limit) || 100));
     const safeSnapshotLimit = Math.max(
       0,
@@ -868,9 +897,10 @@ function createMailboxCampaignRepliesService(deps = {}) {
     const selectedConversations = allVisibleConversations
       .filter((conversation) => selectedAccountSet.has(normalizeEmail(conversation && conversation.accountEmail)))
       .slice(0, safeLimit);
-    const snapshotConversations = safeSnapshotLimit
-      ? allVisibleConversations.slice(0, safeSnapshotLimit)
-      : [];
+    const snapshotConversations = selectSnapshotConversations(
+      allVisibleConversations,
+      safeSnapshotLimit
+    );
 
     async function hydrateVisibleConversations(conversations) {
       if (typeof mailboxIndexStore.hydrateMessageBodies !== 'function') return conversations;
@@ -884,8 +914,12 @@ function createMailboxCampaignRepliesService(deps = {}) {
     }
 
     return {
-      messages: await hydrateVisibleConversations(selectedConversations),
-      snapshotMessages: await hydrateVisibleConversations(snapshotConversations),
+      messages: hydrateBodies
+        ? await hydrateVisibleConversations(selectedConversations)
+        : selectedConversations,
+      // The bootstrap needs complete metadata, not hundreds of eagerly loaded
+      // bodies. Detail bodies are fetched by exact message identity on open.
+      snapshotMessages: snapshotConversations,
     };
   }
 

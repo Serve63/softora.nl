@@ -133,11 +133,8 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   }]);
   assert.equal(parsed.messages[0].bodyImagesTruncated, false);
   assert.equal(parsed.messages.at(-1).body, '');
-  assert.deepEqual(parsed.messages.at(-1).bodyImages, [{
-    alt: 'Ontwerp',
-    dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A1&index=0',
-  }]);
-  assert.equal(parsed.messages.at(-1).bodyImagesTruncated, false);
+  assert.deepEqual(parsed.messages.at(-1).bodyImages, []);
+  assert.equal(parsed.messages.at(-1).bodyImagesTruncated, true);
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
 });
 
@@ -287,7 +284,7 @@ test('mailbox campaign snapshot bewaart oudere Instantly-gesprekken van beide ei
     messages: [...regularMessages, ...instantlyMessages],
   }));
 
-  assert.equal(parsed.messages.length, 100);
+  assert.equal(parsed.messages.length, 102);
   assert.ok(parsed.messages.some((message) => message.email === 'info@ramoncc.nl'));
   assert.deepEqual(
     parsed.messages
@@ -295,13 +292,40 @@ test('mailbox campaign snapshot bewaart oudere Instantly-gesprekken van beide ei
       .map((message) => message.providerOwner),
     ['serve', 'martijn']
   );
-  assert.equal(parsed.messages.some((message) => message.id === 'inbox:99'), false);
-  assert.equal(parsed.messages.some((message) => message.id === 'inbox:100'), false);
+  assert.equal(parsed.messages.some((message) => message.id === 'inbox:99'), true);
+  assert.equal(parsed.messages.some((message) => message.id === 'inbox:100'), true);
+});
+
+test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor beide eigenaren', () => {
+  const martijnMessages = Array.from({ length: 300 }, (_, index) => ({
+    id: `martijn:${index}`,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: `martijn-${index}@example.test`,
+    date: new Date(Date.UTC(2026, 7, 4, 17, 0) - index * 60_000).toISOString(),
+  }));
+  const serveMessages = Array.from({ length: 200 }, (_, index) => ({
+    id: `serve:${index}`,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: `serve-${index}@example.test`,
+    date: new Date(Date.UTC(2026, 4, 22, 17, 0) - index * 60_000).toISOString(),
+  }));
+
+  const parsed = parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [...martijnMessages, ...serveMessages],
+  }));
+
+  assert.equal(parsed.messages.length, 400);
+  assert.equal(parsed.messages.filter((message) => message.accountEmail === 'martijn@softora.nl').length, 200);
+  assert.equal(parsed.messages.filter((message) => message.accountEmail === 'serve@softora.nl').length, 200);
+  assert.ok(parsed.messages.some((message) => message.id === 'serve:199'));
 });
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 6,
+    version: 7,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{

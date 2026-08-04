@@ -58,6 +58,15 @@
     }
   }
 
+  function isCidArtifactLine(value) {
+    const line = String(value || '').trim().replace(/^(?:>\s*)+/, '').trim();
+    return (
+      /^\[cid:[^\]\r\n]{1,500}\]$/i.test(line) ||
+      /^<cid:[^>\r\n]{1,500}>$/i.test(line) ||
+      /^cid:[^\s\r\n]{1,500}$/i.test(line)
+    );
+  }
+
   function isGeneratedImageDescriptionLine(value) {
     const line = String(value || '').replace(/^\s*(?:>\s*)+/, '').trim();
     return /^\[?\s*(?:afbeelding|image)\s+met\b[\s\S]*\b(?:automatisch\s+gegenereerde\s+beschrijving|automatically\s+generated\s+description)\s*\]?$/i.test(line);
@@ -335,6 +344,7 @@
     formatDetailSubject,
     isSentMessage,
     isGeneratedImageDescriptionLine,
+    isCidArtifactLine,
     isGmailSignatureAssetUrl,
     isLabelledUrlMatch,
     joinBrokenWebdesignLinkLines,

@@ -254,13 +254,15 @@ async function listMailboxCampaignReplySets({
   mailboxCampaignRepliesService,
   limit,
   owner,
+  hydrateBodies = true,
 }) {
   const normalizedLimit = Number(limit || 100) || 100;
   if (typeof mailboxCampaignRepliesService?.listRepliesWithSnapshot === 'function') {
     const result = await mailboxCampaignRepliesService.listRepliesWithSnapshot({
       limit: normalizedLimit,
       owner,
-      snapshotLimit: 100,
+      snapshotLimit: 200,
+      hydrateBodies,
     });
     return {
       replies: Array.isArray(result?.messages) ? result.messages : [],
