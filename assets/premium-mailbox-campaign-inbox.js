@@ -1077,7 +1077,7 @@
       ? fetchImpl
       : global.fetch.bind(global);
     const params = new URLSearchParams({
-      limit: '100',
+      limit: '200',
       owner: owner === 'both' ? '' : owner,
       refreshInstantly: '1',
     });

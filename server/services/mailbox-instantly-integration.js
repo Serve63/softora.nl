@@ -156,6 +156,7 @@ function resolveReplyIdentity({
 
 async function mergeCampaignReplies({
   baseReplies,
+  snapshotBaseReplies = baseReplies,
   instantlyMailboxService,
   limit,
   owner,
@@ -242,10 +243,39 @@ async function mergeCampaignReplies({
   }
   return {
     messages: mergeWithBase(instantlyReplies, selectedBaseReplies),
-    snapshotMessages: mergeWithBase(allInstantlyReplies, baseReplies),
+    snapshotMessages: mergeWithBase(allInstantlyReplies, snapshotBaseReplies),
     instantlyReplies: filterVisibleMailboxMessages(instantlyReplies),
     snapshotInstantlyReplies: filterVisibleMailboxMessages(allInstantlyReplies),
     instantlySync,
+  };
+}
+
+async function listMailboxCampaignReplySets({
+  mailboxCampaignRepliesService,
+  limit,
+  owner,
+}) {
+  const normalizedLimit = Number(limit || 100) || 100;
+  if (typeof mailboxCampaignRepliesService?.listRepliesWithSnapshot === 'function') {
+    const result = await mailboxCampaignRepliesService.listRepliesWithSnapshot({
+      limit: normalizedLimit,
+      owner,
+      snapshotLimit: 100,
+    });
+    return {
+      replies: Array.isArray(result?.messages) ? result.messages : [],
+      snapshotBaseReplies: Array.isArray(result?.snapshotMessages)
+        ? result.snapshotMessages
+        : [],
+    };
+  }
+  const replies = await mailboxCampaignRepliesService.listReplies({
+    limit: normalizedLimit,
+    owner,
+  });
+  return {
+    replies: Array.isArray(replies) ? replies : [],
+    snapshotBaseReplies: Array.isArray(replies) ? replies : [],
   };
 }
 
@@ -322,6 +352,7 @@ module.exports = {
   getMailboxMessageOwner,
   markInstantlyMessageRead,
   mergeCampaignReplies,
+  listMailboxCampaignReplySets,
   resolveReplyIdentity,
   sendMailboxMessage,
   syncInstantlyMailboxResponse,

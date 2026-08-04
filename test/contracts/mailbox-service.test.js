@@ -370,6 +370,7 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
 
 test('selected owner response stays isolated while durable snapshot retains both Instantly owners', async () => {
   let savedSnapshot = '';
+  let localReplyOptions = null;
   const messagesByOwner = {
     serve: [{
       id: 'ramon',
@@ -405,7 +406,12 @@ test('selected owner response stays isolated while durable snapshot retains both
     }],
   };
   const service = createMailboxService({
-    mailboxCampaignRepliesService: { listReplies: async () => [] },
+    mailboxCampaignRepliesService: {
+      listReplies: async (options) => {
+        localReplyOptions = options;
+        return [];
+      },
+    },
     instantlyMailboxService: {
       isConfigured: () => true,
       getConfiguredAccounts: (owner) => owner === 'serve'
@@ -424,6 +430,7 @@ test('selected owner response stays isolated while durable snapshot retains both
   }, res);
 
   assert.equal(res.statusCode, 200);
+  assert.deepEqual(localReplyOptions, { limit: 100, owner: 'serve' });
   assert.deepEqual(res.body.messages.map((message) => message.id), ['ramon']);
   const persisted = parseMailboxCampaignSnapshot(savedSnapshot);
   assert.deepEqual(

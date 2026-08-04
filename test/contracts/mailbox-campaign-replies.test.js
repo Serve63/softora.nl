@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   CAMPAIGN_INCOMING_FOLDERS,
+  CAMPAIGN_MAILBOX_ACCOUNTS,
   CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
@@ -12,6 +13,88 @@ const {
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
 } = require('../../server/services/mailbox-campaign-replies');
+
+test('campaign mailbox applies the selected owner before limiting older conversations', async () => {
+  const serveAccounts = [
+    'serve@softora.nl',
+    'servecreusen@softora.nl',
+    'servec321@gmail.com',
+    'serve290@gmail.com',
+    'servecreusen7@gmail.com',
+  ];
+  const martijnMessages = Array.from({ length: 220 }, (_value, index) => ({
+    id: `martijn:${index}`,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    from: `Martijn lead ${index}`,
+    email: `martijn-lead-${index}@example.test`,
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Menselijke reactie van Martijns lead.',
+    date: new Date(Date.UTC(2026, 6, 31, 23, 59, index % 60)).toISOString(),
+    messageId: `<martijn-${index}@example.test>`,
+  }));
+  const olderServeMessages = Array.from({ length: 3 }, (_value, index) => ({
+    id: `serve:${index}`,
+    folder: 'inbox',
+    accountEmail: serveAccounts[index],
+    from: `Oudere Servé lead ${index}`,
+    email: `serve-lead-${index}@example.test`,
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Oudere menselijke reactie voor Servé.',
+    date: new Date(Date.UTC(2026, 4, 22 + index, 10)).toISOString(),
+    messageId: `<serve-${index}@example.test>`,
+  }));
+  const sourceMessages = [...martijnMessages, ...olderServeMessages];
+  const requestedAccountSets = [];
+  const mailboxIndexStore = {
+    listMessagesForAccounts: async ({ accountEmails, folder }) => {
+      requestedAccountSets.push(accountEmails.slice().sort());
+      return folder === 'inbox'
+        ? sourceMessages.filter((message) => accountEmails.includes(message.accountEmail))
+        : [];
+    },
+    listMatchingMessagesForAccounts: async ({ accountEmails, folder }) => {
+      requestedAccountSets.push(accountEmails.slice().sort());
+      return folder === 'inbox'
+        ? sourceMessages.filter((message) => accountEmails.includes(message.accountEmail))
+        : [];
+    },
+    hydrateMessageBodies: async ({ messages }) => messages,
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore,
+    dataOpsStore: {
+      listCustomersByEmails: async ({ emails }) => emails.map((email) => ({
+        id: email,
+        bedrijf: email,
+        email,
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      })),
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 200, owner: 'serve' });
+
+  assert.deepEqual(replies.map((reply) => reply.id), ['serve:2', 'serve:1', 'serve:0']);
+  assert.ok(requestedAccountSets.length > 0);
+  requestedAccountSets.forEach((accounts) => assert.deepEqual(accounts, serveAccounts.slice().sort()));
+
+  requestedAccountSets.length = 0;
+  const result = await service.listRepliesWithSnapshot({
+    limit: 200,
+    owner: 'serve',
+    snapshotLimit: 100,
+  });
+
+  assert.deepEqual(result.messages.map((reply) => reply.id), ['serve:2', 'serve:1', 'serve:0']);
+  assert.equal(result.snapshotMessages.length, 100);
+  assert.ok(result.snapshotMessages.every((reply) => reply.accountEmail === 'martijn@softora.nl'));
+  requestedAccountSets.forEach((accounts) => assert.deepEqual(
+    accounts,
+    CAMPAIGN_MAILBOX_ACCOUNTS.slice().sort()
+  ));
+});
 
 test('campaign mailbox bouwt een bewezen BCC-kopie als volledige chronologische thread', () => {
   const original = {

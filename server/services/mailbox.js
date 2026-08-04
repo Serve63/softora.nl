@@ -8,7 +8,7 @@ const {
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
 const { createMailboxComposeSend } = require('./mailbox-compose-send');
-const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, mergeCampaignReplies, resolveReplyIdentity, sendMailboxMessage, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
+const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, listMailboxCampaignReplySets, mergeCampaignReplies, resolveReplyIdentity, sendMailboxMessage, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const { createMailboxReadMessageService } = require('./mailbox-read-message');
@@ -2432,10 +2432,8 @@ function createMailboxService(deps = {}) {
     }
   }
   async function listCampaignReplies({ limit = 100, owner = '', refreshInstantly = false } = {}) {
-    const replies = await mailboxCampaignRepliesService.listReplies({
-      limit: Number(limit || 100) || 100,
-    });
-    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
+    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner });
+    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText });
     const result = {
       ok: true,
       messages,
