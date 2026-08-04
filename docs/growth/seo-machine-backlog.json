@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03",
+  "updatedAt": "2026-08-04",
   "minimumReady": 15,
   "minimumCommercialShare": 0.7,
   "scoreFormula": {
@@ -749,7 +749,9 @@
     },
     {
       "id": "chatbot-cost-009",
-      "status": "ready",
+      "status": "shipped",
+      "shippedAt": "2026-08-04",
+      "shippedPath": "/blog/chatbot-kosten-mkb",
       "path": "/blog/chatbot-kosten-mkb",
       "contentType": "blog",
       "cluster": "ai-contact",
@@ -761,14 +763,19 @@
       "clusterRole": "Kostenpagina voor chatbotkopers",
       "demandEvidence": [
         {
-          "type": "inventory-gap",
-          "source": "Softora SEO-contentinventaris",
-          "observedAt": "2026-07-17",
-          "detail": "De site behandelt wanneer een chatbot zinvol is, livechatvergelijking en CRM-koppeling, maar niet de kostenopbouw van laten maken."
+          "type": "serp-and-cluster-gap",
+          "source": "Nederlandse SERP voor chatbot laten maken kosten en Softora SEO-contentinventaris",
+          "observedAt": "2026-08-04",
+          "detail": "Actuele resultaten van AICG, do-IT Digital en Searchlab verdelen chatbotkosten over inrichting, kennis, integraties, gebruik en beheer. Softora behandelde orientatie, livechatvergelijking en CRM-koppeling, maar nog niet hoe een koper deze kostenonderdelen op een gelijke scope afbakent."
         }
       ],
+      "competitorPatterns": [
+        "Prijsbanden met uiteenlopende definities van een FAQ-bot, platforminrichting en maatwerk",
+        "Eenmalige inrichting, platformgebruik en doorlopend beheer die niet altijd afzonderlijk worden vergeleken",
+        "ROI- of besparingsclaims zonder controleerbare klanttaak en procesbaseline"
+      ],
       "overlap": {
-        "checkedAt": "2026-07-17",
+        "checkedAt": "2026-08-04",
         "closestPaths": [
           "/blog/chatbot-laten-maken-wanneer-zinvol",
           "/vergelijkingen/chatbot-vs-livechat",
@@ -823,7 +830,96 @@
           "BreadcrumbList"
         ]
       },
-      "nextAction": "Verifieer actuele kostencomponenten en houd het artikel productneutraal."
+      "nextAction": "Wacht op indexatie en beoordeel op 2026-08-18, 2026-09-01 en 2026-09-29 de niet-branded ontdekking, klikontwikkeling en route naar /chatbot-laten-maken."
+    },
+    {
+      "id": "chatbot-proposal-022",
+      "status": "ready",
+      "path": "/blog/chatbot-offerte-vergelijken",
+      "contentType": "blog",
+      "cluster": "ai-contact",
+      "primaryQuery": "chatbot offerte vergelijken",
+      "intent": "Chatbotvoorstellen op scope, bewijs, eigenaarschap en beheer vergelijken",
+      "intentClass": "comparison",
+      "funnelStage": "decision",
+      "targetMoneyPage": "/chatbot-laten-maken",
+      "clusterRole": "Leveranciers- en offertebeslissing na kostenorientatie en voor implementatie",
+      "demandEvidence": [
+        {
+          "type": "current-serp",
+          "source": "Nederlandse SERP voor chatbot leverancier kiezen en chatbot offerte vergelijken",
+          "observedAt": "2026-08-04",
+          "detail": "Actuele resultaten behandelen prijsmodellen, complexiteit, implementatie, kennisbank, koppelingen en beheer, maar leggen die onderdelen zelden als een leveranciersneutrale bewijs- en acceptatiematrix naast elkaar. AICG benoemt expliciet dat kostencomponenten nodig zijn om offertes transparant te vergelijken."
+        },
+        {
+          "type": "primary-source",
+          "source": "Microsoft Learn implementatiechecklist en gezamenlijke oproep van AP en ACM",
+          "observedAt": "2026-08-04",
+          "detail": "Microsoft benoemt kennisgovernance, integraties, kanalen en betrouwbaar gedrag als implementatievragen; AP en ACM benadrukken transparantie en bereikbaarheid van menselijk contact. Deze controlepunten ondersteunen een praktische offertevergelijking zonder leveranciersranglijst."
+        }
+      ],
+      "competitorPatterns": [
+        "Toplijsten die leveranciers rangschikken zonder gelijke scope of toetsbare acceptatie",
+        "Prijsvergelijkingen waarin licentie, inrichting, koppelingen en beheer door elkaar lopen",
+        "Functielijsten zonder eigenaarschap, menselijk overdrachtspad of exit-afspraken"
+      ],
+      "overlap": {
+        "checkedAt": "2026-08-04",
+        "closestPaths": [
+          "/blog/chatbot-kosten-mkb",
+          "/blog/chatbot-laten-maken-wanneer-zinvol",
+          "/blog/chatbot-crm-koppeling-leads-opvolgen"
+        ],
+        "decision": "distinct",
+        "rationale": "De kostengids maakt budgetonderdelen vergelijkbaar, de orientatiegids toetst of een chatbot zinvol is en de implementatiegids ordent uitvoering. Deze kandidaat helpt een beslisser twee concrete voorstellen toetsen op dezelfde scope, bewijsstukken, verantwoordelijkheden, beheer en overdraagbaarheid."
+      },
+      "scores": {
+        "businessFit": 5,
+        "conversionProximity": 5,
+        "nonBrandOpportunity": 4,
+        "attainability": 3,
+        "uniqueness": 5,
+        "cannibalizationRisk": 1,
+        "effort": 3
+      },
+      "weightedScore": 4.4,
+      "brief": {
+        "title": "Chatbot-offertes vergelijken: scope, bewijs en beheer",
+        "metaDescription": "Vergelijk chatbotvoorstellen op klanttaak, kennisbron, koppelingen, acceptatietests, menselijke overdracht, eigenaarschap en doorlopend beheer.",
+        "h1": "Zo vergelijk je chatbot-offertes op dezelfde scope",
+        "outline": [
+          "Normaliseer klanttaak, routes en uitsluitingen",
+          "Vraag dezelfde kennis-, data- en integratiebewijzen",
+          "Vergelijk acceptatie en menselijke overdracht",
+          "Leg eigenaarschap, gebruikskosten en exit vast",
+          "Score voorstellen met beslispoorten in plaats van functietelling"
+        ],
+        "buyerQuestions": [
+          "Welke onderdelen moeten in iedere chatbot-offerte staan?",
+          "Hoe vergelijk je een platformoplossing met maatwerk?",
+          "Welke bewijsstukken zijn nodig voor livegang?"
+        ],
+        "incomingLinks": [
+          "/blog/chatbot-kosten-mkb",
+          "/blog/chatbot-laten-maken-wanneer-zinvol"
+        ],
+        "outgoingLinks": [
+          "/chatbot-laten-maken",
+          "/kennisbank/chatbot-implementatie-website-crm"
+        ],
+        "conversionPath": "Van voorstelvergelijking naar een afgebakend gesprek over chatbotdoel, bewijs, verantwoordelijkheden en eerste versie.",
+        "claimRisk": "Geen leverancier als beste aanwijzen, geen vaste besparing of foutloze werking claimen en geen juridische beoordeling suggereren.",
+        "visualConcepts": [
+          "Offerte-normalisatiekaart met gelijke klanttaak, bronnen, integraties en uitsluitingen",
+          "Beslismatrix voor acceptatiebewijs, menselijke overdracht, beheer en exit"
+        ],
+        "structuredData": [
+          "Article",
+          "FAQPage",
+          "BreadcrumbList"
+        ]
+      },
+      "nextAction": "Verifieer actuele buyer questions en werk een leveranciersneutrale scorekaart uit zonder ranglijst of ongecontroleerde prijsclaims."
     },
     {
       "id": "chatbot-implementation-010",

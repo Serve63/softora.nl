@@ -1,5 +1,4 @@
-const { INTERNE_LINKSTRUCTUUR_CONTENT_ITEM } = require('./seo-content-interne-linkstructuur');
-const { BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM } = require('./seo-content-bedrijfssoftware-kosten');
+const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
@@ -962,8 +961,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist vs receptionist', href: '/vergelijkingen/ai-telefonist-vs-receptionist' }),
     ]),
   }),
-  INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
-  BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM,
+  ...SEO_CONTENT_QUALITY_V2_ITEMS,
   Object.freeze({
     collection: 'branches',
     slug: 'installateurs',
