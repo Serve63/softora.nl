@@ -8,6 +8,7 @@
   var currentEditEntryId = null;
   var pendingDeleteEntryId = null;
   var pendingMasterSecretResolver = null;
+  var masterSecretDialogMode = "unlock";
   var passwordRegisterAutoLock = null;
   var vaultSessionGeneration = 0;
 
@@ -20,7 +21,16 @@
   var masterSecretOverlayEl = document.getElementById("master-secret-overlay");
   var masterSecretFormEl = document.getElementById("master-secret-form");
   var masterSecretInputEl = document.getElementById("master-secret-input");
+  var masterSecretInputLabelEl = document.getElementById("master-secret-input-label");
+  var masterSecretCurrentFieldEl = document.getElementById("master-secret-current-field");
+  var masterSecretCurrentInputEl = document.getElementById("master-secret-current-input");
+  var masterSecretConfirmFieldEl = document.getElementById("master-secret-confirm-field");
+  var masterSecretConfirmInputEl = document.getElementById("master-secret-confirm-input");
+  var masterSecretPinFieldEl = document.getElementById("master-secret-pin-field");
+  var masterSecretPinInputEl = document.getElementById("master-secret-pin-input");
   var masterSecretErrorEl = document.getElementById("master-secret-error");
+  var masterSecretTitleEl = document.getElementById("master-secret-title");
+  var masterSecretSubmitEl = document.getElementById("master-secret-submit");
   var masterSecretCloseEl = document.getElementById("master-secret-close");
   var entryModalBackdrop = document.getElementById("entry-modal-backdrop");
   var entryModalEl = document.getElementById("entry-modal");
@@ -38,6 +48,7 @@
   var pwDeleteModalTextEl = document.getElementById("pw-delete-modal-text");
   var pwDeleteModalCancelEl = document.getElementById("pw-delete-modal-cancel");
   var pwDeleteModalConfirmEl = document.getElementById("pw-delete-modal-confirm");
+  var changeMasterSecretBtnEl = document.getElementById("change-master-secret-btn");
   var toastEl = document.getElementById("toast");
   var pinMessageEl = document.getElementById("pin-msg");
   var passwordRegisterStore = global.SoftoraPasswordRegisterStore.create({
@@ -110,11 +121,23 @@
       masterSecretInputEl.value = "";
       masterSecretInputEl.removeAttribute("aria-invalid");
     }
+    if (masterSecretConfirmInputEl) {
+      masterSecretConfirmInputEl.value = "";
+      masterSecretConfirmInputEl.removeAttribute("aria-invalid");
+    }
+    if (masterSecretCurrentInputEl) {
+      masterSecretCurrentInputEl.value = "";
+      masterSecretCurrentInputEl.removeAttribute("aria-invalid");
+    }
+    if (masterSecretPinInputEl) {
+      masterSecretPinInputEl.value = "";
+      masterSecretPinInputEl.removeAttribute("aria-invalid");
+    }
     setMasterSecretError("");
-    resolve(normalizeString(value));
+    resolve(value);
   }
 
-  function openMasterSecretDialog() {
+  function openMasterSecretDialog(mode) {
     if (!masterSecretOverlayEl || !masterSecretInputEl) {
       setRegisterStatus("Master-wachtzin kan niet worden gevraagd. Vernieuw de pagina.", "warning");
       return Promise.resolve("");
@@ -123,27 +146,67 @@
       finishMasterSecretDialog("");
     }
     return new Promise(function (resolve) {
+      masterSecretDialogMode = mode === "change" ? "change" : "unlock";
       pendingMasterSecretResolver = resolve;
       masterSecretInputEl.value = "";
       masterSecretInputEl.removeAttribute("aria-invalid");
+      if (masterSecretConfirmInputEl) {
+        masterSecretConfirmInputEl.value = "";
+        masterSecretConfirmInputEl.removeAttribute("aria-invalid");
+      }
+      if (masterSecretCurrentInputEl) {
+        masterSecretCurrentInputEl.value = "";
+        masterSecretCurrentInputEl.removeAttribute("aria-invalid");
+      }
+      if (masterSecretPinInputEl) {
+        masterSecretPinInputEl.value = "";
+        masterSecretPinInputEl.removeAttribute("aria-invalid");
+      }
+      if (masterSecretCurrentFieldEl) masterSecretCurrentFieldEl.hidden = masterSecretDialogMode !== "change";
+      if (masterSecretConfirmFieldEl) masterSecretConfirmFieldEl.hidden = masterSecretDialogMode !== "change";
+      if (masterSecretPinFieldEl) masterSecretPinFieldEl.hidden = masterSecretDialogMode !== "change";
+      if (masterSecretInputLabelEl) {
+        masterSecretInputLabelEl.textContent = masterSecretDialogMode === "change"
+          ? "Nieuwe master-wachtzin"
+          : "Master-wachtzin";
+      }
+      if (masterSecretTitleEl) {
+        masterSecretTitleEl.textContent = masterSecretDialogMode === "change"
+          ? "Nieuwe master-wachtzin"
+          : "Master-wachtzin";
+      }
+      if (masterSecretSubmitEl) {
+        masterSecretSubmitEl.textContent = masterSecretDialogMode === "change"
+          ? "Wachtzin wijzigen"
+          : "Ontgrendelen";
+      }
       setMasterSecretError("");
       masterSecretOverlayEl.hidden = false;
       masterSecretOverlayEl.setAttribute("aria-hidden", "false");
       window.setTimeout(function () {
-        masterSecretInputEl.focus();
+        if (masterSecretDialogMode === "change" && masterSecretCurrentInputEl) {
+          masterSecretCurrentInputEl.focus();
+        } else {
+          masterSecretInputEl.focus();
+        }
       }, 0);
     });
   }
 
   async function persistPasswordEntries(actor) {
-    var result = await passwordRegisterStore.persist(entries, actor || "save");
-    if (result.stale) {
-      var staleError = new Error("De kluis is tijdens het opslaan vergrendeld.");
-      staleError.code = "PASSWORD_REGISTER_LOCKED";
-      throw staleError;
+    try {
+      var result = await passwordRegisterStore.persist(entries, actor || "save");
+      if (result.stale) {
+        var staleError = new Error("De kluis is tijdens het opslaan vergrendeld.");
+        staleError.code = "PASSWORD_REGISTER_LOCKED";
+        throw staleError;
+      }
+      entries = result.entries;
+      return result.response;
+    } catch (error) {
+      if (error && error.forceLock) forceLockAfterVaultFailure(error);
+      throw error;
     }
-    entries = result.entries;
-    return result.response;
   }
 
   async function ensurePasswordEntriesLoaded(masterSecret) {
@@ -185,6 +248,23 @@
     passwordListEl.replaceChildren(renderer.createEmptyState("Kluis vergrendeld."));
   }
 
+  function getVaultFailureMessage(error) {
+    var code = normalizeString(error && error.code);
+    if (code === "PASSWORD_REGISTER_CURRENT_MASTER_INVALID") {
+      return "Huidige master-wachtzin onjuist. De kluis is voor de zekerheid vergrendeld.";
+    }
+    if (code === "PASSWORD_REGISTER_REKEY_UNCERTAIN" || code === "PASSWORD_REGISTER_WRITE_UNCERTAIN") {
+      return "Opslaguitkomst onzeker. Ontgrendel opnieuw; probeer na een wachtzinwijziging eerst de nieuwe wachtzin.";
+    }
+    return "Kluis voor de zekerheid vergrendeld. Ontgrendel opnieuw voor een verse Supabase-controle.";
+  }
+
+  function forceLockAfterVaultFailure(error) {
+    var message = getVaultFailureMessage(error);
+    passwordRegisterPin.lock();
+    if (pinMessageEl) pinMessageEl.textContent = message;
+  }
+
   function secureLockCleanup() {
     vaultSessionGeneration += 1;
     if (passwordRegisterAutoLock) passwordRegisterAutoLock.stop();
@@ -199,7 +279,7 @@
     closeDeleteEntryModal();
     if (global.SoftoraPasswordRegisterSecurity) {
       global.SoftoraPasswordRegisterSecurity.clearSensitiveUi({
-        inputs: [masterSecretInputEl, entryNameEl, entryUrlEl, entryUserEl, entryPasswordEl, searchInputEl],
+        inputs: [masterSecretInputEl, masterSecretCurrentInputEl, masterSecretConfirmInputEl, masterSecretPinInputEl, entryNameEl, entryUrlEl, entryUserEl, entryPasswordEl, searchInputEl],
         entryForm: entryFormEl,
         passwordInput: entryPasswordEl,
         passwordToggle: entryPasswordToggleEl,
@@ -325,6 +405,40 @@
     entryPasswordToggleEl.textContent = willShow ? "Verbergen" : "Tonen";
     entryPasswordToggleEl.setAttribute("aria-pressed", willShow ? "true" : "false");
     entryPasswordToggleEl.setAttribute("aria-label", willShow ? "Wachtwoord verbergen" : "Wachtwoord tonen");
+  }
+
+  async function changeMasterSecret() {
+    var request = await openMasterSecretDialog("change");
+    if (!request || typeof request !== "object") return;
+    var expectedGeneration = vaultSessionGeneration;
+    var rawPin = String(request.pin || "");
+    request.pin = "";
+    try {
+      var verification = await passwordRegisterPin.verifyFreshPin(rawPin);
+      rawPin = "";
+      if (!verification || verification.ok !== true) {
+        throw new Error("De verse beveiligings-PIN is niet bevestigd.");
+      }
+      if (expectedGeneration !== vaultSessionGeneration) return;
+      var result = await passwordRegisterStore.changeMasterSecret(
+        request.currentMasterSecret,
+        request.newMasterSecret,
+        entries,
+        "master-secret-change"
+      );
+      if (result.stale || expectedGeneration !== vaultSessionGeneration) return;
+      entries = result.entries;
+      render();
+      toast("\u2713 Master-wachtzin gewijzigd; v2-migratie volgt in de beveiligde eindstap");
+    } catch (error) {
+      if (expectedGeneration !== vaultSessionGeneration) return;
+      forceLockAfterVaultFailure(error);
+    } finally {
+      rawPin = "";
+      request.currentMasterSecret = "";
+      request.newMasterSecret = "";
+      request.pin = "";
+    }
   }
 
   async function saveEntryFromModal(event) {
@@ -462,6 +576,42 @@
           if (masterSecretInputEl) masterSecretInputEl.focus();
           return;
         }
+        if (masterSecretDialogMode === "change") {
+          var policy = passwordRegisterStore.validateNewMasterSecret(nextSecret);
+          var currentSecret = normalizeString(masterSecretCurrentInputEl && masterSecretCurrentInputEl.value);
+          var confirmedSecret = normalizeString(masterSecretConfirmInputEl && masterSecretConfirmInputEl.value);
+          var freshPin = normalizeString(masterSecretPinInputEl && masterSecretPinInputEl.value);
+          if (!currentSecret) {
+            if (masterSecretCurrentInputEl) masterSecretCurrentInputEl.setAttribute("aria-invalid", "true");
+            setMasterSecretError("Vul eerst je huidige master-wachtzin in.");
+            if (masterSecretCurrentInputEl) masterSecretCurrentInputEl.focus();
+            return;
+          }
+          if (!policy.ok) {
+            masterSecretInputEl.setAttribute("aria-invalid", "true");
+            setMasterSecretError(policy.error);
+            masterSecretInputEl.focus();
+            return;
+          }
+          if (confirmedSecret !== nextSecret) {
+            if (masterSecretConfirmInputEl) masterSecretConfirmInputEl.setAttribute("aria-invalid", "true");
+            setMasterSecretError("De twee master-wachtzinnen zijn niet gelijk.");
+            if (masterSecretConfirmInputEl) masterSecretConfirmInputEl.focus();
+            return;
+          }
+          if (!/^\d{6}$/.test(freshPin)) {
+            if (masterSecretPinInputEl) masterSecretPinInputEl.setAttribute("aria-invalid", "true");
+            setMasterSecretError("Vul de verse zescijferige beveiligings-PIN in.");
+            if (masterSecretPinInputEl) masterSecretPinInputEl.focus();
+            return;
+          }
+          finishMasterSecretDialog({
+            currentMasterSecret: currentSecret,
+            newMasterSecret: nextSecret,
+            pin: freshPin
+          });
+          return;
+        }
         finishMasterSecretDialog(nextSecret);
       });
     }
@@ -487,6 +637,9 @@
     passwordRegisterPin.bindKeyboard(document);
     if (lockRegisterBtnEl) {
       lockRegisterBtnEl.addEventListener("click", passwordRegisterPin.lock);
+    }
+    if (changeMasterSecretBtnEl) {
+      changeMasterSecretBtnEl.addEventListener("click", changeMasterSecret);
     }
     if (addEntryBtnEl) {
       addEntryBtnEl.addEventListener("click", openCreateModal);
@@ -518,7 +671,7 @@
       passwordRegisterAutoLock.start();
       if (!passwordRegisterAutoLock.isActive()) return;
       var expectedGeneration = vaultSessionGeneration;
-      masterSecret = normalizeString(await openMasterSecretDialog());
+      masterSecret = normalizeString(await openMasterSecretDialog("unlock"));
       if (!masterSecret || expectedGeneration !== vaultSessionGeneration) {
         passwordRegisterAutoLock.stop();
         if (!masterSecret) {
