@@ -51,10 +51,12 @@ test('kvk database control defaults fail closed to disabled', async () => {
   assert.equal(response.payload.control.workerState, 'offline');
   assert.equal(response.payload.control.workers.vuller.workerState, 'offline');
   assert.equal(response.payload.control.workers.controle.workerState, 'offline');
+  assert.equal(response.payload.control.workers.goedgekeurd.workerState, 'offline');
   assert.equal(service.controlStateKey, 'softora:kvk_database_control_v1');
   assert.deepEqual(service.workerStateKeys, {
     vuller: 'softora:kvk_database_worker_v1',
     controle: 'softora:kvk_database_worker_v1:controle',
+    goedgekeurd: 'softora:kvk_database_worker_v1:goedgekeurd',
   });
 });
 
@@ -70,11 +72,12 @@ test('premium control request persists the requested enabled state', async () =>
   assert.equal(response.payload.control.workerState, 'starting');
   assert.equal(response.payload.control.workers.vuller.workerState, 'starting');
   assert.equal(response.payload.control.workers.controle.workerState, 'starting');
+  assert.equal(response.payload.control.workers.goedgekeurd.workerState, 'starting');
   assert.equal(getStoredRow(service.controlStateKey).payload.enabled, true);
   assert.equal(getStoredRow(service.controlStateKey).updated_at, '2026-07-26T20:30:00.000Z');
 });
 
-test('vuller and controle report independently and both must be active', async () => {
+test('all three visible database workers report independently and must be active', async () => {
   const { service, getStoredRow } = createInMemoryService();
   await service.sendPostControlResponse({ body: { enabled: true } }, createJsonResponse());
 
@@ -118,10 +121,29 @@ test('vuller and controle report independently and both must be active', async (
     controleReport
   );
   assert.equal(controleReport.statusCode, 200);
-  assert.equal(controleReport.payload.control.workerState, 'running');
+  assert.equal(controleReport.payload.control.workerState, 'starting');
   assert.equal(controleReport.payload.control.workers.vuller.workerState, 'running');
   assert.equal(controleReport.payload.control.workers.controle.workerState, 'running');
+  assert.equal(controleReport.payload.control.workers.goedgekeurd.workerState, 'starting');
   assert.equal(getStoredRow(service.workerStateKeys.controle).payload.workerKey, 'controle');
+
+  const goedgekeurdReport = createJsonResponse();
+  await service.sendReportWorkerResponse(
+    {
+      headers: { authorization: 'Bearer worker-token' },
+      body: {
+        workerKey: 'goedgekeurd',
+        workerState: 'running',
+        workerMessage: 'Luna-goedkeuringen worden gecontroleerd.',
+        currentBatch: 'goedgekeurd 1/6',
+      },
+    },
+    goedgekeurdReport
+  );
+  assert.equal(goedgekeurdReport.statusCode, 200);
+  assert.equal(goedgekeurdReport.payload.control.workerState, 'running');
+  assert.equal(goedgekeurdReport.payload.control.workers.goedgekeurd.workerState, 'running');
+  assert.equal(getStoredRow(service.workerStateKeys.goedgekeurd).payload.workerKey, 'goedgekeurd');
 
   const poll = createJsonResponse();
   await service.sendPollControlResponse(

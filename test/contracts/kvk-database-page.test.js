@@ -199,7 +199,7 @@ test('kvk database renders refresh age in seconds and a real fill control', () =
   assert.match(controlSource, /'X-Softora-Requested-With': 'premium'/);
   assert.match(controlSource, /JSON\.stringify\(\{ enabled: !state\.control\.enabled \}\)/);
   assert.match(controlSource, /fillButtonLabel\.textContent = enabled \? 'AAN' : 'UIT'/);
-  assert.match(controlSource, /\['vuller', 'controle'\]/);
+  assert.match(controlSource, /\['vuller', 'controle', 'goedgekeurd'\]/);
   assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
   assert.match(controlStyles, /\.database-fill-toggle__track/);
   assert.match(controlStyles, /translateX\(15px\)/);
