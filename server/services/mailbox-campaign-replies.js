@@ -586,6 +586,22 @@ function isExternalCampaignMessage(message) {
   return Boolean(sender && (!account || !isSameMailboxIdentity(sender, account)));
 }
 
+function isCampaignMailboxIdentity(value) {
+  const email = normalizeEmail(value);
+  return Boolean(email && CAMPAIGN_MAILBOX_ACCOUNTS.some(
+    (accountEmail) => isSameMailboxIdentity(email, accountEmail)
+  ));
+}
+
+function shouldShowCampaignConversation(conversation) {
+  return Boolean(
+    conversation && (
+      conversation.copyContext ||
+      !isCampaignMailboxIdentity(conversation.email)
+    )
+  );
+}
+
 function shouldShowCampaignMessage(message) {
   return hasCampaignLabelProvenance(message)
     ? isExternalCampaignMessage(message)
@@ -845,7 +861,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
       attachSentThreadMessages(replies, sentMessages),
       replies,
       sentMessages
-    );
+    ).filter(shouldShowCampaignConversation);
     const selectedAccountSet = new Set(selectedMailboxAccounts);
     const selectedConversations = allVisibleConversations
       .filter((conversation) => selectedAccountSet.has(normalizeEmail(conversation && conversation.accountEmail)))
