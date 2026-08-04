@@ -56,15 +56,18 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.match(pageSource, /id="planning-search-input"/);
-  assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
-  assert.match(pageSource, /id="latest-treated-table-frame"/);
+  assert.match(pageSource, /<h2>Laatste 10 Fouten van Luna Max<\/h2>/);
+  assert.match(pageSource, /id="latest-luna-errors-table-frame"/);
   assert.ok(
-    pageSource.indexOf('<h2>Laatste 10 Behandeld</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
-    'Laatste 10 Behandeld hoort boven Planning te staan'
+    pageSource.indexOf('<h2>Laatste 10 Fouten van Luna Max</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
+    'De Luna Max-fouten horen boven Planning te staan'
   );
+  assert.doesNotMatch(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
+  assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804a/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804a/);
 });
@@ -90,21 +93,36 @@ test('kvk database planning merges current parallel route progress', () => {
   assert.match(scriptSource, /function getContactActiveCodes\(\)/);
 });
 
-test('kvk database renders latest treated snapshot rows in the restored panel', () => {
-  const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
+test('kvk database visually renders only material Luna Max errors with before and after values', () => {
+  const lunaErrors = require('../../assets/kvk-database-luna-errors.js');
+  const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-luna-errors.js'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
 
-  assert.match(scriptSource, /latestTreated:Array\.isArray\(embeddedSnapshot\.latestTreated\)/);
-  assert.match(scriptSource, /state\.latestTreated=Array\.isArray\(e\.latestTreated\)/);
-  assert.match(scriptSource, /function renderLatestTreatedRows\(\)/);
-  assert.match(scriptSource, /\[e\.woonplaats,e\.provincie\]\.filter\(Boolean\)\.join\(", "\)/);
-  assert.match(scriptSource, /"Gevonden door"/);
-  assert.match(scriptSource, /found_by_role_label/);
-  assert.match(scriptSource, /found_by_model_label/);
-  assert.match(scriptSource, /"Onterecht goedgekeurd"/);
-  assert.match(scriptSource, /"incorrect_approval"===e\.review_finding/);
-  assert.match(scriptSource, /"rejected_to_control"===e\.usable_review_outcome/);
-  assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
+  assert.match(scriptSource, /snapshot\?\.latestLunaErrors/);
+  assert.doesNotMatch(scriptSource, /latestTreated/);
+  assert.match(scriptSource, /Geen fouten van Luna Max gevonden\./);
+  assert.match(scriptSource, /Luna Max had/);
+  assert.match(scriptSource, /Gecorrigeerd naar/);
+  assert.match(scriptSource, /controller_model_label/);
+  assert.match(scriptSource, /deps\.window\.setInterval\(controller\.render, 1000\)/);
+
+  const html = lunaErrors.findingRowHtml({
+    kvk_nummer: '12345678',
+    bedrijfsnaam: 'Voorbeeld & Zoon',
+    woonplaats: 'Vught',
+    provincie: 'Noord-Brabant',
+    error_label: 'Onjuiste gegevens',
+    incorrect_fields: ['Telefoonnummer'],
+    luna_value_summary: 'Telefoonnummer: 0612345678',
+    corrected_value_summary: 'Telefoonnummer: 0731234567',
+    controller_role_label: 'Controleur',
+    controller_model_label: 'Sol 5.6 xhigh',
+    detected_at: new Date().toISOString(),
+  });
+  assert.match(html, /Voorbeeld &amp; Zoon/);
+  assert.match(html, /Telefoonnummer: 0612345678/);
+  assert.match(html, /Telefoonnummer: 0731234567/);
+  assert.match(html, /Sol 5\.6 xhigh/);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 });
 
@@ -131,7 +149,7 @@ test('kvk database page loads its protected live snapshot with an empty embedded
   assert.match(scriptSource, /await loadRemoteSnapshot\(\);const\[t,a\]=await Promise\.all/);
 });
 
-test('kvk database refreshes live counters and latest treated rows while the page stays open', () => {
+test('kvk database refreshes live counters while the page stays open', () => {
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.js'), 'utf8');
 
   assert.match(scriptSource, /const DASHBOARD_REFRESH_INTERVAL_MS=15e3/);
@@ -159,7 +177,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260803a/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);
@@ -172,6 +190,7 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.match(metricsSource, /unusable_grade_activity/);
   assert.match(metricsSource, /unusableGrades\['3'\]/);
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
+  assert.match(metricsSource, /count > 0 \? '\+' : ''/);
   assert.match(metricsStyles, /\.stat-delta-number/);
   assert.match(metricsStyles, /\.unusable-grade-delta-removed/);
   const definitiveDeltaMarkup = pageSource.match(/<small id="companies-unusable-grade-2-last60">([\s\S]*?)<\/small>/)?.[1] || '';

@@ -41,10 +41,11 @@
 
   function renderLast60Delta(element, value) {
     if (!element) return;
-    const count = Math.max(0, Number(value || 0));
+    const rawCount = Number(value || 0);
+    const count = Number.isFinite(rawCount) ? rawCount : 0;
     const numberNode = element.querySelector('.stat-delta-number');
     const labelNode = element.querySelector('.stat-delta-label');
-    if (numberNode) numberNode.textContent = `+${numberFormat.format(count)}`;
+    if (numberNode) numberNode.textContent = `${count > 0 ? '+' : ''}${numberFormat.format(count)}`;
     if (labelNode) labelNode.textContent = 'laatste 60 min';
     element.classList.toggle('is-zero', count === 0);
   }
