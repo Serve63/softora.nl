@@ -5,6 +5,17 @@ const { execFileSync } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 const PREMIUM_SIDEBAR_THEME_VERSION = '20260519b';
+const PASSWORD_REGISTER_PAGE = 'premium-wachtwoordenregister.html';
+const PASSWORD_REGISTER_ALLOWED_SCRIPT_PATHS = Object.freeze([
+  'assets/premium-password-register-theme-boot.js',
+  'assets/premium-ui-state-client.js',
+  'assets/premium-password-register-renderer.js',
+  'assets/premium-password-register-store.js',
+  'assets/premium-password-register-pin.js',
+  'assets/premium-password-register-security.js',
+  'assets/premium-password-register-autolock.js',
+  'assets/premium-password-register-app.js',
+]);
 
 const REQUIRED_QUALITY_FILES = Object.freeze([
   'AGENTS.md',
@@ -111,6 +122,59 @@ function hasSameVersions(cssVersions, jsVersions) {
   const jsSet = new Set(jsVersions);
   if (cssSet.size !== jsSet.size) return false;
   return Array.from(cssSet).every((version) => jsSet.has(version));
+}
+
+function listScriptSources(html) {
+  const pattern = /<script\b[^>]*\bsrc\s*=\s*(["'])([^"']+)\1[^>]*>/gi;
+  return Array.from(String(html || '').matchAll(pattern), (match) =>
+    match[2].replace(/^\/+/, '').split(/[?#]/, 1)[0]
+  );
+}
+
+function hasInlineScript(html) {
+  return Array.from(String(html || '').matchAll(/<script\b([^>]*)>/gi)).some(
+    (match) => !/(?:^|\s)src\s*=\s*["']/i.test(match[1])
+  );
+}
+
+function addPasswordRegisterIsolationViolations(html, violations) {
+  const cssVersions = listPremiumThemeVersions(html, 'personnel-theme.css');
+  const jsVersions = listPremiumThemeVersions(html, 'personnel-theme.js');
+
+  if (cssVersions.length !== 1 || cssVersions[0] !== PREMIUM_SIDEBAR_THEME_VERSION) {
+    violations.push(
+      `[quality-lock] ${PASSWORD_REGISTER_PAGE} moet personnel-theme.css exact eenmaal met versie ${PREMIUM_SIDEBAR_THEME_VERSION} laden.`
+    );
+  }
+  if (jsVersions.length > 0) {
+    violations.push(
+      `[quality-lock] ${PASSWORD_REGISTER_PAGE} mag gedeelde personnel-theme.js niet laden; de kluis vereist scriptisolatie.`
+    );
+  }
+  if (!/<html\b[^>]*\bdata-password-register-csp-ready=["']1["']/i.test(html)) {
+    violations.push(
+      `[quality-lock] ${PASSWORD_REGISTER_PAGE} mist de verplichte data-password-register-csp-ready markering.`
+    );
+  }
+  if (hasInlineScript(html)) {
+    violations.push(`[quality-lock] ${PASSWORD_REGISTER_PAGE} mag geen inline scripts bevatten.`);
+  }
+
+  const scriptSources = listScriptSources(html);
+  const expectedScripts = new Set(PASSWORD_REGISTER_ALLOWED_SCRIPT_PATHS);
+  const unexpectedScripts = scriptSources.filter((source) => !expectedScripts.has(source));
+  const missingScripts = PASSWORD_REGISTER_ALLOWED_SCRIPT_PATHS.filter(
+    (source) => !scriptSources.includes(source)
+  );
+  const duplicateScripts = scriptSources.filter(
+    (source, index) => scriptSources.indexOf(source) !== index
+  );
+
+  if (unexpectedScripts.length > 0 || missingScripts.length > 0 || duplicateScripts.length > 0) {
+    violations.push(
+      `[quality-lock] ${PASSWORD_REGISTER_PAGE} moet exact de geïsoleerde wachtwoordenregister-scriptallowlist laden.`
+    );
+  }
 }
 
 function listQualityLockViolations(options = {}) {
@@ -308,6 +372,7 @@ function listQualityLockViolations(options = {}) {
 
   const premiumThemeFiles = trackedFiles.filter((filePath) => {
     if (!/^premium-[^/]+\.html$/i.test(filePath)) return false;
+    if (filePath === PASSWORD_REGISTER_PAGE) return false;
     const html = readFile(filePath);
     return /assets\/personnel-theme\.(?:css|js)\?v=/.test(html);
   });
@@ -342,6 +407,10 @@ function listQualityLockViolations(options = {}) {
     });
   });
 
+  if (trackedFileSet.has(PASSWORD_REGISTER_PAGE)) {
+    addPasswordRegisterIsolationViolations(readFile(PASSWORD_REGISTER_PAGE), violations);
+  }
+
   if (trackedFileSet.has('.github/pull_request_template.md')) {
     const template = readFile('.github/pull_request_template.md');
     ['npm run verify:critical', 'npm run check:guardrails', 'rollback'].forEach((requiredText) => {
@@ -370,6 +439,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  PASSWORD_REGISTER_ALLOWED_SCRIPT_PATHS,
+  PASSWORD_REGISTER_PAGE,
   PREMIUM_SIDEBAR_THEME_VERSION,
   listExistingRepoFiles,
   listQualityLockViolations,

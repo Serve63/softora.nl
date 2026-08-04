@@ -23,13 +23,22 @@
     });
   }
 
+  function wipeEntries(entries) {
+    (Array.isArray(entries) ? entries : []).forEach(function (entry) {
+      if (!entry || typeof entry !== "object") return;
+      Object.keys(entry).forEach(function (key) {
+        entry[key] = "";
+      });
+    });
+  }
+
   function sanitizeEntry(entry, index) {
     var safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
     var safeId = Number(entry && entry.id);
     var name = normalizeString(entry && entry.naam) || "Inlog " + (safeIndex + 1);
     var url = normalizeString(entry && entry.url) || "onbekend";
     var user = normalizeString(entry && entry.user);
-    var pw = normalizeString(entry && entry.pw);
+    var pw = String(entry && entry.pw != null ? entry.pw : "");
     var cat = normalizeString(entry && entry.cat) || "Overig";
 
     return {
@@ -113,19 +122,23 @@
     if (!encodedSecret.length) {
       throw new Error("Master-wachtzin is verplicht om de kluis te openen.");
     }
-    var baseKey = await cryptoObj.subtle.importKey("raw", encodedSecret, "PBKDF2", false, ["deriveKey"]);
-    return cryptoObj.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        hash: "SHA-256",
-        salt: saltBytes,
-        iterations: PASSWORD_REGISTER_KDF_ITERATIONS
-      },
-      baseKey,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
+    try {
+      var baseKey = await cryptoObj.subtle.importKey("raw", encodedSecret, "PBKDF2", false, ["deriveKey"]);
+      return await cryptoObj.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          hash: "SHA-256",
+          salt: saltBytes,
+          iterations: PASSWORD_REGISTER_KDF_ITERATIONS
+        },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    } finally {
+      encodedSecret.fill(0);
+    }
   }
 
   async function fetchWithTimeout(url, options, timeoutMs) {
@@ -207,12 +220,25 @@
     var entriesLoadPromise = null;
     var currentKey = null;
     var currentSaltBytes = null;
+    var sessionGeneration = 0;
     var setStatus = typeof config.setStatus === "function" ? config.setStatus : function () {};
 
-    async function ensureUnlocked(masterSecret, preferredSaltBytes) {
+    function assertActiveGeneration(expectedGeneration) {
+      if (expectedGeneration !== sessionGeneration) {
+        var error = new Error("De kluis is tijdens de beveiligingsactie vergrendeld.");
+        error.code = "PASSWORD_REGISTER_LOCKED";
+        throw error;
+      }
+    }
+
+    async function ensureUnlocked(masterSecret, preferredSaltBytes, expectedGeneration) {
+      assertActiveGeneration(expectedGeneration);
       if (currentKey && currentSaltBytes) return;
-      currentSaltBytes = preferredSaltBytes || getRandomBytes(16);
-      currentKey = await deriveAesKey(masterSecret, currentSaltBytes);
+      var nextSaltBytes = preferredSaltBytes || getRandomBytes(16);
+      var nextKey = await deriveAesKey(masterSecret, nextSaltBytes);
+      assertActiveGeneration(expectedGeneration);
+      currentSaltBytes = nextSaltBytes;
+      currentKey = nextKey;
     }
 
     async function encryptEntriesPayload(entries) {
@@ -222,21 +248,25 @@
       var cryptoObj = getWebCrypto();
       var iv = getRandomBytes(12);
       var plainText = new TextEncoder().encode(JSON.stringify(sanitizeEntries(entries)));
-      var cipherBytes = new Uint8Array(
-        await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: iv }, currentKey, plainText)
-      );
-      return {
-        version: 1,
-        algorithm: "AES-GCM",
-        kdf: "PBKDF2-SHA256",
-        iterations: PASSWORD_REGISTER_KDF_ITERATIONS,
-        salt: bytesToBase64(currentSaltBytes),
-        iv: bytesToBase64(iv),
-        ciphertext: bytesToBase64(cipherBytes)
-      };
+      try {
+        var cipherBytes = new Uint8Array(
+          await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: iv }, currentKey, plainText)
+        );
+        return {
+          version: 1,
+          algorithm: "AES-GCM",
+          kdf: "PBKDF2-SHA256",
+          iterations: PASSWORD_REGISTER_KDF_ITERATIONS,
+          salt: bytesToBase64(currentSaltBytes),
+          iv: bytesToBase64(iv),
+          ciphertext: bytesToBase64(cipherBytes)
+        };
+      } finally {
+        plainText.fill(0);
+      }
     }
 
-    async function decryptEntriesPayload(serializedPayload, masterSecret) {
+    async function decryptEntriesPayload(serializedPayload, masterSecret, expectedGeneration) {
       var payload = JSON.parse(normalizeString(serializedPayload));
       if (
         Number(payload && payload.version) !== 1 ||
@@ -249,18 +279,21 @@
       var iv = base64ToBytes(payload.iv);
       var cipherBytes = base64ToBytes(payload.ciphertext);
       var key = await deriveAesKey(masterSecret, saltBytes);
-      var decrypted = await getWebCrypto().subtle.decrypt(
-        { name: "AES-GCM", iv: iv },
-        key,
-        cipherBytes
+      var decryptedBytes = new Uint8Array(
+        await getWebCrypto().subtle.decrypt({ name: "AES-GCM", iv: iv }, key, cipherBytes)
       );
-      var parsedEntries = JSON.parse(new TextDecoder().decode(new Uint8Array(decrypted)));
-      if (!Array.isArray(parsedEntries)) {
-        throw new Error("Kluisinhoud is ongeldig.");
+      try {
+        var parsedEntries = JSON.parse(new TextDecoder().decode(decryptedBytes));
+        if (!Array.isArray(parsedEntries)) {
+          throw new Error("Kluisinhoud is ongeldig.");
+        }
+        assertActiveGeneration(expectedGeneration);
+        currentKey = key;
+        currentSaltBytes = saltBytes;
+        return sanitizeEntries(parsedEntries);
+      } finally {
+        decryptedBytes.fill(0);
       }
-      currentKey = key;
-      currentSaltBytes = saltBytes;
-      return sanitizeEntries(parsedEntries);
     }
 
     function parseLegacyEntries(serializedEntries) {
@@ -274,31 +307,41 @@
     }
 
     async function persist(entries, actor) {
+      var expectedGeneration = sessionGeneration;
       var sanitized = sanitizeEntries(entries).map(function (entry) {
         return Object.assign({}, entry);
       });
-      var encryptedPayload = await encryptEntriesPayload(sanitized);
-      var payload = {
-        patch: {
-          [PASSWORD_REGISTER_ENCRYPTED_KEY]: JSON.stringify(encryptedPayload),
-          [PASSWORD_REGISTER_LEGACY_ENTRIES_KEY]: "",
-          updated_at: new Date().toISOString(),
-          updated_by: String(actor || "save")
+      try {
+        var encryptedPayload = await encryptEntriesPayload(sanitized);
+        assertActiveGeneration(expectedGeneration);
+        var payload = {
+          patch: {
+            [PASSWORD_REGISTER_ENCRYPTED_KEY]: JSON.stringify(encryptedPayload),
+            [PASSWORD_REGISTER_LEGACY_ENTRIES_KEY]: "",
+            updated_at: new Date().toISOString(),
+            updated_by: String(actor || "save")
+          }
+        };
+        var response = await fetchUiStateSetWithFallback(PASSWORD_REGISTER_SCOPE, payload);
+        if (normalizeString(response && response.source) !== "supabase") {
+          throw new Error("Supabase heeft de kluisopslag niet bevestigd.");
         }
-      };
-      var response = await fetchUiStateSetWithFallback(PASSWORD_REGISTER_SCOPE, payload);
-      var source = normalizeString(response && response.source);
-      cachedEntries = cloneEntries(sanitized);
-      entriesLoaded = true;
-      if (source === "supabase") {
+        if (expectedGeneration !== sessionGeneration) {
+          wipeEntries(sanitized);
+          return { entries: [], response: response, stale: true };
+        }
+        wipeEntries(cachedEntries);
+        cachedEntries = cloneEntries(sanitized);
+        entriesLoaded = true;
         setStatus("Versleutelde kluis is opgeslagen in Supabase.");
-      } else {
-        setStatus("Versleutelde kluis is tijdelijk opgeslagen, maar nog niet bevestigd vanuit Supabase.", "warning");
+        return { entries: cloneEntries(sanitized), response: response, stale: false };
+      } catch (error) {
+        wipeEntries(sanitized);
+        throw error;
       }
-      return { entries: cloneEntries(sanitized), response: response };
     }
 
-    async function load(masterSecret) {
+    async function load(masterSecret, expectedGeneration) {
       if (entriesLoaded && currentKey) return cloneEntries(cachedEntries);
       if (entriesLoadPromise) return entriesLoadPromise;
 
@@ -306,12 +349,12 @@
         var result = null;
         var loadedEntries;
         var source = "";
-        try {
-          result = await fetchUiStateGetWithFallback(PASSWORD_REGISTER_SCOPE);
-          source = normalizeString(result && result.source);
-        } catch (_) {
-          result = null;
+        result = await fetchUiStateGetWithFallback(PASSWORD_REGISTER_SCOPE);
+        source = normalizeString(result && result.source);
+        if (source !== "supabase" || !result.values || typeof result.values !== "object") {
+          throw new Error("De kluis is niet gezaghebbend door Supabase bevestigd.");
         }
+        assertActiveGeneration(expectedGeneration);
 
         var values = (result && result.values && typeof result.values === "object") ? result.values : {};
         var encryptedEntries = normalizeString(values[PASSWORD_REGISTER_ENCRYPTED_KEY]);
@@ -319,15 +362,17 @@
 
         if (encryptedEntries) {
           try {
-            loadedEntries = await decryptEntriesPayload(encryptedEntries, masterSecret);
+            loadedEntries = await decryptEntriesPayload(encryptedEntries, masterSecret, expectedGeneration);
           } catch (_) {
-            currentKey = null;
-            currentSaltBytes = null;
+            if (expectedGeneration === sessionGeneration) {
+              currentKey = null;
+              currentSaltBytes = null;
+            }
             throw new Error("Master-wachtzin klopt niet of de versleutelde kluis is beschadigd.");
           }
           setStatus(source === "supabase" ? "Versleutelde kluis geladen vanuit Supabase." : "Versleutelde kluis geladen uit fallback-opslag.");
         } else {
-          await ensureUnlocked(masterSecret);
+          await ensureUnlocked(masterSecret, null, expectedGeneration);
           var parsedLegacyEntries = parseLegacyEntries(legacyEntries);
           if (parsedLegacyEntries && parsedLegacyEntries.length) {
             loadedEntries = sanitizeEntries(parsedLegacyEntries);
@@ -338,12 +383,14 @@
             setStatus(
               result
                 ? "Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren."
-                : "Kon Supabase niet laden. Veilige voorbeeldgegevens zijn lokaal geladen totdat je later opslaat.",
+                : "Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren.",
               "warning"
             );
           }
         }
 
+        assertActiveGeneration(expectedGeneration);
+        wipeEntries(cachedEntries);
         cachedEntries = cloneEntries(loadedEntries);
         entriesLoaded = true;
         return cloneEntries(loadedEntries);
@@ -352,22 +399,20 @@
       try {
         return await entriesLoadPromise;
       } finally {
-        entriesLoadPromise = null;
+        if (expectedGeneration === sessionGeneration) entriesLoadPromise = null;
       }
     }
 
     async function unlock(masterSecret) {
-      currentKey = null;
-      currentSaltBytes = null;
-      cachedEntries = [];
-      entriesLoaded = false;
-      entriesLoadPromise = null;
-      return load(masterSecret);
+      lock();
+      return load(masterSecret, sessionGeneration);
     }
 
     function lock() {
+      sessionGeneration += 1;
       currentKey = null;
       currentSaltBytes = null;
+      wipeEntries(cachedEntries);
       cachedEntries = [];
       entriesLoaded = false;
       entriesLoadPromise = null;
@@ -375,7 +420,7 @@
 
     return {
       getNextId: getNextId,
-      load: load,
+      load: function (masterSecret) { return load(masterSecret, sessionGeneration); },
       lock: lock,
       normalizeString: normalizeString,
       persist: persist,

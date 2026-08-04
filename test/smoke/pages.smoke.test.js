@@ -286,7 +286,6 @@ const premiumSidebarThemeVersionTargets = [
   'premium-seo.html',
   'premium-socialmedia.html',
   'premium-vaste-lasten.html',
-  'premium-wachtwoordenregister.html',
   'premium-websitegenerator.html',
   'premium-websitepreview.html',
   'premium-word.html',
@@ -312,6 +311,14 @@ test('page smoke: premium sidebar pages pin the refreshed personnel theme script
       `Nieuwe sidebar scriptversie ontbreekt voor ${filePath}`
     );
   }
+});
+
+test('page smoke: password register keeps shared theme code outside the isolated vault', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-wachtwoordenregister.html'), 'utf8');
+  assert.match(html, /assets\/personnel-theme\.css\?v=20260519b/);
+  assert.doesNotMatch(html, /assets\/personnel-theme\.js/);
+  assert.match(html, /assets\/premium-password-register-security\.js\?v=20260804a/);
+  assert.match(html, /assets\/premium-password-register-autolock\.js\?v=20260804a/);
 });
 
 test('page smoke: premium-website.html uses the current WhatsApp number', () => {

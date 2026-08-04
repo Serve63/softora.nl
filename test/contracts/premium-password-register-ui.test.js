@@ -12,15 +12,36 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   const rendererPath = path.join(__dirname, '../../assets/premium-password-register-renderer.js');
   const storePath = path.join(__dirname, '../../assets/premium-password-register-store.js');
   const pinPath = path.join(__dirname, '../../assets/premium-password-register-pin.js');
+  const securityPath = path.join(__dirname, '../../assets/premium-password-register-security.js');
+  const autoLockPath = path.join(__dirname, '../../assets/premium-password-register-autolock.js');
+  const themeBootPath = path.join(__dirname, '../../assets/premium-password-register-theme-boot.js');
   const appPath = path.join(__dirname, '../../assets/premium-password-register-app.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
   const storeSource = fs.readFileSync(storePath, 'utf8');
   const pinSource = fs.readFileSync(pinPath, 'utf8');
+  const securitySource = fs.readFileSync(securityPath, 'utf8');
+  const autoLockSource = fs.readFileSync(autoLockPath, 'utf8');
+  const themeBootSource = fs.readFileSync(themeBootPath, 'utf8');
   const appSource = fs.readFileSync(appPath, 'utf8');
-  const combinedSource = `${pageSource}\n${rendererSource}\n${storeSource}\n${pinSource}\n${appSource}`;
+  const combinedSource = `${pageSource}\n${rendererSource}\n${storeSource}\n${pinSource}\n${securitySource}\n${autoLockSource}\n${themeBootSource}\n${appSource}`;
+  const executableScriptSources = Array.from(pageSource.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/gi))
+    .map((match) => match[1]);
+
+  assert.deepEqual(executableScriptSources, [
+    'assets/premium-password-register-theme-boot.js?v=20260804a',
+    'assets/premium-ui-state-client.js?v=20260722b',
+    'assets/premium-password-register-renderer.js?v=20260427a',
+    'assets/premium-password-register-store.js?v=20260804a',
+    'assets/premium-password-register-pin.js?v=20260804a',
+    'assets/premium-password-register-security.js?v=20260804a',
+    'assets/premium-password-register-autolock.js?v=20260804a',
+    'assets/premium-password-register-app.js?v=20260804a',
+  ]);
+  assert.doesNotMatch(pageSource, /personnel-theme\.js|premium-boot-one-second\.js|premium-sidebar-profile-prefill\.js/);
 
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
+  assert.match(pageSource, /<html lang="nl" data-password-register-csp-ready="1">/);
   assert.doesNotMatch(pageSource, /Barlow/);
   assert.doesNotMatch(pageSource, /<div class="reg-logo">SOFTORA\.NL<\/div>/);
   assert.doesNotMatch(pageSource, /cat-bar/);
@@ -32,9 +53,13 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /\.reg-title\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*font-size:\s*3rem;/s);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/s);
   assert.match(pageSource, /assets\/premium-password-register-renderer\.js\?v=20260427a/);
-  assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260722a/);
-  assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260516a/);
-  assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260509b/);
+  assert.match(pageSource, /assets\/premium-password-register-theme-boot\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-password-register-security\.css\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-password-register-store\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-password-register-pin\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-password-register-security\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-password-register-autolock\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/premium-password-register-app\.js\?v=20260804a/);
   assert.match(rendererSource, /global\.SoftoraPasswordRegisterRenderer/);
   assert.match(storeSource, /global\.SoftoraPasswordRegisterStore/);
   assert.match(storeSource, /var PASSWORD_REGISTER_SCOPE = "premium_password_register";/);
@@ -65,6 +90,13 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.doesNotMatch(appSource, /global\.prompt\(/);
   assert.doesNotMatch(appSource, /window\.prompt\(/);
   assert.match(pinSource, /global\.SoftoraPasswordRegisterPin/);
+  assert.match(securitySource, /global\.SoftoraPasswordRegisterSecurity/);
+  assert.match(autoLockSource, /global\.SoftoraPasswordRegisterAutoLock/);
+  assert.match(autoLockSource, /DEFAULT_INACTIVITY_MS = 5 \* 60 \* 1000/);
+  assert.match(autoLockSource, /visibilitychange/);
+  assert.match(autoLockSource, /pagehide/);
+  assert.match(autoLockSource, /lock\("blur"\)/);
+  assert.match(autoLockSource, /resume-timeout/);
   assert.match(storeSource, /hosting@example\.test/);
   assert.match(storeSource, /Voorbeeldgegevens geladen\. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren\./);
   assert.doesNotMatch(pageSource, /DEFAULT_PASSWORD_ENTRIES|fetchUiStateGetWithFallback|fetchUiStateSetWithFallback|PASSWORD_REGISTER_SCOPE/);
@@ -91,6 +123,11 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(appSource, /passwordRegisterPin\.bindNumpad\(pinNumpadEl\)/);
   assert.match(appSource, /passwordRegisterPin\.bindKeyboard\(document\)/);
   assert.match(appSource, /lockRegisterBtnEl\.addEventListener\("click", passwordRegisterPin\.lock\)/);
+  assert.match(appSource, /secureLockCleanup/);
+  assert.match(appSource, /SoftoraPasswordRegisterSecurity\.wipeEntries\(entries\)/);
+  assert.match(appSource, /SoftoraPasswordRegisterSecurity\.clearSensitiveUi/);
+  assert.match(appSource, /passwordRegisterAutoLock\.start\(\)/);
+  assert.match(appSource, /finally\s*\{\s*masterSecret = "";/);
   assert.doesNotMatch(pageSource, /function p\(|function pb\(|function pClear\(|function dots\(|function check\(/);
   assert.match(pinSource, /function createPinController/);
   assert.match(pinSource, /bindNumpad: bindNumpad/);
@@ -111,16 +148,23 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /id="entry-modal"/);
   assert.match(pageSource, /id="entry-user"/);
   assert.match(pageSource, /id="entry-password"/);
+  assert.match(pageSource, /id="entry-password"[^>]*type="password"/);
+  assert.match(pageSource, /id="entry-password-toggle"/);
+  assert.match(appSource, /toggleEntryPasswordVisibility/);
   assert.doesNotMatch(pageSource, /const PIN\s*=\s*['"][0-9]{6}['"]/);
   assert.match(pinSource, /fetch\("\/api\/premium-users\/verify-pin"/);
-  assert.match(pinSource, /body:\s*JSON\.stringify\(\{\s*actionConfirmCode:\s*pin\s*\}\)/);
+  assert.match(pinSource, /actionConfirmCode:\s*pin/);
+  assert.match(pinSource, /actionConfirmScope:\s*"password-register"/);
+  assert.match(pinSource, /credentials:\s*"same-origin"/);
+  assert.match(pinSource, /data\.ok !== true/);
 });
 
-function loadPasswordRegisterStoreWithUiState(initialValues = {}) {
+function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = {}) {
   const storePath = path.join(__dirname, '../../assets/premium-password-register-store.js');
   const source = fs.readFileSync(storePath, 'utf8');
   const postBodies = [];
   let values = { ...initialValues };
+  let getCount = 0;
   const window = {
     crypto: webcrypto,
     setTimeout,
@@ -130,21 +174,24 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}) {
   };
   const context = {
     window,
-    fetch: async (_url, options = {}) => {
-      if (options.method === 'POST') {
-        const body = JSON.parse(String(options.body || '{}'));
+    fetch: async (_url, requestOptions = {}) => {
+      if (requestOptions.method === 'POST') {
+        const body = JSON.parse(String(requestOptions.body || '{}'));
         postBodies.push(body);
+        if (typeof loadOptions.waitForPost === 'function') await loadOptions.waitForPost(body);
         values = { ...values, ...(body.patch || {}) };
         return {
           ok: true,
           status: 200,
-          json: async () => ({ ok: true, source: 'supabase' }),
+          json: async () => ({ ok: true, source: loadOptions.postSource || 'supabase' }),
         };
       }
+      getCount += 1;
+      if (loadOptions.readError) throw loadOptions.readError;
       return {
         ok: true,
         status: 200,
-        json: async () => ({ ok: true, source: 'supabase', values }),
+        json: async () => ({ ok: true, source: loadOptions.readSource || 'supabase', values }),
       };
     },
     AbortController,
@@ -159,6 +206,7 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}) {
   vm.runInContext(source, context);
   return {
     createStore: context.window.SoftoraPasswordRegisterStore.create,
+    getGetCount: () => getCount,
     getPostBodies: () => postBodies.slice(),
     getValues: () => ({ ...values }),
   };
@@ -225,4 +273,218 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
     () => encryptedHarness.createStore().unlock('verkeerde master'),
     /Master-wachtzin klopt niet/
   );
+});
+
+test('premium wachtwoordenregister faalt gesloten zonder gezaghebbende Supabase-read', async () => {
+  const unavailableHarness = loadPasswordRegisterStoreWithUiState({}, {
+    readError: new Error('Supabase onbereikbaar'),
+  });
+  await assert.rejects(
+    () => unavailableHarness.createStore().unlock('lange unieke master wachtzin'),
+    /Supabase onbereikbaar/
+  );
+
+  const fallbackHarness = loadPasswordRegisterStoreWithUiState({}, { readSource: 'memory' });
+  await assert.rejects(
+    () => fallbackHarness.createStore().unlock('lange unieke master wachtzin'),
+    /niet gezaghebbend door Supabase bevestigd/
+  );
+});
+
+test('premium wachtwoordenregister bewaart wachtwoord-whitespace exact', async () => {
+  const harness = loadPasswordRegisterStoreWithUiState();
+  const store = harness.createStore();
+  const fixturePasswordWithWhitespace = '  fixture-exact-secret-with-spaces  ';
+  await store.unlock('lange unieke master wachtzin');
+  await store.persist([
+    {
+      id: 1,
+      naam: 'Whitespace test',
+      url: 'https://example.test',
+      user: 'user@example.test',
+      pw: fixturePasswordWithWhitespace,
+      cat: 'Test',
+    },
+  ], 'whitespace-test');
+
+  const reopened = loadPasswordRegisterStoreWithUiState(harness.getValues()).createStore();
+  const entries = await reopened.unlock('lange unieke master wachtzin');
+  assert.equal(entries[0].pw, fixturePasswordWithWhitespace);
+});
+
+test('premium wachtwoordenregister zet een late opslag na lock niet terug in geheugen', async () => {
+  let releasePost;
+  let markPostStarted;
+  const postStarted = new Promise((resolve) => { markPostStarted = resolve; });
+  const harness = loadPasswordRegisterStoreWithUiState({}, {
+    waitForPost: async () => {
+      markPostStarted();
+      await new Promise((resolve) => { releasePost = resolve; });
+    },
+  });
+  const store = harness.createStore();
+  const entries = await store.unlock('lange unieke race test master wachtzin');
+  const persistPromise = store.persist(entries, 'race-test');
+  await postStarted;
+  store.lock();
+  releasePost();
+
+  const result = await persistPromise;
+  assert.equal(result.stale, true);
+  assert.equal(result.entries.length, 0);
+  const reopened = await store.unlock('lange unieke race test master wachtzin');
+  assert.equal(reopened.length, entries.length);
+  assert.equal(harness.getGetCount(), 2);
+});
+
+function loadPasswordRegisterSecurityModule() {
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-security.js');
+  try {
+    global.window = {};
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-security.js');
+    return global.window;
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+}
+
+function createFakeElement(value = '') {
+  const attributes = new Map();
+  const classes = new Set(['show']);
+  return {
+    value,
+    type: 'text',
+    textContent: value,
+    classList: {
+      contains: (name) => classes.has(name),
+      remove: (name) => classes.delete(name),
+    },
+    setAttribute: (name, nextValue) => attributes.set(name, String(nextValue)),
+    removeAttribute: (name) => attributes.delete(name),
+    getAttribute: (name) => attributes.get(name),
+  };
+}
+
+test('premium wachtwoordenregister wist plaintext uit entries, formulieren en DOM bij lock', () => {
+  const window = loadPasswordRegisterSecurityModule();
+  const security = window.SoftoraPasswordRegisterSecurity;
+  const entries = [{ id: 1, naam: 'Account', user: 'user@example.test', pw: 'fixture-secret-test-value' }];
+  const inputs = [
+    createFakeElement('master-secret-test'),
+    createFakeElement('user@example.test'),
+    createFakeElement('fixture-secret-test-value'),
+  ];
+  const passwordInput = inputs[2];
+  const toggle = createFakeElement('Verbergen');
+  const deleteText = createFakeElement('Account verwijderen?');
+  const status = createFakeElement('Account geladen');
+  const toast = createFakeElement('Account getoond');
+  const list = {
+    children: ['fixture-secret-test-value'],
+    replaceChildren(...children) { this.children = children; },
+  };
+  let formResetCount = 0;
+
+  security.wipeEntries(entries);
+  security.clearSensitiveUi({
+    inputs,
+    entryForm: { reset: () => { formResetCount += 1; } },
+    passwordInput,
+    passwordToggle: toggle,
+    deleteModalText: deleteText,
+    status,
+    toast,
+    list,
+    createLockedState: (message) => ({ message }),
+  });
+
+  assert.equal(entries[0].pw, '');
+  assert.equal(entries[0].user, '');
+  assert.equal(inputs.every((input) => input.value === ''), true);
+  assert.equal(passwordInput.type, 'password');
+  assert.equal(toggle.textContent, 'Tonen');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+  assert.equal(deleteText.textContent, '');
+  assert.equal(status.textContent, '');
+  assert.equal(toast.textContent, '');
+  assert.equal(toast.classList.contains('show'), false);
+  assert.equal(formResetCount, 1);
+  assert.deepEqual(list.children, [{ message: 'Kluis vergrendeld.' }]);
+});
+
+test('premium wachtwoordenregister vergrendelt direct bij blur, inactiviteit, achtergrond en hervatten', () => {
+  const documentListeners = {};
+  const windowListeners = {};
+  const timers = new Map();
+  let timerId = 0;
+  let now = 1000;
+  const reasons = [];
+  const fakeDocument = {
+    hidden: false,
+    addEventListener: (name, handler) => { documentListeners[name] = handler; },
+  };
+  const fakeWindow = {
+    document: fakeDocument,
+    addEventListener: (name, handler) => { windowListeners[name] = handler; },
+    setTimeout: (handler, delay) => {
+      timerId += 1;
+      timers.set(timerId, { handler, delay });
+      return timerId;
+    },
+    clearTimeout: (id) => timers.delete(id),
+  };
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-autolock.js');
+  let create;
+  try {
+    global.window = fakeWindow;
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-autolock.js');
+    create = fakeWindow.SoftoraPasswordRegisterAutoLock.create;
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+
+  const controller = create({
+    document: fakeDocument,
+    window: fakeWindow,
+    inactivityMs: 300000,
+    now: () => now,
+    setTimeout: fakeWindow.setTimeout,
+    clearTimeout: fakeWindow.clearTimeout,
+    onLock: (reason) => reasons.push(reason),
+  });
+  controller.start();
+  windowListeners.blur();
+  assert.deepEqual(reasons, ['blur']);
+
+  controller.start();
+  fakeDocument.hidden = true;
+  documentListeners.visibilitychange();
+  assert.deepEqual(reasons, ['blur', 'hidden']);
+
+  fakeDocument.hidden = false;
+  controller.start();
+  now += 300001;
+  const pendingTimer = Array.from(timers.values()).at(-1);
+  pendingTimer.handler();
+  assert.deepEqual(reasons, ['blur', 'hidden', 'inactivity']);
+
+  controller.start();
+  now += 300001;
+  windowListeners.focus();
+  assert.deepEqual(reasons, ['blur', 'hidden', 'inactivity', 'resume-timeout']);
+
+  controller.start();
+  documentListeners.freeze();
+  assert.equal(reasons.at(-1), 'freeze');
+  controller.start();
+  windowListeners.pagehide();
+  assert.equal(reasons.at(-1), 'pagehide');
 });
