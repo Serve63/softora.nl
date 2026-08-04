@@ -4392,7 +4392,102 @@ test('coldmail autopilot treats fris webdesign dashboard text as a real image-ba
   assert.equal(savedRows[0].outreachCampaignType, 'webdesign');
 });
 
-test('coldmail autopilot does not send fris webdesign mail when no design assets are ready', async () => {
+test('coldmail autopilot hydrates the exact eligible design beyond the first 100 snapshot rows', async () => {
+  const signedMediaCalls = [];
+  const farRows = Array.from({ length: 251 }, (_, index) => ({
+    id: `far-${index + 1}`,
+    bedrijf: `Ver Bedrijf ${index + 1}`,
+    email: `ver-${index + 1}@example.test`,
+    website: `ver-${index + 1}.example.test`,
+    status: 'benaderbaar',
+    branche: 'Horeca & Restaurants',
+    stad: 'Groningen',
+    mail: true,
+    hasPhoto: true,
+    hasMockup: true,
+  }));
+  const exactCandidate = {
+    id: 'position-252-ready',
+    bedrijf: 'Exact Ontwerp Oisterwijk',
+    email: 'exact-252@example.test',
+    website: 'exact-ontwerp.example.test',
+    status: 'benaderbaar',
+    branche: 'Horeca & Restaurants',
+    stad: 'Oisterwijk',
+    mail: true,
+    hasPhoto: true,
+    hasMockup: true,
+  };
+  const snapshotRows = [...farRows, exactCandidate];
+  const { service, sentMessages } = createService({
+    rows: snapshotRows,
+    mailReadySnapshotService: {
+      async buildMailReadySnapshot(options) {
+        assert.deepEqual(options, { limit: 3000, offset: 0 });
+        return { ok: true, customers: snapshotRows };
+      },
+    },
+    dataOpsStore: {
+      async listDesignPhotosWithSignedUrls(options) {
+        signedMediaCalls.push(options);
+        return [
+          {
+            customerId: 'unrelated-record',
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+            websiteMockupUrl: TINY_PNG_DATA_URL,
+          },
+          {
+            customerId: exactCandidate.id,
+            websitePhotoUrl: TINY_PNG_DATA_URL,
+            websiteMockupUrl: TINY_PNG_DATA_URL,
+            fileName: 'Exact webdesign.png',
+            websiteMockupName: 'Exact mockup.png',
+          },
+        ];
+      },
+    },
+    mailboxAccountsRaw: JSON.stringify([
+      {
+        email: 'servec321@gmail.com',
+        name: 'Servé Creusen',
+        smtpHost: 'smtp.gmail.com',
+        smtpUser: 'servec321@gmail.com',
+        smtpPass: 'gmail-secret',
+      },
+    ]),
+    autopilotState: {
+      enabled: true,
+      config: {
+        count: 1,
+        senderEmails: ['servec321@gmail.com'],
+        senderProfiles: {
+          'servec321@gmail.com': {
+            subject: 'Kleine vraag over jullie website',
+            body: 'Goedendag,\n\nIk heb een fris webdesign gemaakt.\n\nMet vriendelijke groet,\nServé Creusen',
+          },
+        },
+        branch: 'Horeca & Restaurants',
+        radiusKm: 50,
+        specialAction: 'webdesign',
+      },
+    },
+  });
+
+  const result = await service.runColdmailAutopilot({
+    publicBaseUrl: 'https://www.softora.nl',
+    actor: 'Coldmail Autopilot Cron',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].to, exactCandidate.email);
+  assert.equal(signedMediaCalls.length, 1);
+  assert.deepEqual(signedMediaCalls[0].customerIds, [exactCandidate.id]);
+  assert.equal(signedMediaCalls[0].maxMatches, 1);
+  assert.equal(sentMessages[0].attachments.length, 2);
+});
+
+test('coldmail autopilot does not start a standalone preparation job when no design assets are ready', async () => {
   const preparedJobs = [];
   const { service, sentMessages } = createService({
     rows: [
@@ -4453,10 +4548,9 @@ test('coldmail autopilot does not send fris webdesign mail when no design assets
 
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
-  assert.equal(result.reason, 'webdesign_preparation_queued');
+  assert.equal(result.reason, 'no_webdesign_photos');
   assert.equal(sentMessages.length, 0);
-  assert.equal(preparedJobs.length, 1);
-  assert.equal(preparedJobs[0].customer.id, 'import-5-db-mpfntuzo-cifdr3');
+  assert.equal(preparedJobs.length, 0);
 });
 
 test('coldmail autopilot requires both a design image and a device mockup', async () => {
@@ -4625,7 +4719,7 @@ test('coldmail autopilot does not extend cooldown when no webdesign-ready lead e
   assert.equal(getAutopilotState().lastStartedAt, previousLastStartedAt);
 });
 
-test('coldmail autopilot queues the next webdesign job when ready stock is empty', async () => {
+test('coldmail autopilot safely skips without a preparation job when ready stock is empty', async () => {
   const previousLastStartedAt = '2026-04-24T11:40:00.000Z';
   const preparedJobs = [];
   const { service, sentMessages, getAutopilotState } = createService({
@@ -4696,16 +4790,9 @@ test('coldmail autopilot queues the next webdesign job when ready stock is empty
 
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
-  assert.equal(result.reason, 'webdesign_preparation_queued');
+  assert.equal(result.reason, 'no_webdesign_photos');
   assert.equal(sentMessages.length, 0);
-  assert.equal(preparedJobs.length, 1);
-  assert.equal(preparedJobs[0].ownerKey, 'coldmail-autopilot::system');
-  assert.equal(preparedJobs[0].customer.id, 'missing-design');
-  assert.equal(preparedJobs[0].customer.bedrijf, 'Nog Geen Design BV');
-  assert.equal(preparedJobs[0].websiteUrl, 'https://noggeendesign.nl/');
-  assert.match(preparedJobs[0].jobId, /^coldmail_webdesign_[a-f0-9]{24}_[a-z0-9]+$/);
-  assert.equal(result.webdesignPreparation.customerId, 'missing-design');
-  assert.equal(result.webdesignPreparation.job.status, 'queued');
+  assert.equal(preparedJobs.length, 0);
   assert.equal(getAutopilotState().lastStartedAt, previousLastStartedAt);
 });
 
@@ -6471,7 +6558,7 @@ test('coldmail campaign refuses webdesign action when no ready website-design is
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
 });
 
-test('coldmail campaign starts webdesign preparation for the exact next mailable lead when stock is empty', async () => {
+test('coldmail campaign never starts standalone preparation when stock is empty', async () => {
   const preparedJobs = [];
   const { service, sentMessages, getSavedStates } = createService({
     rows: [
@@ -6529,22 +6616,18 @@ test('coldmail campaign starts webdesign preparation for the exact next mailable
         specialAction: 'webdesign',
       }),
     (error) => {
-      assert.equal(error.code, 'WEBDESIGN_PREPARATION_QUEUED');
-      assert.match(error.message, /Voorbereiding gestart voor Bakkerij Zonder Foto/);
-      assert.equal(error.webdesignPreparation.customerId, 'prospect-no-photo');
-      assert.equal(error.webdesignPreparation.job.status, 'queued');
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
+      assert.ok(error.failedItems.some((item) => /Nog geen website-design klaar voor Bakkerij Zonder Foto/.test(item.error)));
       return true;
     }
   );
 
   assert.equal(sentMessages.length, 0);
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
-  assert.equal(preparedJobs.length, 1);
-  assert.equal(preparedJobs[0].customer.id, 'prospect-no-photo');
-  assert.equal(preparedJobs[0].websiteUrl, 'https://zonderfoto.nl/');
+  assert.equal(preparedJobs.length, 0);
 });
 
-test('coldmail campaign prepares fresh webdesign when ready stock is only duplicate-guarded', async () => {
+test('coldmail campaign does not prepare a fresh webdesign when ready stock is duplicate-guarded', async () => {
   const preparedJobs = [];
   const { service, sentMessages, getSavedStates } = createService({
     rows: [
@@ -6610,19 +6693,14 @@ test('coldmail campaign prepares fresh webdesign when ready stock is only duplic
         specialAction: 'webdesign',
       }),
     (error) => {
-      assert.equal(error.code, 'WEBDESIGN_PREPARATION_QUEUED');
-      assert.match(error.message, /Voorbereiding gestart voor Nieuwe Voorraad BV/);
-      assert.equal(error.webdesignPreparation.customerId, 'needs-fresh-design');
-      assert.equal(error.webdesignPreparation.job.status, 'queued');
+      assert.equal(error.code, 'NO_WEBDESIGN_PHOTOS');
       return true;
     }
   );
 
   assert.equal(sentMessages.length, 0);
   assert.equal(getSavedStates().some((state) => state.scope === 'premium_customers_database'), false);
-  assert.equal(preparedJobs.length, 1);
-  assert.equal(preparedJobs[0].customer.id, 'needs-fresh-design');
-  assert.equal(preparedJobs[0].websiteUrl, 'https://nieuwevoorraad.nl/');
+  assert.equal(preparedJobs.length, 0);
 });
 
 test('coldmail campaign preview only lists webdesign recipients with a generated photo', async () => {
