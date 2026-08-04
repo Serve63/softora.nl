@@ -5,6 +5,7 @@ const path = require('path');
 const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder, TextDecoder } = require('node:util');
+const { findUnsafeCredentialFixtures } = require('../testlib/credential-fixture-safety');
 
 test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente editflow', () => {
   const pagePath = path.join(__dirname, '../../premium-wachtwoordenregister.html');
@@ -69,8 +70,9 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.doesNotMatch(pageSource, /DEFAULT_PASSWORD_ENTRIES|fetchUiStateGetWithFallback|fetchUiStateSetWithFallback|PASSWORD_REGISTER_SCOPE/);
   assert.doesNotMatch(pageSource, /passwordRegisterStore|passwordRegisterPin|entryModalMode|saveEntryFromModal|persistPasswordEntries/);
   assert.doesNotMatch(pageSource, /persistPasswordEntries\('bootstrap'\)/);
-  assert.doesNotMatch(combinedSource, /H0st!nger24|Tr@nsIP2026!|G00gl3Work!|Insta\$oft24|Link3dIn!26/);
-  assert.doesNotMatch(combinedSource, /beheer@softora\.nl|admin@softora\.nl|info@softora\.nl/);
+  const contractSource = fs.readFileSync(__filename, 'utf8');
+  assert.deepEqual(findUnsafeCredentialFixtures(combinedSource, { allowPasswordFields: true }), []);
+  assert.deepEqual(findUnsafeCredentialFixtures(contractSource), []);
   assert.match(appSource, /openEditModal\(/);
   assert.match(appSource, /openCreateModal\(/);
   assert.match(pageSource, /class="add-entry-btn"/);
@@ -176,7 +178,7 @@ test('premium wachtwoordenregister bewaart entries alleen als versleutelde blob'
       naam: 'Productie login',
       url: 'https://example.com',
       user: 'beheer@example.com',
-      pw: 'super-geheim',
+      pw: 'fixture-only-secret',
       cat: 'Test',
     },
   ], 'test-save');
@@ -184,7 +186,7 @@ test('premium wachtwoordenregister bewaart entries alleen als versleutelde blob'
   const posted = harness.getPostBodies().at(-1);
   assert.equal(posted.patch.entries_json, '');
   assert.equal(typeof posted.patch.entries_encrypted_v1, 'string');
-  assert.doesNotMatch(posted.patch.entries_encrypted_v1, /super-geheim|beheer@example\.com|Productie login/);
+  assert.doesNotMatch(posted.patch.entries_encrypted_v1, /fixture-only-secret|beheer@example\.com|Productie login/);
   assert.match(posted.patch.entries_encrypted_v1, /"algorithm":"AES-GCM"/);
   assert.match(statuses.at(-1).message, /Versleutelde kluis/);
 });
@@ -196,7 +198,7 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
       naam: 'Legacy login',
       url: 'legacy.example',
       user: 'legacy@example.com',
-      pw: 'oude-plaintext',
+      pw: 'fixture-legacy-secret',
       cat: 'Legacy',
     },
   ];
@@ -206,11 +208,11 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
   const legacyStore = legacyHarness.createStore();
   const migrated = await legacyStore.unlock('juiste master');
 
-  assert.equal(migrated[0].pw, 'oude-plaintext');
+  assert.equal(migrated[0].pw, 'fixture-legacy-secret');
   const migratedPatch = legacyHarness.getPostBodies().at(-1).patch;
   assert.equal(migratedPatch.entries_json, '');
   assert.equal(typeof migratedPatch.entries_encrypted_v1, 'string');
-  assert.doesNotMatch(migratedPatch.entries_encrypted_v1, /oude-plaintext|legacy@example\.com/);
+  assert.doesNotMatch(migratedPatch.entries_encrypted_v1, /fixture-legacy-secret|legacy@example\.com/);
 
   const encryptedHarness = loadPasswordRegisterStoreWithUiState({
     entries_encrypted_v1: migratedPatch.entries_encrypted_v1,
@@ -218,7 +220,7 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
   const encryptedStore = encryptedHarness.createStore();
   const decrypted = await encryptedStore.unlock('juiste master');
   assert.equal(decrypted[0].user, 'legacy@example.com');
-  assert.equal(decrypted[0].pw, 'oude-plaintext');
+  assert.equal(decrypted[0].pw, 'fixture-legacy-secret');
   await assert.rejects(
     () => encryptedHarness.createStore().unlock('verkeerde master'),
     /Master-wachtzin klopt niet/
