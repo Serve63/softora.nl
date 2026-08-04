@@ -463,6 +463,15 @@ test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een an
 
 test('campaign mailbox recognizes strong automatic reply signals without hiding normal replies', () => {
   assert.equal(isAutomatedCampaignReply({
+    subject: 'zomersluiting Re: Kleine vraag over jullie website',
+    preview: 'Beste mailer, Tot 1 juli is impressioni gesloten. Daarna helpen we u graag weer!',
+    body: 'Beste mailer,\n\nTot 1 juli is impressioni gesloten.\nDaarna helpen we u graag weer!',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Vraag over jullie zomersluiting',
+    preview: 'Kun je vertellen wanneer jullie deze zomer gesloten zijn?',
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
     subject: 'Afwezigheidmelding Re: Kleine vraag over jullie website',
     preview: 'Vanaf 2 juli tot en met 3 augustus 2026 is ons kantoor gesloten.',
   }), true);

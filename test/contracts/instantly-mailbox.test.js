@@ -1230,6 +1230,39 @@ test('Instantly conversation listing hides automatic ticket receipts but preserv
   assert.equal(JSON.stringify(conversations).includes('sbsupply-ticket-receipt'), false);
 });
 
+test('Instantly conversation listing hides seasonal closure auto-replies', async () => {
+  const { service, store } = buildService();
+  const sent = service.normalizeInstantlyMessage(incoming({
+    id: 'impressioni-sent',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['info@impressioni.nl'],
+    subject: 'Kleine vraag over jullie website',
+    body: { text: 'Goedendag, ik heb een webdesign voor jullie gemaakt.' },
+    timestamp_email: '2026-06-30T07:50:00.000Z',
+  }));
+  const summerClosure = service.normalizeInstantlyMessage(incoming({
+    id: 'impressioni-summer-closure',
+    email_type: 'received',
+    from_address_email: 'info@impressioni.nl',
+    from_address_name: 'info@impressioni.nl',
+    to_address_email_list: ['serve-sender@example.com'],
+    subject: 'zomersluiting Re: Kleine vraag over jullie website',
+    body: {
+      text: [
+        'Beste mailer,',
+        '',
+        'Tot 1 juli is impressioni gesloten.',
+        'Daarna helpen we u graag weer!',
+      ].join('\n'),
+    },
+    timestamp_email: '2026-06-30T07:56:54.000Z',
+  }));
+  store.rows.push(sent, summerClosure);
+
+  assert.deepEqual(await service.listOwnerConversations('serve'), []);
+});
+
 test('reply uses the exact stored account/thread and rejects cross-owner, recipient and attachment drift', async () => {
   const { service, store, requests } = buildService({
     fetchJsonWithTimeout: async (_url, options) => ({
