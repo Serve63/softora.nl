@@ -60,11 +60,18 @@ test('kvk database control defaults fail closed to disabled', async () => {
   });
 });
 
-test('premium control request persists the requested enabled state', async () => {
+test('dashboard control is read-only and token-protected chat command persists enabled state', async () => {
   const { service, getStoredRow } = createInMemoryService();
-  const response = createJsonResponse();
+  const dashboardResponse = createJsonResponse();
+  await service.sendPostControlResponse({ body: { enabled: true } }, dashboardResponse);
+  assert.equal(dashboardResponse.statusCode, 405);
+  assert.match(dashboardResponse.payload.error, /alleen-lezen/);
 
-  await service.sendPostControlResponse({ body: { enabled: true } }, response);
+  const response = createJsonResponse();
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    response
+  );
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.payload.control.enabled, true);
@@ -79,7 +86,10 @@ test('premium control request persists the requested enabled state', async () =>
 
 test('all three visible database workers report independently and must be active', async () => {
   const { service, getStoredRow } = createInMemoryService();
-  await service.sendPostControlResponse({ body: { enabled: true } }, createJsonResponse());
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
 
   const rejected = createJsonResponse();
   await service.sendPollControlResponse({ headers: { authorization: 'Bearer wrong' } }, rejected);
@@ -156,7 +166,10 @@ test('all three visible database workers report independently and must be active
 
 test('stale worker heartbeat is exposed as waiting for self-healing', async () => {
   const { service, setNow } = createInMemoryService();
-  await service.sendPostControlResponse({ body: { enabled: true } }, createJsonResponse());
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: true } },
+    createJsonResponse()
+  );
   await service.sendReportWorkerResponse(
     {
       headers: { authorization: 'Bearer worker-token' },
@@ -177,8 +190,15 @@ test('stale worker heartbeat is exposed as waiting for self-healing', async () =
 
 test('kvk database control validates browser and worker payloads', async () => {
   const { service } = createInMemoryService();
+  const unauthorizedCommand = createJsonResponse();
+  await service.sendCommandControlResponse({ body: { enabled: true } }, unauthorizedCommand);
+  assert.equal(unauthorizedCommand.statusCode, 401);
+
   const invalidToggle = createJsonResponse();
-  await service.sendPostControlResponse({ body: { enabled: 'yes' } }, invalidToggle);
+  await service.sendCommandControlResponse(
+    { headers: { authorization: 'Bearer worker-token' }, body: { enabled: 'yes' } },
+    invalidToggle
+  );
   assert.equal(invalidToggle.statusCode, 400);
 
   const invalidWorker = createJsonResponse();

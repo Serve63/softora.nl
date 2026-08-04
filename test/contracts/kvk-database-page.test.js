@@ -56,20 +56,19 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   );
   assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.match(pageSource, /id="planning-search-input"/);
-  assert.match(pageSource, /<h2>Laatste 10 Fouten van Luna Max<\/h2>/);
+  assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
   assert.match(pageSource, /id="latest-luna-errors-table-frame"/);
   assert.ok(
-    pageSource.indexOf('<h2>Laatste 10 Fouten van Luna Max</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
-    'De Luna Max-fouten horen boven Planning te staan'
+    pageSource.indexOf('<h2>Laatste 10 Behandeld</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
+    'De nieuwe Searcher-resultaten en Controleur-correcties horen boven Planning te staan'
   );
-  assert.doesNotMatch(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
+  assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
@@ -93,36 +92,38 @@ test('kvk database planning merges current parallel route progress', () => {
   assert.match(scriptSource, /function getContactActiveCodes\(\)/);
 });
 
-test('kvk database visually renders only material Luna Max errors with before and after values', () => {
+test('kvk database shows every new Searcher result and only material Controller corrections', () => {
   const lunaErrors = require('../../assets/kvk-database-luna-errors.js');
   const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-luna-errors.js'), 'utf8');
   const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database.css'), 'utf8');
 
-  assert.match(scriptSource, /snapshot\?\.latestLunaErrors/);
-  assert.doesNotMatch(scriptSource, /latestTreated/);
-  assert.match(scriptSource, /Geen fouten van Luna Max gevonden\./);
-  assert.match(scriptSource, /Luna Max had/);
-  assert.match(scriptSource, /Gecorrigeerd naar/);
-  assert.match(scriptSource, /controller_model_label/);
+  assert.match(scriptSource, /snapshot\?\.latestTreated/);
+  assert.doesNotMatch(scriptSource, /snapshot\?\.latestLunaErrors/);
+  assert.match(scriptSource, /Nog geen nieuwe Searcher-resultaten of Controleur-correcties\./);
+  assert.match(scriptSource, /incorrect_approval: 'Onterecht goedgekeurd'/);
+  assert.match(scriptSource, /missed_usable: 'Onterecht afgekeurd'/);
+  assert.match(scriptSource, /activity\.found_by_model_label/);
   assert.match(scriptSource, /deps\.window\.setInterval\(controller\.render, 1000\)/);
 
-  const html = lunaErrors.findingRowHtml({
+  const html = lunaErrors.activityRowHtml({
     kvk_nummer: '12345678',
     bedrijfsnaam: 'Voorbeeld & Zoon',
     woonplaats: 'Vught',
     provincie: 'Noord-Brabant',
-    error_label: 'Onjuiste gegevens',
-    incorrect_fields: ['Telefoonnummer'],
-    luna_value_summary: 'Telefoonnummer: 0612345678',
-    corrected_value_summary: 'Telefoonnummer: 0731234567',
-    controller_role_label: 'Controleur',
-    controller_model_label: 'Sol 5.6 xhigh',
-    detected_at: new Date().toISOString(),
+    lead_status: 'unusable',
+    unusable_reason: 'missing_email',
+    telefoonnummer: '0612345678',
+    email: '',
+    website: 'https://voorbeeld.nl',
+    found_by_role_label: 'Searcher',
+    found_by_model_label: 'Luna 5.6 Max',
+    contact_checked_at: new Date().toISOString(),
   });
   assert.match(html, /Voorbeeld &amp; Zoon/);
-  assert.match(html, /Telefoonnummer: 0612345678/);
-  assert.match(html, /Telefoonnummer: 0731234567/);
-  assert.match(html, /Sol 5\.6 xhigh/);
+  assert.match(html, /Geen mail/);
+  assert.match(html, /0612345678/);
+  assert.match(html, /Searcher/);
+  assert.match(html, /Luna 5\.6 Max/);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 });
 
@@ -177,16 +178,16 @@ test('kvk database restores the last-hour deltas and unusable grade activity', (
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804b/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260803a/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260804c/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260804c/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /successful_found/);
   assert.match(metricsStyles, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
   assert.match(metricsSource, /typeof activeSnapshot === 'undefined'/);
   assert.match(metricsSource, /last_60_minutes/);
-  assert.match(pageSource, /id="luna-max-found-last60"/);
-  assert.match(pageSource, /Luna Max gevonden/);
-  assert.match(metricsSource, /last60\.luna_max_found/);
+  assert.doesNotMatch(pageSource, /id="luna-max-found-last60"/);
+  assert.doesNotMatch(pageSource, /Luna Max gevonden/);
+  assert.doesNotMatch(metricsSource, /lunaMaxFoundLast60/);
   assert.match(metricsSource, /unusable_grade_activity/);
   assert.match(metricsSource, /unusableGrades\['3'\]/);
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
@@ -217,26 +218,35 @@ test('kvk database shows completed locations crossed out with usable company tot
   assert.match(controlStyles, /text-decoration: line-through/);
 });
 
-test('kvk database renders Luna Max throughput and a real fill control', () => {
+test('kvk database renders a read-only live worker status controlled only by Codex chat', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const controlSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.js'), 'utf8');
   const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
+  const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 
   assert.match(pageSource, /id="database-fill-toggle"/);
+  assert.match(pageSource, /id="database-fill-toggle"[^>]*role="status"/);
+  assert.doesNotMatch(pageSource, /<button id="database-fill-toggle"/);
   assert.match(pageSource, /database-fill-toggle__caption">Database vullen/);
   assert.match(pageSource, /id="database-fill-toggle-label"[^>]*>UIT</);
   assert.match(pageSource, /id="last-refresh-time" class="kvk-visually-hidden"/);
   assert.doesNotMatch(pageSource, /Tijd sinds laatste refresh/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
   assert.match(controlSource, /window\.setInterval\(renderRefreshAge, 1000\)/);
-  assert.match(controlSource, /fetch\('\/api\/kvk-database\/control'/);
-  assert.match(controlSource, /'X-Softora-Requested-With': 'premium'/);
-  assert.match(controlSource, /JSON\.stringify\(\{ enabled: !state\.control\.enabled \}\)/);
-  assert.match(controlSource, /fillButtonLabel\.textContent = enabled \? 'AAN' : 'UIT'/);
+  assert.doesNotMatch(controlSource, /method: 'POST'/);
+  assert.doesNotMatch(controlSource, /addEventListener\('click'/);
+  assert.doesNotMatch(controlSource, /JSON\.stringify\(\{ enabled:/);
+  assert.match(controlSource, /statusLabel = workerState === 'error'/);
+  assert.match(controlSource, /uitsluitend via de Codex-chat/);
   assert.match(controlSource, /\['vuller', 'controle', 'goedgekeurd'\]/);
   assert.match(controlSource, /window\.setInterval\(loadControl, 5_000\)/);
   assert.match(controlStyles, /\.database-fill-toggle__track/);
   assert.match(controlStyles, /translateX\(15px\)/);
+  assert.match(controlStyles, /cursor: default/);
+  assert.match(pageSource, /stat-card stat-card-usable kvk-stat-card-enhanced[\s\S]*?<span>Mét Website<\/span>/);
+  assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website kvk-stat-card-enhanced/);
+  assert.match(metricsStyles, /\.stat-card-without-website \.stat-main > span/);
+  assert.match(metricsStyles, /white-space: nowrap/);
 });
 
 test('kvk database snapshot API is wired and only public for token-protected sync posts', () => {
@@ -250,6 +260,7 @@ test('kvk database snapshot API is wired and only public for token-protected syn
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/location-stats', requirePremiumAdminApiAccess/);
   assert.match(routesSource, /app\.get\('\/api\/kvk-database\/control', requirePremiumAdminApiAccess/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control', requirePremiumAdminApiAccess/);
+  assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control\/command'/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control\/poll'/);
   assert.match(routesSource, /app\.post\('\/api\/kvk-database\/control\/worker'/);
   assert.match(runtimeSource, /createKvkDatabaseSnapshotService/);
@@ -258,7 +269,9 @@ test('kvk database snapshot API is wired and only public for token-protected syn
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'POST'/);
   assert.doesNotMatch(authSource, /requestPath === '\/api\/kvk-database\/snapshot' && method === 'GET'/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/poll'/);
+  assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/command'/);
   assert.match(authSource, /requestPath === '\/api\/kvk-database\/control\/worker'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/poll'/);
+  assert.match(requestContextSource, /'\/api\/kvk-database\/control\/command'/);
   assert.match(requestContextSource, /'\/api\/kvk-database\/control\/worker'/);
 });

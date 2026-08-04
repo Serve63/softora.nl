@@ -26,6 +26,11 @@
   border-color: rgba(46, 115, 95, 0.72);
 }
 
+.stat-card-without-website .stat-main > span {
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+
 .stat-delta {
   display: flex;
   align-items: baseline;

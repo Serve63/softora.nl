@@ -46,27 +46,64 @@
     return `<tr>${[
       'Wanneer',
       'Bedrijfsnaam',
-      'Fout van Luna Max',
-      'Luna Max had',
-      'Gecorrigeerd naar',
+      'Status',
       'Gevonden door',
+      'Telefoonnummer',
+      'Mailadres',
+      'Website',
       'Locatie',
     ].map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`;
   }
 
-  function findingRowHtml(finding) {
-    const location = [finding.woonplaats, finding.provincie].filter(Boolean).join(', ');
-    const fields = Array.isArray(finding.incorrect_fields)
-      ? finding.incorrect_fields.join(', ')
-      : '';
+  function activityStatus(activity) {
+    const findingLabels = {
+      incorrect_approval: 'Onterecht goedgekeurd',
+      missed_usable: 'Onterecht afgekeurd',
+      incorrect_data: 'Gegevens gecorrigeerd',
+    };
+    if (findingLabels[activity.review_finding]) return findingLabels[activity.review_finding];
+    if (activity.lead_status === 'usable') return 'Bruikbaar';
+    const reasonLabels = {
+      missing_phone: 'Geen telefoon',
+      missing_email: 'Geen mail',
+      missing_phone_and_email: 'Geen contact',
+      stopped: 'Gestopt',
+      operational_unclear: 'Status onduidelijk',
+      non_specific_entity: 'Geen specifiek bedrijf',
+      weak_source_quality: 'Zwakke bron',
+      no_own_contact: 'Geen eigen contact',
+      wrong_entity: 'Verkeerd bedrijf',
+      chain_branch: 'Keten/formule',
+    };
+    return reasonLabels[activity.unusable_reason] || 'Onbruikbaar';
+  }
+
+  function fieldValue(value) {
+    const text = String(value || '').trim();
+    return text || 'Niet gevonden';
+  }
+
+  function websiteHtml(value) {
+    const text = String(value || '').trim();
+    if (!text) return 'Niet gevonden';
+    const href = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+    return `<a class="website-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
+  }
+
+  function activityRowHtml(activity) {
+    const location = [activity.woonplaats, activity.provincie].filter(Boolean).join(', ');
+    const statusClass = activity.lead_status === 'usable' && !activity.review_finding
+      ? ' is-usable'
+      : ' is-unusable';
     return `
       <tr>
-        <td>${escapeHtml(relativeTimeLabel(finding.detected_at))}</td>
-        <td><span class="cell-stack"><strong>${escapeHtml(finding.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(finding.kvk_nummer || '-')}</span></span></td>
-        <td><span class="cell-stack"><strong>${escapeHtml(finding.error_label || 'Onjuiste gegevens')}</strong><span>${escapeHtml(fields || 'Gegevens')}</span></span></td>
-        <td>${escapeHtml(finding.luna_value_summary || '-')}</td>
-        <td>${escapeHtml(finding.corrected_value_summary || '-')}</td>
-        <td><span class="cell-stack"><strong>${escapeHtml(finding.controller_role_label || 'Controleur')}</strong><span>${escapeHtml(finding.controller_model_label || 'Sol 5.6 xhigh')}</span></span></td>
+        <td>${escapeHtml(relativeTimeLabel(activity.contact_checked_at))}</td>
+        <td><span class="cell-stack"><strong>${escapeHtml(activity.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(activity.kvk_nummer || '-')}</span></span></td>
+        <td><span class="company-status${statusClass}">${escapeHtml(activityStatus(activity))}</span></td>
+        <td><span class="cell-stack"><strong>${escapeHtml(activity.found_by_role_label || '-')}</strong><span>${escapeHtml(activity.found_by_model_label || '-')}</span></span></td>
+        <td>${escapeHtml(fieldValue(activity.telefoonnummer))}</td>
+        <td>${escapeHtml(fieldValue(activity.email))}</td>
+        <td class="link-like">${websiteHtml(activity.website)}</td>
         <td><strong>${escapeHtml(location || '-')}</strong></td>
       </tr>`;
   }
@@ -81,12 +118,12 @@
       if (!head || !body) return;
       head.innerHTML = tableHeaderHtml();
       const snapshot = getSnapshot();
-      const findings = Array.isArray(snapshot?.latestLunaErrors)
-        ? snapshot.latestLunaErrors.slice(0, 10)
+      const activities = Array.isArray(snapshot?.latestTreated)
+        ? snapshot.latestTreated.slice(0, 10)
         : [];
-      body.innerHTML = findings.length
-        ? findings.map(findingRowHtml).join('')
-        : '<tr class="empty-row"><td colspan="7">Geen fouten van Luna Max gevonden.</td></tr>';
+      body.innerHTML = activities.length
+        ? activities.map(activityRowHtml).join('')
+        : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe Searcher-resultaten of Controleur-correcties.</td></tr>';
     }
 
     return { render };
@@ -105,7 +142,8 @@
 
   return {
     createController,
-    findingRowHtml,
+    activityRowHtml,
+    activityStatus,
     relativeTimeLabel,
     start,
   };
