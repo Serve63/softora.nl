@@ -53,7 +53,7 @@
     { id: 'instagram-post-2030', title: 'Jaarlijkse Instagram-post 2030', timeframe: 2035, imageId: 'jaarlijkse-instagram-post' },
     { id: 'vakantiehuis-kopen-2035', title: 'Vakantiehuis kopen', timeframe: 2035, imageId: 'vakantiehuis-kopen' },
     { id: 'huis-miljoen-plus-2035', title: 'Huis van €1 miljoen+ kopen', timeframe: 2035, imageId: 'huis-miljoen-plus' },
-    { id: '2035', title: '2035...', type: 'destination', imageId: '2030' }
+    { id: '2035', title: '2035...', type: 'destination', imageId: '2035' }
   ];
   const ORIGIN_CARD_ID = 'oktober-2024';
   const CHECKPOINT_CARD_ID = 'checkpoint-2028';
@@ -144,7 +144,7 @@
     const target = document.createElement('span');
     artwork.className = 'end-game-card-photo';
     image.className = 'end-game-card-photo-image';
-    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804d`;
+    image.src = `/assets/live-momentum-endgame-cards/${card.imageId || card.id}.png?v=20260804e`;
     image.alt = '';
     image.width = 205;
     image.height = 307;
