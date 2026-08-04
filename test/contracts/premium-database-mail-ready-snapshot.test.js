@@ -93,6 +93,7 @@ test('premium database transfer snapshot excludes every customer covered by an o
   const transferPayload = { bronDatabase: 'Softora Bedrijven Scraper' };
   const customers = [
     { customer_id: 'active-transfer', company: 'Actief BV', email: 'info@actief.nl', website: 'actief.nl', database_status: 'prospect', payload: transferPayload },
+    { customer_id: 'transfer-without-email', company: 'Zonder Mail BV', email: '', website: 'zondermail.nl', database_status: 'prospect', payload: transferPayload },
     { customer_id: 'guarded-email', company: 'E-mail Guard BV', email: 'info@emailguard.nl', website: 'emailguard.nl', database_status: 'prospect', payload: transferPayload },
     { customer_id: 'guarded-domain', company: 'Domein Guard BV', email: 'nieuw@domeinguard.nl', website: 'domeinguard.nl', database_status: 'prospect', payload: transferPayload },
     { customer_id: 'guarded-company', company: 'Bedrijf Guard BV', email: 'info@nieuwbedrijf.nl', website: 'nieuwbedrijf.nl', database_status: 'prospect', payload: transferPayload },
@@ -112,8 +113,16 @@ test('premium database transfer snapshot excludes every customer covered by an o
 
   const payload = await service.buildMailReadySnapshot({ limit: 10, includeFoundSnapshot: true });
 
-  assert.equal(payload.foundTotal, 1);
-  assert.deepEqual(payload.foundCustomerIds, ['active-transfer']);
+  assert.equal(payload.foundTotal, 2);
+  assert.deepEqual(payload.foundCustomerIds, ['active-transfer', 'transfer-without-email']);
+  const availableIds = payload.availableCustomers.map((customer) => customer.id);
+  assert.equal(availableIds.includes('active-transfer'), true);
+  assert.equal(availableIds.includes('transfer-without-email'), true);
+  assert.equal(availableIds.includes('guarded-email'), false);
+  assert.equal(availableIds.includes('guarded-domain'), false);
+  assert.equal(availableIds.includes('guarded-company'), false);
+  assert.equal(availableIds.includes('guarded-id'), false);
+  assert.equal(payload.availableCustomers.find((customer) => customer.id === 'active-transfer').availableSnapshot, true);
 });
 
 test('premium database mail-ready snapshot filters safely and returns a compact shape', async () => {

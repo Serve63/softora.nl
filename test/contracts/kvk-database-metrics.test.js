@@ -38,6 +38,7 @@ test('kvk database metrics render current last-hour and grade values without ano
     '.unusable-grade-delta-label',
   ];
   const elements = {
+    'companies-treated': createElement(),
     'companies-successful-found': createElement(),
     'companies-successful-found-last60': createElement(deltaSelectors),
     'companies-treated-last60': createElement(deltaSelectors),
@@ -50,6 +51,7 @@ test('kvk database metrics render current last-hour and grade values without ano
     'companies-unusable-grade-2-last60': createElement(gradeSelectors),
   };
   const scraperState = {
+    treated: 32_116,
     successful_found: 6_993,
     unusable_grades: { 1: 24_412, 2: 30, 3: 121 },
     last_60_minutes: {
@@ -76,6 +78,7 @@ test('kvk database metrics render current last-hour and grade values without ano
 
   controller.renderMetrics();
 
+  assert.equal(elements['companies-treated'].textContent, '32.116');
   assert.equal(elements['companies-successful-found'].textContent, '6.993');
   assert.equal(
     elements['companies-successful-found-last60'].nodes['.stat-delta-number'].textContent,
@@ -100,6 +103,9 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
     '.unusable-grade-delta-label',
   ];
   const elements = {
+    'companies-treated': createElement(),
+    'companies-successful-found': createElement(),
+    'companies-successful-found-last60': createElement(),
     'companies-treated-last60': createElement(),
     'companies-usable-last60': createElement(),
     'companies-with-website-last60': createElement(),
@@ -116,6 +122,9 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
       },
     },
     getState: () => ({
+      with_website: 5,
+      without_website: 1,
+      unusable: 10,
       unusable_grades: { 1: 10, 2: 2, 3: 4 },
       last_60_minutes: {
         unusable_grades: { 1: 0, 2: 2, 3: 4 },
@@ -126,6 +135,7 @@ test('kvk database metrics combine legacy grade 3 fallback deltas into Definitie
 
   controller.renderMetrics();
 
+  assert.equal(elements['companies-treated'].textContent, '16');
   assert.equal(elements['companies-unusable-grade-2'].textContent, '6');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-added'].textContent, '+6');
   assert.equal(elements['companies-unusable-grade-2-last60'].nodes['.unusable-grade-delta-removed'].hidden, true);
