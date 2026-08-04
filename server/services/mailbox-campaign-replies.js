@@ -594,12 +594,14 @@ function isCampaignMailboxIdentity(value) {
 }
 
 function shouldShowCampaignConversation(conversation) {
-  return Boolean(
-    conversation && (
-      conversation.copyContext ||
-      !isCampaignMailboxIdentity(conversation.email)
-    )
-  );
+  if (!conversation) return false;
+  if (!isCampaignMailboxIdentity(conversation.email)) return true;
+  if (!conversation.copyContext) return false;
+  return (Array.isArray(conversation.threadMessages) ? conversation.threadMessages : [])
+    .some((message) => {
+      const sender = normalizeEmail(message && message.email);
+      return Boolean(sender && !isCampaignMailboxIdentity(sender));
+    });
 }
 
 function shouldShowCampaignMessage(message) {
@@ -929,5 +931,6 @@ module.exports = {
   listMessagesAcrossFolders,
   mergeCampaignConversationsByStableIdentity,
   normalizeOutreachStatus,
+  shouldShowCampaignConversation,
   shouldShowCampaignMessage,
 };

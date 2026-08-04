@@ -12,6 +12,7 @@ const {
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
+  shouldShowCampaignConversation,
 } = require('../../server/services/mailbox-campaign-replies');
 
 test('campaign mailbox applies the selected owner before limiting older conversations', async () => {
@@ -204,6 +205,44 @@ test('campaign mailbox labelt CC exact en gokt niet zonder recipient-provenance'
     [uncertainSent]
   );
   assert.equal(uncertain[0].copyContext, undefined);
+});
+
+test('campaign mailbox toont een bewezen eigen kopie alleen met een externe reactie in de thread', () => {
+  const ownCopy = {
+    id: 'inbox:own-copy',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'martijn@softora.nl',
+    copyContext: {
+      evidenceKnown: true,
+      kind: 'bcc',
+    },
+    threadMessages: [{
+      id: 'sent:own-message',
+      folder: 'sent',
+      accountEmail: 'martijn@softora.nl',
+      email: 'martijn@softora.nl',
+    }],
+  };
+
+  assert.equal(shouldShowCampaignConversation(ownCopy), false);
+  assert.equal(shouldShowCampaignConversation({
+    ...ownCopy,
+    threadMessages: [
+      ...ownCopy.threadMessages,
+      {
+        id: 'inbox:customer-reply',
+        folder: 'inbox',
+        accountEmail: 'martijn@softora.nl',
+        email: 'klant@example.nl',
+      },
+    ],
+  }), true);
+  assert.equal(shouldShowCampaignConversation({
+    id: 'inbox:external',
+    accountEmail: 'serve@softora.nl',
+    email: 'klant@example.nl',
+  }), true);
 });
 
 test('campaign mailbox bewijst een BCC-kopie via exact Message-ID wanneer Outlook de BCC-header verwijdert', () => {
