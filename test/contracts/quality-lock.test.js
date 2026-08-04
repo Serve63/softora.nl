@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
+  PASSWORD_REGISTER_PAGE,
   PREMIUM_SIDEBAR_THEME_VERSION,
   listQualityLockViolations,
 } = require('../../scripts/check-quality-lock');
@@ -240,6 +241,30 @@ test('quality lock keeps premium sidebar theme asset versions in sync', () => {
 
   assert.match(violations.join('\n'), /verschillende CSS\/JS personnel-theme versies/i);
   assert.match(violations.join('\n'), /verwacht 20260519b/i);
+});
+
+test('quality lock permits shared vault styling but rejects shared or inline vault scripts', () => {
+  const vaultHtml = fs.readFileSync(path.join(repoRoot, PASSWORD_REGISTER_PAGE), 'utf8');
+  const readWithVaultHtml = (replacement) => (filePath) =>
+    filePath === PASSWORD_REGISTER_PAGE
+      ? replacement
+      : fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
+
+  const sharedScriptViolations = listQualityLockViolations({
+    readFile: readWithVaultHtml(
+      vaultHtml.replace(
+        '</body>',
+        '<script src="assets/personnel-theme.js?v=20260519b"></script>\n</body>'
+      )
+    ),
+  });
+  assert.match(sharedScriptViolations.join('\n'), /scriptisolatie/i);
+  assert.match(sharedScriptViolations.join('\n'), /scriptallowlist/i);
+
+  const inlineScriptViolations = listQualityLockViolations({
+    readFile: readWithVaultHtml(vaultHtml.replace('</body>', '<script>void 0</script>\n</body>')),
+  });
+  assert.match(inlineScriptViolations.join('\n'), /geen inline scripts/i);
 });
 
 test('quality lock remains part of verify critical and the PR checklist', () => {

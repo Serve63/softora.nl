@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl" data-password-register-csp-ready="1">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,18 +11,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-<script>
-  (function () {
-    document.documentElement.setAttribute("data-personnel-loading", "true");
-    try {
-      document.documentElement.setAttribute("data-theme-mode", "light");
-      document.documentElement.setAttribute("data-theme", "light");
-    } catch (_) {
-      /* ignore */
-    }
-  })();
-</script>
-<script src="assets/personnel-theme.js?v=20260519b" defer></script><script src="assets/premium-boot-one-second.js?v=20260722a"></script>
+<link rel="stylesheet" href="assets/premium-password-register-security.css?v=20260804a">
+<script src="assets/premium-password-register-theme-boot.js?v=20260804a"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -999,7 +989,6 @@ body {
             </div>
           </div>
         </aside>
-        <script src="assets/premium-sidebar-profile-prefill.js?v=20260424a"></script>
   <main class="main-content">
     <div class="register-shell">
       <div id="screen-pin">
@@ -1137,9 +1126,13 @@ body {
       </div>
       <div class="entry-field full">
         <label for="entry-password">Wachtwoord</label>
-        <input id="entry-password" name="password" type="text" autocomplete="off" required>
+        <div class="entry-password-control">
+          <input id="entry-password" name="password" type="password" autocomplete="off" spellcheck="false" required>
+          <button type="button" class="entry-password-toggle" id="entry-password-toggle" aria-pressed="false" aria-label="Wachtwoord tonen">Tonen</button>
+        </div>
       </div>
     </div>
+    <p class="entry-security-warning">Bij vergrendelen, tabwissel of vensterwissel worden niet-opgeslagen wijzigingen direct gewist.</p>
     <div class="entry-modal-actions">
       <button type="button" class="entry-modal-btn" id="entry-cancel">Annuleren</button>
       <button type="submit" class="entry-modal-btn primary" id="entry-save">Opslaan</button>
@@ -1161,8 +1154,10 @@ body {
 <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
 <script src="assets/premium-ui-state-client.js?v=20260722b"></script>
 <script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
-<script src="assets/premium-password-register-store.js?v=20260722a"></script>
-<script src="assets/premium-password-register-pin.js?v=20260516a"></script>
-<script src="assets/premium-password-register-app.js?v=20260509b"></script>
+<script src="assets/premium-password-register-store.js?v=20260804a"></script>
+<script src="assets/premium-password-register-pin.js?v=20260804a"></script>
+<script src="assets/premium-password-register-security.js?v=20260804a"></script>
+<script src="assets/premium-password-register-autolock.js?v=20260804a"></script>
+<script src="assets/premium-password-register-app.js?v=20260804a"></script>
 </body>
 </html>

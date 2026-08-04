@@ -316,6 +316,9 @@ test('agent guardrails require targeted tests for protected quality gates and si
   const workflowSource = readRepoFile('.github/workflows/agent-guardrails.yml');
   const qualityLockSource = readRepoFile('scripts/check-quality-lock.js');
   assert.match(qualityLockSource, /PREMIUM_SIDEBAR_THEME_VERSION = '20260519b'/);
+  assert.match(qualityLockSource, /PASSWORD_REGISTER_PAGE = 'premium-wachtwoordenregister\.html'/);
+  assert.match(qualityLockSource, /data-password-register-csp-ready/);
+  assert.match(qualityLockSource, /premium-password-register-autolock\.js/);
   assert.equal(isProtectedQualityGatePath('scripts/check-quality-lock.js'), true);
   assert.match(workflowSource, /GUARDRAILS_MAX_BEHAVIOR_DIFF_LINES:\s*2500/);
 

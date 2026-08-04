@@ -53,8 +53,15 @@
     async function verifyPin(pin) {
       var response = await fetch("/api/premium-users/verify-pin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionConfirmCode: pin })
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Softora-Requested-With": "premium"
+        },
+        body: JSON.stringify({
+          actionConfirmCode: pin,
+          actionConfirmScope: "password-register"
+        })
       });
       var data = {};
       try {
@@ -62,7 +69,7 @@
       } catch (_) {
         data = {};
       }
-      if (!response.ok || data.ok === false) {
+      if (!response.ok || data.ok !== true) {
         throw new Error(data.error || "Bevestigingspin is onjuist of ontbreekt.");
       }
       return data;
@@ -108,17 +115,11 @@
       setMessage("Controleren...");
       try {
         await verifyPin(attemptedPin);
+        state.input = "";
+        attemptedPin = "";
         updateDots("success");
-        window.setTimeout(function () {
-          Promise.resolve(config.unlock && config.unlock())
-            .then(function () {
-              resetPinState();
-            })
-            .catch(function () {
-              state.checking = false;
-              setMessage("Laden mislukt");
-            });
-        }, 350);
+        await Promise.resolve(config.unlock && config.unlock());
+        resetPinState();
       } catch (_) {
         handleFailedAttempt();
       }

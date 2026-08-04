@@ -690,7 +690,6 @@ test('logged-in premium sidebar pages always have a profile host for session ref
     'premium-bevestigingsmails.html',
     'premium-websitegenerator.html',
     'premium-pakketten.html',
-    'premium-wachtwoordenregister.html',
   ];
 
   for (const relativePath of profileCriticalPages) {

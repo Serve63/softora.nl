@@ -8,6 +8,8 @@
   var currentEditEntryId = null;
   var pendingDeleteEntryId = null;
   var pendingMasterSecretResolver = null;
+  var passwordRegisterAutoLock = null;
+  var vaultSessionGeneration = 0;
 
   var registerStatusEl = document.getElementById("register-status");
   var searchInputEl = document.getElementById("search");
@@ -29,12 +31,15 @@
   var entryUrlEl = document.getElementById("entry-url");
   var entryUserEl = document.getElementById("entry-user");
   var entryPasswordEl = document.getElementById("entry-password");
+  var entryPasswordToggleEl = document.getElementById("entry-password-toggle");
   var entryModalTitleEl = document.getElementById("entry-modal-title");
   var entryModalSubEl = document.getElementById("entry-modal-sub");
   var pwDeleteModalOverlay = document.getElementById("pw-delete-modal-overlay");
   var pwDeleteModalTextEl = document.getElementById("pw-delete-modal-text");
   var pwDeleteModalCancelEl = document.getElementById("pw-delete-modal-cancel");
   var pwDeleteModalConfirmEl = document.getElementById("pw-delete-modal-confirm");
+  var toastEl = document.getElementById("toast");
+  var pinMessageEl = document.getElementById("pin-msg");
   var passwordRegisterStore = global.SoftoraPasswordRegisterStore.create({
     setStatus: setRegisterStatus
   });
@@ -45,11 +50,15 @@
     dotSelector: ".pin-dot",
     unlock: unlockRegister,
     onBeforeLock: function () {
-      passwordRegisterStore.lock();
-      entries = [];
-      visible = {};
-      closeEditModal();
-      closeDeleteEntryModal();
+      secureLockCleanup();
+    }
+  });
+  passwordRegisterAutoLock = global.SoftoraPasswordRegisterAutoLock.create({
+    document: document,
+    window: global,
+    inactivityMs: global.SoftoraPasswordRegisterAutoLock.DEFAULT_INACTIVITY_MS,
+    onLock: function () {
+      passwordRegisterPin.lock();
     }
   });
 
@@ -78,6 +87,15 @@
 
   function isMasterSecretDialogOpen() {
     return Boolean(masterSecretOverlayEl && !masterSecretOverlayEl.hidden);
+  }
+
+  function resetEntryPasswordVisibility() {
+    if (entryPasswordEl) entryPasswordEl.type = "password";
+    if (entryPasswordToggleEl) {
+      entryPasswordToggleEl.textContent = "Tonen";
+      entryPasswordToggleEl.setAttribute("aria-pressed", "false");
+      entryPasswordToggleEl.setAttribute("aria-label", "Wachtwoord tonen");
+    }
   }
 
   function finishMasterSecretDialog(value) {
@@ -119,13 +137,17 @@
 
   async function persistPasswordEntries(actor) {
     var result = await passwordRegisterStore.persist(entries, actor || "save");
+    if (result.stale) {
+      var staleError = new Error("De kluis is tijdens het opslaan vergrendeld.");
+      staleError.code = "PASSWORD_REGISTER_LOCKED";
+      throw staleError;
+    }
     entries = result.entries;
     return result.response;
   }
 
   async function ensurePasswordEntriesLoaded(masterSecret) {
-    entries = await passwordRegisterStore.unlock(masterSecret);
-    return entries;
+    return passwordRegisterStore.unlock(masterSecret);
   }
 
   function getEntryById(id) {
@@ -155,6 +177,41 @@
       fragment.appendChild(renderer.createEntryRow(entry, Boolean(visible[entry.id])));
     });
     passwordListEl.replaceChildren(fragment);
+  }
+
+  function renderLockedState() {
+    var renderer = global.SoftoraPasswordRegisterRenderer;
+    if (!passwordListEl || !renderer) return;
+    passwordListEl.replaceChildren(renderer.createEmptyState("Kluis vergrendeld."));
+  }
+
+  function secureLockCleanup() {
+    vaultSessionGeneration += 1;
+    if (passwordRegisterAutoLock) passwordRegisterAutoLock.stop();
+    passwordRegisterStore.lock();
+    if (global.SoftoraPasswordRegisterSecurity) {
+      global.SoftoraPasswordRegisterSecurity.wipeEntries(entries);
+    }
+    entries = [];
+    visible = {};
+    if (pendingMasterSecretResolver) finishMasterSecretDialog("");
+    closeEditModal();
+    closeDeleteEntryModal();
+    if (global.SoftoraPasswordRegisterSecurity) {
+      global.SoftoraPasswordRegisterSecurity.clearSensitiveUi({
+        inputs: [masterSecretInputEl, entryNameEl, entryUrlEl, entryUserEl, entryPasswordEl, searchInputEl],
+        entryForm: entryFormEl,
+        passwordInput: entryPasswordEl,
+        passwordToggle: entryPasswordToggleEl,
+        deleteModalText: pwDeleteModalTextEl,
+        status: registerStatusEl,
+        toast: toastEl,
+        list: passwordListEl,
+        createLockedState: global.SoftoraPasswordRegisterRenderer.createEmptyState
+      });
+    } else {
+      renderLockedState();
+    }
   }
 
   function toggleVis(id) {
@@ -193,6 +250,7 @@
       return;
     }
     var snapshot = entries.slice();
+    var expectedGeneration = vaultSessionGeneration;
     entries = entries.filter(function (entryItem) {
       return Number(entryItem && entryItem.id) !== Number(id);
     });
@@ -201,8 +259,15 @@
     render();
     try {
       await persistPasswordEntries("delete");
+      if (expectedGeneration !== vaultSessionGeneration) return;
       toast("\u2713 Inlog verwijderd");
     } catch (_) {
+      if (expectedGeneration !== vaultSessionGeneration) {
+        if (global.SoftoraPasswordRegisterSecurity) {
+          global.SoftoraPasswordRegisterSecurity.wipeEntries(snapshot);
+        }
+        return;
+      }
       entries = snapshot;
       render();
       toast("Opslaan mislukt");
@@ -214,6 +279,7 @@
     entryModalMode = "create";
     currentEditEntryId = null;
     entryFormEl.reset();
+    resetEntryPasswordVisibility();
     if (entryModalTitleEl) entryModalTitleEl.textContent = "Nieuwe inlog";
     if (entryModalSubEl) {
       entryModalSubEl.textContent = "Vul naam, website, gebruikersnaam en wachtwoord in.";
@@ -237,6 +303,7 @@
     entryUrlEl.value = entry.url;
     entryUserEl.value = entry.user;
     entryPasswordEl.value = entry.pw;
+    resetEntryPasswordVisibility();
     entryModalBackdrop.hidden = false;
     entryModalEl.hidden = false;
     entryNameEl.focus();
@@ -248,6 +315,16 @@
     entryModalBackdrop.hidden = true;
     entryModalEl.hidden = true;
     entryFormEl.reset();
+    resetEntryPasswordVisibility();
+  }
+
+  function toggleEntryPasswordVisibility() {
+    if (!entryPasswordEl || !entryPasswordToggleEl) return;
+    var willShow = entryPasswordEl.type === "password";
+    entryPasswordEl.type = willShow ? "text" : "password";
+    entryPasswordToggleEl.textContent = willShow ? "Verbergen" : "Tonen";
+    entryPasswordToggleEl.setAttribute("aria-pressed", willShow ? "true" : "false");
+    entryPasswordToggleEl.setAttribute("aria-label", willShow ? "Wachtwoord verbergen" : "Wachtwoord tonen");
   }
 
   async function saveEntryFromModal(event) {
@@ -266,13 +343,21 @@
         entries.length
       );
       var previousEntries = entries.slice();
+      var createGeneration = vaultSessionGeneration;
       entries = entries.concat(newEntry);
       try {
         await persistPasswordEntries("create");
+        if (createGeneration !== vaultSessionGeneration) return;
         closeEditModal();
         render();
         toast("\u2713 Nieuwe inlog opgeslagen");
       } catch (_) {
+        if (createGeneration !== vaultSessionGeneration) {
+          if (global.SoftoraPasswordRegisterSecurity) {
+            global.SoftoraPasswordRegisterSecurity.wipeEntries(previousEntries);
+          }
+          return;
+        }
         entries = previousEntries;
         render();
         toast("Opslaan mislukt");
@@ -306,13 +391,21 @@
     entries = entries.map(function (entry) {
       return entry.id === updatedEntry.id ? updatedEntry : entry;
     });
+    var editGeneration = vaultSessionGeneration;
 
     try {
       await persistPasswordEntries("edit");
+      if (editGeneration !== vaultSessionGeneration) return;
       closeEditModal();
       render();
       toast("\u2713 Inloggegevens opgeslagen");
     } catch (_) {
+      if (editGeneration !== vaultSessionGeneration) {
+        if (global.SoftoraPasswordRegisterSecurity) {
+          global.SoftoraPasswordRegisterSecurity.wipeEntries([existingEntry]);
+        }
+        return;
+      }
       entries = entries.map(function (entry) {
         return entry.id === existingEntry.id ? existingEntry : entry;
       });
@@ -387,6 +480,9 @@
     entryModalCloseEl.addEventListener("click", closeEditModal);
     entryCancelEl.addEventListener("click", closeEditModal);
     entryFormEl.addEventListener("submit", saveEntryFromModal);
+    if (entryPasswordToggleEl) {
+      entryPasswordToggleEl.addEventListener("click", toggleEntryPasswordVisibility);
+    }
     passwordRegisterPin.bindNumpad(pinNumpadEl);
     passwordRegisterPin.bindKeyboard(document);
     if (lockRegisterBtnEl) {
@@ -416,29 +512,46 @@
   }
 
   async function unlockRegister() {
-    var masterSecret = normalizeString(await openMasterSecretDialog());
-    if (!masterSecret) {
-      setRegisterStatus("Master-wachtzin is nodig om de kluis te openen.", "warning");
-      return;
-    }
-    document.getElementById("screen-pin").style.display = "none";
-    document.getElementById("screen-register").style.display = "block";
-    var loaderEl = document.getElementById("register-data-loader");
-    if (loaderEl) {
-      loaderEl.hidden = false;
-      loaderEl.setAttribute("aria-hidden", "false");
-    }
+    var masterSecret = "";
+    var loaderEl = null;
     try {
-      await ensurePasswordEntriesLoaded(masterSecret);
-      render();
-    } catch (error) {
-      entries = [];
-      render();
-      document.getElementById("screen-register").style.display = "none";
-      document.getElementById("screen-pin").style.display = "grid";
-      setRegisterStatus(normalizeString(error && error.message) || "Ontgrendelen mislukt.", "warning");
-      toast("Ontgrendelen mislukt");
+      passwordRegisterAutoLock.start();
+      if (!passwordRegisterAutoLock.isActive()) return;
+      var expectedGeneration = vaultSessionGeneration;
+      masterSecret = normalizeString(await openMasterSecretDialog());
+      if (!masterSecret || expectedGeneration !== vaultSessionGeneration) {
+        passwordRegisterAutoLock.stop();
+        if (!masterSecret) {
+          setRegisterStatus("Master-wachtzin is nodig om de kluis te openen.", "warning");
+        }
+        return;
+      }
+      document.getElementById("screen-pin").style.display = "none";
+      document.getElementById("screen-register").style.display = "block";
+      loaderEl = document.getElementById("register-data-loader");
+      if (loaderEl) {
+        loaderEl.hidden = false;
+        loaderEl.setAttribute("aria-hidden", "false");
+      }
+      try {
+        var loadedEntries = await ensurePasswordEntriesLoaded(masterSecret);
+        if (expectedGeneration !== vaultSessionGeneration) {
+          if (global.SoftoraPasswordRegisterSecurity) {
+            global.SoftoraPasswordRegisterSecurity.wipeEntries(loadedEntries);
+          }
+          return;
+        }
+        entries = loadedEntries;
+        render();
+        passwordRegisterAutoLock.start();
+      } catch (error) {
+        passwordRegisterPin.lock();
+        if (pinMessageEl) {
+          pinMessageEl.textContent = normalizeString(error && error.message) || "Ontgrendelen mislukt.";
+        }
+      }
     } finally {
+      masterSecret = "";
       if (loaderEl) {
         loaderEl.hidden = true;
         loaderEl.setAttribute("aria-hidden", "true");
@@ -447,7 +560,6 @@
   }
 
   function toast(message) {
-    var toastEl = document.getElementById("toast");
     if (!toastEl) return;
     toastEl.textContent = message;
     toastEl.classList.add("show");
@@ -457,5 +569,5 @@
   }
 
   bindEvents();
-  render();
+  renderLockedState();
 })(window);
