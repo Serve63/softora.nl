@@ -36,7 +36,7 @@
   function decorateLocations() {
     document.querySelectorAll('#location-list .location-button').forEach((row) => {
       const statusBoxes = row.querySelectorAll('.status-box');
-      const complete = statusBoxes.length >= 2 && [...statusBoxes].slice(0, 2).every((box) => box.classList.contains('is-done'));
+      const complete = statusBoxes.length >= 3 && [...statusBoxes].slice(0, 3).every((box) => box.classList.contains('is-done'));
       row.classList.toggle('is-complete', complete);
       row.closest('.location-item')?.classList.toggle('is-complete', complete);
       if (!complete) return;
