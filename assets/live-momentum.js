@@ -356,7 +356,7 @@
   }
   function getDayScore(day) {
     const statusCells = getStatusCells();
-    const cellsForDay = statusCells.filter((cell) => getDay(cell) === day && isTracked(cell));
+    const cellsForDay = statusCells.filter((cell) => getDay(cell) === day);
     const checkedCount = cellsForDay.filter(isChecked).length;
     if (!cellsForDay.length) {
       return null;
