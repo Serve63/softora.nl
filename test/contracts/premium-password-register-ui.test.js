@@ -7,6 +7,8 @@ const { webcrypto } = require('node:crypto');
 const { TextEncoder, TextDecoder } = require('node:util');
 const { findUnsafeCredentialFixtures } = require('../testlib/credential-fixture-safety');
 
+const TEST_WRITE_PROOF = 'test-write-proof-v1';
+
 test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente editflow', () => {
   const pagePath = path.join(__dirname, '../../premium-wachtwoordenregister.html');
   const rendererPath = path.join(__dirname, '../../assets/premium-password-register-renderer.js');
@@ -30,7 +32,6 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
 
   assert.deepEqual(executableScriptSources, [
     'assets/premium-password-register-theme-boot.js?v=20260804a',
-    'assets/premium-ui-state-client.js?v=20260722b',
     'assets/premium-password-register-renderer.js?v=20260427a',
     'assets/premium-password-register-store.js?v=20260804a',
     'assets/premium-password-register-pin.js?v=20260804a',
@@ -67,26 +68,35 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(storeSource, /var PASSWORD_REGISTER_LEGACY_ENTRIES_KEY = "entries_json";/);
   assert.match(storeSource, /AES-GCM/);
   assert.match(storeSource, /PBKDF2-SHA256/);
-  assert.match(storeSource, /PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION = 1/);
   assert.match(storeSource, /PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION = 2/);
   assert.match(storeSource, /PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS = 210000/);
   assert.match(storeSource, /PASSWORD_REGISTER_CURRENT_KDF_ITERATIONS = 600000/);
   assert.match(storeSource, /PASSWORD_REGISTER_MIN_MASTER_SECRET_LENGTH = 20/);
   assert.match(storeSource, /cryptoObj\.subtle/);
-  assert.match(storeSource, /fetchUiStateGetWithFallback\(PASSWORD_REGISTER_SCOPE\)/);
-  assert.match(storeSource, /fetchUiStateSetWithFallback\(PASSWORD_REGISTER_SCOPE, payload\)/);
+  assert.match(storeSource, /fetchUiStateReadAuthoritative\(PASSWORD_REGISTER_SCOPE, writeProof\)/);
+  assert.match(storeSource, /"\/api\/ui-state-read\?scope=" \+ encodedScope/);
+  assert.match(storeSource, /body:\s*JSON\.stringify\(\{ writeProof: String\(writeProof \|\| ""\) \}\)/);
+  assert.match(storeSource, /fetchUiStateSetAuthoritative\(PASSWORD_REGISTER_SCOPE, payload\)/);
+  assert.match(storeSource, /result\.source !== "supabase"/);
+  assert.match(storeSource, /result\.ok !== true/);
+  assert.match(storeSource, /result\.scope !== expectedScope/);
+  assert.match(storeSource, /expectedRevision:\s*expectedRevision/);
+  assert.match(storeSource, /expectedUpdatedAt:\s*expectedUpdatedAt/);
+  assert.match(storeSource, /writeProof:\s*confirmedWriteProof/);
+  assert.match(storeSource, /writeQueue = queued\.then\([\s\S]*return undefined;[\s\S]*return undefined;/);
+  assert.doesNotMatch(storeSource, /writeQueue = queued\.catch/);
+  assert.doesNotMatch(storeSource, /\/api\/ui-state-get|X-Softora-Password-Register-Proof/);
+  assert.match(storeSource, /"X-Softora-Requested-With": "premium"/);
+  assert.match(storeSource, /credentials:\s*"same-origin"/);
+  assert.doesNotMatch(storeSource, /actionConfirmCode|actionConfirmScope/);
+  assert.doesNotMatch(storeSource, /SoftoraUiStateClient|readBootstrap|WithFallback/);
   assert.match(storeSource, /\[PASSWORD_REGISTER_ENCRYPTED_KEY\]: JSON\.stringify\(encryptedPayload\)/);
   assert.match(storeSource, /\[PASSWORD_REGISTER_LEGACY_ENTRIES_KEY\]: ""/);
   assert.match(appSource, /global\.SoftoraPasswordRegisterStore\.create/);
-  assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret\)/);
-  assert.match(appSource, /passwordRegisterStore\.persist\(entries, actor \|\| "save"\)/);
-  assert.match(appSource, /passwordRegisterStore\.changeMasterSecret/);
+  assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret, writeProof\)/);
+  assert.match(appSource, /passwordRegisterStore\.persist\([\s\S]*getActiveVaultWriteProof\(\)/);
   assert.match(pageSource, /id="master-secret-overlay"/);
   assert.match(pageSource, /id="master-secret-input"/);
-  assert.match(pageSource, /id="master-secret-current-input"/);
-  assert.match(pageSource, /id="master-secret-confirm-input"/);
-  assert.match(pageSource, /id="master-secret-pin-input"/);
-  assert.match(pageSource, /id="change-master-secret-btn"/);
   assert.match(pageSource, /class="master-secret-modal"/);
   assert.match(pageSource, />Ontgrendelen</);
   assert.doesNotMatch(pageSource, /Voer dezelfde master-wachtzin/);
@@ -96,7 +106,7 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.doesNotMatch(appSource, /masterSecretCancelEl/);
   assert.match(appSource, /openMasterSecretDialog/);
   assert.match(appSource, /finishMasterSecretDialog/);
-  assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret\)/);
+  assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret, writeProof\)/);
   assert.doesNotMatch(appSource, /global\.prompt\(/);
   assert.doesNotMatch(appSource, /window\.prompt\(/);
   assert.match(pinSource, /global\.SoftoraPasswordRegisterPin/);
@@ -130,14 +140,16 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /data-pin-action="backspace"/);
   assert.match(pageSource, /id="lock-register-btn"/);
   assert.match(appSource, /global\.SoftoraPasswordRegisterPin\.create/);
+  assert.match(appSource, /onBeforeLock:\s*function \(\) \{\s*secureLockCleanup\(\)/);
+  assert.match(appSource, /onLock:\s*function \(\) \{\s*passwordRegisterPin\.lock\(\)/);
   assert.match(appSource, /passwordRegisterPin\.bindNumpad\(pinNumpadEl\)/);
   assert.match(appSource, /passwordRegisterPin\.bindKeyboard\(document\)/);
   assert.match(appSource, /lockRegisterBtnEl\.addEventListener\("click", passwordRegisterPin\.lock\)/);
   assert.match(appSource, /secureLockCleanup/);
   assert.match(appSource, /SoftoraPasswordRegisterSecurity\.wipeEntries\(entries\)/);
+  assert.match(appSource, /editGeneration !== vaultSessionGeneration[\s\S]*wipeEntries\(\[existingEntry\]\)/);
   assert.match(appSource, /SoftoraPasswordRegisterSecurity\.clearSensitiveUi/);
   assert.match(appSource, /passwordRegisterAutoLock\.start\(\)/);
-  assert.match(appSource, /finally\s*\{\s*masterSecret = "";/);
   assert.doesNotMatch(pageSource, /function p\(|function pb\(|function pClear\(|function dots\(|function check\(/);
   assert.match(pinSource, /function createPinController/);
   assert.match(pinSource, /bindNumpad: bindNumpad/);
@@ -159,24 +171,80 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /id="entry-user"/);
   assert.match(pageSource, /id="entry-password"/);
   assert.match(pageSource, /id="entry-password"[^>]*type="password"/);
-  assert.match(pageSource, /id="entry-password-toggle"/);
-  assert.match(appSource, /toggleEntryPasswordVisibility/);
+  assert.match(pageSource, /id="entry-password-toggle"[^>]*aria-pressed="false"/);
+  assert.match(pageSource, /id="change-master-secret-btn"/);
+  assert.match(pageSource, /id="master-secret-current-input"[^>]*type="password"/);
+  assert.match(pageSource, /id="master-secret-confirm-input"[^>]*type="password"/);
+  assert.match(pageSource, /id="master-secret-pin-input"[^>]*type="password"[^>]*maxlength="6"/);
+  assert.match(pageSource, /wisselen van tab of venster vergrendelt de kluis en wist niet-opgeslagen wijzigingen/);
+  assert.match(appSource, /passwordRegisterStore\.changeMasterSecret/);
+  assert.match(appSource, /passwordRegisterPin\.verifyFreshPin\(rawPin\)/);
+  assert.match(appSource, /if \(!request \|\| typeof request !== "object"\) \{\s*passwordRegisterPin\.lock\(\)/);
+  assert.match(appSource, /request\.pin = "";[\s\S]*verifyFreshPin\(rawPin\);[\s\S]*rawPin = "";[\s\S]*changeMasterSecret/);
+  assert.match(appSource, /expectedGeneration !== vaultSessionGeneration[\s\S]*getVaultFailureMessage\(error\)/);
+  assert.match(appSource, /VAULT_WRITE_PROOF_MAX_TTL_MS = 5 \* 60 \* 1000/);
+  assert.match(appSource, /vaultWriteProofTimer = global\.setTimeout\(function \(\) \{\s*clearVaultWriteProof\(\);\s*passwordRegisterPin\.lock\(\)/);
+  assert.match(appSource, /function secureLockCleanup\(\) \{[\s\S]*clearVaultWriteProof\(\)/);
+  assert.match(appSource, /if \(!masterSecret\) \{\s*clearVaultWriteProof\(\)/);
+  assert.match(appSource, /async function unlockRegister\(verification\)[\s\S]*finally \{[\s\S]*masterSecret = "";/);
+  assert.match(appSource, /entryPasswordEl\.type = willShow \? "text" : "password"/);
   assert.doesNotMatch(pageSource, /const PIN\s*=\s*['"][0-9]{6}['"]/);
   assert.match(pinSource, /fetch\("\/api\/premium-users\/verify-pin"/);
-  assert.match(pinSource, /actionConfirmCode:\s*pin/);
+  assert.match(pinSource, /actionConfirmCode:\s*rawPin/);
   assert.match(pinSource, /actionConfirmScope:\s*"password-register"/);
-  assert.match(pinSource, /credentials:\s*"same-origin"/);
   assert.match(pinSource, /data\.ok !== true/);
-  assert.match(pinSource, /verifyFreshPin:\s*verifyPin/);
-  assert.doesNotMatch(storeSource, /v1-kdf-migration/);
+  assert.match(pinSource, /config\.unlock\(verification\)/);
+  assert.match(pinSource, /catch\(function \(error\)[\s\S]*verification\.writeProof = "";[\s\S]*setMessage/);
+  assert.match(pinSource, /data\.writeProofExpiresAt/);
+  assert.match(pinSource, /new global\.AbortController\(\)/);
+  assert.match(pinSource, /controller\.abort\(\);[\s\S]*10000/);
+  assert.match(pinSource, /function lock\(\) \{\s*abortPendingVerification\(\)/);
+  assert.match(pinSource, /credentials:\s*"same-origin"/);
+  assert.match(pinSource, /"X-Softora-Requested-With": "premium"/);
+  assert.doesNotMatch(pageSource, /SOFTORA_PAGE_STATE_BOOTSTRAP|premium-ui-state-client\.js/);
+  assert.doesNotMatch(combinedSource, /console\.(?:log|info|debug|warn|error)\s*\(/);
+  assert.doesNotMatch(combinedSource, /\b(?:localStorage|sessionStorage|indexedDB|navigator\.clipboard)\b/);
+  assert.doesNotMatch(combinedSource, /document\.execCommand\s*\(/);
+  assert.match(storeSource, /finally \{\s*wipeEntries\(parsedEntries\);\s*decryptedBytes\.fill\(0\);/);
+  assert.match(storeSource, /finally \{\s*wipeEntries\(loadedEntries\);\s*\}/);
+  for (const scriptTag of pageSource.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    assert.match(scriptTag[1], /\bsrc=/, 'uitvoerbare scripts moeten externe self-assets zijn');
+    assert.equal(scriptTag[2].trim(), '');
+  }
 });
 
 function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = {}) {
   const storePath = path.join(__dirname, '../../assets/premium-password-register-store.js');
   const source = fs.readFileSync(storePath, 'utf8');
   const postBodies = [];
+  const requests = [];
   let values = { ...initialValues };
+  let revision = Object.prototype.hasOwnProperty.call(loadOptions, 'initialRevision')
+    ? Number(loadOptions.initialRevision)
+    : (Object.keys(values).length ? 1 : 0);
+  let updatedAt = Object.prototype.hasOwnProperty.call(loadOptions, 'initialUpdatedAt')
+    ? loadOptions.initialUpdatedAt
+    : (revision > 0 ? '2026-08-04T12:00:01.000Z' : null);
   let getCount = 0;
+
+  function nextUpdatedAt() {
+    return `2026-08-04T12:00:${String(revision).padStart(2, '0')}.000Z`;
+  }
+
+  function makeJsonResponse(status, data) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => data,
+    };
+  }
+
+  function advanceRemote(patch = {}) {
+    values = { ...values, ...patch };
+    revision += 1;
+    updatedAt = nextUpdatedAt();
+  }
+
   const window = {
     crypto: webcrypto,
     setTimeout,
@@ -186,26 +254,77 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = 
   };
   const context = {
     window,
-    fetch: async (_url, requestOptions = {}) => {
-      if (requestOptions.method === 'POST') {
-        const body = JSON.parse(String(requestOptions.body || '{}'));
-        postBodies.push(body);
-        if (typeof loadOptions.waitForPost === 'function') await loadOptions.waitForPost(body);
-        values = { ...values, ...(body.patch || {}) };
-        if (loadOptions.throwAfterPost) throw new Error('Ambigue write na remote commit');
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ ok: true, source: loadOptions.postSource || 'supabase' }),
+    fetch: async (url, fetchOptions = {}) => {
+      const method = String(fetchOptions.method || 'GET').toUpperCase();
+      requests.push({ url: String(url), method });
+      if (String(url).startsWith('/api/ui-state-read?')) {
+        getCount += 1;
+        const readBody = JSON.parse(String(fetchOptions.body || '{}'));
+        if (readBody.writeProof !== TEST_WRITE_PROOF) {
+          return makeJsonResponse(403, {
+            ok: false,
+            code: 'PASSWORD_REGISTER_WRITE_PROOF_INVALID',
+            error: 'Beveiligingsbevestiging ongeldig.',
+          });
+        }
+        if (loadOptions.failGet) {
+          return makeJsonResponse(503, { ok: false, error: 'fixture unavailable' });
+        }
+        const responseData = {
+          ok: loadOptions.getResultOk !== false,
+          scope: loadOptions.getScope || 'premium_password_register',
+          source: loadOptions.getSource || 'supabase',
+          values: { ...values },
+          revision,
+          updatedAt,
         };
+        if (loadOptions.omitRevision) delete responseData.revision;
+        if (loadOptions.omitUpdatedAt) delete responseData.updatedAt;
+        return makeJsonResponse(200, responseData);
       }
-      getCount += 1;
-      if (loadOptions.readError) throw loadOptions.readError;
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ ok: true, source: loadOptions.readSource || 'supabase', values }),
-      };
+      if (fetchOptions.method === 'POST') {
+        const body = JSON.parse(String(fetchOptions.body || '{}'));
+        postBodies.push(body);
+        const postIndex = postBodies.length;
+        if (typeof loadOptions.waitForPost === 'function') {
+          await loadOptions.waitForPost(body, postIndex);
+        }
+        if (body.writeProof !== TEST_WRITE_PROOF) {
+          return makeJsonResponse(403, {
+            ok: false,
+            code: 'PASSWORD_REGISTER_WRITE_PROOF_INVALID',
+            error: 'Beveiligingsbevestiging ongeldig.',
+          });
+        }
+        if (
+          body.expectedRevision !== revision ||
+          body.expectedUpdatedAt !== updatedAt
+        ) {
+          return makeJsonResponse(409, {
+            ok: false,
+            code: 'PASSWORD_REGISTER_REVISION_CONFLICT',
+            error: 'De kluis is intussen gewijzigd.',
+            revision,
+            updatedAt,
+          });
+        }
+        advanceRemote(body.patch || {});
+        if (
+          loadOptions.throwAfterCommit === true ||
+          (typeof loadOptions.throwAfterCommit === 'function' && loadOptions.throwAfterCommit(body, postIndex))
+        ) {
+          throw new Error('Verbinding verbroken nadat Supabase de wijziging mogelijk opsloeg.');
+        }
+        return makeJsonResponse(200, {
+          ok: true,
+          scope: 'premium_password_register',
+          source: loadOptions.postSource || 'supabase',
+          values: { ...values },
+          revision,
+          updatedAt,
+        });
+      }
+      throw new Error(`Onverwacht testverzoek: ${method} ${url}`);
     },
     AbortController,
     Buffer,
@@ -217,46 +336,64 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = 
   };
   vm.createContext(context);
   vm.runInContext(source, context);
+  const rawCreateStore = context.window.SoftoraPasswordRegisterStore.create;
   return {
-    createStore: context.window.SoftoraPasswordRegisterStore.create,
+    createStore: (storeOptions) => {
+      const store = rawCreateStore(storeOptions);
+      return Object.assign({}, store, {
+        changeMasterSecret: (currentSecret, newSecret, entries, actor, writeProof = TEST_WRITE_PROOF) =>
+          store.changeMasterSecret(currentSecret, newSecret, entries, actor, writeProof),
+        load: (masterSecret, writeProof = TEST_WRITE_PROOF) => store.load(masterSecret, writeProof),
+        persist: (entries, actor, writeProof = TEST_WRITE_PROOF) => store.persist(entries, actor, writeProof),
+        unlock: (masterSecret, writeProof = TEST_WRITE_PROOF) => store.unlock(masterSecret, writeProof),
+      });
+    },
+    advanceRemote,
     getGetCount: () => getCount,
     getPostBodies: () => postBodies.slice(),
+    getRequests: () => requests.slice(),
+    getRevision: () => revision,
+    getUpdatedAt: () => updatedAt,
     getValues: () => ({ ...values }),
   };
 }
 
-async function createTestEnvelope(entries, masterSecret, version, iterations) {
-  const salt = webcrypto.getRandomValues(new Uint8Array(16));
-  const iv = webcrypto.getRandomValues(new Uint8Array(12));
-  const baseKey = await webcrypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(String(masterSecret).trim()),
-    'PBKDF2',
-    false,
-    ['deriveKey']
+test('premium wachtwoordenregister faalt gesloten als de kluis niet kan worden geladen', async () => {
+  const harness = loadPasswordRegisterStoreWithUiState({}, { failGet: true });
+  const store = harness.createStore();
+
+  await assert.rejects(
+    () => store.unlock('unieke fail closed master wachtzin'),
+    /fixture unavailable/
   );
-  const key = await webcrypto.subtle.deriveKey(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt']
-  );
-  const cipher = new Uint8Array(await webcrypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    new TextEncoder().encode(JSON.stringify(entries))
-  ));
-  return JSON.stringify({
-    version,
-    algorithm: 'AES-GCM',
-    kdf: 'PBKDF2-SHA256',
-    iterations,
-    salt: Buffer.from(salt).toString('base64'),
-    iv: Buffer.from(iv).toString('base64'),
-    ciphertext: Buffer.from(cipher).toString('base64'),
-  });
-}
+  assert.equal(harness.getPostBodies().length, 0, 'een leesfout mag nooit voorbeelddata terugschrijven');
+  assert.equal(store.getSecurityState().envelopeVersion, null);
+});
+
+test('premium wachtwoordenregister accepteert uitsluitend een gezaghebbende Supabase-snapshot', async () => {
+  const invalidSnapshots = [
+    { getSource: 'bootstrap' },
+    { getSource: 'fallback' },
+    { getResultOk: false },
+    { getScope: 'other_scope' },
+    { omitRevision: true },
+    { omitUpdatedAt: true, initialRevision: 1 },
+  ];
+
+  for (const options of invalidSnapshots) {
+    const harness = loadPasswordRegisterStoreWithUiState({ entries_encrypted_v1: 'fixture' }, options);
+    const store = harness.createStore();
+    await assert.rejects(
+      () => store.unlock('unieke gezaghebbende master wachtzin'),
+      /niet gezaghebbend door Supabase bevestigd/
+    );
+    assert.equal(harness.getPostBodies().length, 0);
+    assert.deepEqual(harness.getRequests(), [{
+      url: '/api/ui-state-read?scope=premium_password_register',
+      method: 'POST',
+    }]);
+  }
+});
 
 test('premium wachtwoordenregister bewaart entries alleen als versleutelde blob', async () => {
   const harness = loadPasswordRegisterStoreWithUiState();
@@ -278,91 +415,38 @@ test('premium wachtwoordenregister bewaart entries alleen als versleutelde blob'
   ], 'test-save');
 
   const posted = harness.getPostBodies().at(-1);
+  assert.equal(posted.expectedRevision, 0);
+  assert.equal(posted.expectedUpdatedAt, null);
+  assert.equal(posted.writeProof, TEST_WRITE_PROOF);
+  assert.equal(Object.hasOwn(posted, 'actionConfirmCode'), false);
+  assert.equal(Object.hasOwn(posted, 'actionConfirmScope'), false);
+  assert.equal(Object.hasOwn(posted.patch, 'writeProof'), false);
   assert.equal(posted.patch.entries_json, '');
   assert.equal(typeof posted.patch.entries_encrypted_v1, 'string');
   assert.doesNotMatch(posted.patch.entries_encrypted_v1, /fixture-only-secret|beheer@example\.com|Productie login/);
   assert.match(posted.patch.entries_encrypted_v1, /"algorithm":"AES-GCM"/);
-  const envelope = JSON.parse(posted.patch.entries_encrypted_v1);
-  assert.equal(envelope.version, 1);
-  assert.equal(envelope.iterations, 210000);
   assert.match(statuses.at(-1).message, /Versleutelde kluis/);
 });
 
-test('C opent v2 rollback-veilig zonder migratie en houdt alle writes bewust op v1', async () => {
-  const masterSecret = 'unieke rollback master wachtzin 2026';
-  const initialEntries = [{
-    id: 8,
-    naam: 'V2 bron',
-    url: 'https://example.test',
-    user: 'rollback@example.test',
-    pw: 'fixture-v2-secret',
-    cat: 'Test',
-  }];
-  const v2Envelope = await createTestEnvelope(initialEntries, masterSecret, 2, 600000);
-  const harness = loadPasswordRegisterStoreWithUiState({ entries_encrypted_v1: v2Envelope });
-  const store = harness.createStore();
-
-  const opened = await store.unlock(masterSecret);
-  assert.equal(opened[0].pw, 'fixture-v2-secret');
-  assert.equal(harness.getPostBodies().length, 0, 'C mag v2 bij openen nog niet automatisch herschrijven');
-  assert.equal(store.getSecurityState().envelopeVersion, 2);
-  assert.equal(store.getSecurityState().kdfIterations, 600000);
-
-  await store.persist(opened, 'rollback-compat-write');
-  const writtenEnvelope = JSON.parse(
-    harness.getPostBodies().at(-1).patch.entries_encrypted_v1
-  );
-  assert.equal(writtenEnvelope.version, 1);
-  assert.equal(writtenEnvelope.iterations, 210000);
-  assert.equal(store.getSecurityState().envelopeVersion, 1);
-});
-
-test('C eist een sterke nieuwe master-wachtzin en rekeyt alleen na controle van de huidige', async () => {
-  const oldSecret = 'huidige unieke master wachtzin 2026';
-  const newSecret = 'volgende unieke master wachtzin 2026';
+test('premium wachtwoordenregister bewaart wachtwoord-whitespace exact', async () => {
   const harness = loadPasswordRegisterStoreWithUiState();
   const store = harness.createStore();
-  const entries = await store.unlock(oldSecret);
-  await store.persist(entries, 'initial-save');
+  const masterSecret = 'exacte whitespace master wachtzin 2026';
+  const exactPassword = '  fixture-exact-secret\nmet-tab\t  ';
 
-  assert.throws(
-    () => store.changeMasterSecret(oldSecret, 'te kort', entries),
-    /minimaal 20 tekens/
-  );
-  await assert.rejects(
-    () => store.changeMasterSecret('onjuiste huidige master wachtzin', newSecret, entries),
-    (error) => {
-      assert.equal(error.code, 'PASSWORD_REGISTER_CURRENT_MASTER_INVALID');
-      assert.equal(error.forceLock, true);
-      return true;
-    }
-  );
+  await store.unlock(masterSecret);
+  await store.persist([{
+    id: 1,
+    naam: 'Whitespace-account',
+    url: 'example.test',
+    user: 'whitespace@example.test',
+    pw: exactPassword,
+    cat: 'Test',
+  }], 'whitespace-test');
+  store.lock();
 
-  const reopened = await store.unlock(oldSecret);
-  const result = await store.changeMasterSecret(oldSecret, newSecret, reopened, 'rekey-test');
-  assert.equal(result.stale, false);
-  const rekeyEnvelope = JSON.parse(harness.getPostBodies().at(-1).patch.entries_encrypted_v1);
-  assert.equal(rekeyEnvelope.version, 1, 'ook rekey blijft in C rollback-veilig v1');
-  assert.equal(rekeyEnvelope.iterations, 210000);
-  const openedWithNew = await store.unlock(newSecret);
-  assert.equal(openedWithNew.length, reopened.length);
-  await assert.rejects(() => store.unlock(oldSecret), /Master-wachtzin klopt niet/);
-});
-
-test('C vergrendelt fail-closed na een ambigue remote write', async () => {
-  const harness = loadPasswordRegisterStoreWithUiState({}, { throwAfterPost: true });
-  const store = harness.createStore();
-  const entries = await store.unlock('unieke ambigue write master wachtzin');
-
-  await assert.rejects(
-    () => store.persist(entries, 'ambigue-test'),
-    (error) => {
-      assert.equal(error.forceLock, true);
-      assert.equal(error.requiresFreshRead, true);
-      return true;
-    }
-  );
-  assert.equal(store.getSecurityState().envelopeVersion, null);
+  const reopened = await store.unlock(masterSecret);
+  assert.equal(reopened[0].pw, exactPassword);
 });
 
 test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerde master key', async () => {
@@ -387,9 +471,6 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
   assert.equal(migratedPatch.entries_json, '');
   assert.equal(typeof migratedPatch.entries_encrypted_v1, 'string');
   assert.doesNotMatch(migratedPatch.entries_encrypted_v1, /fixture-legacy-secret|legacy@example\.com/);
-  const migratedEnvelope = JSON.parse(migratedPatch.entries_encrypted_v1);
-  assert.equal(migratedEnvelope.version, 1, 'ook de legacy-migratie schrijft in C alleen v1');
-  assert.equal(migratedEnvelope.iterations, 210000);
 
   const encryptedHarness = loadPasswordRegisterStoreWithUiState({
     entries_encrypted_v1: migratedPatch.entries_encrypted_v1,
@@ -397,48 +478,227 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
   const encryptedStore = encryptedHarness.createStore();
   const decrypted = await encryptedStore.unlock('juiste master');
   assert.equal(decrypted[0].user, 'legacy@example.com');
-  assert.equal(decrypted[0].pw, 'fixture-legacy-secret');
+  assert.equal(decrypted[0].pw, 'oude-plaintext');
   await assert.rejects(
     () => encryptedHarness.createStore().unlock('verkeerde master'),
     /Master-wachtzin klopt niet/
   );
 });
 
-test('premium wachtwoordenregister faalt gesloten zonder gezaghebbende Supabase-read', async () => {
-  const unavailableHarness = loadPasswordRegisterStoreWithUiState({}, {
-    readError: new Error('Supabase onbereikbaar'),
+async function createLegacyV1Envelope(masterSecret, entries) {
+  const salt = new Uint8Array(16).fill(7);
+  const iv = new Uint8Array(12).fill(9);
+  const secretBytes = new TextEncoder().encode(masterSecret);
+  const baseKey = await webcrypto.subtle.importKey('raw', secretBytes, 'PBKDF2', false, ['deriveKey']);
+  secretBytes.fill(0);
+  const key = await webcrypto.subtle.deriveKey({
+    name: 'PBKDF2',
+    hash: 'SHA-256',
+    salt,
+    iterations: 210000,
+  }, baseKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+  const plaintext = new TextEncoder().encode(JSON.stringify(entries));
+  const ciphertext = new Uint8Array(await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext));
+  plaintext.fill(0);
+  return JSON.stringify({
+    version: 1,
+    algorithm: 'AES-GCM',
+    kdf: 'PBKDF2-SHA256',
+    iterations: 210000,
+    salt: Buffer.from(salt).toString('base64'),
+    iv: Buffer.from(iv).toString('base64'),
+    ciphertext: Buffer.from(ciphertext).toString('base64'),
   });
-  await assert.rejects(
-    () => unavailableHarness.createStore().unlock('lange unieke master wachtzin'),
-    /Supabase onbereikbaar/
-  );
+}
 
-  const fallbackHarness = loadPasswordRegisterStoreWithUiState({}, { readSource: 'memory' });
-  await assert.rejects(
-    () => fallbackHarness.createStore().unlock('lange unieke master wachtzin'),
-    /niet gezaghebbend door Supabase bevestigd/
+test('premium wachtwoordenregister migreert legacy v1 vóór tonen automatisch naar v2 met 600k iteraties', async () => {
+  const legacySecret = 'oude korte zin';
+  const legacyEnvelope = await createLegacyV1Envelope(legacySecret, [{
+    id: 11,
+    naam: 'Legacy account',
+    url: 'legacy.example',
+    user: 'legacy-user@example.test',
+    pw: 'fixture-legacy-v1-secret',
+    cat: 'Test',
+  }]);
+  const harness = loadPasswordRegisterStoreWithUiState({ entries_encrypted_v1: legacyEnvelope });
+  const store = harness.createStore();
+
+  const entries = await store.unlock(legacySecret);
+  assert.equal(entries[0].pw, 'fixture-legacy-v1-secret');
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(store.getSecurityState())),
+    {
+      envelopeVersion: 2,
+      kdfIterations: 600000,
+      masterSecretMeetsPolicy: false,
+      migrationPending: false,
+    }
   );
+  assert.equal(harness.getPostBodies().length, 1, 'v1 unlock moet exact één CAS-migratie uitvoeren');
+  const migrationBody = harness.getPostBodies()[0];
+  assert.equal(migrationBody.expectedRevision, 1);
+  assert.equal(migrationBody.expectedUpdatedAt, '2026-08-04T12:00:01.000Z');
+  assert.equal(migrationBody.writeProof, TEST_WRITE_PROOF);
+  const migratedEnvelope = JSON.parse(migrationBody.patch.entries_encrypted_v1);
+  assert.equal(migratedEnvelope.version, 2);
+  assert.equal(migratedEnvelope.iterations, 600000);
+  assert.equal(migratedEnvelope.algorithm, 'AES-GCM');
+  assert.equal(migratedEnvelope.kdf, 'PBKDF2-SHA256');
+  assert.doesNotMatch(JSON.stringify(migratedEnvelope), /fixture-legacy-v1-secret|legacy-user/);
+
+  const migratedHarness = loadPasswordRegisterStoreWithUiState({
+    entries_encrypted_v1: JSON.stringify(migratedEnvelope),
+  });
+  const migratedEntries = await migratedHarness.createStore().unlock(legacySecret);
+  assert.equal(migratedEntries[0].pw, 'fixture-legacy-v1-secret');
+  assert.equal(migratedHarness.getPostBodies().length, 0, 'bevestigde v2 snapshot mag niet opnieuw migreren');
 });
 
-test('premium wachtwoordenregister bewaart wachtwoord-whitespace exact', async () => {
+test('premium wachtwoordenregister eist een sterke nieuwe master-wachtzin en kan veilig herkeyen', async () => {
+  const firstSecret = 'eerste unieke master wachtzin 2026';
+  const secondSecret = 'tweede unieke master wachtzin 2026';
   const harness = loadPasswordRegisterStoreWithUiState();
   const store = harness.createStore();
-  const fixturePasswordWithWhitespace = '  fixture-exact-secret-with-spaces  ';
-  await store.unlock('lange unieke master wachtzin');
-  await store.persist([
-    {
-      id: 1,
-      naam: 'Whitespace test',
-      url: 'https://example.test',
-      user: 'user@example.test',
-      pw: fixturePasswordWithWhitespace,
-      cat: 'Test',
-    },
-  ], 'whitespace-test');
 
-  const reopened = loadPasswordRegisterStoreWithUiState(harness.getValues()).createStore();
-  const entries = await reopened.unlock('lange unieke master wachtzin');
-  assert.equal(entries[0].pw, fixturePasswordWithWhitespace);
+  await assert.rejects(() => store.unlock('veel te kort'), /minimaal 20 tekens/);
+  const entries = await store.unlock(firstSecret);
+  await store.persist(entries, 'initial-save');
+  await assert.rejects(
+    async () => store.changeMasterSecret(firstSecret, 'nog steeds te kort', entries),
+    /minimaal 20 tekens/
+  );
+  await store.changeMasterSecret(firstSecret, secondSecret, entries, 'master-secret-change');
+
+  const changedEnvelope = harness.getValues().entries_encrypted_v1;
+  const changedHarness = loadPasswordRegisterStoreWithUiState({ entries_encrypted_v1: changedEnvelope });
+  await assert.rejects(
+    () => changedHarness.createStore().unlock(firstSecret),
+    /Master-wachtzin klopt niet/
+  );
+  const reopened = await changedHarness.createStore().unlock(secondSecret);
+  assert.equal(reopened.length, entries.length);
+});
+
+test('premium wachtwoordenregister faalt gesloten bij een stale CAS-revisie', async () => {
+  const harness = loadPasswordRegisterStoreWithUiState();
+  const store = harness.createStore();
+  const entries = await store.unlock('unieke stale cas master wachtzin 2026');
+  harness.advanceRemote({ updated_by: 'andere-sessie' });
+
+  await assert.rejects(
+    () => store.persist(entries, 'stale-client'),
+    (error) => {
+      assert.equal(error.code, 'PASSWORD_REGISTER_REVISION_CONFLICT');
+      assert.equal(error.forceLock, true);
+      assert.equal(error.requiresFreshRead, true);
+      return true;
+    }
+  );
+
+  assert.equal(harness.getPostBodies()[0].expectedRevision, 0);
+  assert.equal(harness.getPostBodies()[0].expectedUpdatedAt, null);
+  assert.equal(store.getRevisionState().revision, null);
+  assert.equal(store.getRevisionState().updatedAt, null);
+  assert.equal(store.getSecurityState().envelopeVersion, null);
+});
+
+test('premium wachtwoordenregister serialiseert gelijktijdige writes met oplopende CAS', async () => {
+  let releaseFirstPost;
+  let markFirstPostStarted;
+  const firstPostStarted = new Promise((resolve) => { markFirstPostStarted = resolve; });
+  const harness = loadPasswordRegisterStoreWithUiState({}, {
+    waitForPost: async (_body, postIndex) => {
+      if (postIndex !== 1) return;
+      markFirstPostStarted();
+      await new Promise((resolve) => { releaseFirstPost = resolve; });
+    },
+  });
+  const store = harness.createStore();
+  const masterSecret = 'unieke serialisatie master wachtzin 2026';
+  await store.unlock(masterSecret);
+
+  const firstSave = store.persist([{
+    id: 1,
+    naam: 'Eerste',
+    url: 'eerste.example',
+    user: 'eerste@example.test',
+    pw: 'fixture-first-secret',
+    cat: 'Test',
+  }], 'first');
+  await firstPostStarted;
+  const secondSave = store.persist([{
+    id: 1,
+    naam: 'Tweede',
+    url: 'tweede.example',
+    user: 'tweede@example.test',
+    pw: 'fixture-second-secret',
+    cat: 'Test',
+  }], 'second');
+
+  await Promise.resolve();
+  assert.equal(harness.getPostBodies().length, 1, 'tweede write mag niet voor de eerste starten');
+  releaseFirstPost();
+  await Promise.all([firstSave, secondSave]);
+
+  const bodies = harness.getPostBodies();
+  assert.equal(bodies.length, 2);
+  assert.deepEqual(
+    bodies.map((body) => [body.expectedRevision, body.expectedUpdatedAt]),
+    [[0, null], [1, '2026-08-04T12:00:01.000Z']]
+  );
+  assert.equal(store.getRevisionState().revision, 2);
+  assert.equal(store.getRevisionState().updatedAt, '2026-08-04T12:00:02.000Z');
+});
+
+test('premium wachtwoordenregister vergrendelt na een ambigue rekey en leest daarna vers uit Supabase', async () => {
+  const oldSecret = 'oude unieke rekey master wachtzin 2026';
+  const newSecret = 'nieuwe unieke rekey master wachtzin 2026';
+  const harness = loadPasswordRegisterStoreWithUiState({}, {
+    throwAfterCommit: (_body, postIndex) => postIndex === 2,
+  });
+  const store = harness.createStore();
+  const entries = await store.unlock(oldSecret);
+  await store.persist(entries, 'initial-save');
+
+  await assert.rejects(
+    () => store.changeMasterSecret(oldSecret, newSecret, entries, 'ambiguous-rekey'),
+    (error) => {
+      assert.equal(error.forceLock, true);
+      assert.equal(error.requiresFreshRead, true);
+      return true;
+    }
+  );
+  assert.equal(store.getSecurityState().envelopeVersion, null);
+  assert.equal(store.getRevisionState().revision, null);
+
+  const reopenedWithNewSecret = await store.unlock(newSecret);
+  assert.equal(reopenedWithNewSecret.length, entries.length);
+  await assert.rejects(
+    () => store.unlock(oldSecret),
+    /Master-wachtzin klopt niet/
+  );
+  assert.equal(harness.getGetCount(), 3, 'elke poging na de ambigue commit moet een verse authoritative read doen');
+});
+
+test('premium wachtwoordenregister controleert de huidige master-wachtzin voor rekey', async () => {
+  const oldSecret = 'huidige unieke master wachtzin 2026';
+  const newSecret = 'volgende unieke master wachtzin 2026';
+  const harness = loadPasswordRegisterStoreWithUiState();
+  const store = harness.createStore();
+  const entries = await store.unlock(oldSecret);
+  await store.persist(entries, 'initial-save');
+
+  await assert.rejects(
+    () => store.changeMasterSecret('onjuiste huidige master wachtzin', newSecret, entries),
+    (error) => {
+      assert.equal(error.code, 'PASSWORD_REGISTER_CURRENT_MASTER_INVALID');
+      assert.equal(error.forceLock, true);
+      return true;
+    }
+  );
+  assert.equal(harness.getPostBodies().length, 1, 'onjuiste huidige wachtzin mag geen rekey-write starten');
+  assert.equal(store.getSecurityState().envelopeVersion, null);
 });
 
 test('premium wachtwoordenregister zet een late opslag na lock niet terug in geheugen', async () => {
@@ -452,7 +712,7 @@ test('premium wachtwoordenregister zet een late opslag na lock niet terug in geh
     },
   });
   const store = harness.createStore();
-  const entries = await store.unlock('lange unieke race test master wachtzin');
+  const entries = await store.unlock('unieke race test master wachtzin');
   const persistPromise = store.persist(entries, 'race-test');
   await postStarted;
   store.lock();
@@ -461,9 +721,126 @@ test('premium wachtwoordenregister zet een late opslag na lock niet terug in geh
   const result = await persistPromise;
   assert.equal(result.stale, true);
   assert.equal(result.entries.length, 0);
-  const reopened = await store.unlock('lange unieke race test master wachtzin');
-  assert.equal(reopened.length, entries.length);
+  assert.equal(store.getSecurityState().envelopeVersion, null);
+  const reopened = await store.unlock('unieke race test master wachtzin');
+  assert.equal(reopened.length, entries.length, 'verse unlock moet de laat bevestigde Supabase-versie ophalen');
   assert.equal(harness.getGetCount(), 2);
+});
+
+test('premium wachtwoordenregister verifieert een verse rekey-PIN server-side en failt gesloten', async () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../../assets/premium-password-register-pin.js'),
+    'utf8'
+  );
+  const fetchCalls = [];
+  const scheduledCallbacks = [];
+  let nextScheduledCallbackId = 1;
+  let unlockVerification = null;
+  let unlockFailure = null;
+  let hangPinVerification = false;
+  let hangingSignal = null;
+  const pinMessage = { textContent: '' };
+  let responseData = {
+    ok: true,
+    writeProof: 'opaque-test-write-proof',
+    writeProofExpiresAt: new Date(Date.now() + 300000).toISOString(),
+  };
+  const context = {
+    window: {
+      AbortController,
+      setTimeout: (callback) => {
+        callback.timerId = nextScheduledCallbackId;
+        nextScheduledCallbackId += 1;
+        scheduledCallbacks.push(callback);
+        return callback.timerId;
+      },
+      clearTimeout: (timerId) => {
+        const index = scheduledCallbacks.findIndex((callback) => callback.timerId === timerId);
+        if (index >= 0) scheduledCallbacks.splice(index, 1);
+      },
+      setInterval,
+      clearInterval,
+    },
+    document: {
+      getElementById: (id) => id === 'pin-msg' ? pinMessage : null,
+      querySelectorAll: () => [],
+    },
+    fetch: async (url, options) => {
+      fetchCalls.push({ url, options });
+      if (hangPinVerification) {
+        hangingSignal = options.signal;
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(new Error('PIN request aborted')));
+        });
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => responseData,
+      };
+    },
+    setTimeout,
+    clearTimeout,
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const pinController = context.window.SoftoraPasswordRegisterPin.create({
+    unlock: async (receivedVerification) => {
+      unlockVerification = { ...receivedVerification };
+      if (unlockFailure) throw unlockFailure;
+    },
+  });
+
+  const verification = await pinController.verifyFreshPin('123456');
+  assert.equal(verification.writeProof, 'opaque-test-write-proof');
+  assert.equal(fetchCalls[0].url, '/api/premium-users/verify-pin');
+  assert.equal(fetchCalls[0].options.credentials, 'same-origin');
+  assert.equal(fetchCalls[0].options.signal.aborted, false);
+  assert.equal(fetchCalls[0].options.headers['X-Softora-Requested-With'], 'premium');
+  assert.deepEqual(JSON.parse(fetchCalls[0].options.body), {
+    actionConfirmCode: '123456',
+    actionConfirmScope: 'password-register',
+  });
+
+  for (const digit of '123456') pinController.pressDigit(digit);
+  await scheduledCallbacks.shift()();
+  scheduledCallbacks.shift()();
+  for (let tick = 0; tick < 6; tick += 1) await Promise.resolve();
+  assert.equal(unlockVerification.ok, true);
+  assert.equal(unlockVerification.writeProof, 'opaque-test-write-proof');
+  assert.equal(typeof unlockVerification.writeProofExpiresAt, 'string');
+  assert.equal(verification.writeProof, '', 'PIN-controller moet proof na geslaagde overdracht uit responseobject wissen');
+  assert.notEqual(unlockVerification, '123456', 'de ruwe PIN mag nooit aan de kluis-app worden doorgegeven');
+
+  unlockFailure = new Error('Gezaghebbende kluisread geweigerd.');
+  responseData = {
+    ok: true,
+    writeProof: 'second-opaque-write-proof',
+    writeProofExpiresAt: new Date(Date.now() + 300000).toISOString(),
+  };
+  const failedUnlockResponse = responseData;
+  for (const digit of '123456') pinController.pressDigit(digit);
+  await scheduledCallbacks.shift()();
+  scheduledCallbacks.shift()();
+  for (let tick = 0; tick < 6; tick += 1) await Promise.resolve();
+  assert.equal(pinMessage.textContent, 'Gezaghebbende kluisread geweigerd.');
+  assert.equal(failedUnlockResponse.writeProof, '', 'proof moet ook na unlock-fout uit het responseobject verdwijnen');
+
+  hangPinVerification = true;
+  const hangingVerification = pinController.verifyFreshPin('123456');
+  const hangingRejection = assert.rejects(hangingVerification, /PIN request aborted/);
+  await Promise.resolve();
+  assert.equal(hangingSignal.aborted, false);
+  pinController.lock();
+  assert.equal(hangingSignal.aborted, true, 'lock moet een lopende ruwe-PIN-request direct afbreken');
+  await hangingRejection;
+  hangPinVerification = false;
+
+  responseData = { ok: false, error: 'PIN verlopen' };
+  await assert.rejects(
+    () => pinController.verifyFreshPin('123456'),
+    /PIN verlopen/
+  );
 });
 
 function loadPasswordRegisterSecurityModule() {
@@ -473,6 +850,21 @@ function loadPasswordRegisterSecurityModule() {
     global.window = {};
     delete require.cache[modulePath];
     require('../../assets/premium-password-register-security.js');
+    return global.window;
+  } finally {
+    delete require.cache[modulePath];
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+}
+
+function loadPasswordRegisterAutoLockModule() {
+  const previousWindow = global.window;
+  const modulePath = require.resolve('../../assets/premium-password-register-autolock.js');
+  try {
+    global.window = {};
+    delete require.cache[modulePath];
+    require('../../assets/premium-password-register-autolock.js');
     return global.window;
   } finally {
     delete require.cache[modulePath];
@@ -511,7 +903,7 @@ test('premium wachtwoordenregister wist plaintext uit entries, formulieren en DO
   const toggle = createFakeElement('Verbergen');
   const deleteText = createFakeElement('Account verwijderen?');
   const status = createFakeElement('Account geladen');
-  const toast = createFakeElement('Account getoond');
+  const toast = createFakeElement('Account gekopieerd');
   const list = {
     children: ['fixture-secret-test-value'],
     replaceChildren(...children) { this.children = children; },
@@ -541,79 +933,71 @@ test('premium wachtwoordenregister wist plaintext uit entries, formulieren en DO
   assert.equal(status.textContent, '');
   assert.equal(toast.textContent, '');
   assert.equal(toast.classList.contains('show'), false);
-  assert.equal(formResetCount, 1);
   assert.deepEqual(list.children, [{ message: 'Kluis vergrendeld.' }]);
+  assert.equal(formResetCount, 1);
 });
 
-test('premium wachtwoordenregister vergrendelt direct bij blur, inactiviteit, achtergrond en hervatten', () => {
-  const documentListeners = {};
-  const windowListeners = {};
-  const timers = new Map();
-  let timerId = 0;
-  let now = 1000;
-  const reasons = [];
-  const fakeDocument = {
+function createFakeEventTarget() {
+  const listeners = new Map();
+  return {
     hidden: false,
-    addEventListener: (name, handler) => { documentListeners[name] = handler; },
+    addEventListener(name, listener) {
+      if (!listeners.has(name)) listeners.set(name, []);
+      listeners.get(name).push(listener);
+    },
+    dispatch(name) {
+      for (const listener of listeners.get(name) || []) listener({ type: name });
+    },
   };
-  const fakeWindow = {
-    document: fakeDocument,
-    addEventListener: (name, handler) => { windowListeners[name] = handler; },
-    setTimeout: (handler, delay) => {
-      timerId += 1;
-      timers.set(timerId, { handler, delay });
-      return timerId;
+}
+
+test('premium wachtwoordenregister vergrendelt direct bij blur, inactiviteit, achtergrond en hervatten', () => {
+  const window = loadPasswordRegisterAutoLockModule();
+  const documentTarget = createFakeEventTarget();
+  const windowTarget = createFakeEventTarget();
+  const timers = new Map();
+  const reasons = [];
+  let clock = 0;
+  let nextTimerId = 1;
+  const autoLock = window.SoftoraPasswordRegisterAutoLock.create({
+    document: documentTarget,
+    window: windowTarget,
+    inactivityMs: 300000,
+    now: () => clock,
+    setTimeout: (callback) => {
+      const id = nextTimerId;
+      nextTimerId += 1;
+      timers.set(id, callback);
+      return id;
     },
     clearTimeout: (id) => timers.delete(id),
-  };
-  const previousWindow = global.window;
-  const modulePath = require.resolve('../../assets/premium-password-register-autolock.js');
-  let create;
-  try {
-    global.window = fakeWindow;
-    delete require.cache[modulePath];
-    require('../../assets/premium-password-register-autolock.js');
-    create = fakeWindow.SoftoraPasswordRegisterAutoLock.create;
-  } finally {
-    delete require.cache[modulePath];
-    if (previousWindow === undefined) delete global.window;
-    else global.window = previousWindow;
-  }
-
-  const controller = create({
-    document: fakeDocument,
-    window: fakeWindow,
-    inactivityMs: 300000,
-    now: () => now,
-    setTimeout: fakeWindow.setTimeout,
-    clearTimeout: fakeWindow.clearTimeout,
     onLock: (reason) => reasons.push(reason),
   });
-  controller.start();
-  windowListeners.blur();
-  assert.deepEqual(reasons, ['blur']);
 
-  controller.start();
-  fakeDocument.hidden = true;
-  documentListeners.visibilitychange();
-  assert.deepEqual(reasons, ['blur', 'hidden']);
+  autoLock.start();
+  documentTarget.hidden = true;
+  documentTarget.dispatch('visibilitychange');
 
-  fakeDocument.hidden = false;
-  controller.start();
-  now += 300001;
-  const pendingTimer = Array.from(timers.values()).at(-1);
-  pendingTimer.handler();
-  assert.deepEqual(reasons, ['blur', 'hidden', 'inactivity']);
+  documentTarget.hidden = false;
+  autoLock.start();
+  documentTarget.dispatch('freeze');
 
-  controller.start();
-  now += 300001;
-  windowListeners.focus();
-  assert.deepEqual(reasons, ['blur', 'hidden', 'inactivity', 'resume-timeout']);
+  autoLock.start();
+  windowTarget.dispatch('pagehide');
 
-  controller.start();
-  documentListeners.freeze();
-  assert.equal(reasons.at(-1), 'freeze');
-  controller.start();
-  windowListeners.pagehide();
-  assert.equal(reasons.at(-1), 'pagehide');
+  autoLock.start();
+  windowTarget.dispatch('blur');
+  clock += 100;
+  windowTarget.dispatch('focus');
+
+  autoLock.start();
+  clock += 300001;
+  windowTarget.dispatch('focus');
+
+  autoLock.start();
+  clock += 300000;
+  for (const callback of [...timers.values()]) callback();
+
+  assert.deepEqual(reasons, ['hidden', 'freeze', 'pagehide', 'blur', 'resume-timeout', 'inactivity']);
+  assert.equal(autoLock.isActive(), false);
 });

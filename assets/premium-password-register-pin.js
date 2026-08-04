@@ -8,7 +8,8 @@
       attempts: 0,
       blocked: false,
       checking: false,
-      blockTimer: null
+      blockTimer: null,
+      verificationController: null
     };
 
     function getElement(value) {
@@ -38,6 +39,7 @@
     }
 
     function resetPinState() {
+      abortPendingVerification();
       state.input = "";
       state.attempts = 0;
       state.blocked = false;
@@ -50,29 +52,64 @@
       setMessage("");
     }
 
+    function abortPendingVerification() {
+      if (!state.verificationController) return;
+      state.verificationController.abort();
+      state.verificationController = null;
+    }
+
     async function verifyPin(pin) {
-      var response = await fetch("/api/premium-users/verify-pin", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Softora-Requested-With": "premium"
-        },
-        body: JSON.stringify({
-          actionConfirmCode: pin,
-          actionConfirmScope: "password-register"
-        })
-      });
-      var data = {};
+      if (typeof global.AbortController !== "function") {
+        throw new Error("Deze browser kan de beveiligings-PIN niet veilig controleren.");
+      }
+      var rawPin = String(pin == null ? "" : pin);
+      pin = "";
+      abortPendingVerification();
+      var controller = new global.AbortController();
+      state.verificationController = controller;
+      var timeoutId = global.setTimeout(function () {
+        controller.abort();
+      }, 10000);
       try {
-        data = await response.json();
-      } catch (_) {
-        data = {};
+        var response = await fetch("/api/premium-users/verify-pin", {
+          method: "POST",
+          credentials: "same-origin",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Softora-Requested-With": "premium"
+          },
+          body: JSON.stringify({
+            actionConfirmCode: rawPin,
+            actionConfirmScope: "password-register"
+          })
+        });
+        var data = {};
+        try {
+          data = await response.json();
+        } catch (_) {
+          data = {};
+        }
+        if (!response.ok || data.ok !== true) {
+          throw new Error(data.error || "Bevestigingspin is onjuist of ontbreekt.");
+        }
+        if (
+          typeof data.writeProof !== "string" ||
+          !data.writeProof ||
+          data.writeProof.length > 4096 ||
+          !Number.isFinite(Date.parse(data.writeProofExpiresAt)) ||
+          Date.parse(data.writeProofExpiresAt) <= Date.now()
+        ) {
+          throw new Error("Server gaf geen geldige beveiligingsbevestiging terug.");
+        }
+        return data;
+      } finally {
+        rawPin = "";
+        global.clearTimeout(timeoutId);
+        if (state.verificationController === controller) {
+          state.verificationController = null;
+        }
       }
-      if (!response.ok || data.ok !== true) {
-        throw new Error(data.error || "Bevestigingspin is onjuist of ontbreekt.");
-      }
-      return data;
     }
 
     function startTemporaryBlock() {
@@ -111,17 +148,33 @@
     async function runCheck() {
       if (state.checking) return;
       var attemptedPin = state.input;
+      state.input = "";
       state.checking = true;
       setMessage("Controleren...");
       try {
-        await verifyPin(attemptedPin);
+        var verification = await verifyPin(attemptedPin);
         state.input = "";
         attemptedPin = "";
         updateDots("success");
-        await Promise.resolve(config.unlock && config.unlock());
-        resetPinState();
+        window.setTimeout(function () {
+          Promise.resolve()
+            .then(function () {
+              return config.unlock && config.unlock(verification);
+            })
+            .then(function () {
+              verification.writeProof = "";
+              resetPinState();
+            })
+            .catch(function (error) {
+              verification.writeProof = "";
+              state.checking = false;
+              setMessage(String(error && error.message || "Laden mislukt").slice(0, 240));
+            });
+        }, 350);
       } catch (_) {
         handleFailedAttempt();
+      } finally {
+        attemptedPin = "";
       }
     }
 
@@ -146,6 +199,7 @@
     }
 
     function lock() {
+      abortPendingVerification();
       if (typeof config.onBeforeLock === "function") config.onBeforeLock();
       var registerScreen = getElement(config.registerScreen || "screen-register");
       var pinScreen = getElement(config.pinScreen || "screen-pin");
@@ -193,6 +247,7 @@
       lock: lock,
       pressDigit: pressDigit,
       reset: resetPinState,
+      setMessage: setMessage,
       verifyFreshPin: verifyPin
     };
   }
