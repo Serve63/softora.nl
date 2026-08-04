@@ -7,6 +7,9 @@ const {
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
 } = require('./instantly-original-message-source');
+const {
+  isAutomatedCampaignReply,
+} = require('./mailbox-automated-reply');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -860,6 +863,9 @@ function createInstantlyMailboxService(deps = {}) {
     return Array.from(groups.entries())
       .map(([threadId, threadMessages]) => {
         const sorted = threadMessages
+          .filter((message) => (
+            message.folder === 'sent' || !isAutomatedCampaignReply(message)
+          ))
           .slice()
           .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0));
         const incoming = sorted.find((message) => message.folder !== 'sent');

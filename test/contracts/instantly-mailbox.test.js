@@ -1170,6 +1170,66 @@ test('owner conversation listing never leaks the other owner and preserves exact
   assert.equal(JSON.stringify(conversations).includes('martijn-incoming'), false);
 });
 
+test('Instantly conversation listing hides automatic ticket receipts but preserves later human replies', async () => {
+  const { service, store } = buildService();
+  const sent = service.normalizeInstantlyMessage(incoming({
+    id: 'sbsupply-sent',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['helpdesknl@sbsupply.eu'],
+    subject: 'Kleine vraag over jullie website',
+    body: { text: 'Goedendag, ik heb een webdesign voor jullie gemaakt.' },
+    timestamp_email: '2026-07-29T05:31:39.000Z',
+  }));
+  const automaticReceipt = service.normalizeInstantlyMessage(incoming({
+    id: 'sbsupply-ticket-receipt',
+    email_type: 'received',
+    from_address_email: 'helpdesknl@sbsupply.eu',
+    from_address_name: 'helpdesknl@sbsupply.eu',
+    to_address_email_list: ['serve-sender@example.com'],
+    subject: '[Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    body: {
+      text: [
+        '##- Please type your reply above this line -##',
+        'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+        'Your request (269705) has been received and will be answered as soon as possible.',
+      ].join('\n'),
+    },
+    timestamp_email: '2026-07-29T05:31:49.000Z',
+  }));
+  store.rows.push(sent, automaticReceipt);
+
+  assert.deepEqual(await service.listOwnerConversations('serve'), []);
+
+  const humanReply = service.normalizeInstantlyMessage(incoming({
+    id: 'sbsupply-human-reply',
+    email_type: 'received',
+    from_address_email: 'helpdesknl@sbsupply.eu',
+    from_address_name: 'SBSupply medewerker',
+    to_address_email_list: ['serve-sender@example.com'],
+    subject: 'Re: [Serviceaanvraag ontvangen] Kleine vraag over jullie website',
+    body: {
+      text: [
+        'Dank voor het ontwerp. Kun je de online preview doorsturen?',
+        '',
+        'On Tue, 29 Jul 2026, helpdesknl@sbsupply.eu wrote:',
+        'Uw aanvraag (269705) is ontvangen en wordt zo snel mogelijk in behandeling genomen.',
+      ].join('\n'),
+    },
+    timestamp_email: '2026-07-29T09:00:00.000Z',
+  }));
+  store.rows.push(humanReply);
+
+  const conversations = await service.listOwnerConversations('serve');
+  assert.equal(conversations.length, 1);
+  assert.equal(conversations[0].providerMessageId, 'sbsupply-human-reply');
+  assert.deepEqual(
+    conversations[0].threadMessages.map((message) => message.providerMessageId),
+    ['sbsupply-sent']
+  );
+  assert.equal(JSON.stringify(conversations).includes('sbsupply-ticket-receipt'), false);
+});
+
 test('reply uses the exact stored account/thread and rejects cross-owner, recipient and attachment drift', async () => {
   const { service, store, requests } = buildService({
     fetchJsonWithTimeout: async (_url, options) => ({
