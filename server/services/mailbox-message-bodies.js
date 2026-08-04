@@ -13,6 +13,11 @@ function createMailboxMessageBodiesService({
   normalizeFolder,
   logger = console,
 } = {}) {
+  function normalizeMessageFolder(value) {
+    const folder = normalizeText(value).toLowerCase();
+    return folder === 'instantly' ? 'instantly' : normalizeFolder(folder);
+  }
+
   async function getInstantlyMessage({ accountEmail, id = '' } = {}) {
     const account = typeof getProviderAccount === 'function'
       ? getProviderAccount(accountEmail)
@@ -69,7 +74,7 @@ function createMailboxMessageBodiesService({
     }
 
     const references = source.map((message) => {
-      const folder = normalizeFolder(message && message.folder);
+      const folder = normalizeMessageFolder(message && message.folder);
       const id = normalizeText(message && message.id);
       if (folder === 'instantly') {
         const account = typeof getProviderAccount === 'function'
@@ -118,7 +123,7 @@ function createMailboxMessageBodiesService({
     return hydrated.map((message) => ({
       id: normalizeText(message && message.id),
       uid: Number(message && message.uid) || 0,
-      folder: normalizeFolder(message && message.folder),
+      folder: normalizeMessageFolder(message && message.folder),
       accountEmail: normalizeText(message && message.accountEmail).toLowerCase(),
       body: normalizeText(message && message.body),
       hasBody: Boolean(message && (message.hasBody || message.body)),

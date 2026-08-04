@@ -2216,7 +2216,7 @@ function createMailboxService(deps = {}) {
     return result.messages;
   }
   async function getMessage({ accountEmail, folder = 'inbox', id = '' }) {
-    const normalizedFolder = normalizeFolder(folder);
+    const normalizedFolder = normalizeString(folder).toLowerCase() === 'instantly' ? 'instantly' : normalizeFolder(folder);
     if (normalizedFolder === 'instantly') return getInstantlyMessage({ accountEmail, id });
     const account = assertReadableAccount(accountEmail);
     if (canUseMailboxIndex() && typeof mailboxIndexStore.getMessage === 'function') {
@@ -2520,7 +2520,7 @@ function createMailboxService(deps = {}) {
     try {
       const message = await getMessage({
         accountEmail: req.query?.account,
-        folder: normalizeFolder(req.query?.folder || 'inbox'),
+        folder: req.query?.folder || 'inbox',
         id: req.query?.id || req.query?.message || '',
       });
       return res.status(200).json({ ok: true, message });
@@ -2543,7 +2543,7 @@ function createMailboxService(deps = {}) {
       }
       const message = await getMessage({
         accountEmail: req.query?.account,
-        folder: normalizeFolder(req.query?.folder || 'inbox'),
+        folder: req.query?.folder || 'inbox',
         id: req.query?.id || req.query?.message || '',
       });
       const image = decodeMailboxMessageImage(

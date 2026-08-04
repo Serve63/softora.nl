@@ -2018,7 +2018,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260803c/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260804a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260804b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260728a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2094,7 +2094,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260804b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260725b"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260803c"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -2183,7 +2183,7 @@ test('coldmail eigenaarfilter houdt de negen campagneadressen gescheiden tussen 
   );
 
   campaignInboxModule.setOwner('both');
-  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn en Servé');
+  assert.equal(campaignInboxModule.getOwnerLabel(), 'Martijn & Servé');
   assert.deepEqual(
     campaignInboxModule.filterMessages(messages).map((message) => message.id),
     messages.slice(0, 9).map((message) => message.id)
@@ -2192,7 +2192,7 @@ test('coldmail eigenaarfilter houdt de negen campagneadressen gescheiden tussen 
   const ownerMenu = campaignInboxModule.renderOwnerMenu((value) => String(value));
   assert.match(ownerMenu, />Servé Creusen</);
   assert.match(ownerMenu, />Martijn van de Ven</);
-  assert.match(ownerMenu, />Martijn en Servé</);
+  assert.match(ownerMenu, />Martijn & Servé</);
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('serve');
 });
@@ -2465,8 +2465,8 @@ test('coldmail eigenaar kiest per ingelogde gebruiker de eigen mailbox als stand
   });
   assert.ok(serveMenu.indexOf('Servé Creusen') < serveMenu.indexOf('Martijn van de Ven'));
   assert.ok(martijnMenu.indexOf('Martijn van de Ven') < martijnMenu.indexOf('Servé Creusen'));
-  assert.match(serveMenu, /Martijn en Servé/);
-  assert.match(martijnMenu, /Martijn en Servé/);
+  assert.match(serveMenu, /Martijn & Servé/);
+  assert.match(martijnMenu, /Martijn & Servé/);
 });
 
 test('coldmail eigenaar kan Servé Martijn of de gecombineerde inbox vastpinnen', () => {
@@ -2492,7 +2492,7 @@ test('coldmail eigenaar kan Servé Martijn of de gecombineerde inbox vastpinnen'
     defaultOwner: 'serve',
     pinnedOwner: 'both',
   });
-  assert.match(combinedMenu, /Martijn en Servé/);
+  assert.match(combinedMenu, /Martijn & Servé/);
   assert.match(combinedMenu, /topbar-mailbox-option-row pinned[\s\S]*data-mailbox-pin-owner="both"/);
 });
 

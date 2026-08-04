@@ -179,6 +179,57 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
   );
 });
 
+test('mailbox detail behoudt de virtuele Instantly-folder tot aan de providerindex', async () => {
+  const lookups = [];
+  const exactMessage = {
+    id: 'instantly:019f3ba3-1e94-7aae-870f-6a05bd8e3a7a',
+    accountEmail: 'servecreusen@websoftora.com',
+    folder: 'sent',
+    storageFolder: 'instantly',
+    provider: 'instantly',
+    providerOwner: 'serve',
+    providerMessageId: '019f3ba3-1e94-7aae-870f-6a05bd8e3a7a',
+    body: 'Volledige exacte Instantly-mail aan Gemeente Vught.',
+    hasBody: true,
+  };
+  const service = createMailboxService({
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      async listMessages() { return []; },
+      async getMessage(input) {
+        lookups.push(input);
+        return input.folder === 'instantly' ? exactMessage : null;
+      },
+    },
+    instantlyMailboxService: {
+      getConfiguredAccounts(owner) {
+        return owner === 'serve'
+          ? [{ email: 'servecreusen@websoftora.com', owner: 'serve' }]
+          : [];
+      },
+    },
+  });
+
+  assert.equal((await service.getMessage({
+    accountEmail: 'servecreusen@websoftora.com',
+    folder: 'INSTANTLY',
+    id: exactMessage.id,
+  })).body, exactMessage.body);
+
+  const response = createResponseRecorder();
+  await service.getMessageResponse({
+    query: {
+      account: 'servecreusen@websoftora.com',
+      folder: 'instantly',
+      id: exactMessage.id,
+    },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.message.body, exactMessage.body);
+  assert.deepEqual(lookups.map((lookup) => lookup.folder), ['instantly', 'instantly']);
+});
+
 test('mailbox service excludes automated delivery failures from list and detail without touching human replies', async () => {
   const automated = {
     id: 'inbox:1',
