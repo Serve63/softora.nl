@@ -91,10 +91,15 @@
     fillButtonLabel.textContent = enabled ? 'AAN' : 'UIT';
     const actionLabel = enabled ? 'uit te zetten' : 'aan te zetten';
     fillButton.setAttribute('aria-label', `Database vullen staat ${enabled ? 'aan' : 'uit'}. Klik om ${actionLabel}.`);
-    const laneMessage = ['vuller', 'controle']
+    const workerLabels = {
+      vuller: 'Vuller',
+      controle: 'Controle',
+      goedgekeurd: 'Goedgekeurd controle',
+    };
+    const laneMessage = ['vuller', 'controle', 'goedgekeurd']
       .map((key) => workers[key])
       .filter(Boolean)
-      .map((worker) => `${worker.workerKey === 'controle' ? 'Controle' : 'Vuller'}: ${worker.workerMessage || worker.workerState}`)
+      .map((worker) => `${workerLabels[worker.workerKey] || worker.workerKey}: ${worker.workerMessage || worker.workerState}`)
       .join(' • ');
     const pendingStopMessage = !enabled && running ? 'De lopende batches worden nog veilig afgemaakt; daarna stopt database vullen.' : '';
     fillButton.title = pendingStopMessage || laneMessage || workerMessage || (enabled ? 'Klik om na de lopende batches te stoppen.' : 'Klik om database vullen aan te zetten.');
