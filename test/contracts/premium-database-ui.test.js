@@ -96,6 +96,12 @@ function loadDatabaseMailReadySnapshotClient(options = {}) {
   return sandbox.window.SoftoraDatabaseMailReadySnapshot;
 }
 
+function loadDatabaseSourceFilterClient() {
+  const scriptPath = path.join(__dirname, '../../assets/premium-database-source-filter.js');
+  delete require.cache[require.resolve(scriptPath)];
+  return require(scriptPath);
+}
+
 function loadPremiumDatabaseCustomersClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-customers-loader.js');
   delete require.cache[require.resolve(scriptPath)];
@@ -280,6 +286,21 @@ function createClassListNode() {
   };
 }
 
+test('premium database source filter recognizes only durable KVK transfers', () => {
+  const sourceFilter = loadDatabaseSourceFilterClient();
+
+  assert.equal(sourceFilter.isKvkTransferCustomer({ bronDatabase: 'Softora Bedrijven Scraper' }), true);
+  assert.equal(sourceFilter.isKvkTransferCustomer({ premiumTransferRunId: 'kvk-transfer-2026-08-04' }), true);
+  assert.equal(sourceFilter.isKvkTransferCustomer({ hist: [{ messageKey: 'kvk-transfer:12345678' }] }), true);
+  assert.equal(sourceFilter.isKvkTransferCustomer({ id: 'kvk-12345678', bronDatabase: '' }), false);
+  assert.equal(sourceFilter.getHeaderLabel('gevonden'), 'Succesvol gevonden');
+  assert.equal(sourceFilter.getHeaderLabel('benaderbaar'), 'Mailklaar');
+  assert.deepEqual(
+    { ...sourceFilter.normalizeCustomerSourceFields({ bronDatabase: ' Softora Bedrijven Scraper ', kvk_nummer: '12345678' }) },
+    { bronDatabase: 'Softora Bedrijven Scraper', kvkNummer: '12345678', premiumTransferRunId: '' }
+  );
+});
+
 test('premium database page bootstraps customer rows before async sync runs', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -353,7 +374,7 @@ test('premium database has a compact company search without the old result count
   );
   assert.match(
     pageSource,
-    /nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/
+    /nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/
   );
 });
 
@@ -1707,7 +1728,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const mailReadyPending = isMailReadyCalculationPending\(\), baseFiltered = getSortedCustomers\(getFilteredCustomers\(\)\), visibleCustomers = getVisibleTableCustomers\(baseFiltered\), blockForMailReadyPending = mailReadyPending && showPhotoColumn && !visibleCustomers\.length;/);
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*return; \}/);
   assert.match(pageSource, /const filtered = databaseTableHelpers\.getVisibleRows\(visibleCustomers, state\.visibleLimit, TABLE_PAGE_SIZE\);/);
-  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = state\.activeStatus === "benaderbaar" \? "Mailklaar" : "Foto's";/);
+  assert.match(pageSource, /document\.getElementById\("outreachActionHeader"\)\.hidden = !showOutreachActionColumn; document\.getElementById\("photoHeader"\)\.hidden = !showPhotoColumn; document\.getElementById\("daysHeader"\)\.hidden = !showOutreachActionColumn; if \(nodes\.photoHeaderLabel\) nodes\.photoHeaderLabel\.textContent = databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\);/);
   assert.match(pageSource, /renderPhotoBatchHeader\(baseFiltered, blockForMailReadyPending, eligiblePhotoCount, resultCountText\);/);
   assert.doesNotMatch(pageSource, /blockForMailReadyPending = mailReadyPending && showPhotoColumn && !state\.klanten\.length;/);
   assert.match(pageSource, /const photoHeaderCount = getPhotoHeaderCount\(visibleCustomers, showPhotoColumn\);/);
@@ -4153,12 +4174,17 @@ test('premium database page combines contact filters into one benaderd step', ()
 
   assert.match(
     pageSource,
-    /<div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters">\s*<span class="status-filter-label">Algemeen<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn act" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true">\s*<span class="status-filter-label">[\s\S]*status-filter-lock-icon[\s\S]*Coldcalling<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik<\/button>\s*<\/span>\s*<\/div>/
+    /<div class="status-filter-group status-filter-group--shared" aria-label="Algemene databasefilters">\s*<span class="status-filter-label">Algemeen<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn act" data-s="gevonden" type="button">Succesvol gevonden<\/button>\s*<button class="sf-btn" data-s="beschikbaar" type="button">Beschikbaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldmail" aria-label="Coldmailing filters">\s*<span class="status-filter-label">Coldmailing<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="benaderbaar" type="button">Mailklaar<\/button>\s*<\/span>\s*<\/div>\s*<span class="status-filter-divider" aria-hidden="true"><\/span>\s*<div class="status-filter-group status-filter-group--coldcalling is-locked" aria-label="Coldcalling filters nog niet beschikbaar" aria-disabled="true">\s*<span class="status-filter-label">[\s\S]*status-filter-lock-icon[\s\S]*Coldcalling<\/span>\s*<span class="status-filter-pills">\s*<button class="sf-btn" data-s="geblokkeerd" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen interesse<\/button>\s*<button class="sf-btn" data-s="geengehoor" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Geen gehoor<\/button>\s*<button class="sf-btn" data-s="buiten" type="button" disabled aria-disabled="true" title="Nog niet beschikbaar">Buiten gebruik<\/button>\s*<\/span>\s*<\/div>/
   );
-  assert.match(pageSource, /activeStatus: "benaderbaar"/);
+  assert.match(pageSource, /activeStatus: "gevonden"/);
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
   assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /data-s="beschikbaar" type="button">Beschikbaar<\/button>/);
+  assert.match(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
+  assert.match(pageSource, /state\.activeStatus === "gevonden"\) return databaseSourceFilter\.isKvkTransferCustomer\(customer\)/);
+  assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260804a/);
+  assert.match(pageSource, /state\.activeStatus === "gevonden"\) return \(customers \|\| \[\]\)\.length/);
+  assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);
   assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailDisplayCandidate\(customer\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
