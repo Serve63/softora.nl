@@ -9669,6 +9669,82 @@ test('coldmail post-SMTP recovery finalizes customer and counters exactly once w
   assert.equal(savedRow.lastColdmailSentAt, '2026-04-24T12:00:00.000Z');
 });
 
+test('coldmail post-SMTP recovery resolves a customer outside the limited UI snapshot by exact id', async () => {
+  let guard = {
+    reservation_id: 'neva-recovery-reservation',
+    recipient_id: 'safe-dedupe-row-287',
+    recipient_email: 'info@nevabeautyclinic.com',
+    recipient_company: 'Neva Beauty Clinic',
+    sender_email: 'martijnven123@gmail.com',
+    provider: 'softora',
+    channel: 'coldmail',
+    source: 'softora-coldmail-pre-send',
+    status: 'sent',
+    permanent: true,
+    created_at: '2026-08-04T14:14:05.000Z',
+    updated_at: '2026-08-04T14:14:05.000Z',
+    payload: {
+      customerId: 'safe-dedupe-row-287',
+      bedrijf: 'Neva Beauty Clinic',
+      expectedSubject: 'Kleine vraag over jullie website',
+      messageId: '<neva@example.test>',
+      providerId: 'sent:682',
+      sentAt: '2026-08-04T14:14:05.000Z',
+      senderEmail: 'martijnven123@gmail.com',
+      recipientEmail: 'info@nevabeautyclinic.com',
+      postSmtpEvidence: 'mailbox-sent-exact-recipient-sender-time',
+      postSmtpReconciled: false,
+    },
+  };
+  const idLookups = [];
+  const { service, sentMessages, getSavedStates, getSendGuardState } = createService({
+    rows: [{
+      id: 'unrelated-top-100-row',
+      bedrijf: 'Andere klant',
+      email: 'info@andere-klant.example',
+      status: 'prospect',
+      mail: true,
+    }],
+    outboundRecipientGuardStore: {
+      async listReservedRecipientGroups() { return []; },
+      async listSentRecipientGroups() {
+        return guard.payload.postSmtpReconciled ? [] : [guard];
+      },
+      async confirmReservation(reservationId, options) {
+        guard = { ...guard, status: options.status, payload: options.payload, updated_at: options.at };
+        return { ok: true, count: 4 };
+      },
+    },
+    dataOpsStore: {
+      async listCustomersByIds(options) {
+        idLookups.push(options);
+        return [{
+          id: 'safe-dedupe-row-287',
+          bedrijf: 'Neva Beauty Clinic',
+          email: 'info@nevabeautyclinic.com',
+          status: 'benaderbaar',
+          mail: true,
+        }];
+      },
+    },
+  });
+
+  const result = await service.reconcileColdmailPostSmtp({ maxRows: 100 });
+
+  assert.equal(result.reconciled, 1);
+  assert.equal(sentMessages.length, 0);
+  assert.equal(idLookups.length, 1);
+  assert.deepEqual(idLookups[0].customerIds, ['safe-dedupe-row-287']);
+  assert.equal(idLookups[0].bypassReadCache, true);
+  assert.equal(guard.payload.postSmtpReconciled, true);
+  assert.equal(getSendGuardState().entries.filter((entry) => entry.recipientEmail === 'info@nevabeautyclinic.com').length, 1);
+  const customerWrites = getSavedStates().filter((state) => state.scope === 'premium_customers_database');
+  assert.equal(customerWrites.length, 1);
+  const savedRows = JSON.parse(customerWrites[0].values.softora_customers_premium_v1);
+  assert.equal(savedRows[0].id, 'safe-dedupe-row-287');
+  assert.equal(savedRows[0].status, 'gemaild');
+});
+
 test('coldmail campaign keeps sender cooldown preflight short and extends after SMTP accept', async () => {
   const calls = [];
   const { service, sentMessages } = createService({

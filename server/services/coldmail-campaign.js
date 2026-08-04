@@ -14,6 +14,7 @@ const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const autopilotResilience = require('./coldmail-autopilot-resilience');
 const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-reconciliation');
+const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
@@ -5634,12 +5635,11 @@ function createColdmailCampaignService(deps = {}) {
     const customerState = await getUiStateValues(customerDbScope);
     const values = customerState && customerState.values && typeof customerState.values === 'object' ? customerState.values : {};
     const currentRows = parseDatabaseRows(values);
-    const recipientEmail = normalizeEmailAddress(evidence.recipientEmail);
-    const customerId = normalizeString(evidence.customerId);
-    const rowIndex = currentRows.findIndex((row, index) => (customerId && getRowId(row, index) === customerId) || (recipientEmail && getRowEmail(row) === recipientEmail));
-    const row = rowIndex >= 0 ? currentRows[rowIndex] : evidence.customerRow;
+    const { row, rowIndex, recipientEmail } = await resolveColdmailReconciliationCustomer({
+      currentRows, evidence, dataOpsStore, normalizeString, normalizeEmail: normalizeEmailAddress, getRowId, getRowEmail,
+    });
     if (!row) throw new Error('Klantstatus kon niet veilig worden hersteld: verzonden klant niet gevonden.');
-    const recipientGuard = buildColdmailRecipientGuard(row, getRowId(row, rowIndex));
+    const recipientGuard = buildColdmailRecipientGuard(row, getRowId(row, rowIndex >= 0 ? rowIndex : 0));
     await runColdmailPostSmtpPersistenceStep('oude send_guard/teller', () => recordColdmailSendGuardEntry({
       senderEmail: evidence.senderEmail, count: 1, personalCount: isPersonalMailboxDomain(recipientEmail) ? 1 : 0,
       ...recipientGuard, actor: evidence.actor || 'Coldmail post-SMTP herstel', sentAt: evidence.sentAt,
