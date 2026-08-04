@@ -3,9 +3,22 @@ const assert = require('node:assert/strict');
 const { validatePremiumAdminActionPin } = require('../../server/security/premium-admin-action-pin');
 const { registerPremiumUserManagementRoutes } = require('../../server/routes/premium-users');
 
-test('premium admin action pin skips when expected pin is empty', () => {
-  assert.equal(validatePremiumAdminActionPin({}, { expectedPin: '' }).ok, true);
-  assert.equal(validatePremiumAdminActionPin({ actionConfirmPin: 'x' }, { expectedPin: '  ' }).ok, true);
+test('premium admin action pin fails closed when expected pin is empty', () => {
+  const result = validatePremiumAdminActionPin({}, { expectedPin: '' });
+  assert.equal(result.ok, false);
+  assert.equal(result.statusCode, 503);
+  assert.equal(result.code, 'ACTION_CONFIRM_PIN_NOT_CONFIGURED');
+});
+
+test('generic admin PIN keeps legacy optional configuration while password scope fails closed', () => {
+  assert.equal(validatePremiumAdminActionPin({}, { env: {} }).ok, true);
+  const scoped = validatePremiumAdminActionPin({}, {
+    env: {},
+    envName: 'PREMIUM_PASSWORD_REGISTER_CONFIRM_PIN',
+    requireConfigured: true,
+  });
+  assert.equal(scoped.ok, false);
+  assert.equal(scoped.statusCode, 503);
 });
 
 test('premium admin action pin rejects mismatch', () => {
@@ -30,6 +43,10 @@ test('premium admin action pin accepts exact match on actionConfirmCode', () => 
 
 test('premium user routes expose server-side admin pin verification without leaking the pin', () => {
   const routes = [];
+  const auditEvents = [];
+  let createdUsers = 0;
+  const updatedUserIds = [];
+  const deletedUserIds = [];
   const app = {
     get(path, ...handlers) {
       routes.push({ method: 'GET', path, handlers });
@@ -45,7 +62,11 @@ test('premium user routes expose server-side admin pin verification without leak
     },
   };
   const previousPin = process.env.PREMIUM_SETTINGS_CONFIRM_PIN;
-  process.env.PREMIUM_SETTINGS_CONFIRM_PIN = 'geheim';
+  const previousColdmailPin = process.env.COLDMAIL_SEND_CONFIRM_PIN;
+  const previousVaultPin = process.env.PREMIUM_PASSWORD_REGISTER_CONFIRM_PIN;
+  process.env.PREMIUM_SETTINGS_CONFIRM_PIN = 'test-only-settings-pin';
+  process.env.COLDMAIL_SEND_CONFIRM_PIN = 'test-only-coldmail-pin';
+  process.env.PREMIUM_PASSWORD_REGISTER_CONFIRM_PIN = 'test-only-vault-pin';
 
   try {
     registerPremiumUserManagementRoutes(app, {
@@ -54,10 +75,21 @@ test('premium user routes expose server-side admin pin verification without leak
         getProfileResponse: () => {},
         updateProfileResponse: () => {},
         listPremiumUsersResponse: () => {},
-        createPremiumUserResponse: () => {},
-        updatePremiumUserResponse: () => {},
-        deletePremiumUserResponse: () => {},
+        createPremiumUserResponse: () => { createdUsers += 1; },
+        updatePremiumUserResponse: (_req, _res, id) => updatedUserIds.push(id),
+        deletePremiumUserResponse: (_req, _res, id) => deletedUserIds.push(id),
       },
+      passwordRegisterOwnerPolicy: {
+        getAccessDecision: () => ({ ok: true }),
+      },
+      passwordRegisterWriteProofManager: {
+        mint: () => ({
+          ok: true,
+          writeProof: 'opaque-write-proof',
+          writeProofExpiresAt: '2026-08-04T12:05:00.000Z',
+        }),
+      },
+      appendSecurityAuditEvent: (payload, reason) => auditEvents.push({ payload, reason }),
     });
 
     const route = routes.find((entry) => entry.method === 'POST' && entry.path === '/api/premium-users/verify-pin');
@@ -76,7 +108,7 @@ test('premium user routes expose server-side admin pin verification without leak
         return this;
       },
     };
-    handler({ body: { actionConfirmCode: 'wrong' } }, badRes);
+    handler({ body: { actionConfirmCode: 'wrong' }, premiumAuth: { userId: 'usr_test' } }, badRes);
     assert.equal(badRes.statusCode, 403);
     assert.equal(badRes.body.ok, false);
 
@@ -92,7 +124,10 @@ test('premium user routes expose server-side admin pin verification without leak
         return this;
       },
     };
-    handler({ body: { actionConfirmCode: 'geheim' } }, okRes);
+    handler(
+      { body: { actionConfirmCode: 'test-only-settings-pin' }, premiumAuth: { userId: 'usr_test' } },
+      okRes
+    );
     assert.equal(okRes.statusCode, 200);
     assert.deepEqual(okRes.body, { ok: true });
 
@@ -108,11 +143,72 @@ test('premium user routes expose server-side admin pin verification without leak
         return this;
       },
     };
-    handler({ body: { actionConfirmCode: '8080', actionConfirmScope: 'coldmail-send' } }, coldmailRes);
+    handler(
+      {
+        body: { actionConfirmCode: '8080', actionConfirmScope: 'coldmail-send' },
+        premiumAuth: { userId: 'usr_test' },
+      },
+      coldmailRes
+    );
     assert.equal(coldmailRes.statusCode, 200);
     assert.deepEqual(coldmailRes.body, { ok: true });
+
+    const vaultRes = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        return this;
+      },
+    };
+    handler(
+      {
+        body: { actionConfirmCode: 'test-only-vault-pin', actionConfirmScope: 'password-register' },
+        premiumAuth: { userId: 'usr_test' },
+      },
+      vaultRes
+    );
+    assert.equal(vaultRes.statusCode, 200);
+    assert.deepEqual(vaultRes.body, {
+      ok: true,
+      writeProof: 'opaque-write-proof',
+      writeProofExpiresAt: '2026-08-04T12:05:00.000Z',
+    });
+    assert.ok(
+      auditEvents.some((event) => event.payload.type === 'password_register_pin_verified')
+    );
+    assert.doesNotMatch(JSON.stringify(auditEvents), /test-only-(settings|coldmail|vault)-pin/);
+
+    const mutationRes = { status: () => mutationRes, json: () => mutationRes };
+    routes.find((entry) => entry.method === 'POST' && entry.path === '/api/premium-users')
+      .handlers.at(-1)(
+        { body: { actionConfirmCode: 'test-only-settings-pin' }, premiumAuth: { userId: 'usr_admin_test' } },
+        mutationRes
+      );
+    routes.find((entry) => entry.method === 'PATCH' && entry.path === '/api/premium-users/:id')
+      .handlers.at(-1)(
+        { body: { actionConfirmCode: 'test-only-settings-pin' }, params: { id: 'usr_update_test' }, premiumAuth: { userId: 'usr_admin_test' } },
+        mutationRes
+      );
+    routes.find((entry) => entry.method === 'DELETE' && entry.path === '/api/premium-users/:id')
+      .handlers.at(-1)(
+        { body: {}, params: { id: 'usr_delete_test' }, premiumAuth: { userId: 'usr_admin_test' } },
+        mutationRes
+      );
+    assert.equal(createdUsers, 1);
+    assert.deepEqual(updatedUserIds, ['usr_update_test']);
+    assert.deepEqual(deletedUserIds, ['usr_delete_test']);
+    assert.doesNotMatch(JSON.stringify(auditEvents), /test-only-settings-pin/);
   } finally {
     if (previousPin === undefined) delete process.env.PREMIUM_SETTINGS_CONFIRM_PIN;
     else process.env.PREMIUM_SETTINGS_CONFIRM_PIN = previousPin;
+    if (previousColdmailPin === undefined) delete process.env.COLDMAIL_SEND_CONFIRM_PIN;
+    else process.env.COLDMAIL_SEND_CONFIRM_PIN = previousColdmailPin;
+    if (previousVaultPin === undefined) delete process.env.PREMIUM_PASSWORD_REGISTER_CONFIRM_PIN;
+    else process.env.PREMIUM_PASSWORD_REGISTER_CONFIRM_PIN = previousVaultPin;
   }
 });

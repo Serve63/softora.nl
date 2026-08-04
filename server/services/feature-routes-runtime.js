@@ -274,6 +274,12 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,
+    requireFreshPasswordRegisterApiAccess:
+      premiumRouteRuntime?.requireFreshPasswordRegisterApiAccess,
+    requirePasswordRegisterWriteProof:
+      premiumRouteRuntime?.requirePasswordRegisterWriteProof,
+    requirePasswordRegisterAccessProof:
+      premiumRouteRuntime?.requirePasswordRegisterAccessProof,
     requireRuntimeDebugAccess,
   });
   registerRuntimeDebugOpsRoutes(app, {

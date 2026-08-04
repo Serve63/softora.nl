@@ -40,7 +40,7 @@ function createResponseRecorder() {
   };
 }
 
-function createFixture() {
+function createFixture(overrides = {}) {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-'));
   const knownFiles = new Set([
     'premium-website.html',
@@ -51,6 +51,7 @@ function createFixture() {
     'premium-voicesoftware.html',
     'premium-personeel-login.html',
     'premium-personeel-agenda.html',
+    'premium-wachtwoordenregister.html',
     'live-momentum.html',
     'live-momentum-access.html',
   ]);
@@ -70,12 +71,12 @@ function createFixture() {
       ['premium-personeel-agenda', 'premium-personeel-agenda.html'],
       ['live-momentum', 'live-momentum.html'],
     ]),
-    resolvePremiumHtmlPageAccess: async () => ({
+    resolvePremiumHtmlPageAccess: overrides.resolvePremiumHtmlPageAccess || (async () => ({
       handled: false,
       isLoginPage: false,
       isProtectedPremiumPage: false,
       authState: null,
-    }),
+    })),
     getSeoConfigCached: async () => ({
       pages: {
         'premium-website.html': {
@@ -89,7 +90,7 @@ function createFixture() {
       }
       return String(html || '');
     },
-    getPageBootstrapData: async (_req, fileName) => {
+    getPageBootstrapData: overrides.getPageBootstrapData || (async (_req, fileName) => {
       if (fileName !== 'premium-personeel-agenda.html') return null;
       return {
         marker: 'SOFTORA_AGENDA_BOOTSTRAP',
@@ -101,7 +102,7 @@ function createFixture() {
           appointments: [{ id: 11, company: 'Softora', date: '2026-04-08', time: '14:00' }],
         },
       };
-    },
+    }),
   });
 
   return {
@@ -347,6 +348,108 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.doesNotMatch(res.body, /font-size:2rem !important/);
   assert.doesNotMatch(res.body, /min-height:2\.35rem !important/);
   assert.doesNotMatch(res.body, /fonts\.googleapis\.com\/css2\?family=Inter/);
+});
+
+test('html page coordinator applies a strict path-specific CSP to the password register', async () => {
+  let bootstrapCalls = 0;
+  const { coordinator, pagesDir } = createFixture({
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: true,
+      authState: {
+        authenticated: true,
+        userId: 'usr_owner',
+        email: 'owner@softora.nl',
+        role: 'admin',
+      },
+    }),
+    getPageBootstrapData: async () => {
+      bootstrapCalls += 1;
+      return {
+        scriptId: 'softoraPageStateBootstrap',
+        data: { session: { authenticated: true }, ciphertext: 'never-inline' },
+      };
+    },
+  });
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-wachtwoordenregister.html'),
+    [
+      '<!DOCTYPE html><html data-password-register-csp-ready="1"><head>',
+      '<title>Wachtwoordenregister</title>',
+      '<link rel="stylesheet" href="/assets/personnel-theme.css">',
+      '</head><body>',
+      '<aside class="sidebar" data-static-sidebar="1"><nav class="sidebar-nav"></nav></aside>',
+      '<main class="main-content">Kluis</main>',
+      '<script src="assets/premium-password-register-theme-boot.js"></script>',
+      '<script src="assets/premium-password-register-renderer.js"></script>',
+      '<script src="assets/premium-password-register-store.js"></script>',
+      '<script src="assets/premium-password-register-pin.js"></script>',
+      '<script src="assets/premium-password-register-security.js"></script>',
+      '<script src="assets/premium-password-register-autolock.js"></script>',
+      '<script src="assets/premium-password-register-app.js"></script>',
+      '</body></html>',
+    ].join('')
+  );
+
+  const res = createResponseRecorder();
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-wachtwoordenregister' },
+    res,
+    () => {},
+    'premium-wachtwoordenregister.html'
+  );
+
+  const csp = res.headers['Content-Security-Policy'];
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['X-Frame-Options'], 'DENY');
+  assert.equal(res.headers['Referrer-Policy'], 'no-referrer');
+  assert.match(csp, /default-src 'none'/);
+  assert.match(csp, /script-src 'self'/);
+  assert.match(csp, /script-src-attr 'none'/);
+  assert.match(csp, /connect-src 'self'/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
+  assert.doesNotMatch(csp, /cdnjs|https:/);
+  assert.equal(bootstrapCalls, 0);
+  const renderedScriptSources = Array.from(res.body.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi))
+    .map((match) => match[1])
+    .sort();
+  assert.deepEqual(renderedScriptSources, [
+    '/assets/premium-session-watchdog.js?v=20260516a',
+    'assets/premium-password-register-app.js',
+    'assets/premium-password-register-autolock.js',
+    'assets/premium-password-register-pin.js',
+    'assets/premium-password-register-renderer.js',
+    'assets/premium-password-register-security.js',
+    'assets/premium-password-register-store.js',
+    'assets/premium-password-register-theme-boot.js',
+  ].sort());
+  assert.doesNotMatch(res.body, /<script id="softora-personnel-first-paint">/);
+  assert.doesNotMatch(res.body, /<script\b(?![^>]*\bsrc=)[^>]*>/i);
+  assert.doesNotMatch(res.body, /premium-sidebar|personnel-theme\.js|premium-boot-one-second|premium-dashboard-ai-chat-scope/i);
+  assert.doesNotMatch(res.body, /softoraPageStateBootstrap|never-inline/);
+});
+
+test('password register defers strict CSP until the external-script readiness marker is live', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-wachtwoordenregister.html'),
+    '<!DOCTYPE html><html><head><title>Legacy rollout</title></head><body><script>window.legacy=true;</script></body></html>'
+  );
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-wachtwoordenregister' },
+    res,
+    () => {},
+    'premium-wachtwoordenregister.html'
+  );
+
+  assert.equal(res.headers['Content-Security-Policy'], undefined);
+  assert.equal(res.headers['X-Frame-Options'], 'DENY');
+  assert.equal(res.headers['Referrer-Policy'], 'no-referrer');
 });
 
 test('html page coordinator keeps fullscreen Winnen free of sidebar delivery assets', async () => {

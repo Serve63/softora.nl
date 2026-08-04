@@ -8,6 +8,9 @@ function createPremiumRouteRuntime(deps = {}) {
   const {
     app,
     premiumLoginRateLimiter,
+    requireFreshPasswordRegisterApiAccess,
+    passwordRegisterOwnerPolicy,
+    passwordRegisterWriteProofManager,
     requirePremiumApiAccess,
     requirePremiumAdminApiAccess,
     premiumUsersStore,
@@ -95,7 +98,11 @@ function createPremiumRouteRuntime(deps = {}) {
 
   registerPremiumUserManagementRoutes(app, {
     coordinator: premiumUserManagementCoordinator,
+    requireFreshPasswordRegisterApiAccess,
+    passwordRegisterOwnerPolicy,
+    passwordRegisterWriteProofManager,
     requirePremiumAdminApiAccess,
+    appendSecurityAuditEvent,
   });
 }
 
