@@ -24,7 +24,7 @@ test('data ops store restores large premium database webdesign job queues', () =
   assert.match(source, /status,\s*total: Math\.max/);
   assert.match(
     source,
-    /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)/
+    /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)[\s\S]*maxRows: 25000/
   );
   assert.match(
     source,

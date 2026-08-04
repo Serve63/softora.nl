@@ -539,6 +539,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
       return dataOpsStore.listCustomerSnapshotRows({
+        maxRows: 25000,
         bypassReadCache: true,
         suppressTransientReadFailureLog: true,
       });
