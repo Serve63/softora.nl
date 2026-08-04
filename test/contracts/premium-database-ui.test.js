@@ -1309,6 +1309,19 @@ test('premium database replaces a compatibility bootstrap with the complete cano
   assert.match(pageSource, /await canonicalCustomersPromise; try \{ const photoMap = await loadCustomerPhotoMap\(state\.klanten/);
 });
 
+test('premium database shows canonical available rows while keeping actions guard-protected', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded && !state\.remoteCustomersLoaded/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailDisplayCandidate\(customer\)/);
+  assert.match(pageSource, /function isColdmailBaseLeadEligible\(customer, eligibilityOptions\) \{ const displayOnly = Boolean\(eligibilityOptions && eligibilityOptions\.displayOnly\)/);
+  assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false/);
+  assert.match(pageSource, /if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false/);
+  assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false; if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false; if \(window\.SoftoraDatabaseMailReadySnapshot/);
+  assert.match(pageSource, /isMailLeadEligible: isColdmailBaseLeadEligible/);
+  assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{ return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailDisplayCandidate\); \}/);
+});
+
 test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -1318,7 +1331,7 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /const COLDMAIL_SEND_GUARD_SCOPE = "premium_coldmail_send_guard";/);
   assert.match(pageSource, /const COLDMAIL_SEND_GUARD_KEY = "softora_coldmail_send_guard_v1";/);
   assert.match(pageSource, /function hasColdmailSendGuardSignal\(customer\)/);
-  assert.match(pageSource, /if \(hasColdmailSendGuardSignal\(customer\)\) return false;/);
+  assert.match(pageSource, /if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false;/);
   assert.match(pageSource, /Promise\.all\(\[[\s\S]*window\.SoftoraPremiumDatabaseCustomers\.load\([\s\S]*refreshColdmailGuardState\(\)/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
 
@@ -1431,7 +1444,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /fetchJsonWithTimeout\(url, \{[\s\S]*body: JSON\.stringify\(body \|\| \{\}\)[\s\S]*\}, timeoutMs\)\.then/);
   assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 12000, "Coldmail send-guard reageert niet op tijd\."\)/);
   assert.match(pageSource, /function hasLoadedColdmailGuard\(\)/);
-  assert.match(pageSource, /if \(!hasLoadedColdmailGuard\(\)\) return false;/);
+  assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false;/);
   assert.match(pageSource, /if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) \|\| window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true;/);
   assert.match(pageSource, /Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd\./);
   assert.match(pageSource, /const mailReadySnapshotPromise = loadMailReadySnapshot\(\);/);
@@ -1682,8 +1695,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
-  assert.match(pageSource, /function isAvailableColdmailCandidate\(customer\) \{ if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true; return isColdmailBaseLeadEligible\(customer\) && !hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\) && !outreachController\.hasInstantlyOutreachSignal\(customer\) && !isColdmailReadyWebdesignLead\(customer\);/);
-  assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailCandidate\);/);
+  assert.match(pageSource, /function isAvailableColdmailCandidate\(customer, options\) \{ if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true; return isColdmailBaseLeadEligible\(customer, options\) && !hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\) && !outreachController\.hasInstantlyOutreachSignal\(customer\) && !isColdmailReadyWebdesignLead\(customer\);/);
+  assert.match(pageSource, /function isAvailableColdmailDisplayCandidate\(customer\) \{ return isAvailableColdmailCandidate\(customer, \{ displayOnly: true \}\); \}/);
+  assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailDisplayCandidate\);/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
   assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.mailReadySnapshotLoaded[\s\S]*isSnapshotMailReadyCustomer\(customer\)[\s\S]*state\.availableSnapshotLoaded[\s\S]*isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return customers \|\| \[\];/);
@@ -4143,7 +4157,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /<option value="benaderbaar">Mailklaar<\/option>/);
   assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /data-s="beschikbaar" type="button">Beschikbaar<\/button>/);
-  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailCandidate\(customer\)/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return isAvailableColdmailDisplayCandidate\(customer\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
   assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\)\) return matchesColdcallingStatusFilter\(customer, state\.activeStatus\);/);
