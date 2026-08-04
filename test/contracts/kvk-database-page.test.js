@@ -98,6 +98,12 @@ test('kvk database renders latest treated snapshot rows in the restored panel', 
   assert.match(scriptSource, /state\.latestTreated=Array\.isArray\(e\.latestTreated\)/);
   assert.match(scriptSource, /function renderLatestTreatedRows\(\)/);
   assert.match(scriptSource, /\[e\.woonplaats,e\.provincie\]\.filter\(Boolean\)\.join\(", "\)/);
+  assert.match(scriptSource, /"Gevonden door"/);
+  assert.match(scriptSource, /found_by_role_label/);
+  assert.match(scriptSource, /found_by_model_label/);
+  assert.match(scriptSource, /"Onterecht goedgekeurd"/);
+  assert.match(scriptSource, /"incorrect_approval"===e\.review_finding/);
+  assert.match(scriptSource, /"rejected_to_control"===e\.usable_review_outcome/);
   assert.match(scriptSource, /renderStats\(\),renderLatestTreatedRows\(\),renderLocationList\(\)/);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
 });
