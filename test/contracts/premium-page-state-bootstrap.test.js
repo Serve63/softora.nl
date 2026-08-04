@@ -25,6 +25,7 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
   assert.deepEqual(PAGE_STATE_SCOPES['premium-seo-crm-system.html'], ['premium_seo_crm']);
   assert.deepEqual(PAGE_STATE_SCOPES['premium-vaste-lasten.html'], ['premium_monthly_costs']);
   assert.deepEqual(PAGE_STATE_SCOPES['sportschool.html'], ['sportschool_logboek']);
+  assert.equal(PAGE_STATE_SCOPES['premium-wachtwoordenregister.html'], undefined);
 
   const primaryBootstrapMarkers = {
     'premium-actieve-opdrachten.html': /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP -->/,
@@ -104,6 +105,30 @@ test('pagina-bootstrap blokkeert de pagina niet als één scope faalt', async ()
   assert.equal(payload.ok, true);
   assert.deepEqual(Object.keys(payload.scopes), ['premium_coldmailing_settings']);
   assert.equal(await service.buildPageStateBootstrapPayload('index.html'), null);
+});
+
+test('wachtwoordenregister-bootstrap laadt geen kluisstate in de eerste HTML', async () => {
+  let reads = 0;
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async () => {
+      reads += 1;
+      return { values: { should_not_load: 'ciphertext' }, source: 'supabase' };
+    },
+  });
+
+  const payload = await service.buildPageStateBootstrapPayload(
+    'premium-wachtwoordenregister.html',
+    {
+      session: {
+        authenticated: true,
+        userId: 'usr_owner_test',
+        role: 'admin',
+      },
+    }
+  );
+
+  assert.equal(payload, null);
+  assert.equal(reads, 0);
 });
 
 test('pagina-bootstrap cachet een mislukte scope-read niet als lege state', async () => {

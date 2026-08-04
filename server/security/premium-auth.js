@@ -1,4 +1,5 @@
 const { normalizeRequestPathname } = require('./request-context');
+const { PASSWORD_REGISTER_SCOPE } = require('./password-register-access');
 
 const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/healthz',
@@ -138,7 +139,10 @@ function createPremiumAuthStateManager(options = {}) {
           displayName: '',
         };
       }
-      return buildAuthenticatedStateFromUser(basicAuthState, cachedUser);
+      return {
+        ...buildAuthenticatedStateFromUser(basicAuthState, cachedUser),
+        tokenFallback: true,
+      };
     }
 
     return {
@@ -165,6 +169,7 @@ function createPremiumAuthStateManager(options = {}) {
     const basicAuthState = getPremiumAuthState(req);
     const allowAnonymousWithoutHydration = Boolean(options?.allowAnonymousWithoutHydration);
     const allowTokenFallbackWithoutHydration = Boolean(options?.allowTokenFallbackWithoutHydration);
+    const requireFreshUserHydration = Boolean(options?.requireFreshUserHydration);
     if (!basicAuthState.authenticated) {
       if (allowAnonymousWithoutHydration) {
         return buildConfiguredAnonymousState({
@@ -186,7 +191,9 @@ function createPremiumAuthStateManager(options = {}) {
     const timeoutMs = getSafeResolveTimeoutMs();
     let hydrated;
     if (!timeoutMs) {
-      hydrated = await premiumUsersStore.ensureUsersHydrated();
+      hydrated = await premiumUsersStore.ensureUsersHydrated(
+        requireFreshUserHydration ? { force: true, requireFresh: true } : undefined
+      );
     } else {
       hydrated = await new Promise((resolve) => {
         let settled = false;
@@ -206,7 +213,9 @@ function createPremiumAuthStateManager(options = {}) {
         }, timeoutMs);
 
         Promise.resolve()
-          .then(() => premiumUsersStore.ensureUsersHydrated())
+          .then(() => premiumUsersStore.ensureUsersHydrated(
+            requireFreshUserHydration ? { force: true, requireFresh: true } : undefined
+          ))
           .then((value) => finish(value))
           .catch((error) => {
             console.error('[PremiumAuth][ResolveError]', error?.message || error);
@@ -216,6 +225,13 @@ function createPremiumAuthStateManager(options = {}) {
             });
           });
       });
+    }
+    if (requireFreshUserHydration && hydrated?.source !== 'supabase') {
+      return {
+        ...buildConfiguredAnonymousState(basicAuthState),
+        configured: Boolean(sessionSecret),
+        hydrationUnavailable: true,
+      };
     }
     const users = resolveHydratedUsers(hydrated);
     const configured = Boolean(
@@ -261,7 +277,10 @@ function createPremiumAuthStateManager(options = {}) {
       };
     }
 
-    return buildAuthenticatedStateFromUser(basicAuthState, user);
+    return {
+      ...buildAuthenticatedStateFromUser(basicAuthState, user),
+      ...(requireFreshUserHydration ? { freshUserValidated: true } : {}),
+    };
   }
 
   function buildPremiumAuthSessionPayload(authState) {
@@ -520,7 +539,42 @@ function createPremiumApiAccessGuard(options = {}) {
     return res.status(403).json({ ok: false, error: 'Adminstatus kon niet veilig worden bevestigd.' });
   }
 
+  async function requireFreshPasswordRegisterApiAccess(req, res, next) {
+    const requestedScope = normalizeString(
+      req?.params?.scope || req?.query?.scope || req?.body?.actionConfirmScope || ''
+    ).toLowerCase();
+    if (requestedScope !== PASSWORD_REGISTER_SCOPE && requestedScope !== 'password-register') {
+      return next();
+    }
+
+    const authState = await getResolvedPremiumAuthState(req, {
+      allowAnonymousWithoutHydration: false,
+      allowTokenFallbackWithoutHydration: false,
+      requireFreshUserHydration: true,
+    });
+    res.setHeader('Cache-Control', 'no-store, private');
+    if (authState?.expired || authState?.revoked) {
+      clearPremiumSessionCookie(req, res);
+      return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+    }
+    if (
+      !authState?.authenticated ||
+      !authState?.user ||
+      !authState?.freshUserValidated ||
+      authState?.tokenFallback
+    ) {
+      return res.status(503).json({
+        ok: false,
+        code: 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE',
+        error: 'Wachtwoordenregister is tijdelijk niet beschikbaar omdat de gebruiker niet vers via Supabase kon worden bevestigd.',
+      });
+    }
+    req.premiumAuth = authState;
+    return next();
+  }
+
   return {
+    requireFreshPasswordRegisterApiAccess,
     requirePremiumAdminApiAccess,
     requirePremiumApiAccess,
   };

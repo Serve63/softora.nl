@@ -26,7 +26,6 @@ const PAGE_STATE_SCOPES = Object.freeze({
   'premium-socialmedia.html': Object.freeze(['premium_socialmedia_content_lock']),
   'premium-seo-crm-system.html': Object.freeze(['premium_seo_crm']),
   'premium-vaste-lasten.html': Object.freeze(['premium_monthly_costs']),
-  'premium-wachtwoordenregister.html': Object.freeze(['premium_password_register']),
   'premium-word.html': Object.freeze(['premium_word']),
   'sportschool.html': Object.freeze(['sportschool_logboek']),
 });
@@ -49,6 +48,9 @@ function sanitizeStateSnapshot(result) {
     values,
     source,
     updatedAt: result && result.updatedAt ? result.updatedAt : null,
+    ...(Number.isSafeInteger(Number(result && result.revision))
+      ? { revision: Number(result.revision) }
+      : {}),
   };
 }
 
@@ -204,6 +206,7 @@ function createPremiumPageStateBootstrapService(deps = {}) {
   }
 
   async function buildPageStateBootstrapPayload(fileName, options = {}) {
+    if (normalizeFileName(fileName) === 'premium-wachtwoordenregister.html') return null;
     const scopes = getScopesForPage(fileName);
     const session = sanitizeSessionSnapshot(options.session);
     if (!scopes.length && !session) return null;

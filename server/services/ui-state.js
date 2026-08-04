@@ -326,6 +326,7 @@ function createUiStateStore(deps = {}) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
     const readOptions = getEffectiveUiStateReadOptions(normalizedScope, options);
+    const includeRevision = Boolean(readOptions.includeRevision);
     const readFailureCooldownScope = normalizeReadFailureCooldownScope(normalizedScope, readOptions);
 
     if (!isSupabaseConfigured()) {
@@ -346,7 +347,7 @@ function createUiStateStore(deps = {}) {
         };
         const fallback = await fetchSupabaseRowByKeyViaRest(
           rowKey,
-          'payload,updated_at',
+          includeRevision ? 'payload,updated_at,revision' : 'payload,updated_at',
           restRequestOptions
         );
         if (!fallback.ok) {
@@ -377,7 +378,7 @@ function createUiStateStore(deps = {}) {
         try {
           const { data, error } = await client
             .from(supabaseStateTable)
-            .select('payload, updated_at')
+            .select(includeRevision ? 'payload, updated_at, revision' : 'payload, updated_at')
             .eq('state_key', rowKey)
             .maybeSingle();
 
@@ -404,6 +405,7 @@ function createUiStateStore(deps = {}) {
           values: { ...values },
           updatedAt: row.updatedAt || null,
           source: 'memory',
+          ...(includeRevision ? { revision: 0, exists: true } : {}),
         };
       }
 
@@ -413,12 +415,23 @@ function createUiStateStore(deps = {}) {
         values: { ...values },
         updatedAt: normalizeString(row?.updated_at || '') || null,
         source: row?.source || 'supabase',
+        ...(includeRevision
+          ? {
+              revision: Number.isSafeInteger(Number(row?.revision)) && Number(row?.revision) >= 0
+                ? Number(row.revision)
+                : 0,
+              exists: Boolean(row),
+            }
+          : {}),
       };
     };
 
     const fallbackState = buildFallbackState(normalizedScope);
 
-    if (isReadFailureCooldownActive(readFailureCooldownScope)) {
+    if (
+      isReadFailureCooldownActive(readFailureCooldownScope) &&
+      !Boolean(readOptions.bypassReadFailureCooldown)
+    ) {
       if (!shouldSuppressReadFailureLog(readOptions)) logReadFailureCooldown(readFailureCooldownScope);
       return fallbackState;
     }
@@ -593,7 +606,129 @@ function createUiStateStore(deps = {}) {
     }
   }
 
+  async function compareAndSwapUiStateValues(scope, values, meta = {}) {
+    const normalizedScope = normalizeUiStateScope(scope);
+    const expectedRevision = Number(meta.expectedRevision);
+    const expectedUpdatedAt = meta.expectedUpdatedAt == null
+      ? null
+      : normalizeString(meta.expectedUpdatedAt);
+    if (
+      !normalizedScope ||
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0 ||
+      (meta.expectedUpdatedAt != null && !expectedUpdatedAt)
+    ) {
+      return { ok: false, unavailable: true };
+    }
+
+    const sanitizedValues = sanitizeUiStateValues(values);
+    const invalidJsonStateValueErrors = getInvalidJsonStateValueErrors(sanitizedValues);
+    if (invalidJsonStateValueErrors.length || !isSupabaseConfigured()) {
+      return { ok: false, unavailable: true };
+    }
+
+    const writeRequestOptions = getUiStateWriteRequestOptions();
+    const client = getSupabaseClient(writeRequestOptions);
+    if (!client) return { ok: false, unavailable: true };
+
+    const rowKey = getUiStateRowKey(normalizedScope);
+    const updatedAt = new Date().toISOString();
+    const nextRevision = expectedRevision + 1;
+    const row = {
+      payload: {
+        scope: normalizedScope,
+        values: sanitizedValues,
+      },
+      meta: {
+        type: 'ui_state',
+        scope: normalizedScope,
+        source: normalizeString(meta.source || 'frontend'),
+        actor: normalizeString(meta.actor || ''),
+      },
+      revision: nextRevision,
+      updated_at: updatedAt,
+    };
+
+    async function readConflictState() {
+      const current = await getUiStateValues(normalizedScope, {
+        includeRevision: true,
+        preferSupabaseRestRead: true,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressReadFailureLog: true,
+        ignoreSupabaseRestFailureCooldown: true,
+        suppressSupabaseRestFailureCooldown: true,
+      });
+      if (!current || current.source !== 'supabase') {
+        return { ok: false, unavailable: true };
+      }
+      return {
+        ok: false,
+        conflict: true,
+        revision: Number(current.revision) || 0,
+        updatedAt: current.updatedAt || null,
+      };
+    }
+
+    try {
+      let updateQuery = client
+        .from(supabaseStateTable)
+        .update(row)
+        .eq('state_key', rowKey)
+        .eq('revision', expectedRevision);
+      if (expectedUpdatedAt) updateQuery = updateQuery.eq('updated_at', expectedUpdatedAt);
+      const updateResult = await updateQuery
+        .select('payload, updated_at, revision')
+        .maybeSingle();
+      if (updateResult?.error) {
+        logger.error('[UI State][Supabase][CasUpdateError]', updateResult.error.message || updateResult.error);
+        return { ok: false, unavailable: true };
+      }
+      if (updateResult?.data) {
+        inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
+        return {
+          ok: true,
+          values: { ...sanitizedValues },
+          source: 'supabase',
+          revision: Number(updateResult.data.revision) || nextRevision,
+          updatedAt: normalizeString(updateResult.data.updated_at || '') || updatedAt,
+        };
+      }
+
+      if (expectedRevision === 0 && expectedUpdatedAt === null) {
+        const insertResult = await client
+          .from(supabaseStateTable)
+          .insert({ state_key: rowKey, ...row })
+          .select('payload, updated_at, revision')
+          .maybeSingle();
+        if (!insertResult?.error && insertResult?.data) {
+          inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
+          return {
+            ok: true,
+            values: { ...sanitizedValues },
+            source: 'supabase',
+            revision: Number(insertResult.data.revision) || nextRevision,
+            updatedAt: normalizeString(insertResult.data.updated_at || '') || updatedAt,
+          };
+        }
+        if (String(insertResult?.error?.code || '') !== '23505') {
+          logger.error(
+            '[UI State][Supabase][CasInsertError]',
+            insertResult?.error?.message || insertResult?.error || 'Lege insert-response.'
+          );
+          return { ok: false, unavailable: true };
+        }
+      }
+
+      return readConflictState();
+    } catch (error) {
+      logger.error('[UI State][Supabase][CasCrash]', error?.message || error);
+      return { ok: false, unavailable: true };
+    }
+  }
+
   return {
+    compareAndSwapUiStateValues,
     getUiStateRowKey,
     getUiStateValues,
     normalizeUiStateScope,

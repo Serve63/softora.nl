@@ -221,6 +221,119 @@ test('ui-state store reads values through REST fallback when client is unavailab
   });
 });
 
+test('ui-state store returns authoritative revision metadata only when requested', async () => {
+  const { restReads, store } = createFixture({
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: { values: { encrypted: 'ciphertext' } },
+        updated_at: '2026-08-04T12:00:00.000Z',
+        revision: 12,
+      },
+    },
+  });
+
+  const state = await store.getUiStateValues('premium_password_register', {
+    includeRevision: true,
+    preferSupabaseRestRead: true,
+  });
+
+  assert.equal(restReads[0].columns, 'payload,updated_at,revision');
+  assert.equal(state.source, 'supabase');
+  assert.equal(state.revision, 12);
+  assert.equal(state.exists, true);
+  assert.equal(state.updatedAt, '2026-08-04T12:00:00.000Z');
+});
+
+test('ui-state store performs an atomic revision-and-timestamp CAS update', async () => {
+  let updatedRow = null;
+  const query = {
+    update(row) {
+      updatedRow = row;
+      return this;
+    },
+    eq() {
+      return this;
+    },
+    select() {
+      return this;
+    },
+    async maybeSingle() {
+      return {
+        data: {
+          payload: updatedRow.payload,
+          revision: updatedRow.revision,
+          updated_at: updatedRow.updated_at,
+        },
+        error: null,
+      };
+    },
+  };
+  const { store } = createFixture({
+    client: { from: () => query },
+  });
+
+  const result = await store.compareAndSwapUiStateValues(
+    'premium_password_register',
+    { encrypted: 'ciphertext' },
+    {
+      expectedRevision: 4,
+      expectedUpdatedAt: '2026-08-04T11:59:00.000Z',
+      source: 'password-register-vault',
+      actor: 'usr_owner_test',
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source, 'supabase');
+  assert.equal(result.revision, 5);
+  assert.equal(updatedRow.revision, 5);
+  assert.equal(updatedRow.meta.source, 'password-register-vault');
+  assert.equal(updatedRow.meta.actor, 'usr_owner_test');
+});
+
+test('ui-state store returns the current revision when atomic CAS loses a race', async () => {
+  const query = {
+    update() {
+      return this;
+    },
+    eq() {
+      return this;
+    },
+    select() {
+      return this;
+    },
+    async maybeSingle() {
+      return { data: null, error: null };
+    },
+  };
+  const { store } = createFixture({
+    client: { from: () => query },
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: { values: { encrypted: 'newer-ciphertext' } },
+        updated_at: '2026-08-04T12:01:00.000Z',
+        revision: 8,
+      },
+    },
+  });
+
+  const result = await store.compareAndSwapUiStateValues(
+    'premium_password_register',
+    { encrypted: 'stale-ciphertext' },
+    {
+      expectedRevision: 7,
+      expectedUpdatedAt: '2026-08-04T12:00:00.000Z',
+    }
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.conflict, true);
+  assert.equal(result.revision, 8);
+  assert.equal(result.updatedAt, '2026-08-04T12:01:00.000Z');
+});
+
 test('ui-state store writes values through REST fallback when client upsert fails', async () => {
   const failingClient = {
     from() {

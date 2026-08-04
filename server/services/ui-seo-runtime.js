@@ -118,8 +118,13 @@ function createUiSeoRuntime(deps = {}) {
     logger,
   });
 
-  const { getUiStateValues, normalizeUiStateScope, sanitizeUiStateValues, setUiStateValues } =
-    uiStateStore;
+  const {
+    compareAndSwapUiStateValues,
+    getUiStateValues,
+    normalizeUiStateScope,
+    sanitizeUiStateValues,
+    setUiStateValues,
+  } = uiStateStore;
 
   const dataOpsStore = createSoftoraDataOpsStore({
     isSupabaseConfigured,
@@ -249,6 +254,7 @@ function createUiSeoRuntime(deps = {}) {
     appendDashboardActivity,
     appendSecurityAuditEvent,
     normalizeUiStateScope: normalizeUiStateScopeInput || normalizeUiStateScope,
+    compareAndSwapUiStateValues,
     getUiStateValues,
     sanitizeUiStateValues,
     setUiStateValues,
@@ -307,6 +313,7 @@ function createUiSeoRuntime(deps = {}) {
   });
 
   return {
+    compareAndSwapUiStateValues,
     getUiStateValues,
     getSeoConfigCached,
     extractWebsitePreviewScanFromHtml,
