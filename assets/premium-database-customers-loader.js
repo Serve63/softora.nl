@@ -99,11 +99,13 @@
         return loadCompleteSnapshot(options, true);
     }
 
-    global.SoftoraPremiumDatabaseCustomers = {
+    const api = {
         endpoint: ENDPOINT,
         pageLimit: PAGE_LIMIT,
         maxCustomers: MAX_CUSTOMERS,
         dedupeCustomers: dedupeCustomers,
         load: load
     };
-})(window);
+    global.SoftoraPremiumDatabaseCustomers = api;
+    if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof window !== "undefined" ? window : globalThis);

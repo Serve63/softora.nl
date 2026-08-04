@@ -98,10 +98,8 @@ function loadDatabaseMailReadySnapshotClient(options = {}) {
 
 function loadPremiumDatabaseCustomersClient() {
   const scriptPath = path.join(__dirname, '../../assets/premium-database-customers-loader.js');
-  const source = fs.readFileSync(scriptPath, 'utf8');
-  const sandbox = { window: {} };
-  vm.runInNewContext(source, sandbox);
-  return sandbox.window.SoftoraPremiumDatabaseCustomers;
+  delete require.cache[require.resolve(scriptPath)];
+  return require(scriptPath);
 }
 
 function loadDatabaseTableHelpersClient() {
