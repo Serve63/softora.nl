@@ -1,7 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createPremiumAuthStateManager } = require('../../server/security/premium-auth');
+const {
+  createPremiumApiAccessGuard,
+  createPremiumAuthStateManager,
+} = require('../../server/security/premium-auth');
 
 function normalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
@@ -207,6 +210,168 @@ test('premium auth manager can resolve authenticated token requests without hydr
   assert.equal(resolved.email, 'info@softora.nl');
   assert.equal(resolved.isAdmin, true);
   assert.equal(resolved.user, null);
+});
+
+test('premium auth manager can require a fresh Supabase user for password-register access', async () => {
+  const users = [{
+    id: 'usr_owner_test',
+    email: 'owner@example.test',
+    role: 'admin',
+    status: 'active',
+    firstName: 'Owner',
+  }];
+  const hydrationOptions = [];
+  const store = {
+    ...createPremiumUsersStoreStub(users),
+    async ensureUsersHydrated(options) {
+      hydrationOptions.push(options);
+      return { users, source: 'supabase' };
+    },
+  };
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => 'token',
+    verifySessionToken: () => ({
+      ok: true,
+      expired: false,
+      payload: { email: 'owner@example.test', uid: 'usr_owner_test', role: 'admin' },
+    }),
+    premiumUsersStore: store,
+    getRequestPathname: () => '/premium-wachtwoordenregister',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState({}, {
+    allowTokenFallbackWithoutHydration: false,
+    requireFreshUserHydration: true,
+  });
+
+  assert.equal(resolved.authenticated, true);
+  assert.equal(resolved.freshUserValidated, true);
+  assert.deepEqual(hydrationOptions, [{ force: true, requireFresh: true }]);
+});
+
+test('premium auth manager rejects cached token claims when fresh hydration is unavailable', async () => {
+  const cachedUsers = [{
+    id: 'usr_owner_test',
+    email: 'owner@example.test',
+    role: 'admin',
+    status: 'active',
+  }];
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => 'token',
+    verifySessionToken: () => ({
+      ok: true,
+      expired: false,
+      payload: { email: 'owner@example.test', uid: 'usr_owner_test', role: 'admin' },
+    }),
+    premiumUsersStore: {
+      ...createPremiumUsersStoreStub(cachedUsers),
+      async ensureUsersHydrated() {
+        return { users: cachedUsers, source: 'unavailable' };
+      },
+    },
+    getRequestPathname: () => '/premium-wachtwoordenregister',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState({}, {
+    allowTokenFallbackWithoutHydration: false,
+    requireFreshUserHydration: true,
+  });
+
+  assert.equal(resolved.authenticated, false);
+  assert.equal(resolved.hydrationUnavailable, true);
+  assert.equal(resolved.user, null);
+});
+
+test('password-register API guard rejects token fallback and requests fresh hydration', async () => {
+  let resolveOptions = null;
+  let nextCalls = 0;
+  const guard = createPremiumApiAccessGuard({
+    normalizeString,
+    getResolvedPremiumAuthState: async (_req, options) => {
+      resolveOptions = options;
+      return {
+        configured: true,
+        authenticated: true,
+        isAdmin: true,
+        tokenFallback: true,
+        user: null,
+      };
+    },
+  });
+  const res = {
+    headers: {},
+    statusCode: 200,
+    body: null,
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+  };
+
+  await guard.requireFreshPasswordRegisterApiAccess(
+    { query: { scope: 'premium_password_register' } },
+    res,
+    () => {
+      nextCalls += 1;
+    }
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_FRESH_AUTH_UNAVAILABLE');
+  assert.equal(nextCalls, 0);
+  assert.deepEqual(resolveOptions, {
+    allowAnonymousWithoutHydration: false,
+    allowTokenFallbackWithoutHydration: false,
+    requireFreshUserHydration: true,
+  });
+});
+
+test('password-register API guard passes only a freshly validated active user', async () => {
+  const freshState = {
+    configured: true,
+    authenticated: true,
+    isAdmin: true,
+    userId: 'usr_owner_test',
+    user: { id: 'usr_owner_test', status: 'active' },
+    freshUserValidated: true,
+  };
+  let nextCalls = 0;
+  const guard = createPremiumApiAccessGuard({
+    normalizeString,
+    getResolvedPremiumAuthState: async () => freshState,
+  });
+  const req = { body: { actionConfirmScope: 'password-register' } };
+  const res = {
+    setHeader() {},
+    status() {
+      return this;
+    },
+    json() {
+      return this;
+    },
+  };
+
+  await guard.requireFreshPasswordRegisterApiAccess(req, res, () => {
+    nextCalls += 1;
+  });
+
+  assert.equal(nextCalls, 1);
+  assert.equal(req.premiumAuth, freshState);
 });
 
 test('premium auth manager rejects unsafe redirects and recognizes public api paths', () => {

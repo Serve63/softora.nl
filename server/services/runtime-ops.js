@@ -1,4 +1,12 @@
 const { createAdminOnlyUiStateScopesSet } = require('../config/admin-ui-state-scopes');
+const {
+  createPasswordRegisterOwnerPolicy,
+  isPasswordRegisterScope,
+} = require('../security/password-register-access');
+const {
+  isExactLegacyPasswordRegisterWrite,
+  validatePasswordRegisterValues,
+} = require('../schemas/password-register-vault');
 
 const PREMIUM_WORD_SCOPE = 'premium_word';
 const PREMIUM_WORD_HTML_KEY = 'softora_premium_word_html_v1';
@@ -160,6 +168,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     getUiStateValues = async () => null,
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
+    compareAndSwapUiStateValues = async () => ({ ok: false, unavailable: true }),
     dataOpsUiStateBridge = null,
     dataOpsStore = null,
     sportschoolLogbookStore = null,
@@ -167,6 +176,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
     dataOpsUiStateReadTimeoutMsByScope = {},
     uiStateReadTimeoutMs = 4500,
     adminOnlyUiStateScopes = createAdminOnlyUiStateScopesSet(),
+    passwordRegisterOwnerPolicy = createPasswordRegisterOwnerPolicy(),
     appendSecurityAuditEvent = () => {},
     logger = console,
   } = deps;
@@ -251,6 +261,64 @@ function createRuntimeOpsCoordinator(deps = {}) {
   function hasAdminUiStateAccess(req, scope) {
     if (!requiresAdminUiStateAccess(scope)) return true;
     return Boolean(req?.premiumAuth?.authenticated && req?.premiumAuth?.isAdmin);
+  }
+
+  function appendPasswordRegisterAuditEvent(req, payload, reason) {
+    appendSecurityAuditEvent(
+      {
+        type: payload.type,
+        severity: payload.success ? 'info' : 'warning',
+        success: Boolean(payload.success),
+        email: String(req?.premiumAuth?.email || '').trim(),
+        ip: String(req?.ip || req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim(),
+        path: String(req?.originalUrl || req?.url || '').trim(),
+        origin: String(req?.headers?.origin || '').trim(),
+        userAgent: typeof req?.get === 'function' ? req.get('user-agent') : '',
+        detail: String(payload.detail || '').trim(),
+      },
+      reason
+    );
+  }
+
+  function getPasswordRegisterOwnerDecision(req, scope) {
+    if (!isPasswordRegisterScope(scope)) return { ok: true };
+    return passwordRegisterOwnerPolicy.getAccessDecision(req?.premiumAuth || null);
+  }
+
+  function sendPasswordRegisterOwnerDenied(req, res, decision) {
+    appendPasswordRegisterAuditEvent(
+      req,
+      {
+        type: 'password_register_owner_denied',
+        success: false,
+        detail: decision.statusCode === 503
+          ? 'Wachtwoordenregister geweigerd omdat eigenaarstoegang niet geconfigureerd is.'
+          : 'Wachtwoordenregister geweigerd voor niet-eigenaar.',
+      },
+      'security_password_register_owner_denied'
+    );
+    return res.status(decision.statusCode).json({
+      ok: false,
+      code: decision.code,
+      error: decision.error,
+    });
+  }
+
+  function sendPasswordRegisterVaultInvalid(req, res, statusCode, detail) {
+    appendPasswordRegisterAuditEvent(
+      req,
+      {
+        type: 'password_register_vault_rejected',
+        success: false,
+        detail,
+      },
+      'security_password_register_vault_rejected'
+    );
+    return res.status(statusCode).json({
+      ok: false,
+      code: 'PASSWORD_REGISTER_VAULT_INVALID',
+      error: 'Versleutelde wachtwoordenkluis heeft een ongeldig of onveilig formaat.',
+    });
   }
 
   function logDataOpsReadFallback(scope, error) {
@@ -374,7 +442,282 @@ function createRuntimeOpsCoordinator(deps = {}) {
       values: savedState.values || fallbackValues || {},
       source: savedState.source || 'supabase',
       updatedAt: savedState.updatedAt || null,
+      ...(Number.isSafeInteger(Number(savedState.revision))
+        ? { revision: Number(savedState.revision) }
+        : {}),
     });
+  }
+
+  async function getAuthoritativePasswordRegisterState(scope) {
+    try {
+      const state = await awaitWithTimeout(
+        getUiStateValues(scope, {
+          includeRevision: true,
+          preferSupabaseRestRead: true,
+          bypassReadFailureCooldown: true,
+          suppressReadFailureCooldown: true,
+          suppressReadFailureLog: true,
+          ignoreSupabaseRestFailureCooldown: true,
+          suppressSupabaseRestFailureCooldown: true,
+        }),
+        uiStateReadTimeoutMs,
+        'Wachtwoordenregister-read timeout'
+      );
+      const revision = Number(state && state.revision);
+      if (
+        !state ||
+        normalizeString(state.source).toLowerCase() !== 'supabase' ||
+        !Number.isSafeInteger(revision) ||
+        revision < 0
+      ) {
+        return null;
+      }
+      return {
+        ...state,
+        revision,
+        updatedAt: normalizeString(state.updatedAt) || null,
+      };
+    } catch (error) {
+      logUiStateReadFallback(scope, error);
+      return null;
+    }
+  }
+
+  function getAuthenticatedVaultActor(req) {
+    const actor = normalizeString(
+      req?.premiumAuth?.userId || req?.premiumAuth?.email || 'password-register-owner'
+    );
+    return {
+      actor,
+      updatedBy: /^[a-z0-9:_-]{1,60}$/i.test(actor) ? actor : 'password-register-owner',
+    };
+  }
+
+  async function sendLegacyPasswordRegisterCompatWrite(req, res, scope, incomingValues) {
+    const currentState = await getAuthoritativePasswordRegisterState(scope);
+    if (!currentState) {
+      return res.status(503).json({
+        ok: false,
+        code: 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE',
+        error: 'Wachtwoordenregister-opslag kon niet rechtstreeks via Supabase worden bevestigd.',
+      });
+    }
+    const currentValidation = validatePasswordRegisterValues(currentState.values || {}, {
+      requireEncrypted: true,
+    });
+    if (!currentValidation.ok || currentValidation.version !== 1) {
+      appendPasswordRegisterAuditEvent(
+        req,
+        {
+          type: 'password_register_legacy_downgrade_blocked',
+          success: false,
+          detail: 'Legacy v1-write geweigerd omdat de authoritative kluis niet meer v1 is.',
+        },
+        'security_password_register_legacy_downgrade_blocked'
+      );
+      return res.status(409).json({
+        ok: false,
+        code: 'PASSWORD_REGISTER_LEGACY_DOWNGRADE_BLOCKED',
+        error: 'Deze oude wachtwoordenregisterpagina is verouderd. Vergrendel en laad de nieuwste pagina.',
+      });
+    }
+    const identity = getAuthenticatedVaultActor(req);
+    const valuesToSave = {
+      ...(currentState.values && typeof currentState.values === 'object' ? currentState.values : {}),
+      ...sanitizeUiStateValues(incomingValues),
+      updated_at: new Date().toISOString(),
+      updated_by: identity.updatedBy,
+    };
+    const validation = validatePasswordRegisterValues(valuesToSave, { requireEncrypted: true });
+    if (!validation.ok || validation.version !== 1) {
+      return sendPasswordRegisterVaultInvalid(
+        req,
+        res,
+        400,
+        'Tijdelijke legacy-write geweigerd wegens ongeldig versleuteld opslagformaat.'
+      );
+    }
+    // Tijdelijke backend-eerst rolloutcompat: uitsluitend exact v1, owner-gated,
+    // vers gehydrateerd en rechtstreeks Supabase. Verwijderen zodra v2/CAS live is.
+    const state = await compareAndSwapUiStateValues(scope, valuesToSave, {
+      source: 'password-register-legacy-rollout-compat',
+      actor: identity.actor,
+      expectedRevision: currentState.revision,
+      expectedUpdatedAt: currentState.updatedAt,
+    });
+    if (state && state.conflict) return sendPasswordRegisterRevisionConflict(req, res, state);
+    const savedValidation = validatePasswordRegisterValues(state && state.values, {
+      requireEncrypted: true,
+    });
+    if (
+      !state ||
+      !state.ok ||
+      normalizeString(state.source).toLowerCase() !== 'supabase' ||
+      !savedValidation.ok ||
+      savedValidation.version !== 1 ||
+      Number(state.revision) !== currentState.revision + 1
+    ) {
+      return res.status(503).json({
+        ok: false,
+        code: 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE',
+        error: 'Wachtwoordenregister legacy-write kon niet veilig worden bevestigd.',
+      });
+    }
+    appendPasswordRegisterAuditEvent(
+      req,
+      {
+        type: 'password_register_legacy_write_compat',
+        success: true,
+        detail: 'Tijdelijke owner-gated v1 rolloutcompat-write rechtstreeks in Supabase opgeslagen.',
+      },
+      'security_password_register_legacy_write_compat'
+    );
+    return sendUiStateSetSuccessResponse(res, scope, state, valuesToSave);
+  }
+
+  function sendPasswordRegisterRevisionConflict(req, res, state, code = 'PASSWORD_REGISTER_REVISION_CONFLICT') {
+    appendPasswordRegisterAuditEvent(
+      req,
+      {
+        type: 'password_register_revision_conflict',
+        success: false,
+        detail: code === 'PASSWORD_REGISTER_REVISION_REQUIRED'
+          ? 'Wachtwoordenregister-write geweigerd omdat CAS-versievelden ontbreken.'
+          : 'Wachtwoordenregister-write geweigerd wegens een versieconflict.',
+      },
+      'security_password_register_revision_conflict'
+    );
+    return res.status(409).json({
+      ok: false,
+      code,
+      error: 'Het wachtwoordenregister is intussen gewijzigd. Vergrendel en laad de kluis opnieuw.',
+      revision: Number(state && state.revision) || 0,
+      updatedAt: state && state.updatedAt ? state.updatedAt : null,
+    });
+  }
+
+  async function sendPasswordRegisterUiStateSetResponse(req, res, scope) {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const patchProvided = body.patch && typeof body.patch === 'object' && !Array.isArray(body.patch);
+    const valuesProvided = body.values && typeof body.values === 'object' && !Array.isArray(body.values);
+    const incomingValues = patchProvided ? body.patch : valuesProvided ? body.values : {};
+    const hasExpectedRevision = Object.prototype.hasOwnProperty.call(body, 'expectedRevision');
+    const hasExpectedUpdatedAt = Object.prototype.hasOwnProperty.call(body, 'expectedUpdatedAt');
+    const isLegacyRolloutCompatWrite = isExactLegacyPasswordRegisterWrite(body);
+    if (isLegacyRolloutCompatWrite) {
+      return sendLegacyPasswordRegisterCompatWrite(req, res, scope, incomingValues);
+    }
+    const incomingValidation = validatePasswordRegisterValues(incomingValues, {
+      requireEncrypted: true,
+      requireCurrentVersion: true,
+    });
+    if (!incomingValidation.ok) {
+      return sendPasswordRegisterVaultInvalid(
+        req,
+        res,
+        400,
+        'Wachtwoordenregister-write geweigerd wegens ongeldig versleuteld opslagformaat.'
+      );
+    }
+
+    const currentState = await getAuthoritativePasswordRegisterState(scope);
+    if (!currentState) {
+      return res.status(503).json({
+        ok: false,
+        code: 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE',
+        error: 'Wachtwoordenregister-opslag kon niet rechtstreeks via Supabase worden bevestigd.',
+      });
+    }
+
+    const expectedRevision = Number(body.expectedRevision);
+    const expectedUpdatedAt = body.expectedUpdatedAt == null
+      ? null
+      : normalizeString(body.expectedUpdatedAt);
+    if (
+      !hasExpectedRevision ||
+      !hasExpectedUpdatedAt ||
+      !Number.isSafeInteger(expectedRevision) ||
+      expectedRevision < 0 ||
+      (body.expectedUpdatedAt != null && !expectedUpdatedAt)
+    ) {
+      return sendPasswordRegisterRevisionConflict(
+        req,
+        res,
+        currentState,
+        'PASSWORD_REGISTER_REVISION_REQUIRED'
+      );
+    }
+    if (
+      expectedRevision !== currentState.revision ||
+      expectedUpdatedAt !== currentState.updatedAt
+    ) {
+      return sendPasswordRegisterRevisionConflict(req, res, currentState);
+    }
+
+    const identity = getAuthenticatedVaultActor(req);
+    const valuesToSave = {
+      ...(currentState.values && typeof currentState.values === 'object' ? currentState.values : {}),
+      ...sanitizeUiStateValues(incomingValues),
+      updated_at: new Date().toISOString(),
+      updated_by: identity.updatedBy,
+    };
+    const mergedValidation = validatePasswordRegisterValues(valuesToSave, {
+      requireEncrypted: true,
+      requireCurrentVersion: true,
+    });
+    if (!mergedValidation.ok) {
+      return sendPasswordRegisterVaultInvalid(
+        req,
+        res,
+        400,
+        'Wachtwoordenregister-write geweigerd omdat de volledige kluisstate ongeldig is.'
+      );
+    }
+
+    const state = await compareAndSwapUiStateValues(scope, valuesToSave, {
+      source: 'password-register-vault',
+      actor: identity.actor,
+      expectedRevision,
+      expectedUpdatedAt,
+    });
+    if (state && state.conflict) {
+      return sendPasswordRegisterRevisionConflict(req, res, state);
+    }
+    if (!state || !state.ok || normalizeString(state.source).toLowerCase() !== 'supabase') {
+      return res.status(503).json({
+        ok: false,
+        code: 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE',
+        error: 'Wachtwoordenregister kon niet atomair in Supabase worden opgeslagen.',
+      });
+    }
+
+    const savedValidation = validatePasswordRegisterValues(state.values || {}, {
+      requireEncrypted: true,
+      requireCurrentVersion: true,
+    });
+    if (
+      !savedValidation.ok ||
+      !Number.isSafeInteger(Number(state.revision)) ||
+      Number(state.revision) !== expectedRevision + 1 ||
+      !normalizeString(state.updatedAt)
+    ) {
+      return sendPasswordRegisterVaultInvalid(
+        req,
+        res,
+        503,
+        'Wachtwoordenregister-write kon niet veilig worden bevestigd.'
+      );
+    }
+    appendPasswordRegisterAuditEvent(
+      req,
+      {
+        type: 'password_register_vault_written',
+        success: true,
+        detail: `Versleutelde wachtwoordenkluis v${savedValidation.version} atomair opgeslagen.`,
+      },
+      'security_password_register_vault_written'
+    );
+    return sendUiStateSetSuccessResponse(res, scope, state, valuesToSave);
   }
 
   async function sendUiStateGetResponse(req, res, scopeRaw) {
@@ -391,12 +734,43 @@ function createRuntimeOpsCoordinator(deps = {}) {
       });
     }
 
-    const state = await getUiStateValuesForScope(scope);
+    const ownerDecision = getPasswordRegisterOwnerDecision(req, scope);
+    if (!ownerDecision.ok) {
+      return sendPasswordRegisterOwnerDenied(req, res, ownerDecision);
+    }
+
+    const state = isPasswordRegisterScope(scope)
+      ? await getAuthoritativePasswordRegisterState(scope)
+      : await getUiStateValuesForScope(scope);
     if (!state) {
       return res.status(503).json({
         ok: false,
         error: 'Kon UI state niet laden zonder geldige Supabase-opslag.',
       });
+    }
+
+
+    if (isPasswordRegisterScope(scope)) {
+      const vaultValidation = validatePasswordRegisterValues(state.values || {});
+      if (!vaultValidation.ok) {
+        return sendPasswordRegisterVaultInvalid(
+          req,
+          res,
+          503,
+          'Wachtwoordenregister-read geweigerd wegens ongeldig versleuteld opslagformaat.'
+        );
+      }
+      appendPasswordRegisterAuditEvent(
+        req,
+        {
+          type: 'password_register_vault_read',
+          success: true,
+          detail: vaultValidation.empty
+            ? 'Lege wachtwoordenkluis veilig gelezen.'
+            : `Versleutelde wachtwoordenkluis v${vaultValidation.version} veilig gelezen.`,
+        },
+        'security_password_register_vault_read'
+      );
     }
 
     return res.status(200).json({
@@ -405,6 +779,7 @@ function createRuntimeOpsCoordinator(deps = {}) {
       values: state.values || {},
       source: state.source || 'supabase',
       updatedAt: state.updatedAt || null,
+      ...(isPasswordRegisterScope(scope) ? { revision: state.revision } : {}),
     });
   }
 
@@ -420,6 +795,15 @@ function createRuntimeOpsCoordinator(deps = {}) {
         ok: false,
         error: 'Alleen Full Acces-accounts hebben toegang tot deze UI state scope.',
       });
+    }
+
+    const ownerDecision = getPasswordRegisterOwnerDecision(req, scope);
+    if (!ownerDecision.ok) {
+      return sendPasswordRegisterOwnerDenied(req, res, ownerDecision);
+    }
+
+    if (isPasswordRegisterScope(scope)) {
+      return sendPasswordRegisterUiStateSetResponse(req, res, scope);
     }
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};

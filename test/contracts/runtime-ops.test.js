@@ -3,6 +3,31 @@ const assert = require('node:assert/strict');
 
 const { createRuntimeOpsCoordinator } = require('../../server/services/runtime-ops');
 
+function createPasswordRegisterValues(version = 2) {
+  return {
+    entries_encrypted_v1: JSON.stringify({
+      version,
+      algorithm: 'AES-GCM',
+      kdf: 'PBKDF2-SHA256',
+      iterations: version === 1 ? 210000 : 600000,
+      salt: Buffer.alloc(16, 1).toString('base64'),
+      iv: Buffer.alloc(12, 2).toString('base64'),
+      ciphertext: Buffer.alloc(48, 3).toString('base64'),
+    }),
+    entries_json: '',
+    updated_at: '2026-08-04T12:00:00.000Z',
+    updated_by: 'test-save',
+  };
+}
+
+function createPasswordRegisterWriteBody(values, overrides = {}) {
+  return {
+    patch: values,
+    writeProof: 'opaque-test-proof',
+    ...overrides,
+  };
+}
+
 function createResponseRecorder() {
   return {
     statusCode: null,
@@ -71,6 +96,15 @@ function createFixture(overrides = {}) {
         source: meta.source,
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
+    compareAndSwapUiStateValues:
+      overrides.compareAndSwapUiStateValues ||
+      (async (_scope, values, meta) => ({
+        ok: true,
+        values,
+        source: 'supabase',
+        revision: Number(meta.expectedRevision) + 1,
+        updatedAt: '2026-08-04T12:00:00.000Z',
+      })),
     dataOpsUiStateBridge: overrides.dataOpsUiStateBridge || null,
     dataOpsStore: overrides.dataOpsStore || null,
     sportschoolLogbookStore: overrides.sportschoolLogbookStore || null,
@@ -78,6 +112,18 @@ function createFixture(overrides = {}) {
     dataOpsUiStateReadTimeoutMsByScope: overrides.dataOpsUiStateReadTimeoutMsByScope,
     uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     adminOnlyUiStateScopes: overrides.adminOnlyUiStateScopes || new Set(['premium_password_register']),
+    passwordRegisterOwnerPolicy: overrides.passwordRegisterOwnerPolicy || {
+      getAccessDecision(authState) {
+        return authState?.userId === 'usr_password_owner'
+          ? { ok: true }
+          : {
+              ok: false,
+              statusCode: 403,
+              code: 'PASSWORD_REGISTER_OWNER_REQUIRED',
+              error: 'Alleen de geconfigureerde eigenaar heeft toegang.',
+            };
+      },
+    },
     appendSecurityAuditEvent: overrides.appendSecurityAuditEvent || ((payload, reason) => {
       securityAuditCalls.push({ payload, reason });
       return payload;
@@ -1325,23 +1371,431 @@ test('runtime ops coordinator blocks admin-only ui-state scopes for non-admin us
 });
 
 test('runtime ops coordinator allows admin users on admin-only ui-state scopes', async () => {
-  const { coordinator } = createFixture({
+  const { coordinator, securityAuditCalls } = createFixture({
     getUiStateValues: async () => ({
-      values: { entries_json: '[]' },
+      values: createPasswordRegisterValues(1),
       source: 'supabase',
       updatedAt: '2026-04-07T12:00:00.000Z',
+      revision: 4,
+      exists: true,
     }),
   });
   const res = createResponseRecorder();
 
   await coordinator.sendUiStateGetResponse(
-    { premiumAuth: { authenticated: true, isAdmin: true } },
+    { premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' } },
     res,
     'premium_password_register'
   );
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.scope, 'premium_password_register');
+  assert.equal(res.body.revision, 4);
+  assert.equal(
+    securityAuditCalls.some((call) => call.reason === 'security_password_register_vault_read'),
+    true
+  );
+});
+
+test('password register scope fails closed when owner configuration is missing', async () => {
+  let reads = 0;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      reads += 1;
+      return { values: createPasswordRegisterValues(), source: 'supabase' };
+    },
+    passwordRegisterOwnerPolicy: {
+      getAccessDecision: () => ({
+        ok: false,
+        statusCode: 503,
+        code: 'PASSWORD_REGISTER_OWNER_NOT_CONFIGURED',
+        error: 'Ownerconfiguratie ontbreekt.',
+      }),
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateGetResponse(
+    { premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_admin_test' } },
+    res,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_OWNER_NOT_CONFIGURED');
+  assert.equal(reads, 0);
+});
+
+test('password register scope blocks a second admin who is not the configured owner', async () => {
+  const { coordinator, securityAuditCalls } = createFixture();
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateGetResponse(
+    { premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_other_admin' } },
+    res,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_OWNER_REQUIRED');
+  assert.equal(securityAuditCalls.at(-1).reason, 'security_password_register_owner_denied');
+});
+
+test('password register writes accept current envelopes and reject non-exact patch-only v1 bodies', async () => {
+  const writes = [];
+  const { coordinator, securityAuditCalls } = createFixture({
+    getUiStateValues: async () => ({
+      values: createPasswordRegisterValues(1),
+      source: 'supabase',
+      updatedAt: '2026-08-04T11:00:00.000Z',
+      revision: 7,
+      exists: true,
+    }),
+    compareAndSwapUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return {
+        ok: true,
+        values,
+        source: 'supabase',
+        revision: 8,
+        updatedAt: '2026-08-04T12:00:00.000Z',
+      };
+    },
+  });
+  const res = createResponseRecorder();
+  const nextValues = createPasswordRegisterValues(2);
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: createPasswordRegisterWriteBody(nextValues, {
+        expectedRevision: 7,
+        expectedUpdatedAt: '2026-08-04T11:00:00.000Z',
+      }),
+    },
+    res,
+    'premium_password_register'
+  );
+
+  const extraFieldRes = createResponseRecorder();
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: { patch: createPasswordRegisterValues(1), source: 'not-an-exact-legacy-client' },
+    },
+    extraFieldRes,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(extraFieldRes.statusCode, 400);
+  assert.equal(extraFieldRes.body.code, 'PASSWORD_REGISTER_VAULT_INVALID');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].values.entries_encrypted_v1, nextValues.entries_encrypted_v1);
+  assert.equal(writes[0].values.updated_by, 'usr_password_owner');
+  assert.notEqual(writes[0].values.updated_at, nextValues.updated_at);
+  assert.equal(writes[0].meta.expectedRevision, 7);
+  assert.equal(writes[0].meta.source, 'password-register-vault');
+  assert.equal(writes[0].meta.actor, 'usr_password_owner');
+  assert.equal(res.body.revision, 8);
+  assert.equal(
+    securityAuditCalls.some((call) => call.reason === 'security_password_register_vault_written'),
+    true
+  );
+});
+
+test('password register requires CAS fields and reports the authoritative revision', async () => {
+  let writes = 0;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: createPasswordRegisterValues(2),
+      source: 'supabase',
+      updatedAt: '2026-08-04T11:00:00.000Z',
+      revision: 9,
+      exists: true,
+    }),
+    compareAndSwapUiStateValues: async () => {
+      writes += 1;
+      return null;
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: createPasswordRegisterWriteBody(createPasswordRegisterValues(2)),
+    },
+    res,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_REVISION_REQUIRED');
+  assert.equal(res.body.revision, 9);
+  assert.equal(res.body.updatedAt, '2026-08-04T11:00:00.000Z');
+  assert.equal(writes, 0);
+});
+
+test('password register rejects stale CAS before writing and propagates atomic conflicts', async () => {
+  let writes = 0;
+  const authoritativeState = {
+    values: createPasswordRegisterValues(2),
+    source: 'supabase',
+    updatedAt: '2026-08-04T11:00:00.000Z',
+    revision: 10,
+    exists: true,
+  };
+  const staleFixture = createFixture({
+    getUiStateValues: async () => authoritativeState,
+    compareAndSwapUiStateValues: async () => {
+      writes += 1;
+      return null;
+    },
+  });
+  const staleRes = createResponseRecorder();
+
+  await staleFixture.coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: createPasswordRegisterWriteBody(createPasswordRegisterValues(2), {
+        expectedRevision: 9,
+        expectedUpdatedAt: '2026-08-04T10:59:00.000Z',
+      }),
+    },
+    staleRes,
+    'premium_password_register'
+  );
+
+  assert.equal(staleRes.statusCode, 409);
+  assert.equal(staleRes.body.code, 'PASSWORD_REGISTER_REVISION_CONFLICT');
+  assert.equal(staleRes.body.revision, 10);
+  assert.equal(writes, 0);
+
+  const atomicFixture = createFixture({
+    getUiStateValues: async () => authoritativeState,
+    compareAndSwapUiStateValues: async () => ({
+      ok: false,
+      conflict: true,
+      revision: 11,
+      updatedAt: '2026-08-04T11:01:00.000Z',
+    }),
+  });
+  const atomicRes = createResponseRecorder();
+  await atomicFixture.coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: createPasswordRegisterWriteBody(createPasswordRegisterValues(2), {
+        expectedRevision: 10,
+        expectedUpdatedAt: '2026-08-04T11:00:00.000Z',
+      }),
+    },
+    atomicRes,
+    'premium_password_register'
+  );
+
+  assert.equal(atomicRes.statusCode, 409);
+  assert.equal(atomicRes.body.revision, 11);
+  assert.equal(atomicRes.body.updatedAt, '2026-08-04T11:01:00.000Z');
+});
+
+test('password register rejects memory or fallback state instead of reading or writing it', async () => {
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: createPasswordRegisterValues(2),
+      source: 'memory',
+      updatedAt: null,
+      revision: 0,
+      exists: true,
+    }),
+  });
+  const getRes = createResponseRecorder();
+  const setRes = createResponseRecorder();
+  const auth = { authenticated: true, isAdmin: true, userId: 'usr_password_owner' };
+
+  await coordinator.sendUiStateGetResponse({ premiumAuth: auth }, getRes, 'premium_password_register');
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: auth,
+      body: createPasswordRegisterWriteBody(createPasswordRegisterValues(2), {
+        expectedRevision: 0,
+        expectedUpdatedAt: null,
+      }),
+    },
+    setRes,
+    'premium_password_register'
+  );
+
+  assert.equal(getRes.statusCode, 503);
+  assert.equal(setRes.statusCode, 503);
+  assert.equal(setRes.body.code, 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE');
+});
+
+test('password register rejects plaintext and arbitrary fields', async () => {
+  let writes = 0;
+  const { coordinator } = createFixture({
+    setUiStateValues: async () => {
+      writes += 1;
+      return null;
+    },
+  });
+  const requests = [
+    { ...createPasswordRegisterValues(2), entries_json: '[{"pw":"plaintext"}]' },
+    { ...createPasswordRegisterValues(2), unexpected: 'value' },
+  ];
+
+  for (const values of requests) {
+    const res = createResponseRecorder();
+    await coordinator.sendUiStateSetResponse(
+      {
+        premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+        body: createPasswordRegisterWriteBody(values),
+      },
+      res,
+      'premium_password_register'
+    );
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.code, 'PASSWORD_REGISTER_VAULT_INVALID');
+  }
+
+  assert.equal(writes, 0);
+});
+
+test('password register temporarily accepts only exact owner-gated v1 writes during rollout', async () => {
+  const writes = [];
+  const { coordinator, securityAuditCalls } = createFixture({
+    getUiStateValues: async () => ({
+      values: createPasswordRegisterValues(1),
+      source: 'supabase',
+      updatedAt: '2026-08-04T11:00:00.000Z',
+      revision: 3,
+    }),
+    compareAndSwapUiStateValues: async (scope, values, meta) => {
+      writes.push({ scope, values, meta });
+      return {
+        ok: true,
+        values,
+        source: 'supabase',
+        updatedAt: '2026-08-04T11:01:00.000Z',
+        revision: 4,
+      };
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: { patch: createPasswordRegisterValues(1) },
+    },
+    res,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].meta.source, 'password-register-legacy-rollout-compat');
+  assert.equal(writes[0].meta.actor, 'usr_password_owner');
+  assert.equal(writes[0].meta.expectedRevision, 3);
+  assert.equal(writes[0].meta.expectedUpdatedAt, '2026-08-04T11:00:00.000Z');
+  assert.equal(writes[0].values.updated_by, 'usr_password_owner');
+  assert.equal(res.body.revision, 4);
+  assert.equal(
+    securityAuditCalls.some(
+      (call) => call.reason === 'security_password_register_legacy_write_compat'
+    ),
+    true
+  );
+});
+
+test('password register legacy rollout path can never downgrade an authoritative v2 vault', async () => {
+  let writes = 0;
+  const { coordinator, securityAuditCalls } = createFixture({
+    getUiStateValues: async () => ({
+      values: createPasswordRegisterValues(2),
+      source: 'supabase',
+      updatedAt: '2026-08-04T11:00:00.000Z',
+      revision: 5,
+    }),
+    compareAndSwapUiStateValues: async () => {
+      writes += 1;
+      return null;
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: { patch: createPasswordRegisterValues(1) },
+    },
+    res,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_LEGACY_DOWNGRADE_BLOCKED');
+  assert.equal(writes, 0);
+  assert.equal(
+    securityAuditCalls.at(-1).reason,
+    'security_password_register_legacy_downgrade_blocked'
+  );
+});
+
+test('password register legacy compat uses CAS so a concurrent v2 winner cannot be downgraded', async () => {
+  let remote = {
+    values: createPasswordRegisterValues(1),
+    source: 'supabase',
+    updatedAt: '2026-08-04T11:00:00.000Z',
+    revision: 12,
+    exists: true,
+  };
+  let signalRead;
+  const readObserved = new Promise((resolve) => { signalRead = resolve; });
+  let releaseCas;
+  const casReleased = new Promise((resolve) => { releaseCas = resolve; });
+  let legacyWrites = 0;
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => {
+      const snapshot = { ...remote, values: { ...remote.values } };
+      signalRead();
+      return snapshot;
+    },
+    compareAndSwapUiStateValues: async (_scope, values, meta) => {
+      await casReleased;
+      if (remote.revision !== meta.expectedRevision || remote.updatedAt !== meta.expectedUpdatedAt) {
+        return { ok: false, conflict: true, ...remote };
+      }
+      legacyWrites += 1;
+      remote = { values, source: 'supabase', revision: remote.revision + 1, updatedAt: 'later' };
+      return { ok: true, ...remote };
+    },
+  });
+  const res = createResponseRecorder();
+  const requestPromise = coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
+      body: { patch: createPasswordRegisterValues(1) },
+    },
+    res,
+    'premium_password_register'
+  );
+
+  await readObserved;
+  remote = {
+    values: createPasswordRegisterValues(2),
+    source: 'supabase',
+    revision: 13,
+    updatedAt: '2026-08-04T11:00:01.000Z',
+    exists: true,
+  };
+  releaseCas();
+  await requestPromise;
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_REVISION_CONFLICT');
+  assert.equal(legacyWrites, 0);
+  assert.equal(JSON.parse(remote.values.entries_encrypted_v1).version, 2);
 });
 
 test('runtime ops coordinator creates manual dashboard activities with normalized defaults', () => {

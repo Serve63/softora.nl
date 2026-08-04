@@ -189,6 +189,71 @@ test('premium users store honors shorter login timeout while another hydrate is 
   }
 });
 
+test('fresh premium-user hydration never shares a failing non-fresh in-flight read or cached result', async () => {
+  let readCalls = 0;
+  let releaseNonFreshRead;
+  const cachedRow = {
+    payload: {
+      users: [{
+        id: 'usr_cached',
+        email: 'cached@softora.nl',
+        role: 'admin',
+        status: 'active',
+        passwordHash: 'sha256:test-only-hash',
+      }],
+    },
+    updated_at: '2026-08-04T10:00:00.000Z',
+  };
+  const store = createFixture({
+    client: {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle() {
+                    readCalls += 1;
+                    if (readCalls === 1) return Promise.resolve({ data: cachedRow, error: null });
+                    if (readCalls === 2) {
+                      return new Promise((resolve) => {
+                        releaseNonFreshRead = () => resolve({ data: null, error: new Error('nonfresh failed') });
+                      });
+                    }
+                    return Promise.resolve({ data: null, error: new Error('fresh failed') });
+                  },
+                };
+              },
+            };
+          },
+          async upsert() {
+            return { error: new Error('write should not happen') };
+          },
+        };
+      },
+    },
+  });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const initial = await store.ensureUsersHydrated();
+    assert.equal(initial.source, 'supabase');
+    assert.equal(store.getCachedUsers().length, 1);
+
+    const pendingNonFresh = store.ensureUsersHydrated({ force: true });
+    await new Promise((resolve) => setImmediate(resolve));
+    const fresh = await store.ensureUsersHydrated({ force: true, requireFresh: true });
+
+    assert.equal(readCalls, 3);
+    assert.equal(fresh.source, 'unavailable');
+    assert.deepEqual(fresh.users, []);
+    releaseNonFreshRead();
+    await pendingNonFresh;
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
 test('premium users store uses bootstrap users only when fallback is explicitly allowed', async () => {
   const store = createFixture({
     client: {
