@@ -23,7 +23,10 @@ function createService(overrides = {}) {
     },
     canUseMailboxIndex: () => true,
     assertMailboxMessageVisible: (message) => message,
-    normalizeFolder: (value) => String(value || 'inbox').trim().toLowerCase() || 'inbox',
+    normalizeFolder: (value) => {
+      const folder = String(value || 'inbox').trim().toLowerCase() || 'inbox';
+      return ['inbox', 'sent', 'coldmail'].includes(folder) ? folder : 'inbox';
+    },
     mailboxIndexStore: {
       async getMessage({ accountEmail, folder, id }) {
         if (

@@ -48,6 +48,8 @@ function isAutomatedCampaignReply(message) {
     /\bplease type your reply above this line\b/,
     /\buw aanvraag\s*\([^)]{1,40}\)\s+is ontvangen\b/,
     /\byour request\s*\([^)]{1,40}\)\s+has been received\b/,
+    /\bwij streven ernaar om (?:je|jouw|uw) (?:vraag|bericht|e-?mail|mail) binnen \d+\s+(?:werk)?dag(?:en)? te beantwoorden\b/,
+    /\bin deze periode beantwoorden wij geen (?:e-?mails?|mails?|berichten)\b/,
   ];
 
   return (

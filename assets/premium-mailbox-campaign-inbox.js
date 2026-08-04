@@ -4,7 +4,7 @@
   const OWNER_OPTIONS = Object.freeze([
     Object.freeze({ key: 'serve', label: 'Servé Creusen' }),
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
-    Object.freeze({ key: 'both', label: 'Martijn en Servé' }),
+    Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';

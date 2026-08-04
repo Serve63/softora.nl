@@ -179,6 +179,57 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
   );
 });
 
+test('mailbox detail behoudt de virtuele Instantly-folder tot aan de providerindex', async () => {
+  const lookups = [];
+  const exactMessage = {
+    id: 'instantly:019f3ba3-1e94-7aae-870f-6a05bd8e3a7a',
+    accountEmail: 'servecreusen@websoftora.com',
+    folder: 'sent',
+    storageFolder: 'instantly',
+    provider: 'instantly',
+    providerOwner: 'serve',
+    providerMessageId: '019f3ba3-1e94-7aae-870f-6a05bd8e3a7a',
+    body: 'Volledige exacte Instantly-mail aan Gemeente Vught.',
+    hasBody: true,
+  };
+  const service = createMailboxService({
+    mailboxIndexStore: {
+      isAvailable: () => true,
+      async listMessages() { return []; },
+      async getMessage(input) {
+        lookups.push(input);
+        return input.folder === 'instantly' ? exactMessage : null;
+      },
+    },
+    instantlyMailboxService: {
+      getConfiguredAccounts(owner) {
+        return owner === 'serve'
+          ? [{ email: 'servecreusen@websoftora.com', owner: 'serve' }]
+          : [];
+      },
+    },
+  });
+
+  assert.equal((await service.getMessage({
+    accountEmail: 'servecreusen@websoftora.com',
+    folder: 'INSTANTLY',
+    id: exactMessage.id,
+  })).body, exactMessage.body);
+
+  const response = createResponseRecorder();
+  await service.getMessageResponse({
+    query: {
+      account: 'servecreusen@websoftora.com',
+      folder: 'instantly',
+      id: exactMessage.id,
+    },
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.message.body, exactMessage.body);
+  assert.deepEqual(lookups.map((lookup) => lookup.folder), ['instantly', 'instantly']);
+});
+
 test('mailbox service excludes automated delivery failures from list and detail without touching human replies', async () => {
   const automated = {
     id: 'inbox:1',
@@ -287,6 +338,15 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
       ].join('\n'),
       date: '2026-07-26T12:03:00.000Z',
     },
+    {
+      id: 'typetuin-acknowledgement',
+      email: 'info@typetuin.nl',
+      from: 'Support De Typetuin',
+      subject: 'We hebben jouw vraag met als onderwerp - Kleine vraag over jullie website ontvangen.',
+      preview: 'Hartelijk dank voor je bericht. Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
+      body: 'Van 24 juli t/m 5 augustus is de Typetuin gesloten. In deze periode beantwoorden wij geen e-mails.',
+      date: '2026-07-26T12:04:00.000Z',
+    },
   ];
   const service = createMailboxService({
     mailboxCampaignRepliesService: {
@@ -302,9 +362,10 @@ test('campaign mailbox response excludes delivery and support acknowledgements w
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.messages.map((message) => message.id), ['human-support-reply', 'human']);
-  assert.equal(sourceMessages.length, 4);
+  assert.equal(sourceMessages.length, 5);
   assert.equal(sourceMessages[0].id, 'bounce');
   assert.equal(sourceMessages[2].id, 'support-acknowledgement');
+  assert.equal(sourceMessages[4].id, 'typetuin-acknowledgement');
 });
 
 test('selected owner response stays isolated while durable snapshot retains both Instantly owners', async () => {
