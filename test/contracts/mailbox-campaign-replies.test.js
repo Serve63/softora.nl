@@ -373,16 +373,28 @@ test('campaign reply service shows filtered replies and bounces once without exp
     date: '2026-07-25T09:00:00.000Z',
     messageId: '<sent@gmail.com>',
   };
+  const unprovenCrossAccountOwnCopy = {
+    id: 'coldmail:23',
+    uid: 23,
+    folder: 'coldmail',
+    accountEmail: 'servec321@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'martijn@softora.nl',
+    to: 'klant@example.nl',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-25T08:55:00.000Z',
+    messageId: '<unproven-cross-account-copy@softora.nl>',
+  };
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {
       listMessagesForAccounts: async ({ folder }) => (
         folder === 'coldmail'
-          ? [filteredBounce, filteredReply, labeledOwnSent]
+          ? [filteredBounce, filteredReply, labeledOwnSent, unprovenCrossAccountOwnCopy]
           : [staleInboxCopy]
       ),
       listMatchingMessagesForAccounts: async ({ folder }) => (
         folder === 'coldmail'
-          ? [filteredReply, labeledOwnSent]
+          ? [filteredReply, labeledOwnSent, unprovenCrossAccountOwnCopy]
           : folder === 'inbox'
             ? [staleInboxCopy]
             : []
@@ -405,6 +417,7 @@ test('campaign reply service shows filtered replies and bounces once without exp
   assert.deepEqual(replies.map((message) => message.id), ['coldmail:21', 'coldmail:20']);
   assert.equal(replies.filter((message) => message.messageId === '<reply@example.nl>').length, 1);
   assert.equal(replies.some((message) => message.id === 'coldmail:22'), false);
+  assert.equal(replies.some((message) => message.id === 'coldmail:23'), false);
 });
 
 test('campaign mailbox classificeert Gmail-dot-aliassen als eigen outbound en bouwt geen Altiflex-megathread', async () => {
