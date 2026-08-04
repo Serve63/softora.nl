@@ -1041,10 +1041,13 @@ body {
             <div class="reg-title">Wachtwoordenregister</div>
             <div class="reg-sub">Beveiligd overzicht van inloggegevens</div>
           </div>
-          <button class="lock-btn" type="button" id="lock-register-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-            Vergrendelen
-          </button>
+          <div class="reg-security-actions">
+            <button class="lock-btn" type="button" id="change-master-secret-btn">Wachtzin wijzigen</button>
+            <button class="lock-btn" type="button" id="lock-register-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              Vergrendelen
+            </button>
+          </div>
         </div>
 
         <div class="register-status" id="register-status"></div>
@@ -1086,9 +1089,21 @@ body {
       </button>
     </div>
     <form id="master-secret-form">
+      <div class="master-secret-field" id="master-secret-current-field" hidden>
+        <label for="master-secret-current-input">Huidige master-wachtzin</label>
+        <input id="master-secret-current-input" name="currentMasterSecret" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </div>
       <div class="master-secret-field">
-        <label for="master-secret-input">Master-wachtzin</label>
-        <input id="master-secret-input" name="masterSecret" type="password" autocomplete="off" spellcheck="false">
+        <label for="master-secret-input" id="master-secret-input-label">Master-wachtzin</label>
+        <input id="master-secret-input" name="masterSecret" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="master-secret-field" id="master-secret-confirm-field" hidden>
+        <label for="master-secret-confirm-input">Herhaal master-wachtzin</label>
+        <input id="master-secret-confirm-input" name="masterSecretConfirm" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="master-secret-field" id="master-secret-pin-field" hidden>
+        <label for="master-secret-pin-input">Verse beveiligings-PIN</label>
+        <input id="master-secret-pin-input" name="actionConfirmCode" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off">
       </div>
       <p class="master-secret-error" id="master-secret-error" aria-live="polite"></p>
       <div class="master-secret-actions">

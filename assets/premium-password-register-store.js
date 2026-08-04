@@ -4,7 +4,11 @@
   var PASSWORD_REGISTER_SCOPE = "premium_password_register";
   var PASSWORD_REGISTER_ENCRYPTED_KEY = "entries_encrypted_v1";
   var PASSWORD_REGISTER_LEGACY_ENTRIES_KEY = "entries_json";
-  var PASSWORD_REGISTER_KDF_ITERATIONS = 210000;
+  var PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION = 1;
+  var PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION = 2;
+  var PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS = 210000;
+  var PASSWORD_REGISTER_CURRENT_KDF_ITERATIONS = 600000;
+  var PASSWORD_REGISTER_MIN_MASTER_SECRET_LENGTH = 20;
   var DEFAULT_PASSWORD_ENTRIES = [
     { id: 1, naam: "Hostinger", url: "hostinger.com", user: "hosting@example.test", pw: "voorbeeld-hosting", cat: "Hosting" },
     { id: 2, naam: "TransIP", url: "transip.nl", user: "dns@example.test", pw: "voorbeeld-domein", cat: "Hosting" },
@@ -81,6 +85,39 @@
     }, 0) + 1;
   }
 
+  function validateNewMasterSecret(masterSecret) {
+    var normalizedSecret = normalizeString(masterSecret);
+    var characterCount = Array.from(normalizedSecret).length;
+    if (characterCount < PASSWORD_REGISTER_MIN_MASTER_SECRET_LENGTH) {
+      return { ok: false, error: "Gebruik een unieke master-wachtzin van minimaal 20 tekens." };
+    }
+    if (new Set(Array.from(normalizedSecret.toLowerCase())).size < 4) {
+      return {
+        ok: false,
+        error: "Kies een minder voorspelbare master-wachtzin met verschillende tekens."
+      };
+    }
+    return { ok: true, error: "" };
+  }
+
+  function resolveEnvelopeParameters(payload) {
+    var version = Number(payload && payload.version);
+    var iterations = Number(payload && payload.iterations);
+    var expectedIterations = version === PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION
+      ? PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS
+      : PASSWORD_REGISTER_CURRENT_KDF_ITERATIONS;
+    if (
+      (version !== PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION && version !== PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION) ||
+      normalizeString(payload && payload.algorithm) !== "AES-GCM" ||
+      normalizeString(payload && payload.kdf) !== "PBKDF2-SHA256" ||
+      !Number.isSafeInteger(iterations) ||
+      iterations !== expectedIterations
+    ) {
+      throw new Error("Kluisformaat wordt niet ondersteund.");
+    }
+    return { version: version, iterations: iterations };
+  }
+
   function getWebCrypto() {
     var cryptoObj = global.crypto || {};
     if (!cryptoObj.subtle || typeof cryptoObj.getRandomValues !== "function") {
@@ -116,7 +153,7 @@
     return bytes;
   }
 
-  async function deriveAesKey(masterSecret, saltBytes) {
+  async function deriveAesKey(masterSecret, saltBytes, iterations) {
     var cryptoObj = getWebCrypto();
     var encodedSecret = new TextEncoder().encode(normalizeString(masterSecret));
     if (!encodedSecret.length) {
@@ -129,7 +166,7 @@
           name: "PBKDF2",
           hash: "SHA-256",
           salt: saltBytes,
-          iterations: PASSWORD_REGISTER_KDF_ITERATIONS
+          iterations: iterations
         },
         baseKey,
         { name: "AES-GCM", length: 256 },
@@ -220,7 +257,15 @@
     var entriesLoadPromise = null;
     var currentKey = null;
     var currentSaltBytes = null;
+    var currentEnvelopeSerialized = "";
     var sessionGeneration = 0;
+    var writeQueue = Promise.resolve();
+    var securityState = {
+      envelopeVersion: null,
+      kdfIterations: null,
+      masterSecretMeetsPolicy: true,
+      v2UpgradePending: false
+    };
     var setStatus = typeof config.setStatus === "function" ? config.setStatus : function () {};
 
     function assertActiveGeneration(expectedGeneration) {
@@ -231,18 +276,50 @@
       }
     }
 
-    async function ensureUnlocked(masterSecret, preferredSaltBytes, expectedGeneration) {
+    function markRequiresFreshUnlock(error, fallbackCode) {
+      var safeError = error instanceof Error ? error : new Error("Kluisactie mislukt.");
+      safeError.code = normalizeString(safeError.code) || String(fallbackCode || "PASSWORD_REGISTER_WRITE_UNCERTAIN");
+      safeError.forceLock = true;
+      safeError.requiresFreshRead = true;
+      return safeError;
+    }
+
+    function enqueueWrite(operation) {
+      var expectedGeneration = sessionGeneration;
+      var queued = writeQueue.then(async function () {
+        assertActiveGeneration(expectedGeneration);
+        return operation(expectedGeneration);
+      });
+      writeQueue = queued.catch(function () {});
+      return queued;
+    }
+
+    async function ensureUnlocked(masterSecret, preferredSaltBytes, expectedGeneration, enforcePolicy) {
       assertActiveGeneration(expectedGeneration);
       if (currentKey && currentSaltBytes) return;
+      if (enforcePolicy) {
+        var policy = validateNewMasterSecret(masterSecret);
+        if (!policy.ok) throw new Error(policy.error);
+      }
       var nextSaltBytes = preferredSaltBytes || getRandomBytes(16);
-      var nextKey = await deriveAesKey(masterSecret, nextSaltBytes);
+      var nextKey = await deriveAesKey(
+        masterSecret,
+        nextSaltBytes,
+        PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS
+      );
       assertActiveGeneration(expectedGeneration);
       currentSaltBytes = nextSaltBytes;
       currentKey = nextKey;
+      securityState = {
+        envelopeVersion: PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION,
+        kdfIterations: PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS,
+        masterSecretMeetsPolicy: validateNewMasterSecret(masterSecret).ok,
+        v2UpgradePending: true
+      };
     }
 
-    async function encryptEntriesPayload(entries) {
-      if (!currentKey || !currentSaltBytes) {
+    async function encryptEntriesPayload(entries, key, saltBytes) {
+      if (!key || !saltBytes) {
         throw new Error("Ontgrendel de kluis eerst met de master-wachtzin.");
       }
       var cryptoObj = getWebCrypto();
@@ -250,14 +327,14 @@
       var plainText = new TextEncoder().encode(JSON.stringify(sanitizeEntries(entries)));
       try {
         var cipherBytes = new Uint8Array(
-          await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: iv }, currentKey, plainText)
+          await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, plainText)
         );
         return {
-          version: 1,
+          version: PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION,
           algorithm: "AES-GCM",
           kdf: "PBKDF2-SHA256",
-          iterations: PASSWORD_REGISTER_KDF_ITERATIONS,
-          salt: bytesToBase64(currentSaltBytes),
+          iterations: PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS,
+          salt: bytesToBase64(saltBytes),
           iv: bytesToBase64(iv),
           ciphertext: bytesToBase64(cipherBytes)
         };
@@ -268,17 +345,14 @@
 
     async function decryptEntriesPayload(serializedPayload, masterSecret, expectedGeneration) {
       var payload = JSON.parse(normalizeString(serializedPayload));
-      if (
-        Number(payload && payload.version) !== 1 ||
-        normalizeString(payload && payload.algorithm) !== "AES-GCM" ||
-        normalizeString(payload && payload.kdf) !== "PBKDF2-SHA256"
-      ) {
-        throw new Error("Kluisformaat wordt niet ondersteund.");
-      }
+      var envelope = resolveEnvelopeParameters(payload);
       var saltBytes = base64ToBytes(payload.salt);
       var iv = base64ToBytes(payload.iv);
       var cipherBytes = base64ToBytes(payload.ciphertext);
-      var key = await deriveAesKey(masterSecret, saltBytes);
+      if (saltBytes.length !== 16 || iv.length !== 12 || cipherBytes.length < 17) {
+        throw new Error("Kluisformaat wordt niet ondersteund.");
+      }
+      var key = await deriveAesKey(masterSecret, saltBytes, envelope.iterations);
       var decryptedBytes = new Uint8Array(
         await getWebCrypto().subtle.decrypt({ name: "AES-GCM", iv: iv }, key, cipherBytes)
       );
@@ -288,11 +362,55 @@
           throw new Error("Kluisinhoud is ongeldig.");
         }
         assertActiveGeneration(expectedGeneration);
-        currentKey = key;
-        currentSaltBytes = saltBytes;
-        return sanitizeEntries(parsedEntries);
+        var loadedEntries = sanitizeEntries(parsedEntries);
+        if (envelope.version === PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION) {
+          currentKey = key;
+          currentSaltBytes = saltBytes;
+        } else {
+          var legacyWriteSaltBytes = getRandomBytes(16);
+          var legacyWriteKey = await deriveAesKey(
+            masterSecret,
+            legacyWriteSaltBytes,
+            PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS
+          );
+          assertActiveGeneration(expectedGeneration);
+          currentKey = legacyWriteKey;
+          currentSaltBytes = legacyWriteSaltBytes;
+        }
+        currentEnvelopeSerialized = normalizeString(serializedPayload);
+        securityState = {
+          envelopeVersion: envelope.version,
+          kdfIterations: envelope.iterations,
+          masterSecretMeetsPolicy: validateNewMasterSecret(masterSecret).ok,
+          v2UpgradePending: envelope.version !== PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION
+        };
+        wipeEntries(parsedEntries);
+        return loadedEntries;
       } finally {
         decryptedBytes.fill(0);
+      }
+    }
+
+    async function verifyMasterSecretAgainstEnvelope(serializedPayload, masterSecret) {
+      if (!normalizeString(serializedPayload) || !normalizeString(masterSecret)) return false;
+      var decryptedBytes = null;
+      try {
+        var payload = JSON.parse(normalizeString(serializedPayload));
+        var envelope = resolveEnvelopeParameters(payload);
+        var saltBytes = base64ToBytes(payload.salt);
+        var iv = base64ToBytes(payload.iv);
+        var cipherBytes = base64ToBytes(payload.ciphertext);
+        if (saltBytes.length !== 16 || iv.length !== 12 || cipherBytes.length < 17) return false;
+        var key = await deriveAesKey(masterSecret, saltBytes, envelope.iterations);
+        decryptedBytes = new Uint8Array(
+          await getWebCrypto().subtle.decrypt({ name: "AES-GCM", iv: iv }, key, cipherBytes)
+        );
+        JSON.parse(new TextDecoder().decode(decryptedBytes));
+        return true;
+      } catch (_) {
+        return false;
+      } finally {
+        if (decryptedBytes) decryptedBytes.fill(0);
       }
     }
 
@@ -306,13 +424,17 @@
       }
     }
 
-    async function persist(entries, actor) {
-      var expectedGeneration = sessionGeneration;
-      var sanitized = sanitizeEntries(entries).map(function (entry) {
-        return Object.assign({}, entry);
-      });
+    async function writeEntriesAuthoritatively(
+      sanitized,
+      actor,
+      expectedGeneration,
+      key,
+      saltBytes,
+      nextSecurityState
+    ) {
       try {
-        var encryptedPayload = await encryptEntriesPayload(sanitized);
+        assertActiveGeneration(expectedGeneration);
+        var encryptedPayload = await encryptEntriesPayload(sanitized, key, saltBytes);
         assertActiveGeneration(expectedGeneration);
         var payload = {
           patch: {
@@ -333,12 +455,43 @@
         wipeEntries(cachedEntries);
         cachedEntries = cloneEntries(sanitized);
         entriesLoaded = true;
-        setStatus("Versleutelde kluis is opgeslagen in Supabase.");
+        currentKey = key;
+        currentSaltBytes = saltBytes;
+        currentEnvelopeSerialized = JSON.stringify(encryptedPayload);
+        securityState = Object.assign({}, nextSecurityState || securityState, {
+          envelopeVersion: PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION,
+          kdfIterations: PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS,
+          v2UpgradePending: true
+        });
+        setStatus(
+          securityState.masterSecretMeetsPolicy
+            ? "Versleutelde kluis rollback-veilig in v1 opgeslagen; de v2-upgrade volgt in de beveiligde migratiestap."
+            : "Versleutelde kluis in v1 opgeslagen. Wijzig de bestaande master-wachtzin naar minimaal 20 tekens.",
+          "warning"
+        );
         return { entries: cloneEntries(sanitized), response: response, stale: false };
       } catch (error) {
         wipeEntries(sanitized);
-        throw error;
+        if (expectedGeneration === sessionGeneration) lock();
+        throw markRequiresFreshUnlock(error, "PASSWORD_REGISTER_WRITE_UNCERTAIN");
       }
+    }
+
+    function persist(entries, actor) {
+      var sanitized = cloneEntries(sanitizeEntries(entries));
+      return enqueueWrite(function (expectedGeneration) {
+        return writeEntriesAuthoritatively(
+          sanitized,
+          actor || "save",
+          expectedGeneration,
+          currentKey,
+          currentSaltBytes,
+          Object.assign({}, securityState)
+        );
+      }).catch(function (error) {
+        wipeEntries(sanitized);
+        throw error;
+      });
     }
 
     async function load(masterSecret, expectedGeneration) {
@@ -346,6 +499,8 @@
       if (entriesLoadPromise) return entriesLoadPromise;
 
       entriesLoadPromise = (async function () {
+        await writeQueue;
+        assertActiveGeneration(expectedGeneration);
         var result = null;
         var loadedEntries;
         var source = "";
@@ -370,20 +525,30 @@
             }
             throw new Error("Master-wachtzin klopt niet of de versleutelde kluis is beschadigd.");
           }
-          setStatus(source === "supabase" ? "Versleutelde kluis geladen vanuit Supabase." : "Versleutelde kluis geladen uit fallback-opslag.");
+          if (securityState.envelopeVersion === PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION) {
+            setStatus("V2-kluis rollback-veilig geopend; C schrijft tijdelijk v1 tot de atomaire migratiestap.", "warning");
+          } else if (!securityState.masterSecretMeetsPolicy) {
+            setStatus("V1-kluis geopend. Wijzig de bestaande master-wachtzin naar minimaal 20 tekens.", "warning");
+          } else {
+            setStatus("V1-kluis geopend; de sterkere v2-migratie volgt in de beveiligde eindstap.", "warning");
+          }
         } else {
-          await ensureUnlocked(masterSecret, null, expectedGeneration);
           var parsedLegacyEntries = parseLegacyEntries(legacyEntries);
+          await ensureUnlocked(
+            masterSecret,
+            null,
+            expectedGeneration,
+            !(parsedLegacyEntries && parsedLegacyEntries.length)
+          );
           if (parsedLegacyEntries && parsedLegacyEntries.length) {
             loadedEntries = sanitizeEntries(parsedLegacyEntries);
+            wipeEntries(parsedLegacyEntries);
             await persist(loadedEntries, "legacy-migration");
             setStatus("Oude leesbare opslag is gemigreerd naar een versleutelde kluis.");
           } else {
             loadedEntries = sanitizeEntries(DEFAULT_PASSWORD_ENTRIES);
             setStatus(
-              result
-                ? "Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren."
-                : "Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren.",
+              "Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens versleuteld te bewaren.",
               "warning"
             );
           }
@@ -408,29 +573,101 @@
       return load(masterSecret, sessionGeneration);
     }
 
+    function changeMasterSecret(currentMasterSecret, newMasterSecret, entries, actor) {
+      var policy = validateNewMasterSecret(newMasterSecret);
+      if (!policy.ok) throw new Error(policy.error);
+      var sanitized = cloneEntries(sanitizeEntries(entries));
+      return enqueueWrite(async function (expectedGeneration) {
+        try {
+          if (!currentKey || !currentSaltBytes || !entriesLoaded || !currentEnvelopeSerialized) {
+            var missingError = new Error("Ontgrendel een opgeslagen kluis voordat je de master-wachtzin wijzigt.");
+            missingError.code = "PASSWORD_REGISTER_CURRENT_MASTER_REQUIRED";
+            throw missingError;
+          }
+          var currentSecretValid = await verifyMasterSecretAgainstEnvelope(
+            currentEnvelopeSerialized,
+            currentMasterSecret
+          );
+          assertActiveGeneration(expectedGeneration);
+          if (!currentSecretValid) {
+            var invalidError = new Error("De huidige master-wachtzin klopt niet.");
+            invalidError.code = "PASSWORD_REGISTER_CURRENT_MASTER_INVALID";
+            throw invalidError;
+          }
+          var nextSaltBytes = getRandomBytes(16);
+          var nextKey = await deriveAesKey(
+            newMasterSecret,
+            nextSaltBytes,
+            PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS
+          );
+          assertActiveGeneration(expectedGeneration);
+          return await writeEntriesAuthoritatively(
+            sanitized,
+            actor || "master-secret-change",
+            expectedGeneration,
+            nextKey,
+            nextSaltBytes,
+            {
+              envelopeVersion: PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION,
+              kdfIterations: PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS,
+              masterSecretMeetsPolicy: true,
+              v2UpgradePending: true
+            }
+          );
+        } catch (error) {
+          if (error && error.forceLock) throw error;
+          wipeEntries(sanitized);
+          if (expectedGeneration === sessionGeneration) lock();
+          throw markRequiresFreshUnlock(error, "PASSWORD_REGISTER_REKEY_UNCERTAIN");
+        }
+      }).catch(function (error) {
+        wipeEntries(sanitized);
+        throw error;
+      });
+    }
+
+    function getSecurityState() {
+      return Object.assign({}, securityState);
+    }
+
     function lock() {
       sessionGeneration += 1;
       currentKey = null;
       currentSaltBytes = null;
+      currentEnvelopeSerialized = "";
       wipeEntries(cachedEntries);
       cachedEntries = [];
       entriesLoaded = false;
       entriesLoadPromise = null;
+      securityState = {
+        envelopeVersion: null,
+        kdfIterations: null,
+        masterSecretMeetsPolicy: true,
+        v2UpgradePending: false
+      };
     }
 
     return {
+      changeMasterSecret: changeMasterSecret,
       getNextId: getNextId,
+      getSecurityState: getSecurityState,
       load: function (masterSecret) { return load(masterSecret, sessionGeneration); },
       lock: lock,
       normalizeString: normalizeString,
       persist: persist,
       sanitizeEntries: sanitizeEntries,
       sanitizeEntry: sanitizeEntry,
-      unlock: unlock
+      unlock: unlock,
+      validateNewMasterSecret: validateNewMasterSecret
     };
   }
 
   global.SoftoraPasswordRegisterStore = {
-    create: createStore
+    CURRENT_ENVELOPE_VERSION: PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION,
+    CURRENT_KDF_ITERATIONS: PASSWORD_REGISTER_CURRENT_KDF_ITERATIONS,
+    LEGACY_ENVELOPE_VERSION: PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION,
+    LEGACY_KDF_ITERATIONS: PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS,
+    create: createStore,
+    validateNewMasterSecret: validateNewMasterSecret
   };
 })(window);

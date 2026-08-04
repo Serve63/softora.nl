@@ -192,7 +192,8 @@
       clear: clear,
       lock: lock,
       pressDigit: pressDigit,
-      reset: resetPinState
+      reset: resetPinState,
+      verifyFreshPin: verifyPin
     };
   }
 

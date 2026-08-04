@@ -67,6 +67,11 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(storeSource, /var PASSWORD_REGISTER_LEGACY_ENTRIES_KEY = "entries_json";/);
   assert.match(storeSource, /AES-GCM/);
   assert.match(storeSource, /PBKDF2-SHA256/);
+  assert.match(storeSource, /PASSWORD_REGISTER_LEGACY_ENVELOPE_VERSION = 1/);
+  assert.match(storeSource, /PASSWORD_REGISTER_CURRENT_ENVELOPE_VERSION = 2/);
+  assert.match(storeSource, /PASSWORD_REGISTER_LEGACY_KDF_ITERATIONS = 210000/);
+  assert.match(storeSource, /PASSWORD_REGISTER_CURRENT_KDF_ITERATIONS = 600000/);
+  assert.match(storeSource, /PASSWORD_REGISTER_MIN_MASTER_SECRET_LENGTH = 20/);
   assert.match(storeSource, /cryptoObj\.subtle/);
   assert.match(storeSource, /fetchUiStateGetWithFallback\(PASSWORD_REGISTER_SCOPE\)/);
   assert.match(storeSource, /fetchUiStateSetWithFallback\(PASSWORD_REGISTER_SCOPE, payload\)/);
@@ -75,8 +80,13 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(appSource, /global\.SoftoraPasswordRegisterStore\.create/);
   assert.match(appSource, /passwordRegisterStore\.unlock\(masterSecret\)/);
   assert.match(appSource, /passwordRegisterStore\.persist\(entries, actor \|\| "save"\)/);
+  assert.match(appSource, /passwordRegisterStore\.changeMasterSecret/);
   assert.match(pageSource, /id="master-secret-overlay"/);
   assert.match(pageSource, /id="master-secret-input"/);
+  assert.match(pageSource, /id="master-secret-current-input"/);
+  assert.match(pageSource, /id="master-secret-confirm-input"/);
+  assert.match(pageSource, /id="master-secret-pin-input"/);
+  assert.match(pageSource, /id="change-master-secret-btn"/);
   assert.match(pageSource, /class="master-secret-modal"/);
   assert.match(pageSource, />Ontgrendelen</);
   assert.doesNotMatch(pageSource, /Voer dezelfde master-wachtzin/);
@@ -157,6 +167,8 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pinSource, /actionConfirmScope:\s*"password-register"/);
   assert.match(pinSource, /credentials:\s*"same-origin"/);
   assert.match(pinSource, /data\.ok !== true/);
+  assert.match(pinSource, /verifyFreshPin:\s*verifyPin/);
+  assert.doesNotMatch(storeSource, /v1-kdf-migration/);
 });
 
 function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = {}) {
@@ -180,6 +192,7 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = 
         postBodies.push(body);
         if (typeof loadOptions.waitForPost === 'function') await loadOptions.waitForPost(body);
         values = { ...values, ...(body.patch || {}) };
+        if (loadOptions.throwAfterPost) throw new Error('Ambigue write na remote commit');
         return {
           ok: true,
           status: 200,
@@ -212,6 +225,39 @@ function loadPasswordRegisterStoreWithUiState(initialValues = {}, loadOptions = 
   };
 }
 
+async function createTestEnvelope(entries, masterSecret, version, iterations) {
+  const salt = webcrypto.getRandomValues(new Uint8Array(16));
+  const iv = webcrypto.getRandomValues(new Uint8Array(12));
+  const baseKey = await webcrypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(String(masterSecret).trim()),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+  const key = await webcrypto.subtle.deriveKey(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+  const cipher = new Uint8Array(await webcrypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    new TextEncoder().encode(JSON.stringify(entries))
+  ));
+  return JSON.stringify({
+    version,
+    algorithm: 'AES-GCM',
+    kdf: 'PBKDF2-SHA256',
+    iterations,
+    salt: Buffer.from(salt).toString('base64'),
+    iv: Buffer.from(iv).toString('base64'),
+    ciphertext: Buffer.from(cipher).toString('base64'),
+  });
+}
+
 test('premium wachtwoordenregister bewaart entries alleen als versleutelde blob', async () => {
   const harness = loadPasswordRegisterStoreWithUiState();
   const statuses = [];
@@ -236,7 +282,87 @@ test('premium wachtwoordenregister bewaart entries alleen als versleutelde blob'
   assert.equal(typeof posted.patch.entries_encrypted_v1, 'string');
   assert.doesNotMatch(posted.patch.entries_encrypted_v1, /fixture-only-secret|beheer@example\.com|Productie login/);
   assert.match(posted.patch.entries_encrypted_v1, /"algorithm":"AES-GCM"/);
+  const envelope = JSON.parse(posted.patch.entries_encrypted_v1);
+  assert.equal(envelope.version, 1);
+  assert.equal(envelope.iterations, 210000);
   assert.match(statuses.at(-1).message, /Versleutelde kluis/);
+});
+
+test('C opent v2 rollback-veilig zonder migratie en houdt alle writes bewust op v1', async () => {
+  const masterSecret = 'unieke rollback master wachtzin 2026';
+  const initialEntries = [{
+    id: 8,
+    naam: 'V2 bron',
+    url: 'https://example.test',
+    user: 'rollback@example.test',
+    pw: 'fixture-v2-secret',
+    cat: 'Test',
+  }];
+  const v2Envelope = await createTestEnvelope(initialEntries, masterSecret, 2, 600000);
+  const harness = loadPasswordRegisterStoreWithUiState({ entries_encrypted_v1: v2Envelope });
+  const store = harness.createStore();
+
+  const opened = await store.unlock(masterSecret);
+  assert.equal(opened[0].pw, 'fixture-v2-secret');
+  assert.equal(harness.getPostBodies().length, 0, 'C mag v2 bij openen nog niet automatisch herschrijven');
+  assert.equal(store.getSecurityState().envelopeVersion, 2);
+  assert.equal(store.getSecurityState().kdfIterations, 600000);
+
+  await store.persist(opened, 'rollback-compat-write');
+  const writtenEnvelope = JSON.parse(
+    harness.getPostBodies().at(-1).patch.entries_encrypted_v1
+  );
+  assert.equal(writtenEnvelope.version, 1);
+  assert.equal(writtenEnvelope.iterations, 210000);
+  assert.equal(store.getSecurityState().envelopeVersion, 1);
+});
+
+test('C eist een sterke nieuwe master-wachtzin en rekeyt alleen na controle van de huidige', async () => {
+  const oldSecret = 'huidige unieke master wachtzin 2026';
+  const newSecret = 'volgende unieke master wachtzin 2026';
+  const harness = loadPasswordRegisterStoreWithUiState();
+  const store = harness.createStore();
+  const entries = await store.unlock(oldSecret);
+  await store.persist(entries, 'initial-save');
+
+  assert.throws(
+    () => store.changeMasterSecret(oldSecret, 'te kort', entries),
+    /minimaal 20 tekens/
+  );
+  await assert.rejects(
+    () => store.changeMasterSecret('onjuiste huidige master wachtzin', newSecret, entries),
+    (error) => {
+      assert.equal(error.code, 'PASSWORD_REGISTER_CURRENT_MASTER_INVALID');
+      assert.equal(error.forceLock, true);
+      return true;
+    }
+  );
+
+  const reopened = await store.unlock(oldSecret);
+  const result = await store.changeMasterSecret(oldSecret, newSecret, reopened, 'rekey-test');
+  assert.equal(result.stale, false);
+  const rekeyEnvelope = JSON.parse(harness.getPostBodies().at(-1).patch.entries_encrypted_v1);
+  assert.equal(rekeyEnvelope.version, 1, 'ook rekey blijft in C rollback-veilig v1');
+  assert.equal(rekeyEnvelope.iterations, 210000);
+  const openedWithNew = await store.unlock(newSecret);
+  assert.equal(openedWithNew.length, reopened.length);
+  await assert.rejects(() => store.unlock(oldSecret), /Master-wachtzin klopt niet/);
+});
+
+test('C vergrendelt fail-closed na een ambigue remote write', async () => {
+  const harness = loadPasswordRegisterStoreWithUiState({}, { throwAfterPost: true });
+  const store = harness.createStore();
+  const entries = await store.unlock('unieke ambigue write master wachtzin');
+
+  await assert.rejects(
+    () => store.persist(entries, 'ambigue-test'),
+    (error) => {
+      assert.equal(error.forceLock, true);
+      assert.equal(error.requiresFreshRead, true);
+      return true;
+    }
+  );
+  assert.equal(store.getSecurityState().envelopeVersion, null);
 });
 
 test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerde master key', async () => {
@@ -261,6 +387,9 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
   assert.equal(migratedPatch.entries_json, '');
   assert.equal(typeof migratedPatch.entries_encrypted_v1, 'string');
   assert.doesNotMatch(migratedPatch.entries_encrypted_v1, /fixture-legacy-secret|legacy@example\.com/);
+  const migratedEnvelope = JSON.parse(migratedPatch.entries_encrypted_v1);
+  assert.equal(migratedEnvelope.version, 1, 'ook de legacy-migratie schrijft in C alleen v1');
+  assert.equal(migratedEnvelope.iterations, 210000);
 
   const encryptedHarness = loadPasswordRegisterStoreWithUiState({
     entries_encrypted_v1: migratedPatch.entries_encrypted_v1,
