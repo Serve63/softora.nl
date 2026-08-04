@@ -183,15 +183,16 @@ function createPremiumHtmlPageAccessController(options = {}) {
             path: requestedPath,
             origin: getRequestOriginFromHeaders(req),
             userAgent: getRequestUserAgent(req),
-            detail: 'Winnen-pagina geweigerd omdat de toegangscode nog niet is bevestigd.',
+            detail: 'Winnen toont de beveiligde toegangspagina omdat de toegangscode nog niet is bevestigd.',
           },
           'security_live_momentum_code_required'
         );
-        res.redirect(302, '/premium-instellingen?liveMomentumLocked=1');
         return {
-          handled: true,
+          handled: false,
           authState,
           fileName,
+          renderFileName: 'live-momentum-access.html',
+          liveMomentumAccessRequired: true,
           isLoginPage,
           isProtectedPremiumPage,
           isAdminOnlyPremiumPage,

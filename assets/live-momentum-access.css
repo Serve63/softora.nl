@@ -1,0 +1,334 @@
+:root {
+  color-scheme: light;
+  --access-bg: #f8f7f4;
+  --access-ink: #1a1a2e;
+  --access-muted: #737684;
+  --access-green: #239f58;
+  --access-line: rgba(26, 26, 46, .11);
+  --access-display: "Oswald", sans-serif;
+  --access-sans: "Inter", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: var(--access-bg);
+  color: var(--access-ink);
+  font-family: var(--access-sans);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.momentum-access-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.momentum-access-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(35, 159, 88, .075), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, .94), rgba(248, 247, 244, .9));
+}
+
+.momentum-access-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  font-family: var(--access-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(26, 26, 46, .055);
+}
+
+.momentum-access-art span {
+  position: absolute;
+  font-size: clamp(3rem, 8vw, 8rem);
+  line-height: .95;
+}
+
+.momentum-access-art span:first-child {
+  top: 8%;
+  left: 4%;
+}
+
+.momentum-access-art span:last-child {
+  right: 3%;
+  bottom: 4%;
+  max-width: 8ch;
+  text-align: right;
+  -webkit-text-stroke-color: rgba(35, 159, 88, .07);
+}
+
+.momentum-access-card {
+  position: relative;
+  width: min(100%, 390px);
+  padding: 34px 34px 28px;
+  border: 1px solid rgba(26, 26, 46, .1);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 24px 70px rgba(26, 26, 46, .12);
+  backdrop-filter: blur(18px);
+}
+
+.momentum-access-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--access-line);
+  border-radius: 12px;
+  color: #9599a8;
+  text-decoration: none;
+  transition: color .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.momentum-access-close:hover {
+  color: var(--access-ink);
+  border-color: rgba(26, 26, 46, .22);
+  transform: translateY(-1px);
+}
+
+.momentum-access-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.momentum-access-header {
+  padding: 8px 32px 0 0;
+}
+
+.momentum-access-brand {
+  color: var(--access-green);
+  font-family: var(--access-display);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.momentum-access-header h1 {
+  margin: 8px 0 6px;
+  font-family: var(--access-display);
+  font-size: 2rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.momentum-access-header p {
+  margin: 0;
+  color: var(--access-muted);
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+.momentum-access-form {
+  margin-top: 24px;
+}
+
+.momentum-access-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.momentum-access-dots {
+  width: max-content;
+  display: flex;
+  gap: 10px;
+  margin: 0 auto 18px;
+  padding: 10px 14px;
+  border: 1px solid var(--access-line);
+  border-radius: 999px;
+  background: rgba(248, 247, 244, .78);
+}
+
+.momentum-access-dots span {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #cfd1d8;
+  border-radius: 50%;
+  background: transparent;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+
+.momentum-access-dots span.is-filled {
+  border-color: var(--access-green);
+  background: var(--access-green);
+  transform: scale(1.04);
+}
+
+.momentum-access-dots.is-error {
+  animation: momentum-access-shake .3s ease;
+}
+
+.momentum-access-dots.is-error span {
+  border-color: #e74c3c;
+  background: #e74c3c;
+}
+
+.momentum-access-dots.is-success span {
+  border-color: var(--access-green);
+  background: var(--access-green);
+}
+
+.momentum-access-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.momentum-access-numpad button {
+  min-width: 0;
+  height: 52px;
+  border: 1px solid var(--access-line);
+  border-radius: 13px;
+  background: #fff;
+  color: var(--access-ink);
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(26, 26, 46, .035);
+  transition: transform .12s ease, border-color .15s ease, background .15s ease;
+}
+
+.momentum-access-numpad button:hover {
+  border-color: rgba(35, 159, 88, .4);
+  background: #fbfffc;
+}
+
+.momentum-access-numpad button:active {
+  transform: scale(.96);
+}
+
+.momentum-access-numpad button:focus-visible,
+.momentum-access-close:focus-visible {
+  outline: 3px solid rgba(35, 159, 88, .25);
+  outline-offset: 2px;
+}
+
+.momentum-access-numpad button.is-utility {
+  color: #7d808e;
+}
+
+.momentum-access-numpad svg {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.momentum-access-numpad button:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+.momentum-access-message {
+  min-height: 20px;
+  margin: 13px 0 0;
+  color: #c83e36;
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.momentum-access-message.is-checking {
+  color: var(--access-muted);
+}
+
+@keyframes momentum-access-shake {
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
+}
+
+@media (max-width: 520px) {
+  .momentum-access-page {
+    align-items: center;
+    padding-inline: max(14px, env(safe-area-inset-left));
+  }
+
+  .momentum-access-card {
+    width: 100%;
+    padding: 30px 22px 22px;
+    border-radius: 20px;
+  }
+
+  .momentum-access-header {
+    padding-right: 38px;
+  }
+
+  .momentum-access-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .momentum-access-numpad button {
+    height: 50px;
+  }
+}
+
+@media (max-height: 650px) and (orientation: landscape) {
+  .momentum-access-card {
+    width: min(92vw, 620px);
+    padding: 22px 26px;
+  }
+
+  .momentum-access-form {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 12px 22px;
+    align-items: center;
+    margin-top: 16px;
+  }
+
+  .momentum-access-dots {
+    margin: 0;
+  }
+
+  .momentum-access-message {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .momentum-access-numpad button {
+    height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}

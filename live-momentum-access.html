@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme-mode="light" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Winnen | Beveiligde toegang</title>
+  <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
+  <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
+  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="stylesheet" href="/assets/live-momentum-access.css?v=20260804a">
+</head>
+<body data-live-momentum-access-page>
+  <main class="momentum-access-page" aria-labelledby="momentum-access-title">
+    <div class="momentum-access-art" aria-hidden="true">
+      <span>ATTACK, ATTACK, ATTACK.</span>
+      <span>THE END GAME IS TO WIN</span>
+    </div>
+
+    <section class="momentum-access-card" aria-describedby="momentum-access-description">
+      <a class="momentum-access-close" href="/premium-instellingen" aria-label="Terug naar instellingen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M7 7l10 10M17 7 7 17"></path>
+        </svg>
+      </a>
+
+      <header class="momentum-access-header">
+        <span class="momentum-access-brand">SOFTORA MOMENTUM</span>
+        <h1 id="momentum-access-title">Toegangscode</h1>
+        <p id="momentum-access-description">Vul je zescijferige code in om Winnen te openen.</p>
+      </header>
+
+      <form class="momentum-access-form" data-momentum-access-form novalidate>
+        <input
+          class="momentum-access-input"
+          data-momentum-access-input
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          pattern="[0-9]*"
+          maxlength="6"
+          aria-label="Zescijferige toegangscode"
+        >
+
+        <div class="momentum-access-dots" data-momentum-access-dots role="status" aria-live="polite" aria-label="0 van 6 cijfers ingevuld">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+
+        <div class="momentum-access-numpad" aria-label="Numeriek toetsenbord">
+          <button type="button" data-momentum-access-digit="1">1</button>
+          <button type="button" data-momentum-access-digit="2">2</button>
+          <button type="button" data-momentum-access-digit="3">3</button>
+          <button type="button" data-momentum-access-digit="4">4</button>
+          <button type="button" data-momentum-access-digit="5">5</button>
+          <button type="button" data-momentum-access-digit="6">6</button>
+          <button type="button" data-momentum-access-digit="7">7</button>
+          <button type="button" data-momentum-access-digit="8">8</button>
+          <button type="button" data-momentum-access-digit="9">9</button>
+          <button type="button" class="is-utility" data-momentum-access-clear aria-label="Code wissen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <path d="M5 5l14 14M19 5 5 19"></path>
+            </svg>
+          </button>
+          <button type="button" data-momentum-access-digit="0">0</button>
+          <button type="button" class="is-utility" data-momentum-access-back aria-label="Laatste cijfer wissen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 5H9l-6 7 6 7h12z"></path><path d="m17 9-6 6M11 9l6 6"></path>
+            </svg>
+          </button>
+        </div>
+
+        <p class="momentum-access-message" data-momentum-access-message role="alert" aria-live="assertive"></p>
+      </form>
+    </section>
+  </main>
+  <script src="/assets/live-momentum-access.js?v=20260804a" defer></script>
+</body>
+</html>

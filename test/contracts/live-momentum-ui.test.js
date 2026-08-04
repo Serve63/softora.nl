@@ -36,13 +36,14 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260723a"/);
   assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20260729a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
-  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260723a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-numbers\.css\?v=20260804a"/);
+  assert.match(html, /href="\/assets\/live-momentum-endgame-checkpoint\.css\?v=20260804a"/);
   assert.match(html, /href="\/assets\/live-momentum-video\.css\?v=20260728a"/);
   assert.match(html, /<script src="\/assets\/premium-ui-state-client\.js\?v=20260727b"><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260716b" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260722b" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260804c" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260804d" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260722a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260804a" defer><\/script>/);
@@ -115,6 +116,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   const mobileCss = read('assets/live-momentum-mobile.css');
   const progressCss = read('assets/live-momentum-endgame-progress.css');
   const endGameNumbersCss = read('assets/live-momentum-endgame-numbers.css');
+  const checkpointCss = read('assets/live-momentum-endgame-checkpoint.css');
   const videoCss = read('assets/live-momentum-video.css');
 
   assert.match(css, /--page-bg:\s*#f8f7f4;/);
@@ -191,8 +193,10 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(endGameNumbersCss, /\.end-game-card-slot\s*\{[\s\S]*flex:\s*0 0 clamp\(190px, 13vw, 220px\);[\s\S]*flex-direction:\s*column;/);
   assert.match(endGameNumbersCss, /\.end-game-card-slot\.is-card-dragging\s*\{[\s\S]*will-change:\s*transform;/);
   assert.match(endGameNumbersCss, /\.end-game-card-number\s*\{[\s\S]*font-family:\s*var\(--font-display\);[\s\S]*text-align:\s*center;/);
-  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin,[\s\S]*\.end-game-card-slot--destination\s*\{[\s\S]*flex-basis:\s*clamp\(215px, 14\.5vw, 246px\);[\s\S]*filter:\s*none;/);
-  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin > \.end-game-goal-card,[\s\S]*min-height:\s*clamp\(330px, 38vh, 385px\);[\s\S]*border:\s*2px solid rgba\(218, 175, 89, \.88\)/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin,[\s\S]*\.end-game-card-slot--checkpoint,[\s\S]*\.end-game-card-slot--destination\s*\{[\s\S]*flex-basis:\s*clamp\(215px, 14\.5vw, 246px\);[\s\S]*filter:\s*none;/);
+  assert.match(endGameNumbersCss, /\.end-game-card-slot--origin > \.end-game-goal-card,[\s\S]*\.end-game-card-slot--checkpoint > \.end-game-goal-card,[\s\S]*min-height:\s*clamp\(330px, 38vh, 385px\);[\s\S]*border:\s*2px solid rgba\(218, 175, 89, \.88\)/);
+  assert.match(checkpointCss, /\.end-game-card-photo--checkpoint::after\s*\{[\s\S]*border-color:\s*rgba\(224, 187, 105, \.92\);/);
+  assert.match(checkpointCss, /\.end-game-card-checkpoint-label\s*\{[\s\S]*color:\s*#fff1ca;/);
   assert.doesNotMatch(endGameNumbersCss, /drop-shadow|0 18px 40px|0 0 24px/);
   assert.match(endGameNumbersCss, /@media \(max-width:\s*900px\)[\s\S]*flex-basis:\s*min\(74vw, 280px\);/);
   assert.match(css, /\.end-game-goal-card--mission img\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*object-fit:\s*cover;/);
@@ -346,7 +350,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /function createMissionNumber\(number\)/);
   assert.match(endGameCardsJs, /label\.className = 'end-game-card-number'/);
   assert.match(endGameCardsJs, /if \(!isFixed\) slot\.append\(createMissionNumber\(missionNumber\)\)/);
-  assert.match(endGameCardsJs, /if \(!\[ORIGIN_CARD_ID, DESTINATION_CARD_ID\]\.includes\(card\.id\)\) missionNumber \+= 1/);
+  assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /updateMissionNumbers\(track\)/);
   assert.match(endGameCardsJs, /function updateProgress\(\)/);
   assert.match(endGameCardsJs, /Math\.round\(\(completedCards \/ missionCards\.length\) \* 100\)/);
@@ -367,7 +371,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /if \(slot\.dataset\.endGameCardFixed === 'true'\) return/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-automaat-rijden', title: 'Eigen automaat rijden' \}/);
   assert.doesNotMatch(endGameCardsJs, /standaloneImage|function createCard\(card, state, index\)/);
-  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.imageId \|\| card\.id\}\.png\?v=20260804c/);
+  assert.match(endGameCardsJs, /live-momentum-endgame-cards\/\$\{card\.imageId \|\| card\.id\}\.png\?v=20260804d/);
   assert.doesNotMatch(endGameCardsJs, /atlasIndex|endgame-goals-atlas/);
   assert.match(endGameCardsJs, /title:\s*'PRP Behandeling'/);
   assert.match(endGameCardsJs, /title:\s*'Ketting & Armband'/);
@@ -381,12 +385,14 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
   assert.match(endGameCardsJs, /\{ id: 'eigen-boot-2035', title: 'Eigen boot', timeframe: 2035, imageId: 'eigen-boot' \}/);
   assert.match(endGameCardsJs, /\{ id: 'huis-miljoen-plus-2035', title: 'Huis van €1 miljoen\+ kopen', timeframe: 2035, imageId: 'huis-miljoen-plus' \}/);
-  assert.match(endGameCardsJs, /\{ id: '2030', title: '2030\.\.\.', type: 'destination' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'checkpoint-2028', title: '2028\.\.\.', type: 'checkpoint', imageId: '2030' \}/);
+  assert.match(endGameCardsJs, /\{ id: '2035', title: '2035\.\.\.', type: 'destination', imageId: '2030' \}/);
   assert.match(endGameCardsJs, /\{ id: 'oktober-2024', title: 'Oktober 2024…', type: 'origin' \}/);
-  assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.requestedOrder, \.\.\.remainingOrder, DESTINATION_CARD_ID\]/);
+  assert.match(endGameCardsJs, /return \[ORIGIN_CARD_ID, \.\.\.through2028, CHECKPOINT_CARD_ID, \.\.\.through2035, DESTINATION_CARD_ID\]/);
+  assert.match(endGameCardsJs, /const FIXED_CARD_IDS = \[ORIGIN_CARD_ID, CHECKPOINT_CARD_ID, DESTINATION_CARD_ID\]/);
   assert.match(endGameCardsJs, /dataset\.endGameCardFixed = 'true'/);
-  assert.match(endGameCardsJs, /card\.timeframe\s*\? `TOT \$\{card\.timeframe\}`\s*:\s*'END GAME'/);
-  assert.match(endGameCardsJs, /card\.type === 'origin' \? 'HIER BEGON HET' : 'UITGESPEELD\.\.'/);
+  assert.match(endGameCardsJs, /card\.type === 'checkpoint'[\s\S]*\? 'CHECKPOINT'/);
+  assert.match(endGameCardsJs, /\? 'OP NAAR 2035'[\s\S]*: 'UITGESPEELD\.\.'/);
   assert.doesNotMatch(endGameCardsJs, /WIE BEN IK DAN/);
   assert.match(endGameCardsJs, /if \(!isFixed\) article\.append\(createCompletionOverlay\(\), createActions\(card, state\.completed\)\)/);
   assert.match(endGameCardsJs, /getLegacyMissionState: \(\) => \(\{ \.\.\.state\[LEGACY_MISSION_ID\] \}\)/);
@@ -402,7 +408,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Sponsorbord bij Nemelaer', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
     'Eigen boot', 'Range Rover Sport kopen', 'Rolex Datejust kopen', 'VIP-box bij PSV',
     'Jaarlijkse Instagram-post 2029', 'Jaarlijkse Instagram-post 2030', 'Vakantiehuis kopen',
-    'Huis van €1 miljoen+ kopen', '2030...', 'Oktober 2024…'
+    'Huis van €1 miljoen+ kopen', '2028...', '2035...', 'Oktober 2024…'
   ].forEach((title) => assert.equal(endGameCardsJs.includes(title), true, `missing card title: ${title}`));
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'toggle-complete'/);
   assert.match(endGameCardsJs, /dataset\.endGameCardAction = 'remove'/);

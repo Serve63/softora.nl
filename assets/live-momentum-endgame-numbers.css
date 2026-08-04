@@ -15,11 +15,13 @@
   align-items: center;
 }
 .end-game-card-slot--origin,
+.end-game-card-slot--checkpoint,
 .end-game-card-slot--destination {
   flex-basis: clamp(215px, 14.5vw, 246px);
   filter: none;
 }
 .end-game-card-slot--origin > .end-game-goal-card,
+.end-game-card-slot--checkpoint > .end-game-goal-card,
 .end-game-card-slot--destination > .end-game-goal-card {
   min-height: clamp(330px, 38vh, 385px);
   border: 2px solid rgba(218, 175, 89, .88);
@@ -27,6 +29,7 @@
   box-shadow: 0 0 0 2px rgba(255, 235, 176, .22);
 }
 .end-game-card-slot--origin .end-game-card-photo::after,
+.end-game-card-slot--checkpoint .end-game-card-photo::after,
 .end-game-card-slot--destination .end-game-card-photo::after {
   border-color: rgba(246, 211, 137, .96);
   box-shadow:
@@ -47,6 +50,7 @@
   transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }
 .end-game-card-slot--origin,
+.end-game-card-slot--checkpoint,
 .end-game-card-slot--destination {
   cursor: default;
 }
@@ -69,6 +73,7 @@
     flex-basis: min(74vw, 280px);
   }
   .end-game-card-slot--origin,
+  .end-game-card-slot--checkpoint,
   .end-game-card-slot--destination {
     flex-basis: min(80vw, 305px);
   }
@@ -78,6 +83,7 @@
     flex-basis: min(78vw, 275px);
   }
   .end-game-card-slot--origin,
+  .end-game-card-slot--checkpoint,
   .end-game-card-slot--destination {
     flex-basis: min(84vw, 295px);
   }
