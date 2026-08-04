@@ -74,7 +74,7 @@ body {
   min-height: calc(100vh - 64px);
   position: relative;
 }
-/* Alleen na geldige PIN: bedekt tabel/zoekbalk tot Supabase/fallback geladen is (geen flits op PIN-scherm). */
+/* Alleen na geldige PIN: bedekt tabel/zoekbalk tot de gezaghebbende Supabase-kluis geladen is. */
 .register-data-loader {
   position: absolute;
   inset: 0;
@@ -1125,6 +1125,7 @@ body {
       </svg>
     </button>
   </div>
+  <p class="entry-security-warning">Let op: wisselen van tab of venster vergrendelt de kluis en wist niet-opgeslagen wijzigingen.</p>
   <form id="entry-form">
     <div class="entry-form-grid">
       <div class="entry-field">
@@ -1142,12 +1143,11 @@ body {
       <div class="entry-field full">
         <label for="entry-password">Wachtwoord</label>
         <div class="entry-password-control">
-          <input id="entry-password" name="password" type="password" autocomplete="off" spellcheck="false" required>
+          <input id="entry-password" name="password" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required>
           <button type="button" class="entry-password-toggle" id="entry-password-toggle" aria-pressed="false" aria-label="Wachtwoord tonen">Tonen</button>
         </div>
       </div>
     </div>
-    <p class="entry-security-warning">Bij vergrendelen, tabwissel of vensterwissel worden niet-opgeslagen wijzigingen direct gewist.</p>
     <div class="entry-modal-actions">
       <button type="button" class="entry-modal-btn" id="entry-cancel">Annuleren</button>
       <button type="submit" class="entry-modal-btn primary" id="entry-save">Opslaan</button>
@@ -1166,8 +1166,6 @@ body {
   </div>
 </div>
 
-<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
-<script src="assets/premium-ui-state-client.js?v=20260722b"></script>
 <script src="assets/premium-password-register-renderer.js?v=20260427a"></script>
 <script src="assets/premium-password-register-store.js?v=20260804a"></script>
 <script src="assets/premium-password-register-pin.js?v=20260804a"></script>

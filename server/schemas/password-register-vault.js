@@ -133,21 +133,10 @@ function validatePasswordRegisterValues(values, options = {}) {
   });
 }
 
-function isExactLegacyPasswordRegisterWrite(body) {
-  const payload = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
-  if (Object.keys(payload).join(',') !== 'patch') return false;
-  const patch = payload.patch && typeof payload.patch === 'object' && !Array.isArray(payload.patch)
-    ? payload.patch
-    : {};
-  const validation = validatePasswordRegisterValues(patch, { requireEncrypted: true });
-  return validation.ok && validation.version === 1;
-}
-
 module.exports = {
   PASSWORD_REGISTER_CURRENT_VERSION,
   PASSWORD_REGISTER_ENCRYPTED_KEY,
   PASSWORD_REGISTER_LEGACY_KEY,
-  isExactLegacyPasswordRegisterWrite,
   validatePasswordRegisterEnvelope,
   validatePasswordRegisterValues,
 };

@@ -11,6 +11,10 @@
   var masterSecretDialogMode = "unlock";
   var passwordRegisterAutoLock = null;
   var vaultSessionGeneration = 0;
+  var vaultWriteProof = "";
+  var vaultWriteProofExpiresAt = 0;
+  var vaultWriteProofTimer = null;
+  var VAULT_WRITE_PROOF_MAX_TTL_MS = 5 * 60 * 1000;
 
   var registerStatusEl = document.getElementById("register-status");
   var searchInputEl = document.getElementById("search");
@@ -75,6 +79,59 @@
 
   function normalizeString(value) {
     return passwordRegisterStore.normalizeString(value);
+  }
+
+  function clearVaultWriteProof() {
+    vaultWriteProof = "";
+    vaultWriteProofExpiresAt = 0;
+    if (vaultWriteProofTimer != null) {
+      global.clearTimeout(vaultWriteProofTimer);
+      vaultWriteProofTimer = null;
+    }
+  }
+
+  function parseVaultWriteProof(verification) {
+    var proof = verification && typeof verification.writeProof === "string"
+      ? verification.writeProof
+      : "";
+    var serverExpiresAt = Date.parse(verification && verification.writeProofExpiresAt);
+    var now = Date.now();
+    if (!proof || proof.length > 4096 || !Number.isFinite(serverExpiresAt) || serverExpiresAt <= now) {
+      var error = new Error("Beveiligingsbevestiging ontbreekt of is verlopen.");
+      error.code = "PASSWORD_REGISTER_WRITE_PROOF_REQUIRED";
+      error.forceLock = true;
+      throw error;
+    }
+    return {
+      proof: proof,
+      expiresAt: Math.min(serverExpiresAt, now + VAULT_WRITE_PROOF_MAX_TTL_MS)
+    };
+  }
+
+  function setVaultWriteProof(verification) {
+    var parsed = parseVaultWriteProof(verification);
+    clearVaultWriteProof();
+    vaultWriteProof = parsed.proof;
+    vaultWriteProofExpiresAt = parsed.expiresAt;
+    vaultWriteProofTimer = global.setTimeout(function () {
+      clearVaultWriteProof();
+      passwordRegisterPin.lock();
+      if (pinMessageEl) {
+        pinMessageEl.textContent = "Beveiligingsbevestiging verlopen. Ontgrendel opnieuw met je PIN.";
+      }
+    }, Math.max(0, parsed.expiresAt - Date.now()));
+    return parsed.proof;
+  }
+
+  function getActiveVaultWriteProof() {
+    if (!vaultWriteProof || Date.now() >= vaultWriteProofExpiresAt) {
+      clearVaultWriteProof();
+      var error = new Error("Beveiligingsbevestiging ontbreekt of is verlopen.");
+      error.code = "PASSWORD_REGISTER_WRITE_PROOF_REQUIRED";
+      error.forceLock = true;
+      throw error;
+    }
+    return vaultWriteProof;
   }
 
   function sanitizePasswordEntry(entry, index) {
@@ -195,7 +252,11 @@
 
   async function persistPasswordEntries(actor) {
     try {
-      var result = await passwordRegisterStore.persist(entries, actor || "save");
+      var result = await passwordRegisterStore.persist(
+        entries,
+        actor || "save",
+        getActiveVaultWriteProof()
+      );
       if (result.stale) {
         var staleError = new Error("De kluis is tijdens het opslaan vergrendeld.");
         staleError.code = "PASSWORD_REGISTER_LOCKED";
@@ -209,8 +270,9 @@
     }
   }
 
-  async function ensurePasswordEntriesLoaded(masterSecret) {
-    return passwordRegisterStore.unlock(masterSecret);
+  async function ensurePasswordEntriesLoaded(masterSecret, writeProof) {
+    entries = await passwordRegisterStore.unlock(masterSecret, writeProof);
+    return entries;
   }
 
   function getEntryById(id) {
@@ -250,11 +312,21 @@
 
   function getVaultFailureMessage(error) {
     var code = normalizeString(error && error.code);
-    if (code === "PASSWORD_REGISTER_CURRENT_MASTER_INVALID") {
-      return "Huidige master-wachtzin onjuist. De kluis is voor de zekerheid vergrendeld.";
+    if (code === "PASSWORD_REGISTER_REVISION_CONFLICT" || code === "PASSWORD_REGISTER_REVISION_REQUIRED") {
+      return "De kluis is elders gewijzigd. Ontgrendel opnieuw om de actuele Supabase-versie te laden.";
     }
     if (code === "PASSWORD_REGISTER_REKEY_UNCERTAIN" || code === "PASSWORD_REGISTER_WRITE_UNCERTAIN") {
       return "Opslaguitkomst onzeker. Ontgrendel opnieuw; probeer na een wachtzinwijziging eerst de nieuwe wachtzin.";
+    }
+    if (code === "PASSWORD_REGISTER_CURRENT_MASTER_INVALID") {
+      return "Huidige master-wachtzin onjuist. De kluis is voor de zekerheid vergrendeld.";
+    }
+    if (
+      code === "PASSWORD_REGISTER_WRITE_PROOF_REQUIRED" ||
+      code === "PASSWORD_REGISTER_WRITE_PROOF_INVALID" ||
+      code === "PASSWORD_REGISTER_WRITE_PROOF_EXPIRED"
+    ) {
+      return "De beveiligingsbevestiging is ongeldig of verlopen. Ontgrendel opnieuw met een verse PIN.";
     }
     return "Kluis voor de zekerheid vergrendeld. Ontgrendel opnieuw voor een verse Supabase-controle.";
   }
@@ -267,6 +339,7 @@
 
   function secureLockCleanup() {
     vaultSessionGeneration += 1;
+    clearVaultWriteProof();
     if (passwordRegisterAutoLock) passwordRegisterAutoLock.stop();
     passwordRegisterStore.lock();
     if (global.SoftoraPasswordRegisterSecurity) {
@@ -409,32 +482,48 @@
 
   async function changeMasterSecret() {
     var request = await openMasterSecretDialog("change");
-    if (!request || typeof request !== "object") return;
+    if (!request || typeof request !== "object") {
+      passwordRegisterPin.lock();
+      if (pinMessageEl) {
+        pinMessageEl.textContent = "Wachtzinwijziging geannuleerd. Ontgrendel opnieuw met je PIN.";
+      }
+      return;
+    }
     var expectedGeneration = vaultSessionGeneration;
     var rawPin = String(request.pin || "");
     request.pin = "";
     try {
       var verification = await passwordRegisterPin.verifyFreshPin(rawPin);
       rawPin = "";
-      if (!verification || verification.ok !== true) {
-        throw new Error("De verse beveiligings-PIN is niet bevestigd.");
-      }
       if (expectedGeneration !== vaultSessionGeneration) return;
+      var freshWriteProof = parseVaultWriteProof(verification).proof;
       var result = await passwordRegisterStore.changeMasterSecret(
         request.currentMasterSecret,
         request.newMasterSecret,
         entries,
-        "master-secret-change"
+        "master-secret-change",
+        freshWriteProof
       );
-      if (result.stale || expectedGeneration !== vaultSessionGeneration) return;
+      if (result.stale || expectedGeneration !== vaultSessionGeneration) {
+        var staleRekeyError = new Error("De wachtzinwijziging moet opnieuw worden gecontroleerd.");
+        staleRekeyError.code = "PASSWORD_REGISTER_REKEY_UNCERTAIN";
+        throw staleRekeyError;
+      }
+      setVaultWriteProof(verification);
       entries = result.entries;
       render();
-      toast("\u2713 Master-wachtzin gewijzigd; v2-migratie volgt in de beveiligde eindstap");
+      toast("\u2713 Master-wachtzin veilig gewijzigd");
     } catch (error) {
-      if (expectedGeneration !== vaultSessionGeneration) return;
+      if (expectedGeneration !== vaultSessionGeneration) {
+        clearVaultWriteProof();
+        if (pinMessageEl) pinMessageEl.textContent = getVaultFailureMessage(error);
+        return;
+      }
       forceLockAfterVaultFailure(error);
     } finally {
       rawPin = "";
+      freshWriteProof = "";
+      if (verification && typeof verification === "object") verification.writeProof = "";
       request.currentMasterSecret = "";
       request.newMasterSecret = "";
       request.pin = "";
@@ -466,12 +555,7 @@
         render();
         toast("\u2713 Nieuwe inlog opgeslagen");
       } catch (_) {
-        if (createGeneration !== vaultSessionGeneration) {
-          if (global.SoftoraPasswordRegisterSecurity) {
-            global.SoftoraPasswordRegisterSecurity.wipeEntries(previousEntries);
-          }
-          return;
-        }
+        if (createGeneration !== vaultSessionGeneration) return;
         entries = previousEntries;
         render();
         toast("Opslaan mislukt");
@@ -664,21 +748,27 @@
     }
   }
 
-  async function unlockRegister() {
+  async function unlockRegister(verification) {
     var masterSecret = "";
     var loaderEl = null;
     try {
+      try {
+        setVaultWriteProof(verification);
+      } catch (error) {
+        passwordRegisterPin.lock();
+        throw error;
+      } finally {
+        if (verification && typeof verification === "object") verification.writeProof = "";
+      }
       passwordRegisterAutoLock.start();
-      if (!passwordRegisterAutoLock.isActive()) return;
-      var expectedGeneration = vaultSessionGeneration;
       masterSecret = normalizeString(await openMasterSecretDialog("unlock"));
-      if (!masterSecret || expectedGeneration !== vaultSessionGeneration) {
+      if (!masterSecret) {
+        clearVaultWriteProof();
         passwordRegisterAutoLock.stop();
-        if (!masterSecret) {
-          setRegisterStatus("Master-wachtzin is nodig om de kluis te openen.", "warning");
-        }
+        setRegisterStatus("Master-wachtzin is nodig om de kluis te openen.", "warning");
         return;
       }
+      document.getElementById("screen-register").style.display = "none";
       document.getElementById("screen-pin").style.display = "none";
       document.getElementById("screen-register").style.display = "block";
       loaderEl = document.getElementById("register-data-loader");
@@ -687,21 +777,17 @@
         loaderEl.setAttribute("aria-hidden", "false");
       }
       try {
-        var loadedEntries = await ensurePasswordEntriesLoaded(masterSecret);
-        if (expectedGeneration !== vaultSessionGeneration) {
-          if (global.SoftoraPasswordRegisterSecurity) {
-            global.SoftoraPasswordRegisterSecurity.wipeEntries(loadedEntries);
-          }
-          return;
-        }
-        entries = loadedEntries;
+        await ensurePasswordEntriesLoaded(masterSecret, getActiveVaultWriteProof());
         render();
         passwordRegisterAutoLock.start();
       } catch (error) {
-        passwordRegisterPin.lock();
-        if (pinMessageEl) {
-          pinMessageEl.textContent = normalizeString(error && error.message) || "Ontgrendelen mislukt.";
-        }
+        var unlockFailure = new Error(
+          normalizeString(error && error.message) || "Ontgrendelen mislukt."
+        );
+        secureLockCleanup();
+        document.getElementById("screen-register").style.display = "none";
+        document.getElementById("screen-pin").style.display = "flex";
+        throw unlockFailure;
       }
     } finally {
       masterSecret = "";

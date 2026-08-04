@@ -8,7 +8,6 @@ const PREMIUM_SIDEBAR_THEME_VERSION = '20260519b';
 const PASSWORD_REGISTER_PAGE = 'premium-wachtwoordenregister.html';
 const PASSWORD_REGISTER_ALLOWED_SCRIPT_PATHS = Object.freeze([
   'assets/premium-password-register-theme-boot.js',
-  'assets/premium-ui-state-client.js',
   'assets/premium-password-register-renderer.js',
   'assets/premium-password-register-store.js',
   'assets/premium-password-register-pin.js',
@@ -157,7 +156,9 @@ function addPasswordRegisterIsolationViolations(html, violations) {
     );
   }
   if (hasInlineScript(html)) {
-    violations.push(`[quality-lock] ${PASSWORD_REGISTER_PAGE} mag geen inline scripts bevatten.`);
+    violations.push(
+      `[quality-lock] ${PASSWORD_REGISTER_PAGE} mag geen inline scripts bevatten.`
+    );
   }
 
   const scriptSources = listScriptSources(html);

@@ -1661,62 +1661,14 @@ test('password register rejects plaintext and arbitrary fields', async () => {
   assert.equal(writes, 0);
 });
 
-test('password register temporarily accepts only exact owner-gated v1 writes during rollout', async () => {
-  const writes = [];
-  const { coordinator, securityAuditCalls } = createFixture({
-    getUiStateValues: async () => ({
-      values: createPasswordRegisterValues(1),
-      source: 'supabase',
-      updatedAt: '2026-08-04T11:00:00.000Z',
-      revision: 3,
-    }),
-    compareAndSwapUiStateValues: async (scope, values, meta) => {
-      writes.push({ scope, values, meta });
-      return {
-        ok: true,
-        values,
-        source: 'supabase',
-        updatedAt: '2026-08-04T11:01:00.000Z',
-        revision: 4,
-      };
-    },
-  });
-  const res = createResponseRecorder();
-
-  await coordinator.sendUiStateSetResponse(
-    {
-      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
-      body: { patch: createPasswordRegisterValues(1) },
-    },
-    res,
-    'premium_password_register'
-  );
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].meta.source, 'password-register-legacy-rollout-compat');
-  assert.equal(writes[0].meta.actor, 'usr_password_owner');
-  assert.equal(writes[0].meta.expectedRevision, 3);
-  assert.equal(writes[0].meta.expectedUpdatedAt, '2026-08-04T11:00:00.000Z');
-  assert.equal(writes[0].values.updated_by, 'usr_password_owner');
-  assert.equal(res.body.revision, 4);
-  assert.equal(
-    securityAuditCalls.some(
-      (call) => call.reason === 'security_password_register_legacy_write_compat'
-    ),
-    true
-  );
-});
-
-test('password register legacy rollout path can never downgrade an authoritative v2 vault', async () => {
+test('password register rejects every v1 write before authoritative read or CAS', async () => {
   let writes = 0;
+  let reads = 0;
   const { coordinator, securityAuditCalls } = createFixture({
-    getUiStateValues: async () => ({
-      values: createPasswordRegisterValues(2),
-      source: 'supabase',
-      updatedAt: '2026-08-04T11:00:00.000Z',
-      revision: 5,
-    }),
+    getUiStateValues: async () => {
+      reads += 1;
+      return null;
+    },
     compareAndSwapUiStateValues: async () => {
       writes += 1;
       return null;
@@ -1727,75 +1679,23 @@ test('password register legacy rollout path can never downgrade an authoritative
   await coordinator.sendUiStateSetResponse(
     {
       premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
-      body: { patch: createPasswordRegisterValues(1) },
+      body: createPasswordRegisterWriteBody(createPasswordRegisterValues(1), {
+        expectedRevision: 5,
+        expectedUpdatedAt: '2026-08-04T11:00:00.000Z',
+      }),
     },
     res,
     'premium_password_register'
   );
 
-  assert.equal(res.statusCode, 409);
-  assert.equal(res.body.code, 'PASSWORD_REGISTER_LEGACY_DOWNGRADE_BLOCKED');
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'PASSWORD_REGISTER_VAULT_INVALID');
+  assert.equal(reads, 0);
   assert.equal(writes, 0);
   assert.equal(
     securityAuditCalls.at(-1).reason,
-    'security_password_register_legacy_downgrade_blocked'
+    'security_password_register_vault_rejected'
   );
-});
-
-test('password register legacy compat uses CAS so a concurrent v2 winner cannot be downgraded', async () => {
-  let remote = {
-    values: createPasswordRegisterValues(1),
-    source: 'supabase',
-    updatedAt: '2026-08-04T11:00:00.000Z',
-    revision: 12,
-    exists: true,
-  };
-  let signalRead;
-  const readObserved = new Promise((resolve) => { signalRead = resolve; });
-  let releaseCas;
-  const casReleased = new Promise((resolve) => { releaseCas = resolve; });
-  let legacyWrites = 0;
-  const { coordinator } = createFixture({
-    getUiStateValues: async () => {
-      const snapshot = { ...remote, values: { ...remote.values } };
-      signalRead();
-      return snapshot;
-    },
-    compareAndSwapUiStateValues: async (_scope, values, meta) => {
-      await casReleased;
-      if (remote.revision !== meta.expectedRevision || remote.updatedAt !== meta.expectedUpdatedAt) {
-        return { ok: false, conflict: true, ...remote };
-      }
-      legacyWrites += 1;
-      remote = { values, source: 'supabase', revision: remote.revision + 1, updatedAt: 'later' };
-      return { ok: true, ...remote };
-    },
-  });
-  const res = createResponseRecorder();
-  const requestPromise = coordinator.sendUiStateSetResponse(
-    {
-      premiumAuth: { authenticated: true, isAdmin: true, userId: 'usr_password_owner' },
-      body: { patch: createPasswordRegisterValues(1) },
-    },
-    res,
-    'premium_password_register'
-  );
-
-  await readObserved;
-  remote = {
-    values: createPasswordRegisterValues(2),
-    source: 'supabase',
-    revision: 13,
-    updatedAt: '2026-08-04T11:00:01.000Z',
-    exists: true,
-  };
-  releaseCas();
-  await requestPromise;
-
-  assert.equal(res.statusCode, 409);
-  assert.equal(res.body.code, 'PASSWORD_REGISTER_REVISION_CONFLICT');
-  assert.equal(legacyWrites, 0);
-  assert.equal(JSON.parse(remote.values.entries_encrypted_v1).version, 2);
 });
 
 test('runtime ops coordinator creates manual dashboard activities with normalized defaults', () => {
