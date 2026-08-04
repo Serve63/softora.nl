@@ -9,10 +9,6 @@ const {
   PASSWORD_REGISTER_SCOPE,
   createPasswordRegisterOwnerPolicy,
 } = require('./password-register-access');
-const {
-  isExactLegacyPasswordRegisterWrite,
-} = require('../schemas/password-register-vault');
-
 const VAULT_PROOF_SCOPE = 'password-register';
 const VAULT_PROOF_DOMAIN = 'softora:password-register-write-proof:v1';
 const PASSWORD_REGISTER_PROOF_MAX_TTL_MS = 5 * 60 * 1000;
@@ -172,7 +168,7 @@ function createPasswordRegisterWriteProofGuard(options = {}) {
 
   function requirePasswordRegisterWriteProof(req, res, next) {
     const scope = String(req?.params?.scope || req?.query?.scope || '').trim().toLowerCase();
-    if (scope !== PASSWORD_REGISTER_SCOPE || isExactLegacyPasswordRegisterWrite(req.body)) return next();
+    if (scope !== PASSWORD_REGISTER_SCOPE) return next();
     return verifyRequestProof(req, res, next, 'write');
   }
 

@@ -4,7 +4,6 @@ const {
   isPasswordRegisterScope,
 } = require('../security/password-register-access');
 const {
-  isExactLegacyPasswordRegisterWrite,
   validatePasswordRegisterValues,
 } = require('../schemas/password-register-vault');
 
@@ -493,88 +492,6 @@ function createRuntimeOpsCoordinator(deps = {}) {
     };
   }
 
-  async function sendLegacyPasswordRegisterCompatWrite(req, res, scope, incomingValues) {
-    const currentState = await getAuthoritativePasswordRegisterState(scope);
-    if (!currentState) {
-      return res.status(503).json({
-        ok: false,
-        code: 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE',
-        error: 'Wachtwoordenregister-opslag kon niet rechtstreeks via Supabase worden bevestigd.',
-      });
-    }
-    const currentValidation = validatePasswordRegisterValues(currentState.values || {}, {
-      requireEncrypted: true,
-    });
-    if (!currentValidation.ok || currentValidation.version !== 1) {
-      appendPasswordRegisterAuditEvent(
-        req,
-        {
-          type: 'password_register_legacy_downgrade_blocked',
-          success: false,
-          detail: 'Legacy v1-write geweigerd omdat de authoritative kluis niet meer v1 is.',
-        },
-        'security_password_register_legacy_downgrade_blocked'
-      );
-      return res.status(409).json({
-        ok: false,
-        code: 'PASSWORD_REGISTER_LEGACY_DOWNGRADE_BLOCKED',
-        error: 'Deze oude wachtwoordenregisterpagina is verouderd. Vergrendel en laad de nieuwste pagina.',
-      });
-    }
-    const identity = getAuthenticatedVaultActor(req);
-    const valuesToSave = {
-      ...(currentState.values && typeof currentState.values === 'object' ? currentState.values : {}),
-      ...sanitizeUiStateValues(incomingValues),
-      updated_at: new Date().toISOString(),
-      updated_by: identity.updatedBy,
-    };
-    const validation = validatePasswordRegisterValues(valuesToSave, { requireEncrypted: true });
-    if (!validation.ok || validation.version !== 1) {
-      return sendPasswordRegisterVaultInvalid(
-        req,
-        res,
-        400,
-        'Tijdelijke legacy-write geweigerd wegens ongeldig versleuteld opslagformaat.'
-      );
-    }
-    // Tijdelijke backend-eerst rolloutcompat: uitsluitend exact v1, owner-gated,
-    // vers gehydrateerd en rechtstreeks Supabase. Verwijderen zodra v2/CAS live is.
-    const state = await compareAndSwapUiStateValues(scope, valuesToSave, {
-      source: 'password-register-legacy-rollout-compat',
-      actor: identity.actor,
-      expectedRevision: currentState.revision,
-      expectedUpdatedAt: currentState.updatedAt,
-    });
-    if (state && state.conflict) return sendPasswordRegisterRevisionConflict(req, res, state);
-    const savedValidation = validatePasswordRegisterValues(state && state.values, {
-      requireEncrypted: true,
-    });
-    if (
-      !state ||
-      !state.ok ||
-      normalizeString(state.source).toLowerCase() !== 'supabase' ||
-      !savedValidation.ok ||
-      savedValidation.version !== 1 ||
-      Number(state.revision) !== currentState.revision + 1
-    ) {
-      return res.status(503).json({
-        ok: false,
-        code: 'PASSWORD_REGISTER_STORAGE_UNAVAILABLE',
-        error: 'Wachtwoordenregister legacy-write kon niet veilig worden bevestigd.',
-      });
-    }
-    appendPasswordRegisterAuditEvent(
-      req,
-      {
-        type: 'password_register_legacy_write_compat',
-        success: true,
-        detail: 'Tijdelijke owner-gated v1 rolloutcompat-write rechtstreeks in Supabase opgeslagen.',
-      },
-      'security_password_register_legacy_write_compat'
-    );
-    return sendUiStateSetSuccessResponse(res, scope, state, valuesToSave);
-  }
-
   function sendPasswordRegisterRevisionConflict(req, res, state, code = 'PASSWORD_REGISTER_REVISION_CONFLICT') {
     appendPasswordRegisterAuditEvent(
       req,
@@ -603,10 +520,6 @@ function createRuntimeOpsCoordinator(deps = {}) {
     const incomingValues = patchProvided ? body.patch : valuesProvided ? body.values : {};
     const hasExpectedRevision = Object.prototype.hasOwnProperty.call(body, 'expectedRevision');
     const hasExpectedUpdatedAt = Object.prototype.hasOwnProperty.call(body, 'expectedUpdatedAt');
-    const isLegacyRolloutCompatWrite = isExactLegacyPasswordRegisterWrite(body);
-    if (isLegacyRolloutCompatWrite) {
-      return sendLegacyPasswordRegisterCompatWrite(req, res, scope, incomingValues);
-    }
     const incomingValidation = validatePasswordRegisterValues(incomingValues, {
       requireEncrypted: true,
       requireCurrentVersion: true,
