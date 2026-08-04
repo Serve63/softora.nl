@@ -237,7 +237,7 @@ function createKvkDatabaseControlService(deps = {}) {
       : res.status(503).json({ ok: false, error: result.error });
   }
 
-  async function sendPostControlResponse(req, res) {
+  async function persistControlRequest(req, res) {
     if (typeof req?.body?.enabled !== 'boolean') {
       return res.status(400).json({ ok: false, error: 'enabled moet true of false zijn.' });
     }
@@ -260,6 +260,20 @@ function createKvkDatabaseControlService(deps = {}) {
     return refreshed.ok
       ? res.status(200).json({ ok: true, control: refreshed.control })
       : res.status(503).json({ ok: false, error: refreshed.error });
+  }
+
+  async function sendPostControlResponse(_req, res) {
+    return res.status(405).json({
+      ok: false,
+      error: 'Deze dashboardstatus is alleen-lezen. Start of stop database vullen uitsluitend via de Codex-chat.',
+    });
+  }
+
+  async function sendCommandControlResponse(req, res) {
+    if (!hasValidWorkerToken(req)) {
+      return res.status(401).json({ ok: false, error: 'Ongeldig KVK worker-token.' });
+    }
+    return persistControlRequest(req, res);
   }
 
   async function sendPollControlResponse(req, res) {
@@ -309,6 +323,7 @@ function createKvkDatabaseControlService(deps = {}) {
     workerStateKey,
     workerStateKeys,
     sendGetControlResponse,
+    sendCommandControlResponse,
     sendPollControlResponse,
     sendPostControlResponse,
     sendReportWorkerResponse,

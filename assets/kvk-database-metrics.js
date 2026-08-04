@@ -69,7 +69,6 @@
     const documentRef = deps.document;
     const getState = typeof deps.getState === 'function' ? deps.getState : () => null;
     const elements = {
-      lunaMaxFoundLast60: documentRef.getElementById('luna-max-found-last60'),
       successfulFound: documentRef.getElementById('companies-successful-found'),
       successfulFoundLast60: documentRef.getElementById('companies-successful-found-last60'),
       treated: documentRef.getElementById('companies-treated-last60'),
@@ -89,12 +88,6 @@
       const unusableGrades = scraperState.unusable_grades || {};
       const unusableGradeLast60 = last60.unusable_grades || {};
       const unusableGradeActivity = last60.unusable_grade_activity || {};
-
-      if (elements.lunaMaxFoundLast60) {
-        elements.lunaMaxFoundLast60.textContent = numberFormat.format(
-          Number(last60.luna_max_found || 0),
-        );
-      }
 
       if (elements.successfulFound) {
         elements.successfulFound.textContent = numberFormat.format(

@@ -323,7 +323,8 @@ function createPremiumAuthStateManager(options = {}) {
         return true;
       }
       if (
-        (requestPath === '/api/kvk-database/control/poll' ||
+        (requestPath === '/api/kvk-database/control/command' ||
+          requestPath === '/api/kvk-database/control/poll' ||
           requestPath === '/api/kvk-database/control/worker') &&
         method === 'POST'
       ) {

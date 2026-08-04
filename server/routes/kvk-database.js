@@ -39,6 +39,12 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
       : res.status(503).json({ ok: false, error: 'Databasevulling-besturing is tijdelijk niet beschikbaar.' })
   );
 
+  app.post('/api/kvk-database/control/command', (req, res) =>
+    controlCoordinator && typeof controlCoordinator.sendCommandControlResponse === 'function'
+      ? controlCoordinator.sendCommandControlResponse(req, res)
+      : res.status(503).json({ ok: false, error: 'Databasevulling-chatbesturing is tijdelijk niet beschikbaar.' })
+  );
+
   app.post('/api/kvk-database/control/poll', (req, res) =>
     controlCoordinator && typeof controlCoordinator.sendPollControlResponse === 'function'
       ? controlCoordinator.sendPollControlResponse(req, res)

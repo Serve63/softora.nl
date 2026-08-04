@@ -5,7 +5,6 @@
   const state = {
     control: { enabled: false, workerState: 'offline', workerMessage: '', workers: {} },
     usableByPath: new Map(),
-    loading: false,
   };
   const locationNumberFormat = new Intl.NumberFormat('nl-NL');
 
@@ -84,13 +83,20 @@
     if (!fillButton || !fillButtonLabel) return;
     const { enabled, workerState, workerMessage, workers = {} } = state.control;
     const running = ['starting', 'running', 'waiting'].includes(workerState);
-    fillButton.disabled = state.loading;
     fillButton.classList.toggle('is-on', enabled);
     fillButton.classList.toggle('is-error', workerState === 'error');
-    fillButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    fillButtonLabel.textContent = enabled ? 'AAN' : 'UIT';
-    const actionLabel = enabled ? 'uit te zetten' : 'aan te zetten';
-    fillButton.setAttribute('aria-label', `Database vullen staat ${enabled ? 'aan' : 'uit'}. Klik om ${actionLabel}.`);
+    const statusLabel = workerState === 'error'
+      ? 'FOUT'
+      : enabled && workerState === 'running'
+        ? 'BEZIG'
+        : enabled && running
+          ? 'WACHT'
+          : enabled
+            ? 'AAN'
+            : 'UIT';
+    fillButtonLabel.textContent = statusLabel;
+    fillButton.setAttribute('aria-busy', enabled && running ? 'true' : 'false');
+    fillButton.setAttribute('aria-label', `Database vullen: ${statusLabel.toLowerCase()}. Alleen-lezen status.`);
     const workerLabels = {
       vuller: 'Vuller',
       controle: 'Controle',
@@ -101,8 +107,8 @@
       .filter(Boolean)
       .map((worker) => `${workerLabels[worker.workerKey] || worker.workerKey}: ${worker.workerMessage || worker.workerState}`)
       .join(' • ');
-    const pendingStopMessage = !enabled && running ? 'De lopende batches worden nog veilig afgemaakt; daarna stopt database vullen.' : '';
-    fillButton.title = pendingStopMessage || laneMessage || workerMessage || (enabled ? 'Klik om na de lopende batches te stoppen.' : 'Klik om database vullen aan te zetten.');
+    const statusMessage = laneMessage || workerMessage || `Database vullen staat ${enabled ? 'aan' : 'uit'}.`;
+    fillButton.title = `Alleen-lezen status; starten en stoppen gebeurt uitsluitend via de Codex-chat. ${statusMessage}`;
   }
 
   async function loadControl() {
@@ -121,32 +127,6 @@
     }
   }
 
-  async function toggleControl() {
-    if (state.loading) return;
-    state.loading = true;
-    renderControl();
-    try {
-      const response = await fetch('/api/kvk-database/control', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Softora-Requested-With': 'premium',
-        },
-        body: JSON.stringify({ enabled: !state.control.enabled }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload?.control) throw new Error(payload?.error || 'Besturing opslaan mislukt.');
-      state.control = payload.control;
-    } catch (error) {
-      state.control = { ...state.control, workerState: 'error', workerMessage: error.message || String(error) };
-    } finally {
-      state.loading = false;
-      renderControl();
-    }
-  }
-
-  fillButton?.addEventListener('click', toggleControl);
   document.addEventListener('kvk:refreshed', renderRefreshAge);
   const locationList = document.getElementById('location-list');
   if (locationList) new MutationObserver(decorateLocations).observe(locationList, { childList: true, subtree: true });
