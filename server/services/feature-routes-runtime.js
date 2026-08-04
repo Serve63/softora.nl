@@ -53,6 +53,7 @@ const {
 const {
   createPremiumDatabaseMailReadySnapshotService,
 } = require('./premium-database-mail-ready-snapshot');
+const { createPremiumDatabaseCustomersPageCoordinator } = require('./premium-database-customers-page');
 const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
 const { createKvkDatabaseControlService } = require('./kvk-database-control');
 const {
@@ -112,6 +113,7 @@ function registerFeatureRoutes(app, deps = {}) {
     dataOpsStore: deps.dataOpsStore,
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
   });
+  const premiumDatabaseCustomersPageCoordinator = createPremiumDatabaseCustomersPageCoordinator({ dataOpsStore: deps.dataOpsStore });
   if (
     premiumDatabaseWebdesignJobsCoordinator &&
     typeof premiumDatabaseWebdesignJobsCoordinator.setMailReadySnapshotService === 'function'
@@ -260,6 +262,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerPremiumDatabaseImportRoutes(app, {
     coordinator: premiumDatabaseImportCoordinator,
+    customersPageCoordinator: premiumDatabaseCustomersPageCoordinator,
     mailReadySnapshotService: premiumDatabaseMailReadySnapshotService,
     requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
   });

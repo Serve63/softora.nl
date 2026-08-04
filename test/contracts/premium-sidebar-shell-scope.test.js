@@ -88,7 +88,8 @@ test('premium database consistency assets stay outside the static sidebar', () =
   const asideEnd = source.indexOf('</aside>');
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260723a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260804a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260804a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
 });
 

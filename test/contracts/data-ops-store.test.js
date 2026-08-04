@@ -897,6 +897,45 @@ test('data ops store paginates customer reads beyond Supabase default page size'
   ]);
 });
 
+test('data ops store returns one stable exact customer page for the premium database', async () => {
+  const calls = [];
+  const rows = Array.from({ length: 750 }, (_item, index) => ({
+    customer_id: `lead-${index + 751}`,
+    payload: { id: `lead-${index + 751}`, bedrijf: `Bedrijf ${index + 751}` },
+    updated_at: '2026-08-04T12:00:00.000Z',
+  }));
+  const client = {
+    from(table) {
+      assert.equal(table, 'softora_customers');
+      const query = {
+        select(columns, options) { calls.push(['select', columns, options]); return query; },
+        is(column, value) { calls.push(['is', column, value]); return query; },
+        order(column, options) { calls.push(['order', column, options]); return query; },
+        range(from, to) {
+          calls.push(['range', from, to]);
+          return Promise.resolve({ data: rows, count: null, error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const page = await store.listCustomersPage({ offset: 750, limit: 750 });
+
+  assert.equal(page.customers.length, 750);
+  assert.equal(page.customers[0].id, 'lead-751');
+  assert.equal(page.offset, 750);
+  assert.equal(page.limit, 750);
+  assert.equal(page.hasMore, true);
+  assert.deepEqual(calls.find((call) => call[0] === 'range'), ['range', 750, 1499]);
+  assert.equal(calls.find((call) => call[0] === 'select')[2], undefined);
+});
+
 test('data ops store reads compact dashboard customers from structured rows', async () => {
   const calls = [];
   const rows = [

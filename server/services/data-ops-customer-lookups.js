@@ -62,7 +62,50 @@ function createDataOpsCustomerLookups(deps = {}) {
     };
   }
 
+  async function listCustomersPage(options = {}) {
+    const metaOnly = options.metaOnly === true;
+    const offset = Math.max(0, Math.min(25000, Number.parseInt(String(options.offset || 0), 10) || 0));
+    const limit = Math.max(1, Math.min(1000, Number.parseInt(String(options.limit || 750), 10) || 750));
+    const includeExactCount = metaOnly || offset === 0;
+    const result = await run(`list-customers-page-${metaOnly ? 'meta' : `${offset}-${offset + limit - 1}`}`, (client) => {
+      let query = client
+        .from(tableName)
+        .select(
+          metaOnly ? 'customer_id,updated_at' : 'customer_id,payload,updated_at',
+          includeExactCount ? { count: 'exact' } : undefined
+        )
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .order('customer_id', { ascending: true });
+      if (metaOnly && typeof query.limit === 'function') return query.limit(1);
+      if (typeof query.range === 'function') return query.range(offset, offset + limit - 1);
+      if (typeof query.limit === 'function') return query.limit(limit);
+      return query;
+    }, {
+      timeoutMs: readQueryTimeoutMs,
+      bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+      suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+      suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+    });
+    if (!result.ok) return null;
+    const rows = Array.isArray(result.data) ? result.data : [];
+    const exactTotal = result.count === null || result.count === undefined ? Number.NaN : Number(result.count);
+    const total = Number.isFinite(exactTotal)
+      ? Math.max(0, exactTotal)
+      : Math.max(offset + rows.length, rows.length === limit ? offset + limit + 1 : 0);
+    const customers = metaOnly ? [] : rows.map(normalizeCustomerRow);
+    return {
+      customers,
+      total,
+      offset,
+      limit,
+      hasMore: !metaOnly && offset + customers.length < total,
+      snapshotVersion: `${total}:${normalizeString(rows[0] && rows[0].updated_at)}`,
+    };
+  }
+
   return {
+    listCustomersPage,
     listCustomersByEmails: createListByField({
       inputKey: 'emails', column: 'email', cachePrefix: 'customers-by-email',
       operation: 'list-customers-by-emails', lowercase: true,

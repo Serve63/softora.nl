@@ -14,6 +14,7 @@ const {
   parseDelimitedRows,
   parseSpreadsheetUpload,
 } = require('../../server/services/premium-database-import');
+const { createPremiumDatabaseCustomersPageCoordinator } = require('../../server/services/premium-database-customers-page');
 
 function createStoredZip(files) {
   const localParts = [];
@@ -73,6 +74,11 @@ function createMockResponse() {
   return {
     statusCode: 0,
     body: null,
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+      return this;
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -356,6 +362,37 @@ test('premium database import sync route returns fetched spreadsheet rows', asyn
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.ok, true);
   assert.equal(response.body.rows[1][0], 'Augustijn Auto Expertise');
+});
+
+test('premium database customer route returns a bounded structured page', async () => {
+  const calls = [];
+  const coordinator = createPremiumDatabaseCustomersPageCoordinator({
+    dataOpsStore: {
+      async listCustomersPage(options) {
+        calls.push(options);
+        return {
+          customers: [{ id: 'customer-1', bedrijf: 'Softora' }],
+          total: 7030,
+          offset: 750,
+          limit: 750,
+          hasMore: true,
+          snapshotVersion: '7030:2026-08-04T12:00:00.000Z',
+        };
+      },
+    },
+  });
+  const response = createMockResponse();
+
+  await coordinator.sendCustomersPageResponse({ query: { offset: '750', limit: '750' } }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.total, 7030);
+  assert.equal(response.body.customers[0].id, 'customer-1');
+  assert.equal(response.headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.equal(calls[0].offset, '750');
+  assert.equal(calls[0].limit, '750');
+  assert.equal(calls[0].metaOnly, false);
 });
 
 test('premium database delete lead route removes one customer through data ops without reposting the full list', async () => {
@@ -1570,6 +1607,8 @@ test('premium database import route is registered behind the premium api surface
   assert.match(featureRoutesSource, /createPremiumDatabaseMailReadySnapshotService\(\{[\s\S]*dataOpsStore: deps\.dataOpsStore/);
   assert.match(featureRoutesSource, /getUiStateValues: deps\.getUiStateValues/);
   assert.match(featureRoutesSource, /mailReadySnapshotService: premiumDatabaseMailReadySnapshotService/);
+  assert.match(featureRoutesSource, /createPremiumDatabaseCustomersPageCoordinator\(\{ dataOpsStore: deps\.dataOpsStore \}\)/);
+  assert.match(featureRoutesSource, /customersPageCoordinator: premiumDatabaseCustomersPageCoordinator/);
   assert.match(featureRoutesSource, /premiumDatabaseWebdesignJobsCoordinator\.setMailReadySnapshotService\(premiumDatabaseMailReadySnapshotService\)/);
   assert.match(featureRoutesSource, /requirePremiumApiAccess: premiumRouteRuntime\?\.requirePremiumApiAccess/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/import-spreadsheet'/);
@@ -1577,6 +1616,7 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/add-real-businesses'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/delete-lead'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/remove-webdesign-assets', requirePremiumApiAccess/);
+  assert.match(routeSource, /app\.get\('\/api\/premium-database\/customers', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
