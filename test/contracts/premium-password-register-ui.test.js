@@ -478,7 +478,7 @@ test('premium wachtwoordenregister migreert legacy plaintext en weigert verkeerd
   const encryptedStore = encryptedHarness.createStore();
   const decrypted = await encryptedStore.unlock('juiste master');
   assert.equal(decrypted[0].user, 'legacy@example.com');
-  assert.equal(decrypted[0].pw, 'oude-plaintext');
+  assert.equal(decrypted[0].pw, 'fixture-legacy-secret');
   await assert.rejects(
     () => encryptedHarness.createStore().unlock('verkeerde master'),
     /Master-wachtzin klopt niet/

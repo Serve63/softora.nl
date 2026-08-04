@@ -247,7 +247,7 @@ test('password-register store weigert ontbrekende write-proof vóór iedere klui
 
 test('password-register store weigert gemengde envelopeversies en KDF-sterktes', async () => {
   const secret = 'formaatcontrole unieke master wachtzin';
-  const legacy = JSON.parse(await createLegacyV1Envelope(secret, [{ id: 1, pw: 'geheim' }]));
+  const legacy = JSON.parse(await createLegacyV1Envelope(secret, [{ id: 1, pw: 'fixture-secret' }]));
   for (const invalidEnvelope of [
     { ...legacy, version: 2, iterations: 210000 },
     { ...legacy, version: 1, iterations: 600000 },
@@ -267,7 +267,7 @@ test('password-register store schrijft alleen AES-GCM v2 met CAS en bewaart whit
   const harness = loadStore();
   const store = harness.create();
   const masterSecret = 'exacte unieke master wachtzin 2026';
-  const exactPassword = '  exact geheim\nmet tab\t  ';
+  const exactPassword = '  fixture-exact-secret\nmet-tab\t  ';
   await store.unlock(masterSecret, TEST_WRITE_PROOF);
   await store.persist([{
     id: 1,
@@ -305,7 +305,7 @@ test('password-register store schrijft alleen AES-GCM v2 met CAS en bewaart whit
   assert.equal(Object.hasOwn(body, 'actionConfirmScope'), false);
   assert.equal(Object.hasOwn(body.patch, 'writeProof'), false);
   assert.equal(body.patch.entries_json, '');
-  assert.doesNotMatch(body.patch.entries_encrypted_v1, /exact geheim|exact@example\.test/);
+  assert.doesNotMatch(body.patch.entries_encrypted_v1, /fixture-exact-secret|exact@example\.test/);
   const envelope = JSON.parse(body.patch.entries_encrypted_v1);
   assert.equal(envelope.version, 2);
   assert.equal(envelope.algorithm, 'AES-GCM');
@@ -330,14 +330,14 @@ test('password-register store migreert v1 vóór unlock-resultaat met exact éé
     naam: 'Legacy',
     url: 'legacy.example',
     user: 'legacy@example.test',
-    pw: 'legacy testgeheim',
+    pw: 'fixture-legacy-secret',
     cat: 'Test',
   }]);
   const harness = loadStore({ entries_encrypted_v1: legacyEnvelope });
   const store = harness.create();
 
   const entries = await store.unlock(secret, TEST_WRITE_PROOF);
-  assert.equal(entries[0].pw, 'legacy testgeheim');
+  assert.equal(entries[0].pw, 'fixture-legacy-secret');
   assert.equal(harness.posts().length, 1);
   const body = harness.posts()[0];
   assert.equal(body.expectedRevision, 1);
@@ -361,7 +361,7 @@ test('password-register store geeft v1-entries pas vrij nadat de migratie-CAS is
     naam: 'Wachtende migratie',
     url: 'migration.example',
     user: 'migration@example.test',
-    pw: 'tijdelijk ontsleuteld geheim',
+    pw: 'fixture-transient-secret',
     cat: 'Test',
   }]);
   let releaseMigration;
@@ -387,7 +387,7 @@ test('password-register store geeft v1-entries pas vrij nadat de migratie-CAS is
   assert.equal(harness.posts().length, 1);
   releaseMigration();
   const entries = await unlockPromise;
-  assert.equal(entries[0].pw, 'tijdelijk ontsleuteld geheim');
+  assert.equal(entries[0].pw, 'fixture-transient-secret');
   assert.equal(settled, true);
 });
 
@@ -396,7 +396,7 @@ test('password-register store faalt v1-migratie gesloten bij een CAS-conflict', 
   const legacyEnvelope = await createLegacyV1Envelope(secret, [{
     id: 1,
     naam: 'Conflict',
-    pw: 'niet vrijgeven',
+    pw: 'fixture-do-not-release',
     cat: 'Test',
   }]);
   let harness;
@@ -433,13 +433,13 @@ test('password-register store serialiseert writes en gebruikt de bevestigde CAS-
   const store = harness.create();
   await store.unlock('serialisatie unieke master wachtzin 2026', TEST_WRITE_PROOF);
   const first = store.persist(
-    [{ id: 1, naam: 'A', pw: 'A', cat: 'Test' }],
+    [{ id: 1, naam: 'A', pw: 'fixture-a', cat: 'Test' }],
     'first',
     TEST_WRITE_PROOF
   );
   await firstStarted;
   const second = store.persist(
-    [{ id: 1, naam: 'B', pw: 'B', cat: 'Test' }],
+    [{ id: 1, naam: 'B', pw: 'fixture-b', cat: 'Test' }],
     'second',
     TEST_WRITE_PROOF
   );
@@ -462,12 +462,12 @@ test('password-register store stopt de write-queue na een ambigue eerste commit'
   const store = harness.create();
   await store.unlock('ambigue queue unieke master wachtzin 2026', TEST_WRITE_PROOF);
   const first = store.persist(
-    [{ id: 1, naam: 'Eerste', pw: 'eerste', cat: 'Test' }],
+    [{ id: 1, naam: 'Eerste', pw: 'fixture-first', cat: 'Test' }],
     'first-ambiguous',
     TEST_WRITE_PROOF
   );
   const second = store.persist(
-    [{ id: 1, naam: 'Tweede', pw: 'tweede', cat: 'Test' }],
+    [{ id: 1, naam: 'Tweede', pw: 'fixture-second', cat: 'Test' }],
     'must-not-run',
     TEST_WRITE_PROOF
   );
