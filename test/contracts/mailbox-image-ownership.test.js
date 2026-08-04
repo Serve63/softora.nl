@@ -2,10 +2,25 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  getAuthoredMessageText,
   isOriginalCampaignOutboundMessage,
   isSentCampaignDesignImage,
   tagSentCampaignBodyImages,
 } = require('../../server/services/mailbox-image-ownership');
+
+test('mailbox media scheidt zelfgeschreven tekst van een Nederlandse geciteerde replyheader', () => {
+  const body = [
+    'Dank voor je mail. We bekijken het ontwerp graag.',
+    '',
+    'Op di 4 aug 2026 schreef Support De Typetuin:',
+    'Wij streven ernaar om je bericht binnen 1 werkdag te beantwoorden.',
+  ].join('\n');
+
+  assert.equal(
+    getAuthoredMessageText(body),
+    'Dank voor je mail. We bekijken het ontwerp graag.'
+  );
+});
 
 test('mailbox media herkent uitsluitend de oorspronkelijke verzonden coldmail als eigenaar', () => {
   const original = {
