@@ -1,4 +1,10 @@
-(function (global) {
+(function (global, factory) {
+    "use strict";
+
+    const api = factory();
+    if (global) global.SoftoraPremiumDatabaseSourceFilter = api;
+    if (typeof module === "object" && module.exports) module.exports = api;
+})(typeof window === "object" ? window : null, function () {
     "use strict";
 
     const KVK_SOURCE_LABEL = "softora bedrijven scraper";
@@ -30,9 +36,9 @@
         return activeStatus === "benaderbaar" ? "Mailklaar" : "Foto's";
     }
 
-    global.SoftoraPremiumDatabaseSourceFilter = {
+    return {
         normalizeCustomerSourceFields: normalizeCustomerSourceFields,
         isKvkTransferCustomer: isKvkTransferCustomer,
         getHeaderLabel: getHeaderLabel
     };
-})(window);
+});
