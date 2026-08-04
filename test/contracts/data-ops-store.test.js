@@ -28,7 +28,7 @@ test('data ops store restores large premium database webdesign job queues', () =
   );
   assert.match(
     source,
-    /forgetReads\('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:\*'\)/
+    /forgetReads\('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:\*', 'customers-by-id:\*'\)/
   );
   assert.match(source, /forgetReads\('design-photo-asset-flags', 'design-photos-signed:\*'\)/);
 });
@@ -166,6 +166,62 @@ test('data ops store reads only customers matching campaign reply sender emails'
     'in',
     'email',
     ['contact@dekroon.nl', 'info@studionoord.nl'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 1000]);
+});
+
+test('data ops store resolves exact customer ids without scanning the customer snapshot', async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        limit(value) {
+          calls.push(['limit', value]);
+          return Promise.resolve({
+            data: [{
+              customer_id: 'safe-dedupe-row-287',
+              company: 'Neva Beauty Clinic',
+              email: 'info@nevabeautyclinic.com',
+              database_status: 'benaderbaar',
+              payload: { id: 'safe-dedupe-row-287', status: 'benaderbaar' },
+            }],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const customers = await store.listCustomersByIds({
+    customerIds: ['safe-dedupe-row-287'],
+    bypassReadCache: true,
+  });
+
+  assert.equal(customers.length, 1);
+  assert.equal(customers[0].id, 'safe-dedupe-row-287');
+  assert.equal(customers[0].bedrijf, 'Neva Beauty Clinic');
+  assert.deepEqual(calls.find((call) => call[0] === 'in'), [
+    'in',
+    'customer_id',
+    ['safe-dedupe-row-287'],
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 1000]);
 });
