@@ -4007,7 +4007,7 @@ test('coldmail inbox laadt alleen gekoppelde mailboxberichten van de gekozen eig
   assert.equal(result.messages[0].campaign.actionRequired, true);
   assert.equal(result.sync.source, 'campaign-replies-index');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=100&owner=serve&refreshInstantly=1');
+  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&owner=serve&refreshInstantly=1');
   assert.equal(calls[0].options.cache, 'no-store');
   assert.doesNotMatch(calls[0].url, /ui-state-get/);
   assert.equal(await campaignInboxModule.load('inbox', (message) => message), null);
