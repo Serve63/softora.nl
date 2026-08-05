@@ -380,6 +380,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
+  assert.doesNotMatch(directoryShellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
