@@ -520,7 +520,7 @@ function renderMailBody(value, images, options) {
   };
   const copyContext = options && options.mail && options.mail.copyContext;
   const isProvenMailboxCopy = Boolean(copyContext && copyContext.evidenceKnown === true);
-  const sections = buildMailboxBodySections(value).filter((section) => (
+  const sections = buildMailboxBodySections(window.SoftoraMailboxCampaignInbox?.stripProvenQuotedOutbound?.(value, options && options.mail) || value).filter((section) => (
     !(isProvenMailboxCopy && section && section.type === 'quote') &&
     !window.SoftoraMailboxCampaignInbox?.isDuplicateStructuredOwnQuote(section, options && options.mail, isMailboxReplyHeaderLine)
   ));

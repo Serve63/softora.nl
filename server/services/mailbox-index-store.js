@@ -5,6 +5,7 @@ const {
 const {
   createMailboxMessageReferenceLookup,
 } = require('../repositories/mailbox-message-reference-lookup');
+const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -1141,6 +1142,7 @@ function createMailboxIndexStore(deps = {}) {
     normalizeFolder,
     normalizeMessageRow,
   });
+  const listSentCandidatesForQuotedReplies = createMailboxQuotedSentCandidateLookup({ run, tableName: MAILBOX_INDEX_TABLES.messages, normalizeString, normalizeEmail, normalizeMessageRow });
 
   return {
     BODY_MAX_CHARS,
@@ -1164,6 +1166,7 @@ function createMailboxIndexStore(deps = {}) {
     listAllMessagesForAccounts,
     listMatchingMessagesForAccounts,
     listMessagesByMessageIdsForAccounts,
+    listSentCandidatesForQuotedReplies,
     listMessagesReferencingMessageIdsForAccounts,
     listUnthreadedSentCandidatesForConversations,
     listMessageUidsForAccount,
