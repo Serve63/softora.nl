@@ -24,7 +24,7 @@ const {
   syncMailboxRequest,
 } = require('./mailbox-campaign-sync');
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies');
-const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance');
+const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
@@ -1993,7 +1993,7 @@ function createMailboxService(deps = {}) {
       embeddedImageCount: Math.max(0, Math.min(8, primaryBodyImages.length)),
       originalCampaignOutbound,
       webdesignLinkEvidenceKnown: originalCampaignOutbound,
-      webdesignLinkUrl,
+      webdesignLinkUrl, ...buildAutomatedReplyEvidence({ autoSubmitted: parsedHeaderText(parsed, 'auto-submitted'), precedence: parsedHeaderText(parsed, 'precedence'), autoResponseSuppress: parsedHeaderText(parsed, 'x-auto-response-suppress') }),
     };
   }
 

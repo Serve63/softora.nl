@@ -119,6 +119,10 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
       contentType: 'application/pdf',
       size: 1234,
     }],
+    autoSubmitted: '',
+    precedence: '',
+    autoResponseSuppress: '',
+    automatedReplyEvidence: false,
   });
 
   const listMessage = store.normalizeMessageRow(row);
@@ -179,6 +183,7 @@ test('mailbox index store preserves exact Instantly HTML and link provenance mar
   assert.equal(row.payload.providerOriginalBodyAvailable, true);
   assert.equal(row.payload.webdesignLinkEvidenceKnown, true);
   assert.equal(row.payload.webdesignLinkUrl, exactUrl);
+  assert.equal(Object.hasOwn(row, 'softora_read_at'), false);
 
   const normalized = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(normalized.provider, 'instantly');
@@ -189,6 +194,39 @@ test('mailbox index store preserves exact Instantly HTML and link provenance mar
   assert.equal(normalized.webdesignLinkEvidenceKnown, true);
   assert.equal(normalized.webdesignLinkUrl, exactUrl);
   assert.match(normalized.body, /webdesign hier \[https:\/\/www\.softora\.nl/);
+});
+
+test('mailbox index store laat een duurzame Softora-leesactie voorgaan op provider unread', () => {
+  const store = createMailboxIndexStore({
+    now: () => new Date('2026-08-05T16:00:00.000Z'),
+  });
+  const row = store.buildProviderMessageRow({
+    provider: 'instantly',
+    providerMessageId: 'provider-unread-1',
+    providerThreadId: 'provider-thread-1',
+    providerAccountEmail: 'serve-sender@example.com',
+    providerOwner: 'serve',
+    accountEmail: 'serve-sender@example.com',
+    folder: 'inbox',
+    direction: 'received',
+    email: 'prospect@example.org',
+    subject: 'Re: Website',
+    body: 'Reactie',
+    date: '2026-08-05T15:58:00.000Z',
+    unread: true,
+  });
+
+  assert.equal(store.normalizeMessageRow({
+    ...row,
+    softora_read_at: null,
+  }).unread, true);
+  const opened = store.normalizeMessageRow({
+    ...row,
+    unread: true,
+    softora_read_at: '2026-08-05T15:59:00.000Z',
+  });
+  assert.equal(opened.unread, false);
+  assert.equal(opened.readAt, '2026-08-05T15:59:00.000Z');
 });
 
 test('mailbox index store joins exact active Instantly threads without a broad body scan', async () => {
@@ -406,7 +444,11 @@ test('mailbox index store bewaart gelezen status voor exact account, map en uid'
   assert.equal(result.ok, true);
   assert.deepEqual(calls, [
     ['from', 'softora_mailbox_messages'],
-    ['update', { unread: false, updated_at: '2026-07-22T14:00:00.000Z' }],
+    ['update', {
+      unread: false,
+      softora_read_at: '2026-07-22T14:00:00.000Z',
+      updated_at: '2026-07-22T14:00:00.000Z',
+    }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
     ['is', 'deleted_at', null],
@@ -442,7 +484,12 @@ test('mailbox index store handelt de antwoordherinnering duurzaam af', async () 
   assert.equal(result.dismissedAt, dismissedAt);
   assert.deepEqual(calls, [
     ['from', 'softora_mailbox_messages'],
-    ['update', { unread: false, reply_dismissed_at: dismissedAt, updated_at: dismissedAt }],
+    ['update', {
+      unread: false,
+      softora_read_at: dismissedAt,
+      reply_dismissed_at: dismissedAt,
+      updated_at: dismissedAt,
+    }],
     ['eq', 'account_email', 'serve@softora.nl'],
     ['eq', 'folder', 'inbox'],
     ['is', 'deleted_at', null],
@@ -1047,7 +1094,14 @@ test('mailbox index store hydrates only selected message bodies in one query', a
               payload: {
                 embeddedImageCount: 0,
                 originalCampaignOutbound: false,
+                recipientRoutingEvidenceKnown: true,
+                toDisplay: 'Servé Creusen <serve@softora.nl>',
+                cc: 'team@example.nl',
+                bcc: '',
+                deliveredTo: 'serve@softora.nl',
+                attachments: [{ filename: 'reactie.txt', contentType: 'text/plain', size: 12 }],
               },
+              recipients_text: 'serve@softora.nl',
               folder: 'inbox',
               subject: 'Re: Kleine vraag over jullie website',
               preview: 'Dit is de korte preview.',
@@ -1081,9 +1135,14 @@ test('mailbox index store hydrates only selected message bodies in one query', a
   assert.equal(messages[0].bodyImageEvidenceKnown, true);
   assert.equal(messages[0].embeddedImageCount, 0);
   assert.equal(messages[0].originalCampaignOutbound, false);
+  assert.equal(messages[0].to, 'serve@softora.nl');
+  assert.equal(messages[0].toDisplay, 'Servé Creusen <serve@softora.nl>');
+  assert.equal(messages[0].cc, 'team@example.nl');
+  assert.equal(messages[0].recipientRoutingEvidenceKnown, true);
+  assert.deepEqual(messages[0].attachments, [{ filename: 'reactie.txt', contentType: 'text/plain', size: 12 }]);
   assert.deepEqual(calls.find((call) => call[0] === 'select'), [
     'select',
-    'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text',
+    'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text',
   ]);
   assert.deepEqual(calls.find((call) => call[0] === 'in'), [
     'in',
@@ -1129,7 +1188,10 @@ test('mailbox index store hydrateert Instantly-body alleen via exact account en 
                 providerOwner: 'serve',
                 embeddedImageCount: 0,
                 originalCampaignOutbound: true,
+                recipientRoutingEvidenceKnown: true,
+                toDisplay: 'Prospect <prospect@example.org>',
               },
+              recipients_text: 'prospect@example.org',
               folder: 'instantly',
               subject: 'Kleine vraag over jullie website',
               preview: 'Korte preview',
@@ -1161,6 +1223,9 @@ test('mailbox index store hydrateert Instantly-body alleen via exact account en 
   assert.equal(messages[0].body, 'Exacte Instantly-body.');
   assert.equal(messages[0].hasBody, true);
   assert.equal(messages[0].originalCampaignOutbound, true);
+  assert.equal(messages[0].to, 'prospect@example.org');
+  assert.equal(messages[0].toDisplay, 'Prospect <prospect@example.org>');
+  assert.equal(messages[0].recipientRoutingEvidenceKnown, true);
   assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'instantly']);
   assert.deepEqual(
     calls.filter((call) => call[0] === 'in'),
@@ -1344,6 +1409,8 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
 
   assert.match(schema, /create table if not exists public\.softora_mailbox_messages/);
   assert.match(schema, /reply_dismissed_at timestamptz/);
+  assert.match(schema, /softora_read_at timestamptz/);
+  assert.match(schema, /create trigger softora_mailbox_messages_preserve_read_state/);
   assert.match(schema, /create table if not exists public\.softora_mailbox_sync_state/);
   assert.match(schema, /softora_mailbox_messages_account_folder_date_idx/);
   assert.match(schema, /softora_mailbox_sync_state_account_folder_idx/);

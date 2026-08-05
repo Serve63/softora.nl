@@ -369,3 +369,89 @@ test('premium admin api guard keeps token fallback blocked for unrelated admin r
   assert.equal(res.statusCode, 403);
   assert.equal(res.body.error, 'Adminstatus kon niet veilig worden bevestigd.');
 });
+
+test('premium admin api guard allows only mailbox body reads during temporary user hydration failure', async () => {
+  const allowedRequests = [
+    { method: 'GET', path: '/api/mailbox/message?account=serve%40softora.nl&id=inbox%3A1' },
+    { method: 'GET', path: '/api/mailbox/message-image?account=serve%40softora.nl&id=inbox%3A1&index=0' },
+    { method: 'POST', path: '/api/mailbox/messages/bodies' },
+  ];
+  for (const request of allowedRequests) {
+    const events = [];
+    const guard = createPremiumApiAccessGuard({
+      getResolvedPremiumAuthState: async () => ({
+        configured: true,
+        authenticated: true,
+        isAdmin: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_admin',
+        token: 'signed-session-token',
+        tokenFallback: true,
+        expired: false,
+        revoked: false,
+        user: null,
+      }),
+      appendSecurityAuditEvent: (payload, reason) => events.push({ payload, reason }),
+      getRequestPathname: (req) => req.originalUrl,
+    });
+    const req = {
+      method: request.method,
+      originalUrl: request.path,
+      premiumAuth: {
+        configured: true,
+        authenticated: true,
+        isAdmin: true,
+        email: 'serve@softora.nl',
+        userId: 'usr_admin',
+        token: 'signed-session-token',
+        tokenFallback: true,
+        expired: false,
+        revoked: false,
+        user: null,
+      },
+      get: () => 'agent',
+    };
+    const res = createResponseRecorder();
+    let nextCalled = false;
+    await guard.requirePremiumAdminApiAccess(req, res, () => { nextCalled = true; });
+    assert.equal(nextCalled, true, `${request.method} ${request.path}`);
+    assert.equal(res.statusCode, null);
+    assert.equal(events.at(-1)?.reason, 'security_mailbox_readonly_token_fallback_allowed');
+  }
+});
+
+test('premium admin api guard never extends mailbox body fallback to writes or expired tokens', async () => {
+  async function run({ method, path, expired = false }) {
+    const fallback = {
+      configured: true,
+      authenticated: true,
+      isAdmin: true,
+      email: 'serve@softora.nl',
+      userId: 'usr_admin',
+      token: 'signed-session-token',
+      tokenFallback: true,
+      expired,
+      revoked: false,
+      user: null,
+    };
+    const guard = createPremiumApiAccessGuard({
+      getResolvedPremiumAuthState: async () => fallback,
+      getRequestPathname: (req) => req.originalUrl,
+    });
+    const req = { method, originalUrl: path, premiumAuth: fallback, get: () => 'agent' };
+    const res = createResponseRecorder();
+    let nextCalled = false;
+    await guard.requirePremiumAdminApiAccess(req, res, () => { nextCalled = true; });
+    return { nextCalled, res };
+  }
+
+  const write = await run({ method: 'POST', path: '/api/mailbox/send' });
+  assert.equal(write.nextCalled, false);
+  assert.equal(write.res.statusCode, 403);
+  const readMutation = await run({ method: 'POST', path: '/api/mailbox/messages/read' });
+  assert.equal(readMutation.nextCalled, false);
+  assert.equal(readMutation.res.statusCode, 403);
+  const expiredRead = await run({ method: 'GET', path: '/api/mailbox/message', expired: true });
+  assert.equal(expiredRead.nextCalled, false);
+  assert.equal(expiredRead.res.statusCode, 401);
+});

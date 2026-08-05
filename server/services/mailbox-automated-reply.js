@@ -1,3 +1,5 @@
+const { getAuthoredMessageText } = require('./mailbox-image-ownership');
+
 function normalizeText(value) {
   return String(value || '').trim();
 }
@@ -10,6 +12,22 @@ function normalizeClassifierText(value) {
     .replace(/\s+/g, ' ');
 }
 
+function buildAutomatedReplyEvidence(values = {}) {
+  const autoSubmitted = normalizeText(values.autoSubmitted);
+  const precedence = normalizeText(values.precedence);
+  const autoResponseSuppress = normalizeText(values.autoResponseSuppress);
+  return {
+    autoSubmitted,
+    precedence,
+    autoResponseSuppress,
+    automatedReplyEvidence: Boolean(
+      (autoSubmitted && normalizeClassifierText(autoSubmitted) !== 'no') ||
+      /^(?:auto_reply|auto-reply|bulk|junk|list)$/i.test(precedence) ||
+      autoResponseSuppress
+    ),
+  };
+}
+
 function isAutomatedCampaignReply(message) {
   const subject = normalizeClassifierText(message && message.subject);
   const preview = normalizeText(message && message.preview);
@@ -18,6 +36,15 @@ function isAutomatedCampaignReply(message) {
     preview ? getAuthoredMessageText(preview) : '',
     body ? getAuthoredMessageText(body) : '',
   ].filter(Boolean).join(' '));
+  const autoSubmitted = normalizeClassifierText(message && message.autoSubmitted);
+  const precedence = normalizeClassifierText(message && message.precedence);
+  const autoResponseSuppress = normalizeClassifierText(message && message.autoResponseSuppress);
+  const provenAutomaticHeader = Boolean(
+    message && message.automatedReplyEvidence === true ||
+    (autoSubmitted && autoSubmitted !== 'no') ||
+    /^(?:auto_reply|auto-reply|bulk|junk|list)$/.test(precedence) ||
+    autoResponseSuppress
+  );
 
   const automatedSubjectPatterns = [
     /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
@@ -36,7 +63,7 @@ function isAutomatedCampaignReply(message) {
     /^email received\b/,
     /^bericht ontvangen\b/,
     /\buw mail is ontvangen\b/,
-    /\bbedankt voor (?:je|jouw|uw) (?:e-?mail|mail|bericht)\b/,
+    /^bedankt voor (?:je|jouw|uw) (?:mail|bericht)!?\s+(?:re|fw|fwd)\s*:/,
   ];
   const automatedContentPatterns = [
     /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
@@ -51,18 +78,21 @@ function isAutomatedCampaignReply(message) {
     /\byour request\s*\([^)]{1,40}\)\s+has been received\b/,
     /\bwij streven ernaar om (?:je|jouw|uw) (?:vraag|bericht|e-?mail|mail) binnen \d+\s+(?:werk)?dag(?:en)? te beantwoorden\b/,
     /\bin deze periode beantwoorden wij geen (?:e-?mails?|mails?|berichten)\b/,
+    /\b(?:we|wij) streven ernaar (?:jouw|je|uw) (?:e-?mail|mail|bericht) (?:de )?(?:eerstvolgende|volgende) werkdag te beantwoorden\b/,
+    /\b(?:bedankt|dank) voor (?:je|jouw|uw) bericht\b[\s\S]{0,220}\b(?:eerstvolgende werkdag|zo snel mogelijk) te beantwoorden\b/,
+    /\b(?:ik ben|wij zijn|ons kantoor is) (?:momenteel|op dit moment|tijdelijk)?\s*(?:afwezig|gesloten|niet aanwezig)\b/,
+    /\b(?:i am|we are) (?:currently )?out of (?:the )?office\b/,
   ];
 
   return (
+    provenAutomaticHeader ||
     automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
     automatedContentPatterns.some((pattern) => pattern.test(content))
   );
 }
 
 module.exports = {
+  buildAutomatedReplyEvidence,
   isAutomatedCampaignReply,
   normalizeClassifierText,
 };
-const {
-  getAuthoredMessageText,
-} = require('./mailbox-image-ownership');

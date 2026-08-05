@@ -597,7 +597,9 @@ test('campaign mailbox koppelt een later antwoord via mailheaders ook bij een an
     conversations[0].threadMessages.map((message) => message.id),
     ['sent:joey']
   );
-  assert.equal(conversations[0].activityAt, '2026-06-10T08:00:00.000Z');
+  assert.equal(conversations[0].activityAt, '2026-06-09T21:38:29.000Z');
+  assert.equal(conversations[0].latestInboundAt, '2026-06-09T21:38:29.000Z');
+  assert.equal(conversations[0].latestOutboundAt, '2026-06-10T08:00:00.000Z');
 });
 
 test('campaign mailbox recognizes strong automatic reply signals without hiding normal replies', () => {
@@ -669,6 +671,28 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
   assert.equal(isAutomatedCampaignReply({
     subject: 'Re: Kleine vraag over jullie website',
     preview: 'Dank voor je ontwerp. Wij werken al met een andere partij en hebben geen interesse.',
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Bedankt voor je bericht! Re: Kleine vraag over jullie website',
+    preview: 'Bedankt voor je bericht! We streven ernaar jouw mail de eerstvolgende werkdag te beantwoorden.',
+    body: 'Bedankt voor je bericht! We streven ernaar jouw mail de eerstvolgende werkdag te beantwoorden. Op woensdag wordt de mail beperkt gelezen.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Out of the office Re: Kleine vraag over jullie website',
+    preview: 'I am currently out of the office. For urgent matters contact my colleague.',
+    body: 'I am currently out of the office until 12 August. For urgent matters contact info@example.nl.',
+    autoSubmitted: 'auto-replied',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Automatisch antwoord: Re: Kleine vraag over jullie website',
+    body: 'Ik ben momenteel afwezig. Voor dringende zaken kun je mijn collega bellen.',
+    precedence: 'auto_reply',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Bedankt voor je bericht',
+    preview: 'Het ontwerp ziet er goed uit. Kun je mij vertellen wat een nieuwe website ongeveer kost?',
+    body: 'Het ontwerp ziet er goed uit. Kun je mij vertellen wat een nieuwe website ongeveer kost?',
+    autoSubmitted: 'no',
   }), false);
 });
 
@@ -1144,7 +1168,8 @@ test('campaign reply service koppelt alleen exact bewezen historische vervolgrea
     replies[0].conversationId,
     'conversation:martijn@softora.nl|martijn-reply@example.test'
   );
-  assert.equal(replies[0].activityAt, '2026-06-16T12:31:32.000Z');
+  assert.equal(replies[0].activityAt, '2026-06-15T13:58:18.000Z');
+  assert.equal(replies[0].latestOutboundAt, '2026-06-16T12:31:32.000Z');
   assert.deepEqual(
     replies[0].threadMessages.map((message) => message.id),
     ['sent:111']
@@ -1332,7 +1357,9 @@ test('campaign reply service laadt een latere Sent-descendant buiten de globale 
 
   assert.ok(descendantLookups.length >= 1);
   assert.equal(replies.length, 1);
-  assert.equal(replies[0].activityAt, laterOutbound.date);
+  assert.equal(replies[0].activityAt, inbound.date);
+  assert.equal(replies[0].latestInboundAt, inbound.date);
+  assert.equal(replies[0].latestOutboundAt, laterOutbound.date);
   assert.deepEqual(
     replies[0].threadMessages.map((message) => message.id),
     ['sent:71', 'sent:62']

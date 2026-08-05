@@ -445,12 +445,23 @@ function createPremiumApiAccessGuard(options = {}) {
   }
 
   function getNormalizedAdminRequestPath(req) {
-    return normalizeRequestPathname(getRequestPathname(req) || '/');
+    const rawPath = normalizeString(getRequestPathname(req) || '/').split(/[?#]/, 1)[0] || '/';
+    return normalizeRequestPathname(rawPath);
   }
 
   function isAutopilotAdminFallbackRequest(req) {
     const method = normalizeString(req?.method || '').toUpperCase();
     return method === 'POST' && getNormalizedAdminRequestPath(req) === '/api/coldmailing/autopilot/settings';
+  }
+
+  function isMailboxReadOnlyAdminFallbackRequest(req) {
+    const method = normalizeString(req?.method || '').toUpperCase();
+    const path = getNormalizedAdminRequestPath(req);
+    return (
+      method === 'GET' && ['/api/mailbox/message', '/api/mailbox/message-image'].includes(path)
+    ) || (
+      method === 'POST' && path === '/api/mailbox/messages/bodies'
+    );
   }
 
   function isTrustedAdminTokenFallback(authState) {
@@ -532,6 +543,25 @@ function createPremiumApiAccessGuard(options = {}) {
           detail: 'Autopilot admin-actie toegestaan op basis van een geldige gesigneerde Full Access-sessie.',
         },
         'security_admin_token_fallback_allowed'
+      );
+      return next();
+    }
+
+    if (isMailboxReadOnlyAdminFallbackRequest(req) && isTrustedAdminTokenFallback(fallbackAuthState)) {
+      req.premiumAuth = fallbackAuthState;
+      appendSecurityAuditEvent(
+        {
+          type: 'mailbox_readonly_token_fallback_allowed',
+          severity: 'info',
+          success: true,
+          email: fallbackAuthState.email || '',
+          ip: getClientIpFromRequest(req),
+          path: getRequestPathname(req),
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: getUserAgent(req),
+          detail: 'Alleen-lezen mailboxbody toegestaan op basis van een geldige gesigneerde Full Access-sessie.',
+        },
+        'security_mailbox_readonly_token_fallback_allowed'
       );
       return next();
     }
