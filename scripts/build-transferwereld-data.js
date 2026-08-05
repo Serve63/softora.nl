@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-const fs = require('node:fs');
-const path = require('node:path');
 const vm = require('node:vm');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { DomUtils, parseDocument } = require('htmlparser2');
+const {
+  loadTransferwereldDataset,
+  writeTransferwereldDataset,
+} = require('./transferwereld-data-io');
 
-const ROOT = path.resolve(__dirname, '..');
-const OUTPUT_PATH = path.join(ROOT, 'assets', 'transferwereld-data.js');
 const OPTA_URL = 'https://dataviz.theanalyst.com/opta-power-rankings/index.js';
 const TRANSFERMARKT_ORIGIN = 'https://www.transfermarkt.com';
 const TRANSFERMARKT_FETCH_ORIGINS = [
@@ -565,12 +565,8 @@ async function mapWithConcurrency(items, limit, worker) {
 }
 
 function loadExistingClubs() {
-  if (!fs.existsSync(OUTPUT_PATH)) return new Map();
   try {
-    const context = { window: {} };
-    vm.createContext(context);
-    vm.runInContext(fs.readFileSync(OUTPUT_PATH, 'utf8'), context);
-    return new Map((context.window.TRANSFERWERELD_DATA?.clubs || []).map((club) => [club.transfermarkt?.id, club]));
+    return new Map((loadTransferwereldDataset().clubs || []).map((club) => [club.transfermarkt?.id, club]));
   } catch {
     return new Map();
   }
@@ -651,9 +647,8 @@ async function addClubData(teams, existingClubs = new Map()) {
 }
 
 function writeData(payload) {
-  const serialized = JSON.stringify(payload);
-  fs.writeFileSync(OUTPUT_PATH, `window.TRANSFERWERELD_DATA=${serialized};\n`, 'utf8');
-  console.log(`Wrote ${path.relative(ROOT, OUTPUT_PATH)} (${Buffer.byteLength(serialized)} bytes)`);
+  const sizes = writeTransferwereldDataset(payload);
+  console.log(`Wrote split transfer data (${sizes.baseBytes} + ${sizes.scopeBytes} bytes)`);
 }
 
 async function main() {

@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 const {
   addClubData,
   extractClubCandidates,
   fetchTransfermarkt,
   loadExistingClubs,
 } = require('./build-transferwereld-data');
+const {
+  loadTransferwereldDataset,
+  writeTransferwereldDataset,
+} = require('./transferwereld-data-io');
 
-const ROOT = path.resolve(__dirname, '..');
-const DATA_PATH = path.join(ROOT, 'assets', 'transferwereld-data.js');
 const TRANSFERMARKT_ORIGIN = 'https://www.transfermarkt.com';
 const TOP_COMPETITIONS = [
   { id: 'tm-GB1', code: 'GB1', name: 'Premier League', country: 'England', slug: 'premier-league', kind: 'top-7' },
@@ -29,10 +28,7 @@ function sleep(ms) {
 }
 
 function loadDataset() {
-  const context = { window: {} };
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(DATA_PATH, 'utf8'), context);
-  return context.window.TRANSFERWERELD_DATA;
+  return loadTransferwereldDataset();
 }
 
 function normalize(value) {
@@ -57,6 +53,51 @@ function badgeFor(team) {
 function rankFor(team, fallback = 10000) {
   const value = Number(team.globalRank || team.rank);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function identifyBaseTop100Ids(clubs) {
+  const top100Ids = new Set();
+  const seenRanks = new Set();
+  clubs.forEach((club) => {
+    const id = Number(club.transfermarkt?.id);
+    const rank = Number(club.rank);
+    if (!Number.isFinite(id) || !Number.isFinite(rank) || rank < 1 || rank > 100 || seenRanks.has(rank)) return;
+    seenRanks.add(rank);
+    top100Ids.add(id);
+  });
+  return top100Ids;
+}
+
+function normalizeDatasetIdentity(dataset) {
+  const top100Ids = identifyBaseTop100Ids(dataset.clubs || []);
+  const scopeTeamsById = new Map((dataset.scopeLeagues || []).flatMap((league) => (
+    (league.teams || []).map((team) => [Number(team.transfermarktId), team])
+  )));
+  return {
+    ...dataset,
+    clubs: (dataset.clubs || []).map((club) => {
+      const id = Number(club.transfermarkt?.id);
+      const isTop100 = top100Ids.has(id);
+      const scopeTeam = scopeTeamsById.get(id);
+      const currentRank = Number(club.rank);
+      const rank = !isTop100 && currentRank >= 1 && currentRank <= 100 ? 10000 : club.rank;
+      const canonicalName = scopeTeam?.name;
+      return {
+        ...club,
+        ...(canonicalName && !isTop100 ? {
+          name: canonicalName,
+          fullName: canonicalName,
+          shortName: scopeTeam.shortName || canonicalName,
+          transfermarkt: {
+            ...club.transfermarkt,
+            matchedName: canonicalName,
+          },
+        } : {}),
+        rank,
+        isTop100,
+      };
+    }),
+  };
 }
 
 function teamRowFromCandidate(candidate, index) {
@@ -181,6 +222,7 @@ async function main() {
   const newCompetitionClubs = expandedTargetClubs.filter((club) => !existingIds.has(club.transfermarkt?.id));
   dataset.clubs = [...updatedExistingClubs, ...newCompetitionClubs];
   dataset.scopeLeagues = scopeLeagues;
+  Object.assign(dataset, normalizeDatasetIdentity(dataset));
   dataset.meta = {
     ...dataset.meta,
     title: 'Transferwereld — top 7 competities + KKD',
@@ -192,8 +234,8 @@ async function main() {
     scopeFetchedAt: new Date().toISOString(),
     warnings: dataset.clubs.filter((club) => club.dataWarning).length,
   };
-  fs.writeFileSync(DATA_PATH, `window.TRANSFERWERELD_DATA=${JSON.stringify(dataset)};\n`, 'utf8');
-  console.log(`Wrote ${path.relative(ROOT, DATA_PATH)} (${fs.statSync(DATA_PATH).size} bytes)`);
+  const sizes = writeTransferwereldDataset(dataset);
+  console.log(`Wrote split transfer data (${sizes.baseBytes} + ${sizes.scopeBytes} bytes)`);
   console.log(JSON.stringify({ clubs: dataset.clubs.length, scopeClubs: uniqueTargetRows.length, warnings: dataset.meta.warnings }));
   if (dataset.meta.warnings) process.exitCode = 2;
 }
@@ -205,4 +247,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { TOP_COMPETITIONS, normalize };
+module.exports = { TOP_COMPETITIONS, identifyBaseTop100Ids, normalize, normalizeDatasetIdentity };

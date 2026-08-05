@@ -14,7 +14,15 @@ function loadDataset() {
   const context = { window: {} };
   vm.createContext(context);
   vm.runInContext(read('assets/transferwereld-data.js'), context);
-  return context.window.TRANSFERWERELD_DATA;
+  vm.runInContext(read('assets/transferwereld-scope-data.js'), context);
+  const scope = context.window.TRANSFERWERELD_SCOPE_DATA;
+  return scope?.clubs?.length
+    ? {
+      ...context.window.TRANSFERWERELD_DATA,
+      clubs: [...context.window.TRANSFERWERELD_DATA.clubs, ...scope.clubs],
+      scopeLeagues: scope.scopeLeagues,
+    }
+    : context.window.TRANSFERWERELD_DATA;
 }
 
 test('transferwereld exposes all requested analysis tabs and defaults to fee sorting', () => {
@@ -32,6 +40,7 @@ test('transferwereld exposes all requested analysis tabs and defaults to fee sor
   assert.match(html, /Alle transfers van de top 100 clubs/);
   assert.doesNotMatch(html, /101 (?:geselecteerde )?(?:top)?clubs/);
   assert.match(html, /<select id="transfer-sort"><option value="fee">Hoogste transfersom<\/option>/);
+  assert.match(html, /transferwereld-scope-data\.js\?v=20260805b/);
   const script = read('assets/transferwereld.js');
   assert.match(script, /if \(sort === 'fee'\) return right\.feeValue - left\.feeValue/);
   assert.match(script, /secondaryKey === 'income' \? 'verdiend' : 'uitgegeven'/);
@@ -54,6 +63,13 @@ test('transferwereld dataset covers the Opta top 100 plus the requested competit
   const ajax = data.clubs.find((club) => club.transfermarkt?.id === 610);
   assert.equal(ajax?.rank, 133);
   assert.equal(ajax?.isWildcard, true);
+  assert.equal(data.clubs.filter((club) => club.isTop100).length, 100);
+  assert.equal(new Set(data.clubs.filter((club) => club.isTop100).map((club) => club.rank)).size, 100);
+  const espanyol = data.clubs.find((club) => club.transfermarkt?.id === 714);
+  assert.equal(espanyol?.name, 'RCD Espanyol Barcelona');
+  assert.equal(espanyol?.isTop100, false);
+  assert.ok(Number(espanyol?.rank) > 100);
+  assert.equal(new Set(data.clubs.map((club) => club.name)).size, data.clubs.length, 'club names must be unique across views');
   assert.deepEqual(Array.from(data.scopeLeagues, (league) => league.name), [
     'Premier League', 'LaLiga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie', 'Liga Portugal', 'Keuken Kampioen Divisie',
   ]);
