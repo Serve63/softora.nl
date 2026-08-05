@@ -133,11 +133,11 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   const snapshot = {
     version: 1,
     generatedAt: '2026-07-10T12:00:00.000Z',
-    total: 1013,
+    total: 1,
     customers: [
       { id: 'mail-ready-1', bedrijf: 'Mailklaar', mailReady: true, mailReadySnapshot: true },
     ],
-    availableTotal: 113,
+    availableTotal: 1,
     availableCustomers: [
       { id: 'available-1', bedrijf: 'Beschikbaar', availableSnapshot: true },
     ],
@@ -163,8 +163,8 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   assert.equal(payload.ok, true);
   assert.equal(payload.source, 'mail-ready-snapshot-cache');
   assert.equal(payload.stale, false);
-  assert.equal(payload.mailReadySnapshotTotal, 1013);
-  assert.equal(payload.availableSnapshotTotal, 113);
+  assert.equal(payload.mailReadySnapshotTotal, 1);
+  assert.equal(payload.availableSnapshotTotal, 1);
   assert.equal(payload.foundTotal, 2);
   assert.deepEqual(payload.foundCustomerIds, ['mail-ready-1', 'available-1']);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
@@ -192,7 +192,7 @@ test('premium database bootstrap renders an expired valid snapshot while fresh d
           [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify({
             version: 2,
             generatedAt: '2026-07-10T12:00:00.000Z',
-            total: 740,
+            total: 1,
             customers: [{ id: 'stale-ready', mailReady: true, mailReadySnapshot: true }],
             availableTotal: 1,
             availableCustomers: [{ id: 'stale-deleted', availableSnapshot: true }],
@@ -207,7 +207,7 @@ test('premium database bootstrap renders an expired valid snapshot while fresh d
   assert.equal(payload.source, 'mail-ready-snapshot-cache');
   assert.equal(payload.stale, true);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['stale-ready', 'stale-deleted']);
-  assert.equal(payload.mailReadySnapshotTotal, 740);
+  assert.equal(payload.mailReadySnapshotTotal, 1);
   assert.equal(payload.availableSnapshotTotal, 1);
 });
 
@@ -222,7 +222,7 @@ test('premium database bootstrap repairs a category-incomplete compact cache fro
             [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify({
               version: 2,
               generatedAt: '2026-07-23T00:50:00.000Z',
-              total: 408,
+              total: 1,
               customers: [],
               availableTotal: 2,
               availableCustomers: [{ id: 'magnivita', availableSnapshot: true }],
@@ -237,7 +237,7 @@ test('premium database bootstrap repairs a category-incomplete compact cache fro
             [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify({
               version: 2,
               generatedAt: '2026-07-23T00:50:01.000Z',
-              total: 408,
+              total: 1,
               customers: [{ id: 'mail-ready-1', mailReady: true, mailReadySnapshot: true }],
               availableTotal: 2,
               availableCustomers: [
@@ -256,7 +256,7 @@ test('premium database bootstrap repairs a category-incomplete compact cache fro
 
   assert.equal(payload.source, 'mail-ready-snapshot-cache');
   assert.equal(payload.snapshotFallback, true);
-  assert.equal(payload.mailReadySnapshotTotal, 408);
+  assert.equal(payload.mailReadySnapshotTotal, 1);
   assert.equal(payload.availableSnapshotTotal, 2);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'magnivita', 'bliv']);
 });

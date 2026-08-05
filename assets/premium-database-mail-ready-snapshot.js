@@ -3,9 +3,9 @@
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
     const PAGE_LIMIT = 3000;
-    const MAX_SNAPSHOT_ROWS = 3000;
+    const MAX_SNAPSHOT_ROWS = 25000;
     const FIRST_PAGE_TIMEOUT_MS = 20000;
-    const NEXT_PAGE_TIMEOUT_MS = 4500;
+    const NEXT_PAGE_TIMEOUT_MS = 20000;
     const PAGE_CONCURRENCY = 3;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
 
@@ -36,7 +36,15 @@
     function isSnapshotCategoryCoherent(totalRaw, rowsRaw) {
         const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
         const total = Math.max(0, Number(totalRaw) || 0);
-        return total === 0 || rows.length > 0;
+        return total === rows.length;
+    }
+
+    function isSnapshotPageCategoryValid(totalRaw, rowsRaw, offsetRaw) {
+        const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
+        const total = Math.max(0, Number(totalRaw) || 0);
+        const offset = Math.max(0, Number(offsetRaw) || 0);
+        if (offset >= total) return rows.length === 0;
+        return rows.length === Math.min(PAGE_LIMIT, total - offset);
     }
 
     function isSnapshotPayloadCoherent(payload) {
@@ -227,6 +235,13 @@
     function markCanonicalInventoryReady(state) {
         if (!state || state.remoteCustomersLoaded !== true || !Array.isArray(state.klanten) || !state.klanten.length) return false;
         if (state.mailReadySnapshotLoaded !== true || state.availableSnapshotLoaded !== true || state.foundSnapshotLoaded !== true) return false;
+        if (state.mailReadySnapshotPending === true) return false;
+        if (!Number.isFinite(Number(state.mailReadySnapshotTotal)) || !Array.isArray(state.mailReadySnapshotCustomers)) return false;
+        if (!Number.isFinite(Number(state.availableSnapshotTotal)) || !Array.isArray(state.availableSnapshotCustomers)) return false;
+        if (!Number.isFinite(Number(state.foundSnapshotTotal)) || !state.foundSnapshotCustomerIdSet || typeof state.foundSnapshotCustomerIdSet.has !== "function") return false;
+        if (!isSnapshotCategoryCoherent(state.mailReadySnapshotTotal, state.mailReadySnapshotCustomers)) return false;
+        if (!isSnapshotCategoryCoherent(state.availableSnapshotTotal, state.availableSnapshotCustomers)) return false;
+        if (!isFoundSnapshotCategoryCoherent(state.foundSnapshotTotal, Array.from(state.foundSnapshotCustomerIdSet || []))) return false;
         state.canonicalInventoryReady = true;
         state.dataLoading = false;
         state.dataUnavailable = false;
@@ -265,10 +280,12 @@
         if (!response.ok) throw new Error("Mailklare snapshot laden mislukt (" + response.status + ")");
         const payload = await response.json().catch(function () { return {}; });
         if (!payload || payload.ok !== true) throw new Error(String(payload && (payload.detail || payload.error) || "Mailklare snapshot gaf geen geldige data terug."));
-        if (offset === 0 && !isSnapshotPayloadCoherent(payload)) throw new Error("Mailklare snapshot was onvolledig; laatste geldige tabel blijft actief.");
         const rows = Array.isArray(payload.customers) ? payload.customers : [];
-        const total = Math.max(rows.length + offset, Number(payload.total) || 0);
-        return { payload: payload, rows: rows, total: total, generatedAt: String(payload.generatedAt || "").trim() };
+        const availableRows = Array.isArray(payload.availableCustomers) ? payload.availableCustomers : [];
+        const total = Math.max(rows.length, Number(payload.total) || 0);
+        const availableTotal = Math.max(availableRows.length, Number(payload.availableTotal) || 0);
+        if (!isSnapshotPageCategoryValid(total, rows, offset) || !isSnapshotPageCategoryValid(availableTotal, availableRows, offset)) throw new Error("Mailklare snapshot was onvolledig; laatste geldige tabel blijft actief.");
+        return { payload: payload, rows: rows, availableRows: availableRows, total: total, availableTotal: availableTotal, generatedAt: String(payload.generatedAt || "").trim() };
     }
 
     function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
@@ -315,8 +332,9 @@
         return true;
     }
 
-    async function fetchRemainingPages(config, total, firstRows) {
-        const maxRows = Math.min(MAX_SNAPSHOT_ROWS, Math.max(0, Number(total) || 0));
+    async function fetchRemainingPages(config, firstPage) {
+        const maxRows = Math.max(Math.max(0, Number(firstPage.total) || 0), Math.max(0, Number(firstPage.availableTotal) || 0));
+        if (maxRows > MAX_SNAPSHOT_ROWS) throw new Error("Mailklare snapshot overschrijdt de veilige pagineringslimiet.");
         const offsets = [];
         for (let offset = PAGE_LIMIT; offset < maxRows; offset += PAGE_LIMIT) offsets.push(offset);
         const pages = [];
@@ -326,11 +344,18 @@
                 const offset = offsets[cursor];
                 cursor += 1;
                 const page = await fetchSnapshotPage(config, PAGE_LIMIT, offset, NEXT_PAGE_TIMEOUT_MS);
-                pages.push({ offset: offset, rows: page.rows });
+                if (page.total !== firstPage.total || page.availableTotal !== firstPage.availableTotal || page.generatedAt !== firstPage.generatedAt) {
+                    throw new Error("Mailklare snapshot veranderde tijdens paginering; er wordt opnieuw geladen.");
+                }
+                pages.push({ offset: offset, rows: page.rows, availableRows: page.availableRows });
             }
         }
         await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
-        return firstRows.concat(pages.sort(function (left, right) { return left.offset - right.offset; }).flatMap(function (page) { return page.rows; }));
+        const sortedPages = pages.sort(function (left, right) { return left.offset - right.offset; });
+        return {
+            rows: firstPage.rows.concat(sortedPages.flatMap(function (page) { return page.rows; })),
+            availableRows: firstPage.availableRows.concat(sortedPages.flatMap(function (page) { return page.availableRows; }))
+        };
     }
 
     async function load(options) {
@@ -343,25 +368,21 @@
         try {
             const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
-            let availableCustomers = normalizeAvailableSnapshotRows(firstPage.payload.availableCustomers, 0, config.normalizeCustomer);
-            const hasRemainingPages = firstPage.total > firstPage.rows.length;
-            const published = publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.payload.foundCustomerIds, firstPage.payload.foundTotal, firstPage.generatedAt, hasRemainingPages);
-            if (!published) { state.mailReadySnapshotPending = false; return false; }
-            if (hasRemainingPages && firstPage.rows.length < MAX_SNAPSHOT_ROWS) {
-                try {
-                    const allRows = await fetchRemainingPages(config, firstPage.total, firstPage.rows);
-                    snapshotCustomers = normalizeSnapshotRows(allRows, 0, config.normalizeCustomer);
-                    publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.payload.availableTotal, firstPage.payload.foundCustomerIds, firstPage.payload.foundTotal, firstPage.generatedAt, false);
-                } catch (error) {
-                    state.mailReadySnapshotFailed = true;
-                    state.mailReadySnapshotPending = true;
-                    scheduleRetry(config);
-                    const logger = config.logger || global.console;
-                    if (logger && typeof logger.warn === "function") logger.warn("Mailklare snapshot vervolgpaginering tijdelijk overgeslagen:", error);
-                }
-            } else {
-                state.mailReadySnapshotPending = false;
+            let availableCustomers = normalizeAvailableSnapshotRows(firstPage.availableRows, 0, config.normalizeCustomer);
+            const hasRemainingPages = firstPage.total > firstPage.rows.length || firstPage.availableTotal > firstPage.availableRows.length;
+            if (hasRemainingPages) {
+                const allRows = await fetchRemainingPages(config, firstPage);
+                snapshotCustomers = normalizeSnapshotRows(allRows.rows, 0, config.normalizeCustomer);
+                availableCustomers = normalizeAvailableSnapshotRows(allRows.availableRows, 0, config.normalizeCustomer);
             }
+            const incomingGeneratedAtMs = Date.parse(String(firstPage.generatedAt || "").trim()) || 0;
+            const currentGeneratedAtMs = Math.max(0, Number(state.mailReadySnapshotGeneratedAtMs) || 0);
+            if (incomingGeneratedAtMs && currentGeneratedAtMs && incomingGeneratedAtMs < currentGeneratedAtMs) {
+                state.mailReadySnapshotPending = false;
+                return false;
+            }
+            const published = publishSnapshot(config, snapshotCustomers, firstPage.total, availableCustomers, firstPage.availableTotal, firstPage.payload.foundCustomerIds, firstPage.payload.foundTotal, firstPage.generatedAt, false);
+            if (!published) throw new Error("Mailklare snapshot was niet volledig; laatste geldige tabel blijft actief.");
             return true;
         } catch (error) {
             state.mailReadySnapshotFailed = true;

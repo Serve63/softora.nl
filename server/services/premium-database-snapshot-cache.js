@@ -45,7 +45,7 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
   function isSnapshotCategoryCoherent(totalRaw, rowsRaw) {
     const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
     const total = Math.max(0, Number(totalRaw) || 0);
-    return total === 0 || rows.length > 0;
+    return total === rows.length;
   }
 
   function isMailReadySnapshotCoherent(snapshot = {}) {
