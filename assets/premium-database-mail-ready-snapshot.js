@@ -210,6 +210,26 @@
         return count;
     }
 
+    function getCanonicalInventoryStatus(state) {
+        if (state && state.canonicalInventoryReady === true) return "ready";
+        if (state && state.dataUnavailable === true) return "unavailable";
+        return "loading";
+    }
+
+    function getCanonicalResultCountText(state, currentCount) {
+        if (getCanonicalInventoryStatus(state) !== "ready") return "-- resultaten";
+        return Math.max(0, Number(currentCount) || 0).toLocaleString("nl-NL") + " resultaten";
+    }
+
+    function markCanonicalInventoryReady(state) {
+        if (!state || state.remoteCustomersLoaded !== true || !Array.isArray(state.klanten) || !state.klanten.length) return false;
+        if (state.mailReadySnapshotLoaded !== true || state.availableSnapshotLoaded !== true || state.foundSnapshotLoaded !== true) return false;
+        state.canonicalInventoryReady = true;
+        state.dataLoading = false;
+        state.dataUnavailable = false;
+        return true;
+    }
+
     function clearRetry(state) {
         if (!state) return;
         if (state.mailReadySnapshotRetryTimer && typeof global.clearTimeout === "function") {
@@ -271,9 +291,16 @@
         state.availableSnapshotTotal = availableCustomers.length;
         state.availableSnapshotCustomers = availableCustomers;
         const coherentFoundSnapshot = isFoundSnapshotCategoryCoherent(foundTotal, foundCustomerIds);
-        state.foundSnapshotLoaded = coherentFoundSnapshot;
-        state.foundSnapshotTotal = coherentFoundSnapshot ? normalizeFoundCustomerIds(foundCustomerIds).length : null;
-        state.foundSnapshotCustomerIdSet = new Set(coherentFoundSnapshot ? normalizeFoundCustomerIds(foundCustomerIds) : []);
+        if (coherentFoundSnapshot) {
+            const normalizedFoundCustomerIds = normalizeFoundCustomerIds(foundCustomerIds);
+            state.foundSnapshotLoaded = true;
+            state.foundSnapshotTotal = normalizedFoundCustomerIds.length;
+            state.foundSnapshotCustomerIdSet = new Set(normalizedFoundCustomerIds);
+        } else if (state.foundSnapshotLoaded !== true) {
+            state.foundSnapshotLoaded = false;
+            state.foundSnapshotTotal = null;
+            state.foundSnapshotCustomerIdSet = new Set();
+        }
         state.dataUnavailable = false;
         clearRetry(state);
         if (typeof config.applyCustomerList === "function") {
@@ -310,9 +337,6 @@
         if (typeof fetchJsonWithTimeout !== "function") return false;
         config.fetchJsonWithTimeout = fetchJsonWithTimeout;
         state.mailReadySnapshotPending = true;
-        state.foundSnapshotLoaded = false;
-        state.foundSnapshotTotal = null;
-        state.foundSnapshotCustomerIdSet = new Set();
         try {
             const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
@@ -351,5 +375,5 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, load: load };
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load };
 })(window);

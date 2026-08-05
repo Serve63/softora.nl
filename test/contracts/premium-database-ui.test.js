@@ -301,7 +301,7 @@ test('premium database source filter recognizes only durable KVK transfers', () 
   );
 });
 
-test('premium database page bootstraps customer rows before async sync runs', () => {
+test('premium database keeps bootstrap rows hidden until the canonical inventory is ready', () => {
   const pagePath = path.join(__dirname, '../../premium-database.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -311,7 +311,7 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
   assert.match(
     pageSource,
-    /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\),[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\); state\.dataLoading = false; state\.dataUnavailable = false; state\.remoteCustomersLoaded = !databaseHasFastSnapshotBootstrap;[\s\S]*state\.mailReadySnapshotTotal = [\s\S]*state\.availableSnapshotTotal = [\s\S]*renderPage\(\);/
+    /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\),[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\); state\.dataLoading = true; state\.dataUnavailable = false; state\.remoteCustomersLoaded = false;[\s\S]*state\.mailReadySnapshotTotal = [\s\S]*state\.availableSnapshotTotal = [\s\S]*renderPage\(\);/
   );
   assert.match(pageSource, /state\.mailReadySnapshotStale = customersBootstrapPayload\.stale === true;/);
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
@@ -321,6 +321,53 @@ test('premium database page bootstraps customer rows before async sync runs', ()
   assert.doesNotMatch(pageSource, /function serializeCustomerList/);
   assert.match(pageSource, /function customerListsDiffer\(nextCustomers\) \{ return state\.klanten !== nextCustomers; \}/);
   assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender\) \{ const dedupedCustomers = window\.SoftoraDatabaseMailReadySnapshot\.dedupeCustomers\(nextCustomers\);/);
+});
+
+test('canonical inventory gate never publishes compact or capped counts', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const state = { canonicalInventoryReady: false, remoteCustomersLoaded: false, dataLoading: true, dataUnavailable: false, klanten: [{ id: 'canonical-1' }], mailReadySnapshotLoaded: true, availableSnapshotLoaded: true, foundSnapshotLoaded: true };
+
+  assert.equal(client.getCanonicalInventoryStatus(state), 'loading');
+  assert.equal(client.getCanonicalResultCountText(state, 53), '-- resultaten');
+  assert.equal(client.getCanonicalResultCountText(state, 3000), '-- resultaten');
+  assert.equal(client.markCanonicalInventoryReady(state), false);
+
+  state.remoteCustomersLoaded = true;
+  assert.equal(client.markCanonicalInventoryReady(state), true);
+  assert.equal(client.getCanonicalInventoryStatus(state), 'ready');
+  assert.equal(client.getCanonicalResultCountText(state, 8707), '8.707 resultaten');
+  assert.equal(client.getCanonicalResultCountText(state, 8708), '8.708 resultaten');
+  assert.equal(state.dataLoading, false);
+  assert.equal(state.dataUnavailable, false);
+});
+
+test('snapshot refresh keeps the last coherent found inventory until a complete replacement arrives', async () => {
+  const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => {} } });
+  const state = {
+    klanten: [],
+    mailReadySnapshotLoaded: true,
+    mailReadySnapshotCustomers: [],
+    availableSnapshotLoaded: true,
+    availableSnapshotCustomers: [],
+    foundSnapshotLoaded: true,
+    foundSnapshotTotal: 2,
+    foundSnapshotCustomerIdSet: new Set(['found-1', 'found-2']),
+  };
+
+  const loaded = await client.load({
+    state,
+    normalizeCustomer: (raw) => ({ ...raw }),
+    applyCustomerList: () => {},
+    fetchJsonWithTimeout: async () => ({
+      ok: true,
+      json: async () => ({ ok: true, total: 0, customers: [], availableTotal: 0, availableCustomers: [], foundTotal: 2, foundCustomerIds: ['incomplete'] }),
+    }),
+  });
+
+  assert.equal(loaded, true);
+  assert.equal(state.foundSnapshotLoaded, true);
+  assert.equal(state.foundSnapshotTotal, 2);
+  assert.deepEqual(Array.from(state.foundSnapshotCustomerIdSet), ['found-1', 'found-2']);
 });
 
 test('premium database page keeps customers fixed from Oisterwijk nearby to far away', () => {
@@ -1419,14 +1466,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(resilienceSource, /controller\.abort\(\);/);
   assert.match(resilienceSource, /throw new Error\("Supabase-data reageert niet op tijd\."\);/);
   assert.match(resilienceSource, /function hasChunkedStateKey\(values, baseKey\) \{/);
-  assert.match(pageSource, /state\.dataUnavailable = !hadBootstrapCustomers;/);
+  assert.match(pageSource, /state\.dataUnavailable = !state\.canonicalInventoryReady;/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseCustomers\.load\(\{ previousSnapshotVersion:/);
-  assert.match(pageSource, /catch \(error\) \{[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);[\s\S]*state\.dataUnavailable = !hadBootstrapCustomers;/);
+  assert.match(pageSource, /catch \(error\) \{[\s\S]*console\.warn\("Klanten laden via Supabase tijdelijk overgeslagen:", error\);[\s\S]*state\.dataUnavailable = !state\.canonicalInventoryReady;/);
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260804c/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805a/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
@@ -1448,12 +1495,14 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*setDatabaseTableBodyHtml\(""\); return; \}/);
   assert.doesNotMatch(pageSource, /mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount/);
   assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);/);
-  assert.match(pageSource, /const resultCountText = blockForMailReadyPending \|\| \(state\.dataLoading && !state\.klanten\.length\) \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten" : visibleResultCount\.toLocaleString\("nl-NL"\) \+ " resultaten";/);
+  assert.match(pageSource, /const canonicalInventoryStatus = window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalInventoryStatus\(state\);/);
+  assert.match(pageSource, /if \(canonicalInventoryStatus !== "ready"\) \{[\s\S]*getCanonicalResultCountText\(state, 0\)[\s\S]*setDatabaseTableBodyHtml\("<tr><td colspan=\\"9\\"><div class=\\"tbl-empty\\">" \+ escapeHtml\(inventoryMessage\)/);
+  assert.match(pageSource, /const resultCountText = blockForMailReadyPending \? "-- resultaten" : window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalResultCountText\(state, visibleResultCount\);/);
   assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
   assert.doesNotMatch(pageSource, /Mailklare data laden\.\.\./);
   assert.doesNotMatch(pageSource, /Beschikbare data laden\.\.\./);
   assert.match(pageSource, /if \(\(state\.dataLoading \|\| state\.dataUnavailable\) && !state\.klanten\.length\) \{ setDatabaseTableBodyHtml\(""\);/);
-  assert.match(pageSource, /state\.dataUnavailable = !hadBootstrapCustomers;/);
+  assert.match(pageSource, /state\.dataUnavailable = !state\.canonicalInventoryReady;/);
   assert.match(pageSource, /state\.dataLoading = true;[\s\S]*state\.dataUnavailable = false;[\s\S]*renderPage\(\);/);
   assert.doesNotMatch(pageSource, /setStatusMessage\("Database laden\.\.\.", "info"\);/);
   assert.match(resilienceSource, /function shouldStopUiStateFallback\(error\) \{/);
@@ -1465,7 +1514,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /setStatusMessage\(window\.SoftoraDatabaseResilience\.unavailableMessage, "error"\);/);
   assert.match(pageSource, /if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
   assert.doesNotMatch(resilienceSource, /Supabase-data tijdelijk niet vernieuwd; bestaande data blijft staan\./);
-  assert.match(pageSource, /if \(!hadBootstrapCustomers\) renderPage\(\);[\s\S]*setStatusMessage\(""\);/);
+  assert.match(pageSource, /if \(!state\.canonicalInventoryReady\) renderPage\(\);[\s\S]*setStatusMessage\(""\);/);
   assert.match(pageSource, /function getUiStateFetchTimeoutMs\(scope\) \{/);
   assert.match(pageSource, /normalizedScope === CUSTOMER_PHOTO_SCOPE \|\| normalizedScope === COLDMAIL_SEND_GUARD_SCOPE \|\| normalizedScope === CUSTOMER_DB_SCOPE\) return 12000/);
   assert.match(pageSource, /const timeoutMs = getUiStateFetchTimeoutMs\(scope\);/);
@@ -1558,7 +1607,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /\.toast\s*\{[\s\S]*background: #111;[\s\S]*color: #fff;[\s\S]*font-weight: 700;[\s\S]*max-width: min\(340px, calc\(100vw - 48px\)\);/);
   const toastCssBlock = pageSource.match(/\.toast\s*\{[\s\S]*?\}/)[0];
   assert.doesNotMatch(toastCssBlock, /color: var\(--dark\)/);
-  assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">0 resultaten<\/span><\/button>/);
+  assert.match(pageSource, /class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">-- resultaten<\/span><\/button>/);
   assert.match(pageSource, /<div class="top-right"><div class="filter-metrics" aria-label="Database statistieken">/);
   assert.match(pageSource, /<div class="filter-search"><div class="search">[\s\S]*<input type="text" id="q" placeholder="Zoek bedrijf in database…">/);
   const topRightHtml = pageSource.slice(
@@ -1607,7 +1656,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /state\.remoteCustomersLoaded = true/);
   assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded \|\| state\.photoRestorePending \|\| state\.photoRestoreFailed/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.005;/);
-  assert.match(pageSource, /id="photoHeaderResultsLabel">0 resultaten<\/span>/);
+  assert.match(pageSource, /id="photoHeaderResultsLabel">-- resultaten<\/span>/);
   assert.match(pageSource, /<div class="modal-bg" id="photoBatchModal" aria-hidden="true">/);
   assert.match(pageSource, /id="photoBatchTitle">Webdesigns maken<\/div>/);
   assert.match(pageSource, /data-photo-batch-mode="all"/);
@@ -1651,7 +1700,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(autopilotToggleScriptSource, /body: JSON\.stringify\(\{ enabled: nextEnabled \}\)/);
   assert.doesNotMatch(autopilotToggleScriptSource, /senderProfiles|senderEmails|subject|schedule|buildAutopilotConfig/);
   assert.match(pageSource, /dataLoading: state\.dataLoading \|\| !state\.remoteCustomersLoaded \|\| state\.photoRestorePending \|\| state\.photoRestoreFailed/);
-  assert.match(pageSource, /const resultCountText = blockForMailReadyPending \|\| \(state\.dataLoading && !state\.klanten\.length\) \|\| \(state\.dataUnavailable && !state\.klanten\.length\) \? "-- resultaten" : visibleResultCount\.toLocaleString\("nl-NL"\) \+ " resultaten";/);
+  assert.match(pageSource, /const resultCountText = blockForMailReadyPending \? "-- resultaten" : window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalResultCountText\(state, visibleResultCount\);/);
   assert.match(pageSource, /const showPhotoBatchControl = state\.activeStatus === "beschikbaar";/);
   assert.match(pageSource, /nodes\.photoHeaderTitle\.hidden = showPhotoBatchControl;/);
   assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
@@ -1715,7 +1764,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /data-edit-id=\\"/);
   assert.doesNotMatch(pageSource, /<th data-sort-key="updatedAt" id="latestActionHeader">Laatste actie<\/th>/);
   assert.match(pageSource, /<th id="outreachActionHeader" hidden>Acties<\/th>/);
-  assert.match(pageSource, /<th id="photoHeader"><span class="photo-header-title" id="photoHeaderTitle"><span id="photoHeaderLabel">Foto's<\/span> <span id="photoHeaderCount">\(0\)<\/span><\/span><button class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">0 resultaten<\/span><\/button><\/th>/);
+  assert.match(pageSource, /<th id="photoHeader"><span class="photo-header-title" id="photoHeaderTitle"><span id="photoHeaderLabel">Foto's<\/span> <span id="photoHeaderCount">\(--\)<\/span><\/span><button class="photo-header-results-button" id="generatePhotosButton" type="button" aria-label="Webdesigns maken voor beschikbare resultaten" hidden><span id="photoHeaderResultsLabel">-- resultaten<\/span><\/button><\/th>/);
   assert.match(pageSource, /<th id="daysHeader" hidden>Dagen<\/th>/);
   assert.doesNotMatch(pageSource, /id="myMailsFilterButton"/);
   assert.doesNotMatch(pageSource, /Enkel mijn mails tonen/);
