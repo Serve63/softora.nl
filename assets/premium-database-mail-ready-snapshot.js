@@ -285,7 +285,7 @@
         const total = Math.max(rows.length, Number(payload.total) || 0);
         const availableTotal = Math.max(availableRows.length, Number(payload.availableTotal) || 0);
         if (!isSnapshotPageCategoryValid(total, rows, offset) || !isSnapshotPageCategoryValid(availableTotal, availableRows, offset)) throw new Error("Mailklare snapshot was onvolledig; laatste geldige tabel blijft actief.");
-        return { payload: payload, rows: rows, availableRows: availableRows, total: total, availableTotal: availableTotal, generatedAt: String(payload.generatedAt || "").trim() };
+        return { payload: payload, rows: rows, availableRows: availableRows, total: total, availableTotal: availableTotal, generatedAt: String(payload.generatedAt || "").trim(), snapshotVersion: String(payload.snapshotVersion || "").trim() };
     }
 
     function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
@@ -335,6 +335,7 @@
     async function fetchRemainingPages(config, firstPage) {
         const maxRows = Math.max(Math.max(0, Number(firstPage.total) || 0), Math.max(0, Number(firstPage.availableTotal) || 0));
         if (maxRows > MAX_SNAPSHOT_ROWS) throw new Error("Mailklare snapshot overschrijdt de veilige pagineringslimiet.");
+        if (maxRows > PAGE_LIMIT && !firstPage.snapshotVersion) throw new Error("Mailklare snapshot mist een stabiele inhoudsversie; er wordt opnieuw geladen.");
         const offsets = [];
         for (let offset = PAGE_LIMIT; offset < maxRows; offset += PAGE_LIMIT) offsets.push(offset);
         const pages = [];
@@ -344,7 +345,7 @@
                 const offset = offsets[cursor];
                 cursor += 1;
                 const page = await fetchSnapshotPage(config, PAGE_LIMIT, offset, NEXT_PAGE_TIMEOUT_MS);
-                if (page.total !== firstPage.total || page.availableTotal !== firstPage.availableTotal || page.generatedAt !== firstPage.generatedAt) {
+                if (page.total !== firstPage.total || page.availableTotal !== firstPage.availableTotal || page.snapshotVersion !== firstPage.snapshotVersion) {
                     throw new Error("Mailklare snapshot veranderde tijdens paginering; er wordt opnieuw geladen.");
                 }
                 pages.push({ offset: offset, rows: page.rows, availableRows: page.availableRows });

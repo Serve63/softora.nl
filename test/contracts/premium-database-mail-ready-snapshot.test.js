@@ -8,6 +8,7 @@ const {
   MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
   MAIL_READY_SNAPSHOT_CACHE_KEY,
   MAIL_READY_SNAPSHOT_CACHE_SCOPE,
+  buildSnapshotVersion,
   createPremiumDatabaseMailReadySnapshotService,
   isActiveTransferredLead,
   isKvkTransferRow,
@@ -166,6 +167,7 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(payload.ok, true);
   assert.equal(payload.source, 'structured-mail-ready-snapshot');
   assert.equal(payload.generatedAt, '2026-06-16T12:00:00.000Z');
+  assert.match(payload.snapshotVersion, /^sha256:[a-f0-9]{64}$/);
   assert.equal(payload.total, 1);
   assert.equal(payload.availableTotal, 1);
   assert.equal(payload.customers.length, 1);
@@ -204,6 +206,28 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_BOOTSTRAP_CACHE_SCOPE), true);
+});
+
+test('premium database snapshot version is deterministic across serverless clocks and row order', () => {
+  const first = buildSnapshotVersion({
+    customers: [{ id: 'ready-b' }, { id: 'ready-a' }],
+    availableCustomers: [{ id: 'available-a' }],
+    foundCustomerIds: ['found-b', 'found-a'],
+  });
+  const sameContent = buildSnapshotVersion({
+    generatedAt: '2099-01-01T00:00:00.000Z',
+    customers: [{ id: 'ready-a' }, { id: 'ready-b' }],
+    availableCustomers: [{ id: 'available-a' }],
+    foundCustomerIds: ['found-a', 'found-b'],
+  });
+  const newCompany = buildSnapshotVersion({
+    customers: [{ id: 'ready-a' }, { id: 'ready-b' }],
+    availableCustomers: [{ id: 'available-a' }, { id: 'available-new' }],
+    foundCustomerIds: ['found-a', 'found-b'],
+  });
+
+  assert.equal(first, sameContent);
+  assert.notEqual(first, newCompany);
 });
 
 test('premium database mail-ready snapshot honors limit and offset', async () => {

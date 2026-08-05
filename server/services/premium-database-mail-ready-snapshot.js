@@ -1,3 +1,4 @@
+const { createHash } = require('crypto');
 const { normalizeContactStatus } = require('./customer-lifecycle');
 const {
   getIdentityKeyRows,
@@ -151,6 +152,24 @@ function dedupeCustomerRows(rows = []) {
     if (nextUpdatedAt > currentUpdatedAt) byId.set(id, row);
   });
   return Array.from(byId.values());
+}
+
+function buildSnapshotVersion(data = {}) {
+  const normalizeIds = (rows) => Array.from(new Set(
+    (Array.isArray(rows) ? rows : [])
+      .map((row) => getRowId(row))
+      .filter(Boolean)
+  )).sort();
+  const identity = {
+    mailReady: normalizeIds(data.customers),
+    available: normalizeIds(data.availableCustomers),
+    found: Array.from(new Set(
+      (Array.isArray(data.foundCustomerIds) ? data.foundCustomerIds : [])
+        .map(normalizeString)
+        .filter(Boolean)
+    )).sort(),
+  };
+  return `sha256:${createHash('sha256').update(JSON.stringify(identity)).digest('hex')}`;
 }
 
 function isColdmailTestCompany(row = {}) {
@@ -1075,6 +1094,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       ok: true,
       source: SNAPSHOT_SOURCE,
       generatedAt: snapshotData.generatedAt,
+      snapshotVersion: buildSnapshotVersion(snapshotData),
       total: allCustomers.length,
       limit,
       offset,
@@ -1132,6 +1152,7 @@ module.exports = {
   MAIL_READY_SNAPSHOT_CACHE_SCOPE,
   SNAPSHOT_CACHE_TTL_MS,
   SNAPSHOT_SOURCE,
+  buildSnapshotVersion,
   buildGuardKeysForRow,
   createPremiumDatabaseMailReadySnapshotService,
   isBasicMailReadyCandidate,
