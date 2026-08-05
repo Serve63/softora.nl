@@ -1,41 +1,3 @@
-create table if not exists public.softora_mailbox_send_provenance (
-  intent_id text primary key,
-  idempotency_key text not null unique,
-  owner text not null check (owner in ('serve', 'martijn')),
-  account_email text not null,
-  recipient_email text not null,
-  mode text not null check (mode in ('reply', 'new-message')),
-  conversation_id text,
-  reply_target_message_id text,
-  references_text text,
-  provider text not null default 'smtp',
-  provider_thread_id text,
-  provider_message_id text,
-  sent_message_id text,
-  sender_name text,
-  subject text not null,
-  body_text text not null default '',
-  cc_text text,
-  bcc_text text,
-  status text not null default 'prepared'
-    check (status in ('prepared', 'accepted', 'failed')),
-  error_text text,
-  accepted_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index if not exists softora_mailbox_send_provenance_account_status_idx
-  on public.softora_mailbox_send_provenance (account_email, status, accepted_at desc);
-create index if not exists softora_mailbox_send_provenance_conversation_idx
-  on public.softora_mailbox_send_provenance (account_email, conversation_id, accepted_at desc)
-  where status = 'accepted';
-
-create index if not exists softora_mailbox_sent_thread_lookup_idx
-  on public.softora_mailbox_messages (account_email, date desc)
-  include (subject, recipients_text, message_id, in_reply_to, references_text, payload)
-  where folder = 'sent' and deleted_at is null;
-
 create or replace function public.softora_find_mailbox_unthreaded_sent_candidates(
   p_targets jsonb,
   p_limit integer default 1000
@@ -96,12 +58,8 @@ as $$
   limit greatest(1, least(coalesce(p_limit, 1000), 3000));
 $$;
 
-alter table public.softora_mailbox_send_provenance enable row level security;
-
-revoke all on table public.softora_mailbox_send_provenance from public, anon, authenticated;
 revoke all on function public.softora_find_mailbox_unthreaded_sent_candidates(jsonb, integer)
   from public, anon, authenticated;
 
-grant select, insert, update on table public.softora_mailbox_send_provenance to service_role;
 grant execute on function public.softora_find_mailbox_unthreaded_sent_candidates(jsonb, integer)
   to service_role;

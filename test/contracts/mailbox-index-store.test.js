@@ -1507,6 +1507,8 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   assert.match(schema, /create table if not exists public\.softora_mailbox_sync_state/);
   assert.match(schema, /create table if not exists public\.softora_mailbox_send_provenance/);
   assert.match(schema, /softora_find_mailbox_unthreaded_sent_candidates/);
+  assert.equal(schema.includes("'^\\s*((re|fw|fwd)\\s*:\\s*)+'"), true);
+  assert.equal(schema.includes("'^\\\\s*((re|fw|fwd)\\\\s*:\\\\s*)+'"), false);
   assert.match(schema, /softora_mailbox_sent_thread_lookup_idx/);
   assert.match(schema, /softora_mailbox_messages_account_folder_date_idx/);
   assert.match(schema, /softora_mailbox_sync_state_account_folder_idx/);

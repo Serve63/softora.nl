@@ -396,7 +396,7 @@ as $$
       and position(targets.counterparty_email in lower(coalesce(messages.recipients_text, ''))) > 0
       and regexp_replace(
         lower(trim(coalesce(messages.subject, ''))),
-        '^\\s*((re|fw|fwd)\\s*:\\s*)+',
+        '^\s*((re|fw|fwd)\s*:\s*)+',
         '',
         'i'
       ) = targets.canonical_subject
