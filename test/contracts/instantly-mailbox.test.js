@@ -14,6 +14,11 @@ const {
 const { createMailboxService } = require('../../server/services/mailbox');
 const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
 const {
+  MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
+  parseMailboxCampaignSnapshot,
+  serializeMailboxCampaignSnapshot,
+} = require('../../server/services/mailbox-campaign-snapshot');
+const {
   createDefaultInstantlyMailboxService,
   mergeCampaignReplies,
 } = require('../../server/services/mailbox-instantly-integration');
@@ -1162,7 +1167,9 @@ test('owner conversation listing never leaks the other owner and preserves exact
   const conversations = await service.listOwnerConversations('serve');
   assert.equal(conversations.length, 1);
   assert.equal(conversations[0].providerOwner, 'serve');
-  assert.equal(conversations[0].activityAt, '2026-07-25T11:05:00.000Z');
+  assert.equal(conversations[0].activityAt, '2026-07-25T11:00:00.000Z');
+  assert.equal(conversations[0].latestInboundAt, '2026-07-25T11:00:00.000Z');
+  assert.equal(conversations[0].latestOutboundAt, '2026-07-25T11:05:00.000Z');
   assert.deepEqual(
     conversations[0].threadMessages.map((message) => message.providerMessageId),
     ['serve-sent']
@@ -1556,6 +1563,7 @@ test('webhook and polling-style replays remain idempotent by exact Instantly ema
 
 test('provider read and hide stay local to Softora and reject cross-owner mutations', async () => {
   const mutations = [];
+  let savedSnapshot = '';
   const instantlyMailboxService = {
     getConfiguredAccounts(owner) {
       return owner === 'serve'
@@ -1588,7 +1596,7 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
     },
     async markMessageRead(input) {
       mutations.push({ operation: 'read', ...input });
-      return { ok: true };
+      return { ok: true, readAt: '2026-08-05T15:51:00.000Z' };
     },
     async markMessageDeleted(input) {
       mutations.push({ operation: 'hide', ...input });
@@ -1607,6 +1615,30 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
       imapCreated = true;
       throw new Error('Instantly state must never touch IMAP');
     },
+    getUiStateValues: async () => ({
+      values: {
+        [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serializeMailboxCampaignSnapshot({
+          ok: true,
+          messages: [{
+            id: 'instantly:incoming-serve-1',
+            mailboxId: 'instantly:incoming-serve-1',
+            uid: 0,
+            folder: 'inbox',
+            storageFolder: 'instantly',
+            accountEmail: 'serve-sender@example.com',
+            provider: 'instantly',
+            providerMessageId: 'incoming-serve-1',
+            providerOwner: 'serve',
+            unread: true,
+            subject: 'Re: Website',
+            date: '2026-08-05T15:50:00.000Z',
+          }],
+        }),
+      },
+    }),
+    setUiStateValues: async (_scope, values) => {
+      savedSnapshot = values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY];
+    },
   });
 
   const read = await coordinator.markMessageRead({
@@ -1617,6 +1649,9 @@ test('provider read and hide stay local to Softora and reject cross-owner mutati
   });
   assert.equal(read.sourceMailboxMutated, false);
   assert.equal(imapCreated, false);
+  const [snapshotMessage] = parseMailboxCampaignSnapshot(savedSnapshot).messages;
+  assert.equal(snapshotMessage.unread, false);
+  assert.equal(snapshotMessage.readAt, '2026-08-05T15:51:00.000Z');
   await coordinator.hideConversation({
     owner: 'serve',
     accountEmail: 'serve-sender@example.com',
