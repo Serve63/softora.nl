@@ -862,6 +862,107 @@ test('mailbox index store haalt oude Sent-ouders gericht op internet-message-id 
   assert.deepEqual(calls.find((call) => call[0] === 'eq'), ['eq', 'folder', 'sent']);
 });
 
+test('mailbox index store haalt alleen exacte Sent-descendants binnen hetzelfde account op', async () => {
+  const calls = [];
+  const rows = [{
+    message_key: 'serve@softora.nl|sent|71',
+    account_email: 'serve@softora.nl',
+    folder: 'sent',
+    uid: 71,
+    provider_id: 'sent:71',
+    message_id: '<brigit-follow-up@softora.nl>',
+    in_reply_to: '<brigit-reply@example.nl>',
+    references_text: '<brigit-parent@softora.nl>, <brigit-reply@example.nl>',
+    sender_email: 'serve@softora.nl',
+    recipients_text: 'info@bizzylizzy.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dankjewel voor je reactie.',
+    date: '2026-06-02T11:12:14.000Z',
+    payload: {},
+  }, {
+    message_key: 'martijn@softora.nl|sent|72',
+    account_email: 'martijn@softora.nl',
+    folder: 'sent',
+    uid: 72,
+    provider_id: 'sent:72',
+    message_id: '<cross-owner@softora.nl>',
+    in_reply_to: '<brigit-reply@example.nl>',
+    references_text: '<brigit-reply@example.nl>',
+    sender_email: 'martijn@softora.nl',
+    recipients_text: 'info@bizzylizzy.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dit bericht hoort niet bij Servé.',
+    date: '2026-06-02T11:13:14.000Z',
+    payload: {},
+  }, {
+    message_key: 'serve@softora.nl|sent|73',
+    account_email: 'serve@softora.nl',
+    folder: 'sent',
+    uid: 73,
+    provider_id: 'sent:73',
+    message_id: '<substring@softora.nl>',
+    in_reply_to: '',
+    references_text: '<not-brigit-reply@example.nl>',
+    sender_email: 'serve@softora.nl',
+    recipients_text: 'someone@example.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Alleen een substringmatch.',
+    date: '2026-06-02T11:14:14.000Z',
+    payload: {},
+  }];
+  const client = {
+    from(table) {
+      const query = {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return query;
+        },
+        eq(column, value) {
+          calls.push(['eq', column, value]);
+          return query;
+        },
+        in(column, values) {
+          calls.push(['in', column, values]);
+          return query;
+        },
+        or(filters) {
+          calls.push(['or', filters]);
+          return query;
+        },
+        is(column, value) {
+          calls.push(['is', column, value]);
+          return query;
+        },
+        order(column, options) {
+          calls.push(['order', column, options]);
+          return query;
+        },
+        range(from, to) {
+          calls.push(['range', from, to]);
+          return Promise.resolve({ data: rows, error: null });
+        },
+      };
+      return query;
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, info() {} },
+  });
+
+  const descendants = await store.listMessagesReferencingMessageIdsForAccounts({
+    accountEmails: ['SERVE@SOFTORA.NL'],
+    folder: 'SENT',
+    messageIds: ['<brigit-reply@example.nl>'],
+  });
+
+  assert.deepEqual(descendants.map((message) => message.id), ['sent:71']);
+  assert.ok(calls.some((call) => call[0] === 'eq' && call[1] === 'account_email' && call[2] === 'serve@softora.nl'));
+  assert.ok(calls.some((call) => call[0] === 'eq' && call[1] === 'folder' && call[2] === 'sent'));
+  assert.ok(calls.some((call) => call[0] === 'or' && call[1].includes('in_reply_to')));
+});
+
 test('mailbox index store leest alleen uid-metadata voor begrensde syncselectie', async () => {
   const calls = [];
   const client = {

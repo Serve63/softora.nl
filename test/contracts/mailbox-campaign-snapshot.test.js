@@ -325,7 +325,7 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 7,
+    version: 8,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{
@@ -453,4 +453,5 @@ test('mailbox campaign snapshot weigert lege en ongeldige data', () => {
   assert.equal(parseMailboxCampaignSnapshot('{kapot'), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 2, messages: [] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 3, messages: [{}] })), null);
+  assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 7, messages: [{}] })), null);
 });
