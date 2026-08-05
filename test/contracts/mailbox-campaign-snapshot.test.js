@@ -151,6 +151,12 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     messageId: '<sent-answer@example.test>',
     inReplyTo: '<inbox-answer@example.test>',
     references: '',
+    conversationId: '',
+    softoraConversationId: '',
+    softoraSendIntentId: '',
+    softoraSendMode: '',
+    softoraReplyTargetMessageId: '',
+    softoraThreadProvenanceKnown: false,
     unread: false,
     readAt: '',
     replyDismissedAt: '',
@@ -210,6 +216,39 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
   assert.equal(message.latestInboundAt, '2026-07-23T09:31:11.000Z');
   assert.equal(message.threadMessages[0].folder, 'inbox');
   assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
+});
+
+test('mailbox campaign snapshot bewaart durable send provenance across reload', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:1',
+      folder: 'inbox',
+      accountEmail: 'contact.venvisuals@gmail.com',
+      email: 'info@blue-monkey.nl',
+      subject: 'Re: Kleine vraag over jullie website',
+      date: '2026-06-25T13:27:19.000Z',
+      conversationId: 'conversation:blue',
+      threadMessages: [{
+        id: 'accepted-sent:<blue@gmail.com>',
+        folder: 'sent',
+        accountEmail: 'contact.venvisuals@gmail.com',
+        messageId: '<blue@gmail.com>',
+        date: '2026-08-05T18:26:02.000Z',
+        softoraConversationId: 'conversation:blue',
+        softoraSendIntentId: 'send:blue',
+        softoraSendMode: 'reply',
+        softoraReplyTargetMessageId: '<blue-inbound@example.nl>',
+        softoraThreadProvenanceKnown: true,
+      }],
+    }],
+  });
+  const sent = parseMailboxCampaignSnapshot(raw).messages[0].threadMessages[0];
+  assert.equal(sent.softoraConversationId, 'conversation:blue');
+  assert.equal(sent.softoraSendIntentId, 'send:blue');
+  assert.equal(sent.softoraSendMode, 'reply');
+  assert.equal(sent.softoraReplyTargetMessageId, '<blue-inbound@example.nl>');
+  assert.equal(sent.softoraThreadProvenanceKnown, true);
 });
 
 test('mailbox campaign snapshot bewaart volledige Instantly provenance voor root en thread', () => {
@@ -366,7 +405,7 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 9,
+    version: 10,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{

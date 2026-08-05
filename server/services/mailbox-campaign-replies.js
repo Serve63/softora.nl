@@ -38,6 +38,7 @@ const {
   getOutboundSenderIdentity,
 } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
+const { createMailboxCampaignThreadRecovery } = require('./mailbox-campaign-thread-recovery');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -453,6 +454,24 @@ function getCampaignConversationId(message, disjointSet) {
   ].join(':');
 }
 
+const {
+  attachTargetedUnthreadedSentMessages,
+  buildAcceptedProvenanceMessage,
+  canMergeProvenConversationSegments,
+} = createMailboxCampaignThreadRecovery({
+  dedupeCampaignMessages,
+  extractEmailAddresses,
+  getCanonicalCampaignSubject,
+  getMailboxMessageDirection,
+  getMessageIdentity,
+  getMessageReferenceIds,
+  getMessageTimestamp,
+  normalizeEmail,
+  normalizeMessageId,
+  normalizeText,
+  resolveConversationActivity,
+});
+
 function mergeCampaignConversationsByStableIdentity(conversations, sentMessages) {
   const sentByStableKey = new Map();
   dedupeCampaignMessages(sentMessages)
@@ -474,12 +493,14 @@ function mergeCampaignConversationsByStableIdentity(conversations, sentMessages)
     groups.get(groupKey).conversations.push(conversation);
   });
 
-  return Array.from(groups.values()).map(({ stableKey, conversations: groupedConversations }) => {
+  return Array.from(groups.values()).flatMap(({ stableKey, conversations: groupedConversations }) => {
     if (!stableKey) return groupedConversations[0];
+    // Equal subjects are not thread proof. Multiple disjoint conversations must
+    // remain isolated unless each segment has its own exact parent/reply proof
+    // and the segments form one non-overlapping inbound -> outbound sequence.
+    if (!canMergeProvenConversationSegments(groupedConversations)) return groupedConversations;
     const stableSentMessages = sentByStableKey.get(stableKey) || [];
-    const fallbackSentMessages = groupedConversations.length > 1 || stableSentMessages.length === 1
-      ? stableSentMessages
-      : [];
+    const fallbackSentMessages = [];
     const groupedMessages = groupedConversations.flatMap((conversation) => {
       const { threadMessages: nestedThreadMessages, ...rootMessage } = conversation || {};
       return [
@@ -506,7 +527,7 @@ function mergeCampaignConversationsByStableIdentity(conversations, sentMessages)
       .filter((message) => getMessageIdentity(message) !== primaryIdentity)
       .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
     const activity = resolveConversationActivity({ ...primaryReply, threadMessages });
-    const usedStableFallback = groupedConversations.length > 1 || fallbackSentMessages
+    const usedStableFallback = fallbackSentMessages
       .some((message) => !groupedMessageIdentities.has(getMessageIdentity(message)));
     return {
       ...primaryReply,
@@ -823,6 +844,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
   const {
     mailboxIndexStore = null,
     dataOpsStore = null,
+    mailboxSendProvenanceStore = null,
   } = deps;
 
   async function listRepliesWithSnapshot({
@@ -970,15 +992,57 @@ function createMailboxCampaignRepliesService(deps = {}) {
       ],
       allowedAccountEmails: campaignMailboxAccounts,
     });
+    const acceptedSendIntents = mailboxSendProvenanceStore &&
+      typeof mailboxSendProvenanceStore.listAcceptedMessages === 'function'
+      ? await mailboxSendProvenanceStore.listAcceptedMessages({
+          accountEmails: campaignMailboxAccounts,
+          limit: CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
+        }).catch(() => [])
+      : [];
     const sentMessages = dedupeCampaignMessages([
       ...(Array.isArray(sentMessagesResult) ? sentMessagesResult : []),
       ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
       ...targetedSentDescendantsResult,
+      ...(Array.isArray(acceptedSendIntents) ? acceptedSendIntents.map(buildAcceptedProvenanceMessage) : []),
     ]);
+    const exactConversations = attachSentThreadMessages(replies, sentMessages);
+    const stableKeyCounts = new Map();
+    exactConversations.forEach((conversation) => {
+      const stableKey = getStableCampaignThreadKey(conversation);
+      if (stableKey) stableKeyCounts.set(stableKey, (stableKeyCounts.get(stableKey) || 0) + 1);
+    });
+    const unthreadedTargets = exactConversations
+      .filter((conversation) => {
+        const stableKey = getStableCampaignThreadKey(conversation);
+        return stableKey && stableKeyCounts.get(stableKey) === 1;
+      })
+      .map((conversation) => ({
+        conversationId: conversation.conversationId,
+        accountEmail: conversation.accountEmail,
+        counterpartyEmail: conversation.email,
+        canonicalSubject: getCanonicalCampaignSubject(conversation.subject),
+        latestInboundAt: conversation.latestInboundAt || conversation.date,
+      }));
+    const targetedUnthreadedRows = unthreadedTargets.length &&
+      typeof mailboxIndexStore.listUnthreadedSentCandidatesForConversations === 'function'
+      ? await mailboxIndexStore.listUnthreadedSentCandidatesForConversations({
+          targets: unthreadedTargets,
+          limit: Math.min(3000, unthreadedTargets.length * 3),
+        }).catch(() => [])
+      : [];
+    const conversationsWithHistoricalReplies = attachTargetedUnthreadedSentMessages(
+      exactConversations,
+      targetedUnthreadedRows
+    );
     const allVisibleConversations = attachCrossAccountMailboxCopies(
-      attachSentThreadMessages(replies, sentMessages),
+      conversationsWithHistoricalReplies,
       replies,
-      sentMessages
+      dedupeCampaignMessages([
+        ...sentMessages,
+        ...(Array.isArray(targetedUnthreadedRows)
+          ? targetedUnthreadedRows.map((row) => row.message)
+          : []),
+      ])
     ).filter(shouldShowCampaignConversation);
     const selectedAccountSet = new Set(selectedMailboxAccounts);
     const selectedConversations = allVisibleConversations
@@ -1031,6 +1095,8 @@ module.exports = {
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   CAMPAIGN_SUBJECT_TERMS,
   attachSentThreadMessages,
+  attachTargetedUnthreadedSentMessages,
+  buildAcceptedProvenanceMessage,
   attachCrossAccountMailboxCopies,
   buildCampaignReply,
   createMailboxCampaignRepliesService,

@@ -166,7 +166,27 @@ test('compose controller verstuurt CC BCC en bijlagen uitsluitend na expliciete 
   await controller.send();
   assert.equal(requests.length, 1);
   assert.equal(requests[0].url, '/api/mailbox/send');
-  assert.deepEqual(JSON.parse(requests[0].options.body), {
+  const payload = JSON.parse(requests[0].options.body);
+  assert.equal(payload.mode, 'new-message');
+  assert.equal(typeof payload.idempotencyKey, 'string');
+  assert.ok(payload.idempotencyKey.length > 8);
+  assert.deepEqual(payload.context, {
+    conversationId: '',
+    id: '',
+    folder: '',
+    uid: 0,
+    messageId: '',
+    references: '',
+  });
+  assert.deepEqual({
+    account: payload.account,
+    to: payload.to,
+    cc: payload.cc,
+    bcc: payload.bcc,
+    subject: payload.subject,
+    body: payload.body,
+    attachments: payload.attachments,
+  }, {
     account: 'serve@softora.nl',
     to: 'klant@example.nl',
     cc: 'cc@example.nl',

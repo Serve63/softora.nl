@@ -123,6 +123,11 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
     precedence: '',
     autoResponseSuppress: '',
     automatedReplyEvidence: false,
+    softoraConversationId: '',
+    softoraSendIntentId: '',
+    softoraSendMode: '',
+    softoraReplyTargetMessageId: '',
+    softoraThreadProvenanceKnown: false,
   });
 
   const listMessage = store.normalizeMessageRow(row);
@@ -145,6 +150,94 @@ test('mailbox index store maps IMAP messages into stable indexed rows', () => {
 
   const detailMessage = store.normalizeMessageRow(row, { includeBody: true });
   assert.equal(detailMessage.body, 'Volledige tekst');
+});
+
+test('mailbox index store preserves durable Softora thread provenance from MIME headers', () => {
+  const store = createMailboxIndexStore({
+    now: () => new Date('2026-08-05T20:00:00.000Z'),
+  });
+  const row = store.buildMessageRow({
+    id: 'sent:216',
+    uid: 216,
+    folder: 'sent',
+    accountEmail: 'contact.venvisuals@gmail.com',
+    email: 'contact.venvisuals@gmail.com',
+    to: 'info@blue-monkey.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Dankjewel.',
+    date: '2026-08-05T18:26:02.000Z',
+    messageId: '<blue-sent@gmail.com>',
+    inReplyTo: '<blue-inbound@example.nl>',
+    references: '<blue-original@example.nl> <blue-inbound@example.nl>',
+    softoraConversationId: 'conversation:blue',
+    softoraSendIntentId: 'send:blue',
+    softoraSendMode: 'reply',
+    softoraReplyTargetMessageId: '<blue-inbound@example.nl>',
+    softoraThreadProvenanceKnown: true,
+  }, 'contact.venvisuals@gmail.com', 'sent');
+
+  const restored = store.normalizeMessageRow(row, { includeBody: true });
+  assert.equal(restored.softoraConversationId, 'conversation:blue');
+  assert.equal(restored.softoraSendIntentId, 'send:blue');
+  assert.equal(restored.softoraSendMode, 'reply');
+  assert.equal(restored.softoraReplyTargetMessageId, '<blue-inbound@example.nl>');
+  assert.equal(restored.softoraThreadProvenanceKnown, true);
+});
+
+test('mailbox index performs one bounded targeted lookup for old unthreaded Sent candidates', async () => {
+  const rpcCalls = [];
+  const client = {
+    rpc: async (name, args) => {
+      rpcCalls.push({ name, args });
+      return {
+        error: null,
+        data: [{
+          target_conversation_id: 'conversation:blue',
+          message: {
+            message_key: 'contact.venvisuals@gmail.com|sent|216',
+            account_email: 'contact.venvisuals@gmail.com',
+            folder: 'sent',
+            uid: 216,
+            provider_id: 'sent:216',
+            message_id: '<blue-sent@gmail.com>',
+            in_reply_to: '',
+            references_text: '',
+            sender_name: 'Martijn van de Ven',
+            sender_email: 'contact.venvisuals@gmail.com',
+            recipients_text: 'info@blue-monkey.nl',
+            subject: 'Re: Kleine vraag over jullie website',
+            preview: 'Dankjewel.',
+            body_text: 'Dankjewel.',
+            body_truncated: false,
+            has_body: true,
+            date: '2026-08-05T18:26:02.000Z',
+            unread: false,
+            starred: false,
+            payload: {},
+          },
+        }],
+      };
+    },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+  });
+  const rows = await store.listUnthreadedSentCandidatesForConversations({
+    targets: [{
+      conversationId: 'conversation:blue',
+      accountEmail: 'contact.venvisuals@gmail.com',
+      counterpartyEmail: 'info@blue-monkey.nl',
+      canonicalSubject: 'kleine vraag over jullie website',
+      latestInboundAt: '2026-06-25T13:27:19.000Z',
+    }],
+  });
+
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, 'softora_find_mailbox_unthreaded_sent_candidates');
+  assert.equal(rpcCalls[0].args.p_targets[0].account_email, 'contact.venvisuals@gmail.com');
+  assert.equal(rows[0].targetConversationId, 'conversation:blue');
+  assert.equal(rows[0].message.id, 'sent:216');
 });
 
 test('mailbox index store preserves exact Instantly HTML and link provenance markers', () => {
@@ -1412,10 +1505,16 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   assert.match(schema, /softora_read_at timestamptz/);
   assert.match(schema, /create trigger softora_mailbox_messages_preserve_read_state/);
   assert.match(schema, /create table if not exists public\.softora_mailbox_sync_state/);
+  assert.match(schema, /create table if not exists public\.softora_mailbox_send_provenance/);
+  assert.match(schema, /softora_find_mailbox_unthreaded_sent_candidates/);
+  assert.match(schema, /softora_mailbox_sent_thread_lookup_idx/);
   assert.match(schema, /softora_mailbox_messages_account_folder_date_idx/);
   assert.match(schema, /softora_mailbox_sync_state_account_folder_idx/);
   assert.match(schema, /alter table public\.softora_mailbox_messages enable row level security;/);
   assert.match(schema, /alter table public\.softora_mailbox_sync_state enable row level security;/);
+  assert.match(schema, /alter table public\.softora_mailbox_send_provenance enable row level security;/);
   assert.match(schema, /grant select, insert, update, delete on public\.softora_mailbox_messages to service_role;/);
   assert.match(schema, /grant select, insert, update, delete on public\.softora_mailbox_sync_state to service_role;/);
+  assert.match(schema, /grant select, insert, update on table public\.softora_mailbox_send_provenance to service_role;/);
+  assert.match(schema, /revoke all on table public\.softora_mailbox_send_provenance from public, anon, authenticated;/);
 });

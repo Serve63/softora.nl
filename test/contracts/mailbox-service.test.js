@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
+const { createMailboxService: createRawMailboxService, sanitizeMailboxDisplayText } = require('../../server/services/mailbox');
 const {
   CAMPAIGN_GMAIL_LABEL_FOLDER,
   CAMPAIGN_SYNC_FETCH_LIMIT,
@@ -20,6 +20,50 @@ const {
 
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
+let provenanceSequence = 0;
+function createMailboxService(deps = {}) {
+  const intents = new Map();
+  const mailboxSendProvenanceStore = deps.mailboxSendProvenanceStore || {
+    reserve: async (payload) => {
+      const existing = intents.get(payload.idempotencyKey);
+      if (existing) return { created: false, intent: existing };
+      const intent = { ...payload, status: 'prepared' };
+      intents.set(payload.idempotencyKey, intent);
+      return { created: true, intent };
+    },
+    accept: async (intentId, payload) => {
+      const intent = Array.from(intents.values()).find((candidate) => candidate.intentId === intentId) || {};
+      const accepted = { ...intent, ...payload, intentId, status: 'accepted' };
+      if (intent.idempotencyKey) intents.set(intent.idempotencyKey, accepted);
+      return accepted;
+    },
+    fail: async () => null,
+    listAcceptedMessages: async () => [],
+  };
+  const mailboxComposeThreadContext = deps.mailboxComposeThreadContext || {
+    resolve: async ({ body = {}, accountEmail, recipientEmail, provider }) => ({
+      intentId: `test-send:${++provenanceSequence}`,
+      idempotencyKey: body.idempotencyKey || `test-idempotency:${provenanceSequence}`,
+      owner: body.owner || (/martijn|venvisuals/i.test(accountEmail) ? 'martijn' : 'serve'),
+      senderName: /martijn|venvisuals/i.test(accountEmail) ? 'Martijn van de Ven' : 'Servé Creusen',
+      accountEmail,
+      recipientEmail,
+      mode: body.mode || (provider === 'instantly' ? 'reply' : 'new-message'),
+      conversationId: body.context?.conversationId || `conversation:test:${provenanceSequence}`,
+      replyTargetMessageId: body.providerMessageId || '',
+      references: body.providerMessageId || '',
+      provider: provider || 'smtp',
+      providerThreadId: body.providerThreadId || '',
+      messageId: `<test-${provenanceSequence}@softora.nl>`,
+    }),
+  };
+  return createRawMailboxService({
+    ...deps,
+    mailboxSendProvenanceStore,
+    mailboxComposeThreadContext,
+  });
+}
 
 function createResponseRecorder() {
   return {

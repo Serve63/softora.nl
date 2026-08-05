@@ -7,7 +7,7 @@ const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 9;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 10;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -194,6 +194,12 @@ function sanitizeThreadMessage(value, options = {}) {
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
+    conversationId: text(source.conversationId, 2000),
+    softoraConversationId: text(source.softoraConversationId, 2000),
+    softoraSendIntentId: text(source.softoraSendIntentId, 500),
+    softoraSendMode: text(source.softoraSendMode, 40).toLowerCase(),
+    softoraReplyTargetMessageId: text(source.softoraReplyTargetMessageId, 1000),
+    softoraThreadProvenanceKnown: source.softoraThreadProvenanceKnown === true,
     ...(source.autoSubmitted ? { autoSubmitted: text(source.autoSubmitted, 200) } : {}),
     ...(source.precedence ? { precedence: text(source.precedence, 200) } : {}),
     ...(source.autoResponseSuppress ? { autoResponseSuppress: text(source.autoResponseSuppress, 500) } : {}),
@@ -271,6 +277,11 @@ function sanitizeMessage(value, options = {}) {
     ...(source.autoResponseSuppress ? { autoResponseSuppress: text(source.autoResponseSuppress, 500) } : {}),
     ...(source.automatedReplyEvidence === true ? { automatedReplyEvidence: true } : {}),
     conversationId: text(source.conversationId, 2000),
+    softoraConversationId: text(source.softoraConversationId, 2000),
+    softoraSendIntentId: text(source.softoraSendIntentId, 500),
+    softoraSendMode: text(source.softoraSendMode, 40).toLowerCase(),
+    softoraReplyTargetMessageId: text(source.softoraReplyTargetMessageId, 1000),
+    softoraThreadProvenanceKnown: source.softoraThreadProvenanceKnown === true,
     unread: Boolean(source.unread),
     readAt: text(source.readAt, 100),
     starred: Boolean(source.starred),

@@ -320,6 +320,8 @@ async function sendMailboxMessage({
   instantlyMailboxService,
   sendMessage,
   normalizeString,
+  threadProvenance,
+  mailboxSendProvenanceStore,
 }) {
   if (normalizeString(body.provider).toLowerCase() !== 'instantly') {
     return sendMessage({
@@ -330,20 +332,82 @@ async function sendMailboxMessage({
       subject: body.subject,
       text: body.body || body.text || '',
       attachments: body.attachments,
+      threadProvenance,
     });
   }
-  return instantlyMailboxService.reply({
-    owner: body.owner,
+  if (threadProvenance?.mode !== 'reply') {
+    const error = new Error('Instantly ondersteunt hier alleen een bewezen antwoord in de bestaande thread.');
+    error.status = 409;
+    error.code = 'INSTANTLY_NEW_MESSAGE_UNSUPPORTED';
+    throw error;
+  }
+  if (!mailboxSendProvenanceStore) {
+    const error = new Error('De duurzame Instantly-threadregistratie ontbreekt.');
+    error.status = 503;
+    error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
+    throw error;
+  }
+  const reservation = await mailboxSendProvenanceStore.reserve({
+    ...threadProvenance,
     accountEmail: body.account,
-    providerMessageId: body.providerMessageId,
-    providerThreadId: body.providerThreadId,
-    to: body.to,
+    recipientEmail: body.to,
+    senderName: threadProvenance.senderName,
+    subject: body.subject,
+    body: body.body || body.text || '',
     cc: body.cc,
     bcc: body.bcc,
-    subject: body.subject,
-    text: body.body || body.text || '',
-    attachments: body.attachments,
   });
+  if (!reservation.created) {
+    if (reservation.intent.status === 'accepted') {
+      return {
+        provider: 'instantly',
+        providerMessageId: reservation.intent.providerMessageId,
+        providerThreadId: reservation.intent.providerThreadId,
+        accountEmail: reservation.intent.accountEmail,
+        owner: reservation.intent.owner,
+        intentId: reservation.intent.intentId,
+        idempotentReplay: true,
+      };
+    }
+    const error = new Error('Dit Instantly-antwoord wordt al veilig verwerkt.');
+    error.status = 409;
+    error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
+    throw error;
+  }
+  try {
+    const result = await instantlyMailboxService.reply({
+      owner: body.owner,
+      accountEmail: body.account,
+      providerMessageId: body.providerMessageId,
+      providerThreadId: body.providerThreadId,
+      to: body.to,
+      cc: body.cc,
+      bcc: body.bcc,
+      subject: body.subject,
+      text: body.body || body.text || '',
+      attachments: body.attachments,
+    });
+    const accepted = await mailboxSendProvenanceStore.accept(threadProvenance.intentId, {
+      messageId: result.sentMessage?.messageId,
+      providerMessageId: result.providerMessageId,
+      providerThreadId: result.providerThreadId,
+      acceptedAt: result.sentMessage?.receivedAt || new Date().toISOString(),
+    });
+    return {
+      ...result,
+      intentId: accepted.intentId,
+      sentMessage: {
+        ...(result.sentMessage || {}),
+        conversationId: threadProvenance.conversationId,
+        softoraSendIntentId: threadProvenance.intentId,
+        softoraSendMode: 'reply',
+        softoraReplyTargetMessageId: threadProvenance.replyTargetMessageId,
+      },
+    };
+  } catch (error) {
+    await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+    throw error;
+  }
 }
 
 module.exports = {

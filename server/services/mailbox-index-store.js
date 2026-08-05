@@ -262,6 +262,11 @@ function createMailboxIndexStore(deps = {}) {
         precedence: truncateText(normalizeString(message && message.precedence), 120),
         autoResponseSuppress: truncateText(normalizeString(message && message.autoResponseSuppress), 200),
         automatedReplyEvidence: message && message.automatedReplyEvidence === true,
+        softoraConversationId: truncateText(normalizeString(message && message.softoraConversationId), 2000),
+        softoraSendIntentId: truncateText(normalizeString(message && message.softoraSendIntentId), 500),
+        softoraSendMode: truncateText(normalizeString(message && message.softoraSendMode).toLowerCase(), 40),
+        softoraReplyTargetMessageId: truncateText(normalizeString(message && message.softoraReplyTargetMessageId), 1000),
+        softoraThreadProvenanceKnown: message && message.softoraThreadProvenanceKnown === true,
       },
       updated_at: isoNow(),
     };
@@ -292,6 +297,11 @@ function createMailboxIndexStore(deps = {}) {
       precedence: normalizeString(payload.precedence),
       autoResponseSuppress: normalizeString(payload.autoResponseSuppress),
       automatedReplyEvidence: payload.automatedReplyEvidence === true,
+      softoraConversationId: normalizeString(payload.softoraConversationId),
+      softoraSendIntentId: normalizeString(payload.softoraSendIntentId),
+      softoraSendMode: normalizeString(payload.softoraSendMode).toLowerCase(),
+      softoraReplyTargetMessageId: normalizeString(payload.softoraReplyTargetMessageId),
+      softoraThreadProvenanceKnown: payload.softoraThreadProvenanceKnown === true,
       subject: normalizeString(row.subject) || '(Geen onderwerp)',
       preview: normalizeString(row.preview),
       body: includeBody ? normalizeString(row.body_text) : '',
@@ -867,6 +877,42 @@ function createMailboxIndexStore(deps = {}) {
     return normalizeMessageRow(result.data, { includeBody: true });
   }
 
+  async function listUnthreadedSentCandidatesForConversations({ targets = [], limit = 1000 } = {}) {
+    const normalizedTargets = (Array.isArray(targets) ? targets : [])
+      .map((target) => ({
+        conversation_id: normalizeString(target && target.conversationId),
+        account_email: normalizeEmail(target && target.accountEmail),
+        counterparty_email: normalizeEmail(target && target.counterpartyEmail),
+        canonical_subject: normalizeString(target && target.canonicalSubject).toLowerCase(),
+        latest_inbound_at: parseDateIso(target && target.latestInboundAt),
+      }))
+      .filter((target) => (
+        target.conversation_id &&
+        target.account_email &&
+        target.counterparty_email &&
+        target.canonical_subject &&
+        target.latest_inbound_at
+      ));
+    if (!normalizedTargets.length) return [];
+    const result = await run('list-unthreaded-sent-candidates', (client) =>
+      client.rpc('softora_find_mailbox_unthreaded_sent_candidates', {
+        p_targets: normalizedTargets,
+        p_limit: Math.max(1, Math.min(3000, Number(limit) || 1000)),
+      })
+    );
+    if (!result.ok) return [];
+    return (Array.isArray(result.data) ? result.data : [])
+      .map((row) => {
+        const message = row && row.message && typeof row.message === 'object' ? row.message : null;
+        if (!message) return null;
+        return {
+          targetConversationId: normalizeString(row.target_conversation_id),
+          message: normalizeMessageRow(message, { includeBody: true }),
+        };
+      })
+      .filter(Boolean);
+  }
+
   async function getOldestMatchingMessageUid({
     accountEmail,
     folder = 'inbox',
@@ -1119,6 +1165,7 @@ function createMailboxIndexStore(deps = {}) {
     listMatchingMessagesForAccounts,
     listMessagesByMessageIdsForAccounts,
     listMessagesReferencingMessageIdsForAccounts,
+    listUnthreadedSentCandidatesForConversations,
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,

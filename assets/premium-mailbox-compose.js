@@ -156,6 +156,12 @@
       date: mail.date,
       time: mail.time,
       folder: mail.folder || options.activeFolder || 'inbox',
+      uid: Number(mail.uid || 0) || 0,
+      mailboxId: String(mail.mailboxId || mail.id || '').trim(),
+      messageId: String(mail.messageId || '').trim(),
+      inReplyTo: String(mail.inReplyTo || '').trim(),
+      references: String(mail.references || '').trim(),
+      conversationId: String(mail.conversationId || '').trim(),
       accountEmail: getAccount(mail, options.fallbackAccount),
       ...(String(mail.provider || '').trim()
         ? {
@@ -197,6 +203,8 @@
     if (!accountEmail || !to) return null;
     return {
       id: mail.id,
+      mailboxId: String(mail.mailboxId || mail.id || '').trim(),
+      conversationId: String(mail.conversationId || '').trim(),
       accountEmail,
       to,
       subject: String(latest.subject || mail.subject || '').trim(),
