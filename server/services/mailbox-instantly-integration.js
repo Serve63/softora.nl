@@ -1,6 +1,8 @@
 const { createInstantlyMailboxService } = require('./instantly-mailbox');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
+const INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS = 3 * 60 * 1000;
+
 function getMailboxMessageOwner(message) {
   const provider = String(message?.provider || '').trim().toLowerCase();
   if (provider === 'instantly') {
@@ -313,7 +315,15 @@ async function syncInstantlyMailboxResponse({
     const owners = !requestedOwner || requestedOwner === 'both' || requestedOwner === 'all'
       ? ['serve', 'martijn']
       : [requestedOwner];
-    const results = await Promise.all(owners.map((owner) => instantlyMailboxService.syncOwner(owner)));
+    const fastRefresh = /^(1|true|yes)$/i.test(normalizeString(
+      req.body?.fastRefresh || req.query?.fastRefresh
+    ));
+    const syncOptions = fastRefresh
+      ? { minIntervalMs: INSTANTLY_INTERACTIVE_MIN_SYNC_INTERVAL_MS }
+      : {};
+    const results = await Promise.all(owners.map((owner) => (
+      instantlyMailboxService.syncOwner(owner, syncOptions)
+    )));
     return res.status(200).json({
       ok: results.every((result) => result?.ok !== false),
       owners,

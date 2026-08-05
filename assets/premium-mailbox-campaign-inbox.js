@@ -1061,7 +1061,7 @@
     const params = new URLSearchParams({
       limit: '200',
       owner: owner === 'both' ? '' : owner,
-      refreshInstantly: '1',
+      refreshInstantly: options && options.refreshInstantly === false ? '0' : '1',
     });
     const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
       credentials: 'same-origin',

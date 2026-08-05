@@ -11,10 +11,7 @@
   function formatRefreshAge(lastRefreshAt, currentTime = Date.now()) {
     if (!Number.isFinite(Number(lastRefreshAt)) || Number(lastRefreshAt) <= 0) return '';
     const elapsedMs = Math.max(0, Number(currentTime) - Number(lastRefreshAt));
-    const elapsedSeconds = Math.floor(elapsedMs / 1000);
-    if (elapsedSeconds < 60) {
-      return elapsedSeconds === 1 ? '1 sec geleden' : elapsedSeconds + ' sec geleden';
-    }
+    if (elapsedMs < 60_000) return 'Zojuist';
     const elapsedMinutes = Math.floor(elapsedMs / 60_000);
     if (elapsedMinutes < 60) return `${elapsedMinutes} min geleden`;
     const elapsedHours = Math.floor(elapsedMinutes / 60);
@@ -100,11 +97,11 @@
       const state = getFreshness(scope);
       const age = formatRefreshAge(state.lastSuccessfulAt, getNow());
       if (state.status === 'checking') {
-        ageLabel.textContent = age ? `${age} gecontroleerd · controleren…` : 'Controleren…';
+        ageLabel.textContent = 'Controleren…';
       } else if (state.status === 'partial') {
-        ageLabel.textContent = age ? `Deels bijgewerkt · ${age}` : 'Deels bijgewerkt';
+        ageLabel.textContent = 'Deels bijgewerkt';
       } else if (state.status === 'error') {
-        ageLabel.textContent = age ? `Bijwerken mislukt · ${age}` : 'Bijwerken mislukt';
+        ageLabel.textContent = 'Bijwerken mislukt';
       } else {
         ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
       }
@@ -112,7 +109,15 @@
       const checkedText = state.lastSuccessfulAt
         ? new Date(state.lastSuccessfulAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : 'nog niet voltooid';
-      ageLabel.setAttribute('title', `Laatste volledige providercontrole${ownerText}: ${checkedText}`);
+      const statusText = state.status === 'checking'
+        ? `Mailboxproviders worden gecontroleerd${ownerText}.`
+        : state.status === 'partial'
+          ? `Niet alle mailboxproviders konden worden bijgewerkt${ownerText}.`
+          : state.status === 'error'
+            ? `Mailboxcontrole mislukt${ownerText}.`
+            : `Laatste volledige providercontrole${ownerText}: ${checkedText}`;
+      ageLabel.setAttribute('title', statusText);
+      ageLabel.setAttribute('aria-label', statusText);
     }
 
     function setRefreshing(refreshing) {
@@ -209,7 +214,7 @@
             incrementalOnly: true,
             fastRefresh: true,
           }), signal),
-          requestJson('/api/mailbox/instantly/sync', init({ owner: scope.owner }), signal),
+          requestJson('/api/mailbox/instantly/sync', init({ owner: scope.owner, fastRefresh: true }), signal),
         ];
       }
       return [requestJson('/api/mailbox/sync', init({
@@ -246,6 +251,7 @@
         const listUpdated = await loadMessages({
           showLoader: false,
           skipBackgroundSync: true,
+          skipProviderRefresh: true,
           skipPageBootstrap: true,
           openLatest: false,
         });
