@@ -311,7 +311,7 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
   assert.match(
     pageSource,
-    /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\),[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\); state\.dataLoading = true; state\.dataUnavailable = false; state\.remoteCustomersLoaded = false;[\s\S]*state\.mailReadySnapshotTotal = [\s\S]*state\.availableSnapshotTotal = [\s\S]*renderPage\(\);/
+    /const databaseHasExactSnapshotCountBootstrap = [\s\S]*databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\),[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\); state\.dataLoading = true; state\.dataUnavailable = false; state\.remoteCustomersLoaded = false;[\s\S]*state\.mailReadySnapshotTotal = [\s\S]*state\.availableSnapshotTotal = [\s\S]*renderPage\(\);/
   );
   assert.match(pageSource, /state\.mailReadySnapshotStale = customersBootstrapPayload\.stale === true;/);
   assert.match(pageSource, /state\.foundSnapshotLoaded = true; state\.foundSnapshotTotal = [\s\S]*state\.foundSnapshotCustomerIdSet = new Set\(customersBootstrapPayload\.foundCustomerIds\);/);
@@ -340,6 +340,34 @@ test('canonical inventory gate never publishes compact or capped counts', () => 
   assert.equal(client.getCanonicalResultCountText(state, 8708), '8.708 resultaten');
   assert.equal(state.dataLoading, false);
   assert.equal(state.dataUnavailable, false);
+});
+
+test('exact bootstrap count replaces every provisional row count before full inventory restore', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const availableCustomers = Array.from({ length: 100 }, (_, index) => ({ id: `available-${index + 1}`, availableSnapshot: true }));
+  const payload = {
+    generatedAt: '2026-08-05T12:00:00.000Z',
+    mailReadySnapshotTotal: 0,
+    availableSnapshotTotal: 6008,
+    foundTotal: 100,
+    foundCustomerIds: availableCustomers.map((customer) => customer.id),
+    customers: availableCustomers,
+  };
+  const state = {
+    activeStatus: 'beschikbaar',
+    query: '',
+    canonicalInventoryReady: false,
+    canonicalCountReady: true,
+    availableSnapshotTotal: 6008,
+  };
+
+  assert.equal(client.isBootstrapSnapshotCountPayloadCoherent(payload), true);
+  assert.equal(client.isBootstrapSnapshotPayloadCoherent(payload), false);
+  assert.equal(client.getCanonicalResultCountText(state, 53), '6.008 resultaten');
+  assert.equal(client.getCanonicalResultCountText(state, 3000), '6.008 resultaten');
+  assert.equal(client.getCanonicalResultCountText(state, 8707), '6.008 resultaten');
+  state.query = 'oisterwijk';
+  assert.equal(client.getCanonicalResultCountText(state, 53), '-- resultaten');
 });
 
 test('snapshot refresh keeps the last coherent found inventory until a complete replacement arrives', async () => {
@@ -1141,7 +1169,7 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=3000&offset=0');
   assert.equal(requests[0][1].method, 'GET');
   assert.equal(requests[0][1].cache, 'no-store');
-  assert.equal(requests[0][2], 20000);
+  assert.equal(requests[0][2], 90000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0']);
   assert.equal(state.mailReadySnapshotLoaded, true);
   assert.equal(state.canonicalSnapshotApplied, true);
@@ -1171,7 +1199,7 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   state.activeStatus = 'beschikbaar';
   assert.equal(client.getDisplayCount(state, applied[0].customers.length), 1);
   state.remoteCustomersLoaded = true;
-  assert.equal(client.getDisplayCount(state, 8856), 8856);
+  assert.equal(client.getDisplayCount(state, 8856), 1);
 
   const merged = client.mergeAssetFlags([
     { id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', website: 'https://demo.nl' },
@@ -1676,7 +1704,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805e/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805f/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
@@ -2468,7 +2496,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(coldmailGuardScriptSource, /entryIndex = createGuardIndex\(entries\);/);
   assert.doesNotMatch(coldmailGuardScriptSource, /return entries\.some\(function \(entry\)/);
   assert.doesNotMatch(pageSource, /await webdesignMockupController\.ensureForCustomer\(context\.customerId\)/);
-  assert.match(pageSource, /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\), databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
+  assert.match(pageSource, /const databaseHasExactSnapshotCountBootstrap = [\s\S]*databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\), databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
   assert.match(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);

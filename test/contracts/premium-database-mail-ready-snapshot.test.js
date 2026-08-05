@@ -12,7 +12,11 @@ const {
   createPremiumDatabaseMailReadySnapshotService,
   isActiveTransferredLead,
   isKvkTransferRow,
+  parseMailReadySnapshotCacheValue,
 } = require('../../server/services/premium-database-mail-ready-snapshot');
+const {
+  createPremiumDatabaseSnapshotCacheCodec,
+} = require('../../server/services/premium-database-snapshot-cache');
 
 function createService(overrides = {}) {
   const calls = [];
@@ -228,6 +232,36 @@ test('premium database snapshot version is deterministic across serverless clock
 
   assert.equal(first, sameContent);
   assert.notEqual(first, newCompany);
+});
+
+test('premium database durable snapshot compresses and restores more than the old 3000-row cap', () => {
+  const codec = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: 25000, formatVersion: 2 });
+  const availableCustomers = Array.from({ length: 6008 }, (_, index) => ({
+    id: `available-${index + 1}`,
+    bedrijf: `Bedrijf ${index + 1}`,
+    email: `info${index + 1}@bedrijf.nl`,
+    telefoon: `06123${String(index).padStart(5, '0')}`,
+    website: `bedrijf-${index + 1}.nl`,
+    adres: `Straat ${index + 1}, Oisterwijk`,
+    availableSnapshot: true,
+  }));
+  const serialized = codec.serializeMailReadySnapshotCache({
+    generatedAt: '2026-08-05T12:00:00.000Z',
+    total: 0,
+    customers: [],
+    availableTotal: availableCustomers.length,
+    availableCustomers,
+    foundCustomerIds: availableCustomers.map((customer) => customer.id),
+  }, 25000, { compress: true });
+
+  assert.equal(JSON.parse(serialized).encoding, 'gzip-base64');
+  assert.ok(serialized.length < 950000);
+  const restored = codec.parseMailReadySnapshotCacheValue(serialized);
+  assert.equal(codec.isMailReadySnapshotCoherent(restored), true);
+  assert.equal(restored.availableTotal, 6008);
+  assert.equal(restored.availableCustomers.length, 6008);
+  assert.equal(restored.foundCustomerIds.length, 6008);
+  assert.equal(parseMailReadySnapshotCacheValue(serialized).availableCustomers.length, 6008);
 });
 
 test('premium database mail-ready snapshot honors limit and offset', async () => {
