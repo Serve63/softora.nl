@@ -152,15 +152,11 @@
   function mountDashboardLink(browserWindow) {
     const document = browserWindow?.document;
     const card = document?.getElementById('companies-total-card');
-    if (!card) return null;
+    const openButton = document?.getElementById('companies-total-open');
+    if (!card || !openButton) return null;
 
     const openDirectory = () => navigateToDirectory(browserWindow);
-    card.addEventListener('click', openDirectory);
-    card.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      openDirectory();
-    });
+    openButton.addEventListener('click', openDirectory);
 
     return { openDirectory };
   }

@@ -64,7 +64,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805e/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805f/);
   assert.match(shellSource, />Database verbinden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -73,7 +73,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805e/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805f/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -86,8 +86,11 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
   assert.match(pageSource, /id="companies-treated"/);
   assert.match(pageSource, /id="companies-total-card"/);
-  assert.match(pageSource, /id="companies-total-card"[^>]*role="link"[^>]*tabindex="0"/);
-  assert.match(pageSource, /aria-label="Open alle gevonden bedrijven op een aparte pagina"/);
+  assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*role="link"/);
+  assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*tabindex=/);
+  assert.match(pageSource, /<button id="companies-total-open"[^>]*aria-label="Bekijk alle bedrijven"[^>]*title="Bekijk alle bedrijven"/);
+  assert.match(pageSource, /id="companies-total-open"[\s\S]*?<svg[^>]*aria-hidden="true"/);
+  assert.doesNotMatch(pageSource, /BEKIJK ALLE BEDRIJVEN|Bekijk alle bedrijven →/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*aria-controls=/);
   assert.doesNotMatch(pageSource, /id="total-found-source-status"/);
   assert.match(pageSource, /id="companies-successful-found"/);
@@ -108,8 +111,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805b/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805f/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
@@ -119,6 +122,10 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   const totalFound = require('../../assets/kvk-database-total-found.js');
   const scriptSource = fs.readFileSync(
     path.join(repoRoot, 'assets/kvk-database-total-found.js'),
+    'utf8'
+  );
+  const styleSource = fs.readFileSync(
+    path.join(repoRoot, 'assets/kvk-database-total-found.css'),
     'utf8'
   );
 
@@ -135,7 +142,11 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
     mode: 'cors',
     targetAddressSpace: 'loopback',
   });
-  assert.match(scriptSource, /card\.addEventListener\('click', openDirectory\)/);
+  assert.match(scriptSource, /openButton\.addEventListener\('click', openDirectory\)/);
+  assert.doesNotMatch(scriptSource, /card\.addEventListener/);
+  assert.match(styleSource, /\.stat-card-total-found__open\s*\{/);
+  assert.match(styleSource, /\.stat-card-total-found__open:focus-visible/);
+  assert.doesNotMatch(styleSource, /content:\s*["']/);
   assert.match(scriptSource, /targetWindow\?\.location\?\.assign\(DIRECTORY_PAGE_URL\)/);
   assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
   assert.match(scriptSource, /if \(!reset && \(state\.loading \|\| !state\.hasMore\)\) return;/);

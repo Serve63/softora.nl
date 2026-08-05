@@ -1,28 +1,40 @@
 .stat-card-total-found {
-  cursor: pointer;
-  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  position: relative;
 }
 
-.stat-card-total-found:hover {
-  border-color: var(--accent);
-  box-shadow: 0 16px 38px rgba(44, 37, 31, 0.12);
-  transform: translateY(-1px);
+.stat-card-total-found .stat-main {
+  padding-right: 30px;
 }
 
-.stat-card-total-found:focus-visible {
-  border-color: var(--accent);
-  outline: 0;
-  box-shadow: 0 0 0 4px rgba(142, 47, 95, 0.14), 0 16px 38px rgba(44, 37, 31, 0.12);
-}
-
-.stat-card-total-found::after {
-  display: block;
-  margin-top: 7px;
+.stat-card-total-found__open {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   color: var(--accent-dark);
-  content: 'Bekijk alle bedrijven →';
-  font-size: 0.52rem;
-  font-weight: 900;
-  letter-spacing: 0.02em;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.stat-card-total-found__open svg {
+  width: 15px;
+  height: 15px;
+}
+
+.stat-card-total-found__open:hover {
+  background: rgba(142, 47, 95, 0.1);
+}
+
+.stat-card-total-found__open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .total-found-source-status {

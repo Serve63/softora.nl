@@ -1215,6 +1215,36 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   assert.equal(client.isSnapshotAvailableCustomer(merged[2]), false);
 });
 
+test('canonical mail-ready merge clears stale category flags from unmatched remote rows', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const merged = client.mergeWithCanonicalSnapshots([
+    { id: 'ready-current', bedrijf: 'Ready Remote', mailReady: false, mailReadySnapshot: false },
+    { id: 'available-current', bedrijf: 'Available Remote', availableSnapshot: false },
+    { id: 'stale-ready', bedrijf: 'Stale Ready', mailReady: true, mailReadySnapshot: true },
+    { id: 'stale-available', bedrijf: 'Stale Available', availableSnapshot: true },
+    { id: 'ordinary-row', bedrijf: 'Ordinary' },
+  ], [
+    { id: 'ready-current', bedrijf: 'Ready Canonical', mailReady: true, mailReadySnapshot: true },
+  ], [
+    { id: 'available-current', bedrijf: 'Available Canonical', availableSnapshot: true },
+  ]);
+
+  assert.deepEqual(merged.filter(client.isSnapshotMailReadyCustomer).map((customer) => customer.id), ['ready-current']);
+  assert.deepEqual(merged.filter(client.isSnapshotAvailableCustomer).map((customer) => customer.id), ['available-current']);
+  assert.equal(merged.length, 5);
+  assert.deepEqual(
+    Object.fromEntries(merged.filter((customer) => customer.id.startsWith('stale-')).map((customer) => [customer.id, {
+      mailReady: customer.mailReady,
+      mailReadySnapshot: customer.mailReadySnapshot,
+      availableSnapshot: customer.availableSnapshot,
+    }])),
+    {
+      'stale-ready': { mailReady: false, mailReadySnapshot: false, availableSnapshot: false },
+      'stale-available': { mailReady: false, mailReadySnapshot: false, availableSnapshot: false },
+    }
+  );
+});
+
 test('mail-ready snapshot client paginates every available row before publishing the count', async () => {
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('complete pagination should not warn'); } } });
   const availableCustomers = Array.from({ length: 6001 }, (_item, index) => ({
@@ -1704,7 +1734,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805f/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805g/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);

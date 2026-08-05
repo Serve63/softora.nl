@@ -876,6 +876,14 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const cachedAtMs = Number(snapshotDataCache && snapshotDataCache.cachedAtMs) || 0;
     const cacheAgeMs = snapshotDataCache ? nowMs() - cachedAtMs : Number.POSITIVE_INFINITY;
     if (snapshotDataCache && cacheAgeMs < SNAPSHOT_CACHE_TTL_MS) return snapshotDataCache.data;
+    if (snapshotDataCache && options.allowStaleWhileRefreshing === true) {
+      startSnapshotRefresh().catch((error) => {
+        if (logger && typeof logger.warn === 'function') {
+          logger.warn('[PremiumDatabaseMailReadySnapshot][stale-refresh]', error?.message || error);
+        }
+      });
+      return snapshotDataCache.data;
+    }
     return startSnapshotRefresh();
   }
 
@@ -1089,7 +1097,10 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function buildMailReadySnapshot(options = {}) {
     const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
     const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
-    const snapshotData = await getMailReadySnapshotData({ requireFoundSnapshot: options.includeFoundSnapshot === true });
+    const snapshotData = await getMailReadySnapshotData({
+      requireFoundSnapshot: options.includeFoundSnapshot === true,
+      allowStaleWhileRefreshing: options.allowStaleWhileRefreshing === true,
+    });
     const allCustomers = Array.isArray(snapshotData.customers) ? snapshotData.customers : [];
     const allAvailableCustomers = Array.isArray(snapshotData.availableCustomers) ? snapshotData.availableCustomers : [];
     return {
@@ -1115,6 +1126,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         limit: req && req.query ? req.query.limit : undefined,
         offset: req && req.query ? req.query.offset : undefined,
         includeFoundSnapshot: true,
+        allowStaleWhileRefreshing: true,
       });
       res.setHeader('Cache-Control', 'private, no-store, max-age=0');
       res.setHeader('Pragma', 'no-cache');

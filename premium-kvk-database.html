@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260804c">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
-  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260805b">
+  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260805f">
 </head>
 <body>
   <main class="app-shell">
@@ -33,7 +33,10 @@
     </header>
 
     <section class="stats-grid" aria-label="Scraper status">
-      <article id="companies-total-card" class="stat-card stat-card-primary stat-card-total-found kvk-stat-card-enhanced" role="link" tabindex="0" aria-label="Open alle gevonden bedrijven op een aparte pagina">
+      <article id="companies-total-card" class="stat-card stat-card-primary stat-card-total-found kvk-stat-card-enhanced">
+        <button id="companies-total-open" class="stat-card-total-found__open" type="button" aria-label="Bekijk alle bedrijven" title="Bekijk alle bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
         <div class="stat-main stat-main-full">
           <span>Totaal Gevonden</span>
           <strong id="companies-total">0</strong>
@@ -254,7 +257,7 @@
 
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database.js?v=20260804a"></script>
-  <script src="/assets/kvk-database-total-found.js?v=20260805b"></script>
+  <script src="/assets/kvk-database-total-found.js?v=20260805f"></script>
   <script src="/assets/kvk-database-metrics.js?v=20260804d"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260804b"></script>
   <script src="/assets/kvk-database-control.js?v=20260804b"></script>
