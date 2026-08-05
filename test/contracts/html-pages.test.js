@@ -52,6 +52,7 @@ function createFixture(overrides = {}) {
     'premium-personeel-login.html',
     'premium-personeel-agenda.html',
     'premium-wachtwoordenregister.html',
+    'premium-kvk-company-directory-shell.html',
     'live-momentum.html',
     'live-momentum-access.html',
   ]);
@@ -69,6 +70,7 @@ function createFixture(overrides = {}) {
     knownPrettyPageSlugToFile: new Map([
       ['premium-personeel-login', 'premium-personeel-login.html'],
       ['premium-personeel-agenda', 'premium-personeel-agenda.html'],
+      ['kvk-database-bedrijven', 'premium-kvk-company-directory-shell.html'],
       ['live-momentum', 'live-momentum.html'],
     ]),
     resolvePremiumHtmlPageAccess: overrides.resolvePremiumHtmlPageAccess || (async () => ({
@@ -487,6 +489,53 @@ test('html page coordinator keeps fullscreen Winnen free of sidebar delivery ass
     /autoplay=\(self "https:\/\/www\.youtube-nocookie\.com"\), camera=\(\)/
   );
   assert.doesNotMatch(res.headers['Content-Security-Policy'], /https:\/\/www\.youtube\.com/);
+});
+
+test('html page coordinator permits only the KVK directory to reach the local loopback database', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-kvk-company-directory-shell.html'),
+    '<!DOCTYPE html><html><head><title>Bedrijven</title></head><body><main>Bedrijven</main></body></html>'
+  );
+
+  const res = createResponseRecorder();
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; connect-src 'self' https:; frame-ancestors 'none'; upgrade-insecure-requests"
+  );
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/kvk-database-bedrijven' },
+    res,
+    () => {},
+    'premium-kvk-company-directory-shell.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.match(
+    res.headers['Content-Security-Policy'],
+    /connect-src 'self' https: http:\/\/127\.0\.0\.1:8000/
+  );
+  assert.doesNotMatch(res.headers['Content-Security-Policy'], /upgrade-insecure-requests/);
+  assert.match(res.headers['Content-Security-Policy'], /default-src 'self'/);
+  assert.match(res.headers['Content-Security-Policy'], /frame-ancestors 'none'/);
+
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-website.html'),
+    '<!DOCTYPE html><html><head><title>Website</title></head><body><main>Website</main></body></html>'
+  );
+  const ordinaryPageRes = createResponseRecorder();
+  ordinaryPageRes.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; connect-src 'self' https:; frame-ancestors 'none'; upgrade-insecure-requests"
+  );
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-website' },
+    ordinaryPageRes,
+    () => {},
+    'premium-website.html'
+  );
+  assert.doesNotMatch(ordinaryPageRes.headers['Content-Security-Policy'], /127\.0\.0\.1/);
+  assert.match(ordinaryPageRes.headers['Content-Security-Policy'], /upgrade-insecure-requests/);
 });
 
 test('html page coordinator renders premium content-frame pages without an active sidebar shell', async () => {

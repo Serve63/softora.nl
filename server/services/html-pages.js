@@ -122,6 +122,8 @@ const PUBLIC_HERO_IMAGE_PRELOADS_BY_FILE = Object.freeze({
 });
 const PREMIUM_SESSION_WATCHDOG_SCRIPT = '<script src="/assets/premium-session-watchdog.js?v=20260516a" defer></script>';
 const LIVE_MOMENTUM_VIDEO_ORIGIN = 'https://www.youtube-nocookie.com';
+const KVK_COMPANY_DIRECTORY_FILE = 'premium-kvk-company-directory-shell.html';
+const KVK_COMPANY_DIRECTORY_LOCAL_ORIGIN = 'http://127.0.0.1:8000';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_CSP_BASE = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -445,6 +447,23 @@ function createHtmlPageCoordinator(options = {}) {
     res.setHeader('Permissions-Policy', nextPermissions);
   }
 
+  function applyKvkCompanyDirectorySecurityHeaders(res, fileName) {
+    if (fileName !== KVK_COMPANY_DIRECTORY_FILE || !res || typeof res.setHeader !== 'function') return;
+
+    const getHeader = typeof res.getHeader === 'function' ? (name) => res.getHeader(name) : () => '';
+    const currentCsp = String(getHeader('Content-Security-Policy') || '').trim();
+    if (!currentCsp) return;
+
+    const directives = currentCsp
+      .split(';')
+      .map((directive) => directive.trim())
+      .filter(Boolean)
+      .filter((directive) => !/^connect-src(?:\s|$)/i.test(directive))
+      .filter((directive) => !/^upgrade-insecure-requests(?:\s|$)/i.test(directive));
+    directives.push(`connect-src 'self' https: ${KVK_COMPANY_DIRECTORY_LOCAL_ORIGIN}`);
+    res.setHeader('Content-Security-Policy', directives.join('; '));
+  }
+
   function applyPasswordRegisterSecurityHeaders(res, fileName, renderedHtml = '') {
     if (fileName !== 'premium-wachtwoordenregister.html' || !res || typeof res.setHeader !== 'function') {
       return;
@@ -751,6 +770,7 @@ function createHtmlPageCoordinator(options = {}) {
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
         res.setHeader('Content-Security-Policy', getPremiumSidebarContentFrameCsp());
       }
+      applyKvkCompanyDirectorySecurityHeaders(res, fileName);
       applyLiveMomentumVideoSecurityHeaders(res, fileName);
       applyPasswordRegisterSecurityHeaders(res, fileName, rendered);
       res.setHeader(
