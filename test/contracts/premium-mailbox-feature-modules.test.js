@@ -92,9 +92,12 @@ test('mailbox featuremodules tonen BCC alleen met exacte provenance', () => {
   assert.match(proven, /Van:<\/span><strong>Martijn van de Ven &lt;martijn@softora\.nl&gt;/);
   assert.match(proven, /Aan:<\/span><strong>Sandra van Berkel &lt;sandra@example\.nl&gt;/);
   assert.match(proven, /BCC:<\/span><strong>Servé Creusen &lt;serve@softora\.nl&gt;/);
-  assert.equal(campaignInbox.renderCopyRouting({
+  const unproven = campaignInbox.renderCopyRouting({
     copyContext: { evidenceKnown: false, kind: 'bcc' },
-  }, escapeHtml), '');
+  }, escapeHtml);
+  assert.match(unproven, /Van:<\/span><strong>Onbekend/);
+  assert.match(unproven, /Aan:<\/span><strong data-mailbox-routing-unknown="true">Niet beschikbaar in bronbericht/);
+  assert.doesNotMatch(unproven, /BCC:<\/span>/);
 });
 
 test('compose featuremodule neemt alleen expliciet gekozen veilige bijlagen mee', async () => {

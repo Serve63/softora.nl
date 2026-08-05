@@ -8,7 +8,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v9';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v10';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -44,9 +44,18 @@
   function isAutomatedCampaignReply(mail) {
     const subject = normalizeClassifierText(mail && mail.subject);
     const content = normalizeClassifierText([
-      mail && mail.preview,
-      mail && mail.body,
+      mail && mail.preview ? stripQuotedReply(mail.preview) : '',
+      mail && mail.body ? stripQuotedReply(mail.body) : '',
     ].filter(Boolean).join(' '));
+    const autoSubmitted = normalizeClassifierText(mail && mail.autoSubmitted);
+    const precedence = normalizeClassifierText(mail && mail.precedence);
+    const autoResponseSuppress = normalizeClassifierText(mail && mail.autoResponseSuppress);
+    const provenAutomaticHeader = Boolean(
+      mail && mail.automatedReplyEvidence === true ||
+      (autoSubmitted && autoSubmitted !== 'no') ||
+      /^(?:auto_reply|auto-reply|bulk|junk|list)$/.test(precedence) ||
+      autoResponseSuppress
+    );
     const automatedSubjectPatterns = [
       /^(?:(?:re|fw|fwd)\s*:\s*)*automatisch antwoord(?:en)?\b/,
       /^(?:(?:re|fw|fwd)\s*:\s*)*(?:zomer|winter|vakantie|kerst|feestdagen?|bouwvak)[ -]?sluiting\b/,
@@ -57,8 +66,12 @@
       /\bauto[ -]?reply\b/,
       /\bout[ -]?of[ -]?office\b/,
       /\bafwezigheid(?:sbericht|melding)?\b/,
+      /\bdelivery status notification\b/,
+      /\bmail delivery (?:failure|failed)\b/,
       /^email received\b/,
       /^bericht ontvangen\b/,
+      /\buw mail is ontvangen\b/,
+      /^bedankt voor (?:je|jouw|uw) (?:mail|bericht)!?\s+(?:re|fw|fwd)\s*:/,
     ];
     const automatedContentPatterns = [
       /\bdit (?:bericht|e-mail|email) is automatisch gegenereerd\b/,
@@ -66,8 +79,20 @@
       /\bthis is an automated (?:e-?mail|mail|message|reply|response)\b/,
       /\bwe would like to acknowledge that we have received your request\b/,
       /\bis ons kantoor gesloten\b/,
+      /\bop dit moment ben ik op vakantie\b/,
+      /\bberichten worden (?:in deze periode )?niet gelezen\b/,
+      /\bplease type your reply above this line\b/,
+      /\buw aanvraag\s*\([^)]{1,40}\)\s+is ontvangen\b/,
+      /\byour request\s*\([^)]{1,40}\)\s+has been received\b/,
+      /\bwij streven ernaar om (?:je|jouw|uw) (?:vraag|bericht|e-?mail|mail) binnen \d+\s+(?:werk)?dag(?:en)? te beantwoorden\b/,
+      /\bin deze periode beantwoorden wij geen (?:e-?mails?|mails?|berichten)\b/,
+      /\b(?:we|wij) streven ernaar (?:jouw|je|uw) (?:e-?mail|mail|bericht) (?:de )?(?:eerstvolgende|volgende) werkdag te beantwoorden\b/,
+      /\b(?:bedankt|dank) voor (?:je|jouw|uw) bericht\b[\s\S]{0,220}\b(?:eerstvolgende werkdag|zo snel mogelijk) te beantwoorden\b/,
+      /\b(?:ik ben|wij zijn|ons kantoor is) (?:momenteel|op dit moment|tijdelijk)?\s*(?:afwezig|gesloten|niet aanwezig)\b/,
+      /\b(?:i am|we are) (?:currently )?out of (?:the )?office\b/,
     ];
     return (
+      provenAutomaticHeader ||
       automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
       automatedContentPatterns.some((pattern) => pattern.test(content))
     );
@@ -194,7 +219,7 @@
   }
 
   function getReceivedTimestamp(mail) {
-    const value = mail && (mail.activityAt || mail.receivedAt || mail.internalDate || mail.date);
+    const value = mail && (mail.latestInboundAt || mail.activityAt || mail.receivedAt || mail.internalDate || mail.date);
     const timestamp = Date.parse(value || '');
     return Number.isFinite(timestamp) ? timestamp : 0;
   }
@@ -341,14 +366,28 @@
           seen.add(identity);
           return true;
         })
-        .sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left));
+        .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
+      const allMessages = [primary, ...threadMessages];
+      const latestInboundAt = allMessages
+        .filter((message) => !isSentMessageByProvenance(message, primary.accountEmail) && !(message.copyContext && message.copyContext.evidenceKnown === true))
+        .map((message) => message.receivedAt || message.internalDate || message.date)
+        .filter((value) => Number.isFinite(Date.parse(value || '')))
+        .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || primary.latestInboundAt || primary.receivedAt || '';
+      const latestOutboundAt = allMessages
+        .filter((message) => isSentMessageByProvenance(message, primary.accountEmail) || (message.copyContext && message.copyContext.evidenceKnown === true))
+        .map((message) => message.receivedAt || message.internalDate || message.date)
+        .filter((value) => Number.isFinite(Date.parse(value || '')))
+        .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || primary.latestOutboundAt || '';
       return {
         ...primary,
         conversationId,
+        activityAt: latestInboundAt,
+        latestInboundAt,
+        latestOutboundAt,
         unread: groupedMessages.some((message) => Boolean(message && message.unread)),
         threadMessages,
       };
-    });
+    }).sort((left, right) => getReceivedTimestamp(right) - getReceivedTimestamp(left));
   }
 
   function filterMessages(messages, value) {
@@ -404,7 +443,7 @@
     const mailboxId = String(message.mailboxId || message.id || mail && mail.id || '').trim();
     const accountEmail = normalizeEmail(message.accountEmail || mail && mail.accountEmail);
     const receivedAtValue = message.receivedAt || message.date || mail && mail.receivedAt;
-    const activityAtValue = message.activityAt || receivedAtValue;
+    const activityAtValue = message.latestInboundAt || receivedAtValue || message.activityAt;
     return {
       ...mail,
       id: accountEmail && mailboxId ? `${accountEmail}|${mailboxId}` : (mail && mail.id) || mailboxId,
@@ -415,6 +454,12 @@
         : '',
       activityAt: Number.isFinite(Date.parse(activityAtValue || ''))
         ? new Date(activityAtValue).toISOString()
+        : '',
+      latestInboundAt: Number.isFinite(Date.parse(activityAtValue || ''))
+        ? new Date(activityAtValue).toISOString()
+        : '',
+      latestOutboundAt: Number.isFinite(Date.parse(message.latestOutboundAt || ''))
+        ? new Date(message.latestOutboundAt).toISOString()
         : '',
       provider: String(message.provider || mail && mail.provider || '').trim().toLowerCase(),
       providerMessageId: String(message.providerMessageId || '').trim(),
@@ -498,18 +543,18 @@
     const rows = [];
     const fromName = String(mail.from || '').trim();
     const fromEmail = normalizeEmail(mail.email);
-    if (fromName || fromEmail) {
-      rows.push(`<div><span>Van:</span><strong>${identity(fromName, fromEmail)}</strong></div>`);
-    }
+    rows.push(`<div><span>Van:</span><strong>${identity(fromName, fromEmail)}</strong></div>`);
+    const unknownRecipient = '<strong data-mailbox-routing-unknown="true">Niet beschikbaar in bronbericht</strong>';
     if (mail.recipientRoutingEvidenceKnown === true) {
       const to = String(mail.toDisplay || mail.to || '').trim();
       const cc = String(mail.cc || '').trim();
       const bcc = String(mail.bcc || '').trim();
-      if (to) rows.push(`<div><span>Aan:</span><strong>${exactHeaderValue(to)}</strong></div>`);
+      rows.push(`<div><span>Aan:</span>${to ? `<strong>${exactHeaderValue(to)}</strong>` : unknownRecipient}</div>`);
       if (cc) rows.push(`<div><span>CC:</span><strong>${exactHeaderValue(cc)}</strong></div>`);
       if (bcc) rows.push(`<div><span>BCC:</span><strong>${exactHeaderValue(bcc)}</strong></div>`);
+    } else {
+      rows.push(`<div><span>Aan:</span>${unknownRecipient}</div>`);
     }
-    if (!rows.length) return '';
     return `
       <div class="detail-routing" data-mailbox-routing-kind="direct">
         ${rows.join('')}
@@ -533,7 +578,7 @@
     }).join('')}</div>`;
   }
 
-  function stripQuotedReply(value) {
+  function splitQuotedReply(value) {
     const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
     const directQuoteStart = lines.findIndex((line) => {
       const content = String(line || '').trim();
@@ -578,7 +623,14 @@
     }
     const quoteStarts = [directQuoteStart, structuredQuoteStart].filter((index) => index >= 0);
     const quoteStart = quoteStarts.length ? Math.min(...quoteStarts) : -1;
-    return (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim();
+    return {
+      authored: (quoteStart >= 0 ? lines.slice(0, quoteStart) : lines).join('\n').trim(),
+      quoted: quoteStart >= 0 ? lines.slice(quoteStart).join('\n').trim() : '',
+    };
+  }
+
+  function stripQuotedReply(value) {
+    return splitQuotedReply(value).authored;
   }
 
   const THREAD_MATCH_IGNORABLE_LINE_PATTERNS = [
@@ -609,109 +661,6 @@
       .toLowerCase();
   }
 
-  function tokenizeThreadMatchText(value) {
-    return String(value || '')
-      .replace(/&(?:nbsp|amp);/gi, ' ')
-      .replace(/['’]/g, '')
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-  }
-
-  function extractThreadWebsiteDomain(value) {
-    const match = String(value || '').match(
-      /\b(?:website|site)\s+\(?([a-z0-9-]+(?:\s*\.\s*[a-z0-9-]+)+)\)?\s+tegen\b/i
-    );
-    return match ? match[1].replace(/\s+/g, '').toLowerCase() : '';
-  }
-
-  function countSharedTokens(leftTokens, rightTokens) {
-    const available = new Map();
-    rightTokens.forEach((token) => available.set(token, (available.get(token) || 0) + 1));
-    return leftTokens.reduce((count, token) => {
-      const remaining = available.get(token) || 0;
-      if (!remaining) return count;
-      available.set(token, remaining - 1);
-      return count + 1;
-    }, 0);
-  }
-
-  function createThreadTokenShingles(tokens, size = 3) {
-    if (!Array.isArray(tokens) || tokens.length < size) return [];
-    const shingles = [];
-    for (let index = 0; index <= tokens.length - size; index += 1) {
-      shingles.push(tokens.slice(index, index + size).join(' '));
-    }
-    return shingles;
-  }
-
-  function isFormattingVariantOfThreadMessage(quotedText, authoredText) {
-    if (Math.min(quotedText.length, authoredText.length) < 96) return false;
-    const quotedDomain = extractThreadWebsiteDomain(quotedText);
-    const authoredDomain = extractThreadWebsiteDomain(authoredText);
-    if (quotedDomain && authoredDomain && quotedDomain !== authoredDomain) return false;
-
-    const quotedTokens = tokenizeThreadMatchText(quotedText);
-    const authoredTokens = tokenizeThreadMatchText(authoredText);
-    if (Math.min(quotedTokens.length, authoredTokens.length) < 16) return false;
-
-    const shorterTokens = quotedTokens.length <= authoredTokens.length ? quotedTokens : authoredTokens;
-    const longerTokens = quotedTokens.length <= authoredTokens.length ? authoredTokens : quotedTokens;
-    const sharedTokenCoverage = countSharedTokens(shorterTokens, longerTokens) / shorterTokens.length;
-
-    const shorterShingles = createThreadTokenShingles(shorterTokens);
-    const longerShingles = createThreadTokenShingles(longerTokens);
-    if (!shorterShingles.length || !longerShingles.length) return false;
-    const sharedShingleCoverage = countSharedTokens(shorterShingles, longerShingles) / shorterShingles.length;
-
-    return (
-      (sharedTokenCoverage >= 0.82 && sharedShingleCoverage >= 0.72) ||
-      (sharedTokenCoverage >= 0.9 && sharedShingleCoverage >= 0.58)
-    );
-  }
-
-  function isSameThreadMessageText(quotedText, authoredText) {
-    if (!quotedText || !authoredText) return false;
-    if (quotedText === authoredText) return true;
-    const [shorterText, longerText] = quotedText.length <= authoredText.length
-      ? [quotedText, authoredText]
-      : [authoredText, quotedText];
-    if (shorterText.length < 8) return false;
-    if (longerText.startsWith(`${shorterText} `) || longerText.endsWith(` ${shorterText}`)) return true;
-    return isFormattingVariantOfThreadMessage(quotedText, authoredText);
-  }
-
-  function looksLikeOriginalCampaignText(value) {
-    const text = normalizeThreadMatchText(value);
-    const signals = [
-      /\bafgelopen week kwam ik (?:jullie|je|uw) website\b/,
-      /\b(?:uit|vanuit) enthousiasme\b.{0,180}\b(?:fris|nieuw) webdesign\b/,
-      /\bik heb\b.{0,100}\b(?:fris|nieuw) webdesign\b.{0,80}\bgemaakt\b/,
-      /\bik ben oprecht benieuwd wat (?:je|jullie|u) ervan vind/,
-      /\b(?:ontwerp|webdesign)\b.{0,100}\b(?:bijlage|online preview)\b/,
-    ];
-    return signals.filter((pattern) => pattern.test(text)).length >= 2;
-  }
-
-  function getCampaignWebsiteDomains(value) {
-    const domains = new Set();
-    const source = String(value || '').replace(/\u2060/g, '');
-    for (const match of source.matchAll(/\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/gi)) {
-      const domain = String(match[1] || '').toLowerCase();
-      if (!domain || domain === 'softora.nl' || domain.endsWith('.softora.nl')) continue;
-      domains.add(domain);
-    }
-    return domains;
-  }
-
-  function isSameCampaignWebsite(leftText, rightText) {
-    const leftDomains = getCampaignWebsiteDomains(leftText);
-    const rightDomains = getCampaignWebsiteDomains(rightText);
-    if (!leftDomains.size || !rightDomains.size) return true;
-    return Array.from(leftDomains).some((domain) => rightDomains.has(domain));
-  }
-
   function stripStructuredQuoteMetadata(lines) {
     const metadataPattern = /^(?:verzonden|sent|datum|date|aan|to|onderwerp|subject):\s*/i;
     const values = Array.isArray(lines) ? lines.slice() : [];
@@ -721,36 +670,90 @@
     return values;
   }
 
+  function stripQuotedThreadEnvelope(value) {
+    const values = String(value || '').replace(/\r\n?/g, '\n').split('\n');
+    while (values.length && !String(values[0] || '').trim()) values.shift();
+    const firstLine = String(values[0] || '').trim();
+    if (
+      /^(?:on .+\bwrote\b|op .+\bschreef\b.*|op .+\bheeft\s+.+\s+geschreven)\s*:\s*$/i.test(firstLine) ||
+      /^-{2,}\s*(?:original message|oorspronkelijk bericht)\b/i.test(firstLine)
+    ) {
+      values.shift();
+    }
+    return stripStructuredQuoteMetadata(values).join('\n');
+  }
+
+  function stripOneQuotedDepth(value) {
+    return String(value || '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => String(line || '').replace(/^\s*>\s?/, ''))
+      .join('\n');
+  }
+
+  function isForwardedConversation(mail) {
+    return /^(?:(?:re)\s*:\s*)*(?:fw|fwd)\s*:/i.test(String(mail && mail.subject || '').trim());
+  }
+
+  function isSameProvenMailboxScope(message, mail) {
+    const messageAccount = normalizeEmail(message && message.accountEmail);
+    const mailAccount = normalizeEmail(mail && mail.accountEmail);
+    if (messageAccount && mailAccount && messageAccount === mailAccount) return true;
+    const copyContext = mail && mail.copyContext;
+    return Boolean(
+      copyContext && copyContext.evidenceKnown === true &&
+      messageAccount &&
+      messageAccount === normalizeEmail(copyContext.sourceAccountEmail)
+    );
+  }
+
+  function getProvenOutboundThreadMessages(mail) {
+    return (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
+      .filter((message) => (
+        isSentMessageByProvenance(message, mail && mail.accountEmail) &&
+        isSameProvenMailboxScope(message, mail)
+      ));
+  }
+
+  function findExactQuotedOutbound(quotedValue, mail) {
+    if (isForwardedConversation(mail)) return null;
+    const quotedEnvelope = stripQuotedThreadEnvelope(quotedValue);
+    const quotedText = normalizeThreadMatchText(quotedEnvelope);
+    const quotedAuthoredText = normalizeThreadMatchText(
+      stripQuotedReply(stripOneQuotedDepth(quotedEnvelope))
+    );
+    if (!quotedText && !quotedAuthoredText) return null;
+    return getProvenOutboundThreadMessages(mail).find((message) => {
+      const fullText = normalizeThreadMatchText(message && (message.body || message.text || ''));
+      const authoredText = normalizeThreadMatchText(stripQuotedReply(
+        message && (message.body || message.text || '')
+      ));
+      return (
+        (fullText.length >= 8 && quotedText === fullText) ||
+        (authoredText.length >= 8 && quotedAuthoredText === authoredText)
+      );
+    }) || null;
+  }
+
+  function getSourceSafeThreadBody(message, mail) {
+    const body = String(message && message.body || '');
+    if (!body || isSentMessageByProvenance(message, mail && mail.accountEmail)) {
+      return stripQuotedReply(body);
+    }
+    const parts = splitQuotedReply(body);
+    if (!parts.quoted || !parts.authored) return body.trim();
+    return findExactQuotedOutbound(parts.quoted, mail) ? parts.authored : body.trim();
+  }
+
   function isDuplicateStructuredOwnQuote(section, mail, isReplyHeaderLine) {
     if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
+    if (isForwardedConversation(mail)) return false;
     const firstLine = String(section.lines[0] || '').trim();
     const hasReplyHeader = typeof isReplyHeaderLine === 'function' && isReplyHeaderLine(firstLine);
-    const quotedText = normalizeThreadMatchText(
-      stripStructuredQuoteMetadata(hasReplyHeader ? section.lines.slice(1) : section.lines).join('\n')
-    );
-    if (!quotedText) return false;
-    const sentMessages = (Array.isArray(mail && mail.threadMessages) ? mail.threadMessages : [])
-      .filter((message) => isSentMessageByProvenance(message, mail && mail.accountEmail));
-    if (looksLikeOriginalCampaignText(quotedText)) {
-      const originalCampaignMessage = sentMessages.find((message) => {
-        const authoredText = stripQuotedReply(
-          message && (message.body || message.text || message.preview)
-        );
-        return Boolean(
-          (message && message.originalCampaignOutbound) ||
-          looksLikeOriginalCampaignText(authoredText)
-        ) && isSameCampaignWebsite(quotedText, authoredText);
-      });
-      if (originalCampaignMessage) return true;
-    }
-    if (!hasReplyHeader) return false;
-    return sentMessages.some((message) => {
-      const authoredText = normalizeThreadMatchText(stripQuotedReply(
-        message && (message.body || message.text || message.preview)
-      ));
-      if (authoredText.length < 8) return false;
-      return isSameThreadMessageText(quotedText, authoredText);
-    });
+    return Boolean(findExactQuotedOutbound(
+      (hasReplyHeader ? section.lines.slice(1) : section.lines).join('\n'),
+      mail
+    ));
   }
 
   function isMessageBodyPending(message) {
@@ -792,7 +795,7 @@
     return messages.map((message) => {
       const loadError = String(message && message.bodyLoadError || '').trim();
       const loading = !loadError && isMessageBodyPending(message);
-      const body = loading ? '' : stripQuotedReply(message && message.body);
+      const body = loading ? '' : getSourceSafeThreadBody(message, mail);
       if (!body && !loading && !loadError) return '';
       const when = typeof formatDate === 'function' ? formatDate(message.date) : null;
       const sent = isSentMessageByProvenance(message, mail.accountEmail);
@@ -813,6 +816,7 @@
             return `<div class="detail-mail-line${emptyClass}">${escapeHtml(content)}</div>`;
           }).join('')}</div>`;
       const renderedAttachments = loading ? '' : renderAttachments(message, escapeHtml);
+      const renderedRouting = renderMessageRouting(message, escapeHtml);
       const sectionClass = sent
         ? 'detail-mail-section detail-mail-section-sent'
         : 'detail-mail-section detail-mail-section-received';
@@ -825,7 +829,7 @@
       return `${actionBefore}<section class="${sectionClass}">
           <div class="detail-mail-section-label">${sent ? sentLabel : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
-          ${renderedBody}${renderedAttachments}${actionInside}
+          ${renderedRouting}${renderedBody}${renderedAttachments}${actionInside}
         </section>`;
     }).filter(Boolean).join('');
   }
