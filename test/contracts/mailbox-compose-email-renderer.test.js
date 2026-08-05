@@ -26,7 +26,7 @@ test('manual mailbox email preserves exact safe links and escapes raw user HTML'
 
   assert.match(html, /href="https:\/\/www\.softora\.nl\/webdesign\/test\?x=1&amp;y=2"[^>]+>het ontwerp<\/a>/);
   assert.match(html, /href="https:\/\/example\.nl\/pad"[^>]+>https:\/\/example\.nl\/pad<\/a>\./);
-  assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(html, /<script>/i);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt; 😁/);
   assert.doesNotMatch(html, /href="(?:javascript|data):/i);
 });
