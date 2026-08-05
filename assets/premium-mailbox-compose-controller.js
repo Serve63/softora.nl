@@ -1,8 +1,78 @@
 (function (global) {
   function create(options = {}) {
     const documentRef = options.document || global.document;
+    const acceptedSends = new Map();
     let replyContext = null;
     let replyOwner = '';
+
+    function normalize(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function normalizeMessageId(value) {
+      return normalize(value).replace(/^<+|>+$/g, '');
+    }
+
+    function getMessageIdentity(message) {
+      const providerMessageId = normalize(message?.providerMessageId);
+      if (providerMessageId) return `provider:${providerMessageId}`;
+      const messageId = normalizeMessageId(message?.messageId);
+      if (messageId) return `message:${messageId}`;
+      return `local:${normalize(message?.id || message?.mailboxId)}`;
+    }
+
+    function getConversationKeys(mail) {
+      return new Set([
+        mail?.id,
+        mail?.mailboxId,
+        mail?.conversationId,
+        mail?.providerThreadId && `provider-thread:${normalize(mail.providerThreadId)}`,
+        mail?.messageId && `message:${normalizeMessageId(mail.messageId)}`,
+      ].map((value) => String(value || '').trim()).filter(Boolean));
+    }
+
+    function recordMatchesMail(record, mail) {
+      if (!record || !mail) return false;
+      if (normalize(record.owner) !== normalize(options.campaignInbox?.getMessageOwner?.(mail))) return false;
+      if (normalize(record.accountEmail) !== normalize(mail.accountEmail)) return false;
+      const keys = getConversationKeys(mail);
+      return (Array.isArray(record.conversationKeys) ? record.conversationKeys : [])
+        .some((key) => keys.has(String(key || '').trim()));
+    }
+
+    function reconcile(mail) {
+      if (!mail) return mail;
+      const records = Array.from(acceptedSends.values()).filter((record) => recordMatchesMail(record, mail));
+      if (!records.length) return mail;
+      const messages = Array.isArray(mail.threadMessages) ? mail.threadMessages.slice() : [];
+      const identities = new Set([mail, ...messages].map(getMessageIdentity).filter(Boolean));
+      records
+        .sort((left, right) => Date.parse(left.acceptedAt) - Date.parse(right.acceptedAt))
+        .forEach((record) => {
+          const normalizedMessage = typeof options.normalizeAcceptedMessage === 'function'
+            ? options.normalizeAcceptedMessage(record.message)
+            : { ...record.message };
+          const identity = getMessageIdentity(normalizedMessage);
+          if (identity && !identities.has(identity)) {
+            messages.push(normalizedMessage);
+            identities.add(identity);
+          }
+          const acceptedAt = String(record.acceptedAt || '');
+          mail.latestOutboundAt = acceptedAt;
+          mail.unread = false;
+          mail.replyDismissedAt = acceptedAt;
+        });
+      mail.threadMessages = messages.sort((left, right) => (
+        Date.parse(String(right?.receivedAt || right?.date || '')) - Date.parse(String(left?.receivedAt || left?.date || ''))
+      ));
+      return mail;
+    }
+
+    function rememberAcceptedSend(record) {
+      if (!record?.key) return;
+      acceptedSends.set(record.key, record);
+      options.onAcceptedSend?.(record);
+    }
 
     function fieldValue(id) {
       return String(documentRef?.getElementById(id)?.value || '');
@@ -172,9 +242,15 @@
       }
       const account = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
       const sendBtn = documentRef?.querySelector('.btn-send');
-      if (sendBtn) sendBtn.disabled = true;
+      const originalSendLabel = sendBtn ? sendBtn.textContent : '';
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.setAttribute?.('aria-busy', 'true');
+        sendBtn.textContent = 'Versturen…';
+      }
       try {
         assertReplyOwner();
+        const contextAtSend = replyContext ? { ...replyContext } : null;
         const provider = String(replyContext && replyContext.provider || '').trim().toLowerCase();
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
@@ -207,15 +283,66 @@
         if (!response.ok || !data?.ok) {
           throw new Error(data?.detail || data?.error || 'Mail verzenden mislukt');
         }
+        const result = data?.result && typeof data.result === 'object' ? data.result : {};
+        const acceptedAt = new Date().toISOString();
+        const messageId = String(result.messageId || '').trim();
+        const providerMessageId = String(result.providerMessageId || '').trim();
+        const contextMail = contextAtSend ? options.findMail(contextAtSend.id) : null;
+        const conversationKeys = Array.from(getConversationKeys(contextMail || contextAtSend));
+        if (contextAtSend?.providerThreadId) {
+          conversationKeys.push(`provider-thread:${normalize(contextAtSend.providerThreadId)}`);
+        }
+        const sentMessage = {
+          ...(result.sentMessage && typeof result.sentMessage === 'object' ? result.sentMessage : {}),
+          id: providerMessageId ? `instantly:${providerMessageId}` : `accepted-sent:${messageId || acceptedAt}`,
+          mailboxId: providerMessageId ? `instantly:${providerMessageId}` : `accepted-sent:${messageId || acceptedAt}`,
+          folder: 'sent',
+          storageFolder: provider === 'instantly' ? 'instantly' : 'sent',
+          direction: 'sent',
+          accountEmail: account,
+          provider,
+          providerOwner: replyOwner,
+          providerMessageId,
+          providerThreadId: String(result.providerThreadId || contextAtSend?.providerThreadId || '').trim(),
+          messageId: String(result.sentMessage?.messageId || messageId).trim(),
+          from: String(result.sentMessage?.from || options.campaignInbox?.getOwnerLabel?.(replyOwner) || account),
+          email: String(result.sentMessage?.email || account),
+          to: String(result.sentMessage?.to || to),
+          toDisplay: String(result.sentMessage?.toDisplay || result.sentMessage?.to || to),
+          cc: String(result.sentMessage?.cc || fieldValue('c-cc')),
+          bcc: String(result.sentMessage?.bcc || fieldValue('c-bcc')),
+          recipientRoutingEvidenceKnown: true,
+          subject,
+          body: fieldValue('c-body'),
+          preview: fieldValue('c-body'),
+          receivedAt: String(result.sentMessage?.receivedAt || acceptedAt),
+          activityAt: String(result.sentMessage?.activityAt || result.sentMessage?.receivedAt || acceptedAt),
+          hasBody: true,
+          bodyLoaded: true,
+          bodyTruncated: false,
+          unread: false,
+          replyDismissedAt: acceptedAt,
+          localAcceptedSend: true,
+        };
+        const identity = getMessageIdentity(sentMessage);
+        rememberAcceptedSend({
+          key: `${normalize(replyOwner)}|${normalize(account)}|${identity}`,
+          owner: normalize(replyOwner),
+          accountEmail: normalize(account),
+          acceptedAt,
+          conversationKeys: Array.from(new Set(conversationKeys.filter(Boolean))),
+          message: sentMessage,
+        });
         close();
         options.toast('✓ Mail verzonden');
-        if (['sent', 'outreach'].includes(options.getActiveFolder())) {
-          await options.loadMessages({ skipPageBootstrap: true, openLatest: false });
-        }
       } catch (error) {
         options.toast(String(error?.message || error || 'Mail verzenden mislukt'));
       } finally {
-        if (sendBtn) sendBtn.disabled = false;
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          sendBtn.removeAttribute?.('aria-busy');
+          sendBtn.textContent = originalSendLabel || 'Versturen';
+        }
       }
     }
 
@@ -254,6 +381,7 @@
       open,
       reply,
       rewrite,
+      reconcile,
       send,
     };
   }
