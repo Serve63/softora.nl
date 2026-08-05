@@ -1257,6 +1257,88 @@ test('campaign reply service koppelt Brigit, Karlien en Marjolein via exacte oud
   });
 });
 
+test('campaign reply service laadt een latere Sent-descendant buiten de globale scan bronvast bij', async () => {
+  const inbound = {
+    id: 'inbox:60',
+    uid: 60,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    from: 'Brigit',
+    email: 'info@bizzylizzy.nl',
+    to: 'serve@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Bedankt voor je bericht.',
+    date: '2026-06-01T14:46:38.000Z',
+    messageId: '<brigit-reply@example.nl>',
+    inReplyTo: '<brigit-parent@softora.nl>',
+    references: '<brigit-parent@softora.nl>',
+  };
+  const originalOutbound = {
+    id: 'sent:62',
+    uid: 62,
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    from: 'Servé Creusen',
+    email: 'serve@softora.nl',
+    to: 'info@bizzylizzy.nl',
+    subject: 'Kleine vraag over jullie website',
+    preview: 'Goedendag,',
+    date: '2026-05-31T10:33:11.000Z',
+    messageId: '<brigit-parent@softora.nl>',
+    originalCampaignOutbound: true,
+  };
+  const laterOutbound = {
+    id: 'sent:71',
+    uid: 71,
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    from: 'Servé Creusen',
+    email: 'serve@softora.nl',
+    to: 'info@bizzylizzy.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dankjewel voor je reactie.',
+    date: '2026-06-02T11:12:14.000Z',
+    messageId: '<brigit-follow-up@softora.nl>',
+    inReplyTo: '<brigit-reply@example.nl>',
+    references: '<brigit-parent@softora.nl>, <brigit-reply@example.nl>',
+  };
+  const descendantLookups = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'inbox' ? [inbound] : [],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'sent' ? [] : [inbound],
+      listMessagesByMessageIdsForAccounts: async () => [originalOutbound],
+      listMessagesReferencingMessageIdsForAccounts: async (options) => {
+        descendantLookups.push(options);
+        assert.deepEqual(options.accountEmails, ['serve@softora.nl']);
+        return options.messageIds.some((messageId) => String(messageId).includes('brigit-reply@example.nl'))
+          ? [laterOutbound]
+          : [];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'bizzylizzy',
+        bedrijf: 'Bizzylizzy',
+        email: 'info@bizzylizzy.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'serve' });
+
+  assert.ok(descendantLookups.length >= 1);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].activityAt, laterOutbound.date);
+  assert.deepEqual(
+    replies[0].threadMessages.map((message) => message.id),
+    ['sent:71', 'sent:62']
+  );
+});
+
 test('campaign reply service hydrateert alleen de zichtbare conversatieroots en niet alle threadbodies', async () => {
   const hydratedIds = [];
   const replies = Array.from({ length: 140 }, (_item, index) => ({

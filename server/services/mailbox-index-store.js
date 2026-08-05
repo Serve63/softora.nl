@@ -2,6 +2,9 @@ const crypto = require('crypto');
 const {
   isOriginalCampaignOutboundMessage,
 } = require('./mailbox-image-ownership');
+const {
+  createMailboxMessageReferenceLookup,
+} = require('../repositories/mailbox-message-reference-lookup');
 
 const MAILBOX_INDEX_TABLES = Object.freeze({
   messages: 'softora_mailbox_messages',
@@ -1055,6 +1058,16 @@ function createMailboxIndexStore(deps = {}) {
     return now().getTime() - syncedAt > Math.max(1_000, Number(maxAgeMs) || 120_000);
   }
 
+  const listMessagesReferencingMessageIdsForAccounts = createMailboxMessageReferenceLookup({
+    run,
+    tableName: MAILBOX_INDEX_TABLES.messages,
+    metadataColumns: MAILBOX_MESSAGE_METADATA_COLUMNS,
+    normalizeString,
+    normalizeEmail,
+    normalizeFolder,
+    normalizeMessageRow,
+  });
+
   return {
     BODY_MAX_CHARS,
     BODY_RETENTION_DAYS,
@@ -1077,6 +1090,7 @@ function createMailboxIndexStore(deps = {}) {
     listAllMessagesForAccounts,
     listMatchingMessagesForAccounts,
     listMessagesByMessageIdsForAccounts,
+    listMessagesReferencingMessageIdsForAccounts,
     listMessageUidsForAccount,
     listMessages,
     listMessagesForAccounts,

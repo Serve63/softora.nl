@@ -15,6 +15,8 @@ const CAMPAIGN_MESSAGE_SCAN_LIMIT = 250;
 const CAMPAIGN_MATCHING_MESSAGE_SCAN_LIMIT = 1000;
 const CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT = 2000;
 const CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT = 1000;
+const CAMPAIGN_SENT_DESCENDANT_LOOKUP_LIMIT = 2000;
+const CAMPAIGN_SENT_DESCENDANT_MAX_DEPTH = 20;
 const CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE = 100;
 const CAMPAIGN_UNREFERENCED_PARENT_WINDOW_MS = 15 * 60 * 1000;
 const CAMPAIGN_SUBJECT_TERMS = Object.freeze([
@@ -147,10 +149,11 @@ function getMessageReferenceIds(message) {
   return Array.from(new Set([
     message && message.references,
     message && message.inReplyTo,
-  ]
-    .flatMap((value) => normalizeText(value).toLowerCase().split(/\s+/))
-    .map(normalizeMessageId)
-    .filter(Boolean)));
+  ].flatMap((value) => {
+    const source = normalizeText(value).toLowerCase();
+    if (!source) return [];
+    return source.match(/<[^<>]+>/g) || source.split(/[,\s]+/);
+  }).map(normalizeMessageId).filter(Boolean)));
 }
 
 function getMessageReferenceLookupValues(messages) {
@@ -171,6 +174,84 @@ function getMessageReferenceLookupValues(messages) {
     });
   });
   return Array.from(values).slice(0, CAMPAIGN_PARENT_MESSAGE_LOOKUP_LIMIT);
+}
+
+async function listExactSentDescendants({
+  mailboxIndexStore,
+  seedMessages = [],
+  allowedAccountEmails = [],
+} = {}) {
+  if (!mailboxIndexStore || typeof mailboxIndexStore.listMessagesReferencingMessageIdsForAccounts !== 'function') {
+    return [];
+  }
+  const allowedAccounts = new Set(
+    (Array.isArray(allowedAccountEmails) ? allowedAccountEmails : [])
+      .map(normalizeEmail)
+      .filter(Boolean)
+  );
+  const allDescendants = [];
+  const seenMessageIdentities = new Set();
+  const queriedReferences = new Set();
+  let frontier = dedupeCampaignMessages(seedMessages).filter((message) => (
+    allowedAccounts.has(normalizeEmail(message && message.accountEmail)) &&
+    normalizeMessageId(message && message.messageId)
+  ));
+
+  for (let depth = 0; frontier.length && depth < CAMPAIGN_SENT_DESCENDANT_MAX_DEPTH; depth += 1) {
+    const frontierByAccount = new Map();
+    frontier.forEach((message) => {
+      const accountEmail = normalizeEmail(message && message.accountEmail);
+      const messageId = normalizeMessageId(message && message.messageId);
+      const queryKey = `${accountEmail}|${messageId}`;
+      if (!accountEmail || !messageId || queriedReferences.has(queryKey)) return;
+      queriedReferences.add(queryKey);
+      if (!frontierByAccount.has(accountEmail)) frontierByAccount.set(accountEmail, []);
+      frontierByAccount.get(accountEmail).push(messageId);
+    });
+    if (!frontierByAccount.size) break;
+
+    const nextFrontier = [];
+    for (const [accountEmail, messageIds] of frontierByAccount.entries()) {
+      const result = await mailboxIndexStore.listMessagesReferencingMessageIdsForAccounts({
+        accountEmails: [accountEmail],
+        folder: 'sent',
+        messageIds,
+      });
+      if (!Array.isArray(result)) {
+        const error = new Error('Gerichte Sent-threadcontrole kon niet worden gelezen.');
+        error.status = 503;
+        throw error;
+      }
+      result.forEach((message) => {
+        if (
+          normalizeEmail(message && message.accountEmail) !== accountEmail ||
+          getMailboxMessageDirection(message) !== 'sent'
+        ) {
+          return;
+        }
+        const referencedIds = getMessageReferenceIds(message);
+        if (!referencedIds.some((messageId) => messageIds.includes(messageId))) return;
+        const identity = getMessageIdentity(message);
+        if (!identity || seenMessageIdentities.has(identity)) return;
+        seenMessageIdentities.add(identity);
+        allDescendants.push(message);
+        nextFrontier.push(message);
+      });
+    }
+    if (allDescendants.length > CAMPAIGN_SENT_DESCENDANT_LOOKUP_LIMIT) {
+      const error = new Error('Gerichte Sent-threadcontrole overschreed de veilige limiet.');
+      error.status = 503;
+      throw error;
+    }
+    frontier = nextFrontier;
+  }
+
+  if (frontier.length) {
+    const error = new Error('Gerichte Sent-threadcontrole bereikte de maximale ketendiepte.');
+    error.status = 503;
+    throw error;
+  }
+  return dedupeCampaignMessages(allDescendants);
 }
 
 function getExactCrossAccountSentCopy(message, sentMessages) {
@@ -884,9 +965,18 @@ function createMailboxCampaignRepliesService(deps = {}) {
           messageIds: parentMessageIds,
         }).catch(() => [])
       : [];
+    const targetedSentDescendantsResult = await listExactSentDescendants({
+      mailboxIndexStore,
+      seedMessages: [
+        ...replies,
+        ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
+      ],
+      allowedAccountEmails: campaignMailboxAccounts,
+    });
     const sentMessages = dedupeCampaignMessages([
       ...(Array.isArray(sentMessagesResult) ? sentMessagesResult : []),
       ...(Array.isArray(targetedParentMessagesResult) ? targetedParentMessagesResult : []),
+      ...targetedSentDescendantsResult,
     ]);
     const allVisibleConversations = attachCrossAccountMailboxCopies(
       attachSentThreadMessages(replies, sentMessages),
@@ -952,6 +1042,7 @@ module.exports = {
   getCampaignConversationId,
   getMessageReferenceIds,
   getMessageReferenceLookupValues,
+  listExactSentDescendants,
   getExactCrossAccountSentCopy,
   getExactMessageLineage,
   getStableCampaignThreadKey,
