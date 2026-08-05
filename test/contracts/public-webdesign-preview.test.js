@@ -1693,6 +1693,16 @@ test('public webdesign preview route exposes the shareable webdesign page', () =
   const req = {};
   publicWebdesignRoute.handler(req, {});
   assert.equal(req.called, 'concept');
+
+  for (const assetPath of [
+    '/webdesign/:companySlug/asset/:assetType',
+    '/mailklaar/:customerId/asset/:assetType',
+  ]) {
+    const assetResponse = createResponseRecorder();
+    routes.find((route) => route.path === assetPath).handler({}, assetResponse);
+    assert.equal(assetResponse.headers['Access-Control-Allow-Origin'], '*');
+    assert.equal(assetResponse.headers['Cross-Origin-Resource-Policy'], 'cross-origin');
+  }
 });
 
 test('public webdesign preview is wired into feature routes', () => {
