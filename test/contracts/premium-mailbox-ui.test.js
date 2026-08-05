@@ -110,6 +110,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260805a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -1481,6 +1482,131 @@ test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs
   );
 });
 
+test('mailbox houdt een bewezen outboundbody zichtbaar als alleen optionele linkverrijking faalt', async () => {
+  const helpers = loadMailboxHelpersForTest();
+  const exactBody = [
+    'Goedendag,',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
+  ].join('\n');
+  const mail = {
+    id: 'instantly:mhc-received',
+    accountEmail: 'servecreusen@websoftora.com',
+    threadMessages: [{
+      id: 'instantly:mhc-sent',
+      folder: 'sent',
+      storageFolder: 'instantly',
+      accountEmail: 'servecreusen@websoftora.com',
+      provider: 'instantly',
+      body: exactBody,
+      bodyLoaded: true,
+      hasBody: true,
+      bodyTruncated: false,
+      bodyImageEvidenceKnown: true,
+      embeddedImageCount: 0,
+      originalCampaignOutbound: true,
+      webdesignLinkEvidenceKnown: false,
+    }],
+  };
+  const requests = [];
+
+  await helpers.index.loadThreadBodies({
+    mail,
+    getActiveMail: () => mail.id,
+    openMail() {},
+    fetchImpl: async (url) => {
+      requests.push(String(url));
+      if (String(url) === '/api/mailbox/messages/bodies') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            messages: [{
+              id: 'instantly:mhc-sent',
+              folder: 'instantly',
+              accountEmail: 'servecreusen@websoftora.com',
+              body: exactBody,
+              hasBody: true,
+              bodyTruncated: false,
+              bodyImageEvidenceKnown: true,
+              embeddedImageCount: 0,
+              originalCampaignOutbound: true,
+              webdesignLinkEvidenceKnown: false,
+            }],
+          }),
+        };
+      }
+      return {
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'Linkbron niet beschikbaar' }),
+      };
+    },
+  });
+
+  assert.equal(requests.length, 2);
+  assert.equal(mail.threadMessages[0].body, exactBody);
+  assert.equal(mail.threadMessages[0].bodyLoaded, true);
+  assert.equal(mail.threadMessages[0].bodyLoadError, '');
+  assert.equal(mail.threadMessages[0].bodyLoading, false);
+  assert.equal(mail.threadMessages[0].webdesignLinkHydrationAttempted, true);
+  assert.equal(helpers.index.needsThreadLinkHydration(mail.threadMessages[0]), false);
+});
+
+test('MHC quote staat alleen in de bewezen roze outboundkaart en niet dubbel in grijs', () => {
+  const exactUrl = 'https://www.softora.nl/webdesign/mhc-berkel-enschot?cid=safe-dedupe-20260615-row-830-5ee1bc4e3b&sender=serve';
+  const outboundBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website mhcbe.nl tegen.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    '',
+    `Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link [${exactUrl}] bekijken 🎨`,
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '',
+    '📍 Berkel-Enschot',
+  ].join('\n');
+  const incomingBody = [
+    'Beste Servé, bedankt voor je bericht.',
+    '',
+    'Op vr 24 jul 2026 om 07:33 schreef Servé Creusen <servecreusen@websoftora.com>:',
+    ...outboundBody.replace(` [${exactUrl}]`, '').split('\n').map((line) => `> ${line}`),
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'instantly:mhc-received',
+    mail: {
+      accountEmail: 'servecreusen@websoftora.com',
+      provider: 'instantly',
+      receivedAt: '2026-08-05T08:26:16.000Z',
+      threadMessages: [{
+        id: 'instantly:mhc-sent',
+        folder: 'sent',
+        storageFolder: 'instantly',
+        accountEmail: 'servecreusen@websoftora.com',
+        provider: 'instantly',
+        providerOwner: 'serve',
+        to: 'bestuur@mhcbe.nl',
+        date: '2026-07-24T05:33:08.000Z',
+        body: outboundBody,
+        hasBody: true,
+        bodyLoaded: true,
+        originalCampaignOutbound: true,
+        webdesignLinkEvidenceKnown: true,
+        webdesignLinkUrl: exactUrl,
+      }],
+    },
+  });
+
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website mhcbe\.nl tegen\./g) || []).length, 1);
+  assert.match(html, /Jouw bericht/);
+  assert.doesNotMatch(html, /Ingesloten berichtgeschiedenis/);
+  assert.doesNotMatch(html, /Volledig bericht is niet beschikbaar/);
+});
+
 test('mailbox verwijdert alleen een exacte dubbele URL-annotatie op de volgende regel', () => {
   const url = 'https://www.festivalcement.nl/over-cement';
   const html = renderMailboxBodyForTest([
@@ -2355,7 +2481,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260805a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260805b/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -2430,7 +2556,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260805a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260805a"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -4264,6 +4390,73 @@ test('mailbox bodyhydratie herstelt in-place na een tijdelijke serverfout', asyn
   assert.equal(mail.bodyLoadError, '');
   assert.equal(mail.bodyLoading, false);
   assert.equal(renderCount, 1);
+});
+
+test('top-level body blijft zichtbaar wanneer alleen campagne-linkverrijking definitief faalt', async () => {
+  const exactBody = [
+    'Goedendag,',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
+  ].join('\n');
+  const requests = [];
+  const mailbox = loadMailboxHelpersForTest({
+    fetch: async (url) => {
+      requests.push(String(url));
+      if (String(url) === '/api/mailbox/messages/bodies') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            messages: [{
+              id: 'instantly:mhc-sent',
+              folder: 'instantly',
+              accountEmail: 'servecreusen@websoftora.com',
+              body: exactBody,
+              hasBody: true,
+              bodyTruncated: false,
+              bodyImageEvidenceKnown: true,
+              embeddedImageCount: 0,
+              originalCampaignOutbound: true,
+              webdesignLinkEvidenceKnown: false,
+              recipientRoutingEvidenceKnown: true,
+              to: 'bestuur@mhcbe.nl',
+            }],
+          }),
+        };
+      }
+      return {
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'Linkbron niet beschikbaar' }),
+      };
+    },
+  });
+  const mail = {
+    id: 'instantly:mhc-sent',
+    body: '',
+    hasBody: true,
+    bodyLoaded: false,
+  };
+
+  await mailbox.index.loadBody({
+    id: mail.id,
+    requestId: mail.id,
+    getMail: () => mail,
+    account: 'servecreusen@websoftora.com',
+    folder: 'instantly',
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+    getActiveMail: () => mail.id,
+    openMail() {},
+  });
+
+  assert.equal(requests.filter((url) => url === '/api/mailbox/messages/bodies').length, 1);
+  assert.equal(requests.filter((url) => url.startsWith('/api/mailbox/message?')).length, 1);
+  assert.equal(mail.body, exactBody);
+  assert.equal(mail.bodyLoaded, true);
+  assert.equal(mail.bodyLoadError, '');
+  assert.equal(mail.webdesignLinkHydrationAttempted, true);
 });
 
 test('top-level bodyloader eindigt begrensd met retry in plaats van oneindig laden', async () => {

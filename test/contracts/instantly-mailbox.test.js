@@ -300,6 +300,152 @@ test('exact customer and delivered quote restore Ramon emoji and the proven dire
   assert.equal(requests.some((request) => /\/leads(?:\/|$)/.test(new URL(request.url).pathname)), false);
 });
 
+test('MHC current CTA restores the exact quoted body and link across a proven same-owner alias', async () => {
+  const customerId = 'safe-dedupe-20260615-row-830-5ee1bc4e3b';
+  const exactUrl = `https://www.softora.nl/webdesign/mhc-berkel-enschot?cid=${customerId}&sender=serve`;
+  const providerBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website mhcbe.nl tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '',
+    'Berkel-Enschot',
+  ].join('\n');
+  const quotedBody = providerBody
+    .replace('eerlijke mening', 'eerlijke mening 😁')
+    .replace('link bekijken', 'link bekijken 🎨')
+    .replace('\nBerkel-Enschot', '\n📍 Berkel-Enschot');
+  const rawSent = incoming({
+    id: 'mhc-sent',
+    lead_id: 'lead-mhc',
+    thread_id: 'mhc-thread',
+    email_type: '1',
+    eaccount: 'servecreusen@websoftora.com',
+    from_address_email: 'servecreusen@websoftora.com',
+    to_address_email_list: ['bestuur@mhcbe.nl'],
+    body: { text: providerBody },
+  });
+  const rawReceived = incoming({
+    id: 'mhc-received',
+    thread_id: 'mhc-thread',
+    eaccount: 'servecreusen@websoftora.com',
+    from_address_email: 'bestuur@mhcbe.nl',
+    to_address_email_list: ['servecreusen@websoftora.com'],
+    body: {
+      text: [
+        'Beste Servé, bedankt voor je bericht.',
+        '',
+        'Op vr 24 jul 2026 om 07:33 schreef Servé Creusen <servecreusen@websoftora.com>:',
+        ...quotedBody.split('\n').map((line) => `> ${line}`),
+      ].join('\n'),
+    },
+  });
+  const exactCustomer = {
+    id: customerId,
+    email: 'bestuur@mhcbe.nl',
+    instantlyCampaignId: 'campaign-serve',
+    instantlyLeadId: 'lead-mhc',
+    instantlyActualSenderEmail: 'serve@websoftora.com',
+    instantlyPublicPreviewUrl: exactUrl,
+  };
+  const source = buildCustomerQuotedMessageSource(
+    rawSent,
+    [rawSent, rawReceived],
+    exactCustomer,
+    {
+      accountEmail: 'servecreusen@websoftora.com',
+      recipientEmail: 'bestuur@mhcbe.nl',
+      sameOwnerAccountEmails: ['serve@websoftora.com', 'servecreusen@websoftora.com'],
+    }
+  );
+
+  assert.equal(source.available, true);
+  assert.equal(source.webdesignLinkEvidenceKnown, true);
+  assert.equal(source.webdesignLinkUrl, exactUrl);
+  assert.match(source.body, /eerlijke mening 😁/u);
+  assert.match(source.body, new RegExp(`deze link \\[${exactUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\] bekijken 🎨`));
+
+  const store = createStore();
+  const { service, requests } = buildService({
+    store,
+    config: {
+      accountOwners: {
+        'serve@websoftora.com': 'serve',
+        'servecreusen@websoftora.com': 'serve',
+      },
+      campaignOwners: { 'campaign-serve': 'serve' },
+    },
+    getCustomerSourcesByEmails: async () => [exactCustomer],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('search') === 'thread:mhc-thread') {
+        return { response: { ok: true, status: 200 }, data: { items: [rawSent, rawReceived] } };
+      }
+      throw new Error(`Onverwachte providerrequest: ${url}`);
+    },
+  });
+
+  await service.hydrateThread({
+    threadId: 'mhc-thread',
+    accountEmail: 'servecreusen@websoftora.com',
+    owner: 'serve',
+  });
+
+  const restored = store.rows.find((message) => message.providerMessageId === 'mhc-sent');
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.webdesignLinkUrl, exactUrl);
+  assert.match(restored.body, /📍 Berkel-Enschot/u);
+  assert.equal(requests.some((request) => /\/leads(?:\/|$)/.test(new URL(request.url).pathname)), false);
+});
+
+test('exact delivered quote remains available without inventing a link when no supported CTA exists', () => {
+  const exactBody = [
+    'Goedendag,',
+    '',
+    'Dit is een voldoende lange, exact bewezen uitgaande tekst zonder ontwerpknop of linkmarker.',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const result = buildCustomerQuotedMessageSource({
+    id: 'body-only-sent',
+    lead_id: 'lead-body-only',
+    campaign_id: 'campaign-serve',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    body: { text: exactBody },
+  }, [{
+    id: 'body-only-received',
+    body: {
+      text: `Bedankt.\n\nOp di 7 jul 2026 om 07:52 schreef Servé <serve-sender@example.com>:\n${exactBody}`,
+    },
+  }], {
+    id: 'customer-body-only',
+    email: 'prospect@example.org',
+    instantlyCampaignId: 'campaign-serve',
+    instantlyLeadId: 'lead-body-only',
+    instantlyActualSenderEmail: 'serve-sender@example.com',
+    instantlyPublicPreviewUrl: 'https://www.softora.nl/webdesign/prospect?cid=customer-body-only&sender=serve',
+  }, {
+    accountEmail: 'serve-sender@example.com',
+    recipientEmail: 'prospect@example.org',
+  });
+
+  assert.equal(result.available, true);
+  assert.equal(result.body, exactBody);
+  assert.equal(result.webdesignLinkEvidenceKnown, true);
+  assert.equal(result.webdesignLinkUrl, '');
+  assert.match(result.reason, /:body-only$/);
+});
+
 test('Vught Outlook quote restores exact rich body across a stale same-owner sender alias', async () => {
   const customerId = 'safe-dedupe-vught';
   const exactUrl = `https://www.softora.nl/webdesign/gemeente-vught?cid=${customerId}&sender=serve`;
