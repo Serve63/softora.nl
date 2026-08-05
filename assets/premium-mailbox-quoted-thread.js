@@ -125,6 +125,13 @@
     return `${account}|${messageId || id}`;
   }
 
+  function normalizeMessageId(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^<+|>+$/g, '');
+  }
+
   function getAuthoredPrefix(value) {
     const parsed = findQuotedSegments(value);
     const firstQuotedStart = parsed.segments.length
@@ -135,7 +142,7 @@
       : String(value || '').trim();
   }
 
-  function findExactProvenOutbound(quotedValue, outboundMessages) {
+  function findExactProvenOutbound(quotedValue, outboundMessages, options = {}) {
     const quotedText = normalizeMatchText(quotedValue);
     if (!quotedText) return null;
     const matches = (Array.isArray(outboundMessages) ? outboundMessages : [])
@@ -156,16 +163,31 @@
       const identity = messageIdentity(message);
       if (identity && !unique.has(identity)) unique.set(identity, message);
     });
-    return unique.size === 1 ? Array.from(unique.values())[0] : null;
+    if (unique.size === 1) return Array.from(unique.values())[0];
+
+    // A quoted reply can contain the direct parent plus older nested messages.
+    // Text matching alone then produces multiple valid candidates. Prefer only
+    // an exact RFC Message-ID from the current message's In-Reply-To header;
+    // references/subject/date are deliberately not used as a guess.
+    const directParentMessageIds = new Set(
+      (Array.isArray(options.directParentMessageIds) ? options.directParentMessageIds : [])
+        .map(normalizeMessageId)
+        .filter(Boolean)
+    );
+    if (!directParentMessageIds.size) return null;
+    const directParents = Array.from(unique.values()).filter((message) => (
+      directParentMessageIds.has(normalizeMessageId(message && message.messageId))
+    ));
+    return directParents.length === 1 ? directParents[0] : null;
   }
 
-  function stripProvenQuotedOutbound(value, outboundMessages) {
+  function stripProvenQuotedOutbound(value, outboundMessages, options = {}) {
     const parsed = findQuotedSegments(value);
     if (!parsed.segments.length) return { body: String(value || '').trim(), removed: [], matchedMessages: [] };
     const removed = [];
     const matchedMessages = [];
     parsed.segments.forEach((segment) => {
-      const match = findExactProvenOutbound(segment.text, outboundMessages);
+      const match = findExactProvenOutbound(segment.text, outboundMessages, options);
       if (!match) return;
       removed.push(segment);
       matchedMessages.push(match);
