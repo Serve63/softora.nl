@@ -1397,16 +1397,17 @@ test('premium database replaces a compatibility bootstrap with the complete cano
   assert.match(pageSource, /await canonicalCustomersPromise; try \{ const photoMap = await loadCustomerPhotoMap\(state\.klanten/);
 });
 
-test('premium database shows canonical available rows while keeping actions guard-protected', () => {
+test('premium database keeps the server snapshot authoritative for available rows', () => {
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
 
-  assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded && !state\.remoteCustomersLoaded/);
-  assert.match(pageSource, /function isColdmailBaseLeadEligible\(customer, eligibilityOptions\) \{ const displayOnly = Boolean\(eligibilityOptions && eligibilityOptions\.displayOnly\)/);
-  assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false/);
-  assert.match(pageSource, /if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false/);
-  assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false; if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false; if \(window\.SoftoraDatabaseMailReadySnapshot/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)/);
+  assert.doesNotMatch(pageSource, /state\.availableSnapshotLoaded && !state\.remoteCustomersLoaded/);
+  assert.doesNotMatch(pageSource, /reconcileCanonicalAvailableSnapshot/);
+  assert.doesNotMatch(pageSource, /isAvailableColdmailDisplayCandidate/);
+  assert.match(pageSource, /function isColdmailBaseLeadEligible\(customer\) \{ if \(!hasLoadedColdmailGuard\(\)\) return false;/);
+  assert.match(pageSource, /if \(customer && hasColdmailSendGuardSignal\(customer\)\) return false/);
+  assert.doesNotMatch(pageSource, /displayOnly/);
   assert.match(pageSource, /isMailLeadEligible: isColdmailBaseLeadEligible/);
-  assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{ return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailDisplayCandidate\); \}/);
 });
 
 test('premium database excludes send-guarded customers from mail-ready voorraad', async () => {
@@ -1418,7 +1419,7 @@ test('premium database excludes send-guarded customers from mail-ready voorraad'
   assert.match(pageSource, /const COLDMAIL_SEND_GUARD_SCOPE = "premium_coldmail_send_guard";/);
   assert.match(pageSource, /const COLDMAIL_SEND_GUARD_KEY = "softora_coldmail_send_guard_v1";/);
   assert.match(pageSource, /function hasColdmailSendGuardSignal\(customer\)/);
-  assert.match(pageSource, /if \(!displayOnly && customer && hasColdmailSendGuardSignal\(customer\)\) return false;/);
+  assert.match(pageSource, /if \(customer && hasColdmailSendGuardSignal\(customer\)\) return false;/);
   assert.match(pageSource, /Promise\.all\(\[[\s\S]*window\.SoftoraPremiumDatabaseCustomers\.load\([\s\S]*refreshColdmailGuardState\(\)/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
 
@@ -1534,7 +1535,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /fetchJsonWithTimeout\(url, \{[\s\S]*body: JSON\.stringify\(body \|\| \{\}\)[\s\S]*\}, timeoutMs\)\.then/);
   assert.match(pageSource, /window\.SoftoraDatabaseResilience\.withTimeout\(coldmailGuardController\.load\(\), 12000, "Coldmail send-guard reageert niet op tijd\."\)/);
   assert.match(pageSource, /function hasLoadedColdmailGuard\(\)/);
-  assert.match(pageSource, /if \(!displayOnly && !hasLoadedColdmailGuard\(\)\) return false;/);
+  assert.match(pageSource, /if \(!hasLoadedColdmailGuard\(\)\) return false;/);
   assert.match(pageSource, /if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotMailReadyCustomer\(customer\) \|\| window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true;/);
   assert.match(pageSource, /Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd\./);
   assert.match(pageSource, /const mailReadySnapshotPromise = loadMailReadySnapshot\(\);/);
@@ -1785,9 +1786,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function customerWasSentFromAuthenticatedEmail\(customer\)/);
   assert.doesNotMatch(pageSource, /nodes\.myMailsFilterButton/);
   assert.match(pageSource, /showOutreachActionColumn = state\.activeStatus === "benaderd" \|\| state\.activeStatus === "instantly", showPhotoColumn = !showOutreachActionColumn/);
-  assert.match(pageSource, /function isAvailableColdmailCandidate\(customer, options\) \{ if \(window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)\) return true; return isColdmailBaseLeadEligible\(customer, options\) && !hasUsedColdCalling\(customer\) && !hasUsedColdMailing\(customer\) && !outreachController\.hasInstantlyOutreachSignal\(customer\) && !isColdmailReadyWebdesignLead\(customer\);/);
-  assert.match(pageSource, /function isAvailableColdmailDisplayCandidate\(customer\) \{ return isAvailableColdmailCandidate\(customer, \{ displayOnly: true \}\); \}/);
-  assert.match(pageSource, /function getAvailableColdmailCandidates\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isAvailableColdmailDisplayCandidate\);/);
+  assert.doesNotMatch(pageSource, /function isAvailableColdmailCandidate\(/);
+  assert.doesNotMatch(pageSource, /function getAvailableColdmailCandidates\(/);
+  assert.doesNotMatch(pageSource, /isAvailableColdmailDisplayCandidate/);
   assert.match(pageSource, /function getMailReadyCustomers\(customers\) \{\s*return \(customers \|\| \[\]\)\.filter\(isColdmailReadyWebdesignLead\);/);
   assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.mailReadySnapshotLoaded[\s\S]*isSnapshotMailReadyCustomer\(customer\)[\s\S]*state\.availableSnapshotLoaded[\s\S]*isSnapshotAvailableCustomer\(customer\)/);
   assert.match(pageSource, /function getVisibleTableCustomers\(customers\) \{\s*return customers \|\| \[\];/);
@@ -2381,7 +2382,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /patch\[prefix \+ index\] = chunk;/);
   assert.match(pageSource, /patch: window\.SoftoraDatabaseImport\.buildChunkedStatePatch\(CUSTOMER_DB_KEY, JSON\.stringify\(normalizedCustomers\)\)/);
   assert.match(pageSource, /const remoteCustomers = parseCustomers\(JSON\.stringify\(customerResult && customerResult\.customers \|\| \[\]\)\);[\s\S]*if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
-  assert.match(pageSource, /reconcileCanonicalAvailableSnapshot\(\);/);
+  assert.doesNotMatch(pageSource, /reconcileCanonicalAvailableSnapshot/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
   assert.match(pageSource, /function normalizeStoredAmount\(value\)/);
   assert.match(pageSource, /databaseStatus: status,/);
@@ -4246,7 +4247,8 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /benaderbaar: "Mailklaar"/);
   assert.match(pageSource, /data-s="beschikbaar" type="button">Beschikbaar<\/button>/);
   assert.doesNotMatch(pageSource, /data-s="gevonden" type="button">Succesvol gevonden<\/button>/);
-  assert.match(pageSource, /state\.activeStatus === "beschikbaar"\) return \(state\.foundSnapshotLoaded && databaseSourceFilter\.isKvkTransferCustomer\(customer\) && window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotFoundCustomer\(customer, state\.foundSnapshotCustomerIdSet\) && !isColdmailReadyWebdesignLead\(customer\)\) \|\| isAvailableColdmailDisplayCandidate\(customer\)/);
+  assert.match(pageSource, /state\.activeStatus === "beschikbaar" && state\.availableSnapshotLoaded\) return window\.SoftoraDatabaseMailReadySnapshot\.isSnapshotAvailableCustomer\(customer\)/);
+  assert.match(pageSource, /if \(state\.activeStatus === "beschikbaar"\) return false;/);
   assert.match(pageSource, /assets\/premium-database-source-filter\.js\?v=20260804b/);
   assert.match(pageSource, /databaseSourceFilter\.getHeaderLabel\(state\.activeStatus\)/);
   assert.match(pageSource, /state\.activeStatus === "benaderd"/);
