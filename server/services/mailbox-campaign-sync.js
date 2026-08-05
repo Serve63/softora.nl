@@ -1,4 +1,7 @@
-const { CAMPAIGN_MAILBOX_ACCOUNTS } = require('./mailbox-campaign-replies');
+const {
+  CAMPAIGN_MAILBOX_ACCOUNTS,
+  getCampaignMailboxAccounts,
+} = require('./mailbox-campaign-replies');
 const {
   CAMPAIGN_HISTORY_SINCE,
   CAMPAIGN_HISTORY_SUBJECT_TERMS,
@@ -62,6 +65,7 @@ function collectCampaignThreadRecipientTerms(messages = []) {
 
 function selectMailboxSyncAccounts({
   accountEmail = '',
+  owner = '',
   accounts = [],
   assertReadableAccount,
   normalizeEmail,
@@ -76,7 +80,42 @@ function selectMailboxSyncAccounts({
   const readableAccounts = (Array.isArray(accounts) ? accounts : [])
     .filter((account) => account && account.imapConfigured);
   if (!campaignOnly) return readableAccounts;
-  return readableAccounts.filter((account) => campaignAccounts.has(normalizeEmail(account.email)));
+  const ownerAccounts = new Set(
+    getCampaignMailboxAccounts(owner === 'both' ? '' : owner).map(normalizeEmail)
+  );
+  return readableAccounts.filter((account) => {
+    const email = normalizeEmail(account.email);
+    return campaignAccounts.has(email) && ownerAccounts.has(email);
+  });
+}
+
+function normalizeMailboxSyncOwner(value) {
+  const owner = String(value || '').trim().toLowerCase().replace('servé', 'serve');
+  if (!owner) return '';
+  if (owner === 'all') return 'both';
+  if (owner === 'serve' || owner === 'martijn' || owner === 'both') return owner;
+  const error = new Error('Onbekende mailbox-eigenaar.');
+  error.status = 400;
+  throw error;
+}
+
+function isRequestFlagEnabled(value) {
+  return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  const source = Array.isArray(items) ? items : [];
+  const results = new Array(source.length);
+  let cursor = 0;
+  const workerCount = Math.max(1, Math.min(source.length || 1, Number(concurrency) || 1));
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (cursor < source.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(source[index], index);
+    }
+  }));
+  return results;
 }
 
 function isGmailImapAccount(account = {}) {
@@ -118,23 +157,45 @@ async function syncMailboxRequest({
   const params = query && typeof query === 'object' ? query : {};
   const folderParam = payload.folder || params.folder || '';
   const accountEmail = payload.account || params.account || '';
+  const owner = normalizeMailboxSyncOwner(payload.owner || params.owner || '');
   const fallbackLimit = String(method || '').toUpperCase() === 'GET' ? cronLimit : defaultLimit;
   const requestedLimit = payload.limit || params.limit || fallbackLimit;
   const folders = folderParam
     ? String(folderParam).split(',').map(normalizeFolder).filter(Boolean)
     : defaultFolders;
-  const force = Boolean(payload.force || params.force === '1' || params.force === 'true');
-  const campaignOnly = Boolean(
-    payload.campaignOnly ||
-    params.campaignOnly === '1' ||
-    params.campaignOnly === 'true'
+  const force = isRequestFlagEnabled(payload.force) || isRequestFlagEnabled(params.force);
+  const campaignOnly = isRequestFlagEnabled(payload.campaignOnly) || isRequestFlagEnabled(params.campaignOnly);
+  if (owner && !campaignOnly) {
+    const error = new Error('Een owner-scope is alleen toegestaan voor campagnemail.');
+    error.status = 400;
+    throw error;
+  }
+  if (owner && accountEmail) {
+    const error = new Error('Kies een owner-scope of één account, niet beide.');
+    error.status = 400;
+    throw error;
+  }
+  const incrementalOnly = Boolean(
+    campaignOnly && (
+      isRequestFlagEnabled(payload.incrementalOnly) ||
+      isRequestFlagEnabled(params.incrementalOnly)
+    )
+  );
+  const fastRefresh = Boolean(
+    incrementalOnly && (
+      isRequestFlagEnabled(payload.fastRefresh) ||
+      isRequestFlagEnabled(params.fastRefresh)
+    )
   );
   const result = await syncMailbox({
     accountEmail,
+    owner,
     folders,
     limit: Number(requestedLimit) || fallbackLimit,
     force,
     campaignOnly,
+    incrementalOnly,
+    maxConcurrentAccounts: fastRefresh ? 3 : 1,
   });
   if (
     String(method || '').toUpperCase() === 'GET' &&
@@ -176,6 +237,7 @@ function createMailboxSyncService({
     limit = defaultLimit,
     force = false,
     campaignOnly = false,
+    incrementalOnly = false,
   } = {}) {
     const account = assertReadableAccount(accountEmail);
     const normalizedFolder = normalizeFolder(folder);
@@ -192,8 +254,9 @@ function createMailboxSyncService({
     }
 
     try {
+      const hydrateCampaignHistory = campaignOnly && !incrementalOnly;
       const oldestIndexedCampaignUid =
-        campaignOnly &&
+        hydrateCampaignHistory &&
         normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER &&
         typeof mailboxIndexStore.getOldestMatchingMessageUid === 'function'
           ? await mailboxIndexStore.getOldestMatchingMessageUid({
@@ -216,6 +279,7 @@ function createMailboxSyncService({
             })) || [];
         }
         if (
+          hydrateCampaignHistory &&
           normalizedFolder === 'sent' &&
           typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
         ) {
@@ -229,6 +293,7 @@ function createMailboxSyncService({
           threadReferenceIds = collectCampaignThreadReferenceIds(indexedInboxMessages);
           threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
         } else if (
+          hydrateCampaignHistory &&
           normalizedFolder === 'sent' &&
           typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
         ) {
@@ -253,6 +318,7 @@ function createMailboxSyncService({
           threadRecipientTerms = collectCampaignThreadRecipientTerms(indexedInboxMessages);
         }
         if (
+          hydrateCampaignHistory &&
           !indexedUids.length &&
           normalizedFolder !== 'sent' &&
           typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
@@ -273,7 +339,7 @@ function createMailboxSyncService({
           ? Math.min(getSafeLimit(limit), CAMPAIGN_SYNC_FETCH_LIMIT)
           : getSafeLimit(limit),
         campaignHistory:
-          campaignOnly && normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER,
+          hydrateCampaignHistory && normalizedFolder !== CAMPAIGN_GMAIL_LABEL_FOLDER,
         oldestIndexedCampaignUid,
         threadReferenceIds,
         threadRecipientTerms,
@@ -301,10 +367,11 @@ function createMailboxSyncService({
         folder: normalizedFolder,
         synced: messages.length,
         upserted: saved.upserted || messages.length,
-        historyBackfill: Boolean(campaignOnly),
+        historyBackfill: Boolean(campaignOnly && !incrementalOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
         targetedThreadReferences: threadReferenceIds.length,
         targetedThreadRecipients: threadRecipientTerms.length,
+        incrementalOnly: Boolean(incrementalOnly),
       };
     } catch (error) {
       await mailboxIndexStore.finishSync({
@@ -319,13 +386,17 @@ function createMailboxSyncService({
 
   async function syncMailbox({
     accountEmail = '',
+    owner = '',
     folders = defaultFolders,
     limit = defaultLimit,
     force = false,
     campaignOnly = false,
+    incrementalOnly = false,
+    maxConcurrentAccounts = 1,
   } = {}) {
     const accounts = selectMailboxSyncAccounts({
       accountEmail,
+      owner,
       accounts: getAccounts(),
       assertReadableAccount,
       normalizeEmail,
@@ -334,34 +405,41 @@ function createMailboxSyncService({
     const requestedFolders = Array.from(
       new Set((Array.isArray(folders) && folders.length ? folders : defaultFolders).map(normalizeFolder))
     );
-    const results = [];
-    for (const account of accounts) {
-      const folderList = getMailboxSyncFoldersForAccount({
-        account,
-        folders: requestedFolders,
-        campaignOnly,
-        normalizeFolder,
-      });
-      for (const folder of folderList) {
-        try {
-          results.push(await syncMailboxFolder({
-            accountEmail: account.email,
-            folder,
-            limit,
-            force,
-            campaignOnly,
-          }));
-        } catch (error) {
-          logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
-          results.push({
-            ok: false,
-            account: account.email,
-            folder,
-            error: String(error?.message || error || 'Mailbox sync mislukt'),
-          });
+    const accountResults = await mapWithConcurrency(
+      accounts,
+      Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
+      async (account) => {
+        const results = [];
+        const folderList = getMailboxSyncFoldersForAccount({
+          account,
+          folders: requestedFolders,
+          campaignOnly,
+          normalizeFolder,
+        });
+        for (const folder of folderList) {
+          try {
+            results.push(await syncMailboxFolder({
+              accountEmail: account.email,
+              folder,
+              limit,
+              force,
+              campaignOnly,
+              incrementalOnly,
+            }));
+          } catch (error) {
+            logger.error('[Mailbox][Sync]', account.email, folder, error?.message || error);
+            results.push({
+              ok: false,
+              account: account.email,
+              folder,
+              error: String(error?.message || error || 'Mailbox sync mislukt'),
+            });
+          }
         }
+        return results;
       }
-    }
+    );
+    const results = accountResults.flat();
     return {
       ok: results.every((result) => result.ok !== false),
       results,
@@ -383,7 +461,10 @@ module.exports = {
   collectCampaignThreadReferenceIds,
   createMailboxSyncService,
   getMailboxSyncFoldersForAccount,
+  isRequestFlagEnabled,
   isGmailImapAccount,
+  mapWithConcurrency,
+  normalizeMailboxSyncOwner,
   selectMailboxSyncAccounts,
   syncMailboxRequest,
 };
