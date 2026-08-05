@@ -16,7 +16,7 @@ const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 3000;
-const MAX_OFFSET = 10000;
+const MAX_OFFSET = 25000;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 950000;
 const SNAPSHOT_FORMAT_VERSION = 2;
@@ -628,7 +628,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const mediaMs = Date.now() - mediaStartMs;
     return {
       generatedAt: now().toISOString(),
+      total: mailReadyRows.length,
       customers: mailReadyRows,
+      availableTotal: availableRows.length,
       availableCustomers: availableRows,
       foundCustomerIds,
       timings: {
@@ -655,7 +657,8 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
         readFailureCooldownScope: MAIL_READY_SNAPSHOT_CACHE_SCOPE,
       });
       const values = state && state.values && typeof state.values === 'object' ? state.values : {};
-      return parseMailReadySnapshotCacheValue(values[MAIL_READY_SNAPSHOT_CACHE_KEY]);
+      const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_SNAPSHOT_CACHE_KEY]);
+      return snapshot && isMailReadySnapshotCoherent(snapshot) ? snapshot : null;
     } catch (error) {
       if (logger && typeof logger.warn === 'function') {
         logger.warn('[PremiumDatabaseMailReadySnapshot][durable-read]', error?.message || error);
@@ -838,6 +841,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function getMailReadySnapshotData(options = {}) {
     if (snapshotInvalidated) return startSnapshotRefresh();
     await hydrateDurableSnapshotData({ force: Boolean(snapshotDataCache) });
+    if (!snapshotDataCache || !isMailReadySnapshotCoherent(snapshotDataCache.data)) {
+      return startSnapshotRefresh();
+    }
     if (options.requireFoundSnapshot === true && (!snapshotDataCache || !Array.isArray(snapshotDataCache.data.foundCustomerIds))) {
       return startSnapshotRefresh();
     }
