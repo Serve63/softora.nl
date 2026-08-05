@@ -233,7 +233,8 @@
     }
 
     function markCanonicalInventoryReady(state) {
-        if (!state || state.remoteCustomersLoaded !== true || !Array.isArray(state.klanten) || !state.klanten.length) return false;
+        if (!state || !Array.isArray(state.klanten) || !state.klanten.length) return false;
+        if (state.remoteCustomersLoaded !== true && state.canonicalSnapshotApplied !== true) return false;
         if (state.mailReadySnapshotLoaded !== true || state.availableSnapshotLoaded !== true || state.foundSnapshotLoaded !== true) return false;
         if (state.mailReadySnapshotPending === true) return false;
         if (!Number.isFinite(Number(state.mailReadySnapshotTotal)) || !Array.isArray(state.mailReadySnapshotCustomers)) return false;
@@ -328,6 +329,7 @@
             const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer); });
             const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers));
             config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, false);
+            state.canonicalSnapshotApplied = true;
         }
         return true;
     }
