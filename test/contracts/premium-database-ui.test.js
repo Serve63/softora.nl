@@ -333,7 +333,7 @@ test('canonical inventory gate never publishes compact or capped counts', () => 
   assert.equal(client.getCanonicalResultCountText(state, 3000), '-- resultaten');
   assert.equal(client.markCanonicalInventoryReady(state), false);
 
-  state.remoteCustomersLoaded = true;
+  state.canonicalSnapshotApplied = true;
   assert.equal(client.markCanonicalInventoryReady(state), true);
   assert.equal(client.getCanonicalInventoryStatus(state), 'ready');
   assert.equal(client.getCanonicalResultCountText(state, 8707), '8.707 resultaten');
@@ -1144,6 +1144,7 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   assert.equal(requests[0][2], 20000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0']);
   assert.equal(state.mailReadySnapshotLoaded, true);
+  assert.equal(state.canonicalSnapshotApplied, true);
   assert.equal(state.mailReadySnapshotStale, false);
   assert.equal(state.mailReadySnapshotFailed, false);
   assert.equal(state.mailReadySnapshotPending, false);
@@ -1675,7 +1676,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805d/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805e/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
