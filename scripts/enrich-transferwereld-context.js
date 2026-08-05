@@ -1,21 +1,18 @@
 #!/usr/bin/env node
 
-const fs = require('node:fs');
-const path = require('node:path');
 const vm = require('node:vm');
 const { chromium } = require('playwright');
+const {
+  loadTransferwereldDataset,
+  writeTransferwereldDataset,
+} = require('./transferwereld-data-io');
 
-const ROOT = path.resolve(__dirname, '..');
-const DATA_PATH = path.join(ROOT, 'assets', 'transferwereld-data.js');
 const OPTA_URL = 'https://dataviz.theanalyst.com/opta-power-rankings/index.js';
 const TRANSFERMARKT = 'https://www.transfermarkt.com';
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/135.0.0.0 Safari/537.36';
 
 function loadDataset() {
-  const context = { window: {} };
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(DATA_PATH, 'utf8'), context);
-  return context.window.TRANSFERWERELD_DATA;
+  return loadTransferwereldDataset();
 }
 
 function clean(value) {
@@ -436,9 +433,8 @@ async function main() {
     estimatedRatings: forecast.estimatedRatings,
     fullLeagueTables: missingOnly ? (dataset.meta.contextCoverage?.fullLeagueTables || dataset.leagues.length) : fullLeagueTables.size,
   };
-  const serialized = JSON.stringify(dataset);
-  fs.writeFileSync(DATA_PATH, `window.TRANSFERWERELD_DATA=${serialized};\n`, 'utf8');
-  console.log(`Wrote ${path.relative(ROOT, DATA_PATH)} (${Buffer.byteLength(serialized)} bytes)`);
+  const sizes = writeTransferwereldDataset(dataset);
+  console.log(`Wrote split transfer data (${sizes.baseBytes} + ${sizes.scopeBytes} bytes)`);
   console.log(JSON.stringify(dataset.meta.contextCoverage));
   if (dataset.meta.contextWarnings) process.exitCode = 2;
 }

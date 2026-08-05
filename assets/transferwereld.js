@@ -1,7 +1,15 @@
 (() => {
   'use strict';
 
-  const dataset = window.TRANSFERWERELD_DATA;
+  const baseDataset = window.TRANSFERWERELD_DATA;
+  const scopeDataset = window.TRANSFERWERELD_SCOPE_DATA;
+  const dataset = scopeDataset?.clubs?.length
+    ? {
+      ...baseDataset,
+      clubs: [...(baseDataset.clubs || []), ...scopeDataset.clubs],
+      scopeLeagues: scopeDataset.scopeLeagues || baseDataset.scopeLeagues,
+    }
+    : baseDataset;
   if (!dataset?.clubs?.length) {
     document.querySelector('main').insertAdjacentHTML('beforeend', '<p class="empty">De transferdata wordt nog opgebouwd. Ververs de pagina over een moment.</p>');
     return;
