@@ -52,6 +52,17 @@ function createService(overrides = {}) {
           webdesignLinkUrl: message.id === 'sent:42'
             ? 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1'
             : '',
+          to: message.id === 'sent:42' ? 'klant@example.nl' : 'serve@softora.nl',
+          toDisplay: message.id === 'sent:42'
+            ? 'Klant <klant@example.nl>'
+            : 'Servé Creusen <serve@softora.nl>',
+          cc: message.id === 'sent:42' ? 'boekhouder@example.nl' : '',
+          bcc: '',
+          deliveredTo: message.id === 'sent:42' ? '' : 'serve@softora.nl',
+          recipientRoutingEvidenceKnown: true,
+          attachments: message.id === 'sent:42'
+            ? [{ filename: 'ontwerp.pdf', contentType: 'application/pdf', size: 2048 }]
+            : [],
         }));
       },
     },
@@ -89,6 +100,13 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     originalCampaignOutbound: true,
     webdesignLinkEvidenceKnown: true,
     webdesignLinkUrl: 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1',
+    to: 'klant@example.nl',
+    toDisplay: 'Klant <klant@example.nl>',
+    cc: 'boekhouder@example.nl',
+    bcc: '',
+    deliveredTo: '',
+    recipientRoutingEvidenceKnown: true,
+    attachments: [{ filename: 'ontwerp.pdf', contentType: 'application/pdf', size: 2048 }],
   }, {
     id: 'inbox:43',
     uid: 43,
@@ -103,6 +121,13 @@ test('mailbox body batch hydrateert alleen de expliciet zichtbare berichtreferen
     originalCampaignOutbound: false,
     webdesignLinkEvidenceKnown: false,
     webdesignLinkUrl: '',
+    to: 'serve@softora.nl',
+    toDisplay: 'Servé Creusen <serve@softora.nl>',
+    cc: '',
+    bcc: '',
+    deliveredTo: 'serve@softora.nl',
+    recipientRoutingEvidenceKnown: true,
+    attachments: [],
   }]);
 });
 
@@ -186,6 +211,13 @@ test('mailbox body batch hydrateert Instantly via exact provideraccount en provi
     originalCampaignOutbound: false,
     webdesignLinkEvidenceKnown: false,
     webdesignLinkUrl: '',
+    to: 'serve@softora.nl',
+    toDisplay: 'Servé Creusen <serve@softora.nl>',
+    cc: '',
+    bcc: '',
+    deliveredTo: 'serve@softora.nl',
+    recipientRoutingEvidenceKnown: true,
+    attachments: [],
   }]);
 
   await assert.rejects(

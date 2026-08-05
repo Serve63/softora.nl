@@ -3,11 +3,48 @@ const assert = require('node:assert/strict');
 
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
+  markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
   parseMailboxCampaignSnapshot,
   removeMailboxCampaignSnapshotMessage,
   serializeMailboxCampaignSnapshot,
 } = require('../../server/services/mailbox-campaign-snapshot');
+
+test('mailbox campaign snapshot bewaart een geopende Instantly-mail duurzaam als gelezen', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'instantly:incoming-serve-1',
+      mailboxId: 'instantly:incoming-serve-1',
+      uid: 0,
+      folder: 'inbox',
+      storageFolder: 'instantly',
+      accountEmail: 'serve-sender@example.com',
+      provider: 'instantly',
+      providerMessageId: 'incoming-serve-1',
+      providerOwner: 'serve',
+      unread: true,
+      subject: 'Re: Kleine vraag',
+      date: '2026-08-05T08:26:16.000Z',
+    }],
+  });
+  const readAt = '2026-08-05T15:51:00.000Z';
+  const result = markMailboxCampaignSnapshotRead(
+    raw,
+    {
+      accountEmail: 'serve-sender@example.com',
+      folder: 'instantly',
+      id: 'instantly:incoming-serve-1',
+      uid: 0,
+    },
+    { readAt }
+  );
+  const [message] = parseMailboxCampaignSnapshot(result.serialized).messages;
+
+  assert.equal(result.changed, true);
+  assert.equal(message.unread, false);
+  assert.equal(message.readAt, readAt);
+});
 
 test('mailbox campaign snapshot bewaart een afgehandelde antwoordherinnering', () => {
   const raw = serializeMailboxCampaignSnapshot({
@@ -114,6 +151,9 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     messageId: '<sent-answer@example.test>',
     inReplyTo: '<inbox-answer@example.test>',
     references: '',
+    unread: false,
+    readAt: '',
+    replyDismissedAt: '',
     hasBody: true,
     bodyImageEvidenceKnown: true,
     embeddedImageCount: 1,
@@ -166,7 +206,8 @@ test('mailbox campaign snapshot bewaart conversatie-id en ontvangen threadberich
     'conversation:martijnven123@gmail.com|campaign-start@example.test'
   );
   assert.equal(message.receivedAt, '2026-07-23T09:31:11.000Z');
-  assert.equal(message.activityAt, '2026-07-23T11:31:12.000Z');
+  assert.equal(message.activityAt, '2026-07-23T09:31:11.000Z');
+  assert.equal(message.latestInboundAt, '2026-07-23T09:31:11.000Z');
   assert.equal(message.threadMessages[0].folder, 'inbox');
   assert.equal(message.threadMessages[0].body, 'Het eerdere ontvangen bericht.');
 });
@@ -325,7 +366,7 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
 
 test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 8,
+    version: 9,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{
@@ -356,7 +397,9 @@ test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata'
   const [message] = parseMailboxCampaignSnapshot(legacySnapshot).messages;
 
   assert.equal(message.receivedAt, '2026-06-15T13:58:18.000Z');
-  assert.equal(message.activityAt, '2026-06-23T11:32:58.000Z');
+  assert.equal(message.activityAt, '2026-06-15T13:58:18.000Z');
+  assert.equal(message.latestInboundAt, '2026-06-15T13:58:18.000Z');
+  assert.equal(message.latestOutboundAt, '2026-06-23T11:32:58.000Z');
 });
 
 test('mailbox campaign snapshot bewaart de volledige conversatie van meer dan tien berichten', () => {

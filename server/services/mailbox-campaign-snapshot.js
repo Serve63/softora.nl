@@ -4,9 +4,10 @@ const {
   isMailboxMessageImageUrl,
 } = require('./mailbox-message-image');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 8;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 9;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -193,6 +194,13 @@ function sanitizeThreadMessage(value, options = {}) {
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
+    ...(source.autoSubmitted ? { autoSubmitted: text(source.autoSubmitted, 200) } : {}),
+    ...(source.precedence ? { precedence: text(source.precedence, 200) } : {}),
+    ...(source.autoResponseSuppress ? { autoResponseSuppress: text(source.autoResponseSuppress, 500) } : {}),
+    ...(source.automatedReplyEvidence === true ? { automatedReplyEvidence: true } : {}),
+    unread: Boolean(source.unread),
+    readAt: text(source.readAt, 100),
+    replyDismissedAt: text(source.replyDismissedAt, 100),
     hasBody: Boolean(source.hasBody || rawBody),
     bodyImageEvidenceKnown,
     embeddedImageCount: bodyImageEvidenceKnown
@@ -208,26 +216,8 @@ function sanitizeThreadMessage(value, options = {}) {
 }
 
 function resolveMessageActivityAt(source) {
-  const candidates = [
-    source.activityAt,
-    source.receivedAt,
-    source.internalDate,
-    source.date,
-    ...(Array.isArray(source.threadMessages)
-      ? source.threadMessages.flatMap((message) => [
-          message && message.activityAt,
-          message && message.receivedAt,
-          message && message.internalDate,
-          message && message.date,
-        ])
-      : []),
-  ];
-  const latestTimestamp = candidates.reduce((latest, value) => {
-    const timestamp = Date.parse(value || '');
-    return Number.isFinite(timestamp) && timestamp > latest ? timestamp : latest;
-  }, 0);
-  if (latestTimestamp > 0) return new Date(latestTimestamp).toISOString();
-  return text(source.activityAt || source.receivedAt || source.internalDate || source.date, 100);
+  const activity = resolveConversationActivity(source);
+  return text(activity.latestInboundAt || source.receivedAt || source.internalDate || source.date, 100);
 }
 
 function sanitizeMessage(value, options = {}) {
@@ -247,6 +237,7 @@ function sanitizeMessage(value, options = {}) {
       source.bodyImageEvidenceKnown !== false &&
       Object.prototype.hasOwnProperty.call(source, 'embeddedImageCount')
     );
+  const conversationActivity = resolveConversationActivity(source);
   return {
     ...sanitizeProviderProvenance(source),
     id: text(source.id, 500),
@@ -270,11 +261,18 @@ function sanitizeMessage(value, options = {}) {
     date: text(source.date, 100),
     receivedAt: text(source.receivedAt || source.date, 100),
     activityAt: resolveMessageActivityAt(source),
+    latestInboundAt: text(conversationActivity.latestInboundAt, 100),
+    latestOutboundAt: text(conversationActivity.latestOutboundAt, 100),
     messageId: text(source.messageId, 1000),
     inReplyTo: text(source.inReplyTo, 1000),
     references: text(source.references, 4000),
+    ...(source.autoSubmitted ? { autoSubmitted: text(source.autoSubmitted, 200) } : {}),
+    ...(source.precedence ? { precedence: text(source.precedence, 200) } : {}),
+    ...(source.autoResponseSuppress ? { autoResponseSuppress: text(source.autoResponseSuppress, 500) } : {}),
+    ...(source.automatedReplyEvidence === true ? { automatedReplyEvidence: true } : {}),
     conversationId: text(source.conversationId, 2000),
     unread: Boolean(source.unread),
+    readAt: text(source.readAt, 100),
     starred: Boolean(source.starred),
     replyDismissedAt: text(source.replyDismissedAt, 100),
     hasBody: Boolean(source.hasBody || rawBody),
@@ -508,10 +506,47 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
   };
 }
 
+function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) {
+  const snapshot = parseMailboxCampaignSnapshot(rawValue);
+  if (!snapshot) return { changed: false, serialized: String(rawValue || '') };
+  const accountEmail = text(identity.accountEmail, 320).toLowerCase();
+  const folder = text(identity.folder || 'inbox', 50).toLowerCase() || 'inbox';
+  const uid = Number(identity.uid) || 0;
+  const id = text(identity.id, 500);
+  const readAt = text(options.readAt || new Date().toISOString(), 100);
+  let changed = false;
+  const matches = (message) => {
+    const messageFolder = text(message.storageFolder || message.folder, 50).toLowerCase();
+    const messageUid = Number(message.storageUid || message.uid) || 0;
+    if (message.accountEmail !== accountEmail || messageFolder !== folder) return false;
+    if (uid > 0 && messageUid > 0) return messageUid === uid;
+    return message.mailboxId === id || message.id === id;
+  };
+  const messages = snapshot.messages.map((message) => {
+    const threadMessages = (Array.isArray(message.threadMessages) ? message.threadMessages : []).map((threadMessage) => {
+      if (!matches(threadMessage)) return threadMessage;
+      changed = true;
+      return { ...threadMessage, unread: false, readAt };
+    });
+    if (!matches(message)) return { ...message, threadMessages };
+    changed = true;
+    return { ...message, unread: false, readAt, threadMessages };
+  });
+  if (!changed) return { changed: false, serialized: String(rawValue || '') };
+  return {
+    changed: true,
+    serialized: serializeMailboxCampaignSnapshot(
+      { ok: snapshot.ok, messages, sync: snapshot.sync },
+      { savedAt: options.savedAt || readAt }
+    ),
+  };
+}
+
 module.exports = {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  markMailboxCampaignSnapshotRead,
   markMailboxCampaignSnapshotReplyDismissed,
   parseMailboxCampaignSnapshot,
   removeMailboxCampaignSnapshotMessage,

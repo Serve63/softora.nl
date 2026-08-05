@@ -37,6 +37,7 @@ const {
 const {
   getOutboundSenderIdentity,
 } = require('./outbound-sender-identity');
+const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -504,17 +505,14 @@ function mergeCampaignConversationsByStableIdentity(conversations, sentMessages)
     const threadMessages = messages
       .filter((message) => getMessageIdentity(message) !== primaryIdentity)
       .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
-    const latestActivity = [primaryReply, ...threadMessages]
-      .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0];
+    const activity = resolveConversationActivity({ ...primaryReply, threadMessages });
     const usedStableFallback = groupedConversations.length > 1 || fallbackSentMessages
       .some((message) => !groupedMessageIdentities.has(getMessageIdentity(message)));
     return {
       ...primaryReply,
-      activityAt: normalizeText(latestActivity && (
-        latestActivity.receivedAt ||
-        latestActivity.internalDate ||
-        latestActivity.date
-      )),
+      activityAt: activity.latestInboundAt,
+      latestInboundAt: activity.latestInboundAt,
+      latestOutboundAt: activity.latestOutboundAt,
       unread: messages
         .filter((message) => getMailboxMessageDirection(message) !== 'sent')
         .some((message) => Boolean(message && message.unread)),
@@ -588,16 +586,13 @@ function attachSentThreadMessages(replies, sentMessages) {
           return true;
         })
         .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left));
-      const latestActivity = [primaryReply, ...threadMessages]
-        .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))[0];
+      const activity = resolveConversationActivity({ ...primaryReply, threadMessages });
       return {
         ...primaryReply,
         conversationId,
-        activityAt: normalizeText(latestActivity && (
-          latestActivity.receivedAt ||
-          latestActivity.internalDate ||
-          latestActivity.date
-        )),
+        activityAt: activity.latestInboundAt,
+        latestInboundAt: activity.latestInboundAt,
+        latestOutboundAt: activity.latestOutboundAt,
         unread: sortedReplies.some((reply) => Boolean(reply && reply.unread)),
         threadMessages,
       };
@@ -710,9 +705,11 @@ function shouldShowCampaignConversation(conversation) {
 }
 
 function shouldShowCampaignMessage(message) {
+  if (getMailboxMessageDirection(message) === 'sent') return true;
+  if (isAutomatedCampaignReply(message)) return false;
   return hasCampaignLabelProvenance(message)
     ? isExternalCampaignMessage(message)
-    : !isAutomatedCampaignReply(message);
+    : true;
 }
 
 async function listMessagesAcrossFolders({

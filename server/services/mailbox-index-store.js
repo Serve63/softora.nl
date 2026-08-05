@@ -20,7 +20,7 @@ const MAILBOX_MESSAGE_ID_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE = 100;
 const PROVIDER_ACTIVE_THREAD_MAX_COUNT = 10_000;
 const MAILBOX_MESSAGE_METADATA_COLUMNS =
-  'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,starred,reply_dismissed_at,has_body,body_truncated,payload';
+  'message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,sender_name,sender_email,recipients_text,subject,preview,date,internal_date,unread,softora_read_at,starred,reply_dismissed_at,has_body,body_truncated,payload';
 
 function createMailboxIndexStore(deps = {}) {
   const {
@@ -258,6 +258,10 @@ function createMailboxIndexStore(deps = {}) {
         bcc: truncateText(normalizeString(message && message.bcc), 2000),
         deliveredTo: truncateText(normalizeString(message && message.deliveredTo), 1000),
         attachments: normalizeAttachments(message && message.attachments),
+        autoSubmitted: truncateText(normalizeString(message && message.autoSubmitted), 200),
+        precedence: truncateText(normalizeString(message && message.precedence), 120),
+        autoResponseSuppress: truncateText(normalizeString(message && message.autoResponseSuppress), 200),
+        automatedReplyEvidence: message && message.automatedReplyEvidence === true,
       },
       updated_at: isoNow(),
     };
@@ -268,6 +272,7 @@ function createMailboxIndexStore(deps = {}) {
     const uid = Number(row.uid) || 0;
     const includeBody = options.includeBody === true;
     const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const softoraReadAt = normalizeString(row.softora_read_at);
     const bodyImageEvidenceKnown = Object.prototype.hasOwnProperty.call(payload, 'embeddedImageCount');
     const normalized = {
       id: normalizeString(row.provider_id) || `${folder}:${uid}`,
@@ -283,6 +288,10 @@ function createMailboxIndexStore(deps = {}) {
       deliveredTo: normalizeString(payload.deliveredTo),
       recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true,
       attachments: normalizeAttachments(payload.attachments),
+      autoSubmitted: normalizeString(payload.autoSubmitted),
+      precedence: normalizeString(payload.precedence),
+      autoResponseSuppress: normalizeString(payload.autoResponseSuppress),
+      automatedReplyEvidence: payload.automatedReplyEvidence === true,
       subject: normalizeString(row.subject) || '(Geen onderwerp)',
       preview: normalizeString(row.preview),
       body: includeBody ? normalizeString(row.body_text) : '',
@@ -290,7 +299,8 @@ function createMailboxIndexStore(deps = {}) {
       inReplyTo: normalizeString(row.in_reply_to),
       references: normalizeString(row.references_text),
       date: parseDateIso(row.date || row.internal_date),
-      unread: Boolean(row.unread),
+      unread: Boolean(row.unread) && !softoraReadAt,
+      readAt: softoraReadAt,
       starred: Boolean(row.starred),
       replyDismissedAt: normalizeString(row.reply_dismissed_at),
       hasBody: Boolean(row.has_body),
@@ -379,6 +389,10 @@ function createMailboxIndexStore(deps = {}) {
         bcc: truncateText(normalizeString(message.bcc), 2000),
         deliveredTo: truncateText(normalizeString(message.deliveredTo), 1000),
         attachments: normalizeAttachments(message.attachments),
+        autoSubmitted: truncateText(normalizeString(message.autoSubmitted), 200),
+        precedence: truncateText(normalizeString(message.precedence), 120),
+        autoResponseSuppress: truncateText(normalizeString(message.autoResponseSuppress), 200),
+        automatedReplyEvidence: message.automatedReplyEvidence === true,
         attachmentSource: provider,
         originalCampaignOutbound: message.originalCampaignOutbound === true,
         providerBodyHtmlEvidenceKnown: message.providerBodyHtmlEvidenceKnown === true,
@@ -749,7 +763,7 @@ function createMailboxIndexStore(deps = {}) {
       .filter((message) => message.accountEmail && /^instantly:[a-z0-9-]+$/i.test(message.providerId));
     if (!messageKeys.length && !providerReferences.length) return source;
 
-    const selectedColumns = 'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text';
+    const selectedColumns = 'message_key,account_email,provider_id,body_text,has_body,body_truncated,payload,folder,subject,preview,in_reply_to,references_text,recipients_text';
     const [messageResult, providerResult] = await Promise.all([
       messageKeys.length
         ? run('hydrate-message-bodies', (client) =>
@@ -821,6 +835,13 @@ function createMailboxIndexStore(deps = {}) {
           payload.webdesignLinkEvidenceKnown === true ||
           Boolean(normalizeString(payload.webdesignLinkUrl)),
         webdesignLinkUrl: normalizeString(payload.webdesignLinkUrl),
+        to: normalizeString(row.recipients_text || message.to),
+        toDisplay: normalizeString(payload.toDisplay),
+        cc: normalizeString(payload.cc),
+        bcc: normalizeString(payload.bcc),
+        deliveredTo: normalizeString(payload.deliveredTo),
+        recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true,
+        attachments: normalizeAttachments(payload.attachments),
       };
     });
   }
@@ -900,16 +921,18 @@ function createMailboxIndexStore(deps = {}) {
     const parsedUid = normalizedFolder === 'instantly'
       ? 0
       : Number(uid || normalizedId.match(/:(\d+)$/)?.[1] || 0);
-    return run('mark-message-read', (client) => {
+    const readAt = isoNow();
+    const result = await run('mark-message-read', (client) => {
       const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ unread: false, updated_at: isoNow() })
+        .update({ unread: false, softora_read_at: readAt, updated_at: readAt })
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizedFolder)
         .is('deleted_at', null);
       if (Number.isSafeInteger(parsedUid) && parsedUid > 0) return query.eq('uid', parsedUid);
       return query.eq('provider_id', normalizedId);
     });
+    return { ...result, readAt: result.ok ? readAt : '' };
   }
 
   async function markMessageReplyDismissed({ accountEmail, folder = 'inbox', id = '', uid = 0 }) {
@@ -922,7 +945,12 @@ function createMailboxIndexStore(deps = {}) {
     const result = await run('mark-message-reply-dismissed', (client) => {
       const query = client
         .from(MAILBOX_INDEX_TABLES.messages)
-        .update({ unread: false, reply_dismissed_at: dismissedAt, updated_at: dismissedAt })
+        .update({
+          unread: false,
+          softora_read_at: dismissedAt,
+          reply_dismissed_at: dismissedAt,
+          updated_at: dismissedAt,
+        })
         .eq('account_email', normalizeEmail(accountEmail))
         .eq('folder', normalizedFolder)
         .is('deleted_at', null);

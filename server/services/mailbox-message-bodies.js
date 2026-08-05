@@ -137,6 +137,13 @@ function createMailboxMessageBodiesService({
       originalCampaignOutbound: Boolean(message && message.originalCampaignOutbound),
       webdesignLinkEvidenceKnown: Boolean(message && message.webdesignLinkEvidenceKnown),
       webdesignLinkUrl: normalizeText(message && message.webdesignLinkUrl),
+      to: normalizeText(message && message.to),
+      toDisplay: normalizeText(message && (message.toDisplay || message.to)),
+      cc: normalizeText(message && message.cc),
+      bcc: normalizeText(message && message.bcc),
+      deliveredTo: normalizeText(message && message.deliveredTo),
+      recipientRoutingEvidenceKnown: message && message.recipientRoutingEvidenceKnown === true,
+      attachments: Array.isArray(message && message.attachments) ? message.attachments : [],
     }));
   }
 
