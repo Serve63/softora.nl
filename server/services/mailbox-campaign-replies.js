@@ -1130,6 +1130,7 @@ module.exports = {
   dedupeCampaignMessages,
   getStrictUnreferencedCampaignParent,
   getCampaignConversationId,
+  getCampaignMailboxAccounts,
   getMessageReferenceIds,
   getMessageReferenceLookupValues,
   listExactSentDescendants,

@@ -290,6 +290,7 @@ async function syncInstantlyMailboxResponse({
   normalizeString,
 }) {
   try {
+    const startedAt = new Date().toISOString();
     const status = getInstantlyStatus(instantlyMailboxService);
     if (!status.configured) {
       return res.status(200).json({
@@ -299,11 +300,27 @@ async function syncInstantlyMailboxResponse({
         missing: Array.isArray(status.missing) ? status.missing : [],
       });
     }
-    const requestedOwner = normalizeString(req.body?.owner || req.query?.owner).toLowerCase();
-    const owners = requestedOwner ? [requestedOwner] : ['serve', 'martijn'];
-    const results = [];
-    for (const owner of owners) results.push(await instantlyMailboxService.syncOwner(owner));
-    return res.status(200).json({ ok: true, results });
+    const requestedOwner = normalizeString(req.body?.owner || req.query?.owner)
+      .toLowerCase()
+      .replace('servé', 'serve');
+    if (requestedOwner && !['serve', 'martijn', 'both', 'all'].includes(requestedOwner)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'INSTANTLY_MAILBOX_OWNER_INVALID',
+        error: 'Onbekende mailbox-eigenaar.',
+      });
+    }
+    const owners = !requestedOwner || requestedOwner === 'both' || requestedOwner === 'all'
+      ? ['serve', 'martijn']
+      : [requestedOwner];
+    const results = await Promise.all(owners.map((owner) => instantlyMailboxService.syncOwner(owner)));
+    return res.status(200).json({
+      ok: results.every((result) => result?.ok !== false),
+      owners,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      results,
+    });
   } catch (error) {
     logger.error('[Mailbox][InstantlySync]', error?.message || error);
     return res.status(error.status || 500).json({
