@@ -139,6 +139,7 @@
             owner: scope.owner,
             signal: candidate.signal,
             skipBootstrap: loadOptions.skipPageBootstrap === true,
+            refreshInstantly: loadOptions.skipProviderRefresh !== true,
           }
         );
         if (!isCurrent(candidate)) return false;

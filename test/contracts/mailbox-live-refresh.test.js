@@ -163,18 +163,21 @@ test('Instantly fast refresh supports exact owners and both owners without mixin
   const calls = [];
   const service = {
     getStatus: () => ({ configured: true, missing: [] }),
-    syncOwner: async (owner) => { calls.push(owner); return { ok: true, owner }; },
+    syncOwner: async (owner, options) => { calls.push({ owner, options }); return { ok: true, owner }; },
   };
   const response = responseRecorder();
   await syncInstantlyMailboxResponse({
     instantlyMailboxService: service,
-    req: { body: { owner: 'both' }, query: {} },
+    req: { body: { owner: 'both', fastRefresh: true }, query: {} },
     res: response,
     logger: { error() {} },
     normalizeString: (value) => String(value || '').trim(),
   });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(calls, ['serve', 'martijn']);
+  assert.deepEqual(calls, [
+    { owner: 'serve', options: { minIntervalMs: 3 * 60 * 1000 } },
+    { owner: 'martijn', options: { minIntervalMs: 3 * 60 * 1000 } },
+  ]);
   assert.deepEqual(response.body.owners, ['serve', 'martijn']);
 
   const rejected = responseRecorder();
@@ -240,6 +243,61 @@ test('temporary provider failures retry once and then update the list in place',
   assert.equal(attempts.get('/api/mailbox/instantly/sync'), 2);
   assert.equal(loads.length, 1);
   assert.equal(loads[0].skipPageBootstrap, true);
+  controller.destroy();
+});
+
+test('refresh status is exclusive while active, successful, partial and failed', async () => {
+  const ageLabel = {
+    textContent: '',
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  let mode = 'success';
+  let releaseFirstRequest;
+  const controller = refreshModule.create({
+    autoStart: false,
+    ageLabel,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async (url) => {
+      if (mode === 'pending' && url === '/api/mailbox/sync') {
+        return new Promise((resolve) => { releaseFirstRequest = resolve; });
+      }
+      if (mode === 'partial' && url === '/api/mailbox/instantly/sync') {
+        return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
+      }
+      if (mode === 'error') {
+        return { ok: false, status: 400, json: async () => ({ error: 'invalid' }) };
+      }
+      return successfulResponse();
+    },
+    loadMessages: async () => true,
+    setTimeout: () => 1,
+    clearTimeout() {},
+  });
+
+  assert.equal(await controller.refresh(), true);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.match(ageLabel.attributes.title, /^Laatste volledige providercontrole voor serve:/);
+
+  mode = 'pending';
+  const pendingRefresh = controller.refresh();
+  await Promise.resolve();
+  assert.equal(ageLabel.textContent, 'Controleren…');
+  assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
+  assert.equal(ageLabel.attributes['aria-label'], 'Mailboxproviders worden gecontroleerd voor serve.');
+  releaseFirstRequest(successfulResponse());
+  assert.equal(await pendingRefresh, true);
+
+  mode = 'partial';
+  assert.equal(await controller.refresh(), false);
+  assert.equal(ageLabel.textContent, 'Deels bijgewerkt');
+  assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
+
+  mode = 'error';
+  assert.equal(await controller.refresh(), false);
+  assert.equal(ageLabel.textContent, 'Bijwerken mislukt');
+  assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
   controller.destroy();
 });
 

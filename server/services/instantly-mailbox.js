@@ -13,6 +13,7 @@ const {
 } = require('./mailbox-automated-reply');
 const { buildAcceptedSentMessage, normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
+const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -665,6 +666,8 @@ function createInstantlyMailboxService(deps = {}) {
       }
       const syncKey = getSyncStateKey(selectedOwner);
       const state = await mailboxIndexStore.getSyncState({ accountEmail: syncKey, folder: 'instantly' });
+      const recentSync = buildRecentSyncResult({ state, owner: selectedOwner, accounts, minIntervalMs: options.minIntervalMs, nowMs: now().getTime() });
+      if (recentSync) return recentSync;
       const lock = await mailboxIndexStore.acquireSyncLock?.({
         accountEmail: syncKey,
         folder: 'instantly',

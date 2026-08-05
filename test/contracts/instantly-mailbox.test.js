@@ -1581,6 +1581,24 @@ test('bounded polling persists its cursor and resumes the next cycle without dup
   );
 });
 
+test('interactive refresh reuses a recent durable Instantly sync instead of hitting provider rate limits', async () => {
+  const store = createStore();
+  let lockCalls = 0;
+  store.getSyncState = async () => ({ last_synced_at: '2026-07-25T11:59:00.000Z' });
+  store.acquireSyncLock = async () => { lockCalls += 1; return { ok: true, lockToken: 'lock' }; };
+  const { service, requests } = buildService({ store });
+
+  const result = await service.syncOwner('serve', { minIntervalMs: 3 * 60 * 1000 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, 'recent-sync');
+  assert.equal(result.syncedAt, '2026-07-25T11:59:00.000Z');
+  assert.equal(result.nextAllowedAt, '2026-07-25T12:02:00.000Z');
+  assert.equal(lockCalls, 0);
+  assert.equal(requests.length, 0);
+});
+
 test('suggested replies use the exact Instantly owner identity instead of falling back to Servé', async () => {
   let promptPayload = null;
   const coordinator = createMailboxService({

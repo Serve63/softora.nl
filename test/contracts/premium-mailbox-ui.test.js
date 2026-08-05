@@ -118,6 +118,9 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
 });
 
@@ -2738,7 +2741,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260805e/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2780,16 +2783,16 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.equal(intervals.length, 0);
   assert.equal(ageLabel.textContent, 'Controleren…');
   assert.equal(await controller.refresh({ manual: true }), true);
-  assert.equal(ageLabel.textContent, '0 sec geleden gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   assert.equal(requests.length, 2);
   assert.equal(requests[0].url, '/api/mailbox/sync');
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     owner: 'both', folder: 'inbox', limit: 4, campaignOnly: true, incrementalOnly: true, fastRefresh: true,
   });
   assert.equal(requests[1].url, '/api/mailbox/instantly/sync');
-  assert.deepEqual(JSON.parse(requests[1].options.body), { owner: 'both' });
+  assert.deepEqual(JSON.parse(requests[1].options.body), { owner: 'both', fastRefresh: true });
   assert.deepEqual(loads[0], {
-    showLoader: false, skipBackgroundSync: true, skipPageBootstrap: true, openLatest: false,
+    showLoader: false, skipBackgroundSync: true, skipProviderRefresh: true, skipPageBootstrap: true, openLatest: false,
   });
   assert.deepEqual(toasts, ['Mailbox volledig bijgewerkt']);
 
@@ -2799,10 +2802,10 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.equal(timeouts.at(-1).delay, 0);
   nowMs += 1 * 1000;
   intervals[0].handler();
-  assert.equal(ageLabel.textContent, '1 sec geleden gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   nowMs += 28 * 1000;
   intervals[0].handler();
-  assert.equal(ageLabel.textContent, '29 sec geleden gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   nowMs += 91 * 1000;
   intervals[0].handler();
   assert.equal(ageLabel.textContent, '2 min geleden gecontroleerd');
@@ -2830,7 +2833,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260806a/);
+  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260806b/);
   assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
@@ -5288,7 +5291,7 @@ test('coldmail inbox isoleert alleen gekoppelde eigen campagne-reacties over all
   assert.match(ownerSessionSource, /options\.campaignInbox\?\.load/);
   assert.match(campaignInboxSource, /\/api\/mailbox\/campaign-replies\?\$\{params\.toString\(\)\}/);
   assert.match(campaignInboxSource, /owner: activeOwner/);
-  assert.match(campaignInboxSource, /refreshInstantly: '1'/);
+  assert.match(campaignInboxSource, /refreshInstantly: options && options\.refreshInstantly === false \? '0' : '1'/);
   assert.match(campaignInboxSource, /function getAccount\(mail, fallbackAccount\)/);
   assert.match(campaignInboxSource, /function getRequestId\(mail\)/);
   assert.match(campaignInboxSource, /async function load\(folder, normalizeMessage, fetchImpl, options\)/);
@@ -5367,6 +5370,16 @@ test('coldmail inbox laadt alleen gekoppelde mailboxberichten van de gekozen eig
   assert.equal(calls[0].options.cache, 'no-store');
   assert.doesNotMatch(calls[0].url, /ui-state-get/);
   assert.equal(await campaignInboxModule.load('inbox', (message) => message), null);
+
+  calls.length = 0;
+  await campaignInboxModule.load('outreach', (message) => message, async (url, options) => {
+    calls.push({ url: String(url), options });
+    return {
+      ok: true,
+      json: async () => ({ ok: true, messages: [], sync: { indexed: true } }),
+    };
+  }, { owner: 'serve', refreshInstantly: false });
+  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&owner=serve&refreshInstantly=0');
 });
 
 test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste client-request', async () => {
