@@ -64,7 +64,8 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805d/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805e/);
+  assert.match(shellSource, />Database verbinden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
   assert.match(pageSource, /<h1 id="company-directory-title">Alle gevonden bedrijven<\/h1>/);
@@ -72,7 +73,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805d/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805e/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -124,6 +125,8 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   assert.equal(totalFound.COMPANY_API_URL, 'http://127.0.0.1:8000/api/company-directory');
   assert.equal(totalFound.DIRECTORY_PAGE_URL, '/kvk-database-bedrijven');
   assert.equal(totalFound.PAGE_SIZE, 100);
+  assert.equal(totalFound.AUTO_CONNECT_TIMEOUT_MS, 8000);
+  assert.equal(totalFound.USER_CONNECT_TIMEOUT_MS, 30000);
   assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /q=Caf%C3%A9\+%26\+Zoon/);
   assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /offset=200/);
   assert.deepEqual(totalFound.companyFetchOptions(), {
@@ -137,8 +140,10 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
   assert.match(scriptSource, /if \(!reset && \(state\.loading \|\| !state\.hasMore\)\) return;/);
   assert.match(scriptSource, /if \(!state\.query\) state\.total = Math\.max/);
-  assert.match(scriptSource, /retryButton\?\.addEventListener\('click', \(\) => loadPage\(\{ reset: true \}\)\)/);
+  assert.match(scriptSource, /retryButton\?\.addEventListener\('click', \(\) => loadPage\(\{ reset: true, userInitiated: true \}\)\)/);
   assert.match(scriptSource, /permissions\.query\(\{ name \}\)/);
+  assert.match(scriptSource, /permissionState === 'prompt' \|\| permissionState === 'denied'/);
+  assert.match(scriptSource, /browserWindow\.setTimeout\(\(\) => controller\.abort\(\), timeoutMs\)/);
   assert.doesNotMatch(scriptSource, /scrollIntoView/);
 
   let assignedUrl = '';
