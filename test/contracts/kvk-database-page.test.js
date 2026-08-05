@@ -64,14 +64,15 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805c/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805d/);
+  assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
   assert.match(pageSource, /<h1 id="company-directory-title">Alle gevonden bedrijven<\/h1>/);
   assert.match(pageSource, /href="\/kvk-database" target="_top"/);
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805c/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805d/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
