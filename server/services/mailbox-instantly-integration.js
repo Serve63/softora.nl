@@ -111,6 +111,7 @@ async function markInstantlyMessageRead({
     uid: 0,
     id: `instantly:${stored.providerMessageId}`,
     unread: false,
+    readAt: result.readAt,
     sourceMailboxMutated: false,
   };
 }
@@ -237,8 +238,8 @@ async function mergeCampaignReplies({
     });
     return filterVisibleMailboxMessages([...uniqueBaseReplies, ...providerReplies]
       .sort((left, right) => (
-        Date.parse(right.activityAt || right.receivedAt || right.date || 0) -
-        Date.parse(left.activityAt || left.receivedAt || left.date || 0)
+        Date.parse(right.latestInboundAt || right.activityAt || right.receivedAt || right.date || 0) -
+        Date.parse(left.latestInboundAt || left.activityAt || left.receivedAt || left.date || 0)
       )));
   }
   return {

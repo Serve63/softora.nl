@@ -1,3 +1,8 @@
+const {
+  MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION,
+  renderMailboxComposeEmailHtml,
+} = require('./mailbox-compose-email-renderer');
+
 const MAX_COMPOSE_ATTACHMENTS = 5;
 const MAX_COMPOSE_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 const MAX_COMPOSE_ATTACHMENTS_TOTAL_BYTES = 5 * 1024 * 1024;
@@ -152,10 +157,12 @@ function createMailboxComposeSend(deps = {}) {
       subject: cleanSubject,
       text: webdesignParts?.text || normalizedText,
     };
-    if (webdesignParts?.html) mail.html = webdesignParts.html;
-    if (webdesignParts) {
-      mail.headers = { 'X-Softora-Template-Version': webdesignEmailTemplateVersion };
-    }
+    mail.html = webdesignParts?.html || renderMailboxComposeEmailHtml(normalizedText);
+    mail.headers = {
+      'X-Softora-Template-Version': webdesignParts
+        ? webdesignEmailTemplateVersion
+        : MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION,
+    };
     const outboundAttachments = [
       ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
       ...explicitAttachments,
@@ -175,13 +182,14 @@ function createMailboxComposeSend(deps = {}) {
         subject: cleanSubject,
       });
     }
+    const sentAt = now();
     const sentCopySaved = await appendSentMessage({
       account,
       createImapClient,
       nodemailer,
       mail,
       messageId: normalizeString(info?.messageId || ''),
-      sentAt: now(),
+      sentAt,
       logger,
     });
     return {
@@ -189,6 +197,30 @@ function createMailboxComposeSend(deps = {}) {
       accepted: Array.isArray(info?.accepted) ? info.accepted : [],
       rejected: Array.isArray(info?.rejected) ? info.rejected : [],
       sentCopySaved,
+      sentMessage: {
+        id: `accepted-sent:${normalizeString(info?.messageId || sentAt.toISOString())}`,
+        mailboxId: `accepted-sent:${normalizeString(info?.messageId || sentAt.toISOString())}`,
+        folder: 'sent',
+        storageFolder: 'sent',
+        direction: 'sent',
+        accountEmail: account.email,
+        messageId: normalizeString(info?.messageId || ''),
+        from: account.name || account.email,
+        email: account.email,
+        to: normalizedTo,
+        toDisplay: normalizedTo,
+        cc: normalizedCc.join(', '),
+        bcc: normalizedBcc.join(', '),
+        recipientRoutingEvidenceKnown: true,
+        subject: cleanSubject,
+        body: webdesignParts?.text || normalizedText,
+        preview: webdesignParts?.text || normalizedText,
+        receivedAt: sentAt.toISOString(),
+        activityAt: sentAt.toISOString(),
+        hasBody: true,
+        bodyTruncated: false,
+        unread: false,
+      },
     };
   };
 }

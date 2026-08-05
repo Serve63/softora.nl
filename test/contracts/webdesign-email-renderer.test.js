@@ -57,6 +57,7 @@ test('shared webdesign renderer is width-safe without CSS and stacks each image 
   assert.match(styles, /\.softora-webdesign-email-body\{width:100%!important;max-width:600px!important;/);
   assert.match(styles, /\.softora-coldmail-body p\{font-size:16px!important;line-height:26px!important/);
   assert.match(styles, /\.softora-mailbox-webdesign-body p\{font-size:16px!important;line-height:26px!important/);
+  assert.match(styles, /\.softora-mailbox-compose-body p\{font-size:16px!important;line-height:26px!important/);
   assert.match(html, /class="softora-webdesign-image-stack" style="display:block;[^\"]+max-width:600px/);
   assert.match(html, /class="softora-webdesign-image" width="600" style="display:block;width:100%;max-width:600px;height:auto;max-height:none;/);
   assert.match(html, /class="softora-webdesign-image softora-webdesign-image--mockup" width="600"/);
