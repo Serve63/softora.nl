@@ -64,6 +64,21 @@
 }
 
 .company-directory-shell-page {
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background: #f4f1ed;
+}
+
+.company-directory-page {
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+  background: #f4f1ed;
+}
+
+.company-directory {
   --page: #f4f1ed;
   --panel: #fffdfb;
   --panel-strong: #fff;
@@ -77,19 +92,7 @@
   --green-soft: #e9f2ed;
   --yellow-soft: #f7efd9;
   --shadow: 0 18px 45px rgba(44, 37, 31, 0.11);
-  min-width: 0;
-  min-height: 100vh;
-  margin: 0;
-  overflow: hidden;
-  background: var(--page);
   color: var(--ink);
-}
-
-.company-directory-page {
-  min-width: 0;
-  min-height: 100vh;
-  margin: 0;
-  background: var(--page);
 }
 
 .company-directory,
@@ -263,7 +266,7 @@
   margin-left: var(--premium-sidebar-width, 320px);
   padding: 0 !important;
   overflow: hidden;
-  background: var(--page);
+  background: #f4f1ed;
 }
 
 .company-directory {

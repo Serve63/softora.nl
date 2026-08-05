@@ -236,6 +236,16 @@
       if (retryButton) retryButton.hidden = false;
     }
 
+    function setServiceUnavailable() {
+      state.hasMore = false;
+      state.rows = [];
+      state.error = true;
+      state.connectionRequired = false;
+      state.errorMessage = 'Lokale databaseservice is niet bereikbaar. Start de databasekoppeling en probeer opnieuw.';
+      setSourceStatus(state.errorMessage, 'error');
+      if (retryButton) retryButton.hidden = false;
+    }
+
     async function loadPage({ reset = false, userInitiated = false } = {}) {
       if (!reset && (state.loading || !state.hasMore)) return;
       if (reset) {
@@ -286,7 +296,11 @@
         if (requestVersion !== state.requestVersion) return;
         const permissionState = await localNetworkPermissionState(browserWindow);
         if (requestVersion !== state.requestVersion) return;
-        setConnectionRequired(permissionState);
+        if (permissionState === 'prompt' || permissionState === 'denied') {
+          setConnectionRequired(permissionState);
+        } else {
+          setServiceUnavailable();
+        }
       } finally {
         if (timeoutHandle !== null && typeof browserWindow?.clearTimeout === 'function') {
           browserWindow.clearTimeout(timeoutHandle);
