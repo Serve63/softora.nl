@@ -128,6 +128,9 @@ function decorateMessage(mail, source) {
     embeddedImageCount: Math.max(0, Math.min(8, Number(message.embeddedImageCount) || 0)),
     originalCampaignOutbound: Boolean(message.originalCampaignOutbound),
     webdesignLinkEvidenceKnown: Boolean(message.webdesignLinkEvidenceKnown),
+    webdesignLinkHydrationAttempted: Boolean(
+      message.webdesignLinkHydrationAttempted || message.webdesignLinkEvidenceKnown
+    ),
     webdesignLinkUrl: normalizeText(message.webdesignLinkUrl),
     toDisplay: normalizeText(message.toDisplay),
     cc: normalizeText(message.cc),
@@ -193,6 +196,7 @@ async function loadBody({
   const mail = getMail(id);
   if (!mail || mail.bodyLoading) return;
   mail.bodyLoading = true;
+  let exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
   try {
     try {
       const { response: indexedResponse, data: indexedData } = await fetchMailboxBodyJson(fetch, '/api/mailbox/messages/bodies', {
@@ -227,6 +231,7 @@ async function loadBody({
         );
         mail.originalCampaignOutbound = Boolean(indexedMessage.originalCampaignOutbound);
         mail.webdesignLinkEvidenceKnown = Boolean(indexedMessage.webdesignLinkEvidenceKnown);
+        if (mail.webdesignLinkEvidenceKnown) mail.webdesignLinkHydrationAttempted = true;
         mail.webdesignLinkUrl = normalizeText(indexedMessage.webdesignLinkUrl);
         mail.to = normalizeText(indexedMessage.to || mail.to);
         mail.toDisplay = normalizeText(indexedMessage.toDisplay || indexedMessage.to || mail.toDisplay || mail.to);
@@ -237,6 +242,7 @@ async function loadBody({
         mail.recipientRoutingNeedsHydration = !mail.recipientRoutingEvidenceKnown;
         mail.attachments = Array.isArray(indexedMessage.attachments) ? indexedMessage.attachments : [];
         mail.bodyLoadError = '';
+        exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
         const needsLiveCampaignEnrichment = Boolean(
           mail.recipientRoutingNeedsHydration ||
           (mail.originalCampaignOutbound &&
@@ -247,6 +253,16 @@ async function loadBody({
           ))
         );
         if (mail.bodyLoaded && !needsLiveCampaignEnrichment) return;
+        if (exactBodyAvailable) {
+          mail.bodyLoading = false;
+          if (
+            (typeof isCurrent !== 'function' || isCurrent()) &&
+            typeof getActiveMail === 'function' &&
+            String(getActiveMail()) === String(id)
+          ) {
+            openMail(id, { skipBodyFetch: true, skipReadPersist: true });
+          }
+        }
       }
     } catch (error) {
       if (error && error.name === 'AbortError') throw error;
@@ -283,6 +299,7 @@ async function loadBody({
     );
     mail.originalCampaignOutbound = Boolean(data.message.originalCampaignOutbound);
     mail.webdesignLinkEvidenceKnown = Boolean(data.message.webdesignLinkEvidenceKnown);
+    mail.webdesignLinkHydrationAttempted = true;
     mail.webdesignLinkUrl = normalizeText(data.message.webdesignLinkUrl);
     mail.to = normalizeText(data.message.to || mail.to);
     mail.toDisplay = normalizeText(data.message.toDisplay || data.message.to || mail.toDisplay || mail.to);
@@ -294,8 +311,14 @@ async function loadBody({
     mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
   } catch (error) {
     if (typeof isCurrent === 'function' && !isCurrent()) return;
-    mail.bodyLoadError = getBodyLoadError(error, error?.status);
-    mail.bodyLoaded = false;
+    mail.webdesignLinkHydrationAttempted = true;
+    if (exactBodyAvailable || (mail.bodyLoaded && normalizeText(mail.body))) {
+      mail.bodyLoadError = '';
+      mail.bodyLoaded = true;
+    } else {
+      mail.bodyLoadError = getBodyLoadError(error, error?.status);
+      mail.bodyLoaded = false;
+    }
   } finally {
     mail.bodyLoading = false;
     if (
@@ -358,6 +381,7 @@ function applyThreadMessagePayload(message, source, normalizeBodyImages, normali
   message.embeddedImageCount = Math.max(0, Math.min(8, Number(source && source.embeddedImageCount) || 0));
   message.originalCampaignOutbound = Boolean(source && source.originalCampaignOutbound);
   message.webdesignLinkEvidenceKnown = Boolean(source && source.webdesignLinkEvidenceKnown);
+  if (message.webdesignLinkEvidenceKnown) message.webdesignLinkHydrationAttempted = true;
   message.webdesignLinkUrl = normalizeText(source && source.webdesignLinkUrl);
   const previousRouting = [message.to, message.toDisplay, message.cc, message.bcc, message.deliveredTo, message.recipientRoutingEvidenceKnown]
     .map((value) => String(value || ''))
@@ -380,6 +404,7 @@ function needsThreadLinkHydration(message) {
   const source = message && typeof message === 'object' ? message : {};
   if (source.originalCampaignOutbound !== true) return false;
   if (source.webdesignLinkEvidenceKnown === true) return false;
+  if (source.webdesignLinkHydrationAttempted === true) return false;
   const body = normalizeText(source.body || source.preview);
   if (!body || /https?:\/\/[^\s<>"']*\/webdesign\/[a-z0-9-]+/i.test(body)) return false;
   return /\b(?:webdesign|ontwerp)\b[\s\S]{0,240}\b(?:deze link|(?:open|bekijk) het via hier)\b/i.test(body);
@@ -425,7 +450,9 @@ async function loadThreadBodies({
   const targets = pendingTargets.slice(0, MAX_THREAD_HYDRATION_TARGETS);
   pendingTargets.slice(MAX_THREAD_HYDRATION_TARGETS).forEach((message) => {
     message.bodyLoading = false;
-    message.bodyLoadError = 'Dit bericht wacht op een losse laadpoging.';
+    message.bodyLoadError = needsThreadBodyHydration(message)
+      ? 'Dit bericht wacht op een losse laadpoging.'
+      : '';
   });
   if (!targets.length) return false;
 
@@ -433,9 +460,7 @@ async function loadThreadBodies({
   mail.threadBodiesLoading = true;
   targets.forEach((message) => {
     message.bodyLoadError = '';
-    message.bodyLoading =
-      needsThreadBodyHydration(message) ||
-      needsThreadLinkHydration(message);
+    message.bodyLoading = needsThreadBodyHydration(message);
   });
   if (
     typeof openMail === 'function' &&
@@ -479,7 +504,7 @@ async function loadThreadBodies({
             normalizeBodyImages,
             normalizeOptOutUrl
           ) || updated;
-          if (!needsThreadBodyHydration(target.message) && !needsThreadLinkHydration(target.message)) {
+          if (!needsThreadBodyHydration(target.message)) {
             target.message.bodyLoadError = '';
           }
         });
@@ -490,9 +515,7 @@ async function loadThreadBodies({
 
     if (!stillCurrent()) return false;
     targets.forEach((message) => {
-      message.bodyLoading =
-        needsThreadBodyHydration(message) ||
-        needsThreadLinkHydration(message);
+      message.bodyLoading = needsThreadBodyHydration(message);
     });
     if (
       typeof openMail === 'function' &&
@@ -512,13 +535,14 @@ async function loadThreadBodies({
       await Promise.all(detailTargets.slice(offset, offset + 2).map(async (message) => {
         const { account, folder, id } = getThreadMessageRequest(message, mail);
         if (!account || !id) {
-          message.bodyLoadError = 'Volledig bericht kon niet worden geladen.';
+          message.webdesignLinkHydrationAttempted = true;
+          message.bodyLoadError = needsThreadBodyHydration(message)
+            ? 'Volledig bericht kon niet worden geladen.'
+            : '';
           return;
         }
         message.imageLoading = true;
-        message.bodyLoading =
-          needsThreadBodyHydration(message) ||
-          needsThreadLinkHydration(message);
+        message.bodyLoading = needsThreadBodyHydration(message);
         try {
           const params = new URLSearchParams({ account, folder, id });
           const { response, data } = await fetchMailboxBodyJson(request, `/api/mailbox/message?${params.toString()}`, {
@@ -538,14 +562,16 @@ async function loadThreadBodies({
             normalizeBodyImages,
             normalizeOptOutUrl
           ) || updated;
-          message.bodyLoadError = (
-            needsThreadBodyHydration(message) || needsThreadLinkHydration(message)
-          ) ? 'Volledig bericht is niet beschikbaar in het bronbericht.' : '';
+          message.webdesignLinkHydrationAttempted = true;
+          message.bodyLoadError = needsThreadBodyHydration(message)
+            ? 'Volledig bericht is niet beschikbaar in het bronbericht.'
+            : '';
         } catch (error) {
           if (stillCurrent() && !(error && error.name === 'AbortError')) {
-            message.bodyLoadError = (
-              needsThreadBodyHydration(message) || needsThreadLinkHydration(message)
-            ) ? getBodyLoadError(error, error?.status) : '';
+            message.webdesignLinkHydrationAttempted = true;
+            message.bodyLoadError = needsThreadBodyHydration(message)
+              ? getBodyLoadError(error, error?.status)
+              : '';
           }
         } finally {
           message.bodyLoading = false;

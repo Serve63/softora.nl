@@ -361,11 +361,22 @@ function normalizeExactWebdesignUrl(value, expectedCustomerId) {
 }
 
 function insertExactWebdesignUrl(body, exactUrl) {
-  const marker = `hier [${exactUrl}]`;
-  if (body.includes(marker)) return body;
-  const exactCta = /(\bwebdesign\s+)hier(\s+bekijken\b)/i;
-  if (!exactCta.test(body)) return '';
-  return body.replace(exactCta, `$1${marker}$2`);
+  const exactMarkers = [
+    {
+      linkedText: `hier [${exactUrl}]`,
+      pattern: /(\bwebdesign\s+)hier(\s+bekijken\b)/i,
+      replacement: `$1hier [${exactUrl}]$2`,
+    },
+    {
+      linkedText: `link [${exactUrl}]`,
+      pattern: /(\bwebdesign\b[\s\S]{0,160}\bvia\s+deze\s+)link(\s+bekijken\b)/i,
+      replacement: `$1link [${exactUrl}]$2`,
+    },
+  ];
+  const existing = exactMarkers.find(({ linkedText }) => body.includes(linkedText));
+  if (existing) return body;
+  const marker = exactMarkers.find(({ pattern }) => pattern.test(body));
+  return marker ? body.replace(marker.pattern, marker.replacement) : '';
 }
 
 function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], customer = {}, options = {}) {
@@ -430,7 +441,14 @@ function buildCustomerQuotedMessageSource(rawMessage = {}, rawMessages = [], cus
   }
   const sourceBody = insertExactWebdesignUrl(quotedBody, exactPublicUrl);
   if (!sourceBody) {
-    return { evidenceKnown: true, available: false, reason: 'quoted-link-marker-missing' };
+    return {
+      evidenceKnown: true,
+      available: true,
+      body: quotedBody,
+      webdesignLinkEvidenceKnown: true,
+      webdesignLinkUrl: '',
+      reason: `exact-customer-and-delivered-quote-source:${quotedEvidence.source}:body-only`,
+    };
   }
 
   return {
