@@ -15,6 +15,8 @@
   const COMPANY_API_URL = 'http://127.0.0.1:8000/api/company-directory';
   const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
   const PAGE_SIZE = 100;
+  const AUTO_CONNECT_TIMEOUT_MS = 8000;
+  const USER_CONNECT_TIMEOUT_MS = 30000;
   const TREATED_CONTACT_STATUSES = new Set(['checked', 'done', 'searched', 'unusable']);
   const FINAL_LEAD_STATUSES = new Set(['usable', 'unusable']);
   const UNUSABLE_LABELS = {
@@ -115,13 +117,15 @@
     return `${COMPANY_API_URL}?${params.toString()}`;
   }
 
-  function companyFetchOptions() {
-    return {
+  function companyFetchOptions(signal) {
+    const options = {
       cache: 'no-store',
       credentials: 'omit',
       mode: 'cors',
       targetAddressSpace: 'loopback',
     };
+    if (signal) options.signal = signal;
+    return options;
   }
 
   async function localNetworkPermissionState(browserWindow) {
@@ -180,6 +184,7 @@
       hasMore: true,
       loading: false,
       error: false,
+      connectionRequired: false,
       errorMessage: '',
       query: '',
       requestVersion: 0,
@@ -206,13 +211,13 @@
       `;
       if (state.rows.length) {
         body.innerHTML = state.rows.map(companyRowHtml).join('');
-      } else if (state.error) {
+      } else if (state.error || state.connectionRequired) {
         body.innerHTML = `<tr class="empty-row"><td colspan="7">${escapeHtml(state.errorMessage || 'Lokale bedrijvendatabase niet bereikbaar.')}</td></tr>`;
       } else if (!state.loading) {
         body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.query ? 'Geen bedrijven gevonden.' : 'Nog geen bedrijven geladen.'}</td></tr>`;
       }
       totalCount.textContent = state.total ? numberFormat.format(state.total) : '—';
-      if (!state.loading && !state.error) {
+      if (!state.loading && !state.error && !state.connectionRequired) {
         if (retryButton) retryButton.hidden = true;
         const totalText = numberFormat.format(state.total);
         const statusText = state.query
@@ -222,7 +227,20 @@
       }
     }
 
-    async function loadPage({ reset = false } = {}) {
+    function setConnectionRequired(permissionState) {
+      const blocked = permissionState === 'denied';
+      state.hasMore = false;
+      state.rows = [];
+      state.error = blocked;
+      state.connectionRequired = !blocked;
+      state.errorMessage = blocked
+        ? 'Lokale netwerktoegang is geblokkeerd. Sta deze toe in de site-instellingen van softora.nl en probeer opnieuw.'
+        : 'Chrome heeft éénmalig toestemming nodig. Klik op Database verbinden en kies Toestaan.';
+      setSourceStatus(state.errorMessage, blocked ? 'error' : 'permission');
+      if (retryButton) retryButton.hidden = false;
+    }
+
+    async function loadPage({ reset = false, userInitiated = false } = {}) {
       if (!reset && (state.loading || !state.hasMore)) return;
       if (reset) {
         state.rows = [];
@@ -230,17 +248,33 @@
         if (!state.query) state.total = 0;
         state.hasMore = true;
         state.error = false;
+        state.connectionRequired = false;
         state.errorMessage = '';
         state.requestVersion += 1;
       }
       const requestVersion = state.requestVersion;
       state.loading = true;
       if (retryButton) retryButton.hidden = true;
-      setSourceStatus(reset ? 'Volledige landelijke lijst laden…' : 'Meer bedrijven laden…', 'loading');
+      setSourceStatus(
+        userInitiated
+          ? 'Kies Toestaan in de Chrome-melding…'
+          : reset
+            ? 'Volledige landelijke lijst laden…'
+            : 'Meer bedrijven laden…',
+        'loading'
+      );
+      const AbortControllerClass = browserWindow?.AbortController;
+      const controller = typeof AbortControllerClass === 'function'
+        ? new AbortControllerClass()
+        : null;
+      const timeoutMs = userInitiated ? USER_CONNECT_TIMEOUT_MS : AUTO_CONNECT_TIMEOUT_MS;
+      const timeoutHandle = controller && typeof browserWindow?.setTimeout === 'function'
+        ? browserWindow.setTimeout(() => controller.abort(), timeoutMs)
+        : null;
       try {
         const response = await browserWindow.fetch(
           buildCompanyApiUrl(state.query, state.offset),
-          companyFetchOptions()
+          companyFetchOptions(controller?.signal)
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
@@ -250,19 +284,17 @@
         state.offset += rows.length;
         if (!state.query) state.total = Math.max(0, Number(payload?.total) || state.rows.length);
         state.hasMore = Boolean(payload?.has_more) && rows.length > 0;
+        state.error = false;
+        state.connectionRequired = false;
       } catch {
         if (requestVersion !== state.requestVersion) return;
         const permissionState = await localNetworkPermissionState(browserWindow);
         if (requestVersion !== state.requestVersion) return;
-        state.hasMore = false;
-        state.rows = [];
-        state.error = true;
-        state.errorMessage = permissionState === 'denied'
-          ? 'Lokale netwerktoegang is geblokkeerd. Sta deze toe in de site-instellingen van softora.nl en probeer opnieuw.'
-          : 'Verbinding met de lokale bedrijvendatabase mislukt. Klik op Opnieuw verbinden en kies Toestaan bij de browsermelding.';
-        setSourceStatus(state.errorMessage, 'error');
-        if (retryButton) retryButton.hidden = false;
+        setConnectionRequired(permissionState);
       } finally {
+        if (timeoutHandle !== null && typeof browserWindow?.clearTimeout === 'function') {
+          browserWindow.clearTimeout(timeoutHandle);
+        }
         if (requestVersion === state.requestVersion) {
           state.loading = false;
           renderRows();
@@ -275,14 +307,25 @@
       browserWindow.clearTimeout(searchTimer);
       searchTimer = browserWindow.setTimeout(() => loadPage({ reset: true }), 220);
     });
-    retryButton?.addEventListener('click', () => loadPage({ reset: true }));
+    retryButton?.addEventListener('click', () => loadPage({ reset: true, userInitiated: true }));
     frame.addEventListener('scroll', () => {
       if (state.loading || !state.hasMore) return;
       if (frame.scrollTop + frame.clientHeight >= frame.scrollHeight - 180) loadPage();
     });
-    loadPage({ reset: true });
+    async function loadInitialPage() {
+      const permissionState = await localNetworkPermissionState(browserWindow);
+      if (permissionState === 'prompt' || permissionState === 'denied') {
+        state.loading = false;
+        setConnectionRequired(permissionState);
+        renderRows();
+        return;
+      }
+      await loadPage({ reset: true });
+    }
 
-    return { loadPage, renderRows, state };
+    loadInitialPage();
+
+    return { loadInitialPage, loadPage, renderRows, state };
   }
 
   function mount(browserWindow) {
@@ -296,6 +339,8 @@
     COMPANY_API_URL,
     DIRECTORY_PAGE_URL,
     PAGE_SIZE,
+    AUTO_CONNECT_TIMEOUT_MS,
+    USER_CONNECT_TIMEOUT_MS,
     buildCompanyApiUrl,
     companyFetchOptions,
     companyRowHtml,

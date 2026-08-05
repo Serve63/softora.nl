@@ -41,6 +41,10 @@
   color: #8b3b32;
 }
 
+.total-found-source-status[data-tone='permission'] {
+  color: var(--accent-dark);
+}
+
 .company-status.is-pending {
   min-width: 96px;
   background: #efeae4;
