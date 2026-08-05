@@ -367,6 +367,7 @@ test('canonical premium pages opt into the shared sidebar shell', () => {
 
 test('kvk database route keeps the canonical sidebar outside its scraper frame', () => {
   const pageSource = readRepoFile('premium-kvk-database-shell.html');
+  const directoryShellSource = readRepoFile('premium-kvk-company-directory-shell.html');
   const themeSource = readRepoFile('assets/personnel-theme.js');
 
   assert.match(pageSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
@@ -375,6 +376,11 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(pageSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
   assert.match(themeSource, /pathname === "\/kvk-database"/);
   assert.match(themeSource, /pathname === "\/kvk-database\.html"/);
+  assert.match(directoryShellSource, /class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical"/);
+  assert.match(directoryShellSource, /<aside class="sidebar" data-sidebar-ready="false"/);
+  assert.match(directoryShellSource, /src="\/premium-kvk-company-directory\?softora_sidebar_content=1"/);
+  assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
+  assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
 });
 
 test('premium dashboard keeps its first-paint boot overlay in the shell contract', () => {
