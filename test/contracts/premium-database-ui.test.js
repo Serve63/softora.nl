@@ -321,7 +321,8 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
   assert.doesNotMatch(pageSource, /function serializeCustomerList/);
   assert.match(pageSource, /function customerListsDiffer\(nextCustomers\) \{ return state\.klanten !== nextCustomers; \}/);
-  assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender\) \{ const dedupedCustomers = window\.SoftoraDatabaseMailReadySnapshot\.dedupeCustomers\(nextCustomers\);/);
+  assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender\) \{ const reconciledCustomers = window\.SoftoraDatabaseMailReadySnapshot\.reconcileCustomerList\(state, nextCustomers\);/);
+  assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
 });
 
 test('canonical inventory gate never publishes compact or capped counts', () => {
@@ -1200,6 +1201,8 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   assert.equal(client.getDisplayCount(state, applied[0].customers.length), 1);
   state.remoteCustomersLoaded = true;
   assert.equal(client.getDisplayCount(state, 8856), 1);
+  state.canonicalInventoryReady = true;
+  assert.equal(client.getDisplayCount(state, 8856), 8856);
 
   const merged = client.mergeAssetFlags([
     { id: 'customer-ready', bedrijf: 'Demo BV', email: 'info@demo.nl', website: 'https://demo.nl' },
@@ -1243,6 +1246,42 @@ test('canonical mail-ready merge clears stale category flags from unmatched remo
       'stale-available': { mailReady: false, mailReadySnapshot: false, availableSnapshot: false },
     }
   );
+});
+
+test('canonical customer reconciliation survives later normalized refreshes and gates ready state on table truth', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const state = {
+    activeStatus: 'benaderbaar',
+    canonicalInventoryReady: false,
+    remoteCustomersLoaded: true,
+    canonicalSnapshotApplied: true,
+    mailReadySnapshotLoaded: true,
+    mailReadySnapshotPending: false,
+    mailReadySnapshotTotal: 1,
+    mailReadySnapshotCustomers: [{ id: 'ready-1', email: 'ready@example.test', mailReady: true, mailReadySnapshot: true }],
+    availableSnapshotLoaded: true,
+    availableSnapshotTotal: 1,
+    availableSnapshotCustomers: [{ id: 'available-1', email: 'available@example.test', mailReady: false, availableSnapshot: true }],
+    foundSnapshotLoaded: true,
+    foundSnapshotTotal: 2,
+    foundSnapshotCustomerIdSet: new Set(['ready-1', 'available-1']),
+  };
+  const normalizedRefresh = [
+    { id: 'ready-1', email: 'ready@example.test', mailReady: false, mailReadySnapshot: false },
+    { id: 'available-1', email: 'available@example.test', availableSnapshot: false },
+    { id: 'ordinary-1', email: 'ordinary@example.test', mailReady: true, mailReadySnapshot: true },
+  ];
+
+  state.klanten = normalizedRefresh;
+  assert.equal(client.isCanonicalCustomerListCoherent(state, state.klanten), false);
+  assert.equal(client.markCanonicalInventoryReady(state), false);
+
+  state.klanten = client.reconcileCustomerList(state, normalizedRefresh);
+  assert.deepEqual(state.klanten.filter(client.isSnapshotMailReadyCustomer).map((customer) => customer.id), ['ready-1']);
+  assert.deepEqual(state.klanten.filter(client.isSnapshotAvailableCustomer).map((customer) => customer.id), ['available-1']);
+  assert.equal(client.isCanonicalCustomerListCoherent(state, state.klanten), true);
+  assert.equal(client.markCanonicalInventoryReady(state), true);
+  assert.equal(client.getDisplayCount(state, 1), 1);
 });
 
 test('mail-ready snapshot client paginates every available row before publishing the count', async () => {
@@ -1734,7 +1773,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805g/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805h/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
