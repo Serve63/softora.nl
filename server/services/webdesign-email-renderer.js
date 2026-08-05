@@ -16,6 +16,7 @@ function renderWebdesignEmailHeadStyles() {
     `.softora-webdesign-email-body{width:100%!important;max-width:${EMAIL_CONTENT_MAX_WIDTH}px!important;min-width:0!important;box-sizing:border-box!important;overflow-wrap:anywhere!important;word-break:normal!important;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important;text-size-adjust:100%!important}`,
     `.softora-coldmail-body p{font-size:16px!important;line-height:26px!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important}`,
     `.softora-mailbox-webdesign-body p{font-size:16px!important;line-height:26px!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important}`,
+    `.softora-mailbox-compose-body p{font-size:16px!important;line-height:26px!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important}`,
   ].join('');
 }
 

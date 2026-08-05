@@ -8,8 +8,11 @@ const {
   hydrateIndexedThreadMessageEvidence,
 } = require('./instantly-original-message-source');
 const {
+  buildAutomatedReplyEvidence,
   isAutomatedCampaignReply,
 } = require('./mailbox-automated-reply');
+const { buildAcceptedSentMessage, normalizeProviderAttachmentList } = require('./mailbox-accepted-sent-message');
+const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -259,24 +262,6 @@ function createInstantlyMailboxService(deps = {}) {
       : 'received';
   }
 
-  function normalizeAttachmentList(value) {
-    const source = typeof value === 'string'
-      ? (() => {
-          try {
-            return JSON.parse(value);
-          } catch (_) {
-            return [];
-          }
-        })()
-      : value;
-    const files = Array.isArray(source) ? source : Array.isArray(source?.files) ? source.files : [];
-    return files.slice(0, 20).map((attachment) => ({
-      filename: normalizeText(attachment?.filename || attachment?.name || 'Bijlage').slice(0, 180),
-      contentType: normalizeText(attachment?.content_type || attachment?.type).slice(0, 120),
-      size: Math.max(0, Number(attachment?.size) || 0),
-    }));
-  }
-
   function normalizeInstantlyMessage(rawMessage = {}) {
     const account = resolveAccountRecord(rawMessage);
     const providerMessageId = normalizeText(rawMessage.id || rawMessage.email_id || rawMessage.uuid);
@@ -358,7 +343,7 @@ function createInstantlyMailboxService(deps = {}) {
       hasBody: Boolean(body),
       bodyLoaded: Boolean(body),
       bodyTruncated: false,
-      attachments: normalizeAttachmentList(rawMessage.attachment_json || rawMessage.attachments),
+      attachments: normalizeProviderAttachmentList(rawMessage.attachment_json || rawMessage.attachments),
       originalCampaignOutbound: direction === 'sent' && lifecycleType === '1',
       providerBodyHtmlEvidenceKnown: Boolean(html),
       providerRichBodyAvailable: Boolean(providerHtml.body),
@@ -370,6 +355,11 @@ function createInstantlyMailboxService(deps = {}) {
       webdesignLinkUrl: originalSource?.available
         ? normalizeText(originalSource.webdesignLinkUrl)
         : providerHtml.webdesignLinkUrl,
+      ...buildAutomatedReplyEvidence({
+        autoSubmitted: rawMessage.auto_submitted || rawMessage.autoSubmitted,
+        precedence: rawMessage.precedence,
+        autoResponseSuppress: rawMessage.x_auto_response_suppress || rawMessage.auto_response_suppress,
+      }),
       indexed: true,
     };
   }
@@ -870,20 +860,24 @@ function createInstantlyMailboxService(deps = {}) {
           .sort((left, right) => Date.parse(right.date || 0) - Date.parse(left.date || 0));
         const incoming = sorted.find((message) => message.folder !== 'sent');
         if (!incoming) return null;
-        const activity = sorted[0];
         const root = incoming;
+        const activity = resolveConversationActivity({ ...root, threadMessages: sorted.filter(
+          (message) => getMessageIdentity(message) !== getMessageIdentity(root)
+        ) });
         return {
           ...root,
           id: `${root.accountEmail}|instantly-thread:${threadId}`,
           mailboxId: root.id,
           conversationId: `instantly:${root.accountEmail}:${threadId}`,
-          activityAt: activity.date,
+          activityAt: activity.latestInboundAt,
+          latestInboundAt: activity.latestInboundAt,
+          latestOutboundAt: activity.latestOutboundAt,
           campaign: {
             provider: 'instantly',
             campaignId: normalizeText(root.providerCampaignId),
             account: root.accountEmail,
             company: root.from || root.email,
-            actionRequired: activity.folder !== 'sent',
+            actionRequired: (Date.parse(activity.latestInboundAt || '') || 0) > (Date.parse(activity.latestOutboundAt || '') || 0),
           },
           outreach: {
             provider: 'instantly',
@@ -896,7 +890,7 @@ function createInstantlyMailboxService(deps = {}) {
         };
       })
       .filter(Boolean)
-      .sort((left, right) => Date.parse(right.activityAt || 0) - Date.parse(left.activityAt || 0));
+      .sort((left, right) => Date.parse(right.latestInboundAt || right.activityAt || 0) - Date.parse(left.latestInboundAt || left.activityAt || 0));
   }
 
   async function listOwnerConversations(owner, { limit = 100 } = {}) {
@@ -1077,6 +1071,13 @@ function createInstantlyMailboxService(deps = {}) {
       providerThreadId: normalizeText(normalizedSent?.providerThreadId || stored.providerThreadId),
       accountEmail: account,
       owner: selectedOwner,
+      sentMessage: buildAcceptedSentMessage(normalizedSent, {
+        body: cleanText,
+        subject: cleanSubject,
+        to: expectedRecipient,
+        cc: ccAddresses.join(', '),
+        bcc: bccAddresses.join(', '),
+      }),
     };
   }
 
