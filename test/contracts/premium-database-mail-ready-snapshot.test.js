@@ -637,6 +637,7 @@ test('premium database mail-ready snapshot persists compact full and bootstrap c
     email: `info${index + 1}@ready.nl`,
     website: `ready-${index + 1}.nl`,
     database_status: 'prospect',
+    payload: index < 2 ? { bronDatabase: 'Softora Bedrijven Scraper' } : {},
   }));
   const { service, calls } = createService({
     customers,
@@ -652,6 +653,8 @@ test('premium database mail-ready snapshot persists compact full and bootstrap c
   assert.equal(JSON.parse(fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY]).customers.length, 120);
   assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).customers.length, 100);
   assert.equal(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).total, 120);
+  assert.deepEqual(JSON.parse(fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY]).foundCustomerIds, ['ready-1', 'ready-2']);
+  assert.deepEqual(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).foundCustomerIds, ['ready-1', 'ready-2']);
 });
 
 test('premium database mail-ready snapshot waits for the central refresh after its memory cache expires', async () => {

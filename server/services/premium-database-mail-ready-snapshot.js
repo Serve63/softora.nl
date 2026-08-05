@@ -2,6 +2,9 @@ const { normalizeContactStatus } = require('./customer-lifecycle');
 const {
   getIdentityKeyRows,
 } = require('./outbound-recipient-guard-store');
+const {
+  createPremiumDatabaseSnapshotCacheCodec,
+} = require('./premium-database-snapshot-cache');
 
 const SNAPSHOT_SOURCE = 'structured-mail-ready-snapshot';
 const MAIL_READY_SNAPSHOT_CACHE_SCOPE = 'premium_database_mail_ready_snapshot_cache';
@@ -17,6 +20,11 @@ const MAX_OFFSET = 10000;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 950000;
 const SNAPSHOT_FORMAT_VERSION = 2;
+const {
+  isMailReadySnapshotCoherent,
+  parseMailReadySnapshotCacheValue,
+  serializeMailReadySnapshotCache,
+} = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: MAX_LIMIT, formatVersion: SNAPSHOT_FORMAT_VERSION });
 const EXCLUDED_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -305,62 +313,6 @@ function parseColdmailGuardPayload(raw) {
   } catch (_error) {
     return {};
   }
-}
-
-function parseMailReadySnapshotCacheValue(raw) {
-  try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.customers)) return null;
-    const customers = parsed.customers
-      .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
-      .slice(0, MAX_LIMIT);
-    const availableCustomers = (Array.isArray(parsed.availableCustomers) ? parsed.availableCustomers : [])
-      .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id))
-      .slice(0, MAX_LIMIT);
-    if (!customers.length && !availableCustomers.length) return null;
-    return {
-      version: Math.max(1, Number(parsed.version) || 1),
-      generatedAt: normalizeString(parsed.generatedAt),
-      total: Math.max(customers.length, Number(parsed.total) || 0),
-      customers,
-      availableTotal: Math.max(availableCustomers.length, Number(parsed.availableTotal) || 0),
-      availableCustomers,
-      timings: parsed.timings && typeof parsed.timings === 'object' ? parsed.timings : {},
-    };
-  } catch (_error) {
-    return null;
-  }
-}
-
-function isMailReadySnapshotCategoryCoherent(totalRaw, rowsRaw) {
-  const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
-  const total = Math.max(0, Number(totalRaw) || 0);
-  return total === 0 || rows.length > 0;
-}
-
-function isMailReadySnapshotCoherent(snapshot = {}) {
-  return Boolean(
-    snapshot &&
-    isMailReadySnapshotCategoryCoherent(snapshot.total, snapshot.customers) &&
-    isMailReadySnapshotCategoryCoherent(snapshot.availableTotal, snapshot.availableCustomers)
-  );
-}
-
-function serializeMailReadySnapshotCache(data = {}, rowLimit = MAX_LIMIT) {
-  const customers = (Array.isArray(data.customers) ? data.customers : [])
-    .slice(0, Math.max(1, Math.min(MAX_LIMIT, Number(rowLimit) || MAX_LIMIT)));
-  const availableCustomers = (Array.isArray(data.availableCustomers) ? data.availableCustomers : [])
-    .slice(0, Math.max(1, Math.min(MAX_LIMIT, Number(rowLimit) || MAX_LIMIT)));
-  if (!customers.length && !availableCustomers.length) return '';
-  return JSON.stringify({
-    version: SNAPSHOT_FORMAT_VERSION,
-    generatedAt: normalizeString(data.generatedAt),
-    total: Math.max(customers.length, Number(data.total) || (Array.isArray(data.customers) ? data.customers.length : 0)),
-    customers,
-    availableTotal: Math.max(availableCustomers.length, Number(data.availableTotal) || (Array.isArray(data.availableCustomers) ? data.availableCustomers.length : 0)),
-    availableCustomers,
-    timings: data.timings && typeof data.timings === 'object' ? data.timings : {},
-  });
 }
 
 function normalizeLegacyGuardEntry(entry = {}) {
@@ -721,9 +673,9 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     };
     const fullValue = serializeMailReadySnapshotCache(snapshotData, MAX_LIMIT);
     const bootstrapValue = serializeMailReadySnapshotCache(snapshotData, MAIL_READY_BOOTSTRAP_ROW_LIMIT);
-    if (!fullValue || !bootstrapValue || fullValue.length > SNAPSHOT_CACHE_VALUE_MAX_LENGTH) {
+    if (!fullValue || !bootstrapValue || Math.max(fullValue.length, bootstrapValue.length) > SNAPSHOT_CACHE_VALUE_MAX_LENGTH) {
       if (logger && typeof logger.warn === 'function') {
-        logger.warn('[PremiumDatabaseMailReadySnapshot][durable-write]', `Snapshotcache ongeldig of te groot (${fullValue.length} tekens).`);
+        logger.warn('[PremiumDatabaseMailReadySnapshot][durable-write]', `Snapshotcache ongeldig of te groot (${Math.max(fullValue.length, bootstrapValue.length)} tekens).`);
       }
       return false;
     }

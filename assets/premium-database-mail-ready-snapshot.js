@@ -4,7 +4,7 @@
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
     const PAGE_LIMIT = 3000;
     const MAX_SNAPSHOT_ROWS = 3000;
-    const FIRST_PAGE_TIMEOUT_MS = 6000;
+    const FIRST_PAGE_TIMEOUT_MS = 20000;
     const NEXT_PAGE_TIMEOUT_MS = 4500;
     const PAGE_CONCURRENCY = 3;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
@@ -48,7 +48,10 @@
     function isBootstrapSnapshotPayloadCoherent(payload) {
         if (!payload || typeof payload !== "object") return false;
         const rows = Array.isArray(payload.customers) ? payload.customers : [];
-        return isSnapshotCategoryCoherent(payload.mailReadySnapshotTotal, rows.filter(isSnapshotMailReadyCustomer)) &&
+        const hasFoundSnapshot = Object.prototype.hasOwnProperty.call(payload, "foundTotal") && Array.isArray(payload.foundCustomerIds);
+        return hasFoundSnapshot &&
+            isFoundSnapshotCategoryCoherent(payload.foundTotal, payload.foundCustomerIds) &&
+            isSnapshotCategoryCoherent(payload.mailReadySnapshotTotal, rows.filter(isSnapshotMailReadyCustomer)) &&
             isSnapshotCategoryCoherent(payload.availableSnapshotTotal, rows.filter(isSnapshotAvailableCustomer));
     }
 

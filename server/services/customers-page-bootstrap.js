@@ -902,6 +902,8 @@ function createCustomersPageBootstrapService(deps = {}) {
       customers: [],
       mailReadySnapshotTotal: null,
       availableSnapshotTotal: null,
+      foundTotal: null,
+      foundCustomerIds: [],
       activeOrdersState: buildBootstrapStateSnapshot(null),
     };
     const readOptions = {
@@ -966,6 +968,8 @@ function createCustomersPageBootstrapService(deps = {}) {
       customers: snapshot.customers.concat(snapshot.availableCustomers),
       mailReadySnapshotTotal: snapshot.total,
       availableSnapshotTotal: snapshot.availableTotal,
+      foundTotal: Array.isArray(snapshot.foundCustomerIds) ? snapshot.foundCustomerIds.length : null,
+      foundCustomerIds: Array.isArray(snapshot.foundCustomerIds) ? snapshot.foundCustomerIds : [],
       activeOrdersState: buildBootstrapStateSnapshot(null),
       ...databaseBootstrapState,
     };
