@@ -181,6 +181,40 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
 });
 
+test('premium database bootstrap publishes an exact count from a complete 100-row cache window', async () => {
+  const availableCustomers = Array.from({ length: 100 }, (_, index) => ({
+    id: `available-${index + 1}`,
+    availableSnapshot: true,
+  }));
+  const service = createCustomersPageBootstrapService({
+    now: () => new Date('2026-08-05T12:00:30.000Z'),
+    getUiStateValues: async (scope) => {
+      if (scope !== MAIL_READY_BOOTSTRAP_CACHE_SCOPE) return { source: 'supabase', values: {} };
+      return {
+        source: 'supabase',
+        values: {
+          [MAIL_READY_BOOTSTRAP_CACHE_KEY]: JSON.stringify({
+            version: 2,
+            generatedAt: '2026-08-05T12:00:00.000Z',
+            total: 0,
+            customers: [],
+            availableTotal: 6008,
+            availableCustomers,
+            foundCustomerIds: availableCustomers.map((customer) => customer.id),
+          }),
+        },
+      };
+    },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload();
+
+  assert.equal(payload.source, 'mail-ready-snapshot-cache');
+  assert.equal(payload.snapshotFallback, false);
+  assert.equal(payload.availableSnapshotTotal, 6008);
+  assert.equal(payload.customers.length, 100);
+});
+
 test('premium database bootstrap renders an expired valid snapshot while fresh data loads in the background', async () => {
   const service = createCustomersPageBootstrapService({
     now: () => new Date('2026-07-10T12:02:00.000Z'),

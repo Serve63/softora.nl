@@ -3,9 +3,10 @@
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
     const PAGE_LIMIT = 3000;
+    const BOOTSTRAP_ROW_LIMIT = 100;
     const MAX_SNAPSHOT_ROWS = 25000;
-    const FIRST_PAGE_TIMEOUT_MS = 20000;
-    const NEXT_PAGE_TIMEOUT_MS = 20000;
+    const FIRST_PAGE_TIMEOUT_MS = 90000;
+    const NEXT_PAGE_TIMEOUT_MS = 90000;
     const PAGE_CONCURRENCY = 3;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
 
@@ -61,6 +62,19 @@
             isFoundSnapshotCategoryCoherent(payload.foundTotal, payload.foundCustomerIds) &&
             isSnapshotCategoryCoherent(payload.mailReadySnapshotTotal, rows.filter(isSnapshotMailReadyCustomer)) &&
             isSnapshotCategoryCoherent(payload.availableSnapshotTotal, rows.filter(isSnapshotAvailableCustomer));
+    }
+
+    function isBootstrapSnapshotCountPayloadCoherent(payload) {
+        if (!payload || typeof payload !== "object") return false;
+        const rows = Array.isArray(payload.customers) ? payload.customers : [];
+        const mailReadyRows = rows.filter(isSnapshotMailReadyCustomer);
+        const availableRows = rows.filter(isSnapshotAvailableCustomer);
+        const mailReadyTotal = Math.max(0, Number(payload.mailReadySnapshotTotal) || 0);
+        const availableTotal = Math.max(0, Number(payload.availableSnapshotTotal) || 0);
+        return Boolean(String(payload.generatedAt || "").trim()) &&
+            mailReadyRows.length === Math.min(mailReadyTotal, BOOTSTRAP_ROW_LIMIT) &&
+            availableRows.length === Math.min(availableTotal, BOOTSTRAP_ROW_LIMIT) &&
+            isFoundSnapshotCategoryCoherent(payload.foundTotal, payload.foundCustomerIds);
     }
 
     function normalizeSnapshotCustomer(raw, index, normalizeCustomer) {
@@ -216,8 +230,8 @@
         const count = Math.max(0, Number(currentCount) || 0);
         if (state && String(state.query || "").trim()) return count;
         if (!state) return count;
-        if (state.activeStatus === "benaderbaar" && state.mailReadySnapshotLoaded && Number.isFinite(Number(state.mailReadySnapshotTotal)) && isSnapshotCategoryCoherent(state.mailReadySnapshotTotal, state.mailReadySnapshotCustomers)) return Math.max(0, Number(state.mailReadySnapshotTotal));
-        if (state.activeStatus === "beschikbaar" && state.availableSnapshotLoaded && !state.remoteCustomersLoaded && Number.isFinite(Number(state.availableSnapshotTotal)) && isSnapshotCategoryCoherent(state.availableSnapshotTotal, state.availableSnapshotCustomers)) return Math.max(0, Number(state.availableSnapshotTotal));
+        if (state.canonicalCountReady === true && state.activeStatus === "benaderbaar" && Number.isFinite(Number(state.mailReadySnapshotTotal))) return Math.max(0, Number(state.mailReadySnapshotTotal));
+        if (state.canonicalCountReady === true && state.activeStatus === "beschikbaar" && Number.isFinite(Number(state.availableSnapshotTotal))) return Math.max(0, Number(state.availableSnapshotTotal));
         return count;
     }
 
@@ -228,8 +242,9 @@
     }
 
     function getCanonicalResultCountText(state, currentCount) {
-        if (getCanonicalInventoryStatus(state) !== "ready") return "-- resultaten";
-        return Math.max(0, Number(currentCount) || 0).toLocaleString("nl-NL") + " resultaten";
+        const canUseExactSnapshotCount = state && state.canonicalCountReady === true && !String(state.query || "").trim() && ["benaderbaar", "beschikbaar"].includes(state.activeStatus);
+        if (getCanonicalInventoryStatus(state) !== "ready" && !canUseExactSnapshotCount) return "-- resultaten";
+        return getDisplayCount(state, currentCount).toLocaleString("nl-NL") + " resultaten";
     }
 
     function markCanonicalInventoryReady(state) {
@@ -244,6 +259,7 @@
         if (!isSnapshotCategoryCoherent(state.availableSnapshotTotal, state.availableSnapshotCustomers)) return false;
         if (!isFoundSnapshotCategoryCoherent(state.foundSnapshotTotal, Array.from(state.foundSnapshotCustomerIdSet || []))) return false;
         state.canonicalInventoryReady = true;
+        state.canonicalCountReady = true;
         state.dataLoading = false;
         state.dataUnavailable = false;
         return true;
@@ -330,6 +346,7 @@
             const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers));
             config.applyCustomerList(currentCustomers.length && !currentIsSnapshotOnly ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers) : combinedSnapshotCustomers, false);
             state.canonicalSnapshotApplied = true;
+            state.canonicalCountReady = true;
         }
         return true;
     }
@@ -402,5 +419,5 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load };
+    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load };
 })(window);

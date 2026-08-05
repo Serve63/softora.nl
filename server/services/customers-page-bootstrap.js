@@ -5,6 +5,7 @@ const {
   MAIL_READY_SNAPSHOT_CACHE_KEY,
   MAIL_READY_SNAPSHOT_CACHE_SCOPE,
   SNAPSHOT_CACHE_TTL_MS,
+  isMailReadySnapshotBootstrapCoherent,
   isMailReadySnapshotCoherent,
   parseMailReadySnapshotCacheValue,
 } = require('./premium-database-mail-ready-snapshot');
@@ -930,7 +931,7 @@ function createCustomersPageBootstrapService(deps = {}) {
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     let snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
     let usedFullSnapshotFallback = false;
-    if (!snapshot || !isMailReadySnapshotCoherent(snapshot)) {
+    if (!snapshot || !isMailReadySnapshotBootstrapCoherent(snapshot, MAIL_READY_BOOTSTRAP_ROW_LIMIT)) {
       const fallbackState = await resolveBootstrapReadWithTimeout(
         readBootstrapUiState(MAIL_READY_SNAPSHOT_CACHE_SCOPE, {
           ...readOptions,

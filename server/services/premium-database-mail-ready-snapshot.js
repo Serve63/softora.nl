@@ -18,14 +18,16 @@ const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 3000;
 const MAX_OFFSET = 25000;
+const SNAPSHOT_STORAGE_MAX_ROWS = MAX_OFFSET;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 950000;
 const SNAPSHOT_FORMAT_VERSION = 2;
 const {
+  isMailReadySnapshotBootstrapCoherent,
   isMailReadySnapshotCoherent,
   parseMailReadySnapshotCacheValue,
   serializeMailReadySnapshotCache,
-} = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: MAX_LIMIT, formatVersion: SNAPSHOT_FORMAT_VERSION });
+} = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: SNAPSHOT_STORAGE_MAX_ROWS, formatVersion: SNAPSHOT_FORMAT_VERSION });
 const EXCLUDED_STATUSES = new Set([
   'gemaild',
   'interesse',
@@ -667,7 +669,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     if (typeof getUiStateValues !== 'function') return null;
     try {
       const state = await getUiStateValues(MAIL_READY_SNAPSHOT_CACHE_SCOPE, {
-        uiStateReadTimeoutMs: 1200,
+        uiStateReadTimeoutMs: 8000,
         bypassReadFailureCooldown: true,
         suppressReadFailureCooldown: true,
         suppressReadFailureLog: true,
@@ -693,7 +695,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       total: Array.isArray(data && data.customers) ? data.customers.length : 0,
       availableTotal: Array.isArray(data && data.availableCustomers) ? data.availableCustomers.length : 0,
     };
-    const fullValue = serializeMailReadySnapshotCache(snapshotData, MAX_LIMIT);
+    const fullValue = serializeMailReadySnapshotCache(snapshotData, SNAPSHOT_STORAGE_MAX_ROWS, { compress: true });
     const bootstrapValue = serializeMailReadySnapshotCache(snapshotData, MAIL_READY_BOOTSTRAP_ROW_LIMIT);
     if (!fullValue || !bootstrapValue || Math.max(fullValue.length, bootstrapValue.length) > SNAPSHOT_CACHE_VALUE_MAX_LENGTH) {
       if (logger && typeof logger.warn === 'function') {
@@ -1159,6 +1161,7 @@ module.exports = {
   isBasicMailLeadEligible,
   isActiveTransferredLead,
   isKvkTransferRow,
+  isMailReadySnapshotBootstrapCoherent,
   isMailReadySnapshotCoherent,
   legacyGuardEntriesToKeySet,
   parseMailReadySnapshotCacheValue,
