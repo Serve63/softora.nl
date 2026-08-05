@@ -455,9 +455,12 @@ function getCampaignConversationId(message, disjointSet) {
 }
 
 const {
+  attachQuotedOriginalSentMessages,
   attachTargetedUnthreadedSentMessages,
   buildAcceptedProvenanceMessage,
   canMergeProvenConversationSegments,
+  getQuotedSentRecoveryTargets,
+  isQuotedSentRecoveryCandidate,
 } = createMailboxCampaignThreadRecovery({
   dedupeCampaignMessages,
   extractEmailAddresses,
@@ -1034,8 +1037,34 @@ function createMailboxCampaignRepliesService(deps = {}) {
       exactConversations,
       targetedUnthreadedRows
     );
+    const quotedRecoveryCandidates = conversationsWithHistoricalReplies
+      .filter(isQuotedSentRecoveryCandidate)
+      .slice(0, 100);
+    const hydratedRecoveryConversations = quotedRecoveryCandidates.length &&
+      typeof mailboxIndexStore.hydrateMessageBodies === 'function'
+      ? await mailboxIndexStore.hydrateMessageBodies({ messages: quotedRecoveryCandidates })
+      : quotedRecoveryCandidates;
+    const quotedSentRecoveryTargets = getQuotedSentRecoveryTargets(hydratedRecoveryConversations);
+    const quotedSentCandidates = quotedSentRecoveryTargets.length &&
+      typeof mailboxIndexStore.listSentCandidatesForQuotedReplies === 'function'
+      ? await mailboxIndexStore.listSentCandidatesForQuotedReplies({
+          targets: quotedSentRecoveryTargets,
+          limitPerTarget: 10,
+        }).catch(() => [])
+      : [];
+    const recoveredQuotedConversations = attachQuotedOriginalSentMessages(
+      hydratedRecoveryConversations,
+      quotedSentCandidates
+    );
+    const recoveredQuotedByIdentity = new Map(recoveredQuotedConversations.map((conversation) => [
+      getMessageIdentity(conversation),
+      conversation,
+    ]));
+    const conversationsWithQuotedOriginals = conversationsWithHistoricalReplies.map((conversation) => (
+      recoveredQuotedByIdentity.get(getMessageIdentity(conversation)) || conversation
+    ));
     const allVisibleConversations = attachCrossAccountMailboxCopies(
-      conversationsWithHistoricalReplies,
+      conversationsWithQuotedOriginals,
       replies,
       dedupeCampaignMessages([
         ...sentMessages,

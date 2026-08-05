@@ -403,9 +403,9 @@ test('mailbox campaign snapshot reserveert de volledige limiet afzonderlijk voor
   assert.ok(parsed.messages.some((message) => message.id === 'serve:199'));
 });
 
-test('mailbox campaign snapshot herstelt laatste activiteit uit oude threaddata', () => {
+test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threaddata', () => {
   const legacySnapshot = JSON.stringify({
-    version: 11,
+    version: 12,
     savedAt: '2026-07-23T15:00:00.000Z',
     ok: true,
     messages: [{

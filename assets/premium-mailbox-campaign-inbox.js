@@ -8,7 +8,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v11';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v12';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -633,32 +633,8 @@
     return splitQuotedReply(value).authored;
   }
 
-  const THREAD_MATCH_IGNORABLE_LINE_PATTERNS = [
-    /^\[image:\s*[^\]]+\]\s*$/i,
-    /^hieronder zie je een korte indruk van de eerste versie op verschillende schermen\.?\s*$/i,
-    /^geen webdesign willen ontvangen\?\s*laat het me weten!.*$/i,
-  ];
-
   function normalizeThreadMatchText(value) {
-    return String(value || '')
-      .replace(/\r\n?/g, '\n')
-      .split('\n')
-      .map((line) => String(line || '')
-        .replace(/^\s*(?:>\s*)+/, '')
-        .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-        .trim())
-      .filter((line) => (
-        line &&
-        !THREAD_MATCH_IGNORABLE_LINE_PATTERNS.some((pattern) => pattern.test(line))
-      ))
-      .join(' ')
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, ' ')
-      .replace(/<?https?:\/\/[^\s>]+>?/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
+    return global.SoftoraMailboxQuotedThread?.normalizeMatchText?.(value) || '';
   }
 
   function stripStructuredQuoteMetadata(lines) {
@@ -716,23 +692,19 @@
   }
 
   function findExactQuotedOutbound(quotedValue, mail) {
-    if (isForwardedConversation(mail)) return null;
     const quotedEnvelope = stripQuotedThreadEnvelope(quotedValue);
-    const quotedText = normalizeThreadMatchText(quotedEnvelope);
-    const quotedAuthoredText = normalizeThreadMatchText(
-      stripQuotedReply(stripOneQuotedDepth(quotedEnvelope))
+    return global.SoftoraMailboxQuotedThread?.findExactProvenOutbound?.(
+      quotedEnvelope,
+      getProvenOutboundThreadMessages(mail)
+    ) || null;
+  }
+
+  function stripProvenQuotedOutbound(value, mail) {
+    const result = global.SoftoraMailboxQuotedThread?.stripProvenQuotedOutbound?.(
+      value,
+      getProvenOutboundThreadMessages(mail)
     );
-    if (!quotedText && !quotedAuthoredText) return null;
-    return getProvenOutboundThreadMessages(mail).find((message) => {
-      const fullText = normalizeThreadMatchText(message && (message.body || message.text || ''));
-      const authoredText = normalizeThreadMatchText(stripQuotedReply(
-        message && (message.body || message.text || '')
-      ));
-      return (
-        (fullText.length >= 8 && quotedText === fullText) ||
-        (authoredText.length >= 8 && quotedAuthoredText === authoredText)
-      );
-    }) || null;
+    return result && typeof result.body === 'string' ? result.body : String(value || '').trim();
   }
 
   function getSourceSafeThreadBody(message, mail) {
@@ -740,14 +712,11 @@
     if (!body || isSentMessageByProvenance(message, mail && mail.accountEmail)) {
       return stripQuotedReply(body);
     }
-    const parts = splitQuotedReply(body);
-    if (!parts.quoted || !parts.authored) return body.trim();
-    return findExactQuotedOutbound(parts.quoted, mail) ? parts.authored : body.trim();
+    return stripProvenQuotedOutbound(body, mail);
   }
 
   function isDuplicateStructuredOwnQuote(section, mail, isReplyHeaderLine) {
     if (!section || section.type !== 'quote' || !Array.isArray(section.lines)) return false;
-    if (isForwardedConversation(mail)) return false;
     const firstLine = String(section.lines[0] || '').trim();
     const hasReplyHeader = typeof isReplyHeaderLine === 'function' && isReplyHeaderLine(firstLine);
     return Boolean(findExactQuotedOutbound(
@@ -1148,6 +1117,7 @@
     resolveOwnerForSession,
     setOwner,
     sortMessagesNewestFirst,
+    stripProvenQuotedOutbound,
     stripQuotedReply,
     subscribeToMessageDeletions,
   };

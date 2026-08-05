@@ -240,6 +240,68 @@ test('mailbox index performs one bounded targeted lookup for old unthreaded Sent
   assert.equal(rows[0].message.id, 'sent:216');
 });
 
+test('mailbox index zoekt forwarded parentmails per exact account, onderwerp en ontvanger met body', async () => {
+  const calls = [];
+  const row = {
+    message_key: 'martijn@softora.nl|sent|242',
+    account_email: 'martijn@softora.nl',
+    folder: 'sent',
+    uid: 242,
+    provider_id: 'sent:242',
+    message_id: '<ttv-original@softora.nl>',
+    sender_email: 'martijn@softora.nl',
+    recipients_text: 'info@ttvirene.nl',
+    subject: 'Kleine vraag over jullie website',
+    preview: 'Goedendag, afgelopen week kwam ik jullie website ttvirene.nl tegen.',
+    body_text: 'Goedendag,\n\nAfgelopen week kwam ik jullie website ttvirene.nl tegen.',
+    body_truncated: false,
+    has_body: true,
+    date: '2026-07-16T09:56:41.000Z',
+    payload: { originalCampaignOutbound: true },
+  };
+  const store = createMailboxIndexStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from(table) {
+        const query = {
+          select(columns) { calls.push(['select', table, columns]); return query; },
+          eq(column, value) { calls.push(['eq', column, value]); return query; },
+          ilike(column, value) { calls.push(['ilike', column, value]); return query; },
+          is(column, value) { calls.push(['is', column, value]); return query; },
+          order(column, options) { calls.push(['order', column, options]); return query; },
+          limit(value) {
+            calls.push(['limit', value]);
+            return Promise.resolve({ data: [row], error: null });
+          },
+        };
+        return query;
+      },
+    }),
+  });
+
+  const messages = await store.listSentCandidatesForQuotedReplies({
+    targets: [{
+      accountEmail: 'MARTIJN@SOFTORA.NL',
+      canonicalSubject: 'kleine vraag over jullie website',
+      recipientEmail: 'INFO@TTVIRENE.NL',
+    }],
+    limitPerTarget: 10,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].id, 'sent:242');
+  assert.match(messages[0].body, /ttvirene\.nl/);
+  assert.deepEqual(calls.filter((call) => call[0] === 'eq'), [
+    ['eq', 'account_email', 'martijn@softora.nl'],
+    ['eq', 'folder', 'sent'],
+  ]);
+  assert.deepEqual(calls.filter((call) => call[0] === 'ilike'), [
+    ['ilike', 'subject', '%kleine vraag over jullie website%'],
+    ['ilike', 'recipients_text', '%info@ttvirene.nl%'],
+  ]);
+  assert.deepEqual(calls.find((call) => call[0] === 'limit'), ['limit', 10]);
+});
+
 test('mailbox index store preserves exact Instantly HTML and link provenance markers', () => {
   const store = createMailboxIndexStore({
     now: () => new Date('2026-07-26T16:00:00.000Z'),

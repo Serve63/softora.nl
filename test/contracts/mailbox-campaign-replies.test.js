@@ -1178,6 +1178,172 @@ test('campaign reply service koppelt alleen exact bewezen historische vervolgrea
   assert.deepEqual(replies[0].threadMessages.map((message) => message.body), [undefined]);
 });
 
+test('campaign reply service herstelt TTV Irene via exacte forward-recipient en geciteerde bronbody', async () => {
+  const originalBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website ttvirene.nl tegen.',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+  ].join('\n');
+  const incomingBody = [
+    'Beste Martijn,',
+    '',
+    'Bedankt voor de toelichting. Ik ontvang graag een offerte.',
+    '',
+    'Met vriendelijke groet,',
+    'Steven van den Brink',
+    'Webmaster TTV Irene',
+    '',
+    'From: secretaris@ttvirene.nl',
+    'Sent: donderdag 16 juli 2026 19:35',
+    'To: webmaster@ttvirene.nl',
+    'Subject: Fwd: Kleine vraag over jullie website',
+    '',
+    'Begin doorgestuurd bericht:',
+    'Van: Martijn van de Ven',
+    'Datum: 16 juli 2026 om 11:56:48 CEST',
+    'Aan: info@ttvirene.nl',
+    'Onderwerp: Kleine vraag over jullie website',
+    'Antwoord aan: martijn@softora.nl',
+    '',
+    originalBody,
+  ].join('\n');
+  const incoming = {
+    id: 'inbox:41',
+    uid: 41,
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Steven van den Brink - Webmaster TTV Irene',
+    email: 'webmaster@ttvirene.nl',
+    to: 'martijn@softora.nl',
+    subject: 'Re: Fwd: Kleine vraag over jullie website',
+    preview: 'Beste Martijn, bedankt voor de toelichting.',
+    body: incomingBody,
+    date: '2026-07-16T18:12:01.000Z',
+    messageId: '<steven-forward@ttvirene.nl>',
+    references: '<secretaris-forward@ttvirene.nl>',
+  };
+  const original = {
+    id: 'sent:242',
+    uid: 242,
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven',
+    email: 'martijn@softora.nl',
+    to: 'info@ttvirene.nl',
+    subject: 'Kleine vraag over jullie website',
+    preview: 'Goedendag, afgelopen week kwam ik jullie website ttvirene.nl tegen.',
+    body: originalBody,
+    date: '2026-07-16T09:56:41.000Z',
+    messageId: '<ttv-original@softora.nl>',
+    originalCampaignOutbound: true,
+  };
+  let quotedTargets = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      hydrateMessageBodies: async ({ messages }) => messages,
+      listSentCandidatesForQuotedReplies: async ({ targets }) => {
+        quotedTargets = targets;
+        return [original];
+      },
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'ttv-irene',
+        bedrijf: 'TTV Irene',
+        email: 'webmaster@ttvirene.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
+
+  assert.equal(replies.length, 1);
+  assert.equal(quotedTargets.some((target) => (
+    target.accountEmail === 'martijn@softora.nl' &&
+    target.recipientEmail === 'info@ttvirene.nl'
+  )), true);
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), ['sent:242']);
+  assert.equal(
+    replies[0].threadMessages[0].threadCorrelationEvidence,
+    'exact-account-subject-quoted-body-and-recipient'
+  );
+  assert.equal(replies[0].threadMessages[0].originalCampaignOutbound, true);
+});
+
+test('campaign reply service koppelt forwarded originals niet bij ambiguïteit of ander account', async () => {
+  const originalBody = [
+    'Goedendag,',
+    'Dit is een lang genoeg exact campagnebericht voor een veilige bronvergelijking.',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+  ].join('\n\n');
+  const incoming = {
+    id: 'inbox:ambiguous-forward',
+    folder: 'inbox',
+    accountEmail: 'martijn@softora.nl',
+    email: 'webmaster@example.nl',
+    to: 'martijn@softora.nl',
+    subject: 'Re: Fwd: Kleine vraag over jullie website',
+    date: '2026-07-16T18:12:01.000Z',
+    body: [
+      'Mijn echte antwoord.',
+      '',
+      'Begin doorgestuurd bericht:',
+      'Van: Martijn van de Ven',
+      'Datum: 16 juli 2026',
+      'Aan: info@example.nl',
+      'Onderwerp: Kleine vraag over jullie website',
+      '',
+      originalBody,
+    ].join('\n'),
+  };
+  const candidate = {
+    id: 'sent:a',
+    folder: 'sent',
+    accountEmail: 'martijn@softora.nl',
+    email: 'martijn@softora.nl',
+    to: 'info@example.nl',
+    subject: 'Kleine vraag over jullie website',
+    date: '2026-07-16T09:56:41.000Z',
+    body: originalBody,
+    messageId: '<a@softora.nl>',
+    originalCampaignOutbound: true,
+  };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      hydrateMessageBodies: async ({ messages }) => messages,
+      listSentCandidatesForQuotedReplies: async () => [
+        candidate,
+        { ...candidate, id: 'sent:b', messageId: '<b@softora.nl>' },
+        { ...candidate, id: 'sent:other-owner', accountEmail: 'serve@softora.nl', messageId: '<c@softora.nl>' },
+      ],
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'ambiguous', bedrijf: 'Ambiguous', email: 'webmaster@example.nl',
+        campaignType: 'webdesign', lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
+
+  assert.equal(replies.length, 1);
+  assert.deepEqual(replies[0].threadMessages, []);
+});
+
 test('campaign reply service koppelt Brigit, Karlien en Marjolein via exacte oude Sent-ouders buiten de globale scan', async () => {
   const fixtures = [
     {
