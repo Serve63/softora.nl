@@ -115,6 +115,29 @@
     return `${COMPANY_API_URL}?${params.toString()}`;
   }
 
+  function companyFetchOptions() {
+    return {
+      cache: 'no-store',
+      credentials: 'omit',
+      mode: 'cors',
+      targetAddressSpace: 'loopback',
+    };
+  }
+
+  async function localNetworkPermissionState(browserWindow) {
+    const permissions = browserWindow?.navigator?.permissions;
+    if (!permissions || typeof permissions.query !== 'function') return 'unknown';
+    for (const name of ['loopback-network', 'local-network-access']) {
+      try {
+        const result = await permissions.query({ name });
+        if (result?.state) return String(result.state);
+      } catch {
+        /* Older browsers do not know these permission names yet. */
+      }
+    }
+    return 'unknown';
+  }
+
   function navigateToDirectory(browserWindow) {
     const targetWindow = browserWindow?.top && browserWindow.top !== browserWindow
       ? browserWindow.top
@@ -146,6 +169,7 @@
     const body = document?.getElementById('company-directory-body');
     const searchInput = document?.getElementById('company-directory-search');
     const sourceStatus = document?.getElementById('company-directory-source-status');
+    const retryButton = document?.getElementById('company-directory-retry');
     const totalCount = document?.getElementById('company-directory-total');
     if (!page || !frame || !head || !body || !searchInput || !sourceStatus || !totalCount) return null;
 
@@ -156,6 +180,7 @@
       hasMore: true,
       loading: false,
       error: false,
+      errorMessage: '',
       query: '',
       requestVersion: 0,
     };
@@ -182,12 +207,13 @@
       if (state.rows.length) {
         body.innerHTML = state.rows.map(companyRowHtml).join('');
       } else if (state.error) {
-        body.innerHTML = '<tr class="empty-row"><td colspan="7">Lokale bedrijvendatabase niet bereikbaar.</td></tr>';
+        body.innerHTML = `<tr class="empty-row"><td colspan="7">${escapeHtml(state.errorMessage || 'Lokale bedrijvendatabase niet bereikbaar.')}</td></tr>`;
       } else if (!state.loading) {
         body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.query ? 'Geen bedrijven gevonden.' : 'Nog geen bedrijven geladen.'}</td></tr>`;
       }
       totalCount.textContent = state.total ? numberFormat.format(state.total) : '—';
       if (!state.loading && !state.error) {
+        if (retryButton) retryButton.hidden = true;
         const totalText = numberFormat.format(state.total);
         const statusText = state.query
           ? `${numberFormat.format(state.rows.length)} zoekresultaten geladen${state.hasMore ? ' · meer beschikbaar' : ''}`
@@ -204,16 +230,18 @@
         if (!state.query) state.total = 0;
         state.hasMore = true;
         state.error = false;
+        state.errorMessage = '';
         state.requestVersion += 1;
       }
       const requestVersion = state.requestVersion;
       state.loading = true;
+      if (retryButton) retryButton.hidden = true;
       setSourceStatus(reset ? 'Volledige landelijke lijst laden…' : 'Meer bedrijven laden…', 'loading');
       try {
-        const response = await browserWindow.fetch(buildCompanyApiUrl(state.query, state.offset), {
-          cache: 'no-store',
-          mode: 'cors',
-        });
+        const response = await browserWindow.fetch(
+          buildCompanyApiUrl(state.query, state.offset),
+          companyFetchOptions()
+        );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         if (requestVersion !== state.requestVersion) return;
@@ -224,10 +252,16 @@
         state.hasMore = Boolean(payload?.has_more) && rows.length > 0;
       } catch {
         if (requestVersion !== state.requestVersion) return;
+        const permissionState = await localNetworkPermissionState(browserWindow);
+        if (requestVersion !== state.requestVersion) return;
         state.hasMore = false;
         state.rows = [];
         state.error = true;
-        setSourceStatus('Lokale database niet bereikbaar · controleer of deze draait en sta lokale netwerktoegang toe', 'error');
+        state.errorMessage = permissionState === 'denied'
+          ? 'Lokale netwerktoegang is geblokkeerd. Sta deze toe in de site-instellingen van softora.nl en probeer opnieuw.'
+          : 'Verbinding met de lokale bedrijvendatabase mislukt. Klik op Opnieuw verbinden en kies Toestaan bij de browsermelding.';
+        setSourceStatus(state.errorMessage, 'error');
+        if (retryButton) retryButton.hidden = false;
       } finally {
         if (requestVersion === state.requestVersion) {
           state.loading = false;
@@ -241,6 +275,7 @@
       browserWindow.clearTimeout(searchTimer);
       searchTimer = browserWindow.setTimeout(() => loadPage({ reset: true }), 220);
     });
+    retryButton?.addEventListener('click', () => loadPage({ reset: true }));
     frame.addEventListener('scroll', () => {
       if (state.loading || !state.hasMore) return;
       if (frame.scrollTop + frame.clientHeight >= frame.scrollHeight - 180) loadPage();
@@ -262,9 +297,11 @@
     DIRECTORY_PAGE_URL,
     PAGE_SIZE,
     buildCompanyApiUrl,
+    companyFetchOptions,
     companyRowHtml,
     companyStatus,
     isTreated,
+    localNetworkPermissionState,
     missingLabel,
     mount,
     mountDashboardLink,

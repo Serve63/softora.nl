@@ -9,30 +9,62 @@
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/personnel-theme.css?v=20260519b">
+  <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
+  <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260805c">
   <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
-  <style>
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; overflow: hidden; background: #f8f7f4; }
-    .kvk-database-shell { display: flex; height: 100vh; }
-    .kvk-database-shell__content { width: calc(100% - var(--premium-sidebar-width, 320px)); min-height: 100vh; margin-left: var(--premium-sidebar-width, 320px); padding: 0; overflow: hidden; background: #f8f7f4; }
-    .kvk-database-shell__frame { display: block; width: 100%; height: 100vh; border: 0; background: #f8f7f4; }
-    @media (max-width: 900px) {
-      .kvk-database-shell { display: block; }
-      .kvk-database-shell__content { width: 100%; margin-left: 0; }
-      .kvk-database-shell__frame { min-height: 720px; }
-    }
-  </style>
 </head>
-<body>
-  <div class="dashboard-layout kvk-database-shell" data-sidebar-shell="canonical">
+<body class="company-directory-shell-page">
+  <div class="dashboard-layout company-directory-shell" data-sidebar-shell="canonical">
     <aside class="sidebar" data-sidebar-ready="false" aria-label="Premium navigatie"></aside>
-    <main class="main-content kvk-database-shell__content" aria-label="Alle gevonden bedrijven">
-      <iframe
-        class="kvk-database-shell__frame"
-        src="/premium-kvk-company-directory?softora_sidebar_content=1"
-        title="Softora Database Alle gevonden bedrijven"
-      ></iframe>
+    <main class="main-content company-directory-shell__content" aria-label="Alle gevonden bedrijven">
+      <div id="company-directory" class="company-directory" aria-labelledby="company-directory-title">
+        <a class="company-directory__back" href="/kvk-database">← Terug naar Bedrijven Scraper</a>
+
+        <header class="company-directory__header">
+          <div class="company-directory__heading">
+            <p class="eyebrow">Softora Database</p>
+            <h1 id="company-directory-title">Alle gevonden bedrijven</h1>
+            <p class="company-directory__intro">Eén doorlopende lijst met bekende gegevens en de status van ieder bedrijf.</p>
+          </div>
+          <div class="company-directory__total" aria-label="Totaal aantal gevonden bedrijven">
+            <span>Totaal gevonden</span>
+            <strong id="company-directory-total">—</strong>
+          </div>
+        </header>
+
+        <section class="company-directory__panel" aria-label="Volledige bedrijvenlijst">
+          <div class="company-directory__toolbar">
+            <div class="company-directory__connection">
+              <span id="company-directory-source-status" class="total-found-source-status" aria-live="polite">Volledige landelijke lijst laden…</span>
+              <button id="company-directory-retry" class="company-directory__retry" type="button" hidden>Opnieuw verbinden</button>
+            </div>
+            <label class="search-field company-directory__search">
+              <span>Zoeken</span>
+              <input id="company-directory-search" type="search" placeholder="Bedrijfsnaam, KVK, plaats of contactgegeven" autocomplete="off">
+            </label>
+          </div>
+          <div id="company-directory-table-frame" class="table-frame company-directory__table-frame">
+            <table>
+              <colgroup>
+                <col class="company-directory__col-company">
+                <col class="company-directory__col-kvk">
+                <col class="company-directory__col-status">
+                <col class="company-directory__col-phone">
+                <col class="company-directory__col-email">
+                <col class="company-directory__col-website">
+                <col class="company-directory__col-location">
+              </colgroup>
+              <thead id="company-directory-head"></thead>
+              <tbody id="company-directory-body">
+                <tr class="empty-row"><td colspan="7">Bedrijven laden…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
+
+  <script src="/assets/kvk-database-total-found.js?v=20260805c"></script>
 </body>
 </html>
