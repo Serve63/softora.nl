@@ -6,7 +6,7 @@ const {
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 7;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 8;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
