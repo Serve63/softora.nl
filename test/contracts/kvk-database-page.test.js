@@ -64,7 +64,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805f/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805g/);
   assert.match(shellSource, />Database verbinden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -73,7 +73,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805f/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805g/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -111,8 +111,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805f/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805f/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805g/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805g/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
@@ -146,6 +146,10 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   assert.doesNotMatch(scriptSource, /card\.addEventListener/);
   assert.match(styleSource, /\.stat-card-total-found__open\s*\{/);
   assert.match(styleSource, /\.stat-card-total-found__open:focus-visible/);
+  assert.doesNotMatch(styleSource, /\.company-directory-shell-page\s*\{[^}]*--(?:ink|muted|page|panel):/s);
+  assert.match(styleSource, /\.company-directory\s*\{[^}]*--ink:\s*#252229;/s);
+  assert.match(scriptSource, /Lokale databaseservice is niet bereikbaar\./);
+  assert.match(scriptSource, /permissionState === 'prompt' \|\| permissionState === 'denied'/);
   assert.doesNotMatch(styleSource, /content:\s*["']/);
   assert.match(scriptSource, /targetWindow\?\.location\?\.assign\(DIRECTORY_PAGE_URL\)/);
   assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
