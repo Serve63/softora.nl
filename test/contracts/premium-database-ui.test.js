@@ -314,6 +314,7 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
     /const databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\),[\s\S]*state\.klanten = sortCustomers\(outreachController\.applyAutomation\(initialBootstrapCustomers\)\.customers\); state\.dataLoading = true; state\.dataUnavailable = false; state\.remoteCustomersLoaded = false;[\s\S]*state\.mailReadySnapshotTotal = [\s\S]*state\.availableSnapshotTotal = [\s\S]*renderPage\(\);/
   );
   assert.match(pageSource, /state\.mailReadySnapshotStale = customersBootstrapPayload\.stale === true;/);
+  assert.match(pageSource, /state\.foundSnapshotLoaded = true; state\.foundSnapshotTotal = [\s\S]*state\.foundSnapshotCustomerIdSet = new Set\(customersBootstrapPayload\.foundCustomerIds\);/);
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
   assert.match(pageSource, /function isDerivedOrderPlaceholderCustomer\(customer\)/);
@@ -1140,7 +1141,7 @@ test('mail-ready snapshot client loads compact rows and the guarded scraper inve
   assert.equal(requests[0][0], '/api/premium-database/mail-ready-snapshot?limit=3000&offset=0');
   assert.equal(requests[0][1].method, 'GET');
   assert.equal(requests[0][1].cache, 'no-store');
-  assert.equal(requests[0][2], 6000);
+  assert.equal(requests[0][2], 20000);
   assert.deepEqual(requests.map((args) => new URL(args[0], 'https://softora.test').searchParams.get('offset')), ['0']);
   assert.equal(state.mailReadySnapshotLoaded, true);
   assert.equal(state.mailReadySnapshotStale, false);
@@ -1283,6 +1284,16 @@ test('premium database fast bootstrap requires rows for every non-zero category 
   assert.equal(client.isBootstrapSnapshotPayloadCoherent({
     mailReadySnapshotTotal: 1,
     availableSnapshotTotal: 1,
+    customers: [
+      { id: 'ready', mailReady: true, mailReadySnapshot: true },
+      { id: 'magnivita', availableSnapshot: true },
+    ],
+  }), false);
+  assert.equal(client.isBootstrapSnapshotPayloadCoherent({
+    mailReadySnapshotTotal: 1,
+    availableSnapshotTotal: 1,
+    foundTotal: 2,
+    foundCustomerIds: ['ready', 'magnivita'],
     customers: [
       { id: 'ready', mailReady: true, mailReadySnapshot: true },
       { id: 'magnivita', availableSnapshot: true },
@@ -1473,7 +1484,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805a/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805b/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);

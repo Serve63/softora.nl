@@ -141,6 +141,7 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
     availableCustomers: [
       { id: 'available-1', bedrijf: 'Beschikbaar', availableSnapshot: true },
     ],
+    foundCustomerIds: ['mail-ready-1', 'available-1'],
   };
   const service = createCustomersPageBootstrapService({
     now: () => new Date('2026-07-10T12:00:30.000Z'),
@@ -164,6 +165,8 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   assert.equal(payload.stale, false);
   assert.equal(payload.mailReadySnapshotTotal, 1013);
   assert.equal(payload.availableSnapshotTotal, 113);
+  assert.equal(payload.foundTotal, 2);
+  assert.deepEqual(payload.foundCustomerIds, ['mail-ready-1', 'available-1']);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['mail-ready-1', 'available-1']);
   assert.deepEqual(payload.mailStats, { sentToday: 4, bounces: 29, hardBounces: 11, totalSent: 1462, updatedAt: '2026-07-10T12:00:00.000Z' });
   assert.deepEqual(payload.mailRoi, { dealCount: 2 });
@@ -289,6 +292,8 @@ test('premium database bootstrap never publishes category counts when both snaps
   assert.equal(payload.source, 'deferred');
   assert.equal(payload.mailReadySnapshotTotal, null);
   assert.equal(payload.availableSnapshotTotal, null);
+  assert.equal(payload.foundTotal, null);
+  assert.deepEqual(payload.foundCustomerIds, []);
   assert.deepEqual(payload.customers, []);
   assert.equal(seenScopes.includes(MAIL_READY_SNAPSHOT_CACHE_SCOPE), true);
 });
