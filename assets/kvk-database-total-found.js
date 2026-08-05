@@ -12,8 +12,9 @@
 })(typeof window === 'object' ? window : null, function createKvkTotalFoundModule() {
   'use strict';
 
-  const COMPANY_API_URL = 'http://127.0.0.1:8000/api/company-directory';
-  const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
+  const LOCAL_DATABASE_ORIGIN = 'http://127.0.0.1:8000';
+  const COMPANY_API_URL = `${LOCAL_DATABASE_ORIGIN}/api/company-directory`;
+  const DIRECTORY_PAGE_URL = `${LOCAL_DATABASE_ORIGIN}/kvk-database-bedrijven`;
   const PAGE_SIZE = 100;
   const AUTO_CONNECT_TIMEOUT_MS = 8000;
   const USER_CONNECT_TIMEOUT_MS = 30000;
@@ -149,6 +150,11 @@
     targetWindow?.location?.assign(DIRECTORY_PAGE_URL);
   }
 
+  function isLocalDirectoryRuntime(browserWindow) {
+    const hostname = String(browserWindow?.location?.hostname || '').trim().toLowerCase();
+    return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1';
+  }
+
   function mountDashboardLink(browserWindow) {
     const document = browserWindow?.document;
     const card = document?.getElementById('companies-total-card');
@@ -162,6 +168,10 @@
   }
 
   function mountDirectory(browserWindow) {
+    if (!isLocalDirectoryRuntime(browserWindow)) {
+      navigateToDirectory(browserWindow);
+      return { redirected: true };
+    }
     const document = browserWindow?.document;
     const page = document?.getElementById('company-directory');
     const frame = document?.getElementById('company-directory-table-frame');
@@ -294,6 +304,10 @@
         state.connectionRequired = false;
       } catch {
         if (requestVersion !== state.requestVersion) return;
+        if (isLocalDirectoryRuntime(browserWindow)) {
+          setServiceUnavailable();
+          return;
+        }
         const permissionState = await localNetworkPermissionState(browserWindow);
         if (requestVersion !== state.requestVersion) return;
         if (permissionState === 'prompt' || permissionState === 'denied') {
@@ -323,6 +337,10 @@
       if (frame.scrollTop + frame.clientHeight >= frame.scrollHeight - 180) loadPage();
     });
     async function loadInitialPage() {
+      if (isLocalDirectoryRuntime(browserWindow)) {
+        await loadPage({ reset: true });
+        return;
+      }
       const permissionState = await localNetworkPermissionState(browserWindow);
       if (permissionState === 'prompt' || permissionState === 'denied') {
         state.loading = false;
@@ -348,6 +366,7 @@
   return {
     COMPANY_API_URL,
     DIRECTORY_PAGE_URL,
+    LOCAL_DATABASE_ORIGIN,
     PAGE_SIZE,
     AUTO_CONNECT_TIMEOUT_MS,
     USER_CONNECT_TIMEOUT_MS,
@@ -356,6 +375,7 @@
     companyRowHtml,
     companyStatus,
     isTreated,
+    isLocalDirectoryRuntime,
     localNetworkPermissionState,
     missingLabel,
     mount,
