@@ -455,12 +455,10 @@ function getCampaignConversationId(message, disjointSet) {
 }
 
 const {
-  attachQuotedOriginalSentMessages,
   attachTargetedUnthreadedSentMessages,
   buildAcceptedProvenanceMessage,
   canMergeProvenConversationSegments,
-  getQuotedSentRecoveryTargets,
-  isQuotedSentRecoveryCandidate,
+  recoverQuotedOriginalSentMessages,
 } = createMailboxCampaignThreadRecovery({
   dedupeCampaignMessages,
   extractEmailAddresses,
@@ -1037,32 +1035,17 @@ function createMailboxCampaignRepliesService(deps = {}) {
       exactConversations,
       targetedUnthreadedRows
     );
-    const quotedRecoveryCandidates = conversationsWithHistoricalReplies
-      .filter(isQuotedSentRecoveryCandidate)
-      .slice(0, 100);
-    const hydratedRecoveryConversations = quotedRecoveryCandidates.length &&
-      typeof mailboxIndexStore.hydrateMessageBodies === 'function'
-      ? await mailboxIndexStore.hydrateMessageBodies({ messages: quotedRecoveryCandidates })
-      : quotedRecoveryCandidates;
-    const quotedSentRecoveryTargets = getQuotedSentRecoveryTargets(hydratedRecoveryConversations);
-    const quotedSentCandidates = quotedSentRecoveryTargets.length &&
-      typeof mailboxIndexStore.listSentCandidatesForQuotedReplies === 'function'
-      ? await mailboxIndexStore.listSentCandidatesForQuotedReplies({
-          targets: quotedSentRecoveryTargets,
-          limitPerTarget: 10,
-        }).catch(() => [])
-      : [];
-    const recoveredQuotedConversations = attachQuotedOriginalSentMessages(
-      hydratedRecoveryConversations,
-      quotedSentCandidates
-    );
-    const recoveredQuotedByIdentity = new Map(recoveredQuotedConversations.map((conversation) => [
-      getMessageIdentity(conversation),
-      conversation,
-    ]));
-    const conversationsWithQuotedOriginals = conversationsWithHistoricalReplies.map((conversation) => (
-      recoveredQuotedByIdentity.get(getMessageIdentity(conversation)) || conversation
-    ));
+    // The outer subject of a reply-via-forward is not guaranteed to retain an
+    // Fwd/FW prefix (TTV Irene is a real example). The recovery helper hydrates
+    // only the conversations that can actually appear in the selected view.
+    const quotedRecovery = await recoverQuotedOriginalSentMessages({
+      conversations: conversationsWithHistoricalReplies,
+      selectedAccountEmails: selectedMailboxAccounts,
+      limit: safeLimit,
+      mailboxIndexStore,
+    });
+    const conversationsWithQuotedOriginals = quotedRecovery.conversations;
+    const hydratedRecoveryByIdentity = quotedRecovery.hydratedByIdentity;
     const allVisibleConversations = attachCrossAccountMailboxCopies(
       conversationsWithQuotedOriginals,
       replies,
@@ -1087,8 +1070,23 @@ function createMailboxCampaignRepliesService(deps = {}) {
       const hydratedMessages = [];
       for (let index = 0; index < conversations.length; index += CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE) {
         const batch = conversations.slice(index, index + CAMPAIGN_THREAD_HYDRATE_BATCH_SIZE);
-        const hydrated = await mailboxIndexStore.hydrateMessageBodies({ messages: batch });
-        hydratedMessages.push(...(Array.isArray(hydrated) ? hydrated : batch));
+        const unresolved = batch.filter((message) => (
+          !hydratedRecoveryByIdentity.has(getMessageIdentity(message))
+        ));
+        const hydrated = unresolved.length
+          ? await mailboxIndexStore.hydrateMessageBodies({ messages: unresolved })
+          : [];
+        const hydratedByIdentity = new Map(
+          (Array.isArray(hydrated) ? hydrated : unresolved).map((message) => [
+            getMessageIdentity(message),
+            message,
+          ])
+        );
+        hydratedMessages.push(...batch.map((message) => (
+          hydratedRecoveryByIdentity.get(getMessageIdentity(message)) ||
+          hydratedByIdentity.get(getMessageIdentity(message)) ||
+          message
+        )));
       }
       return hydratedMessages.filter(shouldShowCampaignMessage);
     }

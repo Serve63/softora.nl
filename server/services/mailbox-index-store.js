@@ -292,7 +292,7 @@ function createMailboxIndexStore(deps = {}) {
       cc: normalizeString(payload.cc),
       bcc: normalizeString(payload.bcc),
       deliveredTo: normalizeString(payload.deliveredTo),
-      recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true,
+      recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true || Boolean(normalizeString(row.recipients_text)),
       attachments: normalizeAttachments(payload.attachments),
       autoSubmitted: normalizeString(payload.autoSubmitted),
       precedence: normalizeString(payload.precedence),
@@ -851,7 +851,7 @@ function createMailboxIndexStore(deps = {}) {
         cc: normalizeString(payload.cc),
         bcc: normalizeString(payload.bcc),
         deliveredTo: normalizeString(payload.deliveredTo),
-        recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true,
+        recipientRoutingEvidenceKnown: payload.recipientRoutingEvidenceKnown === true || Boolean(normalizeString(row.recipients_text || message.to)),
         attachments: normalizeAttachments(payload.attachments),
       };
     });

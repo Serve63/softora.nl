@@ -8,7 +8,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v13';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v14';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -555,16 +555,13 @@
     const fromName = String(mail.from || '').trim();
     const fromEmail = normalizeEmail(mail.email);
     rows.push(`<div><span>Van:</span><strong>${identity(fromName, fromEmail)}</strong></div>`);
-    const unknownRecipient = '<strong data-mailbox-routing-unknown="true">Niet beschikbaar in bronbericht</strong>';
     if (mail.recipientRoutingEvidenceKnown === true) {
       const to = String(mail.toDisplay || mail.to || '').trim();
       const cc = String(mail.cc || '').trim();
       const bcc = String(mail.bcc || '').trim();
-      rows.push(`<div><span>Aan:</span>${to ? `<strong>${exactHeaderValue(to)}</strong>` : unknownRecipient}</div>`);
+      if (to) rows.push(`<div><span>Aan:</span><strong>${exactHeaderValue(to)}</strong></div>`);
       if (cc) rows.push(`<div><span>CC:</span><strong>${exactHeaderValue(cc)}</strong></div>`);
       if (bcc) rows.push(`<div><span>BCC:</span><strong>${exactHeaderValue(bcc)}</strong></div>`);
-    } else {
-      rows.push(`<div><span>Aan:</span>${unknownRecipient}</div>`);
     }
     return `
       <div class="detail-routing" data-mailbox-routing-kind="direct">

@@ -1204,6 +1204,13 @@ test('campaign reply service herstelt TTV Irene via exacte forward-recipient en 
     'To: webmaster@ttvirene.nl',
     'Subject: Fwd: Kleine vraag over jullie website',
     '',
+    'Verstuurd vanaf mijn iPhone',
+    'Begin doorgestuurd bericht:',
+    'Van: secretaris@ttvirene.nl',
+    'Datum: 16 juli 2026 om 17:42:31 CEST',
+    'Aan: Bas Van der Steen',
+    'Onderwerp: Doorst: Kleine vraag over jullie website',
+    '',
     'Begin doorgestuurd bericht:',
     'Van: Martijn van de Ven',
     'Datum: 16 juli 2026 om 11:56:48 CEST',
@@ -1221,13 +1228,15 @@ test('campaign reply service herstelt TTV Irene via exacte forward-recipient en 
     from: 'Steven van den Brink - Webmaster TTV Irene',
     email: 'webmaster@ttvirene.nl',
     to: 'martijn@softora.nl',
-    subject: 'Re: Fwd: Kleine vraag over jullie website',
+    // Exact production shape: the outer reply no longer contains Fwd/FW.
+    subject: 'RE: Kleine vraag over jullie website',
     preview: 'Beste Martijn, bedankt voor de toelichting.',
     body: incomingBody,
     date: '2026-07-16T18:12:01.000Z',
     messageId: '<steven-forward@ttvirene.nl>',
     references: '<secretaris-forward@ttvirene.nl>',
   };
+  const indexedIncoming = { ...incoming, body: undefined };
   const original = {
     id: 'sent:242',
     uid: 242,
@@ -1244,11 +1253,17 @@ test('campaign reply service herstelt TTV Irene via exacte forward-recipient en 
     originalCampaignOutbound: true,
   };
   let quotedTargets = [];
+  let hydrationCalls = 0;
   const service = createMailboxCampaignRepliesService({
     mailboxIndexStore: {
-      listMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
-      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
-      hydrateMessageBodies: async ({ messages }) => messages,
+      listMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [indexedIncoming] : []),
+      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [indexedIncoming] : []),
+      hydrateMessageBodies: async ({ messages }) => {
+        hydrationCalls += 1;
+        return messages.map((message) => (
+          message.id === indexedIncoming.id ? { ...message, body: incomingBody } : message
+        ));
+      },
       listSentCandidatesForQuotedReplies: async ({ targets }) => {
         quotedTargets = targets;
         return [original];
@@ -1267,6 +1282,7 @@ test('campaign reply service herstelt TTV Irene via exacte forward-recipient en 
 
   const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
 
+  assert.ok(hydrationCalls >= 1);
   assert.equal(replies.length, 1);
   assert.equal(quotedTargets.some((target) => (
     target.accountEmail === 'martijn@softora.nl' &&

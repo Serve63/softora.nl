@@ -184,6 +184,43 @@ test('mailbox index store preserves durable Softora thread provenance from MIME 
   assert.equal(restored.softoraThreadProvenanceKnown, true);
 });
 
+test('mailbox index treats a stored direct To header as exact routing evidence for legacy rows', () => {
+  const store = createMailboxIndexStore();
+  const restored = store.normalizeMessageRow({
+    message_key: 'martijnven123@gmail.com|sent|526',
+    account_email: 'martijnven123@gmail.com',
+    folder: 'sent',
+    uid: 526,
+    provider_id: 'sent:526',
+    sender_name: 'Martijn van de Ven',
+    sender_email: 'martijnven123@gmail.com',
+    recipients_text: 'jolanda.meijden@bogaerstalen.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    body_text: 'Ik wilde nog even kort vragen of je al naar de preview hebt gekeken.',
+    has_body: true,
+    body_truncated: false,
+    date: '2026-06-25T12:32:49.000Z',
+    payload: { source: 'imap-sync' },
+  }, { includeBody: true });
+
+  assert.equal(restored.to, 'jolanda.meijden@bogaerstalen.nl');
+  assert.equal(restored.recipientRoutingEvidenceKnown, true);
+
+  const unknown = store.normalizeMessageRow({
+    message_key: 'martijnven123@gmail.com|sent|527',
+    account_email: 'martijnven123@gmail.com',
+    folder: 'sent',
+    uid: 527,
+    provider_id: 'sent:527',
+    sender_email: 'martijnven123@gmail.com',
+    recipients_text: '',
+    subject: 'Legacy zonder ontvanger',
+    date: '2026-06-25T12:40:00.000Z',
+    payload: { source: 'imap-sync' },
+  });
+  assert.equal(unknown.recipientRoutingEvidenceKnown, false);
+});
+
 test('mailbox index performs one bounded targeted lookup for old unthreaded Sent candidates', async () => {
   const rpcCalls = [];
   const client = {

@@ -204,13 +204,23 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
 
   function isQuotedSentRecoveryCandidate(conversation) {
     const subject = String(conversation && conversation.subject || '').trim();
-    if (!/(?:^|\s)(?:fwd?|doorgestuurd)\s*:/i.test(subject)) return false;
     const messages = [conversation, ...(Array.isArray(conversation && conversation.threadMessages)
       ? conversation.threadMessages
       : [])];
-    return !messages.some((message) => (
+    const alreadyHasOriginal = messages.some((message) => (
       getMailboxMessageDirection(message) === 'sent' && message && message.originalCampaignOutbound === true
     ));
+    if (alreadyHasOriginal) return false;
+
+    const forwardedSubject = /(?:^|\s)(?:fwd?|doorgestuurd)\s*:/i.test(subject);
+    const exactQuotedRecipient = messages
+      .filter((message) => getMailboxMessageDirection(message) !== 'sent')
+      .some((message) => {
+        const body = normalizeText(message && message.body);
+        if (!body || findStructuredQuoteStart(body).index < 0) return false;
+        return extractQuotedRecipientEmails(body, extractEmailAddresses).length > 0;
+      });
+    return forwardedSubject || exactQuotedRecipient;
   }
 
   function attachQuotedOriginalSentMessages(conversations, candidateSentMessages) {
@@ -283,6 +293,63 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
     });
   }
 
+  async function recoverQuotedOriginalSentMessages({
+    conversations,
+    selectedAccountEmails,
+    limit,
+    mailboxIndexStore,
+  }) {
+    const source = Array.isArray(conversations) ? conversations : [];
+    const selectedAccounts = new Set((selectedAccountEmails || []).map(normalizeEmail));
+    const safeLimit = Math.max(1, Number(limit) || 1);
+    const hydrationCandidates = source
+      .filter((conversation) => {
+        const messages = [
+          conversation,
+          ...(Array.isArray(conversation && conversation.threadMessages)
+            ? conversation.threadMessages
+            : []),
+        ];
+        return selectedAccounts.has(normalizeEmail(conversation && conversation.accountEmail)) &&
+          !messages.some((message) => (
+            getMailboxMessageDirection(message) === 'sent' &&
+            message && message.originalCampaignOutbound === true
+          ));
+      })
+      .slice(0, safeLimit);
+    const hydrated = hydrationCandidates.length &&
+      mailboxIndexStore && typeof mailboxIndexStore.hydrateMessageBodies === 'function'
+      ? await mailboxIndexStore.hydrateMessageBodies({ messages: hydrationCandidates })
+      : hydrationCandidates;
+    const recoveryCandidates = hydrated.filter(isQuotedSentRecoveryCandidate);
+    const targets = getQuotedSentRecoveryTargets(recoveryCandidates);
+    const sentCandidates = targets.length &&
+      mailboxIndexStore && typeof mailboxIndexStore.listSentCandidatesForQuotedReplies === 'function'
+      ? await mailboxIndexStore.listSentCandidatesForQuotedReplies({
+          targets,
+          limitPerTarget: 10,
+        }).catch(() => [])
+      : [];
+    const recovered = attachQuotedOriginalSentMessages(recoveryCandidates, sentCandidates);
+    const hydratedByIdentity = new Map(hydrated.map((message) => [
+      getMessageIdentity(message),
+      message,
+    ]));
+    recovered.forEach((conversation) => {
+      hydratedByIdentity.set(getMessageIdentity(conversation), conversation);
+    });
+    const recoveredByIdentity = new Map(recovered.map((conversation) => [
+      getMessageIdentity(conversation),
+      conversation,
+    ]));
+    return {
+      conversations: source.map((conversation) => (
+        recoveredByIdentity.get(getMessageIdentity(conversation)) || conversation
+      )),
+      hydratedByIdentity,
+    };
+  }
+
   return {
     attachQuotedOriginalSentMessages,
     attachTargetedUnthreadedSentMessages,
@@ -290,6 +357,7 @@ function createMailboxCampaignThreadRecovery(helpers = {}) {
     canMergeProvenConversationSegments,
     getQuotedSentRecoveryTargets,
     isQuotedSentRecoveryCandidate,
+    recoverQuotedOriginalSentMessages,
   };
 }
 
