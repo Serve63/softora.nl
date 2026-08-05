@@ -1,6 +1,6 @@
 (function () {
     const pathname = (window.location.pathname || "").toLowerCase();
-    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
+    const isPremiumPersonnelContext = pathname.indexOf("/premium-") !== -1 || pathname === "/mailbox" || pathname === "/kvk-database" || pathname === "/kvk-database.html" || pathname === "/kvk-database-bedrijven" || pathname === "/kvk-database-bedrijven.html" || pathname === "/live-momentum" || pathname === "/live-momentum.html";
     const personnelStorageKey = isPremiumPersonnelContext
         ? "softora_premium_personnel_theme_mode"
         : "softora_software_personnel_theme_mode";

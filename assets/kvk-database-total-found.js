@@ -13,6 +13,7 @@
   'use strict';
 
   const COMPANY_API_URL = 'http://127.0.0.1:8000/api/company-directory';
+  const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
   const PAGE_SIZE = 100;
   const TREATED_CONTACT_STATUSES = new Set(['checked', 'done', 'searched', 'unusable']);
   const FINAL_LEAD_STATUSES = new Set(['usable', 'unusable']);
@@ -114,16 +115,39 @@
     return `${COMPANY_API_URL}?${params.toString()}`;
   }
 
-  function mount(browserWindow) {
+  function navigateToDirectory(browserWindow) {
+    const targetWindow = browserWindow?.top && browserWindow.top !== browserWindow
+      ? browserWindow.top
+      : browserWindow;
+    targetWindow?.location?.assign(DIRECTORY_PAGE_URL);
+  }
+
+  function mountDashboardLink(browserWindow) {
     const document = browserWindow?.document;
     const card = document?.getElementById('companies-total-card');
-    const panel = document?.querySelector('[data-collapsible="total-found"]');
-    const frame = document?.getElementById('main-table-frame');
-    const head = document?.getElementById('table-head');
-    const body = document?.getElementById('table-body');
-    const searchInput = document?.getElementById('search-input');
-    const sourceStatus = document?.getElementById('total-found-source-status');
-    if (!card || !panel || !frame || !head || !body || !searchInput || !sourceStatus) return null;
+    if (!card) return null;
+
+    const openDirectory = () => navigateToDirectory(browserWindow);
+    card.addEventListener('click', openDirectory);
+    card.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openDirectory();
+    });
+
+    return { openDirectory };
+  }
+
+  function mountDirectory(browserWindow) {
+    const document = browserWindow?.document;
+    const page = document?.getElementById('company-directory');
+    const frame = document?.getElementById('company-directory-table-frame');
+    const head = document?.getElementById('company-directory-head');
+    const body = document?.getElementById('company-directory-body');
+    const searchInput = document?.getElementById('company-directory-search');
+    const sourceStatus = document?.getElementById('company-directory-source-status');
+    const totalCount = document?.getElementById('company-directory-total');
+    if (!page || !frame || !head || !body || !searchInput || !sourceStatus || !totalCount) return null;
 
     const state = {
       rows: [],
@@ -131,32 +155,19 @@
       total: 0,
       hasMore: true,
       loading: false,
-      opened: false,
+      error: false,
       query: '',
       requestVersion: 0,
     };
     const numberFormat = new Intl.NumberFormat('nl-NL');
     let searchTimer = null;
-    let observer = null;
 
     function setSourceStatus(text, tone = '') {
       sourceStatus.textContent = text;
       sourceStatus.dataset.tone = tone;
     }
 
-    function observeTable() {
-      if (!observer) {
-        observer = new MutationObserver(() => {
-          if (!state.opened) return;
-          renderRows();
-        });
-      }
-      observer.observe(body, { childList: true });
-    }
-
     function renderRows() {
-      if (!state.opened) return;
-      observer?.disconnect();
       head.innerHTML = `
         <tr>
           <th>Bedrijfsnaam</th>
@@ -170,28 +181,29 @@
       `;
       if (state.rows.length) {
         body.innerHTML = state.rows.map(companyRowHtml).join('');
+      } else if (state.error) {
+        body.innerHTML = '<tr class="empty-row"><td colspan="7">Lokale bedrijvendatabase niet bereikbaar.</td></tr>';
       } else if (!state.loading) {
-        body.innerHTML = '<tr class="empty-row"><td colspan="7">Geen bedrijven gevonden.</td></tr>';
+        body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.query ? 'Geen bedrijven gevonden.' : 'Nog geen bedrijven geladen.'}</td></tr>`;
       }
-      const totalText = state.total ? numberFormat.format(state.total) : '0';
-      card.setAttribute('aria-label', `Toon alle ${totalText} gevonden bedrijven`);
-      card.setAttribute('aria-expanded', state.opened ? 'true' : 'false');
-      if (!state.loading) {
+      totalCount.textContent = state.total ? numberFormat.format(state.total) : '—';
+      if (!state.loading && !state.error) {
+        const totalText = numberFormat.format(state.total);
         const statusText = state.query
           ? `${numberFormat.format(state.rows.length)} zoekresultaten geladen${state.hasMore ? ' · meer beschikbaar' : ''}`
           : `${totalText} bedrijven · ${numberFormat.format(state.rows.length)} geladen`;
         setSourceStatus(statusText, 'ready');
       }
-      observeTable();
     }
 
     async function loadPage({ reset = false } = {}) {
-      if (state.loading || (!reset && !state.hasMore)) return;
+      if (!reset && (state.loading || !state.hasMore)) return;
       if (reset) {
         state.rows = [];
         state.offset = 0;
-        state.total = 0;
+        if (!state.query) state.total = 0;
         state.hasMore = true;
+        state.error = false;
         state.requestVersion += 1;
       }
       const requestVersion = state.requestVersion;
@@ -208,13 +220,14 @@
         const rows = Array.isArray(payload?.rows) ? payload.rows : [];
         state.rows = reset ? rows : [...state.rows, ...rows];
         state.offset += rows.length;
-        state.total = Math.max(0, Number(payload?.total) || state.rows.length);
+        if (!state.query) state.total = Math.max(0, Number(payload?.total) || state.rows.length);
         state.hasMore = Boolean(payload?.has_more) && rows.length > 0;
       } catch {
         if (requestVersion !== state.requestVersion) return;
         state.hasMore = false;
         state.rows = [];
-        setSourceStatus('Volledige lijst niet bereikbaar · start de lokale database', 'error');
+        state.error = true;
+        setSourceStatus('Lokale database niet bereikbaar · controleer of deze draait en sta lokale netwerktoegang toe', 'error');
       } finally {
         if (requestVersion === state.requestVersion) {
           state.loading = false;
@@ -223,38 +236,30 @@
       }
     }
 
-    function openList() {
-      state.opened = true;
-      if (panel.classList.contains('is-collapsed')) {
-        panel.querySelector('.collapse-toggle')?.click();
-      }
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      loadPage({ reset: true });
-    }
-
-    card.addEventListener('click', openList);
-    card.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      openList();
-    });
     searchInput.addEventListener('input', (event) => {
-      if (!state.opened) return;
       state.query = String(event.target.value || '');
       browserWindow.clearTimeout(searchTimer);
       searchTimer = browserWindow.setTimeout(() => loadPage({ reset: true }), 220);
     });
     frame.addEventListener('scroll', () => {
-      if (!state.opened || state.loading || !state.hasMore) return;
+      if (state.loading || !state.hasMore) return;
       if (frame.scrollTop + frame.clientHeight >= frame.scrollHeight - 180) loadPage();
     });
-    observeTable();
+    loadPage({ reset: true });
 
-    return { openList, loadPage, renderRows, state };
+    return { loadPage, renderRows, state };
+  }
+
+  function mount(browserWindow) {
+    return {
+      dashboard: mountDashboardLink(browserWindow),
+      directory: mountDirectory(browserWindow),
+    };
   }
 
   return {
     COMPANY_API_URL,
+    DIRECTORY_PAGE_URL,
     PAGE_SIZE,
     buildCompanyApiUrl,
     companyRowHtml,
@@ -262,5 +267,8 @@
     isTreated,
     missingLabel,
     mount,
+    mountDashboardLink,
+    mountDirectory,
+    navigateToDirectory,
   };
 });

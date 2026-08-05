@@ -47,6 +47,9 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   } else if (map.has('premium-kvk-database')) {
     map.set('kvk-database', map.get('premium-kvk-database'));
   }
+  if (map.has('premium-kvk-company-directory-shell')) {
+    map.set('kvk-database-bedrijven', map.get('premium-kvk-company-directory-shell'));
+  }
   if (map.has('sportschool')) {
     map.set('logboek', map.get('sportschool'));
   }
