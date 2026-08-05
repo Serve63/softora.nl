@@ -1220,6 +1220,7 @@ test('mail-ready snapshot client paginates every available row before publishing
         json: async () => ({
           ok: true,
           generatedAt: '2026-08-05T12:00:00.000Z',
+          snapshotVersion: 'sha256:stable-6001',
           total: 1,
           customers: offset === 0 ? [{ id: 'ready-1', mailReady: true }] : [],
           availableTotal: availableCustomers.length,
@@ -1268,6 +1269,7 @@ test('mail-ready snapshot client never publishes a missing available page', asyn
         ok: true,
         json: async () => ({
           ok: true,
+          snapshotVersion: 'sha256:missing-page',
           total: 0,
           customers: [],
           availableTotal: 3001,
@@ -1285,6 +1287,48 @@ test('mail-ready snapshot client never publishes a missing available page', asyn
   assert.equal(state.mailReadySnapshotPending, true);
   assert.equal(state.availableSnapshotTotal, 2);
   assert.deepEqual(state.availableSnapshotCustomers.map((customer) => customer.id), ['safe-1', 'safe-2']);
+});
+
+test('mail-ready snapshot client accepts different server clocks when the content version is identical', async () => {
+  const client = loadDatabaseMailReadySnapshotClient({ console: { warn: () => { throw new Error('equal content versions should not warn'); } } });
+  const availableCustomers = Array.from({ length: 3001 }, (_item, index) => ({ id: `stable-${index + 1}`, availableSnapshot: true }));
+  const state = {
+    klanten: [],
+    mailReadySnapshotLoaded: false,
+    mailReadySnapshotPending: false,
+    mailReadySnapshotCustomers: [],
+    availableSnapshotLoaded: false,
+    availableSnapshotCustomers: [],
+    foundSnapshotLoaded: false,
+    foundSnapshotCustomerIdSet: new Set(),
+  };
+
+  const loaded = await client.load({
+    state,
+    normalizeCustomer: (raw) => ({ ...raw }),
+    applyCustomerList: () => {},
+    fetchJsonWithTimeout: async (url) => {
+      const offset = Number(new URL(url, 'https://softora.test').searchParams.get('offset')) || 0;
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          generatedAt: offset === 0 ? '2026-08-05T12:00:00.000Z' : '2026-08-05T12:00:01.000Z',
+          snapshotVersion: 'sha256:stable-content',
+          total: 0,
+          customers: [],
+          availableTotal: availableCustomers.length,
+          availableCustomers: availableCustomers.slice(offset, offset + 3000),
+          foundTotal: 0,
+          foundCustomerIds: [],
+        }),
+      };
+    },
+  });
+
+  assert.equal(loaded, true);
+  assert.equal(state.availableSnapshotTotal, 3001);
+  assert.equal(state.availableSnapshotCustomers.length, 3001);
 });
 
 test('mail-ready snapshot client retries when new companies arrive during pagination', async () => {
@@ -1314,7 +1358,8 @@ test('mail-ready snapshot client retries when new companies arrive during pagina
         ok: true,
         json: async () => ({
           ok: true,
-          generatedAt: offset === 0 ? '2026-08-05T12:00:00.000Z' : '2026-08-05T12:00:01.000Z',
+          generatedAt: '2026-08-05T12:00:00.000Z',
+          snapshotVersion: offset === 0 ? 'sha256:before-new-company' : 'sha256:after-new-company',
           total: 0,
           customers: [],
           availableTotal: 3001,
@@ -1630,7 +1675,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805c/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260805d/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ const loaded = await window\.SoftoraDatabaseMailReadySnapshot\.load\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 3000;/);
