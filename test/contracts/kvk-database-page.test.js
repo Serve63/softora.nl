@@ -48,6 +48,10 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
   assert.match(pageSource, /id="companies-treated"/);
+  assert.match(pageSource, /id="companies-total-card"/);
+  assert.match(pageSource, /id="companies-total-card"[^>]*role="button"[^>]*tabindex="0"/);
+  assert.match(pageSource, /aria-controls="main-table-frame"/);
+  assert.match(pageSource, /id="total-found-source-status"/);
   assert.match(pageSource, /id="companies-successful-found"/);
   assert.ok(
     pageSource.indexOf('id="companies-successful-found"') <
@@ -66,9 +70,56 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805a/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
+});
+
+test('totaal gevonden opent de volledige lokale bedrijfsbron met juiste lege-veldlabels', () => {
+  const totalFound = require('../../assets/kvk-database-total-found.js');
+  const scriptSource = fs.readFileSync(
+    path.join(repoRoot, 'assets/kvk-database-total-found.js'),
+    'utf8'
+  );
+
+  assert.equal(totalFound.COMPANY_API_URL, 'http://127.0.0.1:8000/api/company-directory');
+  assert.equal(totalFound.PAGE_SIZE, 100);
+  assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /q=Caf%C3%A9\+%26\+Zoon/);
+  assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /offset=200/);
+  assert.match(scriptSource, /card\.addEventListener\('click', openList\)/);
+  assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
+  assert.match(scriptSource, /panel\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
+
+  const untreatedHtml = totalFound.companyRowHtml({
+    bedrijfsnaam: 'Nog te doen B.V.',
+    kvk_nummer: '12345678',
+    lead_status: 'unresearched',
+    contact_status: 'unknown',
+    woonplaats: 'Vught',
+    gemeente: 'Vught',
+    provincie: 'Noord-Brabant',
+  });
+  assert.match(untreatedHtml, /Nog niet behandeld/);
+  assert.doesNotMatch(untreatedHtml, /Nog niet uitgezocht/);
+  assert.equal((untreatedHtml.match(/Nog niet behandeld/g) || []).length, 4);
+  assert.match(untreatedHtml, /Vught, Noord-Brabant/);
+
+  const treatedHtml = totalFound.companyRowHtml({
+    bedrijfsnaam: 'Behandeld & Getest',
+    kvk_nummer: '87654321',
+    lead_status: 'unusable',
+    contact_status: 'checked',
+    unusable_reason: 'missing_email',
+    telefoonnummer: '0612345678',
+    email: '',
+    website: '',
+  });
+  assert.match(treatedHtml, /Behandeld &amp; Getest/);
+  assert.match(treatedHtml, /Geen mail/);
+  assert.equal((treatedHtml.match(/Niet gevonden/g) || []).length, 2);
+  assert.doesNotMatch(treatedHtml, /Nog niet behandeld/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
