@@ -8,7 +8,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v12';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v13';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -253,6 +253,17 @@
       .flatMap((value) => String(value || '').trim().toLowerCase().split(/\s+/))
       .map(normalizeMessageId)
       .filter(Boolean)));
+  }
+
+  function getDirectParentMessageIds(mail) {
+    return Array.from(new Set(
+      String(mail && mail.inReplyTo || '')
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .map(normalizeMessageId)
+        .filter(Boolean)
+    ));
   }
 
   function getConversationId(mail) {
@@ -699,10 +710,11 @@
     ) || null;
   }
 
-  function stripProvenQuotedOutbound(value, mail) {
+  function stripProvenQuotedOutbound(value, mail, messageContext = mail) {
     const result = global.SoftoraMailboxQuotedThread?.stripProvenQuotedOutbound?.(
       value,
-      getProvenOutboundThreadMessages(mail)
+      getProvenOutboundThreadMessages(mail),
+      { directParentMessageIds: getDirectParentMessageIds(messageContext) }
     );
     return result && typeof result.body === 'string' ? result.body : String(value || '').trim();
   }
@@ -712,7 +724,7 @@
     if (!body || isSentMessageByProvenance(message, mail && mail.accountEmail)) {
       return stripQuotedReply(body);
     }
-    return stripProvenQuotedOutbound(body, mail);
+    return stripProvenQuotedOutbound(body, mail, message);
   }
 
   function isDuplicateStructuredOwnQuote(section, mail, isReplyHeaderLine) {

@@ -115,7 +115,7 @@ function readUiStateScript() {
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805a/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260805b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
@@ -2182,14 +2182,31 @@ test('grijze threadkaart bewaart een niet overeenkomend citaat en doorgestuurde 
   assert.doesNotMatch(forwardedHtml, /Ingesloten berichtgeschiedenis/);
 });
 
-test('mailbox stript Jolandas bewezen markdown-Outlookcitaat uit grijs en houdt de roze bronmail', () => {
-  const sentBody = [
+test('mailbox stript Jolandas geneste markdown-Outlookcitaat via exact In-Reply-To uit grijs', () => {
+  const originalBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website bogaerstalen.nl tegen.',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+  ].join('\n');
+  const sentAuthoredBody = [
     'Beste Jolanda,',
     '',
     'Dankjewel voor je reactie. Hieronder staat de juiste uitleg over het ontwerp.',
     '',
     'Met vriendelijke groet,',
     'Martijn van de Ven',
+  ].join('\n');
+  const sentBody = [
+    sentAuthoredBody,
+    '',
+    'Op 17 juni 2026 schreef Jolanda:',
+    '> Dank je wel voor je bericht en je interesse.',
+    '>',
+    '> Op 17 juni 2026 schreef Martijn:',
+    ...originalBody.split('\n').map((line) => `> > ${line}`),
   ].join('\n');
   const incomingBody = [
     'https://benbacacia.nl/ excuses!',
@@ -2208,13 +2225,21 @@ test('mailbox stript Jolandas bewezen markdown-Outlookcitaat uit grijs en houdt 
       folder: 'inbox',
       accountEmail: 'martijnven123@gmail.com',
       receivedAt: '2026-06-26T12:39:36.000Z',
+      inReplyTo: '<jolanda-direct-parent@gmail.com>',
       threadMessages: [{
-        id: 'sent:jolanda',
+        id: 'sent:jolanda-parent',
         folder: 'sent',
         accountEmail: 'martijnven123@gmail.com',
-        messageId: '<jolanda-sent@gmail.com>',
+        messageId: '<jolanda-direct-parent@gmail.com>',
         date: '2026-06-19T07:44:00.000Z',
         body: sentBody,
+      }, {
+        id: 'sent:jolanda-ancestor',
+        folder: 'sent',
+        accountEmail: 'martijnven123@gmail.com',
+        messageId: '<jolanda-ancestor@gmail.com>',
+        date: '2026-06-17T08:02:00.000Z',
+        body: originalBody,
       }],
     },
   });
@@ -2223,7 +2248,50 @@ test('mailbox stript Jolandas bewezen markdown-Outlookcitaat uit grijs en houdt 
   assert.match(html, /excuses!/);
   assert.doesNotMatch(html, /\*Van:\*|Verzonden: vrijdag 19 juni/);
   assert.equal((html.match(/Dankjewel voor je reactie\. Hieronder staat de juiste uitleg/g) || []).length, 1);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website bogaerstalen\.nl tegen\./g) || []).length, 1);
   assert.match(html, /Jouw bericht/);
+});
+
+test('geneste bewezen quote blijft fail-closed zonder unieke directe Message-ID-parent', () => {
+  const ancestorBody = 'Afgelopen week kwam ik jullie website bogaerstalen.nl tegen met een volledig eigen ontwerp.';
+  const parentBody = [
+    'Goedemorgen Jolanda,',
+    'Hierbij de preview en mijn toelichting op het ontwerp.',
+    '',
+    'Op 17 juni 2026 schreef Martijn:',
+    `> ${ancestorBody}`,
+  ].join('\n');
+  const incomingBody = [
+    'https://benbacacia.nl/ excuses!',
+    '',
+    '*Van:* Martijn Van De Ven',
+    '*Verzonden:* vrijdag 19 juni 2026 09:44',
+    '*Aan:* jolanda.meijden@bogaerstalen.nl',
+    '*Onderwerp:* Re: Kleine vraag over jullie website',
+    '',
+    parentBody,
+  ].join('\n');
+  const candidates = [{
+    id: 'sent:parent',
+    messageId: '<parent@example.com>',
+    accountEmail: 'martijnven123@gmail.com',
+    body: parentBody,
+  }, {
+    id: 'sent:ancestor',
+    messageId: '<ancestor@example.com>',
+    accountEmail: 'martijnven123@gmail.com',
+    body: ancestorBody,
+  }];
+
+  const ambiguous = quotedThreadModule.stripProvenQuotedOutbound(incomingBody, candidates);
+  assert.equal(ambiguous.body, incomingBody);
+  assert.deepEqual(ambiguous.removed, []);
+
+  const proven = quotedThreadModule.stripProvenQuotedOutbound(incomingBody, candidates, {
+    directParentMessageIds: ['<parent@example.com>'],
+  });
+  assert.equal(proven.body, 'https://benbacacia.nl/ excuses!');
+  assert.deepEqual(proven.matchedMessages.map((message) => message.id), ['sent:parent']);
 });
 
 test('mailbox bewaart Moniques handtekening na een bewezen Gmail-citaat', () => {
@@ -2668,8 +2736,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260805b/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260805c/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260805d/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2745,7 +2813,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260805c"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260805b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260805d"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260805b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -5384,7 +5452,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v12:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v13:usr_serve:serve');
         return {
           ok: true,
           owner: 'serve',
