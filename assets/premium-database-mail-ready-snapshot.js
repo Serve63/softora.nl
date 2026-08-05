@@ -223,7 +223,13 @@
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);
         }));
-        return canonical.concat(remoteCustomers.filter(function (customer) { return !consumed.has(customer); }));
+        return canonical.concat(remoteCustomers.filter(function (customer) { return !consumed.has(customer); }).map(function (customer) {
+            return Object.assign({}, customer, {
+                mailReady: false,
+                mailReadySnapshot: false,
+                availableSnapshot: false
+            });
+        }));
     }
 
     function getDisplayCount(state, currentCount) {

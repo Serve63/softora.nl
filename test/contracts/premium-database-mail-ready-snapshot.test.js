@@ -484,6 +484,53 @@ test('premium database mail-ready snapshot refreshes an expired durable snapshot
   assert.equal(calls.includes('customers-snapshot'), true);
 });
 
+test('premium database mail-ready UI serves a coherent expired durable snapshot while refreshing in the background', async () => {
+  let rejectLiveRead;
+  const customerRowsPromise = new Promise((_resolve, reject) => {
+    rejectLiveRead = reject;
+  });
+  const durableSnapshot = {
+    version: 2,
+    generatedAt: '2026-06-16T10:00:00.000Z',
+    total: 1,
+    customers: [{ id: 'ready-cached', mailReady: true, mailReadySnapshot: true }],
+    availableTotal: 1,
+    availableCustomers: [{ id: 'available-cached', availableSnapshot: true }],
+    foundCustomerIds: ['ready-cached', 'available-cached'],
+  };
+  const { service, calls } = createService({
+    durableSnapshot,
+    nowMs: () => Date.parse('2026-06-16T12:00:00.000Z'),
+    customerRowsPromise,
+  });
+  const headers = {};
+  let statusCode = 0;
+  let body = null;
+  const res = {
+    setHeader(name, value) { headers[name] = value; },
+    status(code) { statusCode = code; return this; },
+    json(payload) { body = payload; return payload; },
+  };
+
+  const response = await Promise.race([
+    service.sendMailReadySnapshotResponse({ query: { limit: '3000', offset: '0' } }, res),
+    new Promise((resolve) => setTimeout(() => resolve('timeout'), 100)),
+  ]);
+
+  assert.notEqual(response, 'timeout');
+  assert.equal(statusCode, 200);
+  assert.equal(headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.deepEqual(body.customers.map((customer) => customer.id), ['ready-cached']);
+  assert.deepEqual(body.availableCustomers.map((customer) => customer.id), ['available-cached']);
+  assert.equal(body.total, 1);
+  assert.equal(body.availableTotal, 1);
+  assert.equal(body.foundTotal, 2);
+  assert.equal(calls.includes('customers-snapshot'), true);
+
+  rejectLiveRead(new Error('Supabase client timeout after 1500ms'));
+  await new Promise((resolve) => setImmediate(resolve));
+});
+
 test('premium database mail-ready snapshot keeps the last durable rows when a background refresh regresses to empty', async () => {
   const durableSnapshot = {
     version: 2,
