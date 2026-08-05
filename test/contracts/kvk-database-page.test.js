@@ -64,7 +64,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805g/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805h/);
   assert.match(shellSource, />Database verbinden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -73,7 +73,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805g/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805h/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -111,8 +111,8 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805g/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805g/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805h/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805h/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
@@ -130,7 +130,8 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   );
 
   assert.equal(totalFound.COMPANY_API_URL, 'http://127.0.0.1:8000/api/company-directory');
-  assert.equal(totalFound.DIRECTORY_PAGE_URL, '/kvk-database-bedrijven');
+  assert.equal(totalFound.LOCAL_DATABASE_ORIGIN, 'http://127.0.0.1:8000');
+  assert.equal(totalFound.DIRECTORY_PAGE_URL, 'http://127.0.0.1:8000/kvk-database-bedrijven');
   assert.equal(totalFound.PAGE_SIZE, 100);
   assert.equal(totalFound.AUTO_CONNECT_TIMEOUT_MS, 8000);
   assert.equal(totalFound.USER_CONNECT_TIMEOUT_MS, 30000);
@@ -165,7 +166,20 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   totalFound.navigateToDirectory({
     top: { location: { assign(url) { assignedUrl = url; } } },
   });
-  assert.equal(assignedUrl, '/kvk-database-bedrijven');
+  assert.equal(assignedUrl, 'http://127.0.0.1:8000/kvk-database-bedrijven');
+  assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: '127.0.0.1' } }), true);
+  assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: 'localhost' } }), true);
+  assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: 'www.softora.nl' } }), false);
+
+  let redirectedFromPublicPage = '';
+  const publicMount = totalFound.mountDirectory({
+    location: {
+      hostname: 'www.softora.nl',
+      assign(url) { redirectedFromPublicPage = url; },
+    },
+  });
+  assert.deepEqual(publicMount, { redirected: true });
+  assert.equal(redirectedFromPublicPage, 'http://127.0.0.1:8000/kvk-database-bedrijven');
 
   const untreatedHtml = totalFound.companyRowHtml({
     bedrijfsnaam: 'Nog te doen B.V.',
@@ -215,6 +229,69 @@ test('alle gevonden bedrijven herkent geblokkeerde lokale netwerktoegang', async
   assert.equal(permissionState, 'denied');
   assert.deepEqual(queriedNames, ['loopback-network', 'local-network-access']);
   assert.equal(await totalFound.localNetworkPermissionState({}), 'unknown');
+});
+
+test('lokale bedrijvenpagina laadt dezelfde-origin data zonder Chrome-netwerkprompt', async () => {
+  const totalFound = require('../../assets/kvk-database-total-found.js');
+  const elements = new Map();
+  const makeElement = (extra = {}) => ({
+    addEventListener() {},
+    dataset: {},
+    hidden: false,
+    innerHTML: '',
+    textContent: '',
+    ...extra,
+  });
+  for (const id of [
+    'company-directory',
+    'company-directory-table-frame',
+    'company-directory-head',
+    'company-directory-body',
+    'company-directory-search',
+    'company-directory-source-status',
+    'company-directory-retry',
+    'company-directory-total',
+  ]) {
+    elements.set(id, makeElement());
+  }
+
+  let permissionQueries = 0;
+  const controller = totalFound.mountDirectory({
+    AbortController,
+    clearTimeout,
+    document: { getElementById(id) { return elements.get(id) || null; } },
+    location: { hostname: '127.0.0.1' },
+    navigator: {
+      permissions: {
+        async query() {
+          permissionQueries += 1;
+          return { state: 'prompt' };
+        },
+      },
+    },
+    setTimeout,
+    async fetch(url) {
+      assert.match(url, /^http:\/\/127\.0\.0\.1:8000\/api\/company-directory\?/);
+      return {
+        ok: true,
+        async json() {
+          return {
+            total: 2_924_398,
+            has_more: true,
+            rows: [{ bedrijfsnaam: 'Scouting St. Joris Haaren', kvk_nummer: '40217416' }],
+          };
+        },
+      };
+    },
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(permissionQueries, 0);
+  assert.equal(controller.state.total, 2_924_398);
+  assert.equal(controller.state.rows.length, 1);
+  assert.match(elements.get('company-directory-body').innerHTML, /Scouting St\. Joris Haaren/);
+  assert.equal(elements.get('company-directory-total').textContent, '2.924.398');
+  assert.equal(elements.get('company-directory-retry').hidden, true);
 });
 
 test('kvk database collapse state survives a refresh', () => {
