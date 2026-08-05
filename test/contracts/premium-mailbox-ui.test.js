@@ -468,8 +468,8 @@ test('ieder gesprek toont bewezen Van en Aan zonder dubbele adresregels onder de
     recipientRoutingEvidenceKnown: false,
   }, escapeHtml);
   assert.match(unknownRecipient, /Van:<\/span>/);
-  assert.match(unknownRecipient, /Aan:<\/span>/);
-  assert.match(unknownRecipient, /data-mailbox-routing-unknown="true">Niet beschikbaar in bronbericht/);
+  assert.match(unknownRecipient, /Van:<\/span>/);
+  assert.doesNotMatch(unknownRecipient, /Aan:<\/span>|Niet beschikbaar in bronbericht/);
 
   const instantly = campaignInboxModule.renderMessageRouting({
     provider: 'instantly',
@@ -542,7 +542,8 @@ test('historische inkomende en uitgaande kaarten tonen hun eigen bewezen Aan-rou
   assert.match(html, /Aan:<\/span><strong>Klant &lt;klant@example\.nl&gt;/);
   assert.match(html, /Aan:<\/span><strong>Servé Creusen &lt;serve@softora\.nl&gt;/);
   assert.match(html, /CC:<\/span><strong>team@example\.nl/);
-  assert.match(html, /data-mailbox-routing-unknown="true">Niet beschikbaar in bronbericht/);
+  assert.doesNotMatch(html, /Niet beschikbaar in bronbericht/);
+  assert.equal((html.match(/Aan:<\/span>/g) || []).length, 2);
   assert.equal((html.match(/data-mailbox-routing-kind="direct"/g) || []).length, 3);
 });
 
@@ -2737,7 +2738,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 test('premium mailbox ververst handmatig en automatisch iedere vijf minuten', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260805b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260805d/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260805e/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2813,7 +2814,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260805d"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260805b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260723c"><\/script><script src="assets\/premium-campaign-sender-settings\.js\?v=20260722a"><\/script><script src="assets\/premium-mailbox-outreach\.js\?v=20260720b"><\/script><script src="assets\/premium-mailbox-owner-session\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-message-provenance\.js\?v=20260728a"><\/script><script src="assets\/premium-mailbox-quoted-thread\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-campaign-inbox\.js\?v=20260805e"><\/script><script src="assets\/premium-mailbox-images\.js\?v=20260724c"><\/script><script src="assets\/premium-mailbox-display\.js\?v=20260804a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260804d"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-refresh\.js\?v=20260723f"><\/script><script src="assets\/premium-mailbox-compose\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-compose-window\.js\?v=20260803a"><\/script><script src="assets\/premium-mailbox-compose-controller\.js\?v=20260805b"><\/script><script src="assets\/premium-mailbox-toast\.js\?v=20260724a"><\/script><script src="assets\/premium-mailbox-delete\.js\?v=20260803b"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260805a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260805a"><\/script>\s*<script src="assets\/premium-mailbox\.js\?v=20260805b"><\/script>/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -5452,7 +5453,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v13:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v14:usr_serve:serve');
         return {
           ok: true,
           owner: 'serve',

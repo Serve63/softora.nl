@@ -96,7 +96,7 @@ test('mailbox featuremodules tonen BCC alleen met exacte provenance', () => {
     copyContext: { evidenceKnown: false, kind: 'bcc' },
   }, escapeHtml);
   assert.match(unproven, /Van:<\/span><strong>Onbekend/);
-  assert.match(unproven, /Aan:<\/span><strong data-mailbox-routing-unknown="true">Niet beschikbaar in bronbericht/);
+  assert.doesNotMatch(unproven, /Aan:<\/span>|Niet beschikbaar in bronbericht/);
   assert.doesNotMatch(unproven, /BCC:<\/span>/);
 });
 
