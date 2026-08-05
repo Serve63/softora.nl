@@ -1,0 +1,191 @@
+.stat-card-total-found {
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.stat-card-total-found:hover {
+  border-color: var(--accent);
+  box-shadow: 0 16px 38px rgba(44, 37, 31, 0.12);
+  transform: translateY(-1px);
+}
+
+.stat-card-total-found:focus-visible {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: 0 0 0 4px rgba(142, 47, 95, 0.14), 0 16px 38px rgba(44, 37, 31, 0.12);
+}
+
+.stat-card-total-found::after {
+  display: block;
+  margin-top: 7px;
+  color: var(--accent-dark);
+  content: 'Bekijk alle bedrijven →';
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.total-found-source-status {
+  align-self: center;
+  color: var(--green);
+  font-size: 0.56rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.total-found-source-status[data-tone='loading'] {
+  color: var(--muted);
+}
+
+.total-found-source-status[data-tone='error'] {
+  color: #8b3b32;
+}
+
+.company-status.is-pending {
+  min-width: 96px;
+  background: #efeae4;
+  color: var(--muted);
+}
+
+.company-directory-page {
+  min-width: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.company-directory {
+  display: flex;
+  height: 100vh;
+  min-width: 0;
+  flex-direction: column;
+  gap: 22px;
+  padding: clamp(24px, 3vw, 48px);
+}
+
+.company-directory__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.company-directory__back {
+  display: inline-flex;
+  margin-bottom: 18px;
+  color: var(--accent-dark);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.company-directory__back:hover {
+  text-decoration: underline;
+}
+
+.company-directory h1 {
+  margin: 4px 0 8px;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.company-directory__intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.company-directory__total {
+  min-width: 220px;
+  padding: 19px 22px;
+  border: 1px solid var(--green);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+
+.company-directory__total span,
+.company-directory__total strong {
+  display: block;
+}
+
+.company-directory__total span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.company-directory__total strong {
+  margin-top: 5px;
+  font-size: 1.8rem;
+}
+
+.company-directory__panel {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.company-directory__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.company-directory__search {
+  width: min(430px, 52vw);
+}
+
+.company-directory__table-frame {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.company-directory__table-frame thead {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+}
+
+@media (max-width: 1180px) {
+  .total-found-source-status {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .company-directory {
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .company-directory__header,
+  .company-directory__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .company-directory__total,
+  .company-directory__search {
+    width: 100%;
+  }
+}

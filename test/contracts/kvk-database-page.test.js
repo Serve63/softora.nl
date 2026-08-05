@@ -9,11 +9,17 @@ const repoRoot = path.join(__dirname, '../..');
 
 test('kvk database clean URL resolves to the protected premium sidebar shell', () => {
   const slugMap = createKnownPrettyPageSlugToFile(
-    new Set(['premium-kvk-database.html', 'premium-kvk-database-shell.html'])
+    new Set([
+      'premium-kvk-database.html',
+      'premium-kvk-database-shell.html',
+      'premium-kvk-company-directory.html',
+      'premium-kvk-company-directory-shell.html',
+    ])
   );
 
   assert.equal(slugMap.get('premium-kvk-database'), 'premium-kvk-database.html');
   assert.equal(slugMap.get('kvk-database'), 'premium-kvk-database-shell.html');
+  assert.equal(slugMap.get('kvk-database-bedrijven'), 'premium-kvk-company-directory-shell.html');
 });
 
 test('kvk database shell keeps the premium sidebar around the scraper', () => {
@@ -35,8 +41,30 @@ test('shared premium sidebar script also initializes on the clean kvk database r
 
   assert.match(themeSource, /pathname === "\/kvk-database"/);
   assert.match(themeSource, /pathname === "\/kvk-database\.html"/);
+  assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /sidebar\.innerHTML = buildUnifiedPremiumSidebarHtml\(activeKey\)/);
   assert.match(themeSource, /sidebar\.dataset\.sidebarReady = "true"/);
+});
+
+test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical sidebar', () => {
+  const shellSource = fs.readFileSync(
+    path.join(repoRoot, 'premium-kvk-company-directory-shell.html'),
+    'utf8'
+  );
+  const pageSource = fs.readFileSync(
+    path.join(repoRoot, 'premium-kvk-company-directory.html'),
+    'utf8'
+  );
+
+  assert.match(shellSource, /data-sidebar-shell="canonical"/);
+  assert.match(shellSource, /src="\/premium-kvk-company-directory\?softora_sidebar_content=1"/);
+  assert.match(shellSource, /title="Softora Database Alle gevonden bedrijven"/);
+  assert.match(pageSource, /<h1 id="company-directory-title">Alle gevonden bedrijven<\/h1>/);
+  assert.match(pageSource, /href="\/kvk-database" target="_top"/);
+  assert.match(pageSource, /id="company-directory-search"/);
+  assert.match(pageSource, /id="company-directory-table-frame"/);
+  assert.match(pageSource, /id="company-directory-total"/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805b/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -48,6 +76,11 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
   assert.match(pageSource, /id="companies-treated"/);
+  assert.match(pageSource, /id="companies-total-card"/);
+  assert.match(pageSource, /id="companies-total-card"[^>]*role="link"[^>]*tabindex="0"/);
+  assert.match(pageSource, /aria-label="Open alle gevonden bedrijven op een aparte pagina"/);
+  assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*aria-controls=/);
+  assert.doesNotMatch(pageSource, /id="total-found-source-status"/);
   assert.match(pageSource, /id="companies-successful-found"/);
   assert.ok(
     pageSource.indexOf('id="companies-successful-found"') <
@@ -66,9 +99,66 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805b/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805b/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
+});
+
+test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale bedrijfsbron', () => {
+  const totalFound = require('../../assets/kvk-database-total-found.js');
+  const scriptSource = fs.readFileSync(
+    path.join(repoRoot, 'assets/kvk-database-total-found.js'),
+    'utf8'
+  );
+
+  assert.equal(totalFound.COMPANY_API_URL, 'http://127.0.0.1:8000/api/company-directory');
+  assert.equal(totalFound.DIRECTORY_PAGE_URL, '/kvk-database-bedrijven');
+  assert.equal(totalFound.PAGE_SIZE, 100);
+  assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /q=Caf%C3%A9\+%26\+Zoon/);
+  assert.match(totalFound.buildCompanyApiUrl('Café & Zoon', 200), /offset=200/);
+  assert.match(scriptSource, /card\.addEventListener\('click', openDirectory\)/);
+  assert.match(scriptSource, /targetWindow\?\.location\?\.assign\(DIRECTORY_PAGE_URL\)/);
+  assert.match(scriptSource, /frame\.scrollTop \+ frame\.clientHeight >= frame\.scrollHeight - 180/);
+  assert.match(scriptSource, /if \(!reset && \(state\.loading \|\| !state\.hasMore\)\) return;/);
+  assert.match(scriptSource, /if \(!state\.query\) state\.total = Math\.max/);
+  assert.doesNotMatch(scriptSource, /scrollIntoView/);
+
+  let assignedUrl = '';
+  totalFound.navigateToDirectory({
+    top: { location: { assign(url) { assignedUrl = url; } } },
+  });
+  assert.equal(assignedUrl, '/kvk-database-bedrijven');
+
+  const untreatedHtml = totalFound.companyRowHtml({
+    bedrijfsnaam: 'Nog te doen B.V.',
+    kvk_nummer: '12345678',
+    lead_status: 'unresearched',
+    contact_status: 'unknown',
+    woonplaats: 'Vught',
+    gemeente: 'Vught',
+    provincie: 'Noord-Brabant',
+  });
+  assert.match(untreatedHtml, /Nog niet behandeld/);
+  assert.doesNotMatch(untreatedHtml, /Nog niet uitgezocht/);
+  assert.equal((untreatedHtml.match(/Nog niet behandeld/g) || []).length, 4);
+  assert.match(untreatedHtml, /Vught, Noord-Brabant/);
+
+  const treatedHtml = totalFound.companyRowHtml({
+    bedrijfsnaam: 'Behandeld & Getest',
+    kvk_nummer: '87654321',
+    lead_status: 'unusable',
+    contact_status: 'checked',
+    unusable_reason: 'missing_email',
+    telefoonnummer: '0612345678',
+    email: '',
+    website: '',
+  });
+  assert.match(treatedHtml, /Behandeld &amp; Getest/);
+  assert.match(treatedHtml, /Geen mail/);
+  assert.equal((treatedHtml.match(/Niet gevonden/g) || []).length, 2);
+  assert.doesNotMatch(treatedHtml, /Nog niet behandeld/);
 });
 
 test('kvk database collapse state survives a refresh', () => {
