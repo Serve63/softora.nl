@@ -9,6 +9,7 @@ const {
   CAMPAIGN_SENT_MESSAGE_SCAN_LIMIT,
   attachCrossAccountMailboxCopies,
   attachSentThreadMessages,
+  attachTargetedUnthreadedSentMessages,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
   isAutomatedCampaignReply,
@@ -1364,6 +1365,105 @@ test('campaign reply service laadt een latere Sent-descendant buiten de globale 
     replies[0].threadMessages.map((message) => message.id),
     ['sent:71', 'sent:62']
   );
+});
+
+test('campaign reply service herstelt Blue Monkey via gerichte unieke later-Sent lookup buiten de globale cap', async () => {
+  const inbound = {
+    id: 'coldmail:245',
+    uid: 245,
+    folder: 'coldmail',
+    accountEmail: 'contact.venvisuals@gmail.com',
+    from: 'Blue Monkey',
+    email: 'info@blue-monkey.nl',
+    to: 'contact.venvisuals@gmail.com',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dat klinkt goed.',
+    date: '2026-06-25T11:27:19.000Z',
+    messageId: '<blue-inbound@example.nl>',
+    inReplyTo: '<blue-june-outbound@example.nl>',
+    references: '<blue-original@example.nl> <blue-june-outbound@example.nl>',
+  };
+  const laterSent = {
+    id: 'sent:216',
+    uid: 216,
+    folder: 'sent',
+    accountEmail: 'contact.venvisuals@gmail.com',
+    from: 'Martijn van de Ven',
+    email: 'contact.venvisuals@gmail.com',
+    to: 'info@blue-monkey.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    preview: 'Dankjewel voor je reactie.',
+    date: '2026-08-05T16:26:02.000Z',
+    messageId: '<4647162d-bc58-4cd7-e0bb-50c7d1e00675@gmail.com>',
+    inReplyTo: '',
+    references: '',
+  };
+  const targetedCalls = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => folder === 'sent' ? [] : [inbound],
+      listMatchingMessagesForAccounts: async ({ folder }) => folder === 'sent' ? [] : [inbound],
+      listMessagesByMessageIdsForAccounts: async () => [],
+      listUnthreadedSentCandidatesForConversations: async ({ targets }) => {
+        targetedCalls.push(targets);
+        return [{ targetConversationId: targets[0].conversationId, message: laterSent }];
+      },
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'blue-monkey',
+        bedrijf: 'Blue Monkey',
+        email: 'info@blue-monkey.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'martijn' });
+
+  assert.equal(targetedCalls.length, 1);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].latestOutboundAt, laterSent.date);
+  assert.equal(replies[0].threadMessages[0].id, 'sent:216');
+  assert.equal(
+    replies[0].threadMessages[0].threadCorrelationEvidence,
+    'unique-account-counterparty-subject-later-sent'
+  );
+});
+
+test('targeted later-Sent recovery fails closed when two same-thread candidates exist', () => {
+  const conversation = {
+    id: 'inbox:1',
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    email: 'lead@example.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-06-01T10:00:00.000Z',
+    messageId: '<inbound@example.nl>',
+    conversationId: 'conversation:serve@softora.nl|inbound@example.nl',
+    threadMessages: [],
+  };
+  const candidate = {
+    folder: 'sent',
+    accountEmail: 'serve@softora.nl',
+    email: 'serve@softora.nl',
+    to: 'lead@example.nl',
+    subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-06-02T10:00:00.000Z',
+    inReplyTo: '',
+    references: '',
+  };
+  const [result] = attachTargetedUnthreadedSentMessages([conversation], [{
+    targetConversationId: conversation.conversationId,
+    message: { ...candidate, id: 'sent:1', messageId: '<sent-1@example.nl>' },
+  }, {
+    targetConversationId: conversation.conversationId,
+    message: { ...candidate, id: 'sent:2', messageId: '<sent-2@example.nl>' },
+  }]);
+
+  assert.deepEqual(result.threadMessages, []);
 });
 
 test('campaign reply service hydrateert alleen de zichtbare conversatieroots en niet alle threadbodies', async () => {

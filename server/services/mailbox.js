@@ -7,8 +7,10 @@ const {
   resolveMailboxName,
 } = require('./mailbox-sent-copy');
 const { createMailboxIndexStore } = require('./mailbox-index-store');
-const { createMailboxComposeSend } = require('./mailbox-compose-send');
-const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, listMailboxCampaignReplySets, mergeCampaignReplies, resolveReplyIdentity, sendMailboxMessage, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
+const { createMailboxComposeRuntime } = require('./mailbox-compose-runtime');
+const { createMailboxComposeThreadContext } = require('./mailbox-compose-thread-context');
+const { createMailboxSendProvenanceStore } = require('./mailbox-send-provenance-store');
+const { createDefaultInstantlyMailboxService, getInstantlyVisibilityDeps, listMailboxCampaignReplySets, mergeCampaignReplies, resolveReplyIdentity, syncInstantlyMailboxResponse: respondToInstantlyMailboxSync } = require('./mailbox-instantly-integration');
 const { buildMailboxMessageMetadataHelpers } = require('./mailbox-message-metadata');
 const { createMailboxVisibilityService } = require('./mailbox-delete-message');
 const { createMailboxReadMessageService } = require('./mailbox-read-message');
@@ -591,10 +593,20 @@ function createMailboxService(deps = {}) {
       normalizeString,
       truncateText,
     }),
+    mailboxSendProvenanceStore = createMailboxSendProvenanceStore({
+      isSupabaseConfigured,
+      getSupabaseClient,
+      logger,
+      normalizeString,
+    }),
+    mailboxComposeThreadContext = createMailboxComposeThreadContext({
+      mailboxIndexStore,
+    }),
     mailboxIndexStaleMs = INDEX_STALE_MS,
     mailboxCampaignRepliesService = createMailboxCampaignRepliesService({
       mailboxIndexStore,
       dataOpsStore,
+      mailboxSendProvenanceStore,
     }),
     instantlyMailboxService = createDefaultInstantlyMailboxService({ env, mailboxIndexStore, fetchJsonWithTimeout, getCustomerSourcesByEmails: dataOpsStore?.listCustomersByEmails, getUiStateValues, setUiStateValues, logger }),
   } = deps;
@@ -1987,6 +1999,11 @@ function createMailboxService(deps = {}) {
       references: Array.isArray(parsed.references)
         ? parsed.references.map((item) => normalizeString(item)).filter(Boolean).join(' ')
         : normalizeString(parsed.references || ''),
+      softoraConversationId: parsedHeaderText(parsed, 'x-softora-conversation-id'),
+      softoraSendIntentId: parsedHeaderText(parsed, 'x-softora-send-intent-id'),
+      softoraSendMode: parsedHeaderText(parsed, 'x-softora-send-mode').toLowerCase(),
+      softoraReplyTargetMessageId: parsedHeaderText(parsed, 'x-softora-reply-target-message-id'),
+      softoraThreadProvenanceKnown: Boolean(parsedHeaderText(parsed, 'x-softora-send-intent-id')),
       unread: !Array.from(message.flags || []).includes('\\Seen'),
       starred: Array.from(message.flags || []).includes('\\Flagged'),
       bodyImageEvidenceKnown: true,
@@ -2285,21 +2302,15 @@ function createMailboxService(deps = {}) {
   const hideConversation = mailboxVisibility.hideConversation;
   const restoreConversation = mailboxVisibility.restoreConversation;
 
-  const sendMessage = createMailboxComposeSend({
-    getAccount,
-    isValidEmail,
-    normalizeEmail,
-    normalizeString,
-    truncateText,
-    createTransport,
-    buildMailboxWebdesignSendParts,
-    reserveMailboxWebdesignOutboundRecipient,
-    confirmMailboxWebdesignOutboundRecipient,
-    appendSentMessage,
-    createImapClient,
-    nodemailer,
-    webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
-    logger,
+  const { sendMessage, sendMessageResponse } = createMailboxComposeRuntime({
+    composeSendDependencies: {
+      getAccount, isValidEmail, normalizeEmail, normalizeString, truncateText, createTransport,
+      buildMailboxWebdesignSendParts, reserveMailboxWebdesignOutboundRecipient,
+      confirmMailboxWebdesignOutboundRecipient, appendSentMessage, createImapClient, nodemailer,
+      webdesignEmailTemplateVersion: WEBDESIGN_EMAIL_TEMPLATE_VERSION,
+    },
+    getAccount, instantlyMailboxService, mailboxComposeThreadContext,
+    mailboxSendProvenanceStore, normalizeEmail, normalizeString, logger,
   });
 
   function cleanPromptText(value, maxLength = 6000) {
@@ -2554,21 +2565,6 @@ function createMailboxService(deps = {}) {
   }
 
   async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString }); }
-  async function sendMessageResponse(req, res) {
-    try {
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const result = await sendMailboxMessage({ body, instantlyMailboxService, sendMessage, normalizeString });
-      return res.status(200).json({ ok: true, result });
-    } catch (error) {
-      logger.error('[Mailbox][Send]', error?.message || error);
-      return res.status(error.status || 500).json({
-        ok: false,
-        error: 'Mail verzenden mislukt',
-        detail: String(error?.message || 'Onbekende fout'),
-      });
-    }
-  }
-
   async function markMessageReadResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};

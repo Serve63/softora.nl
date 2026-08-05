@@ -26,9 +26,23 @@ function createMailboxComposeSend(deps = {}) {
     createImapClient,
     nodemailer,
     webdesignEmailTemplateVersion,
+    mailboxSendProvenanceStore,
     logger = console,
     now = () => new Date(),
   } = deps;
+
+  async function acceptProvenanceWithRetry(intentId, values) {
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await mailboxSendProvenanceStore.accept(intentId, values);
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
+    }
+    throw lastError;
+  }
 
   function normalizeRecipientList(value, label) {
     const values = (Array.isArray(value) ? value : String(value || '').split(/[;,]/))
@@ -96,7 +110,7 @@ function createMailboxComposeSend(deps = {}) {
     });
   }
 
-  return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments }) {
+  return async function sendMessage({ accountEmail, to, cc, bcc, subject, text, attachments, threadProvenance }) {
     const account = getAccount(accountEmail);
     if (!account) {
       const error = new Error('Mailbox-account niet gevonden.');
@@ -143,6 +157,12 @@ function createMailboxComposeSend(deps = {}) {
       auth: { user: account.smtpUser, pass: account.smtpPass },
     });
     const normalizedText = normalizeString(text);
+    if (!threadProvenance || !mailboxSendProvenanceStore) {
+      const error = new Error('De duurzame threadcontext ontbreekt; verzending is veilig gestopt.');
+      error.status = 503;
+      error.code = 'MAILBOX_SEND_PROVENANCE_REQUIRED';
+      throw error;
+    }
     const webdesignParts = await buildMailboxWebdesignSendParts({
       accountEmail: account.email,
       to: normalizedTo,
@@ -156,12 +176,21 @@ function createMailboxComposeSend(deps = {}) {
       bcc: normalizedBcc.length ? normalizedBcc : undefined,
       subject: cleanSubject,
       text: webdesignParts?.text || normalizedText,
+      messageId: threadProvenance.messageId,
     };
+    if (threadProvenance.mode === 'reply') {
+      mail.inReplyTo = threadProvenance.replyTargetMessageId;
+      mail.references = threadProvenance.references;
+    }
     mail.html = webdesignParts?.html || renderMailboxComposeEmailHtml(normalizedText);
     mail.headers = {
       'X-Softora-Template-Version': webdesignParts
         ? webdesignEmailTemplateVersion
         : MAILBOX_COMPOSE_EMAIL_TEMPLATE_VERSION,
+      'X-Softora-Send-Intent-Id': threadProvenance.intentId,
+      'X-Softora-Send-Mode': threadProvenance.mode,
+      'X-Softora-Conversation-Id': threadProvenance.conversationId || '',
+      'X-Softora-Reply-Target-Message-Id': threadProvenance.replyTargetMessageId || '',
     };
     const outboundAttachments = [
       ...(Array.isArray(webdesignParts?.attachments) ? webdesignParts.attachments : []),
@@ -174,7 +203,67 @@ function createMailboxComposeSend(deps = {}) {
           subject: cleanSubject,
         })
       : null;
-    const info = await transporter.sendMail(mail);
+    const provenanceReservation = await mailboxSendProvenanceStore.reserve({
+      ...threadProvenance,
+      accountEmail: account.email,
+      recipientEmail: normalizedTo,
+      senderName: account.name || account.email,
+      subject: cleanSubject,
+      body: webdesignParts?.text || normalizedText,
+      cc: normalizedCc.join(', '),
+      bcc: normalizedBcc.join(', '),
+    });
+    if (!provenanceReservation.created) {
+      if (provenanceReservation.intent.status === 'accepted') {
+        const accepted = provenanceReservation.intent;
+        return {
+          messageId: accepted.messageId,
+          accepted: [normalizedTo],
+          rejected: [],
+          sentCopySaved: true,
+          intentId: accepted.intentId,
+          idempotentReplay: true,
+          sentMessage: {
+            id: `accepted-sent:${accepted.messageId || accepted.intentId}`,
+            mailboxId: `accepted-sent:${accepted.messageId || accepted.intentId}`,
+            folder: 'sent',
+            storageFolder: 'sent',
+            direction: 'sent',
+            accountEmail: accepted.accountEmail,
+            messageId: accepted.messageId,
+            from: accepted.senderName || accepted.accountEmail,
+            email: accepted.accountEmail,
+            to: accepted.recipientEmail,
+            toDisplay: accepted.recipientEmail,
+            cc: accepted.cc,
+            bcc: accepted.bcc,
+            recipientRoutingEvidenceKnown: true,
+            subject: accepted.subject,
+            body: accepted.body,
+            preview: accepted.body,
+            receivedAt: accepted.acceptedAt,
+            activityAt: accepted.acceptedAt,
+            hasBody: true,
+            bodyTruncated: false,
+            unread: false,
+            conversationId: accepted.conversationId,
+            softoraSendIntentId: accepted.intentId,
+            softoraSendMode: accepted.mode,
+          },
+        };
+      }
+      const error = new Error('Deze verzending wordt al veilig verwerkt; wacht op bevestiging voordat je opnieuw probeert.');
+      error.status = 409;
+      error.code = 'MAILBOX_SEND_ALREADY_PROCESSING';
+      throw error;
+    }
+    let info;
+    try {
+      info = await transporter.sendMail(mail);
+    } catch (error) {
+      await mailboxSendProvenanceStore.fail(threadProvenance.intentId, error);
+      throw error;
+    }
     if (webdesignParts) {
       await confirmMailboxWebdesignOutboundRecipient(outboundReservation && outboundReservation.reservationId, {
         messageId: normalizeString(info?.messageId || ''),
@@ -183,6 +272,10 @@ function createMailboxComposeSend(deps = {}) {
       });
     }
     const sentAt = now();
+    const acceptedProvenance = await acceptProvenanceWithRetry(threadProvenance.intentId, {
+      messageId: normalizeString(info?.messageId || threadProvenance.messageId),
+      acceptedAt: sentAt.toISOString(),
+    });
     const sentCopySaved = await appendSentMessage({
       account,
       createImapClient,
@@ -197,6 +290,7 @@ function createMailboxComposeSend(deps = {}) {
       accepted: Array.isArray(info?.accepted) ? info.accepted : [],
       rejected: Array.isArray(info?.rejected) ? info.rejected : [],
       sentCopySaved,
+      intentId: acceptedProvenance.intentId,
       sentMessage: {
         id: `accepted-sent:${normalizeString(info?.messageId || sentAt.toISOString())}`,
         mailboxId: `accepted-sent:${normalizeString(info?.messageId || sentAt.toISOString())}`,
@@ -204,7 +298,7 @@ function createMailboxComposeSend(deps = {}) {
         storageFolder: 'sent',
         direction: 'sent',
         accountEmail: account.email,
-        messageId: normalizeString(info?.messageId || ''),
+        messageId: normalizeString(info?.messageId || threadProvenance.messageId),
         from: account.name || account.email,
         email: account.email,
         to: normalizedTo,
@@ -220,6 +314,10 @@ function createMailboxComposeSend(deps = {}) {
         hasBody: true,
         bodyTruncated: false,
         unread: false,
+        conversationId: threadProvenance.conversationId,
+        softoraSendIntentId: threadProvenance.intentId,
+        softoraSendMode: threadProvenance.mode,
+        softoraReplyTargetMessageId: threadProvenance.replyTargetMessageId,
       },
     };
   };

@@ -251,6 +251,13 @@
       try {
         assertReplyOwner();
         const contextAtSend = replyContext ? { ...replyContext } : null;
+        const sendMode = contextAtSend?.mode === 'reply' ? 'reply' : 'new-message';
+        const idempotencyKey = String(contextAtSend?.sendIdempotencyKey || '').trim() || global.crypto?.randomUUID?.() || [
+          'mailbox-send',
+          Date.now(),
+          Math.random().toString(36).slice(2),
+        ].join(':');
+        if (replyContext) replyContext.sendIdempotencyKey = idempotencyKey;
         const provider = String(replyContext && replyContext.provider || '').trim().toLowerCase();
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
@@ -263,9 +270,19 @@
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
             account,
+            owner: replyOwner,
+            mode: sendMode,
+            idempotencyKey,
+            context: {
+              conversationId: String(contextAtSend?.conversationId || '').trim(),
+              id: String(contextAtSend?.mailboxId || contextAtSend?.id || '').trim(),
+              folder: String(contextAtSend?.folder || '').trim().toLowerCase(),
+              uid: Number(contextAtSend?.uid || 0) || 0,
+              messageId: String(contextAtSend?.messageId || '').trim(),
+              references: String(contextAtSend?.references || '').trim(),
+            },
             ...(provider
               ? {
-                  owner: replyOwner,
                   provider,
                   providerMessageId: String(replyContext && replyContext.providerMessageId || '').trim(),
                   providerThreadId: String(replyContext && replyContext.providerThreadId || '').trim(),
@@ -323,6 +340,9 @@
           unread: false,
           replyDismissedAt: acceptedAt,
           localAcceptedSend: true,
+          conversationId: String(result.sentMessage?.conversationId || contextAtSend?.conversationId || '').trim(),
+          softoraSendMode: sendMode,
+          softoraSendIntentId: String(result.sentMessage?.softoraSendIntentId || result.intentId || '').trim(),
         };
         const identity = getMessageIdentity(sentMessage);
         rememberAcceptedSend({
