@@ -8,7 +8,7 @@
   ]);
   const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
   const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v15';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v16';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -66,6 +66,7 @@
       /\bauto[ -]?reply\b/,
       /\bout[ -]?of[ -]?office\b/,
       /\bafwezigheid(?:sbericht|melding)?\b/,
+      /^(?:niet aanwezig|afwezig)(?:\s+tot\b[^:\n]{0,80})?\s+(?:(?:re|fw|fwd)\s*:\s*)+/,
       /\bdelivery status notification\b/,
       /\bmail delivery (?:failure|failed)\b/,
       /^email received\b/,
@@ -89,6 +90,8 @@
       /\b(?:we|wij) streven ernaar (?:jouw|je|uw) (?:e-?mail|mail|bericht) (?:de )?(?:eerstvolgende|volgende) werkdag te beantwoorden\b/,
       /\b(?:bedankt|dank) voor (?:je|jouw|uw) bericht\b[\s\S]{0,220}\b(?:eerstvolgende werkdag|zo snel mogelijk) te beantwoorden\b/,
       /\b(?:ik ben|wij zijn|ons kantoor is) (?:momenteel|op dit moment|tijdelijk)?\s*(?:afwezig|gesloten|niet aanwezig)\b/,
+      /\b(?:momenteel|op dit moment)\s+(?:heb ik|hebben wij)\s+vakantie\b[\s\S]{0,240}\b(?:e-?mail|mail)\b[\s\S]{0,160}\b(?:minder vaak|niet|beperkt)\b/,
+      /\bwelkom bij\b[\s\S]{0,240}\bals u\b[\s\S]{0,180}\bnaar whatsapp stuurt\b[\s\S]{0,180}\b(?:richtprijs|offerte)\b/,
       /\b(?:i am|we are) (?:currently )?out of (?:the )?office\b/,
     ];
     return (
@@ -332,7 +335,13 @@
     const messages = [
       root,
       ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : []),
-    ].filter((message) => getMessageTimestamp(message));
+    ].filter((message) => (
+      getMessageTimestamp(message) &&
+      (
+        isSentMessageByProvenance(message, mail.accountEmail) ||
+        !isAutomatedCampaignReply(message)
+      )
+    ));
     if (!messages.length) return null;
     const latest = messages
       .slice()
@@ -378,6 +387,10 @@
           ...(Array.isArray(message && message.threadMessages) ? message.threadMessages : []),
         ]),
       ]
+        .filter((message) => (
+          isSentMessageByProvenance(message, primary.accountEmail) ||
+          !isAutomatedCampaignReply(message)
+        ))
         .filter((message) => {
           const identity = getMessageIdentity(message);
           if (!identity) return true;
@@ -764,6 +777,10 @@
     const mailboxOwner = getMessageOwner(mail) || activeOwner;
     const position = String(options.position || 'all').trim().toLowerCase();
     let messages = (Array.isArray(mail.threadMessages) ? mail.threadMessages : [])
+      .filter((message) => (
+        isSentMessageByProvenance(message, mail.accountEmail) ||
+        !isAutomatedCampaignReply(message)
+      ))
       .filter((message) => {
         if (position === 'all') return true;
         if (!rootTimestamp) return position !== 'newer';

@@ -115,12 +115,12 @@ function readUiStateScript() {
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806d/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806e/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
 });
 
@@ -2049,6 +2049,79 @@ test('mailbox toont een Gmail-citaat zonder afsluitende dubbele punt niet naast 
   assert.doesNotMatch(html, /Ingesloten berichtgeschiedenis|detail-mail-section-history/);
 });
 
+test('mailbox toont Neelis zonder emoji-variantquote en zonder WhatsApp-autoreply', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website neelisstikwerken.com tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening',
+    '',
+    'Ik kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.',
+    '',
+    'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wel lijkt het me tof om te horen wat je van het design vindt en wat er eventueel beter kan. Daar leer ik dan weer van!',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken',
+    '',
+    'Met vriendelijke groet,',
+    'Martijn van de Ven',
+    '',
+    'Tilburg',
+  ].join('\n');
+  const quotedSentBody = sentBody
+    .replace('eerlijke mening', 'eerlijke mening 😁')
+    .replace('link bekijken', 'link bekijken 🎨')
+    .replace('\nTilburg', '\n📍 Tilburg');
+  const replyBody = [
+    'Helaas met website is prima zo',
+    '',
+    'Op di 28 jul 2026 om 08:28 schreef Martijn van de Ven <martijnven@websoftora.com>',
+    '',
+    quotedSentBody,
+  ].join('\n');
+  const html = renderMailboxBodyForTest(replyBody, [], {
+    replyMailId: 'instantly:neelis-human-reply',
+    mail: {
+      id: 'instantly:neelis-human-reply',
+      folder: 'instantly',
+      direction: 'received',
+      provider: 'instantly',
+      providerOwner: 'martijn',
+      accountEmail: 'martijnven@websoftora.com',
+      receivedAt: '2026-07-28T13:56:13.000Z',
+      threadMessages: [{
+        id: 'instantly:neelis-whatsapp-auto',
+        folder: 'instantly',
+        direction: 'received',
+        provider: 'instantly',
+        providerOwner: 'martijn',
+        accountEmail: 'martijnven@websoftora.com',
+        subject: 'Whatsapp Re: Kleine vraag over jullie website',
+        date: '2026-07-28T06:28:31.000Z',
+        body: 'Welkom bij Neelis Stikwerken. Als u een foto met de globale maten naar whatsapp stuurt, dan krijgt u van mij zo snel mogelijk een richtprijs.',
+      }, {
+        id: 'instantly:neelis-sent',
+        folder: 'sent',
+        direction: 'sent',
+        provider: 'instantly',
+        providerOwner: 'martijn',
+        accountEmail: 'martijnven@websoftora.com',
+        date: '2026-07-28T06:28:27.000Z',
+        body: sentBody,
+      }],
+    },
+  });
+
+  assert.match(html, /Helaas met website is prima zo/);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website neelisstikwerken\.com tegen\./g) || []).length, 1);
+  assert.equal((html.match(/>Jouw bericht</g) || []).length, 1);
+  assert.doesNotMatch(html, /Op di 28 jul 2026 om 08:28 schreef Martijn/);
+  assert.doesNotMatch(html, /Welkom bij Neelis Stikwerken|Eerder ontvangen/);
+  assert.doesNotMatch(html, /detail-mail-section-history/);
+});
+
 test('mailbox toont een gestructureerd antwoord niet nogmaals na Outlook-headervelden', () => {
   const sentBody = [
     'Goedendag,',
@@ -2296,6 +2369,28 @@ test('geneste bewezen quote blijft fail-closed zonder unieke directe Message-ID-
   });
   assert.equal(proven.body, 'https://benbacacia.nl/ excuses!');
   assert.deepEqual(proven.matchedMessages.map((message) => message.id), ['sent:parent']);
+});
+
+test('emoji-normalisatie verwijdert nooit een quote bij twee inhoudelijk gelijke outbound-kandidaten', () => {
+  const baseBody = 'Dit is een voldoende lange campagneboodschap met dezelfde bewezen tekst voor één ontvanger, maar zonder unieke parentidentiteit.';
+  const incomingBody = [
+    'Dit is mijn menselijke antwoord.',
+    '',
+    'Op 28 juli 2026 schreef Martijn van de Ven:',
+    `${baseBody} 😁`,
+  ].join('\n');
+  const result = quotedThreadModule.stripProvenQuotedOutbound(incomingBody, [{
+    id: 'sent:emoji-a',
+    accountEmail: 'martijnven@websoftora.com',
+    body: `${baseBody} 🎨`,
+  }, {
+    id: 'sent:emoji-b',
+    accountEmail: 'martijnven@websoftora.com',
+    body: `${baseBody} 📍`,
+  }]);
+
+  assert.equal(result.body, incomingBody);
+  assert.deepEqual(result.removed, []);
 });
 
 test('mailbox bewaart Moniques handtekening na een bewezen Gmail-citaat', () => {
@@ -2821,8 +2916,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806d/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806e/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -5597,7 +5692,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v15:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v16:usr_serve:serve');
         return {
           ok: true,
           owner: 'serve',
