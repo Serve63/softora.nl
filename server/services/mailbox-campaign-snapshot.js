@@ -7,7 +7,7 @@ const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
-const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 12;
+const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 13;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
@@ -35,8 +35,12 @@ function selectSnapshotMessages(value) {
       50
     ).toLowerCase();
     if (['serve', 'martijn'].includes(explicitOwner)) return explicitOwner;
+    const copyContext = message && message.copyContext;
+    const provenSourceAccount = copyContext && copyContext.evidenceKnown === true
+      ? text(copyContext.sourceAccountEmail, 320).toLowerCase()
+      : '';
     const accountEmail = text(
-      message && (message.accountEmail || message.campaign && message.campaign.account),
+      provenSourceAccount || message && (message.accountEmail || message.campaign && message.campaign.account),
       320
     ).toLowerCase();
     return getOutboundSenderIdentity(accountEmail)?.profileKey || '';

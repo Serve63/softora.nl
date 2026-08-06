@@ -230,15 +230,15 @@ test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gesc
   try {
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('serve'),
-      'mailbox_campaign_replies_v14:user-1:serve'
+      'mailbox_campaign_replies_v15:user-1:serve'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('martijn'),
-      'mailbox_campaign_replies_v14:user-1:martijn'
+      'mailbox_campaign_replies_v15:user-1:martijn'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('both'),
-      'mailbox_campaign_replies_v14:user-1:both'
+      'mailbox_campaign_replies_v15:user-1:both'
     );
   } finally {
     global.SoftoraPageBootstrapSession = previousSession;
@@ -302,6 +302,13 @@ test('server response isoleert IMAP en Instantly records exact op geselecteerde 
   const baseReplies = [
     { id: 'imap-serve', accountEmail: 'serve@softora.nl', activityAt: '2026-07-27T10:00:00Z' },
     { id: 'imap-martijn', accountEmail: 'martijn@softora.nl', activityAt: '2026-07-27T11:00:00Z' },
+    {
+      id: 'martijn-bcc-copy-in-serve',
+      accountEmail: 'serve@softora.nl',
+      email: 'martijn@softora.nl',
+      activityAt: '2026-07-27T11:30:00Z',
+      copyContext: { evidenceKnown: true, sourceAccountEmail: 'martijn@softora.nl' },
+    },
   ];
   const providerReplies = {
     serve: [{ id: 'instantly-serve', provider: 'instantly', providerOwner: 'serve', activityAt: '2026-07-27T12:00:00Z' }],
@@ -329,9 +336,15 @@ test('server response isoleert IMAP en Instantly records exact op geselecteerde 
   assert.deepEqual(new Set(result.snapshotMessages.map((message) => message.id)), new Set([
     'imap-serve',
     'imap-martijn',
+    'martijn-bcc-copy-in-serve',
     'instantly-serve',
     'instantly-martijn',
   ]));
   assert.equal(getMailboxMessageOwner(baseReplies[0]), 'serve');
   assert.equal(getMailboxMessageOwner(baseReplies[1]), 'martijn');
+  assert.equal(getMailboxMessageOwner(baseReplies[2]), 'martijn');
+  assert.equal(getMailboxMessageOwner({
+    ...baseReplies[2],
+    copyContext: null,
+  }), '');
 });

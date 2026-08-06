@@ -570,7 +570,10 @@ function renderMailBody(value, images, options) {
     const copyMeta = [options && options.mail && options.mail.date, options && options.mail && options.mail.time, copyOwner]
       .filter(Boolean)
       .join(' · ');
-    renderedSections.push(`<section class="detail-mail-section detail-mail-section-sent"><div class="detail-mail-section-label">Eerdere mail</div>${copyMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(copyMeta)}</div>` : ''}`);
+    const copyLabel = window.SoftoraMailboxCampaignInbox?.getOwnerByAccount?.(copyContext.sourceAccountEmail)
+      ? 'Jouw bericht'
+      : 'Eerdere mail';
+    renderedSections.push(`<section class="detail-mail-section detail-mail-section-sent"><div class="detail-mail-section-label">${copyLabel}</div>${copyMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(copyMeta)}</div>` : ''}`);
   }
   let injectedImages = false;
   let injectedAttachments = false;
