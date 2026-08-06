@@ -28,6 +28,64 @@
     ));
   }
 
+  const HYDRATED_MESSAGE_FIELDS = [
+    'body', 'hasBody', 'bodyLoaded', 'bodyLoading', 'bodyLoadError', 'bodyTruncated',
+    'bodyImages', 'bodyImagesTruncated', 'bodyImageEvidenceKnown', 'embeddedImageCount',
+    'attachments', 'optOutUrl', 'originalCampaignOutbound', 'webdesignLinkEvidenceKnown',
+    'webdesignLinkHydrationAttempted', 'webdesignLinkUrl', 'recipientRoutingEvidenceKnown',
+    'recipientRoutingNeedsHydration', 'to', 'toDisplay', 'cc', 'bcc', 'deliveredTo',
+  ];
+
+  function getMessageKey(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    const direct = source.id || source.mailboxId || source.messageId;
+    if (direct != null && String(direct).trim()) return String(direct).trim();
+    const account = normalize(source.accountEmail || source.account);
+    const folder = normalize(source.storageFolder || source.folder);
+    const uid = String(source.uid == null ? '' : source.uid).trim();
+    return account && folder && uid ? `${account}|${folder}|${uid}` : '';
+  }
+
+  function getBodyCompleteness(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    const body = String(source.body || '').trim();
+    if (source.bodyLoaded === true && (body || source.hasBody === false)) return 4;
+    if (body && source.bodyTruncated !== true && source.bodyImagesTruncated !== true) return 3;
+    if (body) return 2;
+    return source.hasBody ? 1 : 0;
+  }
+
+  function reconcileMessage(current, incoming) {
+    if (!current || typeof current !== 'object') return incoming;
+    if (!incoming || typeof incoming !== 'object') return current;
+    const currentBody = Object.fromEntries(HYDRATED_MESSAGE_FIELDS.map((field) => [field, current[field]]));
+    const currentThread = Array.isArray(current.threadMessages) ? current.threadMessages : [];
+    const preserveHydration = current.bodyLoading === true ||
+      getBodyCompleteness(current) > getBodyCompleteness(incoming);
+    Object.assign(current, incoming);
+    if (preserveHydration) {
+      HYDRATED_MESSAGE_FIELDS.forEach((field) => { current[field] = currentBody[field]; });
+    }
+    if (Array.isArray(incoming.threadMessages)) {
+      current.threadMessages = reconcileMessages(currentThread, incoming.threadMessages);
+    }
+    return current;
+  }
+
+  function reconcileMessages(currentMessages, incomingMessages) {
+    const currentByKey = new Map(
+      (Array.isArray(currentMessages) ? currentMessages : [])
+        .map((message) => [getMessageKey(message), message])
+        .filter(([key]) => key)
+    );
+    return (Array.isArray(incomingMessages) ? incomingMessages : []).map((message) => {
+      const key = getMessageKey(message);
+      return key && currentByKey.has(key)
+        ? reconcileMessage(currentByKey.get(key), message)
+        : message;
+    });
+  }
+
   function create(options = {}) {
     const AbortControllerImpl = options.AbortController || global.AbortController;
     let generation = 0;
@@ -139,7 +197,9 @@
 
     async function load(loadOptions = {}) {
       const scope = getScope();
-      const candidate = session.begin(scope);
+      const candidate = loadOptions.reuseActiveToken === true && token && session.isCurrent(token, scope)
+        ? token
+        : session.begin(scope);
       token = candidate;
       const normalizeMessage = (message) => options.normalizeMessage?.(message, scope) || message;
       setBusy(true);
@@ -159,7 +219,10 @@
         if (campaignResult) {
           options.setSync?.(campaignResult.sync);
           const ownerMessages = options.campaignInbox.filterMessages(campaignResult.messages, scope.owner);
-          const messages = options.filterDeleted?.(ownerMessages) || [];
+          const messages = reconcileMessages(
+            options.getMessages?.() || [],
+            options.filterDeleted?.(ownerMessages) || []
+          );
           const activeId = options.getActiveMail?.();
           if (campaignResult.fromCache) releaseTransientLoadingState(messages);
           options.setMessages?.(messages);
@@ -174,6 +237,7 @@
               skipBackgroundSync: true,
               openLatest: false,
               preserveOnError: true,
+              reuseActiveToken: true,
             });
           }
           return campaignResult.fromCache !== true;
@@ -193,9 +257,12 @@
         }
         if (!isCurrent(candidate)) return false;
         const sync = data?.sync && typeof data.sync === 'object' ? data.sync : null;
-        const messages = options.filterDeleted?.(
-          Array.isArray(data.messages) ? data.messages.map(normalizeMessage) : []
-        ) || [];
+        const messages = reconcileMessages(
+          options.getMessages?.() || [],
+          options.filterDeleted?.(
+            Array.isArray(data.messages) ? data.messages.map(normalizeMessage) : []
+          ) || []
+        );
         options.setSync?.(sync);
         options.setMessages?.(messages);
         options.prewarm?.(messages);
@@ -267,7 +334,7 @@
     return { ensureToken, getToken: () => token, isCurrent, load, reset, switchOwner };
   }
 
-  const api = { create, createView, isAbortError, normalizeScope, sameScope };
+  const api = { create, createView, isAbortError, normalizeScope, reconcileMessages, sameScope };
   global.SoftoraMailboxOwnerSession = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -119,7 +119,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
-  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
 });
@@ -5051,6 +5051,125 @@ test('zichtbare bodyspinner houdt zijn viersecondenbudget tijdens bootstrap-toke
   assert.match(html, /data-mailbox-action="retry-mail-body"/);
   assert.equal(refreshedMail.bodyLoading, false);
   assert.equal(refreshedMail.bodyLoadError, 'Laden duurde te lang. Opnieuw proberen.');
+});
+
+test('bootstrapachtergrondrefresh annuleert een direct gestarte bodyhydratie niet', async () => {
+  let messages = [];
+  let campaignLoadCalls = 0;
+  let resolveFreshLoad;
+  let resolveBodyAttempt;
+  let bodyTokenWasCurrent = null;
+  const freshLoad = new Promise((resolve) => { resolveFreshLoad = resolve; });
+  const bodyAttempted = new Promise((resolve) => { resolveBodyAttempt = resolve; });
+  const bootstrapMail = {
+    id: 'serve@softora.nl|inbox:bootstrap-body',
+    body: '',
+    hasBody: true,
+    bodyLoaded: false,
+  };
+  let ownerView;
+  const openMail = () => {
+    const bodyToken = ownerView.getToken();
+    queueMicrotask(() => {
+      bodyTokenWasCurrent = ownerView.isCurrent(bodyToken);
+      resolveBodyAttempt();
+    });
+  };
+  ownerView = ownerSessionModule.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() {
+        campaignLoadCalls += 1;
+        if (campaignLoadCalls === 1) {
+          return { fromBootstrap: true, messages: [bootstrapMail], sync: {} };
+        }
+        return freshLoad;
+      },
+      filterMessages(value) { return value; },
+    },
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => bootstrapMail.id,
+    setActiveMail() {},
+    renderList({ openLatest }) {
+      if (openLatest && messages[0]) openMail(messages[0].id);
+    },
+    openMail,
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  await ownerView.load();
+  await bodyAttempted;
+
+  assert.equal(campaignLoadCalls, 2);
+  assert.equal(bodyTokenWasCurrent, true);
+  resolveFreshLoad({ fromBootstrap: false, messages: [bootstrapMail], sync: {} });
+});
+
+test('verse mailboxlijst behoudt de reeds gehydrateerde actieve body en objectreferentie', async () => {
+  let messages = [];
+  let campaignLoadCalls = 0;
+  let setMessagesCalls = 0;
+  let resolveFreshLoad;
+  let resolveFreshCommit;
+  const freshLoad = new Promise((resolve) => { resolveFreshLoad = resolve; });
+  const freshCommitted = new Promise((resolve) => { resolveFreshCommit = resolve; });
+  const bootstrapMail = {
+    id: 'serve@softora.nl|inbox:stable-body',
+    body: '',
+    hasBody: true,
+    bodyLoaded: false,
+    threadMessages: [],
+  };
+  const ownerView = ownerSessionModule.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() {
+        campaignLoadCalls += 1;
+        if (campaignLoadCalls === 1) {
+          return { fromBootstrap: true, messages: [bootstrapMail], sync: {} };
+        }
+        return freshLoad;
+      },
+      filterMessages(value) { return value; },
+    },
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages(value) {
+      messages = value;
+      setMessagesCalls += 1;
+      if (setMessagesCalls === 2) resolveFreshCommit();
+    },
+    getActiveMail: () => bootstrapMail.id,
+    setActiveMail() {},
+    renderList() {},
+    openMail() {},
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  await ownerView.load();
+  bootstrapMail.body = 'Exact geladen bericht.';
+  bootstrapMail.bodyLoaded = true;
+  bootstrapMail.bodyLoading = false;
+  resolveFreshLoad({
+    fromBootstrap: false,
+    messages: [{
+      id: bootstrapMail.id,
+      body: '',
+      hasBody: true,
+      bodyLoaded: false,
+      threadMessages: [],
+    }],
+    sync: {},
+  });
+  await freshCommitted;
+
+  assert.strictEqual(messages[0], bootstrapMail);
+  assert.equal(messages[0].body, 'Exact geladen bericht.');
+  assert.equal(messages[0].bodyLoaded, true);
 });
 
 test('threadbody-spinner eindigt eveneens binnen het gedeelde laadbudget', async () => {
