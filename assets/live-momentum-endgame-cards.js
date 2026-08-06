@@ -27,7 +27,7 @@
     { id: 'rubens-trading-system', title: 'Ruben’s Trading System' },
     { id: 'gewenst-lang-kapsel', title: 'Gewenst lang kapsel' },
     { id: 'gewenste-kledingkast', title: 'Gewenste kledingkast' },
-    { id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' },
+    { id: 'droomfysiek-2028', title: 'Lean fundering gelegd | Forever LeanBulk', timeframe: 2028, imageId: 'bodyfat-onder-13' },
     { id: 'droomkapsel-2028', title: 'Droomkapsel', timeframe: 2028, imageId: 'gewenst-lang-kapsel' },
     { id: 'eigen-parfum-2028', title: 'Eigen parfum', timeframe: 2028, imageId: 'eigen-parfum' },
     { id: 'kledingstijl-upgraden-2028', title: 'Kledingstijl upgraden', timeframe: 2028, imageId: 'gewenste-kledingkast' },
