@@ -331,6 +331,10 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /if \(!cell \|\| !grid\.contains\(cell\) \|\| getDay\(cell\) > TODAY\) \{\s*return;\s*\}[\s\S]*toggleCell\(cell\);\s*if \(event\.detail > 0\) \{\s*cell\.blur\(\);/);
   assert.match(js, /if \(!cell \|\| !grid\.contains\(cell\) \|\| getDay\(cell\) > TODAY \|\| !\[' ', 'Enter'\]\.includes\(event\.key\)\) \{/);
   assert.match(js, /emptyDays:\s*cells\.filter\(isEmpty\)\.map\(getDay\)/);
+  assert.match(js, /touchedDays:\s*cells\.filter\(\(cell\) => isEmpty\(cell\) \|\| isTracked\(cell\)\)\.map\(getDay\)/);
+  assert.match(js, /const hasExplicitTouchedDays = Array\.isArray\(goal\?\.touchedDays\)/);
+  assert.match(js, /trackedDays\.filter\(\(day\) => day < TODAY\)/);
+  assert.match(js, /touchedDays:\s*\[\]/);
   assert.match(js, /emptyDays:\s*goal\.emptyDays/);
   assert.match(js, /function updateChart\(\)/);
   assert.match(js, /function getDayScore\(day\)/);
@@ -500,7 +504,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(js, /markStateChanged\(\);[\s\S]*closeIconPicker\(\);/);
   assert.doesNotMatch(js, /habit-add-cell|habit-add/);
   assert.match(js, /is-untracked/);
-  assert.match(js, /day >= TODAY/);
+  assert.match(js, /day < TODAY/);
   assert.match(js, /is-missed/);
   assert.match(js, /is-warning/);
   assert.match(js, /is-danger/);
