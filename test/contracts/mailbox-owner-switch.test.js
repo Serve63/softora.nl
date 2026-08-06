@@ -84,6 +84,74 @@ test('bootstrapverversing hervat exact het actieve gesprek en ruimt een verdwene
   assert.deepEqual(removed, { activeMail: null, calls: 2, opened: 0, reset: 1 });
 });
 
+test('tijdelijke indexfout bewaart de huidige mailbox en hervat afgebroken detailhydratie', async () => {
+  const messages = [{
+    id: 'actieve-reactie',
+    bodyLoading: true,
+    threadBodiesLoading: true,
+    threadMessages: [{ id: 'sent-1', bodyLoading: true, imageLoading: true }],
+  }];
+  let activeMail = 'actieve-reactie';
+  const opened = [];
+  const rendered = [];
+  const toasts = [];
+  const listElement = { innerHTML: 'bestaande lijst', setAttribute() {} };
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() { throw new Error('Mailbox-index tijdelijk niet leesbaar'); },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages() { throw new Error('bestaande berichten mogen niet worden vervangen'); },
+    getActiveMail: () => activeMail,
+    setActiveMail: (value) => { activeMail = value; },
+    getListElement: () => listElement,
+    renderList: (options) => rendered.push(options),
+    openMail: (id, options) => opened.push({ id, options }),
+    setSync() {},
+    setStatus() {},
+    toast: (message) => toasts.push(message),
+  });
+
+  assert.equal(await view.load({ preserveOnError: true, openLatest: false }), false);
+  assert.equal(listElement.innerHTML, 'bestaande lijst');
+  assert.equal(messages[0].bodyLoading, false);
+  assert.equal(messages[0].threadBodiesLoading, false);
+  assert.equal(messages[0].threadMessages[0].bodyLoading, false);
+  assert.equal(messages[0].threadMessages[0].imageLoading, false);
+  assert.deepEqual(rendered, [{ openLatest: false }]);
+  assert.deepEqual(opened, [{ id: 'actieve-reactie', options: { skipReadPersist: true } }]);
+  assert.deepEqual(toasts, []);
+});
+
+test('eerste tijdelijke indexfout toont nooit een technische foutmelding', async () => {
+  let messages = [];
+  const statuses = [];
+  const toasts = [];
+  const listElement = { innerHTML: '', setAttribute() {} };
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() { throw new Error('Mailbox-index voor campagnereacties kon niet worden gelezen.'); },
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getListElement: () => listElement,
+    setSync() {},
+    setStatus: (status) => statuses.push(status),
+    syncInboxBadge() {},
+    toast: (message) => toasts.push(message),
+  });
+
+  assert.equal(await view.load(), false);
+  assert.match(listElement.innerHTML, /Mailbox wordt opnieuw verbonden…/);
+  assert.doesNotMatch(listElement.innerHTML, /Mailbox-index|mislukt|fout/i);
+  assert.equal(statuses.at(-1), 'Opnieuw verbinden…');
+  assert.deepEqual(toasts, []);
+});
+
 test('eigenaarwissel leegt de oude view direct en een late response kan nooit terugschrijven', async () => {
   let owner = 'serve';
   let messages = [{ id: 'oude-serve-mail' }];

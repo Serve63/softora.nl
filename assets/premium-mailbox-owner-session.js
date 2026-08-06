@@ -96,6 +96,19 @@
     const isCurrent = (candidate = token) => session.isCurrent(candidate, getScope());
     const setBusy = (busy) => options.getListElement?.()?.setAttribute?.('aria-busy', String(Boolean(busy)));
 
+    function releaseTransientLoadingState(messages) {
+      (Array.isArray(messages) ? messages : []).forEach((message) => {
+        if (!message || typeof message !== 'object') return;
+        message.bodyLoading = false;
+        message.threadBodiesLoading = false;
+        (Array.isArray(message.threadMessages) ? message.threadMessages : []).forEach((threadMessage) => {
+          if (!threadMessage || typeof threadMessage !== 'object') return;
+          threadMessage.bodyLoading = false;
+          threadMessage.imageLoading = false;
+        });
+      });
+    }
+
     function keepConversationOpen(messages, previousActiveId, loadOptions = {}) {
       if (loadOptions.openLatest !== false) return;
       const activeMessage = (Array.isArray(messages) ? messages : []).find(
@@ -148,6 +161,7 @@
           const ownerMessages = options.campaignInbox.filterMessages(campaignResult.messages, scope.owner);
           const messages = options.filterDeleted?.(ownerMessages) || [];
           const activeId = options.getActiveMail?.();
+          if (campaignResult.fromCache) releaseTransientLoadingState(messages);
           options.setMessages?.(messages);
           options.prewarm?.(messages);
           options.renderList?.({ openLatest: loadOptions.openLatest !== false });
@@ -162,7 +176,7 @@
               preserveOnError: true,
             });
           }
-          return true;
+          return campaignResult.fromCache !== true;
         }
         const response = await options.fetch(
           `/api/mailbox/messages?account=${encodeURIComponent(scope.account)}&folder=${encodeURIComponent(scope.folder)}&limit=50`,
@@ -196,21 +210,29 @@
         return true;
       } catch (error) {
         if (!isCurrent(candidate) || isAbortError(error)) return false;
-        if (loadOptions.preserveOnError && (options.getMessages?.() || []).length) {
+        const currentMessages = options.getMessages?.() || [];
+        if (loadOptions.preserveOnError && currentMessages.length) {
+          const activeId = options.getActiveMail?.();
+          releaseTransientLoadingState(currentMessages);
+          options.renderList?.({ openLatest: false });
+          const activeMessage = currentMessages.find(
+            (message) => String(message && message.id) === String(activeId || '')
+          );
+          if (activeMessage) options.openMail?.(activeMessage.id, { skipReadPersist: true });
+          else keepConversationOpen(currentMessages, activeId, { openLatest: false });
           options.setStatus?.('');
           setBusy(false);
           return false;
         }
         options.setSync?.(null);
         options.setMessages?.([]);
-        options.setStatus?.('');
+        options.setStatus?.('Opnieuw verbinden…');
         options.syncInboxBadge?.();
         const list = options.getListElement?.();
         if (list) {
           list.setAttribute('aria-busy', 'false');
-          list.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">${options.escapeHtml?.(error?.message || error || 'Mailbox laden mislukt')}</div>`;
+          list.innerHTML = '<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Mailbox wordt opnieuw verbonden…</div>';
         }
-        options.toast?.(String(error?.message || error || 'Mailbox laden mislukt'));
         return false;
       }
     }

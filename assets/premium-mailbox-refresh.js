@@ -7,6 +7,7 @@
   const REFRESH_REQUEST_TIMEOUT_MS = 25 * 1000;
   const REFRESH_MAX_ATTEMPTS = 2;
   const REFRESH_RETRY_BASE_DELAY_MS = 500;
+  const RECOVERY_REFRESH_INTERVAL_MS = 15 * 1000;
 
   function formatRefreshAge(lastRefreshAt, currentTime = Date.now()) {
     if (!Number.isFinite(Number(lastRefreshAt)) || Number(lastRefreshAt) <= 0) return '';
@@ -100,8 +101,8 @@
         ageLabel.textContent = 'Controleren…';
       } else if (state.status === 'partial') {
         ageLabel.textContent = 'Deels bijgewerkt';
-      } else if (state.status === 'error') {
-        ageLabel.textContent = 'Bijwerken mislukt';
+      } else if (state.status === 'recovering') {
+        ageLabel.textContent = age ? `${age} gecontroleerd` : 'Opnieuw verbinden…';
       } else {
         ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
       }
@@ -113,8 +114,8 @@
         ? `Mailboxproviders worden gecontroleerd${ownerText}.`
         : state.status === 'partial'
           ? `Niet alle mailboxproviders konden worden bijgewerkt${ownerText}.`
-          : state.status === 'error'
-            ? `Mailboxcontrole mislukt${ownerText}.`
+          : state.status === 'recovering'
+            ? `Tijdelijke verbindingsstoring${ownerText}; de huidige mailbox blijft zichtbaar en wordt automatisch opnieuw gecontroleerd.`
             : `Laatste volledige providercontrole${ownerText}: ${checkedText}`;
       ageLabel.setAttribute('title', statusText);
       ageLabel.setAttribute('aria-label', statusText);
@@ -137,7 +138,8 @@
       const hidden = documentRef?.visibilityState === 'hidden';
       const baseDelay = hidden ? HIDDEN_REFRESH_INTERVAL_MS : VISIBLE_REFRESH_INTERVAL_MS;
       if (!failureCount) return baseDelay;
-      return Math.min(HIDDEN_REFRESH_INTERVAL_MS, baseDelay * Math.pow(2, Math.min(2, failureCount)));
+      const recoveryBaseDelay = hidden ? VISIBLE_REFRESH_INTERVAL_MS : RECOVERY_REFRESH_INTERVAL_MS;
+      return Math.min(baseDelay, recoveryBaseDelay * Math.pow(2, Math.min(2, failureCount - 1)));
     }
 
     function scheduleNext(delayMs = getNextDelay()) {
@@ -254,6 +256,7 @@
           skipProviderRefresh: true,
           skipPageBootstrap: true,
           openLatest: false,
+          preserveOnError: true,
         });
         if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
         if (listUpdated === false) throw new Error('Mailboxlijst kon niet worden bijgewerkt.');
@@ -273,11 +276,11 @@
         return complete;
       } catch (error) {
         if (signal?.aborted || scopeKey !== getScopeKey(getScope())) return false;
-        state.status = 'error';
+        state.status = 'recovering';
         state.lastErrorAt = getNow();
         failureCount += 1;
         updateRefreshAge();
-        if (manual) showToast(String(error?.message || error || 'Mailbox vernieuwen mislukt'));
+        if (manual) showToast('Tijdelijke verbindingsstoring; je huidige mailbox blijft zichtbaar.');
         return false;
       } finally {
         if (scopeKey === getScopeKey(getScope())) setRefreshing(false);
@@ -361,6 +364,7 @@
     REFRESH_AGE_UPDATE_INTERVAL_MS,
     REFRESH_MAX_ATTEMPTS,
     REFRESH_REQUEST_TIMEOUT_MS,
+    RECOVERY_REFRESH_INTERVAL_MS,
     VISIBLE_REFRESH_INTERVAL_MS,
     create,
     formatRefreshAge,
