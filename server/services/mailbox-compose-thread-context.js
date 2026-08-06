@@ -32,7 +32,9 @@ function createMailboxComposeThreadContext(deps = {}) {
   function resolveOwner(accountEmail, requestedOwner) {
     const identity = getOwnerIdentity(accountEmail);
     const owner = normalizeText(identity && identity.profileKey).toLowerCase();
-    if (!owner || (normalizeText(requestedOwner) && normalizeText(requestedOwner).toLowerCase() !== owner)) {
+    const requested = normalizeText(requestedOwner).toLowerCase();
+    const aggregateSelection = requested === 'both' || requested === 'all';
+    if (!owner || (requested && !aggregateSelection && requested !== owner)) {
       throw inputError('Het gekozen afzenderaccount hoort niet bij de geselecteerde mailbox.', 'MAILBOX_SEND_OWNER_MISMATCH', 403);
     }
     return { owner, senderName: normalizeText(identity && identity.name) || normalizeEmail(accountEmail) };

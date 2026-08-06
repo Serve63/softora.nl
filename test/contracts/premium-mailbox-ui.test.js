@@ -117,15 +117,27 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806d/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806f/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806d/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
+  assert.match(readPage(), /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
   assert.match(readPage(), /\.topbar-mailbox-switcher-label\s*\{[^}]*color:\s*var\(--text-dark\)/s);
+});
+
+test('mailbox initialiseert met de opgeslagen eigenaar en toont geen verkeerde scope tijdens boot', () => {
+  const pageSource = readPage();
+  const scriptSource = readScript();
+  const campaignSource = readCampaignInboxScript();
+  assert.match(campaignSource, /SoftoraMailboxOwnerPreference/);
+  assert.match(pageSource, /assets\/premium-mailbox-owner-preference\.js\?v=20260806a/);
+  assert.match(scriptSource, /SoftoraMailboxBoot\?\.markReady\?\.\(\);/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-boot.js'), 'utf8'), /if \(!ready\) return;/);
+  assert.match(pageSource, /main\.is-premium-boot-host > \.premium-boot-shell\.is-booting \{ visibility: hidden; \}/);
 });
 
 function loadMailboxHelpersForTest(options = {}) {
@@ -2915,9 +2927,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806d/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806f/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806h/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2998,6 +3010,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   const deleteSource = readDeleteScript();
   const composeControllerSource = readComposeControllerScript();
   const ownerSessionSource = readOwnerSessionScript();
+  const ownerPreferenceSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-owner-preference.js'), 'utf8');
 
   assert.doesNotMatch(pageSource, /<div class="topbar-title">Mailbox<\/div>/);
   assert.doesNotMatch(pageSource, /<span class="topbar-mailbox-account" id="topbar-mailbox-account"><\/span>/);
@@ -3010,7 +3023,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806d/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806f/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3051,7 +3064,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(composeControllerSource, /async function send\(\)/);
   assert.match(scriptSource, /const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';/);
   assert.match(scriptSource, /const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';/);
-  assert.match(campaignInboxSource, /const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';/);
+  assert.match(ownerPreferenceSource, /const PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';/);
   assert.match(scriptSource, /window\.SoftoraUiStateClient/);
   assert.match(scriptSource, /async function initializeMailboxAccountPreference\(\)/);
   assert.match(scriptSource, /SoftoraMailboxCampaignInbox\.initializeOwnerPreference\(session, window\.SoftoraUiStateClient, mailboxAccountPreferenceIdentity\)/);
@@ -3062,7 +3075,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /ownerButton\.dataset\.mailboxOwner/);
   assert.match(campaignInboxSource, /data-mailbox-pin-owner/);
   assert.match(campaignInboxSource, /async function pinOwner\(value, uiStateClient\)/);
-  assert.match(campaignInboxSource, /patch: \{ \[getOwnerPinKeyForIdentity\(preferenceIdentity\)\]: pinnedOwner \}/);
+  assert.match(ownerPreferenceSource, /patch: \{ \[getPinKey\(identity\)\]: owner \}/);
   assert.match(scriptSource, /function renderMailboxAccountMenu\(\) \{[\s\S]*data-mailbox-email="\$\{escapeHtml\(email\)\}"/);
   assert.match(scriptSource, /data-mailbox-pin-email="\$\{escapeHtml\(email\)\}"/);
   assert.match(scriptSource, /async function pinMailboxAccount\(email\)/);
@@ -3584,8 +3597,9 @@ test('coldmail eigenaarpin leest en schrijft alleen de voorkeur van de actieve g
   });
   const result = await campaignInboxModule.pinOwner('serve', client);
   assert.equal(result.saved, true);
-  assert.equal(writes.length, 1);
-  assert.deepEqual(writes[0], {
+  const pinWrite = writes.find((entry) => entry.body?.patch?.softora_mailbox_pinned_owner_v1_usr_serve === 'serve');
+  assert.ok(pinWrite);
+  assert.deepEqual(pinWrite, {
     scope: 'premium_mailbox_preferences',
     body: {
       patch: { softora_mailbox_pinned_owner_v1_usr_serve: 'serve' },
@@ -4113,6 +4127,74 @@ test('geaccepteerde reply verschijnt direct roze en dedupliceert met vertraagde 
   };
   controller.reconcile(otherOwner);
   assert.equal(otherOwner.threadMessages.length, 0);
+});
+
+test('gecombineerde mailbox verstuurt via het concrete account en niet met owner both', async () => {
+  const elements = new Map();
+  function element(id, value = '') {
+    const node = {
+      id,
+      value,
+      textContent: id === 'send-button' ? 'Versturen' : '',
+      disabled: false,
+      attributes: {},
+      classList: { add() {}, remove() {} },
+      setAttribute(name, next) { this.attributes[name] = next; },
+      removeAttribute(name) { delete this.attributes[name]; },
+    };
+    elements.set(id, node);
+    return node;
+  }
+  element('c-to', 'lead@example.nl');
+  element('c-subject', 'Re: Vraag');
+  element('c-body', 'Antwoord');
+  element('c-cc', '');
+  element('c-bcc', '');
+  element('compose-overlay');
+  const sendButton = element('send-button');
+  const requests = [];
+  const mail = {
+    id: 'serve@softora.nl|inbox:owner-canonical',
+    accountEmail: 'serve@softora.nl',
+    email: 'lead@example.nl',
+    subject: 'Vraag',
+    threadMessages: [],
+  };
+  const controller = composeControllerModule.create({
+    document: {
+      getElementById: (id) => elements.get(id) || null,
+      querySelector: (selector) => selector === '.btn-send' ? sendButton : null,
+    },
+    fetch: async (_url, options) => {
+      requests.push(JSON.parse(options.body));
+      return { ok: true, json: async () => ({ ok: true, result: { messageId: '<owner-canonical@softora.nl>' } }) };
+    },
+    compose: {
+      buildReplyContext: (value) => ({ id: value.id, accountEmail: value.accountEmail, mode: 'reply' }),
+      resetOptionalFields() {}, reset() {}, getAttachments: () => [], isUsed: () => false,
+    },
+    campaignInbox: {
+      getAccount: (value) => value.accountEmail,
+      getOwnerByAccount: (value) => value === 'serve@softora.nl' ? 'serve' : '',
+      getMessageOwner: () => '',
+      getOwnerLabel: () => 'Servé Creusen',
+      isPersonalOwner: (value) => value === 'serve' || value === 'martijn',
+    },
+    display: { getReplyToAddress: () => mail.email, formatDetailSubject: (value) => value },
+    getActiveFolder: () => 'outreach',
+    getAccount: () => 'serve@softora.nl',
+    getOwner: () => 'both',
+    findMail: () => mail,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    composeWindow: { reset() {} },
+    toast() {},
+  });
+
+  controller.reply(mail);
+  await controller.send();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].owner, 'serve');
+  assert.equal(requests[0].account, 'serve@softora.nl');
 });
 
 test('mislukte reply voegt geen roze bericht toe en herstelt de composer exact', async () => {

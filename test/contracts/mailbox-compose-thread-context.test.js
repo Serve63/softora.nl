@@ -93,6 +93,23 @@ test('new message remains deliberately unthreaded', async () => {
   assert.equal(result.references, '');
 });
 
+test('aggregate mailbox selection is canonicalized to the exact sender account owner', async () => {
+  const resolver = createResolver(null);
+  const result = await resolver.resolve({
+    accountEmail: 'serve@softora.nl',
+    recipientEmail: 'lead@example.nl',
+    body: {
+      owner: 'both',
+      mode: 'new-message',
+      idempotencyKey: 'aggregate-owner-1',
+      context: {},
+    },
+  });
+
+  assert.equal(result.owner, 'serve');
+  assert.equal(result.senderName, 'Servé Creusen');
+});
+
 test('Instantly reply requires the exact provider thread and new message does not become a reply', async () => {
   const resolver = createResolver(null);
   const reply = await resolver.resolve({

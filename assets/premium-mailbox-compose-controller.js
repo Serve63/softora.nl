@@ -9,6 +9,11 @@
       return String(value || '').trim().toLowerCase();
     }
 
+    function isPersonalOwner(value) {
+      const owner = normalize(value);
+      return owner === 'serve' || owner === 'martijn';
+    }
+
     function normalizeMessageId(value) {
       return normalize(value).replace(/^<+|>+$/g, '');
     }
@@ -38,6 +43,23 @@
       const keys = getConversationKeys(mail);
       return (Array.isArray(record.conversationKeys) ? record.conversationKeys : [])
         .some((key) => keys.has(String(key || '').trim()));
+    }
+
+    function getMailAccount(mail) {
+      if (!mail) return '';
+      const account = typeof options.campaignInbox?.getAccount === 'function'
+        ? options.campaignInbox.getAccount(mail, options.getAccount?.())
+        : mail.accountEmail || mail.campaign?.account || options.getAccount?.();
+      return options.normalizeEmail(account || '');
+    }
+
+    function resolveOwnerForMail(mail) {
+      const accountOwner = typeof options.campaignInbox?.getOwnerByAccount === 'function'
+        ? normalize(options.campaignInbox.getOwnerByAccount(getMailAccount(mail)))
+        : '';
+      if (isPersonalOwner(accountOwner)) return accountOwner;
+      const provenOwner = normalize(options.campaignInbox?.getMessageOwner?.(mail));
+      return isPersonalOwner(provenOwner) ? provenOwner : '';
     }
 
     function reconcile(mail) {
@@ -86,16 +108,21 @@
             getAccount: options.campaignInbox.getAccount,
           })
         : null;
-      replyOwner = mail
-        ? String(options.campaignInbox?.getMessageOwner?.(mail) || options.getOwner?.() || '').trim().toLowerCase()
-        : '';
+      replyOwner = mail ? resolveOwnerForMail(mail) : '';
     }
 
-    function assertReplyOwner() {
+    function assertReplyOwner(accountEmail = '') {
       const selectedOwner = String(options.getOwner?.() || '').trim().toLowerCase();
+      const accountOwner = normalize(
+        options.campaignInbox?.getOwnerByAccount?.(accountEmail)
+      );
+      if (isPersonalOwner(accountOwner)) replyOwner = accountOwner;
       if (selectedOwner === 'both') {
-        if (replyOwner && options.campaignInbox?.isPersonalOwner?.(replyOwner)) return;
+        if (isPersonalOwner(replyOwner)) return;
         throw new Error('De echte afzender van dit bericht kon niet veilig worden vastgesteld.');
+      }
+      if (selectedOwner && !isPersonalOwner(replyOwner)) {
+        throw new Error('Deze composer hoort bij een andere mailbox. Open het bericht opnieuw.');
       }
       if (replyOwner && selectedOwner && replyOwner !== selectedOwner) {
         throw new Error('Deze composer hoort bij een andere mailbox. Open het bericht opnieuw.');
@@ -165,10 +192,15 @@
         fallbackAccount: options.getAccount(),
       });
       replyOwner = String(
-        options.campaignInbox?.getMessageOwner?.(mail) || options.getOwner?.() || ''
+        resolveOwnerForMail(mail)
       ).trim().toLowerCase();
       if (!replyContext) {
         options.toast('Ontvanger of afzender ontbreekt');
+        return;
+      }
+      if (!replyOwner) {
+        replyContext = null;
+        options.toast('Deze conversatie heeft geen veilige verzendmailbox; open het bericht opnieuw vanuit een persoonlijke mailbox.');
         return;
       }
       const toField = documentRef?.getElementById('c-to');
@@ -196,8 +228,8 @@
       }
       if (sendBtn) sendBtn.disabled = true;
       try {
-        assertReplyOwner();
         const replyAccount = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
+        assertReplyOwner(replyAccount);
         const senderProfile = await options.loadSenderProfile(replyAccount);
         const response = await options.fetch('/api/mailbox/rewrite', {
           method: 'POST',
@@ -249,8 +281,10 @@
         sendBtn.textContent = 'Versturen…';
       }
       try {
-        assertReplyOwner();
         const contextAtSend = replyContext ? { ...replyContext } : null;
+        const account = options.normalizeEmail(contextAtSend && contextAtSend.accountEmail) || options.getAccount();
+        assertReplyOwner(account);
+        const sendOwner = replyOwner;
         const sendMode = contextAtSend?.mode === 'reply' ? 'reply' : 'new-message';
         const idempotencyKey = String(contextAtSend?.sendIdempotencyKey || '').trim() || global.crypto?.randomUUID?.() || [
           'mailbox-send',
@@ -270,7 +304,7 @@
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
             account,
-            owner: replyOwner,
+            owner: sendOwner,
             mode: sendMode,
             idempotencyKey,
             context: {
@@ -318,7 +352,7 @@
           direction: 'sent',
           accountEmail: account,
           provider,
-          providerOwner: replyOwner,
+          providerOwner: sendOwner,
           providerMessageId,
           providerThreadId: String(result.providerThreadId || contextAtSend?.providerThreadId || '').trim(),
           messageId: String(result.sentMessage?.messageId || messageId).trim(),
@@ -346,8 +380,8 @@
         };
         const identity = getMessageIdentity(sentMessage);
         rememberAcceptedSend({
-          key: `${normalize(replyOwner)}|${normalize(account)}|${identity}`,
-          owner: normalize(replyOwner),
+          key: `${normalize(sendOwner)}|${normalize(account)}|${identity}`,
+          owner: normalize(sendOwner),
           accountEmail: normalize(account),
           acceptedAt,
           conversationKeys: Array.from(new Set(conversationKeys.filter(Boolean))),
