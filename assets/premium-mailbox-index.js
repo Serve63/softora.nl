@@ -8,6 +8,7 @@ const MAX_THREAD_HYDRATION_TARGETS = 40;
 const MAILBOX_BODY_FETCH_ATTEMPTS = 3;
 const MAILBOX_BODY_FETCH_TIMEOUT_MS = 6000;
 const MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS = 3800;
+const visibleBodyLoadingDeadlines = new Map();
 const LEGACY_MAILBOX_MEDIA_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -53,6 +54,82 @@ function createBodyLoadDeadline(parentSignal, requestedDeadlineMs) {
       parentSignal?.removeEventListener?.('abort', abortFromParent);
     },
   };
+}
+
+function clearVisibleBodyLoadingDeadline(id) {
+  const key = String(id || '');
+  const entry = visibleBodyLoadingDeadlines.get(key);
+  if (!entry) return;
+  clearTimeout(entry.timer);
+  visibleBodyLoadingDeadlines.delete(key);
+}
+
+function isRootBodyVisiblyPending(mail) {
+  const source = mail && typeof mail === 'object' ? mail : {};
+  if (normalizeText(source.bodyLoadError)) return false;
+  const body = normalizeText(source.body);
+  const hasBody = Boolean(source.hasBody || body);
+  return Boolean(
+    source.bodyLoading === true ||
+    (
+      hasBody &&
+      (
+        source.bodyLoaded === false ||
+        !body ||
+        source.bodyTruncated === true
+      )
+    )
+  );
+}
+
+function isThreadBodyVisiblyPending(message) {
+  if (!message || normalizeText(message.bodyLoadError)) return false;
+  return message.bodyLoading === true || needsThreadBodyHydration(message);
+}
+
+function guardVisibleBodyLoading({ id, getMail, getActiveMail, getDetailElement, openMail }) {
+  const key = String(id || '');
+  if (!key || typeof getMail !== 'function' || typeof getActiveMail !== 'function') return false;
+  for (const candidateId of Array.from(visibleBodyLoadingDeadlines.keys())) {
+    if (candidateId !== key) clearVisibleBodyLoadingDeadline(candidateId);
+  }
+  const detail = typeof getDetailElement === 'function' ? getDetailElement() : null;
+  const loadingIsVisible = Boolean(detail && String(detail.innerHTML || '').includes('Volledig bericht laden…'));
+  if (String(getActiveMail() || '') !== key || !loadingIsVisible) {
+    clearVisibleBodyLoadingDeadline(key);
+    return false;
+  }
+  if (visibleBodyLoadingDeadlines.has(key)) return true;
+  const timer = setTimeout(() => {
+    const entry = visibleBodyLoadingDeadlines.get(key);
+    if (!entry || entry.timer !== timer) return;
+    visibleBodyLoadingDeadlines.delete(key);
+    if (String(getActiveMail() || '') !== key) return;
+    const currentDetail = typeof getDetailElement === 'function' ? getDetailElement() : null;
+    if (!currentDetail || !String(currentDetail.innerHTML || '').includes('Volledig bericht laden…')) return;
+    const mail = getMail(key);
+    if (!mail) return;
+    if (isRootBodyVisiblyPending(mail)) {
+      mail.bodyLoading = false;
+      mail.bodyLoaded = false;
+      mail.bodyLoadError = createBodyDeadlineError().message;
+    }
+    let threadExpired = false;
+    (Array.isArray(mail.threadMessages) ? mail.threadMessages : []).forEach((message) => {
+      if (!isThreadBodyVisiblyPending(message)) return;
+      message.bodyLoading = false;
+      message.bodyLoadError = createBodyDeadlineError().message;
+      threadExpired = true;
+    });
+    if (threadExpired) mail.threadBodiesLoading = false;
+    openMail?.(key, {
+      skipBodyFetch: true,
+      skipThreadBodyFetch: true,
+      skipReadPersist: true,
+    });
+  }, MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS);
+  visibleBodyLoadingDeadlines.set(key, { timer });
+  return true;
 }
 
 function isRetryableBodyStatus(status) {
@@ -691,6 +768,7 @@ function bindImageRecovery({ getActiveMail, getMail, loadMessageBody, openMail }
 window.SoftoraMailboxIndex = {
   bindImageRecovery,
   decorateMessage,
+  guardVisibleBodyLoading,
   hydrateOutreachContexts,
   isSyncInFlight: () => syncInFlight,
   loadBody,

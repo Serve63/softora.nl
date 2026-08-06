@@ -992,7 +992,7 @@ function openMail(id, options = {}) {
         <div class="detail-divider" aria-hidden="true"></div>
         <div class="detail-body-text">${window.SoftoraMailboxDisplay.renderDetailBody(m, renderMailBody(detailBody, detailBodyImages, { optOutUrl: m.optOutUrl, mail: m, replyMailId: m.id, rootIncomingMeta, threadImagesReady: !imagesPending }))}</div>
       </article>
-    </div>`;
+    </div>`; window.SoftoraMailboxIndex?.guardVisibleBodyLoading?.({ id: m.id, getMail: findMailById, getActiveMail: () => activeMail, getDetailElement: () => document.getElementById('mail-detail'), openMail });
 }
 async function deleteMail(id) {
   const m = findMailById(id);
