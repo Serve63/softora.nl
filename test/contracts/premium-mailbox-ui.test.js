@@ -121,7 +121,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806b/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -2918,7 +2918,7 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -4968,6 +4968,7 @@ test('top-level bodyloader eindigt begrensd met retry in plaats van oneindig lad
     },
   });
   const mail = { id: 'serve@softora.nl|inbox:bogaers', body: '', hasBody: true, bodyLoaded: false };
+  const startedAt = Date.now();
   await mailbox.index.loadBody({
     id: mail.id,
     requestId: 'inbox:bogaers',
@@ -4978,14 +4979,73 @@ test('top-level bodyloader eindigt begrensd met retry in plaats van oneindig lad
     normalizeOptOutUrl: (value) => String(value || ''),
     getActiveMail: () => mail.id,
     openMail() {},
-    bodyFetchTimeoutMs: 5,
+    bodyFetchTimeoutMs: 1000,
     bodyFetchRetryDelayMs: 1,
+    bodyLoadDeadlineMs: 25,
   });
 
-  assert.equal(calls, 6);
+  assert.ok(Date.now() - startedAt < 250);
+  assert.equal(calls, 1);
   assert.equal(mail.bodyLoading, false);
   assert.equal(mail.bodyLoaded, false);
   assert.equal(mail.bodyLoadError, 'Laden duurde te lang. Opnieuw proberen.');
+});
+
+test('alle zichtbare mailbox bodyspinners hebben een harde grens onder vier seconden', () => {
+  assert.match(readIndexScript(), /const MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS = 3800;/);
+  assert.match(readIndexScript(), /Math\.min\(\s*MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS,/);
+});
+
+test('threadbody-spinner eindigt eveneens binnen het gedeelde laadbudget', async () => {
+  let calls = 0;
+  const mailbox = loadMailboxHelpersForTest({
+    setTimeout,
+    clearTimeout,
+    fetch: async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl === '/api/mailbox/messages/bodies' || requestUrl.startsWith('/api/mailbox/message?')) {
+        calls += 1;
+        return new Promise(() => {});
+      }
+      return {
+        ok: true,
+        json: async () => ({ ok: true, accounts: [], messages: [] }),
+      };
+    },
+  });
+  const threadMessage = {
+    id: 'inbox:slow-thread',
+    mailboxId: 'inbox:slow-thread',
+    accountEmail: 'serve@softora.nl',
+    storageFolder: 'inbox',
+    hasBody: true,
+    body: '',
+    bodyLoaded: false,
+    recipientRoutingEvidenceKnown: true,
+  };
+  const mail = {
+    id: 'serve@softora.nl|inbox:root',
+    accountEmail: 'serve@softora.nl',
+    threadMessages: [threadMessage],
+  };
+  const startedAt = Date.now();
+
+  await mailbox.index.loadThreadBodies({
+    mail,
+    normalizeBodyImages: (images) => images || [],
+    normalizeOptOutUrl: (value) => String(value || ''),
+    getActiveMail: () => mail.id,
+    openMail() {},
+    bodyFetchTimeoutMs: 1000,
+    bodyFetchRetryDelayMs: 1,
+    bodyLoadDeadlineMs: 25,
+  });
+
+  assert.ok(Date.now() - startedAt < 250);
+  assert.equal(calls, 1);
+  assert.equal(mail.threadBodiesLoading, false);
+  assert.equal(threadMessage.bodyLoading, false);
+  assert.equal(threadMessage.bodyLoadError, 'Laden duurde te lang. Opnieuw proberen.');
 });
 
 test('top-level bodyfout vervangt de spinner en kan het bericht opnieuw laden', async () => {
