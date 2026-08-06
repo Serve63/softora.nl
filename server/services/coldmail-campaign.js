@@ -14,7 +14,7 @@ const { appendSentMessage } = require('./mailbox-sent-copy');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const autopilotResilience = require('./coldmail-autopilot-resilience');
 const { createColdmailPostSmtpReconciliation } = require('./coldmail-post-smtp-reconciliation');
-const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation');
+const { resolveColdmailReconciliationCustomer } = require('./coldmail-customer-reconciliation'); const { removeAcceptedCustomerFromMailReadySnapshot } = require('./coldmail-mail-ready-snapshot-sync');
 const { mergeMonotonicCurrentDayStats } = require('./coldmail-live-stats-freshness');
 const previewImageCache = require('./coldmail-preview-image-cache');
 const {
@@ -5661,7 +5661,7 @@ function createColdmailCampaignService(deps = {}) {
         })
       ));
     }
-    coldmailLiveStatsCache = null;
+    await removeAcceptedCustomerFromMailReadySnapshot(recipientGuard.recipientId || getRowId(row, rowIndex >= 0 ? rowIndex : 0), mailReadySnapshotService, logger, normalizeString); coldmailLiveStatsCache = null;
     return true;
   }
 
