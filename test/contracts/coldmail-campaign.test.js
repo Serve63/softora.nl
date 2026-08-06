@@ -608,6 +608,76 @@ test('coldmail campaign sends only eligible database rows and marks them as mail
   assert.equal(savedRows[0].coldmailOpenTrackingId, undefined);
 });
 
+test('coldmail accepted send removes the customer from the Mailklaar snapshot', async () => {
+  const removedCustomerIds = [];
+  const invalidations = [];
+  const { service } = createService({
+    mailReadySnapshotService: {
+      async buildMailReadySnapshot() {
+        return {
+          ok: true,
+          customers: [{
+            id: 'prospect-1',
+            bedrijf: 'Bakkerij Zon',
+            email: 'ruben@example.test',
+            status: 'prospect',
+          }],
+        };
+      },
+      async removeCustomers(customerIds) {
+        removedCustomerIds.push(customerIds);
+        return true;
+      },
+      invalidate() {
+        invalidations.push(true);
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.deepEqual(removedCustomerIds, [['prospect-1']]);
+  assert.deepEqual(invalidations, []);
+});
+
+test('coldmail accepted send invalidates the Mailklaar snapshot when pruning is unavailable', async () => {
+  let invalidated = 0;
+  const { service } = createService({
+    mailReadySnapshotService: {
+      async buildMailReadySnapshot() {
+        return {
+          ok: true,
+          customers: [{ id: 'prospect-1', bedrijf: 'Bakkerij Zon', email: 'ruben@example.test', status: 'prospect' }],
+        };
+      },
+      async removeCustomers() {
+        return false;
+      },
+      invalidate() {
+        invalidated += 1;
+      },
+    },
+  });
+
+  const result = await service.sendColdmailCampaign({
+    count: 1,
+    subject: 'Kleine vraag over jullie website',
+    body: 'Goedendag {{naam}}',
+    senderEmail: 'info@softora.nl',
+    specialAction: '',
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(invalidated, 1);
+});
+
 test('coldmail live stats count real sends from the guard and Softora/Gmail database signals', async () => {
   let centralGuardStatsOptions = null;
   const { service } = createService({
