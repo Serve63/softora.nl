@@ -117,10 +117,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
 });
 
@@ -609,7 +609,7 @@ test('gerichte threadhydratie vult Aan uit exacte indexprovenance zonder de body
   assert.equal(helpers.index.needsThreadRoutingHydration(message), false);
 });
 
-test('BCC-thread toont volledige chronologie nieuwste eerst en één nieuwe-berichtactie bovenaan', () => {
+test('BCC-thread blijft bij Martijn, toont zijn hoofdmail roze en houdt de chronologie compleet', () => {
   const html = renderMailboxBodyForTest('Dit is mijn inhoudelijke antwoord aan Sandra.', [], {
     replyMailId: 'serve@softora.nl|inbox:107',
     mail: {
@@ -655,7 +655,7 @@ test('BCC-thread toont volledige chronologie nieuwste eerst en één nieuwe-beri
   assert.equal((html.match(/Nieuw bericht sturen/g) || []).length, 1);
   assert.doesNotMatch(html, /Beantwoorden|Jouw eerdere mail|detail-mail-section-quote/);
   assert.match(html, /detail-mail-section-sent/);
-  assert.match(html, /Eerdere mail/);
+  assert.match(html, /Jouw bericht/);
 });
 
 test('CC-kopie plaatst nieuw bericht sturen één keer vóór de volledige tijdlijn', () => {
@@ -2820,9 +2820,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -2915,7 +2915,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260806b/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806b/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -3023,6 +3023,32 @@ test('coldmail eigenaarfilter houdt de negen campagneadressen gescheiden tussen 
   assert.match(ownerMenu, />Martijn & Servé</);
   assert.doesNotMatch(ownerMenu, /@/);
   campaignInboxModule.setOwner('serve');
+});
+
+test('coldmail eigenaarfilter lekt een bewezen Martijn-kopie nooit naar Servé', () => {
+  const copy = {
+    id: 'serve@softora.nl|inbox:107',
+    accountEmail: 'serve@softora.nl',
+    email: 'martijn@softora.nl',
+    receivedAt: '2026-07-24T16:15:00.000Z',
+    copyContext: {
+      evidenceKnown: true,
+      kind: 'bcc',
+      sourceAccountEmail: 'martijn@softora.nl',
+    },
+  };
+
+  assert.deepEqual(campaignInboxModule.filterMessages([copy], 'serve'), []);
+  assert.deepEqual(
+    campaignInboxModule.filterMessages([copy], 'martijn').map((message) => message.id),
+    ['serve@softora.nl|inbox:107']
+  );
+  assert.equal(campaignInboxModule.getMessageOwner(copy), 'martijn');
+  assert.deepEqual(campaignInboxModule.filterMessages([{
+    ...copy,
+    id: 'unproven-colleague-copy',
+    copyContext: null,
+  }], 'serve'), []);
 });
 
 test('coldmail lijst toont geen automatische antwoorden uit bootstrap- of sessiecache', () => {
@@ -5571,7 +5597,7 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v14:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v15:usr_serve:serve');
         return {
           ok: true,
           owner: 'serve',

@@ -56,8 +56,17 @@ function getCampaignMailboxAccounts(owner) {
   );
 }
 
+function getCampaignConversationAccountEmail(message) {
+  const copyContext = message && message.copyContext;
+  if (copyContext && copyContext.evidenceKnown === true) {
+    const sourceAccountEmail = normalizeEmail(copyContext.sourceAccountEmail);
+    if (getOutboundSenderIdentity(sourceAccountEmail)?.profileKey) return sourceAccountEmail;
+  }
+  return normalizeEmail(message && message.accountEmail);
+}
+
 function getCampaignConversationOwner(message) {
-  return getOutboundSenderIdentity(normalizeEmail(message && message.accountEmail))?.profileKey || '';
+  return getOutboundSenderIdentity(getCampaignConversationAccountEmail(message))?.profileKey || '';
 }
 
 function selectSnapshotConversations(conversations, limit) {
@@ -1058,7 +1067,7 @@ function createMailboxCampaignRepliesService(deps = {}) {
     ).filter(shouldShowCampaignConversation);
     const selectedAccountSet = new Set(selectedMailboxAccounts);
     const selectedConversations = allVisibleConversations
-      .filter((conversation) => selectedAccountSet.has(normalizeEmail(conversation && conversation.accountEmail)))
+      .filter((conversation) => selectedAccountSet.has(getCampaignConversationAccountEmail(conversation)))
       .slice(0, safeLimit);
     const snapshotConversations = selectSnapshotConversations(
       allVisibleConversations,
@@ -1130,6 +1139,7 @@ module.exports = {
   dedupeCampaignMessages,
   getStrictUnreferencedCampaignParent,
   getCampaignConversationId,
+  getCampaignConversationAccountEmail,
   getCampaignMailboxAccounts,
   getMessageReferenceIds,
   getMessageReferenceLookupValues,

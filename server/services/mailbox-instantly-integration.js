@@ -9,10 +9,19 @@ function getMailboxMessageOwner(message) {
     const providerOwner = String(message?.providerOwner || '').trim().toLowerCase();
     return ['serve', 'martijn'].includes(providerOwner) ? providerOwner : '';
   }
+  const copyContext = message?.copyContext;
+  const provenSourceAccount = copyContext?.evidenceKnown === true
+    ? String(copyContext.sourceAccountEmail || '').trim().toLowerCase()
+    : '';
   const accountEmail = String(
-    message?.accountEmail || message?.campaign?.account || ''
+    provenSourceAccount || message?.accountEmail || message?.campaign?.account || ''
   ).trim().toLowerCase();
-  return getOutboundSenderIdentity(accountEmail)?.profileKey || '';
+  const accountOwner = getOutboundSenderIdentity(accountEmail)?.profileKey || '';
+  const senderOwner = getOutboundSenderIdentity(
+    String(message?.email || message?.senderEmail || '').trim().toLowerCase()
+  )?.profileKey || '';
+  if (!provenSourceAccount && accountOwner && senderOwner && accountOwner !== senderOwner) return '';
+  return accountOwner;
 }
 
 function createDefaultInstantlyMailboxService({

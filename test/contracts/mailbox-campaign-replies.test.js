@@ -12,6 +12,7 @@ const {
   attachTargetedUnthreadedSentMessages,
   createMailboxCampaignRepliesService,
   dedupeCampaignMessages,
+  getCampaignConversationAccountEmail,
   isAutomatedCampaignReply,
   shouldShowCampaignConversation,
 } = require('../../server/services/mailbox-campaign-replies');
@@ -159,6 +160,7 @@ test('campaign mailbox bouwt een bewezen BCC-kopie als volledige chronologische 
 
   assert.equal(conversations.length, 1);
   assert.equal(conversations[0].id, 'inbox:copy');
+  assert.equal(getCampaignConversationAccountEmail(conversations[0]), 'martijn@softora.nl');
   assert.deepEqual(conversations[0].threadMessages.map((message) => message.id), [
     'sent:original',
     'inbox:sandra',
@@ -174,6 +176,58 @@ test('campaign mailbox bouwt een bewezen BCC-kopie als volledige chronologische 
     copyAccountEmail: 'serve@softora.nl',
     evidence: 'exact-bcc-recipient-and-cross-account-sent-message-id',
   });
+});
+
+test('campaign mailbox schrijft een bewezen collega-kopie aan de bron-eigenaar toe', async () => {
+  const original = {
+    id: 'sent:original', folder: 'sent', accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven', email: 'martijn@softora.nl',
+    to: 'Sandra van Berkel <equirehab4you@gmail.com>',
+    subject: 'Kleine vraag over jullie website', date: '2026-07-24T15:00:00.000Z',
+    messageId: '<original@softora.nl>',
+  };
+  const incoming = {
+    id: 'inbox:sandra', folder: 'inbox', accountEmail: 'martijn@softora.nl',
+    from: 'Sandra van Berkel', email: 'equirehab4you@gmail.com', to: 'martijn@softora.nl',
+    subject: 'Re: Kleine vraag over jullie website', date: '2026-07-24T15:30:00.000Z',
+    messageId: '<sandra@gmail.com>', inReplyTo: original.messageId, references: original.messageId,
+  };
+  const sentReply = {
+    id: 'sent:reply', folder: 'sent', accountEmail: 'martijn@softora.nl',
+    from: 'Martijn van de Ven', email: 'martijn@softora.nl',
+    to: 'Sandra van Berkel <equirehab4you@gmail.com>', bcc: 'Servé Creusen <serve@softora.nl>',
+    recipientRoutingEvidenceKnown: true, subject: 'Re: Kleine vraag over jullie website',
+    date: '2026-07-24T16:15:00.000Z', messageId: '<reply@softora.nl>',
+    inReplyTo: incoming.messageId, references: `${original.messageId} ${incoming.messageId}`,
+  };
+  const copy = { ...sentReply, id: 'inbox:copy', folder: 'inbox', accountEmail: 'serve@softora.nl' };
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ accountEmails, folder }) => folder === 'inbox'
+        ? [incoming, copy].filter((message) => accountEmails.includes(message.accountEmail))
+        : [],
+      listMatchingMessagesForAccounts: async ({ accountEmails, folder }) => (
+        folder === 'sent' ? [original, sentReply] : [incoming, copy]
+      ).filter((message) => accountEmails.includes(message.accountEmail)),
+      listMessagesByMessageIdsForAccounts: async () => [original, sentReply],
+      listMessagesReferencingMessageIdsForAccounts: async () => [],
+      hydrateMessageBodies: async ({ messages }) => messages,
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'sandra', bedrijf: 'Equirehab4you', email: 'equirehab4you@gmail.com',
+        campaignType: 'webdesign', lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const serve = await service.listRepliesWithSnapshot({ limit: 100, owner: 'serve', snapshotLimit: 100 });
+  const martijn = await service.listRepliesWithSnapshot({ limit: 100, owner: 'martijn', snapshotLimit: 100 });
+
+  assert.deepEqual(serve.messages, []);
+  assert.equal(martijn.messages.length, 1);
+  assert.equal(martijn.messages[0].id, 'inbox:copy');
+  assert.equal(getCampaignConversationAccountEmail(martijn.messages[0]), 'martijn@softora.nl');
 });
 
 test('campaign mailbox labelt CC exact en gokt niet zonder recipient-provenance', () => {
