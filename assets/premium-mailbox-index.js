@@ -596,7 +596,23 @@ async function loadThreadBodies({
   return updated;
 }
 
-function bindImageRecovery({ getActiveMail, getMail, loadMessageBody }) {
+function retryBody({ id, getMail, loadMessageBody, openMail }) {
+  const mail = typeof getMail === 'function' ? getMail(id) : null;
+  if (!mail || mail.bodyLoading || typeof loadMessageBody !== 'function') return false;
+  mail.bodyLoadError = '';
+  mail.bodyLoading = false;
+  mail.bodyLoaded = false;
+  void loadMessageBody(mail.id);
+  openMail?.(mail.id, { skipBodyFetch: true, skipReadPersist: true });
+  return true;
+}
+
+function bindImageRecovery({ getActiveMail, getMail, loadMessageBody, openMail }) {
+  document.addEventListener('click', (event) => {
+    const action = event.target?.closest?.('[data-mailbox-action="retry-mail-body"]');
+    if (!action) return;
+    retryBody({ id: action.getAttribute('data-mailbox-id'), getMail, loadMessageBody, openMail });
+  });
   document.addEventListener('error', (event) => {
     const image = event.target;
     if (!image || !image.matches || !image.matches('[data-mailbox-inline-image]')) return;
@@ -622,6 +638,7 @@ window.SoftoraMailboxIndex = {
   needsThreadImageHydration,
   needsThreadBodyHydration,
   needsThreadRoutingHydration,
+  retryBody,
   setStatus,
   syncInBackground,
 };
