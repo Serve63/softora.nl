@@ -117,11 +117,11 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
 });
 
 test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
@@ -2915,10 +2915,10 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806d/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806f/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260806c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -3010,7 +3010,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260806c/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806c/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260806d/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -4994,6 +4994,63 @@ test('top-level bodyloader eindigt begrensd met retry in plaats van oneindig lad
 test('alle zichtbare mailbox bodyspinners hebben een harde grens onder vier seconden', () => {
   assert.match(readIndexScript(), /const MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS = 3800;/);
   assert.match(readIndexScript(), /Math\.min\(\s*MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS,/);
+});
+
+test('zichtbare bodyspinner houdt zijn viersecondenbudget tijdens bootstrap-tokenvervanging', () => {
+  const timers = [];
+  let nextTimerId = 0;
+  const mailbox = loadMailboxHelpersForTest({
+    setTimeout(callback, delayMs) {
+      const timer = { id: ++nextTimerId, callback, delayMs, cancelled: false };
+      timers.push(timer);
+      return timer.id;
+    },
+    clearTimeout(timerId) {
+      const timer = timers.find((candidate) => candidate.id === timerId);
+      if (timer) timer.cancelled = true;
+    },
+  });
+  const makePendingMail = () => mailbox.normalizeMailboxApiMessage({
+    id: 'serve@softora.nl|inbox:bootstrap-slow',
+    mailboxId: 'inbox:bootstrap-slow',
+    accountEmail: 'serve@softora.nl',
+    folder: 'inbox',
+    subject: 'RE: Kleine vraag over jullie website',
+    hasBody: true,
+    body: '',
+    bodyLoaded: false,
+  });
+
+  mailbox.setMails([makePendingMail()]);
+  mailbox.openMail('serve@softora.nl|inbox:bootstrap-slow', {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+  });
+  assert.match(mailbox.getElement('mail-detail').innerHTML, /Volledig bericht laden…/);
+
+  const firstDeadline = timers.find((timer) => timer.delayMs === 3800 && !timer.cancelled);
+  assert.ok(firstDeadline, 'het zichtbare laadscherm moet zelf direct een deadline starten');
+  assert.ok(firstDeadline.delayMs < 4000);
+
+  const refreshedMail = makePendingMail();
+  mailbox.setMails([refreshedMail]);
+  mailbox.openMail(refreshedMail.id, {
+    skipBodyFetch: true,
+    skipThreadBodyFetch: true,
+  });
+  assert.equal(
+    timers.filter((timer) => timer.delayMs === 3800 && !timer.cancelled).length,
+    1,
+    'een refresh mag het reeds lopende zichtbare budget niet opnieuw starten'
+  );
+
+  firstDeadline.callback();
+  const html = mailbox.getElement('mail-detail').innerHTML;
+  assert.doesNotMatch(html, /Volledig bericht laden…/);
+  assert.match(html, /Laden duurde te lang\. Opnieuw proberen\./);
+  assert.match(html, /data-mailbox-action="retry-mail-body"/);
+  assert.equal(refreshedMail.bodyLoading, false);
+  assert.equal(refreshedMail.bodyLoadError, 'Laden duurde te lang. Opnieuw proberen.');
 });
 
 test('threadbody-spinner eindigt eveneens binnen het gedeelde laadbudget', async () => {
