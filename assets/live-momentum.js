@@ -33,10 +33,10 @@
   const endGameCardsApi = window.SoftoraMomentumEndGameCards;
   const DEFAULT_ICON_KEY = ICONS_BY_KEY.has('plus') ? 'plus' : ICON_CATALOG[0]?.key;
   const DEFAULT_GOALS = [
-    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [] },
-    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [] },
-    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [] },
-    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [] }
+    { id: 'workout', label: 'Workout', iconKey: 'dumbbell', doneDays: [], touchedDays: [] },
+    { id: 'deep-work', label: '90 min deep work', iconKey: 'book', doneDays: [], touchedDays: [] },
+    { id: 'daily-goal', label: 'Dagdoel behalen', iconKey: 'target', doneDays: [], touchedDays: [] },
+    { id: 'healthy-food', label: 'Gezonde voeding', iconKey: 'heart', doneDays: [], touchedDays: [] }
   ];
   const grid = document.querySelector('.habit-grid');
   const chart = document.querySelector('.bar-chart');
@@ -84,7 +84,6 @@
   const formatDay = (day) => `${day} ${PERIOD.label.toLocaleLowerCase('nl-NL')}`;
   const getDefaultGoal = (id) => DEFAULT_GOALS.find((goal) => goal.id === id);
   const getIcon = (key) => ICONS_BY_KEY.get(key) || ICONS_BY_KEY.get(DEFAULT_ICON_KEY) || null;
-  const getDefaultTrackedDays = () => DAYS.filter((day) => day >= PERIOD.startDay);
   function sanitizeDayList(value) {
     return Array.from(new Set((Array.isArray(value) ? value : [])
       .map((day) => Number(day))
@@ -100,22 +99,27 @@
     const requestedIconKey = String(goal?.iconKey || defaultGoal?.iconKey || DEFAULT_ICON_KEY || '');
     const iconKey = ICONS_BY_KEY.has(requestedIconKey) ? requestedIconKey : DEFAULT_ICON_KEY;
     const trackedDays = sanitizeDayList(goal?.trackedDays);
-    const normalizedTrackedDays = trackedDays.length
-      ? trackedDays
-      : defaultGoal
-        ? getDefaultTrackedDays()
-        : TODAY
-          ? DAYS.filter((day) => day >= TODAY)
-          : [];
-    const doneDays = sanitizeDayList(goal?.doneDays).filter((day) => normalizedTrackedDays.includes(day));
+    const doneDays = sanitizeDayList(goal?.doneDays);
+    const emptyDays = sanitizeDayList(goal?.emptyDays);
+    const hasExplicitTouchedDays = Array.isArray(goal?.touchedDays);
+    const touchedDays = sanitizeDayList([
+      ...(hasExplicitTouchedDays
+        ? goal.touchedDays
+        : [...trackedDays.filter((day) => day < TODAY), ...doneDays, ...emptyDays]),
+      ...doneDays,
+      ...emptyDays
+    ]).filter((day) => day <= TODAY);
+    const normalizedTrackedDays = touchedDays.filter((day) => !emptyDays.includes(day));
+    const normalizedDoneDays = doneDays.filter((day) => normalizedTrackedDays.includes(day));
     return {
       id,
       label,
       iconKey,
       icon: getIcon(iconKey)?.markup || '<path d="M12 5v14M5 12h14" />',
-      doneDays,
-      emptyDays: sanitizeDayList(goal?.emptyDays).filter((day) => !doneDays.includes(day)),
-      trackedDays: normalizedTrackedDays
+      doneDays: normalizedDoneDays,
+      emptyDays: emptyDays.filter((day) => !normalizedDoneDays.includes(day) && touchedDays.includes(day)),
+      trackedDays: normalizedTrackedDays,
+      touchedDays
     };
   }
   function removeLegacyTrailingGoalPlaceholders(goals) {
@@ -136,7 +140,8 @@
   function getDefaultGoals() {
     return DEFAULT_GOALS.map((goal, index) => normalizeGoal({
       ...goal,
-      trackedDays: getDefaultTrackedDays()
+      trackedDays: [],
+      touchedDays: []
     }, index));
   }
   function createGoalId() {
@@ -158,7 +163,8 @@
           iconKey: row.dataset.iconKey || defaultGoal?.iconKey,
           doneDays: cells.filter(isChecked).map(getDay),
           emptyDays: cells.filter(isEmpty).map(getDay),
-          trackedDays: cells.filter(isTracked).map(getDay)
+          trackedDays: cells.filter(isTracked).map(getDay),
+          touchedDays: cells.filter((cell) => isEmpty(cell) || isTracked(cell)).map(getDay)
         }, index)
       };
     }).filter((entry) => options.includeDraft === true || !entry.isDraft)
@@ -176,7 +182,8 @@
         iconKey: goal.iconKey,
         doneDays: goal.doneDays,
         emptyDays: goal.emptyDays,
-        trackedDays: goal.trackedDays
+        trackedDays: goal.trackedDays,
+        touchedDays: goal.touchedDays
       })),
       updatedAt: new Date().toISOString()
     };
@@ -224,7 +231,8 @@
         iconKey: goal?.iconKey,
         doneDays: [],
         emptyDays: [],
-        trackedDays: getDefaultTrackedDays()
+        trackedDays: [],
+        touchedDays: []
       }, index));
       const { goals } = removeLegacyTrailingGoalPlaceholders(carriedGoals);
       if (!goals.length) {
@@ -823,7 +831,8 @@
       label: 'Doel',
       doneDays: [],
       emptyDays: [],
-      trackedDays: DAYS.filter((day) => day >= TODAY)
+      trackedDays: [],
+      touchedDays: []
     }, goals.length);
     goals.push({ ...draftGoal, label: '', isDraft: true });
     renderGridShell(goals);
