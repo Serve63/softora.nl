@@ -7,6 +7,7 @@ const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_THREAD_HYDRATION_TARGETS = 40;
 const MAILBOX_BODY_FETCH_ATTEMPTS = 3;
 const MAILBOX_BODY_FETCH_TIMEOUT_MS = 6000;
+const MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS = 3800;
 const LEGACY_MAILBOX_MEDIA_CAPTION =
   'Hieronder zie je een korte indruk van de eerste versie op verschillende schermen.';
 
@@ -18,6 +19,40 @@ function createAbortError() {
   const error = new Error('Mailbox body request geannuleerd.');
   error.name = 'AbortError';
   return error;
+}
+
+function createBodyDeadlineError() {
+  const error = new Error('Laden duurde te lang. Opnieuw proberen.');
+  error.name = 'TimeoutError';
+  error.retryable = true;
+  return error;
+}
+
+function createBodyLoadDeadline(parentSignal, requestedDeadlineMs) {
+  const requested = Number(requestedDeadlineMs);
+  const deadlineMs = Math.min(
+    MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS,
+    Number.isFinite(requested) && requested > 0
+      ? requested
+      : MAILBOX_BODY_VISIBLE_LOADING_LIMIT_MS
+  );
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let deadlineExpired = false;
+  const abortFromParent = () => controller?.abort?.();
+  parentSignal?.addEventListener?.('abort', abortFromParent, { once: true });
+  if (parentSignal?.aborted) abortFromParent();
+  const timer = setTimeout(() => {
+    deadlineExpired = true;
+    controller?.abort?.();
+  }, deadlineMs);
+  return {
+    signal: controller?.signal || parentSignal,
+    expired: () => deadlineExpired,
+    cleanup() {
+      clearTimeout(timer);
+      parentSignal?.removeEventListener?.('abort', abortFromParent);
+    },
+  };
 }
 
 function isRetryableBodyStatus(status) {
@@ -45,6 +80,12 @@ async function fetchMailboxBodyJson(request, url, init = {}, options = {}) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const abortFromParent = () => controller?.abort?.();
     parentSignal?.addEventListener?.('abort', abortFromParent, { once: true });
+    let rejectForParentAbort = null;
+    const parentAbortPromise = new Promise((_resolve, reject) => {
+      rejectForParentAbort = () => reject(createAbortError());
+      parentSignal?.addEventListener?.('abort', rejectForParentAbort, { once: true });
+      if (parentSignal?.aborted) rejectForParentAbort();
+    });
     let timedOut = false;
     let timeout = null;
     const timeoutPromise = new Promise((_resolve, reject) => {
@@ -64,6 +105,7 @@ async function fetchMailboxBodyJson(request, url, init = {}, options = {}) {
           ...(controller ? { signal: controller.signal } : parentSignal ? { signal: parentSignal } : {}),
         })),
         timeoutPromise,
+        parentAbortPromise,
       ]);
       const data = await response.json().catch(() => ({}));
       if (response.ok || !isRetryableBodyStatus(response.status) || attempt === MAILBOX_BODY_FETCH_ATTEMPTS - 1) {
@@ -78,6 +120,7 @@ async function fetchMailboxBodyJson(request, url, init = {}, options = {}) {
     } finally {
       if (timeout !== null) clearTimeout(timeout);
       parentSignal?.removeEventListener?.('abort', abortFromParent);
+      parentSignal?.removeEventListener?.('abort', rejectForParentAbort);
     }
     await waitForBodyRetry(retryDelayMs * (attempt + 1), parentSignal);
   }
@@ -192,9 +235,11 @@ async function loadBody({
   signal,
   bodyFetchTimeoutMs,
   bodyFetchRetryDelayMs,
+  bodyLoadDeadlineMs,
 }) {
   const mail = getMail(id);
   if (!mail || mail.bodyLoading) return;
+  const bodyLoadDeadline = createBodyLoadDeadline(signal, bodyLoadDeadlineMs);
   mail.bodyLoading = true;
   let exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
   try {
@@ -207,7 +252,7 @@ async function loadBody({
         body: JSON.stringify({
           messages: [{ account, folder, id: String(requestId || id) }],
         }),
-      }, { signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
+      }, { signal: bodyLoadDeadline.signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
       const indexedMessage = Array.isArray(indexedData && indexedData.messages)
         ? indexedData.messages[0]
         : null;
@@ -274,7 +319,7 @@ async function loadBody({
       credentials: 'same-origin',
       cache: 'no-store',
       headers: { Accept: 'application/json' },
-    }, { signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
+    }, { signal: bodyLoadDeadline.signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
     if (!response.ok || !data?.ok || !data.message) {
       const error = new Error(data?.detail || data?.error || 'Bericht laden mislukt');
       error.status = response.status;
@@ -311,6 +356,7 @@ async function loadBody({
     mail.attachments = Array.isArray(data.message.attachments) ? data.message.attachments : [];
   } catch (error) {
     if (typeof isCurrent === 'function' && !isCurrent()) return;
+    if (bodyLoadDeadline.expired()) error = createBodyDeadlineError();
     mail.webdesignLinkHydrationAttempted = true;
     if (exactBodyAvailable || (mail.bodyLoaded && normalizeText(mail.body))) {
       mail.bodyLoadError = '';
@@ -320,6 +366,7 @@ async function loadBody({
       mail.bodyLoaded = false;
     }
   } finally {
+    bodyLoadDeadline.cleanup();
     mail.bodyLoading = false;
     if (
       (typeof isCurrent !== 'function' || isCurrent()) &&
@@ -431,6 +478,7 @@ async function loadThreadBodies({
   retryFailed = false,
   bodyFetchTimeoutMs,
   bodyFetchRetryDelayMs,
+  bodyLoadDeadlineMs,
 }) {
   const stillCurrent = () => typeof isCurrent !== 'function' || isCurrent();
   if (!stillCurrent()) return false;
@@ -457,6 +505,7 @@ async function loadThreadBodies({
   if (!targets.length) return false;
 
   const request = typeof fetchImpl === 'function' ? fetchImpl : fetch;
+  const bodyLoadDeadline = createBodyLoadDeadline(signal, bodyLoadDeadlineMs);
   mail.threadBodiesLoading = true;
   targets.forEach((message) => {
     message.bodyLoadError = '';
@@ -488,7 +537,7 @@ async function loadThreadBodies({
           body: JSON.stringify({
             messages: targetReferences.slice(offset, offset + 20),
           }),
-        }, { signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
+        }, { signal: bodyLoadDeadline.signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
         if (!response.ok || !data?.ok || !Array.isArray(data.messages)) {
           throw new Error(data?.detail || data?.error || 'Berichtinhoud laden mislukt');
         }
@@ -508,7 +557,8 @@ async function loadThreadBodies({
             target.message.bodyLoadError = '';
           }
         });
-      } catch (_) {
+      } catch (error) {
+        if (bodyLoadDeadline.expired() || error?.name === 'AbortError') throw error;
         // De gerichte detailfallback hieronder houdt oude of nog niet geïndexeerde berichten leesbaar.
       }
     }
@@ -549,7 +599,7 @@ async function loadThreadBodies({
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { Accept: 'application/json' },
-          }, { signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
+          }, { signal: bodyLoadDeadline.signal, timeoutMs: bodyFetchTimeoutMs, retryDelayMs: bodyFetchRetryDelayMs });
           if (!response.ok || !data?.ok || !data.message) {
             const error = new Error(data?.detail || data?.error || 'Volledig bericht kon niet worden geladen.');
             error.status = response.status;
@@ -567,6 +617,7 @@ async function loadThreadBodies({
             ? 'Volledig bericht is niet beschikbaar in het bronbericht.'
             : '';
         } catch (error) {
+          if (bodyLoadDeadline.expired() || error?.name === 'AbortError') throw error;
           if (stillCurrent() && !(error && error.name === 'AbortError')) {
             message.webdesignLinkHydrationAttempted = true;
             message.bodyLoadError = needsThreadBodyHydration(message)
@@ -579,7 +630,17 @@ async function loadThreadBodies({
         }
       }));
     }
+  } catch (error) {
+    if (stillCurrent() && bodyLoadDeadline.expired()) {
+      targets.forEach((message) => {
+        message.webdesignLinkHydrationAttempted = true;
+        message.bodyLoadError = needsThreadBodyHydration(message)
+          ? getBodyLoadError(createBodyDeadlineError())
+          : '';
+      });
+    }
   } finally {
+    bodyLoadDeadline.cleanup();
     targets.forEach((message) => {
       message.bodyLoading = false;
     });
