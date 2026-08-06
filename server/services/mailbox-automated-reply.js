@@ -56,6 +56,7 @@ function isAutomatedCampaignReply(message) {
     /\bauto[ -]?reply\b/,
     /\bout[ -]?of[ -]?office\b/,
     /\bafwezigheid(?:sbericht|melding)?\b/,
+    /^(?:niet aanwezig|afwezig)(?:\s+tot\b[^:\n]{0,80})?\s+(?:(?:re|fw|fwd)\s*:\s*)+/,
     /\breturned mail\b/,
     /\bundeliverable\b/,
     /\bmail delivery (?:failure|failed)\b/,
@@ -81,6 +82,8 @@ function isAutomatedCampaignReply(message) {
     /\b(?:we|wij) streven ernaar (?:jouw|je|uw) (?:e-?mail|mail|bericht) (?:de )?(?:eerstvolgende|volgende) werkdag te beantwoorden\b/,
     /\b(?:bedankt|dank) voor (?:je|jouw|uw) bericht\b[\s\S]{0,220}\b(?:eerstvolgende werkdag|zo snel mogelijk) te beantwoorden\b/,
     /\b(?:ik ben|wij zijn|ons kantoor is) (?:momenteel|op dit moment|tijdelijk)?\s*(?:afwezig|gesloten|niet aanwezig)\b/,
+    /\b(?:momenteel|op dit moment)\s+(?:heb ik|hebben wij)\s+vakantie\b[\s\S]{0,240}\b(?:e-?mail|mail)\b[\s\S]{0,160}\b(?:minder vaak|niet|beperkt)\b/,
+    /\bwelkom bij\b[\s\S]{0,240}\bals u\b[\s\S]{0,180}\bnaar whatsapp stuurt\b[\s\S]{0,180}\b(?:richtprijs|offerte)\b/,
     /\b(?:i am|we are) (?:currently )?out of (?:the )?office\b/,
   ];
 

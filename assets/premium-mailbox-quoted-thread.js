@@ -105,6 +105,7 @@
         .replace(/^\s*(?:>\s*)+/, '')
         .replace(/\s+>\s+/g, ' ')
         .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+        .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0E\uFE0F]/gu, ' ')
         .trim())
       .filter((line) => (
         line && !IGNORABLE_MATCH_LINE_PATTERNS.some((pattern) => pattern.test(line))

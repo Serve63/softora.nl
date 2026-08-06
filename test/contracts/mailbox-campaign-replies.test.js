@@ -744,10 +744,22 @@ test('campaign mailbox recognizes strong automatic reply signals without hiding 
     precedence: 'auto_reply',
   }), true);
   assert.equal(isAutomatedCampaignReply({
+    subject: 'Niet aanwezig Re: Kleine vraag over jullie website',
+    body: 'Momenteel heb ik vakantie, daardoor zal ik mijn mail minder vaak lezen en beantwoorden. Dringende vragen probeer ik zo snel mogelijk op te pakken.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Whatsapp Re: Kleine vraag over jullie website',
+    body: 'Welkom bij Neelis Stikwerken. Als u een foto met de globale maten naar whatsapp stuurt, dan krijgt u van mij zo snel mogelijk een richtprijs.',
+  }), true);
+  assert.equal(isAutomatedCampaignReply({
     subject: 'Bedankt voor je bericht',
     preview: 'Het ontwerp ziet er goed uit. Kun je mij vertellen wat een nieuwe website ongeveer kost?',
     body: 'Het ontwerp ziet er goed uit. Kun je mij vertellen wat een nieuwe website ongeveer kost?',
     autoSubmitted: 'no',
+  }), false);
+  assert.equal(isAutomatedCampaignReply({
+    subject: 'Re: Kleine vraag over jullie website',
+    body: 'Ik heb momenteel vakantie, maar ik bekeek je ontwerp en wil graag weten wat een nieuwe website kost.',
   }), false);
 });
 

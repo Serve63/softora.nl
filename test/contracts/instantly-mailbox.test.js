@@ -1383,6 +1383,47 @@ test('Instantly conversation listing hides automatic ticket receipts but preserv
   assert.equal(JSON.stringify(conversations).includes('sbsupply-ticket-receipt'), false);
 });
 
+test('Instantly verbergt Neelis WhatsApp-autoreply uit een latere menselijke conversatie', async () => {
+  const { service, store } = buildService();
+  const sent = service.normalizeInstantlyMessage(incoming({
+    id: 'neelis-sent',
+    email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['info@neelisstikwerken.com'],
+    body: { text: 'Goedendag, ik heb een fris webdesign voor jullie gemaakt.' },
+    timestamp_email: '2026-07-28T06:28:27.000Z',
+  }));
+  const whatsappAutoReply = service.normalizeInstantlyMessage(incoming({
+    id: 'neelis-whatsapp-auto',
+    email_type: 'received',
+    from_address_email: 'info@neelisstikwerken.com',
+    to_address_email_list: ['serve-sender@example.com'],
+    subject: 'Whatsapp Re: Kleine vraag over jullie website',
+    body: {
+      text: 'Welkom bij Neelis Stikwerken. Als u een foto met de globale maten naar whatsapp stuurt, dan krijgt u van mij zo snel mogelijk een richtprijs.',
+    },
+    timestamp_email: '2026-07-28T06:28:31.000Z',
+  }));
+  const humanReply = service.normalizeInstantlyMessage(incoming({
+    id: 'neelis-human-reply',
+    email_type: 'received',
+    from_address_email: 'info@neelisstikwerken.com',
+    to_address_email_list: ['serve-sender@example.com'],
+    body: { text: 'Helaas, mijn website is prima zo.' },
+    timestamp_email: '2026-07-28T13:56:13.000Z',
+  }));
+  store.rows.push(sent, whatsappAutoReply, humanReply);
+
+  const conversations = await service.listOwnerConversations('serve');
+  assert.equal(conversations.length, 1);
+  assert.equal(conversations[0].providerMessageId, 'neelis-human-reply');
+  assert.deepEqual(
+    conversations[0].threadMessages.map((message) => message.providerMessageId),
+    ['neelis-sent']
+  );
+  assert.equal(JSON.stringify(conversations).includes('neelis-whatsapp-auto'), false);
+});
+
 test('Instantly conversation listing hides seasonal closure auto-replies', async () => {
   const { service, store } = buildService();
   const sent = service.normalizeInstantlyMessage(incoming({
