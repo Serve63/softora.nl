@@ -243,6 +243,7 @@ test('temporary provider failures retry once and then update the list in place',
   assert.equal(attempts.get('/api/mailbox/instantly/sync'), 2);
   assert.equal(loads.length, 1);
   assert.equal(loads[0].skipPageBootstrap, true);
+  assert.equal(loads[0].preserveOnError, true);
   controller.destroy();
 });
 
@@ -296,8 +297,32 @@ test('refresh status is exclusive while active, successful, partial and failed',
 
   mode = 'error';
   assert.equal(await controller.refresh(), false);
-  assert.equal(ageLabel.textContent, 'Bijwerken mislukt');
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
   assert.doesNotMatch(ageLabel.textContent, /geleden|·/);
+  assert.match(ageLabel.attributes.title, /Tijdelijke verbindingsstoring/);
+  assert.doesNotMatch(ageLabel.textContent, /mislukt/i);
+  controller.destroy();
+});
+
+test('zichtbare mailbox herstelt na een storing binnen vijftien seconden', async () => {
+  const timers = [];
+  const controller = refreshModule.create({
+    autoStart: false,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    fetch: async () => ({ ok: false, status: 400, json: async () => ({ error: 'tijdelijk' }) }),
+    setTimeout(handler, delay) { timers.push({ handler, delay }); return timers.length; },
+    clearTimeout() {},
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+
+  controller.start();
+  assert.equal(timers.at(-1).delay, 0);
+  await timers.at(-1).handler();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timers.at(-1).delay, refreshModule.RECOVERY_REFRESH_INTERVAL_MS);
+  assert.equal(refreshModule.RECOVERY_REFRESH_INTERVAL_MS, 15_000);
   controller.destroy();
 });
 

@@ -1072,6 +1072,26 @@
     return result;
   }
 
+  function getSessionFallback(value) {
+    const owner = normalizeOwner(value == null ? activeOwner : value);
+    const snapshot = readSessionMailboxSnapshot(owner);
+    if (!snapshot) return null;
+    return {
+      owner,
+      messages: filterMessages(snapshot.messages, owner),
+      sync: {
+        ...(snapshot.sync && typeof snapshot.sync === 'object' ? snapshot.sync : {}),
+        indexed: true,
+        stale: true,
+        source: 'campaign-replies-session-cache',
+        refreshRecommended: true,
+        warming: false,
+      },
+      fromBootstrap: false,
+      fromCache: true,
+    };
+  }
+
   async function load(folder, normalizeMessage, fetchImpl, options) {
     if (folder !== 'outreach') return null;
     const owner = normalizeOwner(options && options.owner != null ? options.owner : activeOwner);
@@ -1088,20 +1108,27 @@
       owner: owner === 'both' ? '' : owner,
       refreshInstantly: options && options.refreshInstantly === false ? '0' : '1',
     });
-    const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      ...(options && options.signal ? { signal: options.signal } : {}),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
+    try {
+      const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        ...(options && options.signal ? { signal: options.signal } : {}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.detail || data?.error || 'Campagnereacties laden mislukt');
+      }
+      if (owner !== 'both' && isPersonalOwner(data.owner) && normalizeOwner(data.owner) !== owner) {
+        throw new Error('De mailboxresponse hoort bij een andere eigenaar.');
+      }
+      return normalizeLoadResult(data, normalizeMessage, false, owner);
+    } catch (error) {
+      if (options?.signal?.aborted || error?.name === 'AbortError') throw error;
+      const fallback = getSessionFallback(owner);
+      if (fallback) return fallback;
+      throw error;
     }
-    if (owner !== 'both' && isPersonalOwner(data.owner) && normalizeOwner(data.owner) !== owner) {
-      throw new Error('De mailboxresponse hoort bij een andere eigenaar.');
-    }
-    return normalizeLoadResult(data, normalizeMessage, false, owner);
   }
 
   const campaignInboxApi = {
