@@ -78,11 +78,11 @@ test('publication helpers normalize canonical and UTC rolling windows', () => {
 });
 
 test('public SEO refreshes have an explicit machine-readable event plan', () => {
-  const events = getPublicSeoGrowthEventPlan({ now: new Date('2026-07-23T12:00:00.000Z') });
+  const events = getPublicSeoGrowthEventPlan({ now: new Date('2026-08-06T12:00:00.000Z') });
   assert.deepEqual(
     events.map((event) => [event.path, event.eventAt, event.publicationKind]),
     [
-      ['/bedrijfssoftware-op-maat', '2026-07-06', 'substantial_refresh'],
+      ['/bedrijfssoftware-op-maat', '2026-08-06', 'substantial_refresh'],
       ['/crm-systeem-op-maat', '2026-07-04', 'substantial_refresh'],
       ['/ai-automatisering', '2026-07-23', 'substantial_refresh'],
     ]
