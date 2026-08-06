@@ -129,7 +129,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
   assert.match(
     sitemap,
-    /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>\s*<lastmod>2026-07-06<\/lastmod>/
+    /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>\s*<lastmod>2026-08-06<\/lastmod>/
   );
   assert.match(
     sitemap,
@@ -423,6 +423,8 @@ const CORE_INTERNAL_LINK_EXPECTATIONS = [
       '/kennisbank/wat-is-bedrijfssoftware-op-maat',
       '/ai-automatisering',
       '/kennisbank/wat-is-offerte-automatisering',
+      '/blog/bedrijfssoftware-laten-maken-kosten',
+      '/blog/maatwerk-software-offerte-beoordelen',
     ],
   },
   {
@@ -561,6 +563,17 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
       assert.ok(normalized.includes(term), `${page.fileName} mist GSC-signaal "${term}"`);
     }
   }
+});
+
+test('bedrijfssoftware money page geeft kopers een concrete scope- en acceptatiecheck', () => {
+  const source = fs.readFileSync(path.join(root, 'premium-bedrijfssoftware.html'), 'utf8');
+
+  assert.match(source, /<title>Bedrijfssoftware laten maken: aanpak voor MKB \| Softora<\/title>/);
+  assert.match(source, /1\. Begrens het kernproces/);
+  assert.match(source, /2\. Schrijf rollen en uitzonderingen uit/);
+  assert.match(source, /3\. Wijs databronnen en eigenaarschap aan/);
+  assert.match(source, /4\. Spreek acceptatie en beheer af/);
+  assert.match(source, /inclusief fout- en herstelgevallen/);
 });
 
 test('voicesoftware page owns its internal links inside the page content', () => {
