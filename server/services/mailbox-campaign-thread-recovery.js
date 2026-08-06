@@ -32,7 +32,7 @@ function findStructuredQuoteStart(value) {
       /^(?:op\s.+\b(?:schreef(?:\s+[^:\n]+)?|heeft\s+.+\s+geschreven)\s*:?)$/i.test(line) ||
       /^(?:on\s.+\bwrote\s*:?)$/i.test(line) ||
       /^(?:begin|start)\s+(?:doorgestuurd|forwarded)\s+bericht\s*:?$/i.test(line) ||
-      /^(?:-{2,}|_{2,})\s*(?:original message|oorspronkelijk bericht|forwarded message|doorgestuurd bericht)/i.test(line) ||
+      /^(?:-{2,}|_{2,})\s*(?:original message|oorspronkelijk(?:e)? bericht|forwarded message|doorgestuurd bericht)/i.test(line) ||
       isHeaderClusterAt(index)
     ) return { lines, index };
   }
@@ -45,12 +45,14 @@ function normalizeQuotedMatchText(value) {
     .split('\n')
     .map((line) => String(line || '')
       .replace(/^\s*(?:>\s*)+/, '')
+      .replace(/\s+>\s+/g, ' ')
       .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
       .trim())
     .filter((line) => line && !QUOTED_MATCH_IGNORABLE_LINE_PATTERNS.some((pattern) => pattern.test(line)))
     .join(' ')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\[\s*\d+\s*\]/g, ' ')
     .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, ' ')
     .replace(/<?https?:\/\/[^\s>]+>?/gi, ' ')
     .replace(/\s+/g, ' ')
@@ -61,11 +63,21 @@ function normalizeQuotedMatchText(value) {
 function extractQuotedRecipientEmails(value, extractEmailAddresses) {
   const parsed = findStructuredQuoteStart(value);
   if (parsed.index < 0) return [];
-  return Array.from(new Set(parsed.lines
-    .slice(parsed.index)
-    .map(cleanQuotedHeaderLine)
-    .filter((line) => /^(?:aan|to):\s*/i.test(line))
-    .flatMap((line) => extractEmailAddresses(line))));
+  const lines = parsed.lines.slice(parsed.index).map(cleanQuotedHeaderLine);
+  const recipients = [];
+  lines.forEach((line, index) => {
+    const match = /^(?:aan|to|ontvanger|recipient):\s*(.*)$/i.exec(line);
+    if (!match) return;
+    let valueAfterLabel = String(match[1] || '').trim();
+    if (!valueAfterLabel) {
+      let nextIndex = index + 1;
+      while (nextIndex < lines.length && !String(lines[nextIndex] || '').trim()) nextIndex += 1;
+      const nextLine = String(lines[nextIndex] || '').trim();
+      if (!/^[a-z][a-z-]{1,30}:\s*/i.test(nextLine)) valueAfterLabel = nextLine;
+    }
+    recipients.push(...extractEmailAddresses(valueAfterLabel));
+  });
+  return Array.from(new Set(recipients));
 }
 
 function createMailboxCampaignThreadRecovery(helpers = {}) {

@@ -22,6 +22,21 @@ test('mailbox media scheidt zelfgeschreven tekst van een Nederlandse geciteerde 
   );
 });
 
+test('mailbox media stopt ook bij de Nederlandse Oorspronkelijke bericht-grens', () => {
+  const body = [
+    'Hallo Servé, bedankt voor je ontwerp.',
+    '',
+    '-------- Oorspronkelijke bericht --------',
+    'Goedendag,',
+    'Afgelopen week kwam ik jullie website voorbeeld.nl tegen.',
+  ].join('\n');
+
+  assert.equal(
+    getAuthoredMessageText(body),
+    'Hallo Servé, bedankt voor je ontwerp.'
+  );
+});
+
 test('mailbox media herkent uitsluitend de oorspronkelijke verzonden coldmail als eigenaar', () => {
   const original = {
     folder: 'sent',

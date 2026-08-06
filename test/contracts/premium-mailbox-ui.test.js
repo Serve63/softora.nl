@@ -115,12 +115,12 @@ function readUiStateScript() {
 test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(readPage(), /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(readPage(), /Coldmail Inbox/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-images\.js\?v=20260724c/);
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806a/);
   assert.match(readPage(), /assets\/premium-mailbox-refresh\.js\?v=20260806b/);
   assert.match(readPage(), /assets\/premium-mailbox-owner-session\.js\?v=20260806b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
 });
 
@@ -2579,6 +2579,87 @@ test('mailbox dedupliceert coldmail generiek ondanks Gmail-linkopmaak en templat
   assert.doesNotMatch(html, /detail-mail-section-quote/);
 });
 
+test('mailbox filtert een bewezen Bossche Brouwers origineel met reply- en linkartefacten alleen uit het grijze antwoord', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Afgelopen week kwam ik jullie website bosschebrouwers.nl tegen.',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
+    '',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    '',
+    'Ik kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.',
+    '',
+    'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wel lijkt het me tof om te horen wat je van het design vindt en wat er eventueel beter kan. Daar leer ik dan weer van!',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    "📍 's-Hertogenbosch",
+  ].join('\n');
+  const incomingBody = [
+    'Hallo Servé',
+    '',
+    'Leuk dat je aandacht schenkt aan ons bedrijf.',
+    'Je design ziet er netjes uit. We gaan het echter niet gebruiken :)',
+    '',
+    'Vriendelijke groet;',
+    'Leonard Hamers',
+    '',
+    '-------- Oorspronkelijke bericht --------',
+    'ONDERWERP:',
+    'Kleine vraag over jullie website',
+    'DATUM:',
+    '2026-07-16 07:34',
+    'AFZENDER:',
+    'Servé Creusen',
+    'ONTVANGER:',
+    'arie@bosschebrouwers.nl',
+    'ANTWOORD-AAN:',
+    'servec321@gmail.com',
+    'Goedendag,',
+    'Afgelopen week kwam ik jullie website bosschebrouwers.nl tegen.',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat > leuk vind. Je vindt het ontwerp in de bijlage bij deze e-mail.',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke > mening 😁',
+    'Ik kan ook de online preview doorsturen, zodat je zelf door het ontwerp > kunt scrollen.',
+    'Mocht je er niets mee willen doen, dan is dat natuurlijk ook prima! Wel > lijkt het me tof om te horen wat je van het design vindt en wat er > eventueel beter kan. Daar leer ik dan weer van!',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via > deze link [1] bekijken 🎨',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    "📍 's-Hertogenbosch",
+    '',
+    'Links:',
+    '------',
+    '[1] https://www.softora.nl/webdesign/bossche-brouwers-aan-de-vaart?cid=safe-dedupe-20260615-row-2855-2fe7929a08&sender=serve',
+    '[2] http://www.bosschebrouwers.nl/',
+  ].join('\n');
+  const html = renderMailboxBodyForTest(incomingBody, [], {
+    replyMailId: 'inbox:bossche-brouwers',
+    mail: {
+      id: 'inbox:bossche-brouwers',
+      folder: 'inbox',
+      accountEmail: 'servec321@gmail.com',
+      receivedAt: '2026-07-25T07:25:00.000Z',
+      threadMessages: [{
+        id: 'sent:bossche-brouwers',
+        messageId: '<bossche-brouwers-original@gmail.com>',
+        folder: 'sent',
+        accountEmail: 'servec321@gmail.com',
+        date: '2026-07-16T05:34:00.000Z',
+        body: sentBody,
+        originalCampaignOutbound: true,
+      }],
+    },
+  });
+
+  assert.match(html, /Leuk dat je aandacht schenkt aan ons bedrijf\./);
+  assert.match(html, /Jouw bericht/);
+  assert.equal((html.match(/Afgelopen week kwam ik jullie website bosschebrouwers\.nl tegen\./g) || []).length, 1);
+  assert.doesNotMatch(html, /Oorspronkelijke bericht|ONDERWERP:|ANTWOORD-AAN:|detail-mail-section-quote/);
+});
+
 test('mailbox dedupliceert een coldmail wanneer Gmail alleen het campagneadres in de citaatkop zet', () => {
   const coldmail = [
     'Goedendag,',
@@ -2740,8 +2821,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260806a/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260805b/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806b/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260806a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260806c/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260805b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];

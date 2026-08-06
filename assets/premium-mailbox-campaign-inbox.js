@@ -593,7 +593,7 @@
       return (
         /^>/.test(content) ||
         /^(?:on .+\bwrote\b|op .+\bschreef\b.*|op .+\bheeft\s+.+\s+geschreven)\s*:\s*$/i.test(content) ||
-        /^-{2,}\s*(?:original message|oorspronkelijk bericht)/i.test(content)
+        /^-{2,}\s*(?:original message|oorspronkelijk(?:e)? bericht)/i.test(content)
       );
     });
     const headerPatterns = {
@@ -660,7 +660,7 @@
     const firstLine = String(values[0] || '').trim();
     if (
       /^(?:on .+\bwrote\b|op .+\bschreef\b.*|op .+\bheeft\s+.+\s+geschreven)\s*:\s*$/i.test(firstLine) ||
-      /^-{2,}\s*(?:original message|oorspronkelijk bericht)\b/i.test(firstLine)
+      /^-{2,}\s*(?:original message|oorspronkelijk(?:e)? bericht)\b/i.test(firstLine)
     ) {
       values.shift();
     }
