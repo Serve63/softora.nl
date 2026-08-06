@@ -30,7 +30,7 @@
   function isForwardSeparatorLine(value) {
     const line = cleanHeaderLine(value);
     return (
-      /^(?:-{2,}|_{2,})\s*(?:original message|oorspronkelijk bericht|forwarded message|doorgestuurd bericht)\s*(?:-{2,}|_{2,})?$/i.test(line) ||
+      /^(?:-{2,}|_{2,})\s*(?:original message|oorspronkelijk(?:e)? bericht|forwarded message|doorgestuurd bericht)\s*(?:-{2,}|_{2,})?$/i.test(line) ||
       /^(?:begin|start)\s+(?:doorgestuurd|forwarded)\s+bericht\s*:?$/i.test(line)
     );
   }
@@ -103,6 +103,7 @@
     return normalizeLines(value)
       .map((line) => String(line || '')
         .replace(/^\s*(?:>\s*)+/, '')
+        .replace(/\s+>\s+/g, ' ')
         .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
         .trim())
       .filter((line) => (
@@ -111,6 +112,7 @@
       .join(' ')
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\[\s*\d+\s*\]/g, ' ')
       .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, ' ')
       .replace(/<?https?:\/\/[^\s>]+>?/gi, ' ')
       .replace(/\s+/g, ' ')

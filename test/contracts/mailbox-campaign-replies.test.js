@@ -1296,6 +1296,95 @@ test('campaign reply service herstelt TTV Irene via exacte forward-recipient en 
   assert.equal(replies[0].threadMessages[0].originalCampaignOutbound, true);
 });
 
+test('campaign reply service herstelt een Bossche Brouwers origineel uit een losse ONTVANGER-kop met providerartefacten', async () => {
+  const originalBody = [
+    'Goedendag,',
+    'Afgelopen week kwam ik jullie website bosschebrouwers.nl tegen.',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat leuk vind.',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke mening 😁',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link bekijken 🎨',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const incomingBody = [
+    'Hallo Servé, leuk dat je aandacht schenkt aan ons bedrijf.',
+    '',
+    '-------- Oorspronkelijke bericht --------',
+    'ONDERWERP:',
+    'Kleine vraag over jullie website',
+    'DATUM:',
+    '2026-07-16 07:34',
+    'AFZENDER:',
+    'Servé Creusen',
+    'ONTVANGER:',
+    'arie@bosschebrouwers.nl',
+    'ANTWOORD-AAN:',
+    'servec321@gmail.com',
+    'Goedendag,',
+    'Afgelopen week kwam ik jullie website bosschebrouwers.nl tegen.',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt, gewoon omdat ik dat > leuk vind.',
+    'Ik ben oprecht benieuwd wat je ervan vindt en hoor graag je eerlijke > mening 😁',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via > deze link [1] bekijken 🎨',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+    '[1] https://www.softora.nl/webdesign/bossche-brouwers-aan-de-vaart?sender=serve',
+  ].join('\n');
+  const incoming = {
+    id: 'inbox:bossche-brouwers',
+    folder: 'inbox',
+    accountEmail: 'servec321@gmail.com',
+    email: 'administratie@bosschebrouwers.nl',
+    to: 'servec321@gmail.com',
+    subject: 'Re: Fwd: Kleine vraag over jullie website',
+    preview: 'Hallo Servé, leuk dat je aandacht schenkt aan ons bedrijf.',
+    body: incomingBody,
+    date: '2026-07-25T07:25:00.000Z',
+    messageId: '<bossche-brouwers-reply@example.nl>',
+  };
+  const original = {
+    id: 'sent:bossche-brouwers',
+    folder: 'sent',
+    accountEmail: 'servec321@gmail.com',
+    email: 'servec321@gmail.com',
+    to: 'arie@bosschebrouwers.nl',
+    subject: 'Kleine vraag over jullie website',
+    body: originalBody,
+    date: '2026-07-16T05:34:00.000Z',
+    messageId: '<bossche-brouwers-original@gmail.com>',
+    originalCampaignOutbound: true,
+  };
+  let quotedTargets = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      listMatchingMessagesForAccounts: async ({ folder }) => (folder === 'inbox' ? [incoming] : []),
+      hydrateMessageBodies: async ({ messages }) => messages,
+      listSentCandidatesForQuotedReplies: async ({ targets }) => {
+        quotedTargets = targets;
+        return [original];
+      },
+    },
+    dataOpsStore: {
+      listCustomersByEmails: async () => [{
+        id: 'bossche-brouwers',
+        bedrijf: 'Bossche Brouwers',
+        email: 'administratie@bosschebrouwers.nl',
+        campaignType: 'webdesign',
+        lastColdmailProvider: 'softora',
+      }],
+    },
+  });
+
+  const replies = await service.listReplies({ limit: 100, owner: 'serve' });
+
+  assert.equal(quotedTargets.some((target) => target.recipientEmail === 'arie@bosschebrouwers.nl'), true);
+  assert.deepEqual(replies[0].threadMessages.map((message) => message.id), ['sent:bossche-brouwers']);
+  assert.equal(
+    replies[0].threadMessages[0].threadCorrelationEvidence,
+    'exact-account-subject-quoted-body-and-recipient'
+  );
+});
+
 test('campaign reply service koppelt forwarded originals niet bij ambiguïteit of ander account', async () => {
   const originalBody = [
     'Goedendag,',
