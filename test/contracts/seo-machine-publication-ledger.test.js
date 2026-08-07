@@ -100,6 +100,12 @@ test('content refreshes have an explicit machine-readable event plan', () => {
         'substantial_refresh',
         'live',
       ],
+      [
+        '/vergelijkingen/chatbot-vs-livechat',
+        '2026-08-07',
+        'substantial_refresh',
+        'scheduled',
+      ],
     ]
   );
 });
