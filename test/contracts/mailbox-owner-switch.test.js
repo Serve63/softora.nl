@@ -41,6 +41,25 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
+test('gekozen campagne-eigenaar blijft na een refresh dezelfde servervoorkeur houden', async () => {
+  const writes = [];
+  const client = {
+    async get() { return { values: {} }; },
+    async set(scope, payload) { writes.push({ scope, payload }); },
+  };
+  await campaignInbox.initializeOwnerPreference(
+    { authenticated: true, email: 'serve@softora.nl' },
+    client,
+    'serve@softora.nl'
+  );
+  assert.equal(campaignInbox.setOwner('both'), 'both');
+  await new Promise((resolve) => setImmediate(resolve));
+  const selectionWrite = writes.find((entry) => entry.payload?.patch?.['softora_mailbox_active_owner_v1_serve@softora.nl'] === 'both');
+  assert.ok(selectionWrite);
+  assert.equal(campaignInbox.getOwner(), 'both');
+  campaignInbox.setOwner('serve');
+});
+
 test('bootstrapverversing hervat exact het actieve gesprek en ruimt een verdwenen nepthread op', async () => {
   async function runScenario(liveMessages) {
     let calls = 0;

@@ -1153,47 +1153,33 @@ window.addEventListener('keydown', (event) => {
   closeMailboxAccountMenu();
 });
 (async function initMailboxAccount() {
-  await initializeMailboxAccountPreference();
-  const intent = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.readIntent === 'function'
-    ? window.SoftoraMailboxOutreach.readIntent()
-    : {};
-  if (intent.account) activeMailboxAccount = intent.account;
-  const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
-  if (initialFolder === 'outreach') {
-    activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder);
-    setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
-    await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
-    void loadMailboxAccounts(); mailboxRefreshController?.start?.();
-    return;
+  try {
+    await initializeMailboxAccountPreference();
+    const intent = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.readIntent === 'function'
+      ? window.SoftoraMailboxOutreach.readIntent()
+      : {};
+    if (intent.account) activeMailboxAccount = intent.account;
+    const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
+    if (initialFolder === 'outreach') {
+      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder);
+      setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
+      await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
+      void loadMailboxAccounts(); mailboxRefreshController?.start?.();
+      return;
+    }
+    await loadMailboxAccounts();
+    if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
+      activeMailboxAccount = intent.account;
+    }
+    await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
+      folder: intent.folder || 'outreach',
+      keepSearch: true,
+      openLatest: !(intent.message || intent.email || intent.query),
+    }); mailboxRefreshController?.start?.();
+  } catch (error) {
+    toast(String(error?.message || 'Mailbox laden mislukt'));
+  } finally {
+    window.SoftoraMailboxBoot?.markReady?.();
   }
-  await loadMailboxAccounts();
-  if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
-    activeMailboxAccount = intent.account;
-  }
-  await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
-    folder: intent.folder || 'outreach',
-    keepSearch: true,
-    openLatest: !(intent.message || intent.email || intent.query),
-  }); mailboxRefreshController?.start?.();
 })();
-function finishPremiumShellBoot() {
-  if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-    window.SoftoraPremiumBoot.setShellBooting(false);
-    return;
-  }
-  const main = document.querySelector('main.is-premium-boot-host');
-  if (!main) return;
-  const shell = main.querySelector('.premium-boot-shell');
-  const loader = main.querySelector('.premium-boot-loader');
-  if (shell) {
-    shell.classList.remove('is-booting');
-    shell.setAttribute('aria-busy', 'false');
-  }
-  if (loader) loader.classList.add('is-hidden');
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
-} else {
-  finishPremiumShellBoot();
-}
 })();

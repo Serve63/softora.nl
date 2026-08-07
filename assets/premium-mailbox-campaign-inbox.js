@@ -6,8 +6,6 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
-  const OWNER_PIN_SCOPE = 'premium_mailbox_preferences';
-  const OWNER_PIN_KEY_PREFIX = 'softora_mailbox_pinned_owner_v1_';
   const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v16';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
@@ -26,6 +24,10 @@
   let defaultOwner = 'serve';
   let pinnedOwner = '';
   let preferenceIdentity = 'anonymous';
+  const ownerPreferenceApi = global.SoftoraMailboxOwnerPreference || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-owner-preference.js') : null
+  );
+  const ownerPreference = ownerPreferenceApi?.create?.() || null;
   const pageBootstrapConsumedOwners = new Set();
 
   function normalizeEmail(value) {
@@ -162,30 +164,17 @@
   }
 
   function getOwnerPinKeyForIdentity(identity) {
-    const normalizedIdentity = String(identity || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9@._-]+/g, '_')
-      .slice(0, 72) || 'anonymous';
-    return `${OWNER_PIN_KEY_PREFIX}${normalizedIdentity}`;
+    return ownerPreference?.getPinKey?.(identity) || '';
   }
 
   async function initializeOwnerPreference(session, uiStateClient, identity) {
     defaultOwner = resolveOwnerForSession(session);
     preferenceIdentity = String(identity || '').trim().toLowerCase() || 'anonymous';
-    pinnedOwner = '';
-    try {
-      if (uiStateClient && typeof uiStateClient.get === 'function') {
-        const payload = await uiStateClient.get(OWNER_PIN_SCOPE);
-        const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object'
-          ? payload.values
-          : {};
-        const savedOwner = values[getOwnerPinKeyForIdentity(preferenceIdentity)];
-        if (isOwner(savedOwner)) pinnedOwner = normalizeOwner(savedOwner);
-      }
-    } catch (_) {
-      pinnedOwner = '';
-    }
-    setOwner(pinnedOwner || defaultOwner);
+    const saved = ownerPreference
+      ? await ownerPreference.initialize(uiStateClient, preferenceIdentity)
+      : { pinnedOwner: '', selectedOwner: '' };
+    pinnedOwner = saved.pinnedOwner;
+    setOwner(pinnedOwner || saved.selectedOwner || defaultOwner);
     return { defaultOwner, pinnedOwner, activeOwner };
   }
 
@@ -195,19 +184,7 @@
     }
     pinnedOwner = normalizeOwner(value);
     setOwner(pinnedOwner);
-    let saved = false;
-    try {
-      if (uiStateClient && typeof uiStateClient.set === 'function') {
-        await uiStateClient.set(OWNER_PIN_SCOPE, {
-          patch: { [getOwnerPinKeyForIdentity(preferenceIdentity)]: pinnedOwner },
-          source: 'premium-mailbox',
-          actor: preferenceIdentity,
-        });
-        saved = true;
-      }
-    } catch (_) {
-      saved = false;
-    }
+    const saved = ownerPreference ? await ownerPreference.pin(pinnedOwner, uiStateClient) : false;
     return { owner: pinnedOwner, label: getOwnerLabel(pinnedOwner), saved };
   }
 
@@ -221,6 +198,7 @@
 
   function setOwner(value) {
     activeOwner = normalizeOwner(value);
+    ownerPreference?.persist?.(activeOwner);
     return activeOwner;
   }
 
