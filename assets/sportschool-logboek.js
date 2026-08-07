@@ -125,6 +125,13 @@
     return state.exerciseSources;
   }
 
+  function ensureTrainingDayCompletions(state = logbookState) {
+    state.trainingDayCompletions = logbookStateApi.normalizeTrainingDayCompletions(
+      state.trainingDayCompletions
+    );
+    return state.trainingDayCompletions;
+  }
+
   function cleanNotes(value, options = {}) {
     const text = String(value || '').trim();
     const normalized = upper(text).replace(/\s+/g, ' ');
@@ -197,7 +204,7 @@
   }
 
   function createDefaultState() {
-    const state = { version: 2, exerciseSources: {}, days: {} };
+    const state = { version: 2, exerciseSources: {}, trainingDayCompletions: {}, days: {} };
     STORAGE_DAYS.forEach((day) => {
       state.days[day] = createDefaultDayState(day, state);
     });
@@ -317,6 +324,31 @@
     if (changed) markStateChanged();
   }
 
+  function trainingDateKey(day) {
+    return logbookStateApi.trainingDateKey(storageDay(day));
+  }
+
+  function isExerciseCompleted(day, order) {
+    return logbookStateApi.isTrainingExerciseCompleted(
+      ensureTrainingDayCompletions(),
+      trainingDateKey(day),
+      order
+    );
+  }
+
+  function writeExerciseCompletion(day, order, completed) {
+    const result = logbookStateApi.updateTrainingExerciseCompletion(
+      ensureTrainingDayCompletions(),
+      trainingDateKey(day),
+      order,
+      completed
+    );
+    if (!result.changed) return false;
+    logbookState.trainingDayCompletions = result.completions;
+    markStateChanged();
+    return true;
+  }
+
   function dayTitle(day) {
     if (storageDay(day) === currentWeekday()) return 'Vandaag';
     return DAYS.find((item) => item.id === storageDay(day))?.title || 'Vandaag';
@@ -363,6 +395,7 @@
       version: 2,
       updatedAt: new Date().toISOString(),
       exerciseSources,
+      trainingDayCompletions: ensureTrainingDayCompletions(),
       days,
     };
   }
@@ -429,7 +462,14 @@
         nextDays[day].exercises[String(order)] = { exerciseKey, ...source };
       });
       if (reconciled.repaired) shouldPersistLoadedSnapshot = true;
-      logbookState = { version: 2, exerciseSources: reconciled.exerciseSources, days: nextDays };
+      logbookState = {
+        version: 2,
+        exerciseSources: reconciled.exerciseSources,
+        trainingDayCompletions: logbookStateApi.normalizeTrainingDayCompletions(
+          snapshot.trainingDayCompletions
+        ),
+        days: nextDays,
+      };
       return true;
     } finally {
       isApplyingRemoteState = false;
@@ -801,13 +841,16 @@
     deleteButton.className = 'delete-action';
     deleteButton.textContent = 'Verwijder';
     deleteButton.addEventListener('click', () => {
+      writeExerciseCompletion(day, exercise.order, false);
       saveOrders(day, readOrders(day).filter((order) => order !== exercise.order), { silent: true });
       render();
       persistRemoteSave();
     });
 
     const card = document.createElement('article');
-    card.className = 'exercise-card';
+    const completed = isExerciseCompleted(day, exercise.order);
+    card.className = `exercise-card${completed ? ' is-completed' : ''}`;
+    card.dataset.completed = String(completed);
 
     const top = document.createElement('div');
     top.className = 'exercise-top';
@@ -838,6 +881,28 @@
       createMetric(day, exercise, 'kg', 'Kg', 'decimal')
     );
 
+    const completeButton = document.createElement('button');
+    completeButton.type = 'button';
+    completeButton.className = 'exercise-complete';
+    completeButton.dataset.exerciseComplete = '';
+    const syncCompletionButton = (isCompleted) => {
+      card.classList.toggle('is-completed', isCompleted);
+      card.dataset.completed = String(isCompleted);
+      completeButton.setAttribute('aria-pressed', String(isCompleted));
+      completeButton.setAttribute(
+        'aria-label',
+        `${exercise.title} ${isCompleted ? 'als niet afgerond markeren' : 'afvinken'}`
+      );
+      completeButton.title = isCompleted ? 'Afvinken ongedaan maken' : 'Oefening afvinken';
+    };
+    syncCompletionButton(completed);
+    completeButton.addEventListener('click', () => {
+      const nextCompleted = card.dataset.completed !== 'true';
+      if (writeExerciseCompletion(day, exercise.order, nextCompleted)) {
+        syncCompletionButton(nextCompleted);
+      }
+    });
+
     const notes = document.createElement('input');
     notes.className = 'exercise-notes';
     notes.type = 'text';
@@ -850,7 +915,7 @@
       writeField(day, exercise.order, 'notes', notes.value);
     });
 
-    top.append(dragHandle, title, metricGroup);
+    top.append(dragHandle, title, metricGroup, completeButton);
     card.append(top, notes);
     swipe.append(deleteButton, card);
     bindReorder(swipe, card, dragHandle, day, exercise.order);
