@@ -761,48 +761,6 @@ const SEO_CONTENT_ITEMS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    collection: 'vergelijkingen',
-    slug: 'chatbot-vs-livechat',
-    title: 'Chatbot vs livechat: wat past beter bij je bedrijf?',
-    description:
-      'Een praktische vergelijking tussen chatbots en livechat voor bedrijven die sneller willen reageren op websitebezoekers.',
-    category: 'Chatbots',
-    intent: 'Vergelijking',
-    publishedAt: '2026-05-26',
-    updatedAt: '2026-05-26',
-    readTime: '6 min',
-    summary:
-      'Livechat is sterk voor persoonlijk contact, terwijl een chatbot vooral waarde toevoegt bij herhaalde vragen en gestructureerde intake.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Livechat werkt goed als iemand beschikbaar is',
-        paragraphs: Object.freeze([
-          'Livechat voelt persoonlijk en direct. Het werkt vooral goed wanneer je team snel kan reageren en gesprekken echt maatwerk vragen.',
-          'Het nadeel is beschikbaarheid. Als niemand reageert, verandert livechat snel in frustratie of een gemiste lead.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Een chatbot is sterk in vaste routes',
-        paragraphs: Object.freeze([
-          'Een chatbot kan altijd dezelfde basisvragen stellen, antwoorden geven en bezoekers naar de juiste vervolgroute sturen. Dat is handig voor prijzen, intake, veelgestelde vragen en leadkwalificatie.',
-          'De chatbot moet wel duidelijke grenzen hebben. Voor complexe of gevoelige vragen blijft overdracht naar een mens belangrijk.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'De beste oplossing is vaak combinatie',
-        paragraphs: Object.freeze([
-          'Veel bedrijven hebben baat bij een hybride aanpak. De chatbot vangt de eerste laag op en livechat of terugbelverzoek neemt over wanneer dat nodig is.',
-          'Zo blijft de website bereikbaar zonder dat persoonlijk contact verdwijnt.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Chatbot laten maken', href: '/chatbot-laten-maken' }),
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
-    ]),
-  }),
-  Object.freeze({
     collection: 'kennisbank',
     slug: 'wat-is-een-crm-systeem',
     title: 'Wat is een CRM systeem?',
