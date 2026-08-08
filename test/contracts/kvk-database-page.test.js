@@ -64,7 +64,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-table-frame"/);
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260805h/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260809a/);
   assert.match(shellSource, />Database verbinden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -73,7 +73,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-search"/);
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805h/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809a/);
 });
 
 test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
@@ -111,14 +111,14 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260804a/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260805h/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260809a/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260805h/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260804b/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
-test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale bedrijfsbron', () => {
+test('totaal gevonden opent de productiepagina met de volledige lokale bedrijfsbron', () => {
   const totalFound = require('../../assets/kvk-database-total-found.js');
   const scriptSource = fs.readFileSync(
     path.join(repoRoot, 'assets/kvk-database-total-found.js'),
@@ -131,7 +131,7 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
 
   assert.equal(totalFound.COMPANY_API_URL, 'http://127.0.0.1:8000/api/company-directory');
   assert.equal(totalFound.LOCAL_DATABASE_ORIGIN, 'http://127.0.0.1:8000');
-  assert.equal(totalFound.DIRECTORY_PAGE_URL, 'http://127.0.0.1:8000/kvk-database-bedrijven');
+  assert.equal(totalFound.DIRECTORY_PAGE_URL, '/kvk-database-bedrijven');
   assert.equal(totalFound.PAGE_SIZE, 100);
   assert.equal(totalFound.AUTO_CONNECT_TIMEOUT_MS, 8000);
   assert.equal(totalFound.USER_CONNECT_TIMEOUT_MS, 30000);
@@ -166,20 +166,15 @@ test('totaal gevonden navigeert naar een aparte pagina met de volledige lokale b
   totalFound.navigateToDirectory({
     top: { location: { assign(url) { assignedUrl = url; } } },
   });
-  assert.equal(assignedUrl, 'http://127.0.0.1:8000/kvk-database-bedrijven');
+  assert.equal(assignedUrl, '/kvk-database-bedrijven');
   assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: '127.0.0.1' } }), true);
   assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: 'localhost' } }), true);
   assert.equal(totalFound.isLocalDirectoryRuntime({ location: { hostname: 'www.softora.nl' } }), false);
 
-  let redirectedFromPublicPage = '';
-  const publicMount = totalFound.mountDirectory({
-    location: {
-      hostname: 'www.softora.nl',
-      assign(url) { redirectedFromPublicPage = url; },
-    },
-  });
-  assert.deepEqual(publicMount, { redirected: true });
-  assert.equal(redirectedFromPublicPage, 'http://127.0.0.1:8000/kvk-database-bedrijven');
+  assert.doesNotMatch(
+    scriptSource,
+    /if \(!isLocalDirectoryRuntime\(browserWindow\)\) \{[\s\S]*navigateToDirectory\(browserWindow\)/
+  );
 
   const untreatedHtml = totalFound.companyRowHtml({
     bedrijfsnaam: 'Nog te doen B.V.',
