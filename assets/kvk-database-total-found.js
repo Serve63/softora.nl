@@ -14,7 +14,7 @@
 
   const LOCAL_DATABASE_ORIGIN = 'http://127.0.0.1:8000';
   const COMPANY_API_URL = `${LOCAL_DATABASE_ORIGIN}/api/company-directory`;
-  const DIRECTORY_PAGE_URL = `${LOCAL_DATABASE_ORIGIN}/kvk-database-bedrijven`;
+  const DIRECTORY_PAGE_URL = '/kvk-database-bedrijven';
   const PAGE_SIZE = 100;
   const AUTO_CONNECT_TIMEOUT_MS = 8000;
   const USER_CONNECT_TIMEOUT_MS = 30000;
@@ -168,10 +168,6 @@
   }
 
   function mountDirectory(browserWindow) {
-    if (!isLocalDirectoryRuntime(browserWindow)) {
-      navigateToDirectory(browserWindow);
-      return { redirected: true };
-    }
     const document = browserWindow?.document;
     const page = document?.getElementById('company-directory');
     const frame = document?.getElementById('company-directory-table-frame');
